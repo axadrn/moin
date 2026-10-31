@@ -1,0 +1,44 @@
+name: ops deploy
+description: Deploy with ops from GitHub Actions, the repo or an image built in CI.
+branding:
+  icon: upload-cloud
+  color: gray-dark
+inputs:
+  url:
+    description: The control plane URL.
+    required: true
+  token:
+    description: A personal API token with write access. Store it as a secret.
+    required: true
+  app:
+    description: The app to deploy. Default x-ops.app in compose.yml or the repo name.
+    required: false
+  image:
+    description: Deploy this image, built and pushed earlier in the job, instead of the repo.
+    required: false
+  dir:
+    description: The directory to deploy.
+    required: false
+    default: .
+runs:
+  using: composite
+  steps:
+    - name: Install ops
+      shell: bash
+      run: |
+        case "$(uname -m)" in x86_64) arch=amd64 ;; aarch64 | arm64) arch=arm64 ;; esac
+        curl -fsSL "${{ inputs.url }}/download/ops-linux-$arch" -o "$RUNNER_TEMP/ops"
+        chmod 755 "$RUNNER_TEMP/ops"
+    - name: Deploy
+      shell: bash
+      env:
+        OPS_URL: ${{ inputs.url }}
+        OPS_TOKEN: ${{ inputs.token }}
+        APP: ${{ inputs.app }}
+        IMAGE: ${{ inputs.image }}
+        DIR: ${{ inputs.dir }}
+      run: |
+        args=(deploy --dir "$DIR")
+        [ -n "$IMAGE" ] && args+=(--image "$IMAGE")
+        [ -n "$APP" ] && args+=("$APP")
+        "$RUNNER_TEMP/ops" "${args[@]}"

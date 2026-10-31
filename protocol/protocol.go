@@ -155,6 +155,9 @@ type DeployStart struct {
 	Registry   *Registry         `json:"registry,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
 	Routing    *Routing          `json:"routing,omitempty"`
+	// Snapshot takes a snapshot of the app's databases before the new
+	// release starts, when backups are set up.
+	Snapshot bool `json:"snapshot,omitempty"`
 }
 
 // Routing is how visitors reach the main service, as set in web, CLI, TUI

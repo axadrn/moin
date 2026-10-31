@@ -209,7 +209,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	saveJSON(filepath.Join(release, "detected.json"), detected)
 
 	previous := a.current(start.App)
-	if a.backups != nil && previous > 0 {
+	if a.backups != nil && previous > 0 && start.Snapshot {
 		err = a.backups.snapshotBefore(ctx, start.App, fmt.Sprintf("before-v%d", start.Number), logf)
 		if err != nil {
 			return detected, err
@@ -720,11 +720,11 @@ func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *pro
 	return found, nil
 }
 
-// sqliteFiles returns the files under dir, three levels deep, that start
-// with the SQLite header.
+// sqliteFiles returns the files under dir, three levels deep, that are
+// SQLite databases: the magic string and a valid page size in the 100 byte
+// header.
 func sqliteFiles(dir string) []string {
 	files := []string{}
-	header := []byte("SQLite format 3\x00")
 	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -735,21 +735,28 @@ func sqliteFiles(dir string) []string {
 			}
 			return nil
 		}
-		if !entry.Type().IsRegular() {
-			return nil
-		}
-		file, err := os.Open(path)
-		if err != nil {
-			return nil
-		}
-		defer file.Close()
-		start := make([]byte, len(header))
-		if _, err := io.ReadFull(file, start); err == nil && bytes.Equal(start, header) {
+		if entry.Type().IsRegular() && isSQLite(path) {
 			files = append(files, path)
 		}
 		return nil
 	})
 	return files
+}
+
+func isSQLite(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	header := make([]byte, 100)
+	_, err = io.ReadFull(file, header)
+	if err != nil || !bytes.Equal(header[:16], []byte("SQLite format 3\x00")) {
+		return false
+	}
+	// The page size is a power of two from 512 to 32768, or 1 for 65536.
+	size := int(header[16])<<8 | int(header[17])
+	return size == 1 || (size >= 512 && size <= 32768 && size&(size-1) == 0)
 }
 
 var imagePattern = regexp.MustCompile(`"image": "([^"]+)"`)

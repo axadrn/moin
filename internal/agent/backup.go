@@ -105,15 +105,17 @@ func (b *backups) stopLocked() {
 }
 
 // reconcile replicates the databases of the running releases: new ones
-// start, gone ones stop. Deploys and restores call it.
+// start, gone ones stop. Deploys and restores call it. A database that is
+// slow to open never holds up the others or a backup request.
 func (b *backups) reconcile() {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	b.reconcileLocked()
+	b.mu.Unlock()
 }
 
 func (b *backups) reconcileLocked() {
-	if b.store == nil {
+	store := b.store
+	if store == nil {
 		return
 	}
 	want := map[string]watched{}
@@ -125,7 +127,7 @@ func (b *backups) reconcileLocked() {
 	}
 	for hostPath := range b.watched {
 		if _, ok := want[hostPath]; !ok {
-			_ = b.store.UnregisterDB(context.Background(), hostPath)
+			go store.UnregisterDB(context.Background(), hostPath)
 			delete(b.watched, hostPath)
 		}
 	}
@@ -133,17 +135,23 @@ func (b *backups) reconcileLocked() {
 		if _, ok := b.watched[hostPath]; ok {
 			continue
 		}
-		db := litestream.NewDB(hostPath)
-		client := b.replicaClient(item.app, item.database.Path)
-		replica := litestream.NewReplicaWithClient(db, client)
-		db.Replica = replica
-		err := b.store.RegisterDB(db)
-		if err != nil {
-			slog.Error("backup: replicate failed", "app", item.app, "database", item.database.Path, "error", err)
-			continue
-		}
 		b.watched[hostPath] = item
-		matchOwner(hostPath)
+		db := litestream.NewDB(hostPath)
+		replica := litestream.NewReplicaWithClient(db, b.replicaClient(item.app, item.database.Path))
+		db.Replica = replica
+		go func() {
+			err := store.RegisterDB(db)
+			if err != nil {
+				slog.Error("backup: replicate failed", "app", item.app, "database", item.database.Path, "error", err)
+				b.mu.Lock()
+				if b.store == store {
+					delete(b.watched, hostPath)
+				}
+				b.mu.Unlock()
+				return
+			}
+			matchOwner(hostPath)
+		}()
 	}
 }
 
