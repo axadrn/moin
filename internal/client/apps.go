@@ -1,10 +1,12 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -92,27 +94,33 @@ func (c *Client) RemoveApp(ctx context.Context, app string) error {
 }
 
 // Deploy uploads a gzipped source tarball and starts a deploy.
-func (c *Client) Deploy(ctx context.Context, app string, source io.Reader) (Deploy, error) {
-	return c.deploySource(ctx, appPath(app, "deploys"), source)
-}
-
-func (c *Client) deploySource(ctx context.Context, path string, source io.Reader) (Deploy, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+path, source)
+func (c *Client) Deploy(ctx context.Context, app string, source []byte) (Deploy, error) {
+	var upload struct {
+		Upload string `json:"upload"`
+		URL    string `json:"url"`
+	}
+	err := c.do(ctx, http.MethodPost, appPath(app, "uploads"), map[string]any{}, &upload)
 	if err != nil {
 		return Deploy{}, err
 	}
-	request.Header.Set("Authorization", "Bearer "+c.token)
-	request.Header.Set("Content-Type", "application/gzip")
+	// The source goes straight into the user's bucket; ops only signed the
+	// link.
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, upload.URL, bytes.NewReader(source))
+	if err != nil {
+		return Deploy{}, err
+	}
+	request.ContentLength = int64(len(source))
 	response, err := c.http.Do(request)
 	if err != nil {
-		return Deploy{}, err
+		return Deploy{}, fmt.Errorf("upload to your bucket: %w", err)
 	}
-	defer response.Body.Close()
+	response.Body.Close()
 	if response.StatusCode >= 300 {
-		return Deploy{}, responseError(response)
+		return Deploy{}, fmt.Errorf("upload to your bucket: %s", response.Status)
 	}
+	sum := sha256.Sum256(source)
 	var deploy Deploy
-	err = json.NewDecoder(response.Body).Decode(&deploy)
+	err = c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"upload": upload.Upload, "sha256": hex.EncodeToString(sum[:])}, &deploy)
 	return deploy, err
 }
 
@@ -230,11 +238,6 @@ func (c *Client) DeployRef(ctx context.Context, app, ref string) (Deploy, error)
 	var response Deploy
 	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"ref": ref}, &response)
 	return response, err
-}
-
-// DeploySourceWithImage uploads a source tarball whose main service runs image.
-func (c *Client) DeploySourceWithImage(ctx context.Context, app, image string, source io.Reader) (Deploy, error) {
-	return c.deploySource(ctx, appPath(app, "deploys")+"?image="+url.QueryEscape(image), source)
 }
 
 // RotateDeployHook gives the app a new deploy hook URL; the old one stops working.

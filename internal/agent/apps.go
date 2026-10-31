@@ -144,10 +144,15 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		var config map[string]any
 		var running map[string]string
 		pull := start.Image != ""
-		if start.SourceURL != "" {
+		if start.SourceURL != "" || start.SourceNumber > 0 {
 			src := filepath.Join(release, "src")
-			logf("downloading the source")
-			err = download(ctx, start.SourceURL, start.SHA256, src)
+			if start.SourceURL != "" {
+				logf("downloading the source")
+				err = download(ctx, start, src)
+			} else {
+				logf("building the source of v%d again", start.SourceNumber)
+				err = a.copySource(ctx, start.App, start.SourceNumber, src)
+			}
 			if err != nil {
 				return detected, err
 			}
@@ -193,7 +198,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			if err != nil {
 				return detected, fmt.Errorf("pull: %w", err)
 			}
-		} else if start.SourceURL != "" {
+		} else if start.SourceURL != "" || start.SourceNumber > 0 {
 			logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
 		} else {
 			logf("applying env and routing to the running images")
@@ -461,6 +466,19 @@ func builds(config map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// copySource copies the source a release kept into a new release.
+func (a *apps) copySource(ctx context.Context, app string, number int, target string) error {
+	source := filepath.Join(a.releaseDir(app, number), "src")
+	if _, err := os.Stat(source); err != nil {
+		return fmt.Errorf("the source of v%d is no longer on the server: deploy again with ops deploy", number)
+	}
+	output, err := exec.CommandContext(ctx, "cp", "-a", source, target).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("copy the source of v%d: %s", number, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // pull fetches the main service's image. A registry login goes into a
@@ -878,10 +896,13 @@ func (a *apps) output(ctx context.Context, name string, args ...string) (string,
 }
 
 // download fetches the source tarball, checks its SHA-256 and unpacks it into dir.
-func download(ctx context.Context, url, sum, dir string) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func download(ctx context.Context, start protocol.DeployStart, dir string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, start.SourceURL, nil)
 	if err != nil {
 		return err
+	}
+	if start.SourceAuthorization != "" {
+		request.Header.Set("Authorization", start.SourceAuthorization)
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -899,15 +920,30 @@ func download(ctx context.Context, url, sum, dir string) error {
 		return errors.New("download: the source is larger than 200 MB")
 	}
 	got := sha256.Sum256(body)
-	if hex.EncodeToString(got[:]) != sum {
+	if start.SHA256 != "" && hex.EncodeToString(got[:]) != start.SHA256 {
 		return errors.New("download: the source does not match its SHA-256")
 	}
-	return unpack(bytes.NewReader(body), dir)
+	err = unpack(bytes.NewReader(body), dir, start.SourceStripTop)
+	if err != nil {
+		return err
+	}
+	if start.SourceDeleteURL != "" {
+		// The server keeps the source now; the bucket does not need it.
+		deletion, err := http.NewRequestWithContext(ctx, http.MethodDelete, start.SourceDeleteURL, nil)
+		if err == nil {
+			response, err := http.DefaultClient.Do(deletion)
+			if err == nil {
+				response.Body.Close()
+			}
+		}
+	}
+	return nil
 }
 
 // unpack extracts a gzipped tar of regular files and directories into dir.
-// Links and paths that leave dir are refused.
-func unpack(source io.Reader, dir string) error {
+// Links and paths that leave dir are refused. stripTop drops the first
+// folder of every path, which GitHub wraps a repo in.
+func unpack(source io.Reader, dir string, stripTop bool) error {
 	archive, err := gzip.NewReader(source)
 	if err != nil {
 		return fmt.Errorf("unpack: %w", err)
@@ -921,7 +957,14 @@ func unpack(source io.Reader, dir string) error {
 		if err != nil {
 			return fmt.Errorf("unpack: %w", err)
 		}
-		target := filepath.Join(dir, filepath.FromSlash(header.Name))
+		name := header.Name
+		if stripTop {
+			_, name, _ = strings.Cut(name, "/")
+			if name == "" || header.Typeflag == tar.TypeXGlobalHeader {
+				continue
+			}
+		}
+		target := filepath.Join(dir, filepath.FromSlash(name))
 		if !within(dir, target) {
 			return fmt.Errorf("unpack: %s leaves the source directory", header.Name)
 		}

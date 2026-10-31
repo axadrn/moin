@@ -33,7 +33,7 @@ func tarball(t *testing.T, files map[string]string) []byte {
 func TestUnpackRefusesPathsOutsideTheSource(t *testing.T) {
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/evil"} {
 		dir := t.TempDir()
-		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"))
+		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"), false)
 		if name == "/etc/evil" {
 			// An absolute name lands inside the source directory.
 			if _, statErr := os.Stat(filepath.Join(dir, "src", "etc", "evil")); err != nil || statErr != nil {

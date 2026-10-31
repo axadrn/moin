@@ -307,6 +307,10 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 	case "add":
 		name := strings.Join(args[1:], " ")
 		created, err := api.AddServer(ctx, name)
+		var apiErr *client.Error
+		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
+			return fmt.Errorf("adding servers needs the ops plan: subscribe at %s/app/billing", config.URL)
+		}
 		if err != nil {
 			return err
 		}

@@ -151,8 +151,12 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	if files == 1 {
 		noun = "file"
 	}
-	step(stdout, "Uploading %d %s %s", files, noun, style.Muted.Render("("+size(source.Len())+")"))
-	started, err := api.Deploy(ctx, name, &source)
+	step(stdout, "Uploading %d %s to your bucket %s", files, noun, style.Muted.Render("("+size(source.Len())+")"))
+	started, err := api.Deploy(ctx, name, source.Bytes())
+	var apiErr *client.Error
+	if errors.As(err, &apiErr) && apiErr.Code == "no_bucket" {
+		return fmt.Errorf("ops deploy puts your code into your own bucket, never on ours: add one with %s backups bucket set, or deploy from GitHub with %s deploy --ref main", build.Name, build.Name)
+	}
 	if err != nil {
 		return err
 	}

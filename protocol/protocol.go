@@ -145,16 +145,26 @@ type RegisterResponse struct {
 // the deploy applies env and routing to the running release, without a
 // build.
 type DeployStart struct {
-	DeployID   string            `json:"deploy_id"`
-	App        string            `json:"app"`
-	Number     int               `json:"number"`
-	SourceURL  string            `json:"source_url,omitempty"`
-	SHA256     string            `json:"sha256,omitempty"`
-	FromNumber int               `json:"from_number,omitempty"`
-	Image      string            `json:"image,omitempty"`
-	Registry   *Registry         `json:"registry,omitempty"`
-	Env        map[string]string `json:"env,omitempty"`
-	Routing    *Routing          `json:"routing,omitempty"`
+	DeployID  string `json:"deploy_id"`
+	App       string `json:"app"`
+	Number    int    `json:"number"`
+	SourceURL string `json:"source_url,omitempty"`
+	// SourceAuthorization is sent with the download, such as a GitHub
+	// token; SourceStripTop drops the one folder GitHub wraps a repo in.
+	// SourceDeleteURL deletes the source from the user's bucket once it is
+	// downloaded. The control plane never holds the source itself.
+	SourceAuthorization string `json:"source_authorization,omitempty"`
+	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
+	SourceDeleteURL     string `json:"source_delete_url,omitempty"`
+	// SourceNumber builds the source the server kept of release n again,
+	// for a redeploy; nothing is downloaded.
+	SourceNumber int               `json:"source_number,omitempty"`
+	SHA256       string            `json:"sha256,omitempty"`
+	FromNumber   int               `json:"from_number,omitempty"`
+	Image        string            `json:"image,omitempty"`
+	Registry     *Registry         `json:"registry,omitempty"`
+	Env          map[string]string `json:"env,omitempty"`
+	Routing      *Routing          `json:"routing,omitempty"`
 	// Snapshot takes a snapshot of the app's databases before the new
 	// release starts, when backups are set up.
 	Snapshot bool `json:"snapshot,omitempty"`

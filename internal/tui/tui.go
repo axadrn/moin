@@ -629,7 +629,7 @@ func (m model) deploy() tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		started, err := m.api.Deploy(m.ctx, name, &source)
+		started, err := m.api.Deploy(m.ctx, name, source.Bytes())
 		if client.IsNotFound(err) {
 			return errMsg{fmt.Errorf("no app %s yet: run `%s deploy` in %s once", name, build.Name, m.dir)}
 		}
