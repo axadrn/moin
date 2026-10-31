@@ -26,12 +26,27 @@ const usage = `Usage: ops [command]
 
 Without a command, ops opens the terminal UI.
 
+Commands that work on an app take it from --app, from x-ops.app in
+compose.yml, or from the name of the current directory.
+
 Commands:
   login            Sign in with a personal API token
   logout           Forget the token on this machine
   servers          List servers
   servers add      Add a server and print its install command
   servers rm       Remove a server
+  apps             List apps
+  apps add         Add an app: apps add --server <server> <name>
+  apps rm          Remove an app; its data stays on the server
+  deploy           Deploy this directory: deploy [--server <server>] [app]
+  rollback         Start an earlier release again: rollback [v<number>]
+  redeploy         Build the newest source again with the current env
+  logs             Show the last lines of the app: logs [--tail 200] [app]
+  env              List env vars: env [--show]
+  env set          Set env vars: env set KEY=value ...
+  env rm           Remove env vars: env rm KEY ...
+  env pull         Write the env vars to .env
+  run              Run a command with the env vars: run -- go run .
   agent register   Connect this server with an install token
   agent            Run the agent on this server
   version          Show the version
@@ -77,6 +92,20 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return nil
 	case "servers":
 		return servers(ctx, rest, stdout)
+	case "apps":
+		return apps(ctx, rest, stdout)
+	case "deploy":
+		return deploy(ctx, rest, stdout)
+	case "rollback":
+		return rollback(ctx, rest, stdout)
+	case "redeploy":
+		return redeploy(ctx, rest, stdout)
+	case "logs":
+		return logs(ctx, rest, stdout)
+	case "env":
+		return env(ctx, rest, stdout)
+	case "run":
+		return runWithEnv(ctx, rest, stdin, stdout)
 	case "agent":
 		return agentCommand(ctx, rest, stdout)
 	}
@@ -92,7 +121,11 @@ func openTUI(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return tui.Run(ctx, api, config.URL)
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	return tui.Run(ctx, api, config.URL, dir)
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -237,5 +270,5 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return agent.Run(ctx, state)
+	return agent.Run(ctx, dir, state)
 }

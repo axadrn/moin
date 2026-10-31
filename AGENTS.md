@@ -9,7 +9,8 @@ closed goes here: no control plane code, no secrets, no customer data.
 - One binary. `ops` is the TUI, `ops <command>` the CLI, `ops agent` the agent.
 - The agent only dials out. Never add a listener for ops.
 - Clients (CLI, TUI) only call the control plane API (`/api/v1`) and its SSE streams. They never talk to an agent.
-- Every feature works the same in web, CLI and TUI. A slice is done when all three work end to end.
+- Every feature works in all surfaces: web UI, CLI, TUI, the control plane API and an MCP tool. A feature is done when each one works end to end.
+- Every feature is documented: the control plane docs (`ops-cloud/content/docs`) and `README.md` here. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands.
 - `protocol` is the contract with the control plane. Change it in a way old agents keep working, or bump `protocol.Version`.
 - The product name lives only in `internal/build.Name`.
 - Words: control plane, agent, server, app, deploy, backup. Not "node" or "host".

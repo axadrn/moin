@@ -1,0 +1,795 @@
+package agent
+
+import (
+	"archive/tar"
+	"bufio"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/axadrn/ops/protocol"
+)
+
+// Every app lives in <state dir>/apps/<app>:
+//
+//	releases/<n>/src           the source of deploy n
+//	releases/<n>/compose.json  the resolved compose project ops runs, 0600
+//	current                    the number of the running release
+//	volumes/                   bind mounts that are not part of the repo
+//
+// compose.json is the user's compose.yml after `docker compose config`, with
+// image tags per release, the env and the data mounts filled in. Starting an
+// old compose.json again is a rollback: same images, same env.
+const (
+	keepReleases  = 5
+	maxSourceSize = 200 << 20
+	waitTimeout   = 120 * time.Second
+	healthTimeout = 30 * time.Second
+)
+
+var appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+// apps runs the deploys, logs and removals the control plane asks for.
+type apps struct {
+	dir  string
+	send func(protocol.MessageType, string, any)
+
+	mu    sync.Mutex
+	locks map[string]*sync.Mutex
+}
+
+func newApps(dir string, send func(protocol.MessageType, string, any)) *apps {
+	return &apps{dir: filepath.Join(dir, "apps"), send: send, locks: map[string]*sync.Mutex{}}
+}
+
+// lock serializes everything that touches one app.
+func (a *apps) lock(app string) func() {
+	a.mu.Lock()
+	lock := a.locks[app]
+	if lock == nil {
+		lock = &sync.Mutex{}
+		a.locks[app] = lock
+	}
+	a.mu.Unlock()
+	lock.Lock()
+	return lock.Unlock
+}
+
+func project(app string) string { return "ops-" + app }
+
+func (a *apps) appDir(app string) string { return filepath.Join(a.dir, app) }
+
+func (a *apps) releaseDir(app string, number int) string {
+	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
+}
+
+func (a *apps) current(app string) int {
+	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "current"))
+	number, _ := strconv.Atoi(strings.TrimSpace(string(body)))
+	return number
+}
+
+// deploy runs one deploy and always ends with deploy.done.
+func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
+	logf := func(format string, args ...any) {
+		a.send(protocol.TypeDeployLog, "", protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
+	}
+	done := protocol.DeployDone{DeployID: start.DeployID}
+	detected, err := a.runDeploy(ctx, start, logf)
+	done.Detected = detected
+	if err != nil {
+		done.Error = err.Error()
+		logf("deploy failed: %s", err)
+	} else {
+		done.OK = true
+		logf("v%d is live", start.Number)
+	}
+	a.send(protocol.TypeDeployDone, "", done)
+}
+
+func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
+	var detected protocol.Detected
+	if !appNamePattern.MatchString(start.App) || start.Number < 1 {
+		return detected, errors.New("invalid app name or deploy number")
+	}
+	defer a.lock(start.App)()
+
+	release := a.releaseDir(start.App, start.Number)
+	_ = os.RemoveAll(release)
+	err := os.MkdirAll(release, 0o700)
+	if err != nil {
+		return detected, err
+	}
+	composeFile := filepath.Join(release, "compose.json")
+
+	if start.FromNumber > 0 {
+		logf("rolling back to v%d", start.FromNumber)
+		body, err := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "compose.json"))
+		if err != nil {
+			return detected, fmt.Errorf("v%d is no longer on the server", start.FromNumber)
+		}
+		detectedBody, _ := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "detected.json"))
+		_ = json.Unmarshal(detectedBody, &detected)
+		err = os.WriteFile(composeFile, body, 0o600)
+		if err != nil {
+			return detected, err
+		}
+	} else {
+		src := filepath.Join(release, "src")
+		logf("downloading the source")
+		err = download(ctx, start.SourceURL, start.SHA256, src)
+		if err != nil {
+			return detected, err
+		}
+		detected, err = a.prepare(ctx, start, src, composeFile)
+		if err != nil {
+			return detected, err
+		}
+		logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
+		logf("building")
+		err = a.compose(ctx, start.App, composeFile, logf, "build")
+		if err != nil {
+			return detected, fmt.Errorf("build: %w", err)
+		}
+	}
+	saveJSON(filepath.Join(release, "detected.json"), detected)
+
+	previous := a.current(start.App)
+	logf("starting")
+	err = a.start(ctx, start.App, composeFile, detected, logf)
+	if err != nil {
+		if previous > 0 && previous != start.Number {
+			logf("starting v%d again", previous)
+			rollbackErr := a.compose(ctx, start.App, filepath.Join(a.releaseDir(start.App, previous), "compose.json"), logf, "up", "-d", "--remove-orphans")
+			if rollbackErr == nil {
+				return detected, fmt.Errorf("%w; v%d is running again", err, previous)
+			}
+		}
+		return detected, err
+	}
+	err = os.WriteFile(filepath.Join(a.appDir(start.App), "current"), []byte(strconv.Itoa(start.Number)), 0o600)
+	if err != nil {
+		return detected, err
+	}
+	databases, err := a.databases(ctx, composeFile, detected.Config)
+	if err == nil {
+		detected.Databases = databases
+		saveJSON(filepath.Join(release, "detected.json"), detected)
+	}
+	for _, database := range detected.Databases {
+		logf("database %s (%s)", database.Path, database.HostPath)
+	}
+	a.prune(ctx, start.App)
+	return detected, nil
+}
+
+// start brings the release up and checks that it stays up.
+func (a *apps) start(ctx context.Context, app, composeFile string, detected protocol.Detected, logf func(string, ...any)) error {
+	err := a.compose(ctx, app, composeFile, logf, "up", "-d", "--remove-orphans", "--wait", "--wait-timeout", strconv.Itoa(int(waitTimeout.Seconds())))
+	if err != nil {
+		return fmt.Errorf("start: %w", err)
+	}
+	// A process that crashes right after starting passes --wait without a
+	// healthcheck. Give it a moment.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(3 * time.Second):
+	}
+	running, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
+	if err != nil || strings.TrimSpace(running) == "" {
+		return fmt.Errorf("service %s stopped right after it started; see ops logs", detected.Service)
+	}
+	if detected.Config == nil || detected.Config.Health == "" {
+		return nil
+	}
+	return a.checkHealth(ctx, strings.Fields(running)[0], detected.Port, detected.Config.Health, logf)
+}
+
+// checkHealth calls the health path on the container until it answers below 500.
+func (a *apps) checkHealth(ctx context.Context, container string, port int, path string, logf func(string, ...any)) error {
+	address, err := a.output(ctx, "docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", container)
+	ips := strings.Fields(address)
+	if err != nil || len(ips) == 0 {
+		return errors.New("health check: the container has no IP address")
+	}
+	url := fmt.Sprintf("http://%s:%d/%s", ips[0], port, strings.TrimPrefix(path, "/"))
+	logf("health check %s", url)
+	client := http.Client{Timeout: 3 * time.Second}
+	deadline := time.Now().Add(healthTimeout)
+	var last string
+	for time.Now().Before(deadline) {
+		response, err := client.Get(url)
+		if err == nil {
+			response.Body.Close()
+			if response.StatusCode < 500 {
+				return nil
+			}
+			last = response.Status
+		} else {
+			last = err.Error()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+	return fmt.Errorf("health check %s failed: %s", path, last)
+}
+
+// prepare writes compose.json for a new release and reports what it found.
+func (a *apps) prepare(ctx context.Context, start protocol.DeployStart, src, composeFile string) (protocol.Detected, error) {
+	detected := protocol.Detected{Kind: "compose"}
+	if composePath(src) == "" {
+		var err error
+		detected.Kind, err = generate(src)
+		if err != nil {
+			return detected, err
+		}
+	}
+	raw, err := a.output(ctx, "docker", "compose", "-p", project(start.App), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
+	if err != nil {
+		return detected, fmt.Errorf("compose.yml: %w", err)
+	}
+	var config map[string]any
+	err = json.Unmarshal([]byte(raw), &config)
+	if err != nil {
+		return detected, fmt.Errorf("compose config: %w", err)
+	}
+	services, _ := config["services"].(map[string]any)
+	if len(services) == 0 {
+		return detected, errors.New("compose.yml has no services")
+	}
+	if block, ok := config["x-ops"]; ok {
+		detected.Config = &protocol.Config{}
+		body, _ := json.Marshal(block)
+		err = json.Unmarshal(body, detected.Config)
+		if err != nil {
+			return detected, fmt.Errorf("x-ops: %w", err)
+		}
+	}
+	detected.Service = mainService(services, detected.Config)
+	if detected.Service == "" {
+		return detected, errors.New("cannot tell which service gets the traffic: set x-ops.service")
+	}
+	detected.Port = mainPort(src, services[detected.Service], detected.Config)
+
+	volumesDir := filepath.Join(a.appDir(start.App), "volumes")
+	names := []string{}
+	for name := range services {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		service, _ := services[name].(map[string]any)
+		if service["build"] != nil {
+			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, start.Number)
+			environment, _ := service["environment"].(map[string]any)
+			if environment == nil {
+				environment = map[string]any{}
+			}
+			for key, value := range start.Env {
+				environment[key] = strings.ReplaceAll(value, "$", "$$")
+			}
+			service["environment"] = environment
+		}
+		if service["restart"] == nil {
+			service["restart"] = "unless-stopped"
+		}
+		mounts, _ := service["volumes"].([]any)
+		for _, item := range mounts {
+			mount, _ := item.(map[string]any)
+			source, _ := mount["source"].(string)
+			if mount["type"] != "bind" || !within(src, source) {
+				continue
+			}
+			// A path the repo brings is code or config and stays in the
+			// release. One it does not bring is data and must outlive it.
+			if _, err := os.Lstat(source); err == nil {
+				continue
+			}
+			relative, _ := filepath.Rel(src, source)
+			stable := filepath.Join(volumesDir, relative)
+			err = os.MkdirAll(stable, 0o755)
+			if err != nil {
+				return detected, err
+			}
+			mount["source"] = stable
+		}
+	}
+	body, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return detected, err
+	}
+	err = os.WriteFile(composeFile, body, 0o600)
+	if err != nil {
+		return detected, err
+	}
+	_, err = a.databases(ctx, composeFile, detected.Config)
+	return detected, err
+}
+
+func composePath(src string) string {
+	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
+		path := filepath.Join(src, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+// generate writes what a repo without compose.yml needs: a compose.yml with
+// one service and, for a Go module without Dockerfile, the Dockerfile too.
+func generate(src string) (string, error) {
+	kind := "dockerfile"
+	if _, err := os.Stat(filepath.Join(src, "Dockerfile")); err != nil {
+		goMod, err := os.ReadFile(filepath.Join(src, "go.mod"))
+		if err != nil {
+			return "", errors.New("found no compose.yml, Dockerfile or go.mod")
+		}
+		kind = "go"
+		err = os.WriteFile(filepath.Join(src, "Dockerfile"), []byte(goDockerfile(src, goMod)), 0o644)
+		if err != nil {
+			return "", err
+		}
+	}
+	port := exposedPort(src)
+	if port == 0 {
+		port = 8080
+	}
+	compose := fmt.Sprintf(`services:
+  web:
+    build: .
+    environment:
+      PORT: "%d"
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+`, port)
+	return kind, os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644)
+}
+
+var goVersionPattern = regexp.MustCompile(`(?m)^go (\d+\.\d+)`)
+
+func goDockerfile(src string, goMod []byte) string {
+	version := "1"
+	if match := goVersionPattern.FindSubmatch(goMod); match != nil {
+		version = string(match[1])
+	}
+	return fmt.Sprintf(`# Written by ops. Commit your own Dockerfile to change it.
+FROM golang:%s-bookworm AS build
+WORKDIR /src
+COPY go.* ./
+RUN go mod download
+COPY . .
+RUN go build -o /app %s
+
+FROM debian:bookworm-slim
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /app /app
+ENV PORT=8080
+EXPOSE 8080
+CMD ["/app"]
+`, version, mainPackage(src))
+}
+
+// mainPackage finds the package to build: the module root, cmd/server, or
+// the only directory under cmd.
+func mainPackage(src string) string {
+	if isMain(src) {
+		return "."
+	}
+	if isMain(filepath.Join(src, "cmd", "server")) {
+		return "./cmd/server"
+	}
+	entries, _ := os.ReadDir(filepath.Join(src, "cmd"))
+	mains := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() && isMain(filepath.Join(src, "cmd", entry.Name())) {
+			mains = append(mains, "./cmd/"+entry.Name())
+		}
+	}
+	if len(mains) == 1 {
+		return mains[0]
+	}
+	return "."
+}
+
+var packageMainPattern = regexp.MustCompile(`(?m)^package main\b`)
+
+func isMain(dir string) bool {
+	files, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+	for _, file := range files {
+		body, err := os.ReadFile(file)
+		if err == nil && packageMainPattern.Match(body) {
+			return true
+		}
+	}
+	return false
+}
+
+var exposePattern = regexp.MustCompile(`(?mi)^\s*EXPOSE\s+(\d+)`)
+
+func exposedPort(src string) int {
+	body, err := os.ReadFile(filepath.Join(src, "Dockerfile"))
+	if err != nil {
+		return 0
+	}
+	match := exposePattern.FindSubmatch(body)
+	if match == nil {
+		return 0
+	}
+	port, _ := strconv.Atoi(string(match[1]))
+	return port
+}
+
+// mainService is the service that gets the traffic: the one x-ops names, the
+// only one, or the only one ops builds.
+func mainService(services map[string]any, config *protocol.Config) string {
+	if config != nil && config.Service != "" {
+		if _, ok := services[config.Service]; ok {
+			return config.Service
+		}
+		return ""
+	}
+	if len(services) == 1 {
+		for name := range services {
+			return name
+		}
+	}
+	built := []string{}
+	for name, service := range services {
+		if fields, _ := service.(map[string]any); fields["build"] != nil {
+			built = append(built, name)
+		}
+	}
+	if len(built) == 1 {
+		return built[0]
+	}
+	if _, ok := services["web"]; ok {
+		return "web"
+	}
+	return ""
+}
+
+// mainPort is the port the service listens on inside its container.
+func mainPort(src string, service any, config *protocol.Config) int {
+	if config != nil && config.Port > 0 {
+		return config.Port
+	}
+	fields, _ := service.(map[string]any)
+	if ports, _ := fields["ports"].([]any); len(ports) > 0 {
+		if port, _ := ports[0].(map[string]any); port != nil {
+			if target, ok := port["target"].(float64); ok {
+				return int(target)
+			}
+		}
+	}
+	if expose, _ := fields["expose"].([]any); len(expose) > 0 {
+		port, _ := strconv.Atoi(strings.Split(fmt.Sprint(expose[0]), "/")[0])
+		if port > 0 {
+			return port
+		}
+	}
+	if environment, _ := fields["environment"].(map[string]any); environment != nil {
+		if port, err := strconv.Atoi(fmt.Sprint(environment["PORT"])); err == nil && port > 0 {
+			return port
+		}
+	}
+	if port := exposedPort(src); port > 0 {
+		return port
+	}
+	return 8080
+}
+
+// databases finds the SQLite files on the mounts of every service. Named
+// volumes exist only after the first start, so deploy asks again then. A
+// database that x-ops names but no mount holds fails the deploy: it would be
+// lost with the container.
+func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *protocol.Config) ([]protocol.Database, error) {
+	var config map[string]any
+	body, err := os.ReadFile(composeFile)
+	if err == nil {
+		err = json.Unmarshal(body, &config)
+	}
+	if err != nil {
+		return nil, err
+	}
+	services, _ := config["services"].(map[string]any)
+	volumes, _ := config["volumes"].(map[string]any)
+	found := []protocol.Database{}
+	named := ""
+	if opsConfig != nil {
+		named = opsConfig.Database
+	}
+	namedOnMount := named == ""
+	for _, service := range services {
+		fields, _ := service.(map[string]any)
+		mounts, _ := fields["volumes"].([]any)
+		for _, item := range mounts {
+			mount, _ := item.(map[string]any)
+			source, _ := mount["source"].(string)
+			target, _ := mount["target"].(string)
+			hostPath := source
+			if mount["type"] == "volume" {
+				volume, _ := volumes[source].(map[string]any)
+				name, _ := volume["name"].(string)
+				if name == "" {
+					continue
+				}
+				mountpoint, err := a.output(ctx, "docker", "volume", "inspect", "-f", "{{.Mountpoint}}", name)
+				if err != nil {
+					// The volume does not exist before the first start.
+					continue
+				}
+				hostPath = strings.TrimSpace(mountpoint)
+			} else if mount["type"] != "bind" {
+				continue
+			}
+			if named != "" && within(target, named) {
+				namedOnMount = true
+			}
+			for _, file := range sqliteFiles(hostPath) {
+				relative, _ := filepath.Rel(hostPath, file)
+				path := filepath.Join(target, relative)
+				if !slices.ContainsFunc(found, func(d protocol.Database) bool { return d.HostPath == file }) {
+					found = append(found, protocol.Database{Path: path, HostPath: file})
+				}
+			}
+		}
+	}
+	if !namedOnMount {
+		return found, fmt.Errorf("x-ops.database %s is on no volume: it would be lost on the next deploy", named)
+	}
+	return found, nil
+}
+
+// sqliteFiles returns the files under dir, three levels deep, that start
+// with the SQLite header.
+func sqliteFiles(dir string) []string {
+	files := []string{}
+	header := []byte("SQLite format 3\x00")
+	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if relative, _ := filepath.Rel(dir, path); strings.Count(relative, string(filepath.Separator)) >= 3 {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+		start := make([]byte, len(header))
+		if _, err := io.ReadFull(file, start); err == nil && bytes.Equal(start, header) {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files
+}
+
+var imagePattern = regexp.MustCompile(`"image": "([^"]+)"`)
+
+// prune keeps the newest releases and the images they use.
+func (a *apps) prune(ctx context.Context, app string) {
+	entries, _ := os.ReadDir(filepath.Join(a.appDir(app), "releases"))
+	numbers := []int{}
+	for _, entry := range entries {
+		if number, err := strconv.Atoi(entry.Name()); err == nil {
+			numbers = append(numbers, number)
+		}
+	}
+	slices.Sort(numbers)
+	current := a.current(app)
+	for len(numbers) > keepReleases {
+		if numbers[0] != current {
+			_ = os.RemoveAll(a.releaseDir(app, numbers[0]))
+		}
+		numbers = numbers[1:]
+	}
+	used := map[string]bool{}
+	for _, number := range append(numbers, current) {
+		body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "compose.json"))
+		for _, image := range imagePattern.FindAllStringSubmatch(string(body), -1) {
+			used[image[1]] = true
+		}
+	}
+	images, err := a.output(ctx, "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}", "--filter", "reference="+project(app)+"-*")
+	if err != nil {
+		return
+	}
+	for _, image := range strings.Fields(images) {
+		if !used[image] {
+			_ = exec.CommandContext(ctx, "docker", "image", "rm", image).Run()
+		}
+	}
+}
+
+// logs returns the last lines of every container of the app.
+func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol.LogsResult, error) {
+	if !appNamePattern.MatchString(request.App) {
+		return protocol.LogsResult{}, errors.New("invalid app name")
+	}
+	tail := min(max(request.Tail, 1), 1000)
+	output, err := a.output(ctx, "docker", "compose", "-p", project(request.App), "logs", "--no-color", "--timestamps", "--tail", strconv.Itoa(tail))
+	if err != nil {
+		return protocol.LogsResult{}, err
+	}
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		lines = []string{}
+	}
+	return protocol.LogsResult{Lines: lines}, nil
+}
+
+// remove stops the app and deletes its containers, images and releases. The
+// volumes stay, so the data survives.
+func (a *apps) remove(ctx context.Context, app string) error {
+	if !appNamePattern.MatchString(app) {
+		return errors.New("invalid app name")
+	}
+	defer a.lock(app)()
+	args := []string{"compose", "-p", project(app)}
+	if current := a.current(app); current > 0 {
+		args = append(args, "-f", filepath.Join(a.releaseDir(app, current), "compose.json"))
+	}
+	_, err := a.output(ctx, "docker", append(args, "down", "--rmi", "all", "--remove-orphans")...)
+	if err != nil {
+		return err
+	}
+	_ = os.RemoveAll(filepath.Join(a.appDir(app), "releases"))
+	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
+	return nil
+}
+
+// compose runs docker compose on a release and streams its output as log lines.
+func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
+	command := exec.CommandContext(ctx, "docker", append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)
+	reader, writer := io.Pipe()
+	command.Stdout, command.Stderr = writer, writer
+	lines := make(chan struct{})
+	go func() {
+		defer close(lines)
+		scanner := bufio.NewScanner(reader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			logf("%s", scanner.Text())
+		}
+	}()
+	err := command.Run()
+	writer.Close()
+	<-lines
+	return err
+}
+
+// output runs a command and returns its stdout. A failure carries stderr.
+func (a *apps) output(ctx context.Context, name string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+	command := exec.CommandContext(ctx, name, args...)
+	command.Stdout, command.Stderr = &stdout, &stderr
+	err := command.Run()
+	if err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			return "", err
+		}
+		return "", errors.New(message)
+	}
+	return stdout.String(), nil
+}
+
+// download fetches the source tarball, checks its SHA-256 and unpacks it into dir.
+func download(ctx context.Context, url, sum, dir string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("download: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("download: %s", response.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxSourceSize+1))
+	if err != nil {
+		return fmt.Errorf("download: %w", err)
+	}
+	if len(body) > maxSourceSize {
+		return errors.New("download: the source is larger than 200 MB")
+	}
+	got := sha256.Sum256(body)
+	if hex.EncodeToString(got[:]) != sum {
+		return errors.New("download: the source does not match its SHA-256")
+	}
+	return unpack(bytes.NewReader(body), dir)
+}
+
+// unpack extracts a gzipped tar of regular files and directories into dir.
+// Links and paths that leave dir are refused.
+func unpack(source io.Reader, dir string) error {
+	archive, err := gzip.NewReader(source)
+	if err != nil {
+		return fmt.Errorf("unpack: %w", err)
+	}
+	reader := tar.NewReader(archive)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("unpack: %w", err)
+		}
+		target := filepath.Join(dir, filepath.FromSlash(header.Name))
+		if !within(dir, target) {
+			return fmt.Errorf("unpack: %s leaves the source directory", header.Name)
+		}
+		switch header.Typeflag {
+		case tar.TypeDir:
+			err = os.MkdirAll(target, 0o755)
+		case tar.TypeReg:
+			err = writeFile(target, reader, header.FileInfo().Mode())
+		default:
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("unpack: %w", err)
+		}
+	}
+}
+
+func writeFile(path string, content io.Reader, mode fs.FileMode) error {
+	err := os.MkdirAll(filepath.Dir(path), 0o755)
+	if err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm()|0o600)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(file, content)
+	closeErr := file.Close()
+	return errors.Join(err, closeErr)
+}
+
+// within reports whether path is dir or inside it.
+func within(dir, path string) bool {
+	relative, err := filepath.Rel(dir, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
+}
+
+func saveJSON(path string, value any) {
+	body, err := json.Marshal(value)
+	if err == nil {
+		_ = os.WriteFile(path, body, 0o600)
+	}
+}

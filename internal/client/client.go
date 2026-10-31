@@ -174,7 +174,26 @@ func (c *Client) RemoveServer(ctx context.Context, idOrName string) error {
 // WatchServers calls fn with the full server list on connect and on every
 // change, until ctx ends or the stream breaks.
 func (c *Client) WatchServers(ctx context.Context, fn func([]Server)) error {
-	request, err := c.request(ctx, http.MethodGet, "/api/v1/servers/events", nil)
+	return c.stream(ctx, "/api/v1/servers/events", func(_ string, data []byte) error {
+		var event struct {
+			Items []Server `json:"items"`
+		}
+		err := json.Unmarshal(data, &event)
+		if err == nil {
+			fn(event.Items)
+		}
+		return err
+	})
+}
+
+// errStreamDone ends a stream on purpose.
+var errStreamDone = errors.New("stream done")
+
+// stream reads server-sent events and calls fn with each event name and its
+// data, until ctx ends, fn returns an error or the stream breaks. fn returns
+// errStreamDone to end it without an error.
+func (c *Client) stream(ctx context.Context, path string, fn func(event string, data []byte) error) error {
+	request, err := c.request(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return err
 	}
@@ -189,19 +208,24 @@ func (c *Client) WatchServers(ctx context.Context, fn func([]Server)) error {
 	}
 	scanner := bufio.NewScanner(response.Body)
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	event := ""
 	for scanner.Scan() {
-		data, ok := strings.CutPrefix(scanner.Text(), "data: ")
+		line := scanner.Text()
+		if name, ok := strings.CutPrefix(line, "event: "); ok {
+			event = name
+			continue
+		}
+		data, ok := strings.CutPrefix(line, "data: ")
 		if !ok {
 			continue
 		}
-		var event struct {
-			Items []Server `json:"items"`
+		err = fn(event, []byte(data))
+		if errors.Is(err, errStreamDone) {
+			return nil
 		}
-		err = json.Unmarshal([]byte(data), &event)
 		if err != nil {
 			return err
 		}
-		fn(event.Items)
 	}
 	if ctx.Err() != nil {
 		return nil
@@ -251,6 +275,21 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 	return json.NewDecoder(response.Body).Decode(target)
 }
 
+// Error is an error answer of the API.
+type Error struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *Error) Error() string { return e.Message }
+
+// IsNotFound reports whether err is a not_found answer.
+func IsNotFound(err error) bool {
+	var apiErr *Error
+	return errors.As(err, &apiErr) && apiErr.Code == "not_found"
+}
+
 // responseError turns an API error body into an error people can read.
 func responseError(response *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(response.Body, 64*1024))
@@ -267,14 +306,14 @@ func responseError(response *http.Response) error {
 			message += fmt.Sprintf(" %s: %s", field, detail)
 		}
 		if response.StatusCode == http.StatusUnauthorized {
-			return fmt.Errorf("%s. Run `%s login` again", message, build.Name)
+			message = fmt.Sprintf("%s. Run `%s login` again", message, build.Name)
 		}
-		return errors.New(message)
+		return &Error{Status: response.StatusCode, Code: problem.Error.Code, Message: message}
 	}
 	if response.StatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("token rejected. Run `%s login` again", build.Name)
+		return &Error{Status: response.StatusCode, Code: "unauthenticated", Message: fmt.Sprintf("token rejected. Run `%s login` again", build.Name)}
 	}
-	return fmt.Errorf("%s %s: %s", response.Request.Method, response.Request.URL.Path, response.Status)
+	return &Error{Status: response.StatusCode, Message: fmt.Sprintf("%s %s: %s", response.Request.Method, response.Request.URL.Path, response.Status)}
 }
 
 // Status is "online", "offline" or "waiting" for a server whose agent never connected.

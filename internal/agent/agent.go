@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/axadrn/ops/internal/build"
@@ -139,11 +140,14 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 }
 
 // Run holds the session until ctx ends and reconnects when it drops. A
-// rejected agent token ends Run, because retrying cannot fix it.
-func Run(ctx context.Context, state State) error {
+// rejected agent token ends Run, because retrying cannot fix it. Deploys
+// keep running across reconnects.
+func Run(ctx context.Context, dir string, state State) error {
+	agent := &runner{state: state, pending: map[string]protocol.DeployDone{}}
+	agent.apps = newApps(dir, agent.send)
 	wait := minReconnect
 	for {
-		connected, err := session(ctx, state)
+		connected, err := agent.session(ctx)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -165,15 +169,59 @@ func Run(ctx context.Context, state State) error {
 
 var errRejected = errors.New("the control plane rejected the agent token: register this server again")
 
+// runner is one agent process. conn is the current session, nil between
+// sessions.
+type runner struct {
+	state State
+	apps  *apps
+
+	mu   sync.Mutex
+	conn *websocket.Conn
+	// pending holds the deploy.done messages no session took yet. They go
+	// out on the next one, so a deploy never ends unseen.
+	pending map[string]protocol.DeployDone
+}
+
+// send writes a message to the current session. Log lines without a session
+// are dropped; a deploy.done waits for the next session.
+func (r *runner) send(messageType protocol.MessageType, requestID string, data any) {
+	message, err := protocol.NewMessage(messageType, data)
+	if err != nil {
+		slog.Error("encode message failed", "type", messageType, "error", err)
+		return
+	}
+	message.RequestID = requestID
+	r.mu.Lock()
+	conn := r.conn
+	if done, ok := data.(protocol.DeployDone); ok {
+		r.pending[done.DeployID] = done
+	}
+	r.mu.Unlock()
+	if conn == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = wsjson.Write(ctx, conn, message)
+	if err != nil {
+		return
+	}
+	if done, ok := data.(protocol.DeployDone); ok {
+		r.mu.Lock()
+		delete(r.pending, done.DeployID)
+		r.mu.Unlock()
+	}
+}
+
 // session holds one WebSocket session. connected reports whether the dial
 // succeeded, so Run can reset its backoff.
-func session(ctx context.Context, state State) (connected bool, err error) {
-	sessionURL, err := websocketURL(state.URL + protocol.SessionPath)
+func (r *runner) session(ctx context.Context) (connected bool, err error) {
+	sessionURL, err := websocketURL(r.state.URL + protocol.SessionPath)
 	if err != nil {
 		return false, err
 	}
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+state.AgentToken)
+	header.Set("Authorization", "Bearer "+r.state.AgentToken)
 	conn, response, err := websocket.Dial(ctx, sessionURL, &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		if response != nil && response.StatusCode == http.StatusUnauthorized {
@@ -182,6 +230,7 @@ func session(ctx context.Context, state State) (connected bool, err error) {
 		return false, err
 	}
 	defer conn.CloseNow()
+	conn.SetReadLimit(1 << 20)
 
 	hello, err := protocol.NewMessage(protocol.TypeHello, Hello())
 	if err != nil {
@@ -191,17 +240,78 @@ func session(ctx context.Context, state State) (connected bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	slog.Info("connected", "url", state.URL, "server_id", state.ServerID)
+	slog.Info("connected", "url", r.state.URL, "server_id", r.state.ServerID)
 
-	// Reading answers the control plane's pings. Later slices handle
-	// requests here.
+	r.mu.Lock()
+	r.conn = conn
+	pending := make([]protocol.DeployDone, 0, len(r.pending))
+	for _, done := range r.pending {
+		pending = append(pending, done)
+	}
+	r.mu.Unlock()
+	defer func() {
+		r.mu.Lock()
+		if r.conn == conn {
+			r.conn = nil
+		}
+		r.mu.Unlock()
+	}()
+	for _, done := range pending {
+		r.send(protocol.TypeDeployDone, "", done)
+	}
+
+	// Reading also answers the control plane's pings.
 	for {
 		var message protocol.Message
 		err = wsjson.Read(ctx, conn, &message)
 		if err != nil {
 			return true, err
 		}
-		slog.Debug("message", "type", message.Type)
+		go r.handle(ctx, message)
+	}
+}
+
+// handle runs one request from the control plane.
+func (r *runner) handle(ctx context.Context, message protocol.Message) {
+	fail := func(err error) {
+		r.send(protocol.TypeError, message.RequestID, protocol.Error{Message: err.Error()})
+	}
+	switch message.Type {
+	case protocol.TypeDeployStart:
+		var start protocol.DeployStart
+		if err := message.Decode(&start); err != nil {
+			slog.Error("bad deploy.start", "error", err)
+			return
+		}
+		slog.Info("deploy", "app", start.App, "number", start.Number)
+		r.apps.deploy(ctx, start)
+	case protocol.TypeLogs:
+		var request protocol.LogsRequest
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		result, err := r.apps.logs(ctx, request)
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeLogsResult, message.RequestID, result)
+	case protocol.TypeAppRemove:
+		var request protocol.AppRemove
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		if err := r.apps.remove(ctx, request.App); err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeOK, message.RequestID, nil)
+	default:
+		if message.RequestID != "" {
+			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))
+		}
 	}
 }
 
