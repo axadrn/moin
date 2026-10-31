@@ -10,7 +10,7 @@ closed goes here: no control plane code, no secrets, no customer data.
 - The agent only dials out. Never add a listener for ops.
 - Clients (CLI, TUI) only call the control plane API (`/api/v1`) and its SSE streams. They never talk to an agent.
 - Every feature works in all surfaces: web UI, CLI, TUI, the control plane API and an MCP tool. A feature is done when each one works end to end.
-- Every feature is documented: the control plane docs (`ops-cloud/content/docs`) and `README.md` here. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands.
+- Every feature is documented in the control plane docs (`ops-cloud/content/docs`), the only source of truth. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands. `README.md` stays short and punchy, like shadcn/ui's: what ops is, the first commands, a pointer to the docs, the license. It never repeats the docs.
 - `protocol` is the contract with the control plane. Change it in a way old agents keep working, or bump `protocol.Version`.
 - The product name lives only in `internal/build.Name`.
 - Words: control plane, agent, server, app, deploy, backup. Not "node" or "host".
