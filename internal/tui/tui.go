@@ -102,6 +102,8 @@ const (
 	modeConfirmRollback
 	modeEnv
 	modeImage
+	modeDomains
+	modeProtect
 )
 
 // shared is what every copy of the model points to.
@@ -279,6 +281,25 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.input += msg.Text
 		}
 		return m, nil
+	case modeDomains, modeProtect:
+		switch key {
+		case "esc":
+			m.mode, m.input = modeList, ""
+		case "enter":
+			app, _ := m.currentApp()
+			input := strings.TrimSpace(m.input)
+			mode := m.mode
+			m.mode, m.input = modeList, ""
+			if mode == modeDomains {
+				return m, m.changeDomains(app, input)
+			}
+			return m, m.changeProtect(app.Name, input)
+		case "backspace":
+			m.input = dropLast(m.input)
+		default:
+			m.input += msg.Text
+		}
+		return m, nil
 	case modeImage:
 		switch key {
 		case "esc":
@@ -391,6 +412,15 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			return m, m.newHook(app.Name)
 		}
+	case "o":
+		if ok {
+			m.mode, m.input = modeDomains, ""
+			return m, m.showDomains(app.Name)
+		}
+	case "p":
+		if ok {
+			m.mode, m.input = modeProtect, ""
+		}
 	case "x":
 		if ok {
 			m.mode = modeConfirmRemove
@@ -493,6 +523,92 @@ func (m model) deployImage(name, image string) tea.Cmd {
 			return errMsg{err}
 		}
 		return m.follow(name, started, fmt.Sprintf("deploy v%d of %s", started.Number, name))
+	}
+}
+
+// showDomains fills the output panel with the domains and their DNS state.
+func (m model) showDomains(name string) tea.Cmd {
+	return func() tea.Msg {
+		checks, err := m.api.CheckDomains(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		lines := []string{}
+		address := ""
+		for _, check := range checks {
+			address = check.Address
+			state := "set DNS"
+			if check.Points {
+				state = "points here"
+			}
+			line := check.Domain + "   " + state
+			if check.Canonical {
+				line += "   canonical"
+			}
+			lines = append(lines, line)
+		}
+		if len(lines) == 0 {
+			lines = append(lines, "no domains yet")
+		}
+		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical"
+		if address != "" {
+			note = "point an A record at " + address
+		}
+		return outputMsg{id: m.shared.outputs.Add(1), title: "domains of " + name, note: style.Muted.Render(note), lines: lines}
+	}
+}
+
+// changeDomains adds blog.de, removes -blog.de or sets =blog.de canonical.
+func (m model) changeDomains(app client.App, input string) tea.Cmd {
+	return func() tea.Msg {
+		list, canonical := slices.Clone(app.Domains), app.Canonical
+		switch {
+		case strings.HasPrefix(input, "-"):
+			domain := strings.TrimPrefix(input, "-")
+			list = slices.DeleteFunc(list, func(d string) bool { return d == domain })
+			if canonical == domain {
+				canonical = ""
+			}
+		case strings.HasPrefix(input, "="):
+			canonical = strings.TrimPrefix(input, "=")
+			if canonical == "none" {
+				canonical = ""
+			}
+		case input != "":
+			list = append(list, input)
+		}
+		change, err := m.api.SetDomains(m.ctx, app.Name, list, canonical)
+		if err != nil {
+			return errMsg{err}
+		}
+		if change.Deploy != nil {
+			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("apply v%d of %s", change.Deploy.Number, app.Name))
+		}
+		return noticeMsg("Saved. The next deploy of " + app.Name + " applies it.")
+	}
+}
+
+// changeProtect sets user:password, or turns protection off with "off".
+func (m model) changeProtect(name, input string) tea.Cmd {
+	return func() tea.Msg {
+		var change client.Change
+		var err error
+		if input == "off" {
+			change, err = m.api.RemoveProtection(m.ctx, name)
+		} else {
+			user, password, found := strings.Cut(input, ":")
+			if !found {
+				return errMsg{fmt.Errorf("type user:password, or off")}
+			}
+			change, err = m.api.SetProtection(m.ctx, name, user, password)
+		}
+		if err != nil {
+			return errMsg{err}
+		}
+		if change.Deploy != nil {
+			return m.follow(name, *change.Deploy, fmt.Sprintf("apply v%d of %s", change.Deploy.Number, name))
+		}
+		return noticeMsg("Saved. The next deploy of " + name + " applies it.")
 	}
 }
 

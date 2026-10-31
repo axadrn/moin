@@ -138,7 +138,8 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		}
 	} else {
 		var config map[string]any
-		reuse := 0
+		var running map[string]string
+		pull := start.Image != ""
 		if start.SourceURL != "" {
 			src := filepath.Join(release, "src")
 			logf("downloading the source")
@@ -148,20 +149,27 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			}
 			config, detected, err = a.resolve(ctx, start.App, src)
 		} else {
-			// An image deploy without source keeps the compose file of the
-			// running release and its other images.
-			reuse = a.current(start.App)
-			if reuse == 0 {
+			// A deploy without source keeps the compose file of the running
+			// release and its images; an image replaces the main one.
+			current := a.current(start.App)
+			if current == 0 {
 				return detected, errors.New("no release to take the compose file from: deploy the repo once with ops deploy")
 			}
-			config, detected, err = loadBase(a.releaseDir(start.App, reuse))
+			config, detected, running, err = loadBase(a.releaseDir(start.App, current))
+			if err == nil && start.Image == "" {
+				start.Image = detected.Image
+			}
 		}
 		if err != nil {
 			return detected, err
 		}
 		saveJSON(filepath.Join(release, "base.json"), config)
 		detected.Image = start.Image
-		err = finish(config, start, detected, reuse, composeFile)
+		detected, err = route(detected, start.Routing)
+		if err != nil {
+			return detected, err
+		}
+		err = finish(config, start, detected, running, composeFile)
 		if err != nil {
 			return detected, err
 		}
@@ -169,14 +177,22 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		if err != nil {
 			return detected, err
 		}
-		if start.Image != "" {
+		if len(detected.Domains) > 0 {
+			err = a.ensureProxy(ctx, logf)
+			if err != nil {
+				return detected, fmt.Errorf("proxy: %w", err)
+			}
+		}
+		if pull {
 			logf("pulling %s", start.Image)
 			err = a.pull(ctx, start, composeFile, detected.Service, logf)
 			if err != nil {
 				return detected, fmt.Errorf("pull: %w", err)
 			}
-		} else {
+		} else if start.SourceURL != "" {
 			logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
+		} else {
+			logf("applying env and routing to the running images")
 		}
 		if builds(config) {
 			logf("building")
@@ -338,8 +354,9 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 	return config, detected, nil
 }
 
-// loadBase reads the resolved compose file and the findings of a release.
-func loadBase(release string) (map[string]any, protocol.Detected, error) {
+// loadBase reads the resolved compose file, the findings and the image of
+// every service of a release.
+func loadBase(release string) (map[string]any, protocol.Detected, map[string]string, error) {
 	var config map[string]any
 	var detected protocol.Detected
 	body, err := os.ReadFile(filepath.Join(release, "base.json"))
@@ -347,19 +364,31 @@ func loadBase(release string) (map[string]any, protocol.Detected, error) {
 		err = json.Unmarshal(body, &config)
 	}
 	if err != nil {
-		return nil, detected, errors.New("the running release has no compose file to reuse: deploy the repo once with ops deploy")
+		return nil, detected, nil, errors.New("the running release has no compose file to reuse: deploy the repo once with ops deploy")
 	}
 	body, _ = os.ReadFile(filepath.Join(release, "detected.json"))
 	_ = json.Unmarshal(body, &detected)
 	detected.Databases = nil
-	return config, detected, nil
+	var composed struct {
+		Services map[string]struct {
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+	body, _ = os.ReadFile(filepath.Join(release, "compose.json"))
+	_ = json.Unmarshal(body, &composed)
+	images := map[string]string{}
+	for name, service := range composed.Services {
+		images[name] = service.Image
+	}
+	return config, detected, images, nil
 }
 
 // finish writes compose.json for a release: built services get an image tag
-// per deploy, or the tag of release reuse when there is no source; the main
-// service runs start.Image when set; the app's services get the env; every
-// service restarts unless stopped.
-func finish(base map[string]any, start protocol.DeployStart, detected protocol.Detected, reuse int, composeFile string) error {
+// per deploy, or keep their running image when there is no source; the main
+// service runs start.Image when set; the app's services get the env; the
+// main service gets the routing labels; every service restarts unless
+// stopped.
+func finish(base map[string]any, start protocol.DeployStart, detected protocol.Detected, running map[string]string, composeFile string) error {
 	body, err := json.Marshal(base)
 	if err != nil {
 		return err
@@ -377,9 +406,9 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 		case name == detected.Service && start.Image != "":
 			delete(service, "build")
 			service["image"] = start.Image
-		case service["build"] != nil && reuse > 0:
+		case service["build"] != nil && running != nil:
 			delete(service, "build")
-			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, reuse)
+			service["image"] = running[name]
 		case service["build"] != nil:
 			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, start.Number)
 		}
@@ -389,12 +418,15 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 				environment = map[string]any{}
 			}
 			for key, value := range start.Env {
-				environment[key] = strings.ReplaceAll(value, "$", "$$")
+				environment[key] = escape(value)
 			}
 			service["environment"] = environment
 		}
 		if service["restart"] == nil {
 			service["restart"] = "unless-stopped"
+		}
+		if name == detected.Service && len(detected.Domains) > 0 {
+			addRouting(config, service, start.App, detected, protectHash(start.Routing))
 		}
 	}
 	body, err = json.MarshalIndent(config, "", "  ")
@@ -403,6 +435,9 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 	}
 	return os.WriteFile(composeFile, body, 0o600)
 }
+
+// escape keeps compose from interpolating a value.
+func escape(value string) string { return strings.ReplaceAll(value, "$", "$$") }
 
 // builds reports whether a compose file still has services to build.
 func builds(config map[string]any) bool {

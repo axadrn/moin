@@ -107,7 +107,9 @@ type RegisterResponse struct {
 // FromNumber and no source: the agent starts that release's images again,
 // with the env it had. Image replaces the build of the main service with an
 // image built elsewhere, such as in CI; without a source the agent takes the
-// compose file of the running release.
+// compose file of the running release. Without source, image and FromNumber
+// the deploy applies env and routing to the running release, without a
+// build.
 type DeployStart struct {
 	DeployID   string            `json:"deploy_id"`
 	App        string            `json:"app"`
@@ -118,6 +120,17 @@ type DeployStart struct {
 	Image      string            `json:"image,omitempty"`
 	Registry   *Registry         `json:"registry,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
+	Routing    *Routing          `json:"routing,omitempty"`
+}
+
+// Routing is how visitors reach the main service, as set in web, CLI, TUI
+// or MCP. The x-ops block of compose.yml wins for every field it sets.
+// Protect is an htpasswd line ("user:bcrypt hash") when password protection
+// is on.
+type Routing struct {
+	Domains   []string `json:"domains,omitempty"`
+	Canonical string   `json:"canonical,omitempty"`
+	Protect   string   `json:"protect,omitempty"`
 }
 
 // Registry is a login for pulling Image from a private registry.
@@ -146,8 +159,13 @@ type DeployDone struct {
 type Detected struct {
 	// Kind is "compose", "dockerfile" or "go": what the repo brought.
 	// Image is the image of the main service when it came from CI.
+	// Domains are the domains the main service answers on, Canonical the one
+	// the others redirect to, Protected whether a password guards it.
 	Kind      string     `json:"kind"`
 	Image     string     `json:"image,omitempty"`
+	Domains   []string   `json:"domains,omitempty"`
+	Canonical string     `json:"canonical,omitempty"`
+	Protected bool       `json:"protected,omitempty"`
 	Service   string     `json:"service"`
 	Port      int        `json:"port"`
 	Databases []Database `json:"databases"`
@@ -162,13 +180,15 @@ type Database struct {
 
 // Config is the x-ops block of compose.yml. Every field is optional.
 type Config struct {
-	App      string   `json:"app,omitempty"`
-	Server   string   `json:"server,omitempty"`
-	Service  string   `json:"service,omitempty"`
-	Port     int      `json:"port,omitempty"`
-	Health   string   `json:"health,omitempty"`
-	Domains  []string `json:"domains,omitempty"`
-	Database string   `json:"database,omitempty"`
+	App       string   `json:"app,omitempty"`
+	Server    string   `json:"server,omitempty"`
+	Service   string   `json:"service,omitempty"`
+	Port      int      `json:"port,omitempty"`
+	Health    string   `json:"health,omitempty"`
+	Domains   []string `json:"domains,omitempty"`
+	Canonical string   `json:"canonical,omitempty"`
+	Protect   bool     `json:"protect,omitempty"`
+	Database  string   `json:"database,omitempty"`
 }
 
 // LogsRequest asks for the last Tail lines of every container of an app.

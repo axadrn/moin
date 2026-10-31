@@ -324,6 +324,14 @@ func (m model) prompt() ([]string, [][2]string) {
 		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, {"enter", "apply"}, {"esc", "close"}}
 	case modeImage:
 		return bar(style.Accent, style.Bold.Render("Image: ")+m.input+cursor), [][2]string{{"enter", "deploy"}, {"esc", "cancel"}}
+	case modeDomains:
+		return bar(style.Accent, style.Bold.Render("Domain: ")+m.input+cursor), [][2]string{{"blog.de", "add"}, {"-blog.de", "remove"}, {"=blog.de", "canonical"}, {"esc", "close"}}
+	case modeProtect:
+		masked := m.input
+		if user, password, found := strings.Cut(m.input, ":"); found {
+			masked = user + ":" + strings.Repeat("•", len([]rune(password)))
+		}
+		return bar(style.Accent, style.Bold.Render("Protect: ")+masked+cursor), [][2]string{{"user:password", "protect"}, {"off", "public"}, {"esc", "cancel"}}
 	case modeConfirmRemove:
 		question, detail := "", ""
 		if m.tab == tabServers && m.selected < len(m.servers) {
@@ -339,7 +347,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	}
 
 	here := client.AppName("", m.dir)
-	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
+	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}

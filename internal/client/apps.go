@@ -22,6 +22,9 @@ type App struct {
 	LatestNumber int       `json:"latest_number"`
 	LatestStatus string    `json:"latest_status"`
 	LiveNumber   int       `json:"live_number"`
+	Domains      []string  `json:"domains"`
+	Canonical    string    `json:"canonical"`
+	Protected    bool      `json:"protected"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -250,4 +253,57 @@ func (c *Client) SetRegistry(ctx context.Context, host, username, password strin
 // RemoveRegistry deletes the login for a registry host.
 func (c *Client) RemoveRegistry(ctx context.Context, host string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/registries/"+url.PathEscape(host), nil, nil)
+}
+
+// DomainCheck says whether a domain points at the app's server.
+type DomainCheck struct {
+	Domain    string   `json:"domain"`
+	Canonical bool     `json:"canonical"`
+	Address   string   `json:"address"`
+	Found     []string `json:"found"`
+	Points    bool     `json:"points"`
+}
+
+// Change is the app after a routing change, and the deploy that applies it,
+// nil when the next deploy will.
+type Change struct {
+	App    App     `json:"app"`
+	Deploy *Deploy `json:"deploy"`
+}
+
+// CheckDomains looks up every domain of an app.
+func (c *Client) CheckDomains(ctx context.Context, app string) ([]DomainCheck, error) {
+	var response struct {
+		Items []DomainCheck `json:"items"`
+	}
+	err := c.do(ctx, http.MethodGet, appPath(app, "domains"), nil, &response)
+	return response.Items, err
+}
+
+// SetDomains replaces the domains and the canonical one ("" for none).
+func (c *Client) SetDomains(ctx context.Context, app string, domains []string, canonical string) (Change, error) {
+	var response Change
+	err := c.do(ctx, http.MethodPut, appPath(app, "domains"), map[string]any{"domains": domains, "canonical": canonical}, &response)
+	return response, err
+}
+
+// SetProtection puts a password in front of the app.
+func (c *Client) SetProtection(ctx context.Context, app, username, password string) (Change, error) {
+	var response Change
+	err := c.do(ctx, http.MethodPut, appPath(app, "protection"), map[string]string{"username": username, "password": password}, &response)
+	return response, err
+}
+
+// RemoveProtection takes the password away.
+func (c *Client) RemoveProtection(ctx context.Context, app string) (Change, error) {
+	var response Change
+	err := c.do(ctx, http.MethodDelete, appPath(app, "protection"), nil, &response)
+	return response, err
+}
+
+// Apply restarts the running release with the env and routing as they are now.
+func (c *Client) Apply(ctx context.Context, app string) (Deploy, error) {
+	var response Deploy
+	err := c.do(ctx, http.MethodPost, appPath(app, "apply"), nil, &response)
+	return response, err
 }

@@ -12,9 +12,10 @@ import (
 	"github.com/axadrn/ops/internal/client"
 )
 
-// Colors. The web UI uses the same hues in oklch.
+// Colors carry status only; the brand is monochrome, like the web UI. The
+// accent is bold text in the terminal's own foreground color, so it works
+// on light and dark terminals.
 var (
-	Brand   = lipgloss.Color("#FF6B2C")
 	Live    = lipgloss.Color("#3FCF7A")
 	Running = lipgloss.Color("#F2B544")
 	Failed  = lipgloss.Color("#FF5A4E")
@@ -43,8 +44,8 @@ var (
 	Bold    = lipgloss.NewStyle().Bold(true)
 	Muted   = lipgloss.NewStyle().Foreground(Idle)
 	Dim     = lipgloss.NewStyle().Foreground(Faint)
-	Accent  = lipgloss.NewStyle().Foreground(Brand)
-	Mark    = lipgloss.NewStyle().Foreground(Ink).Background(Brand).Bold(true).Padding(0, 1)
+	Accent  = lipgloss.NewStyle().Bold(true)
+	Mark    = lipgloss.NewStyle().Reverse(true).Bold(true).Padding(0, 1)
 	Success = lipgloss.NewStyle().Foreground(Live)
 	Warning = lipgloss.NewStyle().Foreground(Running)
 	Danger  = lipgloss.NewStyle().Foreground(Failed)

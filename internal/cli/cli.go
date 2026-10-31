@@ -49,6 +49,15 @@ Deploys
   rollback           Start an earlier release again: rollback [v<number>]
   logs               Show the last lines of the app: logs [--tail 200] [app]
 
+Domains
+  domains            List domains and their DNS: domains [app]
+  domains add        Add domains: domains add blog.de www.blog.de
+  domains rm         Remove domains: domains rm www.blog.de
+  domains canonical  Redirect the others to one: domains canonical blog.de|none
+  protect            Ask for a password: protect [--user ops], password on stdin
+  protect off        Make the app public again
+  apply              Restart the running release with the current env and domains
+
 CI
   hook               New deploy hook URL for CI: hook [app]
   registry           List registry logins for private images
@@ -148,6 +157,12 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return env(ctx, rest, stdout)
 	case "hook":
 		return hook(ctx, rest, stdout)
+	case "domains":
+		return domains(ctx, rest, stdout)
+	case "protect":
+		return protect(ctx, rest, stdin, stdout)
+	case "apply":
+		return apply(ctx, rest, stdout)
 	case "registry":
 		return registry(ctx, rest, stdin, stdout)
 	case "run":

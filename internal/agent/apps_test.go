@@ -109,7 +109,8 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	}}
 	file := filepath.Join(t.TempDir(), "compose.json")
 	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc", Env: map[string]string{"KEY": "a$b"}}
-	err := finish(base, start, protocol.Detected{Service: "web"}, 3, file)
+	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "ops-blog-worker:3", "redis": "redis:7"}
+	err := finish(base, start, protocol.Detected{Service: "web"}, running, file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,5 +138,40 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	}
 	if builds(base) != true {
 		t.Fatal("finish changed the base")
+	}
+}
+
+func TestRoutingLabels(t *testing.T) {
+	detected, err := route(protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.de"}}, &protocol.Routing{Domains: []string{"Blog.de", "www.blog.de"}, Protect: "me:$2y$05$abc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detected.Domains[0] != "blog.de" || detected.Canonical != "blog.de" || !detected.Protected {
+		t.Fatalf("detected = %+v", detected)
+	}
+	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
+	service := config["services"].(map[string]any)["web"].(map[string]any)
+	addRouting(config, service, "blog", detected, "me:$2y$05$abc")
+	labels := service["labels"].(map[string]any)
+	if labels["traefik.http.routers.ops-blog.rule"] != "Host(`blog.de`) || Host(`www.blog.de`)" {
+		t.Fatalf("rule = %v", labels["traefik.http.routers.ops-blog.rule"])
+	}
+	if labels["traefik.http.routers.ops-blog.middlewares"] != "ops-blog-canonical,ops-blog-auth" {
+		t.Fatalf("middlewares = %v", labels["traefik.http.routers.ops-blog.middlewares"])
+	}
+	if labels["traefik.http.middlewares.ops-blog-auth.basicauth.users"] != "me:$$2y$$05$$abc" {
+		t.Fatalf("auth = %v", labels["traefik.http.middlewares.ops-blog-auth.basicauth.users"])
+	}
+	if labels["traefik.http.middlewares.ops-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.de)(:[0-9]+)?(.*)` {
+		t.Fatalf("regex = %v", labels["traefik.http.middlewares.ops-blog-canonical.redirectregex.regex"])
+	}
+	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
+		t.Fatal("the main service is not on the proxy network")
+	}
+	if _, err := route(protocol.Detected{Config: &protocol.Config{Protect: true}}, nil); err == nil {
+		t.Fatal("protect without password must fail")
+	}
+	if _, err := route(protocol.Detected{}, &protocol.Routing{Domains: []string{"not a domain"}}); err == nil {
+		t.Fatal("a bad domain must fail")
 	}
 }
