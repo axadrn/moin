@@ -326,6 +326,10 @@ func (m model) prompt() ([]string, [][2]string) {
 		return bar(style.Accent, style.Bold.Render("Image: ")+m.input+cursor), [][2]string{{"enter", "deploy"}, {"esc", "cancel"}}
 	case modeSQL:
 		return bar(style.Accent, style.Bold.Render("SQL: ")+m.input+cursor), [][2]string{{"enter", "run"}, {"esc", "close"}}
+	case modeBackups:
+		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"esc", "close"}}
+	case modeConfirmRestore:
+		return bar(style.Warning, style.Bold.Render("Restore "+m.pendingRestore+"?"), "ops takes a snapshot of the current state first."), [][2]string{{"y", "restore"}, cancel}
 	case modeConfirmWrite:
 		return bar(style.Warning, style.Bold.Render("This query changes data. Run it?"), m.pendingSQL), [][2]string{{"y", "run"}, cancel}
 	case modeDomains:
@@ -351,7 +355,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	}
 
 	here := client.AppName("", m.dir)
-	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
+	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}

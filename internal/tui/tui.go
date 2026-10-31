@@ -108,6 +108,8 @@ const (
 	modeProtect
 	modeSQL
 	modeConfirmWrite
+	modeBackups
+	modeConfirmRestore
 )
 
 // shared is what every copy of the model points to.
@@ -145,6 +147,8 @@ type model struct {
 	added    *client.NewServer
 	// pendingSQL is a query that changes data, waiting for a yes.
 	pendingSQL string
+	// pendingRestore is a snapshot ID or a time, waiting for a yes.
+	pendingRestore string
 
 	apps        []client.App
 	appSelected int
@@ -325,6 +329,30 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.input += msg.Text
 		}
 		return m, nil
+	case modeBackups:
+		switch key {
+		case "esc":
+			m.mode, m.input = modeList, ""
+		case "enter":
+			app, _ := m.currentApp()
+			target := strings.TrimSpace(m.input)
+			m.input = ""
+			if target == "" {
+				return m, m.backUp(app.Name)
+			}
+			m.mode, m.pendingRestore = modeConfirmRestore, target
+		case "backspace":
+			m.input = dropLast(m.input)
+		default:
+			m.input += msg.Text
+		}
+		return m, nil
+	case modeConfirmRestore:
+		m.mode = modeBackups
+		if app, ok := m.currentApp(); key == "y" && ok {
+			return m, m.restore(app.Name, m.pendingRestore)
+		}
+		return m, nil
 	case modeConfirmWrite:
 		m.mode = modeSQL
 		if app, ok := m.currentApp(); key == "y" && ok {
@@ -456,6 +484,11 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.mode, m.input = modeSQL, ""
 			return m, m.showTables(app.Name)
+		}
+	case "b":
+		if ok {
+			m.mode, m.input = modeBackups, ""
+			return m, m.showBackups(app.Name, "")
 		}
 	case "x":
 		if ok {
@@ -843,4 +876,86 @@ func cellText(value any) string {
 		return value
 	}
 	return fmt.Sprint(value)
+}
+
+// showBackups lists the backups of an app in the output panel.
+func (m model) showBackups(name, notice string) tea.Cmd {
+	return func() tea.Msg {
+		list, err := m.api.Backups(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return backupsOutput(m.shared.outputs.Add(1), name, list)
+	}
+}
+
+func backupsOutput(id int64, name string, list client.AppBackups) outputMsg {
+	now := time.Now()
+	lines := []string{}
+	for _, database := range list.Databases {
+		head := style.Bold.Render(database.Database)
+		switch {
+		case database.Error != "":
+			head += "  " + style.Danger.Render(style.SymbolFailed+" "+database.Error)
+		case database.VerifiedAt != nil:
+			head += "  " + style.Success.Render(style.SymbolDone+" verified by restore "+duration(now.Sub(*database.VerifiedAt))+" ago")
+		}
+		lines = append(lines, head)
+		if database.Since != nil && database.ReplicatedAt != nil {
+			lines = append(lines, style.Muted.Render("point in time "+database.Since.UTC().Format("2006-01-02 15:04:05")+" to "+database.ReplicatedAt.UTC().Format("15:04:05")+" UTC"))
+		}
+		rows := [][]any{}
+		for _, snapshot := range database.Snapshots {
+			rows = append(rows, []any{snapshot.ID, snapshot.Reason, duration(now.Sub(snapshot.CreatedAt)) + " ago"})
+		}
+		lines = append(lines, resultLines([]string{"snapshot", "reason", "taken"}, rows)...)
+		lines = append(lines, "")
+	}
+	note := style.Muted.Render("snapshot before every change: on")
+	if !list.SnapshotBeforeChanges {
+		note = style.Muted.Render("snapshot before every change: off")
+	}
+	return outputMsg{id: id, title: "backups of " + name, note: note, lines: lines}
+}
+
+// backUp takes a snapshot and shows the backups again.
+func (m model) backUp(name string) tea.Cmd {
+	return func() tea.Msg {
+		list, err := m.api.BackUp(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		m.shared.program.Send(noticeMsg("snapshot taken"))
+		return backupsOutput(m.shared.outputs.Add(1), name, list)
+	}
+}
+
+// restore restores a snapshot ID, or a time in UTC.
+func (m model) restore(name, target string) tea.Cmd {
+	return func() tea.Msg {
+		snapshot := target
+		var at *time.Time
+		for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "15:04:05", "15:04"} {
+			parsed, err := time.Parse(layout, target)
+			if err != nil {
+				continue
+			}
+			if parsed.Year() == 0 {
+				now := time.Now().UTC()
+				parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
+			}
+			at, snapshot = &parsed, ""
+			break
+		}
+		err := m.api.Restore(m.ctx, name, "", snapshot, at)
+		if err != nil {
+			return errMsg{err}
+		}
+		m.shared.program.Send(noticeMsg("restored; " + name + " runs again"))
+		list, err := m.api.Backups(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return backupsOutput(m.shared.outputs.Add(1), name, list)
+	}
 }

@@ -96,6 +96,19 @@ func frames() map[string]model {
 		m.mode, m.input = modeSQL, "SELECT * FROM orders WHERE status = 'refunded' AND created_at > '2026-10-01' ORDER BY id DESC"
 		m.err = errors.New("near \"FORM\": syntax error")
 	})
+	add("detail-backups", func(m *model) {
+		at := now.Add(-time.Hour)
+		list := client.AppBackups{SnapshotBeforeChanges: true, Databases: []protocol.DatabaseBackup{{
+			Database: "/data/app.db", Since: &at, ReplicatedAt: &now, VerifiedAt: &at,
+			Snapshots: []protocol.Snapshot{{ID: "20261031T143638Z-manual", Reason: "manual", CreatedAt: at}, {ID: "20261031T143526Z-before-v42", Reason: "before-v42", CreatedAt: at}},
+		}}}
+		output := backupsOutput(1, "hello", list)
+		m.tab, m.detail, m.outputID, m.outputTitle, m.outputNote, m.output = tabApps, detail, 1, output.title, output.note, output.lines
+		m.mode, m.input = modeBackups, "14:0"
+	})
+	add("detail-restore", func(m *model) {
+		m.tab, m.detail, m.mode, m.pendingRestore = tabApps, detail, modeConfirmRestore, "20261031T143638Z-manual"
+	})
 	add("detail-sql-write", func(m *model) {
 		m.tab, m.detail, m.mode = tabApps, detail, modeConfirmWrite
 		m.pendingSQL = "UPDATE settings SET value = 'on' WHERE key = 'maintenance' AND value IS NOT NULL AND key != 'currency'"

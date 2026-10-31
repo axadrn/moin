@@ -71,6 +71,15 @@ Data
   sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"
   sql --write        Run SQL that changes data, in one transaction
 
+Backups
+  backups            Snapshots, point in time window and restore drills of an app
+  backup             Take a snapshot now: backup [app]
+  restore            Restore a snapshot: restore <snapshot>, or a time: restore --at "2026-10-31 14:02"
+  backups auto       Snapshot before every change: backups auto on|off
+  backups bucket     Show the bucket backups go to
+  backups bucket set Set it: --endpoint https://… --bucket … --access-key …, secret key on stdin
+  backups bucket rm  Stop backups; the bucket keeps what is in it
+
 Env
   env                List env vars: env [--show]
   env set            Set env vars: env set KEY=value ...
@@ -164,6 +173,12 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return db(ctx, rest, stdout)
 	case "sql":
 		return sql(ctx, rest, stdin, stdout)
+	case "backups":
+		return backups(ctx, rest, stdin, stdout)
+	case "backup":
+		return backUp(ctx, rest, stdout)
+	case "restore":
+		return restore(ctx, rest, stdout)
 	case "env":
 		return env(ctx, rest, stdout)
 	case "hook":

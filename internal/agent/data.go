@@ -75,11 +75,17 @@ func matchOwner(path string) {
 	if err != nil {
 		return
 	}
+	matchOwnerOf(path, info)
+}
+
+// matchOwnerOf gives the database at path and its -wal and -shm files the
+// owner in info.
+func matchOwnerOf(path string, info os.FileInfo) {
 	owner, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return
 	}
-	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
 		_ = os.Lchown(path+suffix, int(owner.Uid), int(owner.Gid))
 	}
 }
@@ -208,6 +214,12 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
 
 	if request.Write {
+		if request.Snapshot && a.backups != nil {
+			err = a.backups.snapshotBefore(ctx, request.App, "before-sql", nil)
+			if err != nil {
+				return result, err
+			}
+		}
 		defer matchOwner(database.HostPath)
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {

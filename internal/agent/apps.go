@@ -51,6 +51,8 @@ var appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 type apps struct {
 	dir  string
 	send func(protocol.MessageType, string, any)
+	// backups takes snapshots before deploys and follows new databases.
+	backups *backups
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
@@ -205,6 +207,12 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	saveJSON(filepath.Join(release, "detected.json"), detected)
 
 	previous := a.current(start.App)
+	if a.backups != nil && previous > 0 {
+		err = a.backups.snapshotBefore(ctx, start.App, fmt.Sprintf("before-v%d", start.Number), logf)
+		if err != nil {
+			return detected, err
+		}
+	}
 	logf("starting")
 	err = a.start(ctx, start.App, composeFile, detected, logf)
 	if err != nil {
@@ -228,6 +236,9 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	}
 	for _, database := range detected.Databases {
 		logf("database %s (%s)", database.Path, database.HostPath)
+	}
+	if a.backups != nil {
+		a.backups.reconcile()
 	}
 	a.prune(ctx, start.App)
 	return detected, nil

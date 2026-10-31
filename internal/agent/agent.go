@@ -145,6 +145,10 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 func Run(ctx context.Context, dir string, state State) error {
 	agent := &runner{state: state, pending: map[string]protocol.DeployDone{}}
 	agent.apps = newApps(dir, agent.send)
+	agent.backups = newBackups(agent.apps, agent.send)
+	agent.apps.backups = agent.backups
+	go agent.backups.drills(ctx)
+	defer agent.backups.configure(context.Background(), nil)
 	wait := minReconnect
 	for {
 		connected, err := agent.session(ctx)
@@ -172,8 +176,9 @@ var errRejected = errors.New("the control plane rejected the agent token: regist
 // runner is one agent process. conn is the current session, nil between
 // sessions.
 type runner struct {
-	state State
-	apps  *apps
+	state   State
+	apps    *apps
+	backups *backups
 
 	mu   sync.Mutex
 	conn *websocket.Conn
@@ -332,6 +337,44 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeDBQueryResult, message.RequestID, result)
+	case protocol.TypeBackupConfig:
+		var config protocol.BackupConfig
+		if err := message.Decode(&config); err != nil {
+			fail(err)
+			return
+		}
+		if err := r.backups.configure(ctx, config.Storage); err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeBackupSnapshot, protocol.TypeBackupList:
+		var request protocol.BackupRequest
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		list := r.backups.list
+		if message.Type == protocol.TypeBackupSnapshot {
+			list = r.backups.snapshot
+		}
+		result, err := list(ctx, request)
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeBackupsResult, message.RequestID, result)
+	case protocol.TypeBackupRestore:
+		var request protocol.BackupRestore
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		if err := r.backups.restore(ctx, request); err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeOK, message.RequestID, nil)
 	default:
 		if message.RequestID != "" {
 			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))

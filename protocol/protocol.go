@@ -7,6 +7,7 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+	"time"
 )
 
 // Version is the protocol version the agent reports in Hello. Bump it when a
@@ -54,6 +55,24 @@ const (
 	// agent answers with TypeDBQueryResult or TypeError.
 	TypeDBQuery       MessageType = "db.query"
 	TypeDBQueryResult MessageType = "db.query.result"
+
+	// TypeBackupConfig tells the agent where backups go (BackupConfig). The
+	// control plane sends it after hello and whenever it changes. The agent
+	// answers with TypeOK.
+	TypeBackupConfig MessageType = "backup.config"
+	// TypeBackupSnapshot takes a snapshot of an app's databases now
+	// (BackupRequest). The agent answers with TypeBackupsResult.
+	TypeBackupSnapshot MessageType = "backup.snapshot"
+	// TypeBackupList lists the backups of an app (BackupRequest). The agent
+	// answers with TypeBackupsResult.
+	TypeBackupList    MessageType = "backup.list"
+	TypeBackupsResult MessageType = "backups.result"
+	// TypeBackupRestore puts a snapshot or a point in time back
+	// (BackupRestore). The agent answers with TypeOK or TypeError.
+	TypeBackupRestore MessageType = "backup.restore"
+	// TypeBackupStatus is how the backups of an app stand (Backups), sent by
+	// the agent after a snapshot, a restore drill or a failure.
+	TypeBackupStatus MessageType = "backup.status"
 
 	// TypeOK answers a request that has no result.
 	TypeOK MessageType = "ok"
@@ -269,6 +288,8 @@ type DBQuery struct {
 	Params []any  `json:"params,omitempty"`
 	Write  bool   `json:"write,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
+	// Snapshot takes a snapshot before a write, when backups are set up.
+	Snapshot bool `json:"snapshot,omitempty"`
 }
 
 // DBResult is the answer to a DBQuery. Values are null, numbers or text;
@@ -280,6 +301,66 @@ type DBResult struct {
 	Rows      [][]any  `json:"rows"`
 	Truncated bool     `json:"truncated,omitempty"`
 	Changes   int64    `json:"changes,omitempty"`
+}
+
+// BackupStorage is an S3-compatible bucket. Backups go to
+// <Path>/<app>/<database>/ in it.
+type BackupStorage struct {
+	Endpoint  string `json:"endpoint"`
+	Region    string `json:"region"`
+	Bucket    string `json:"bucket"`
+	Path      string `json:"path,omitempty"`
+	AccessKey string `json:"access_key"`
+	SecretKey string `json:"secret_key"`
+}
+
+// BackupConfig is where backups go. Without Storage the agent stops
+// replicating.
+type BackupConfig struct {
+	Storage *BackupStorage `json:"storage,omitempty"`
+}
+
+// BackupRequest names an app; Database narrows it to one database. Reason
+// names a snapshot, such as "manual".
+type BackupRequest struct {
+	App      string `json:"app"`
+	Database string `json:"database,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// Backups are the backups of an app's databases.
+type Backups struct {
+	App       string           `json:"app"`
+	Databases []DatabaseBackup `json:"databases"`
+}
+
+// DatabaseBackup is how one database is backed up: its snapshots, newest
+// first, and the window a point in time restore can reach. VerifiedAt is
+// the newest restore drill that passed the integrity check.
+type DatabaseBackup struct {
+	Database     string     `json:"database"`
+	Snapshots    []Snapshot `json:"snapshots"`
+	Since        *time.Time `json:"since,omitempty"`
+	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
+	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
+	Error        string     `json:"error,omitempty"`
+}
+
+// Snapshot is a full copy of a database, gzipped in the bucket.
+type Snapshot struct {
+	ID        string    `json:"id"`
+	Reason    string    `json:"reason"`
+	Size      int64     `json:"size"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// BackupRestore puts one database back: from a snapshot, or to a point in
+// time. The app stops for the swap and starts again.
+type BackupRestore struct {
+	App      string     `json:"app"`
+	Database string     `json:"database,omitempty"`
+	Snapshot string     `json:"snapshot,omitempty"`
+	At       *time.Time `json:"at,omitempty"`
 }
 
 // Error is the answer to a request that failed.
