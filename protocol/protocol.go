@@ -46,6 +46,15 @@ const (
 	// or TypeError.
 	TypeAppRemove MessageType = "app.remove"
 
+	// TypeDBTables lists the tables of an app's SQLite database
+	// (DBRequest). The agent answers with TypeDBTablesResult or TypeError.
+	TypeDBTables       MessageType = "db.tables"
+	TypeDBTablesResult MessageType = "db.tables.result"
+	// TypeDBQuery runs SQL against an app's SQLite database (DBQuery). The
+	// agent answers with TypeDBQueryResult or TypeError.
+	TypeDBQuery       MessageType = "db.query"
+	TypeDBQueryResult MessageType = "db.query.result"
+
 	// TypeOK answers a request that has no result.
 	TypeOK MessageType = "ok"
 	// TypeError answers a request that failed (Error).
@@ -205,6 +214,72 @@ type LogsResult struct {
 // AppRemove names the app to remove.
 type AppRemove struct {
 	App string `json:"app"`
+}
+
+// DBRequest names an app's database by its path in the container, as in
+// Detected.Databases. An empty Database means the first one.
+type DBRequest struct {
+	App      string `json:"app"`
+	Database string `json:"database,omitempty"`
+}
+
+// DBTables lists the tables and views of a database, and the newest
+// migration a known migration tool recorded in it.
+type DBTables struct {
+	Database  string       `json:"database"`
+	Tables    []DBTable    `json:"tables"`
+	Migration *DBMigration `json:"migration,omitempty"`
+}
+
+// DBMigration is the newest migration of goose, golang-migrate, Prisma or
+// Drizzle. The app runs its migrations; ops only reads where they are.
+type DBMigration struct {
+	Tool      string `json:"tool"`
+	Version   string `json:"version"`
+	AppliedAt string `json:"applied_at,omitempty"`
+}
+
+// DBTable is one table or view. RowID is false for views and WITHOUT ROWID
+// tables: their rows cannot be edited by rowid.
+type DBTable struct {
+	Name    string     `json:"name"`
+	Type    string     `json:"type"`
+	Rows    int64      `json:"rows"`
+	RowID   bool       `json:"rowid"`
+	Columns []DBColumn `json:"columns"`
+	// SQL is the CREATE statement, Indexes the CREATE INDEX statements.
+	SQL     string   `json:"sql,omitempty"`
+	Indexes []string `json:"indexes,omitempty"`
+}
+
+// DBColumn is one column of a table.
+type DBColumn struct {
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	NotNull    bool   `json:"not_null,omitempty"`
+	PrimaryKey bool   `json:"primary_key,omitempty"`
+}
+
+// DBQuery runs SQL with positional parameters. A read opens the database
+// read-only and returns at most Limit rows. A write runs in one
+// transaction and returns the number of changed rows.
+type DBQuery struct {
+	DBRequest
+	SQL    string `json:"sql"`
+	Params []any  `json:"params,omitempty"`
+	Write  bool   `json:"write,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+}
+
+// DBResult is the answer to a DBQuery. Values are null, numbers or text;
+// a blob that is not text comes as "0x" and its hex. Truncated is true when
+// the query had more rows than the limit.
+type DBResult struct {
+	Database  string   `json:"database"`
+	Columns   []string `json:"columns"`
+	Rows      [][]any  `json:"rows"`
+	Truncated bool     `json:"truncated,omitempty"`
+	Changes   int64    `json:"changes,omitempty"`
 }
 
 // Error is the answer to a request that failed.

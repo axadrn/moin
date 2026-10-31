@@ -1,0 +1,194 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/internal/style"
+)
+
+// db shows an app's SQLite database: its tables, or a page of rows.
+func db(ctx context.Context, args []string, stdout io.Writer) error {
+	command := "tables"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command, args = args[0], args[1:]
+	}
+	flags := flag.NewFlagSet("db "+command, flag.ContinueOnError)
+	appFlag := flags.String("app", "", "app name")
+	database := flags.String("db", "", "database path in the container; default the first")
+	limit := flags.Int("limit", 20, "rows to show")
+	offset := flags.Int("offset", 0, "rows to skip")
+	if err := parseAnywhere(flags, args); err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	name := appName(*appFlag, ".")
+	switch command {
+	case "tables", "ls":
+		tables, err := api.Tables(ctx, name, *database)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, style.Bold.Render(tables.Database))
+		rows := [][]string{}
+		for _, table := range tables.Tables {
+			rows = append(rows, []string{table.Name, table.Type, strconv.FormatInt(table.Rows, 10), strconv.Itoa(len(table.Columns))})
+		}
+		table(stdout, []string{"TABLE", "TYPE", "ROWS", "COLUMNS"}, rows)
+		if tables.Migration != nil {
+			fmt.Fprintf(stdout, "\n%s at %s %s\n", tables.Migration.Tool, tables.Migration.Version, style.Muted.Render(tables.Migration.AppliedAt))
+		}
+		return nil
+	case "rows":
+		if flags.NArg() != 1 {
+			return errors.New("name the table: " + build.Name + " db rows <table>")
+		}
+		page, err := api.Rows(ctx, name, *database, flags.Arg(0), *offset, *limit)
+		if err != nil {
+			return err
+		}
+		columns, rows := page.Columns, page.Rows
+		if page.Table.RowID && len(columns) > 0 {
+			// The rowid comes first; the table's own columns follow.
+			columns = columns[1:]
+			for index, row := range rows {
+				rows[index] = row[1:]
+			}
+		}
+		printResult(stdout, columns, rows)
+		shown := page.Offset + len(page.Rows)
+		if int64(shown) < page.Table.Rows {
+			fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("%d–%d of %d, more with --offset %d", page.Offset+1, shown, page.Table.Rows, shown)))
+		}
+		return nil
+	case "schema":
+		tables, err := api.Tables(ctx, name, *database)
+		if err != nil {
+			return err
+		}
+		for _, table := range tables.Tables {
+			if flags.NArg() > 0 && table.Name != flags.Arg(0) {
+				continue
+			}
+			fmt.Fprintln(stdout, table.SQL+";")
+			for _, index := range table.Indexes {
+				fmt.Fprintln(stdout, index+";")
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown command %q: use %s db, db rows <table> or db schema", command, build.Name)
+}
+
+// sql runs one statement. Changes need --write.
+func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := flag.NewFlagSet("sql", flag.ContinueOnError)
+	appFlag := flags.String("app", "", "app name")
+	database := flags.String("db", "", "database path in the container; default the first")
+	write := flags.Bool("write", false, "allow changes")
+	limit := flags.Int("limit", 100, "rows to show")
+	if err := parseAnywhere(flags, args); err != nil {
+		return err
+	}
+	query := strings.Join(flags.Args(), " ")
+	if query == "" || query == "-" {
+		body, err := io.ReadAll(stdin)
+		if err != nil {
+			return err
+		}
+		query = string(body)
+	}
+	if strings.TrimSpace(query) == "" {
+		return errors.New("give the SQL as an argument or on stdin: " + build.Name + ` sql "SELECT 1"`)
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	result, err := api.Query(ctx, appName(*appFlag, "."), *database, query, *write, *limit)
+	if err != nil {
+		if !*write && strings.Contains(err.Error(), "readonly") {
+			return errors.New("this query changes data: run it again with --write")
+		}
+		return err
+	}
+	if *write {
+		done(stdout, "%d %s changed", result.Changes, pluralWord(result.Changes, "row", "rows"))
+		return nil
+	}
+	printResult(stdout, result.Columns, result.Rows)
+	if result.Truncated {
+		fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("first %d rows, more with --limit", len(result.Rows))))
+	}
+	return nil
+}
+
+// parseAnywhere parses flags before and after the arguments, so
+// `db rows orders --limit 5` works like `db rows --limit 5 orders`.
+func parseAnywhere(flags *flag.FlagSet, args []string) error {
+	rest := []string{}
+	for {
+		if err := flags.Parse(args); err != nil {
+			return err
+		}
+		if flags.NArg() == 0 {
+			break
+		}
+		rest = append(rest, flags.Arg(0))
+		args = flags.Args()[1:]
+	}
+	return flags.Parse(rest)
+}
+
+func printResult(w io.Writer, columns []string, rows [][]any) {
+	header := make([]string, len(columns))
+	for index, column := range columns {
+		header[index] = strings.ToUpper(column)
+	}
+	cells := make([][]string, 0, len(rows))
+	for _, row := range rows {
+		line := make([]string, len(row))
+		for index, value := range row {
+			line[index] = cellText(value)
+		}
+		cells = append(cells, line)
+	}
+	table(w, header, cells)
+}
+
+// cellText prints a value: NULL dimmed, whole numbers without a decimal
+// point, long text cut.
+func cellText(value any) string {
+	switch value := value.(type) {
+	case nil:
+		return style.Muted.Render("NULL")
+	case float64:
+		if value == float64(int64(value)) {
+			return strconv.FormatInt(int64(value), 10)
+		}
+		return strconv.FormatFloat(value, 'g', -1, 64)
+	case string:
+		value = strings.ReplaceAll(value, "\n", " ")
+		if len([]rune(value)) > 60 {
+			return string([]rune(value)[:59]) + "…"
+		}
+		return value
+	}
+	return fmt.Sprint(value)
+}
+
+func pluralWord(n int64, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}

@@ -90,6 +90,16 @@ func frames() map[string]model {
 		m.mode, m.input = modeEnv, "TUI_KEY=sec"
 	})
 	add("detail-rollback", func(m *model) { m.tab, m.detail, m.mode = tabApps, detail, modeConfirmRollback })
+	add("detail-sql", func(m *model) {
+		m.tab, m.detail, m.outputID, m.outputTitle = tabApps, detail, 1, "SELECT name, stock FROM products ORDER BY stock DESC LIMIT 2"
+		m.output = resultLines([]string{"name", "stock"}, [][]any{{"Cable organizer", float64(61)}, {"Desk lamp", nil}})
+		m.mode, m.input = modeSQL, "SELECT * FROM orders WHERE status = 'refunded' AND created_at > '2026-10-01' ORDER BY id DESC"
+		m.err = errors.New("near \"FORM\": syntax error")
+	})
+	add("detail-sql-write", func(m *model) {
+		m.tab, m.detail, m.mode = tabApps, detail, modeConfirmWrite
+		m.pendingSQL = "UPDATE settings SET value = 'on' WHERE key = 'maintenance' AND value IS NOT NULL AND key != 'currency'"
+	})
 	return out
 }
 

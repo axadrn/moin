@@ -64,6 +64,13 @@ CI
   registry set       Save a login: registry set <host> <username>
   registry rm        Remove a login: registry rm <host>
 
+Data
+  db                 Tables, rows and migration of the app's SQLite database
+  db rows            A page of a table, newest first: db rows orders [--limit 20]
+  db schema          The CREATE statements: db schema [table]
+  sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"
+  sql --write        Run SQL that changes data, in one transaction
+
 Env
   env                List env vars: env [--show]
   env set            Set env vars: env set KEY=value ...
@@ -153,6 +160,10 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return redeploy(ctx, rest, stdout)
 	case "logs":
 		return logs(ctx, rest, stdout)
+	case "db":
+		return db(ctx, rest, stdout)
+	case "sql":
+		return sql(ctx, rest, stdin, stdout)
 	case "env":
 		return env(ctx, rest, stdout)
 	case "hook":

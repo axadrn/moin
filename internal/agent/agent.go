@@ -308,6 +308,30 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeDBTables:
+		var request protocol.DBRequest
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		result, err := r.apps.tables(ctx, request)
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeDBTablesResult, message.RequestID, result)
+	case protocol.TypeDBQuery:
+		var request protocol.DBQuery
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		result, err := r.apps.query(ctx, request)
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeDBQueryResult, message.RequestID, result)
 	default:
 		if message.RequestID != "" {
 			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))

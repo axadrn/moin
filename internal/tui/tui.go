@@ -8,11 +8,13 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
@@ -104,6 +106,8 @@ const (
 	modeImage
 	modeDomains
 	modeProtect
+	modeSQL
+	modeConfirmWrite
 )
 
 // shared is what every copy of the model points to.
@@ -139,6 +143,8 @@ type model struct {
 	selected int
 	input    string
 	added    *client.NewServer
+	// pendingSQL is a query that changes data, waiting for a yes.
+	pendingSQL string
 
 	apps        []client.App
 	appSelected int
@@ -218,6 +224,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 	case streamErrMsg:
 		m.offline = msg.err
+	case writeMsg:
+		m.mode, m.pendingSQL = modeConfirmWrite, string(msg)
 	case addedMsg:
 		added := client.NewServer(msg)
 		m.added, m.mode, m.input = &added, modeList, ""
@@ -298,6 +306,29 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.input = dropLast(m.input)
 		default:
 			m.input += msg.Text
+		}
+		return m, nil
+	case modeSQL:
+		switch key {
+		case "esc":
+			m.mode, m.input = modeList, ""
+		case "enter":
+			app, _ := m.currentApp()
+			query := strings.TrimSpace(m.input)
+			if query == "" {
+				return m, nil
+			}
+			return m, m.runSQL(app.Name, query, false)
+		case "backspace":
+			m.input = dropLast(m.input)
+		default:
+			m.input += msg.Text
+		}
+		return m, nil
+	case modeConfirmWrite:
+		m.mode = modeSQL
+		if app, ok := m.currentApp(); key == "y" && ok {
+			return m, m.runSQL(app.Name, m.pendingSQL, true)
 		}
 		return m, nil
 	case modeImage:
@@ -420,6 +451,11 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 	case "p":
 		if ok {
 			m.mode, m.input = modeProtect, ""
+		}
+	case "s":
+		if ok {
+			m.mode, m.input = modeSQL, ""
+			return m, m.showTables(app.Name)
 		}
 	case "x":
 		if ok {
@@ -709,4 +745,102 @@ func (m model) follow(name string, started client.Deploy, title string) tea.Msg 
 		}
 	}()
 	return outputMsg{id: id, title: title, lines: []string{}, follow: true}
+}
+
+// writeMsg is a query that tried to change data; it waits for a yes.
+type writeMsg string
+
+// showTables lists the tables of the app's database in the output panel.
+func (m model) showTables(name string) tea.Cmd {
+	return func() tea.Msg {
+		tables, err := m.api.Tables(m.ctx, name, "")
+		if err != nil {
+			return errMsg{err}
+		}
+		rows := [][]any{}
+		for _, table := range tables.Tables {
+			rows = append(rows, []any{table.Name, table.Type, float64(table.Rows)})
+		}
+		note := style.Muted.Render(tables.Database)
+		if tables.Migration != nil {
+			note += style.Muted.Render(" · " + tables.Migration.Tool + " at " + tables.Migration.Version)
+		}
+		return outputMsg{id: m.shared.outputs.Add(1), title: "data of " + name, note: note, lines: resultLines([]string{"table", "type", "rows"}, rows)}
+	}
+}
+
+// runSQL runs a query. A read that would change data asks first.
+func (m model) runSQL(name, query string, write bool) tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.api.Query(m.ctx, name, "", query, write, 200)
+		if err != nil && !write && strings.Contains(err.Error(), "readonly") {
+			return writeMsg(query)
+		}
+		if err != nil {
+			return errMsg{err}
+		}
+		if write {
+			return noticeMsg(fmt.Sprintf("%d rows changed", result.Changes))
+		}
+		note := style.Muted.Render(fmt.Sprintf("%d rows", len(result.Rows)))
+		if result.Truncated {
+			note += style.Muted.Render(", more not shown")
+		}
+		return outputMsg{id: m.shared.outputs.Add(1), title: query, note: note, lines: resultLines(result.Columns, result.Rows)}
+	}
+}
+
+// resultLines lays out rows as aligned columns under a muted header.
+func resultLines(columns []string, rows [][]any) []string {
+	cells := [][]string{make([]string, len(columns))}
+	for index, column := range columns {
+		cells[0][index] = strings.ToUpper(column)
+	}
+	for _, row := range rows {
+		line := make([]string, len(row))
+		for index, value := range row {
+			line[index] = cellText(value)
+		}
+		cells = append(cells, line)
+	}
+	widths := make([]int, len(columns))
+	for _, row := range cells {
+		for index, cell := range row {
+			if index < len(widths) {
+				widths[index] = max(widths[index], lipgloss.Width(cell))
+			}
+		}
+	}
+	lines := make([]string, 0, len(cells))
+	for number, row := range cells {
+		parts := make([]string, len(row))
+		for index, cell := range row {
+			parts[index] = cell + strings.Repeat(" ", max(widths[min(index, len(widths)-1)]-lipgloss.Width(cell), 0))
+		}
+		line := strings.TrimRight(strings.Join(parts, "  "), " ")
+		if number == 0 {
+			line = style.Muted.Render(line)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+func cellText(value any) string {
+	switch value := value.(type) {
+	case nil:
+		return style.Muted.Render("NULL")
+	case float64:
+		if value == float64(int64(value)) {
+			return strconv.FormatInt(int64(value), 10)
+		}
+		return strconv.FormatFloat(value, 'g', -1, 64)
+	case string:
+		value = strings.ReplaceAll(value, "\n", " ")
+		if len([]rune(value)) > 40 {
+			return string([]rune(value)[:39]) + "…"
+		}
+		return value
+	}
+	return fmt.Sprint(value)
 }

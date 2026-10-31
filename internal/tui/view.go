@@ -289,14 +289,14 @@ func (m model) footer(width int) []string {
 			lines = append(lines, " "+lead+" "+color.Render(line))
 		}
 	}
+	// A result shows above an open prompt, such as the error of a query.
 	switch {
-	case prompt != nil:
-		lines = append(lines, prompt...)
 	case m.err != nil:
 		message(style.SymbolFailed, style.Danger, sentence(m.err.Error()))
 	case m.notice != "":
 		message(style.SymbolDone, style.Success, m.notice)
 	}
+	lines = append(lines, prompt...)
 	return append(lines, hints(keys, width)...)
 }
 
@@ -324,6 +324,10 @@ func (m model) prompt() ([]string, [][2]string) {
 		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, {"enter", "apply"}, {"esc", "close"}}
 	case modeImage:
 		return bar(style.Accent, style.Bold.Render("Image: ")+m.input+cursor), [][2]string{{"enter", "deploy"}, {"esc", "cancel"}}
+	case modeSQL:
+		return bar(style.Accent, style.Bold.Render("SQL: ")+m.input+cursor), [][2]string{{"enter", "run"}, {"esc", "close"}}
+	case modeConfirmWrite:
+		return bar(style.Warning, style.Bold.Render("This query changes data. Run it?"), m.pendingSQL), [][2]string{{"y", "run"}, cancel}
 	case modeDomains:
 		return bar(style.Accent, style.Bold.Render("Domain: ")+m.input+cursor), [][2]string{{"blog.de", "add"}, {"-blog.de", "remove"}, {"=blog.de", "canonical"}, {"esc", "close"}}
 	case modeProtect:
@@ -347,7 +351,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	}
 
 	here := client.AppName("", m.dir)
-	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
+	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
