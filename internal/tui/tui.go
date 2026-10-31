@@ -59,6 +59,7 @@ func watch(ctx context.Context, program *tea.Program, stream func(context.Contex
 type (
 	serversMsg []client.Server
 	appsMsg    []client.App
+	eventsMsg  []client.Event
 	errMsg     struct{ err error }
 	// streamErrMsg means a live stream broke; it reconnects by itself.
 	streamErrMsg struct{ err error }
@@ -93,6 +94,7 @@ type tab int
 const (
 	tabServers tab = iota
 	tabApps
+	tabActivity
 )
 
 type mode int
@@ -130,8 +132,10 @@ type model struct {
 	ctx    context.Context
 	shared *shared
 
-	tab     tab
-	mode    mode
+	tab  tab
+	mode mode
+	// events is the activity of the workspace, newest first.
+	events  []client.Event
 	width   int
 	height  int
 	err     error
@@ -191,12 +195,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case serversMsg:
 		m.servers, m.loading, m.offline = msg, false, nil
 		m.selected = min(m.selected, max(len(m.servers)-1, 0))
+		if m.tab == tabActivity {
+			return m, m.loadActivity()
+		}
 	case appsMsg:
 		m.apps, m.offline = msg, nil
 		m.appSelected = min(m.appSelected, max(len(m.apps)-1, 0))
+		if m.tab == tabActivity {
+			return m, m.loadActivity()
+		}
 		if m.detail != nil {
 			return m, m.loadDetail(m.detail.App.Name)
 		}
+	case eventsMsg:
+		m.events = msg
 	case detailMsg:
 		detail := client.AppDetail(msg)
 		m.detail = &detail
@@ -400,12 +412,18 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "tab":
-		m.tab = (m.tab + 1) % 2
+		m.tab = (m.tab + 1) % 3
 		m.added = nil
+		if m.tab == tabActivity {
+			return m, m.loadActivity()
+		}
 		return m, nil
 	}
 	if m.tab == tabServers {
 		return m.serverKey(key)
+	}
+	if m.tab == tabActivity {
+		return m, nil
 	}
 	return m.appKey(key)
 }
@@ -602,6 +620,18 @@ func (m model) loadDetail(name string) tea.Cmd {
 			return errMsg{err}
 		}
 		return detailMsg(detail)
+	}
+}
+
+// loadActivity fetches what the team did; every change of the servers or
+// apps loads it again while the tab is open.
+func (m model) loadActivity() tea.Cmd {
+	return func() tea.Msg {
+		events, err := m.api.Activity(m.ctx, 100)
+		if err != nil {
+			return errMsg{err}
+		}
+		return eventsMsg(events)
 	}
 }
 

@@ -29,8 +29,9 @@ Usage
   ops <command>      Run one command
 
 Account
-  login              Sign in with a personal API token
+  login              Sign in with a personal API token; it belongs to one workspace
   logout             Forget the token on this machine
+  activity           Who deployed, restored or changed what: activity [--limit 30]
 
 Servers
   servers            List servers
@@ -166,6 +167,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		done(stdout, "Logged out")
 		return nil
+	case "activity":
+		return activity(ctx, rest, stdout)
 	case "servers":
 		return servers(ctx, rest, stdout)
 	case "apps":

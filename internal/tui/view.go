@@ -62,10 +62,14 @@ func (m model) header(width int) []string {
 	}
 	servers := tab("servers", m.tab == tabServers, len(m.servers))
 	apps := tab("apps", m.tab == tabApps, len(m.apps))
+	activity := style.Muted.Render("activity")
+	if m.tab == tabActivity {
+		activity = style.Accent.Bold(true).Render("activity")
+	}
 	if m.tab == tabApps && m.detail != nil {
 		apps = style.Accent.Bold(true).Render("apps") + style.Muted.Render(" › ") + style.Bold.Render(m.detail.App.Name)
 	}
-	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps
+	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps + "   " + activity
 
 	right := style.Muted.Render(host(m.url))
 	switch {
@@ -98,10 +102,37 @@ func (m model) body(width, room int) []string {
 	switch {
 	case m.tab == tabServers:
 		return m.serversView(width, room)
+	case m.tab == tabActivity:
+		return m.activityView(room)
 	case m.detail != nil:
 		return m.detailView(width, room)
 	}
 	return m.appsView(room)
+}
+
+// activityView is who did what, newest first, as many as fit.
+func (m model) activityView(room int) []string {
+	if len(m.events) == 0 {
+		return []string{pad + style.Muted.Render("Nothing happened yet. Deploys, restores, SQL writes and every other change show up here.")}
+	}
+	rows := make([][]string, 0, len(m.events))
+	for _, event := range m.events {
+		rows = append(rows, []string{style.Muted.Render(event.CreatedAt.Local().Format("Jan 2 15:04")), event.Actor, style.Muted.Render(viaName(event.Via)), event.Summary})
+	}
+	return table([]string{"WHEN", "WHO", "VIA", "WHAT"}, rows, -1, room)
+}
+
+// viaName names how a change came in.
+func viaName(via string) string {
+	switch via {
+	case "api":
+		return "cli"
+	case "mcp":
+		return "agent"
+	case "hook":
+		return "deploy hook"
+	}
+	return via
 }
 
 func (m model) serversView(width, room int) []string {
@@ -364,12 +395,14 @@ func (m model) prompt() ([]string, [][2]string) {
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
+	case m.tab == tabActivity:
+		return nil, [][2]string{{"tab", "servers"}, {"q", "quit"}}
 	case m.tab == tabServers:
 		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		return nil, append(appKeys, [2]string{"esc", "back"}, [2]string{"q", "quit"})
 	}
-	keys := [][2]string{{"tab", "servers"}, {"↑↓", "select"}, {"enter", "open"}}
+	keys := [][2]string{{"tab", "activity"}, {"↑↓", "select"}, {"enter", "open"}}
 	return nil, append(append(keys, appKeys...), [2]string{"q", "quit"})
 }
 
