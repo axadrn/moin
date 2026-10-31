@@ -96,11 +96,12 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
 	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service")
+	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 1 {
-		return fmt.Errorf("usage: %s deploy [--dir <dir>] [--server <server>] [--image <image>] [app]", build.Name)
+		return fmt.Errorf("usage: %s deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [app]", build.Name)
 	}
 	api, err := apiClient()
 	if err != nil {
@@ -109,6 +110,19 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	name := appName(flags.Arg(0), *dir)
 	if name == "" {
 		return errors.New("cannot tell the app name: pass it, or set x-ops.app in compose.yml")
+	}
+	if *ref != "" {
+		// The control plane downloads the commit from GitHub; nothing is
+		// uploaded.
+		step(stdout, "Deploying %s from GitHub", *ref)
+		started, err := api.DeployRef(ctx, name, *ref)
+		if err != nil {
+			return err
+		}
+		if started.Commit != "" {
+			step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
+		}
+		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 	}
 	if *image != "" {
 		// The server keeps the compose file of the running release and pulls

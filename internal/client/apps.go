@@ -15,29 +15,38 @@ import (
 
 // App is a compose project on a server, as the API answers it.
 type App struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	ServerID     string    `json:"server_id"`
-	ServerName   string    `json:"server_name"`
-	LatestNumber int       `json:"latest_number"`
-	LatestStatus string    `json:"latest_status"`
-	LiveNumber   int       `json:"live_number"`
-	Domains      []string  `json:"domains"`
-	Canonical    string    `json:"canonical"`
-	Protected    bool      `json:"protected"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	ServerID     string   `json:"server_id"`
+	ServerName   string   `json:"server_name"`
+	LatestNumber int      `json:"latest_number"`
+	LatestStatus string   `json:"latest_status"`
+	LiveNumber   int      `json:"live_number"`
+	Domains      []string `json:"domains"`
+	Canonical    string   `json:"canonical"`
+	Protected    bool     `json:"protected"`
+	// Repo and Branch are the GitHub repo the app follows, if any.
+	Repo                  string    `json:"repo"`
+	Branch                string    `json:"branch"`
+	AutoDeploy            bool      `json:"auto_deploy"`
+	SnapshotBeforeChanges bool      `json:"snapshot_before_changes"`
+	CreatedAt             time.Time `json:"created_at"`
 }
 
 // Deploy is one release of an app.
 type Deploy struct {
-	Number     int                `json:"number"`
-	Status     string             `json:"status"`
-	FromNumber int                `json:"from_number"`
-	Error      string             `json:"error"`
-	Detected   *protocol.Detected `json:"detected"`
-	CreatedAt  time.Time          `json:"created_at"`
-	FinishedAt *time.Time         `json:"finished_at"`
-	Log        []string           `json:"log"`
+	Number     int    `json:"number"`
+	Status     string `json:"status"`
+	FromNumber int    `json:"from_number"`
+	// Ref and Commit name the GitHub commit the deploy came from.
+	Ref           string             `json:"ref"`
+	Commit        string             `json:"commit"`
+	CommitMessage string             `json:"commit_message"`
+	Error         string             `json:"error"`
+	Detected      *protocol.Detected `json:"detected"`
+	CreatedAt     time.Time          `json:"created_at"`
+	FinishedAt    *time.Time         `json:"finished_at"`
+	Log           []string           `json:"log"`
 }
 
 // AppDetail is an app with its newest deploys.
@@ -212,6 +221,14 @@ func (a App) Status() string {
 func (c *Client) DeployImage(ctx context.Context, app, image string) (Deploy, error) {
 	var response Deploy
 	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image}, &response)
+	return response, err
+}
+
+// DeployRef deploys a branch, tag or commit of the app's GitHub repo;
+// an empty ref deploys the linked branch.
+func (c *Client) DeployRef(ctx context.Context, app, ref string) (Deploy, error) {
+	var response Deploy
+	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"ref": ref}, &response)
 	return response, err
 }
 

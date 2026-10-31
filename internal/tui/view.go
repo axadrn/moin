@@ -203,6 +203,9 @@ func (m model) deployRow(deploy client.Deploy, liveNumber int) []string {
 		took = duration(time.Since(deploy.CreatedAt))
 	}
 	note := deploy.Error
+	if deploy.Commit != "" && note == "" {
+		note = deploy.Commit[:min(7, len(deploy.Commit))] + " " + deploy.CommitMessage
+	}
 	if deploy.FromNumber > 0 {
 		note = strings.TrimSpace(fmt.Sprintf("rollback to v%d %s", deploy.FromNumber, note))
 	}
@@ -355,7 +358,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	}
 
 	here := client.AppName("", m.dir)
-	appKeys := [][2]string{{"d", "deploy " + here}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
+	appKeys := [][2]string{{"d", "deploy " + here}, {"g", "deploy from GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}

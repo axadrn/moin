@@ -45,6 +45,7 @@ Apps
 Deploys
   deploy             Deploy this directory: deploy [--server <server>] [app]
   deploy --image     Deploy an image built in CI: deploy --image <image> [app]
+  deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Run the newest source or image again with the current env
   rollback           Start an earlier release again: rollback [v<number>]
   logs               Show the last lines of the app: logs [--tail 200] [app]
@@ -57,6 +58,12 @@ Domains
   protect            Ask for a password: protect [--user ops], password on stdin
   protect off        Make the app public again
   apply              Restart the running release with the current env and domains
+
+GitHub
+  github             Where the ops GitHub App is installed, and the link to install it
+  github repos       Repos ops may read
+  link               Follow a repo: link owner/name [--branch main] [--auto=false]
+  unlink             Stop following it
 
 CI
   hook               New deploy hook URL for CI: hook [app]
@@ -175,6 +182,12 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return sql(ctx, rest, stdin, stdout)
 	case "backups":
 		return backups(ctx, rest, stdin, stdout)
+	case "github":
+		return github(ctx, rest, stdout)
+	case "link":
+		return link(ctx, rest, stdout)
+	case "unlink":
+		return unlink(ctx, rest, stdout)
 	case "backup":
 		return backUp(ctx, rest, stdout)
 	case "restore":

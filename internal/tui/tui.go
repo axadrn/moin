@@ -490,6 +490,10 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 			m.mode, m.input = modeBackups, ""
 			return m, m.showBackups(app.Name, "")
 		}
+	case "g":
+		if ok {
+			return m, m.deployRef(app.Name)
+		}
 	case "x":
 		if ok {
 			m.mode = modeConfirmRemove
@@ -592,6 +596,21 @@ func (m model) deployImage(name, image string) tea.Cmd {
 			return errMsg{err}
 		}
 		return m.follow(name, started, fmt.Sprintf("deploy v%d of %s", started.Number, name))
+	}
+}
+
+// deployRef deploys the linked branch of the app's GitHub repo.
+func (m model) deployRef(name string) tea.Cmd {
+	return func() tea.Msg {
+		started, err := m.api.DeployRef(m.ctx, name, "")
+		if err != nil {
+			return errMsg{err}
+		}
+		title := fmt.Sprintf("deploy v%d of %s", started.Number, name)
+		if started.Commit != "" {
+			title += " from " + started.Commit[:min(7, len(started.Commit))]
+		}
+		return m.follow(name, started, title)
 	}
 }
 
