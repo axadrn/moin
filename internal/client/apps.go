@@ -81,7 +81,11 @@ func (c *Client) RemoveApp(ctx context.Context, app string) error {
 
 // Deploy uploads a gzipped source tarball and starts a deploy.
 func (c *Client) Deploy(ctx context.Context, app string, source io.Reader) (Deploy, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+appPath(app, "deploys"), source)
+	return c.deploySource(ctx, appPath(app, "deploys"), source)
+}
+
+func (c *Client) deploySource(ctx context.Context, path string, source io.Reader) (Deploy, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+path, source)
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -186,7 +190,7 @@ func (c *Client) WatchApps(ctx context.Context, fn func([]App)) error {
 	})
 }
 
-// Status is "live v3", "deploying v4", "failed v4 (v3 live)" or "new".
+// Status is "live v3", "deploying v4", "failed v4 · v3 live" or "new".
 func (a App) Status() string {
 	switch {
 	case a.LatestNumber == 0:
@@ -194,9 +198,56 @@ func (a App) Status() string {
 	case a.LatestStatus == "running":
 		return fmt.Sprintf("deploying v%d", a.LatestNumber)
 	case a.LatestStatus == "failed" && a.LiveNumber > 0:
-		return fmt.Sprintf("failed v%d, v%d live", a.LatestNumber, a.LiveNumber)
+		return fmt.Sprintf("failed v%d · v%d live", a.LatestNumber, a.LiveNumber)
 	case a.LatestStatus == "failed":
 		return fmt.Sprintf("failed v%d", a.LatestNumber)
 	}
 	return fmt.Sprintf("live v%d", a.LiveNumber)
+}
+
+// DeployImage deploys an image built elsewhere as the app's main service.
+func (c *Client) DeployImage(ctx context.Context, app, image string) (Deploy, error) {
+	var response Deploy
+	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image}, &response)
+	return response, err
+}
+
+// DeploySourceWithImage uploads a source tarball whose main service runs image.
+func (c *Client) DeploySourceWithImage(ctx context.Context, app, image string, source io.Reader) (Deploy, error) {
+	return c.deploySource(ctx, appPath(app, "deploys")+"?image="+url.QueryEscape(image), source)
+}
+
+// RotateDeployHook gives the app a new deploy hook URL; the old one stops working.
+func (c *Client) RotateDeployHook(ctx context.Context, app string) (string, error) {
+	var response struct {
+		URL string `json:"url"`
+	}
+	err := c.do(ctx, http.MethodPost, appPath(app, "hook"), nil, &response)
+	return response.URL, err
+}
+
+// Registry is a registry login without its password.
+type Registry struct {
+	Host      string    `json:"host"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Registries lists the account's registry logins.
+func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
+	var response struct {
+		Items []Registry `json:"items"`
+	}
+	err := c.do(ctx, http.MethodGet, "/api/v1/registries", nil, &response)
+	return response.Items, err
+}
+
+// SetRegistry stores the login for a registry host.
+func (c *Client) SetRegistry(ctx context.Context, host, username, password string) error {
+	return c.do(ctx, http.MethodPut, "/api/v1/registries/"+url.PathEscape(host), map[string]string{"username": username, "password": password}, nil)
+}
+
+// RemoveRegistry deletes the login for a registry host.
+func (c *Client) RemoveRegistry(ctx context.Context, host string) error {
+	return c.do(ctx, http.MethodDelete, "/api/v1/registries/"+url.PathEscape(host), nil, nil)
 }

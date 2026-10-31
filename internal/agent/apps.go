@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -131,22 +132,58 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		if err != nil {
 			return detected, err
 		}
+		base, err := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "base.json"))
+		if err == nil {
+			_ = os.WriteFile(filepath.Join(release, "base.json"), base, 0o600)
+		}
 	} else {
-		src := filepath.Join(release, "src")
-		logf("downloading the source")
-		err = download(ctx, start.SourceURL, start.SHA256, src)
+		var config map[string]any
+		reuse := 0
+		if start.SourceURL != "" {
+			src := filepath.Join(release, "src")
+			logf("downloading the source")
+			err = download(ctx, start.SourceURL, start.SHA256, src)
+			if err != nil {
+				return detected, err
+			}
+			config, detected, err = a.resolve(ctx, start.App, src)
+		} else {
+			// An image deploy without source keeps the compose file of the
+			// running release and its other images.
+			reuse = a.current(start.App)
+			if reuse == 0 {
+				return detected, errors.New("no release to take the compose file from: deploy the repo once with ops deploy")
+			}
+			config, detected, err = loadBase(a.releaseDir(start.App, reuse))
+		}
 		if err != nil {
 			return detected, err
 		}
-		detected, err = a.prepare(ctx, start, src, composeFile)
+		saveJSON(filepath.Join(release, "base.json"), config)
+		detected.Image = start.Image
+		err = finish(config, start, detected, reuse, composeFile)
 		if err != nil {
 			return detected, err
 		}
-		logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
-		logf("building")
-		err = a.compose(ctx, start.App, composeFile, logf, "build")
+		_, err = a.databases(ctx, composeFile, detected.Config)
 		if err != nil {
-			return detected, fmt.Errorf("build: %w", err)
+			return detected, err
+		}
+		if start.Image != "" {
+			logf("pulling %s", start.Image)
+			err = a.pull(ctx, start, composeFile, detected.Service, logf)
+			if err != nil {
+				return detected, fmt.Errorf("pull: %w", err)
+			}
+		} else {
+			logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
+		}
+		if builds(config) {
+			logf("building")
+			err = a.compose(ctx, start.App, composeFile, logf, "build")
+			if err != nil {
+				return detected, fmt.Errorf("build: %w", err)
+			}
 		}
 	}
 	saveJSON(filepath.Join(release, "detected.json"), detected)
@@ -235,65 +272,48 @@ func (a *apps) checkHealth(ctx context.Context, container string, port int, path
 	return fmt.Errorf("health check %s failed: %s", path, last)
 }
 
-// prepare writes compose.json for a new release and reports what it found.
-func (a *apps) prepare(ctx context.Context, start protocol.DeployStart, src, composeFile string) (protocol.Detected, error) {
+// resolve reads the compose file of a release's source through `docker
+// compose config` and moves the data mounts out of the release. It reports
+// what it found.
+func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, protocol.Detected, error) {
 	detected := protocol.Detected{Kind: "compose"}
 	if composePath(src) == "" {
 		var err error
 		detected.Kind, err = generate(src)
 		if err != nil {
-			return detected, err
+			return nil, detected, err
 		}
 	}
-	raw, err := a.output(ctx, "docker", "compose", "-p", project(start.App), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
+	raw, err := a.output(ctx, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
 	if err != nil {
-		return detected, fmt.Errorf("compose.yml: %w", err)
+		return nil, detected, fmt.Errorf("compose.yml: %w", err)
 	}
 	var config map[string]any
 	err = json.Unmarshal([]byte(raw), &config)
 	if err != nil {
-		return detected, fmt.Errorf("compose config: %w", err)
+		return nil, detected, fmt.Errorf("compose config: %w", err)
 	}
 	services, _ := config["services"].(map[string]any)
 	if len(services) == 0 {
-		return detected, errors.New("compose.yml has no services")
+		return nil, detected, errors.New("compose.yml has no services")
 	}
 	if block, ok := config["x-ops"]; ok {
 		detected.Config = &protocol.Config{}
 		body, _ := json.Marshal(block)
 		err = json.Unmarshal(body, detected.Config)
 		if err != nil {
-			return detected, fmt.Errorf("x-ops: %w", err)
+			return nil, detected, fmt.Errorf("x-ops: %w", err)
 		}
 	}
 	detected.Service = mainService(services, detected.Config)
 	if detected.Service == "" {
-		return detected, errors.New("cannot tell which service gets the traffic: set x-ops.service")
+		return nil, detected, errors.New("cannot tell which service gets the traffic: set x-ops.service")
 	}
 	detected.Port = mainPort(src, services[detected.Service], detected.Config)
 
-	volumesDir := filepath.Join(a.appDir(start.App), "volumes")
-	names := []string{}
-	for name := range services {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	for _, name := range names {
-		service, _ := services[name].(map[string]any)
-		if service["build"] != nil {
-			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, start.Number)
-			environment, _ := service["environment"].(map[string]any)
-			if environment == nil {
-				environment = map[string]any{}
-			}
-			for key, value := range start.Env {
-				environment[key] = strings.ReplaceAll(value, "$", "$$")
-			}
-			service["environment"] = environment
-		}
-		if service["restart"] == nil {
-			service["restart"] = "unless-stopped"
-		}
+	volumesDir := filepath.Join(a.appDir(app), "volumes")
+	for _, item := range services {
+		service, _ := item.(map[string]any)
 		mounts, _ := service["volumes"].([]any)
 		for _, item := range mounts {
 			mount, _ := item.(map[string]any)
@@ -310,21 +330,110 @@ func (a *apps) prepare(ctx context.Context, start protocol.DeployStart, src, com
 			stable := filepath.Join(volumesDir, relative)
 			err = os.MkdirAll(stable, 0o755)
 			if err != nil {
-				return detected, err
+				return nil, detected, err
 			}
 			mount["source"] = stable
 		}
 	}
-	body, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return detected, err
+	return config, detected, nil
+}
+
+// loadBase reads the resolved compose file and the findings of a release.
+func loadBase(release string) (map[string]any, protocol.Detected, error) {
+	var config map[string]any
+	var detected protocol.Detected
+	body, err := os.ReadFile(filepath.Join(release, "base.json"))
+	if err == nil {
+		err = json.Unmarshal(body, &config)
 	}
-	err = os.WriteFile(composeFile, body, 0o600)
 	if err != nil {
-		return detected, err
+		return nil, detected, errors.New("the running release has no compose file to reuse: deploy the repo once with ops deploy")
 	}
-	_, err = a.databases(ctx, composeFile, detected.Config)
-	return detected, err
+	body, _ = os.ReadFile(filepath.Join(release, "detected.json"))
+	_ = json.Unmarshal(body, &detected)
+	detected.Databases = nil
+	return config, detected, nil
+}
+
+// finish writes compose.json for a release: built services get an image tag
+// per deploy, or the tag of release reuse when there is no source; the main
+// service runs start.Image when set; the app's services get the env; every
+// service restarts unless stopped.
+func finish(base map[string]any, start protocol.DeployStart, detected protocol.Detected, reuse int, composeFile string) error {
+	body, err := json.Marshal(base)
+	if err != nil {
+		return err
+	}
+	var config map[string]any
+	err = json.Unmarshal(body, &config)
+	if err != nil {
+		return err
+	}
+	services, _ := config["services"].(map[string]any)
+	for name, item := range services {
+		service, _ := item.(map[string]any)
+		ours := service["build"] != nil || name == detected.Service
+		switch {
+		case name == detected.Service && start.Image != "":
+			delete(service, "build")
+			service["image"] = start.Image
+		case service["build"] != nil && reuse > 0:
+			delete(service, "build")
+			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, reuse)
+		case service["build"] != nil:
+			service["image"] = fmt.Sprintf("%s-%s:%d", project(start.App), name, start.Number)
+		}
+		if ours {
+			environment, _ := service["environment"].(map[string]any)
+			if environment == nil {
+				environment = map[string]any{}
+			}
+			for key, value := range start.Env {
+				environment[key] = strings.ReplaceAll(value, "$", "$$")
+			}
+			service["environment"] = environment
+		}
+		if service["restart"] == nil {
+			service["restart"] = "unless-stopped"
+		}
+	}
+	body, err = json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(composeFile, body, 0o600)
+}
+
+// builds reports whether a compose file still has services to build.
+func builds(config map[string]any) bool {
+	services, _ := config["services"].(map[string]any)
+	for _, item := range services {
+		if service, _ := item.(map[string]any); service["build"] != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// pull fetches the main service's image. A registry login goes into a
+// throwaway Docker config, so no credentials stay on the server.
+func (a *apps) pull(ctx context.Context, start protocol.DeployStart, composeFile, service string, logf func(string, ...any)) error {
+	args := []string{"compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "pull", service}
+	if start.Registry == nil {
+		return a.run(ctx, logf, nil, args...)
+	}
+	dir, err := os.MkdirTemp("", "ops-docker-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	auth := base64.StdEncoding.EncodeToString([]byte(start.Registry.Username + ":" + start.Registry.Password))
+	config, _ := json.Marshal(map[string]any{"auths": map[string]any{start.Registry.Host: map[string]string{"auth": auth}}})
+	err = os.WriteFile(filepath.Join(dir, "config.json"), config, 0o600)
+	if err != nil {
+		return err
+	}
+	return a.run(ctx, logf, []string{"DOCKER_CONFIG=" + dir}, args...)
 }
 
 func composePath(src string) string {
@@ -671,7 +780,15 @@ func (a *apps) remove(ctx context.Context, app string) error {
 
 // compose runs docker compose on a release and streams its output as log lines.
 func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
-	command := exec.CommandContext(ctx, "docker", append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)
+	return a.run(ctx, logf, nil, append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)
+}
+
+// run runs docker with extra environment and streams its output as log lines.
+func (a *apps) run(ctx context.Context, logf func(string, ...any), environment []string, args ...string) error {
+	command := exec.CommandContext(ctx, "docker", args...)
+	if environment != nil {
+		command.Env = append(os.Environ(), environment...)
+	}
 	reader, writer := io.Pipe()
 	command.Stdout, command.Stderr = writer, writer
 	lines := make(chan struct{})

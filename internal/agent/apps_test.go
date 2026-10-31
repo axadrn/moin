@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,5 +98,44 @@ func TestSQLiteFiles(t *testing.T) {
 	files := sqliteFiles(dir)
 	if len(files) != 1 || !strings.HasSuffix(files[0], "app.db") {
 		t.Fatalf("files = %v", files)
+	}
+}
+
+func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
+	base := map[string]any{"services": map[string]any{
+		"web":    map[string]any{"build": map[string]any{"context": "."}},
+		"worker": map[string]any{"build": map[string]any{"context": "."}},
+		"redis":  map[string]any{"image": "redis:7"},
+	}}
+	file := filepath.Join(t.TempDir(), "compose.json")
+	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc", Env: map[string]string{"KEY": "a$b"}}
+	err := finish(base, start, protocol.Detected{Service: "web"}, 3, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(file)
+	var config struct {
+		Services map[string]struct {
+			Build       any               `json:"build"`
+			Image       string            `json:"image"`
+			Environment map[string]string `json:"environment"`
+			Restart     string            `json:"restart"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatal(err)
+	}
+	web, worker, redis := config.Services["web"], config.Services["worker"], config.Services["redis"]
+	if web.Image != "ghcr.io/me/blog:abc" || web.Build != nil || web.Environment["KEY"] != "a$$b" {
+		t.Fatalf("web = %+v", web)
+	}
+	if worker.Image != "ops-blog-worker:3" || worker.Build != nil || worker.Environment["KEY"] == "" {
+		t.Fatalf("worker = %+v", worker)
+	}
+	if redis.Image != "redis:7" || redis.Environment != nil || redis.Restart != "unless-stopped" {
+		t.Fatalf("redis = %+v", redis)
+	}
+	if builds(base) != true {
+		t.Fatal("finish changed the base")
 	}
 }

@@ -105,7 +105,9 @@ type RegisterResponse struct {
 
 // DeployStart is one deploy. Number counts per app. A rollback carries
 // FromNumber and no source: the agent starts that release's images again,
-// with the env it had.
+// with the env it had. Image replaces the build of the main service with an
+// image built elsewhere, such as in CI; without a source the agent takes the
+// compose file of the running release.
 type DeployStart struct {
 	DeployID   string            `json:"deploy_id"`
 	App        string            `json:"app"`
@@ -113,7 +115,16 @@ type DeployStart struct {
 	SourceURL  string            `json:"source_url,omitempty"`
 	SHA256     string            `json:"sha256,omitempty"`
 	FromNumber int               `json:"from_number,omitempty"`
+	Image      string            `json:"image,omitempty"`
+	Registry   *Registry         `json:"registry,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
+}
+
+// Registry is a login for pulling Image from a private registry.
+type Registry struct {
+	Host     string `json:"host"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // DeployLog is one line of build or start output.
@@ -134,7 +145,9 @@ type DeployDone struct {
 // running containers. Config holds the x-ops block of compose.yml, if any.
 type Detected struct {
 	// Kind is "compose", "dockerfile" or "go": what the repo brought.
+	// Image is the image of the main service when it came from CI.
 	Kind      string     `json:"kind"`
+	Image     string     `json:"image,omitempty"`
 	Service   string     `json:"service"`
 	Port      int        `json:"port"`
 	Databases []Database `json:"databases"`

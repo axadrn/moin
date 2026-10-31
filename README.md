@@ -35,7 +35,8 @@ trades the one-time install token for an agent token and starts the
 `ops-agent` systemd unit.
 
 `OPS_URL` and `OPS_TOKEN` override the saved login. `OPS_STATE_DIR` moves the
-agent state away from `/var/lib/ops`.
+agent state away from `/var/lib/ops`. Colors and status symbols show only on a
+terminal without `NO_COLOR`; piped output is plain text with the same columns.
 
 ## Deploy
 
@@ -75,6 +76,18 @@ ops rollback         # the release before the live one, or: ops rollback v3
 
 A rollback starts the old images with the env they had. The server needs
 Docker with the Compose plugin.
+
+## Build in CI
+
+Build and push the image in CI, then let ops deploy it. The server keeps the
+compose file of the running release and only pulls the new image.
+
+```bash
+ops registry set ghcr.io <user>   # once, for private images; token on stdin
+ops hook                          # a secret URL for CI, shown once
+curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/blog:$GITHUB_SHA"
+ops deploy --image ghcr.io/me/blog:3f2a9c1   # the same by hand
+```
 
 ## Packages
 

@@ -12,61 +12,103 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"text/tabwriter"
 	"time"
 
 	"github.com/axadrn/ops/internal/agent"
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/ops/internal/style"
 	"github.com/axadrn/ops/internal/tui"
 	"golang.org/x/term"
 )
 
-const usage = `Usage: ops [command]
+const usage = `ops deploys and runs Docker Compose apps on your own servers.
 
-Without a command, ops opens the terminal UI.
+Usage
+  ops                Open the terminal UI
+  ops <command>      Run one command
+
+Account
+  login              Sign in with a personal API token
+  logout             Forget the token on this machine
+
+Servers
+  servers            List servers
+  servers add        Add a server and print its install command
+  servers rm         Remove a server
+
+Apps
+  apps               List apps
+  apps add           Add an app: apps add --server <server> <name>
+  apps rm            Remove an app; its data stays on the server
+
+Deploys
+  deploy             Deploy this directory: deploy [--server <server>] [app]
+  deploy --image     Deploy an image built in CI: deploy --image <image> [app]
+  redeploy           Run the newest source or image again with the current env
+  rollback           Start an earlier release again: rollback [v<number>]
+  logs               Show the last lines of the app: logs [--tail 200] [app]
+
+CI
+  hook               New deploy hook URL for CI: hook [app]
+  registry           List registry logins for private images
+  registry set       Save a login: registry set <host> <username>
+  registry rm        Remove a login: registry rm <host>
+
+Env
+  env                List env vars: env [--show]
+  env set            Set env vars: env set KEY=value ...
+  env rm             Remove env vars: env rm KEY ...
+  env pull           Write the env vars to .env
+  run                Run a command with the env vars: run -- go run .
+
+Agent
+  agent register     Connect this server with an install token
+  agent              Run the agent on this server
+
+  version            Show the version
+  help               Show this help
 
 Commands that work on an app take it from --app, from x-ops.app in
 compose.yml, or from the name of the current directory.
-
-Commands:
-  login            Sign in with a personal API token
-  logout           Forget the token on this machine
-  servers          List servers
-  servers add      Add a server and print its install command
-  servers rm       Remove a server
-  apps             List apps
-  apps add         Add an app: apps add --server <server> <name>
-  apps rm          Remove an app; its data stays on the server
-  deploy           Deploy this directory: deploy [--server <server>] [app]
-  rollback         Start an earlier release again: rollback [v<number>]
-  redeploy         Build the newest source again with the current env
-  logs             Show the last lines of the app: logs [--tail 200] [app]
-  env              List env vars: env [--show]
-  env set          Set env vars: env set KEY=value ...
-  env rm           Remove env vars: env rm KEY ...
-  env pull         Write the env vars to .env
-  run              Run a command with the env vars: run -- go run .
-  agent register   Connect this server with an install token
-  agent            Run the agent on this server
-  version          Show the version
-  help             Show this help
 `
+
+// printUsage writes the help: section names bold, descriptions muted on a
+// terminal.
+func printUsage(w io.Writer) {
+	for index, line := range strings.Split(strings.TrimRight(strings.ReplaceAll(usage, "ops", build.Name), "\n"), "\n") {
+		name, description, ok := strings.Cut(strings.TrimPrefix(line, "  "), "  ")
+		switch {
+		case index == 0:
+			fmt.Fprintln(w, style.Accent.Bold(true).Render(build.Name)+strings.TrimPrefix(line, build.Name))
+		case strings.HasPrefix(line, "  ") && ok:
+			fmt.Fprintln(w, "  "+name+"  "+style.Muted.Render(description))
+		case line != "" && !strings.Contains(line, " "):
+			fmt.Fprintln(w, style.Bold.Render(line))
+		default:
+			fmt.Fprintln(w, line)
+		}
+	}
+}
 
 // Run runs one command and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	stdout, stderr = terminal(stdout), terminal(stderr)
 	err := run(ctx, args, stdin, stdout)
-	if errors.Is(err, flag.ErrHelp) {
+	switch {
+	case err == nil, errors.Is(err, flag.ErrHelp):
 		return 0
+	case errors.Is(err, errReported):
+	case ctx.Err() != nil:
+		fmt.Fprintln(stderr)
+		printError(stderr, errors.New("stopped"))
+	default:
+		printError(stderr, err)
 	}
-	if err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", build.Name, err)
-		return 1
-	}
-	return 0
+	return 1
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -76,7 +118,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	command, rest := args[0], args[1:]
 	switch command {
 	case "help", "-h", "--help":
-		fmt.Fprint(stdout, strings.ReplaceAll(usage, "ops", build.Name))
+		printUsage(stdout)
 		return nil
 	case "version", "--version":
 		fmt.Fprintln(stdout, build.Name, build.Version)
@@ -88,7 +130,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(stdout, "Logged out.")
+		done(stdout, "Logged out")
 		return nil
 	case "servers":
 		return servers(ctx, rest, stdout)
@@ -104,12 +146,16 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return logs(ctx, rest, stdout)
 	case "env":
 		return env(ctx, rest, stdout)
+	case "hook":
+		return hook(ctx, rest, stdout)
+	case "registry":
+		return registry(ctx, rest, stdin, stdout)
 	case "run":
 		return runWithEnv(ctx, rest, stdin, stdout)
 	case "agent":
 		return agentCommand(ctx, rest, stdout)
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", command, build.Name)
+	return fmt.Errorf("unknown command %q. Run `%s help` for all of them", command, build.Name)
 }
 
 func openTUI(ctx context.Context) error {
@@ -145,8 +191,8 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	}
 	config.Token = *token
 	if config.Token == "" {
-		fmt.Fprintf(stdout, "Create a token with read and write access at %s/app/settings\n", config.URL)
-		fmt.Fprint(stdout, "Paste it here: ")
+		step(stdout, "Create a token with read and write access at %s", style.Bold.Render(config.URL+"/app/settings"))
+		fmt.Fprint(stdout, style.Muted.Render(style.SymbolStep)+" Paste it here: ")
 		config.Token, err = readSecret(stdin)
 		fmt.Fprintln(stdout)
 		if err != nil {
@@ -165,7 +211,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Logged in as %s.\n", account.Email)
+	done(stdout, "Logged in as %s %s", style.Bold.Render(account.Email), style.Muted.Render("on "+config.URL))
 	return nil
 }
 
@@ -206,7 +252,12 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "Added %s. Run this on the server within the next hour:\n\n  %s\n\n", created.Server.Name, created.InstallCommand)
+		done(stdout, "Added %s. Run this on the server as root within the next hour:", style.Bold.Render(created.Server.Name))
+		// The command stays on one line, so it copies in one piece.
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
+		fmt.Fprintln(stdout)
+		hint(stdout, "It shows online in", build.Name+" servers")
 		return nil
 	case "rm", "remove":
 		if len(args) != 2 {
@@ -216,7 +267,7 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "Removed %s.\n", args[1])
+		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(args[1]))
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+args[0], build.Name)
@@ -225,15 +276,16 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 // PrintServers writes the server table.
 func PrintServers(stdout io.Writer, list []client.Server) {
 	if len(list) == 0 {
-		fmt.Fprintf(stdout, "No servers yet. Add one with `%s servers add <name>`.\n", build.Name)
+		fmt.Fprintln(stdout, "No servers yet.")
+		hint(stdout, "Add one with", build.Name+" servers add <name>")
 		return
 	}
-	table := tabwriter.NewWriter(stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(table, "NAME\tSTATUS\tSYSTEM\tAGENT\tLAST SEEN")
+	now := time.Now()
+	rows := make([][]string, 0, len(list))
 	for _, server := range list {
-		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", server.Name, server.Status(), server.System(), dash(server.AgentVersion), server.LastSeen(time.Now()))
+		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now)})
 	}
-	table.Flush()
+	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN"}, rows)
 }
 
 func dash(value string) string {
@@ -260,7 +312,7 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "Registered as server %s. State is in %s.\n", state.ServerID, dir)
+		done(stdout, "Registered as server %s. State is in %s", state.ServerID, dir)
 		return nil
 	}
 	if len(args) > 0 {
