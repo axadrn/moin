@@ -110,6 +110,7 @@ const (
 	modeConfirmWrite
 	modeBackups
 	modeConfirmRestore
+	modeConfirmSecurity
 )
 
 // shared is what every copy of the model points to.
@@ -149,6 +150,8 @@ type model struct {
 	pendingSQL string
 	// pendingRestore is a snapshot ID or a time, waiting for a yes.
 	pendingRestore string
+	// pendingSecurity is a change of a server's access, waiting for a yes.
+	pendingSecurity securityChange
 
 	apps        []client.App
 	appSelected int
@@ -353,6 +356,12 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.restore(app.Name, m.pendingRestore)
 		}
 		return m, nil
+	case modeConfirmSecurity:
+		m.mode = modeList
+		if key == "y" {
+			return m, m.applySecurity(m.pendingSecurity)
+		}
+		return m, nil
 	case modeConfirmWrite:
 		m.mode = modeSQL
 		if app, ok := m.currentApp(); key == "y" && ok {
@@ -421,8 +430,51 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 		if len(m.servers) > 0 {
 			m.mode = modeConfirmRemove
 		}
+	case "t", "f":
+		if m.selected < len(m.servers) {
+			server := m.servers[m.selected]
+			change := securityChange{server: server, security: client.Security{Tunnel: server.Tunnel, SSHTailscale: server.SSHTailscale, Firewall: server.Firewall}}
+			if key == "t" {
+				change.security.Tunnel = !server.Tunnel
+				change.question = "Route " + server.Name + " through a Cloudflare Tunnel?"
+				change.detail = "Ports 80 and 443 close; ops points your domains at the tunnel."
+				if server.Tunnel {
+					change.question, change.detail = "Take "+server.Name+" off the tunnel?", "Traefik takes ports 80 and 443 again; point your domains at the server."
+				}
+			} else {
+				change.security.Firewall = !server.Firewall
+				change.question, change.detail = "Turn on the firewall of "+server.Name+"?", "Every inbound connection it does not need is dropped."
+				if server.Firewall {
+					change.question, change.detail = "Turn off the firewall of "+server.Name+"?", "Every port is reachable again."
+				}
+			}
+			m.mode, m.pendingSecurity = modeConfirmSecurity, change
+		}
 	}
 	return m, nil
+}
+
+// securityChange is a server's new access settings and the question
+// that asks for them.
+type securityChange struct {
+	server           client.Server
+	security         client.Security
+	question, detail string
+}
+
+// applySecurity sends the settings and says what the agent set up.
+func (m model) applySecurity(change securityChange) tea.Cmd {
+	return func() tea.Msg {
+		secured, err := m.api.SetSecurity(m.ctx, change.server.ID, change.security)
+		if err != nil {
+			return errMsg{err}
+		}
+		notice := "applied to " + secured.Name + ": " + secured.Access()
+		if secured.Security != nil && len(secured.Security.Problems) > 0 {
+			return errMsg{fmt.Errorf("%s; %s", notice, strings.Join(secured.Security.Problems, "; "))}
+		}
+		return noticeMsg(notice)
+	}
 }
 
 func (m model) appKey(key string) (tea.Model, tea.Cmd) {

@@ -127,13 +127,13 @@ func (m model) serversView(width, room int) []string {
 	now := time.Now()
 	rows := make([][]string, 0, len(m.servers))
 	for index, server := range m.servers {
-		rows = append(rows, []string{name(server.Name, index == m.selected), style.Server(server), server.System(), dash(server.AgentVersion), server.LastSeen(now)})
+		rows = append(rows, []string{name(server.Name, index == m.selected), style.Server(server), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access()})
 	}
 	tableRoom := -1
 	if room >= 0 {
 		tableRoom = max(room-len(added), 2)
 	}
-	return append(table([]string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN"}, rows, m.selected, tableRoom), added...)
+	return append(table([]string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS"}, rows, m.selected, tableRoom), added...)
 }
 
 func (m model) appsView(room int) []string {
@@ -351,6 +351,8 @@ func (m model) prompt() ([]string, [][2]string) {
 			question, detail = "Remove "+app.Name+"?", "Its containers stop, its data stays on the server."
 		}
 		return bar(style.Danger, style.Bold.Render(question), detail), [][2]string{{"y", "remove"}, cancel}
+	case modeConfirmSecurity:
+		return bar(style.Warning, style.Bold.Render(m.pendingSecurity.question), m.pendingSecurity.detail), [][2]string{{"y", "apply"}, cancel}
 	case modeConfirmRollback:
 		app, _ := m.currentApp()
 		question := fmt.Sprintf("Roll %s back to the deploy before v%d?", app.Name, app.LiveNumber)
@@ -363,7 +365,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		return nil, append(appKeys, [2]string{"esc", "back"}, [2]string{"q", "quit"})
 	}

@@ -36,6 +36,8 @@ Servers
   servers            List servers
   servers add        Add a server and print its install command
   servers rm         Remove a server
+  servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]
+  integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
 
 Apps
   apps               List apps
@@ -184,6 +186,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return backups(ctx, rest, stdin, stdout)
 	case "github":
 		return github(ctx, rest, stdout)
+	case "integrations":
+		return integrations(ctx, rest, stdin, stdout)
 	case "link":
 		return link(ctx, rest, stdout)
 	case "unlink":
@@ -313,6 +317,8 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout)
 		hint(stdout, "It shows online in", build.Name+" servers")
 		return nil
+	case "secure":
+		return secure(ctx, api, args[1:], stdout)
 	case "rm", "remove":
 		if len(args) != 2 {
 			return fmt.Errorf("usage: %s servers rm <name or id>", build.Name)
@@ -337,9 +343,9 @@ func PrintServers(stdout io.Writer, list []client.Server) {
 	now := time.Now()
 	rows := make([][]string, 0, len(list))
 	for _, server := range list {
-		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now)})
+		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access()})
 	}
-	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN"}, rows)
+	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS"}, rows)
 }
 
 func dash(value string) string {

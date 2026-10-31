@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/axadrn/ops/protocol"
 	"io"
 	"net/http"
 	"net/url"
@@ -109,7 +110,28 @@ type Server struct {
 	Arch         string     `json:"arch"`
 	AgentVersion string     `json:"agent_version"`
 	LastSeenAt   *time.Time `json:"last_seen_at"`
-	CreatedAt    time.Time  `json:"created_at"`
+	// Tunnel, SSHTailscale and Firewall say how the server is reached and
+	// locked down; Security is what its agent set up.
+	Tunnel       bool                         `json:"tunnel"`
+	SSHTailscale bool                         `json:"ssh_tailscale"`
+	Firewall     bool                         `json:"firewall"`
+	Security     *protocol.ServerConfigResult `json:"security"`
+	CreatedAt    time.Time                    `json:"created_at"`
+}
+
+// Access says in a few words how the server is reached.
+func (s Server) Access() string {
+	parts := []string{"ports 80, 443"}
+	if s.Tunnel {
+		parts = []string{"tunnel"}
+	}
+	if s.Firewall {
+		parts = append(parts, "firewall")
+	}
+	if s.SSHTailscale {
+		parts = append(parts, "ssh on tailnet")
+	}
+	return strings.Join(parts, ", ")
 }
 
 // NewServer is a server that waits for its agent.

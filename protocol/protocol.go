@@ -74,6 +74,12 @@ const (
 	// the agent after a snapshot, a restore drill or a failure.
 	TypeBackupStatus MessageType = "backup.status"
 
+	// TypeServerConfig sets how the server is reached and locked down
+	// (ServerConfig). The control plane sends it after hello and whenever
+	// it changes. The agent answers with TypeServerConfigResult.
+	TypeServerConfig       MessageType = "server.config"
+	TypeServerConfigResult MessageType = "server.config.result"
+
 	// TypeOK answers a request that has no result.
 	TypeOK MessageType = "ok"
 	// TypeError answers a request that failed (Error).
@@ -361,6 +367,30 @@ type BackupRestore struct {
 	Database string     `json:"database,omitempty"`
 	Snapshot string     `json:"snapshot,omitempty"`
 	At       *time.Time `json:"at,omitempty"`
+}
+
+// ServerConfig is how a server is reached and locked down.
+//
+// TunnelToken runs cloudflared, which carries all app traffic from
+// Cloudflare to Traefik; the proxy then opens no port. Without it Traefik
+// takes 80 and 443. TailscaleKey joins the server to the user's tailnet;
+// SSHOnTailscale then answers SSH only there. Firewall drops every other
+// inbound connection.
+type ServerConfig struct {
+	TunnelToken    string `json:"tunnel_token,omitempty"`
+	TailscaleKey   string `json:"tailscale_key,omitempty"`
+	SSHOnTailscale bool   `json:"ssh_on_tailscale,omitempty"`
+	Firewall       bool   `json:"firewall,omitempty"`
+}
+
+// ServerConfigResult is what the agent set up. Problems are the parts it
+// could not, in words; the rest stands.
+type ServerConfigResult struct {
+	Proxy       string   `json:"proxy"`
+	TailscaleIP string   `json:"tailscale_ip,omitempty"`
+	Firewall    bool     `json:"firewall"`
+	OpenPorts   []string `json:"open_ports"`
+	Problems    []string `json:"problems,omitempty"`
 }
 
 // Error is the answer to a request that failed.

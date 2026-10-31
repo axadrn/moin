@@ -147,6 +147,8 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.apps = newApps(dir, agent.send)
 	agent.backups = newBackups(agent.apps, agent.send)
 	agent.apps.backups = agent.backups
+	agent.security = newSecurity(dir, agent.apps)
+	agent.apps.proxyMode = agent.security.proxyMode
 	go agent.backups.drills(ctx)
 	defer agent.backups.configure(context.Background(), nil)
 	wait := minReconnect
@@ -176,9 +178,10 @@ var errRejected = errors.New("the control plane rejected the agent token: regist
 // runner is one agent process. conn is the current session, nil between
 // sessions.
 type runner struct {
-	state   State
-	apps    *apps
-	backups *backups
+	state    State
+	apps     *apps
+	backups  *backups
+	security *security
 
 	mu   sync.Mutex
 	conn *websocket.Conn
@@ -337,6 +340,13 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeDBQueryResult, message.RequestID, result)
+	case protocol.TypeServerConfig:
+		var config protocol.ServerConfig
+		if err := message.Decode(&config); err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeServerConfigResult, message.RequestID, r.security.apply(ctx, config))
 	case protocol.TypeBackupConfig:
 		var config protocol.BackupConfig
 		if err := message.Decode(&config); err != nil {

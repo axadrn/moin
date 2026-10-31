@@ -53,6 +53,8 @@ type apps struct {
 	send func(protocol.MessageType, string, any)
 	// backups takes snapshots before deploys and follows new databases.
 	backups *backups
+	// proxyMode is "direct" or "tunnel", from the server config.
+	proxyMode func() string
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex

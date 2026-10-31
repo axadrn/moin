@@ -104,6 +104,14 @@ func addRouting(config, service map[string]any, app string, detected protocol.De
 	if len(middlewares) > 0 {
 		labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
 	}
+	// The same routes for traffic from a Cloudflare Tunnel, which arrives
+	// as HTTP on an entrypoint no port publishes.
+	labels["traefik.http.routers."+name+"-tunnel.rule"] = labels["traefik.http.routers."+name+".rule"]
+	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
+	labels["traefik.http.routers."+name+"-tunnel.service"] = name
+	if len(middlewares) > 0 {
+		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(middlewares, ",")
+	}
 	existing, _ := service["labels"].(map[string]any)
 	for key, value := range labels {
 		if existing == nil {
@@ -127,10 +135,16 @@ func addRouting(config, service map[string]any, app string, detected protocol.De
 	config["networks"] = top
 }
 
-// ensureProxy starts the shared Traefik container when it does not run, or
-// runs an older image.
-// OPS_HTTP_PORT and OPS_HTTPS_PORT move it off 80 and 443 for development.
+// ensureProxy starts the shared Traefik container when it does not run,
+// runs an older image or another mode. In direct mode it takes 80 and 443;
+// in tunnel mode it publishes no port and cloudflared reaches it on the
+// tunnel entrypoint. OPS_HTTP_PORT and OPS_HTTPS_PORT move it off 80 and
+// 443 for development.
 func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error {
+	mode := "direct"
+	if a.proxyMode != nil {
+		mode = a.proxyMode()
+	}
 	if _, err := a.output(ctx, "docker", "network", "inspect", proxyNetwork); err != nil {
 		_, err = a.output(ctx, "docker", "network", "create", proxyNetwork)
 		if err != nil {
@@ -138,8 +152,8 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		}
 	}
 	// A proxy on an older image is replaced, so proxy updates reach every server.
-	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}}", proxyName)
-	if err == nil && strings.TrimSpace(running) == "true "+proxyImage {
+	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \"ops.mode\"}}", proxyName)
+	if err == nil && strings.TrimSpace(running) == "true "+proxyImage+" "+mode {
 		return nil
 	}
 	if err == nil {
@@ -150,11 +164,16 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	if err != nil {
 		return err
 	}
-	httpPort, httpsPort := envOr("OPS_HTTP_PORT", "80"), envOr("OPS_HTTPS_PORT", "443")
-	logf("starting the proxy on ports %s and %s", httpPort, httpsPort)
-	_, err = a.output(ctx, "docker", "run", "-d", "--name", proxyName, "--restart", "unless-stopped",
-		"--network", proxyNetwork,
-		"-p", httpPort+":80", "-p", httpsPort+":443",
+	args := []string{"run", "-d", "--name", proxyName, "--restart", "unless-stopped",
+		"--network", proxyNetwork, "--label", "ops.mode=" + mode}
+	if mode == "direct" {
+		httpPort, httpsPort := envOr("OPS_HTTP_PORT", "80"), envOr("OPS_HTTPS_PORT", "443")
+		logf("starting the proxy on ports %s and %s", httpPort, httpsPort)
+		args = append(args, "-p", httpPort+":80", "-p", httpsPort+":443")
+	} else {
+		logf("starting the proxy behind the Cloudflare Tunnel, with no open port")
+	}
+	args = append(args,
 		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
 		"-v", data+":/data",
 		proxyImage,
@@ -165,10 +184,12 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		"--entrypoints.web.http.redirections.entrypoint.to=websecure",
 		"--entrypoints.web.http.redirections.entrypoint.scheme=https",
 		"--entrypoints.websecure.address=:443",
+		"--entrypoints."+tunnelEntrypoint+".address=:"+tunnelPort,
 		"--certificatesresolvers.le.acme.httpchallenge=true",
 		"--certificatesresolvers.le.acme.httpchallenge.entrypoint=web",
 		"--certificatesresolvers.le.acme.storage=/data/acme.json",
 	)
+	_, err = a.output(ctx, "docker", args...)
 	return err
 }
 
