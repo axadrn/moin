@@ -84,6 +84,7 @@ func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage
 	if storage == nil {
 		return nil
 	}
+	b.resetForTarget()
 	b.store = litestream.NewStore(nil, litestream.DefaultCompactionLevels)
 	b.store.SnapshotRetention = pointInTime
 	b.store.Logger = slog.Default().With("part", "backup")
@@ -94,6 +95,26 @@ func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage
 	}
 	b.reconcileLocked()
 	return nil
+}
+
+// resetForTarget clears Litestream's local state next to every database
+// when backups go somewhere new. That state tracks what the old target
+// holds; against a new, empty one Litestream would wait for files it
+// already cleaned up. The new target starts with a full snapshot.
+func (b *backups) resetForTarget() {
+	target := b.storage.Endpoint + "|" + b.storage.Bucket + "|" + b.storage.Path
+	file := filepath.Join(filepath.Dir(b.apps.dir), "backup-target")
+	previous, _ := os.ReadFile(file)
+	if string(previous) == target {
+		return
+	}
+	entries, _ := os.ReadDir(b.apps.dir)
+	for _, entry := range entries {
+		for _, database := range b.apps.runningDatabases(entry.Name()) {
+			_ = os.RemoveAll(filepath.Join(filepath.Dir(database.HostPath), "."+filepath.Base(database.HostPath)+litestream.MetaDirSuffix))
+		}
+	}
+	_ = os.WriteFile(file, []byte(target), 0o600)
 }
 
 func (b *backups) stopLocked() {

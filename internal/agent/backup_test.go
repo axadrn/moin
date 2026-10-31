@@ -146,6 +146,32 @@ func TestBackups(t *testing.T) {
 		t.Fatal("no drill report")
 	}
 
+	// A new folder in the bucket starts over and replicates again.
+	moved := *storage
+	moved.Path = "test-moved"
+	err = b.configure(ctx, &moved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO notes (body) VALUES ('after the move')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replicated(time.Now().Add(-time.Second))
+	b.drillAll(ctx)
+	select {
+	case report := <-reports:
+		if report.Databases[0].Error != "" {
+			t.Fatalf("drill after the move = %+v", report)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no drill report after the move")
+	}
+	err = b.configure(ctx, storage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	client := b.s3Client()
 	list, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/" + app + "/data-app.db/")})
 	if len(list.Contents) < 2 {
