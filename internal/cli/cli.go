@@ -32,6 +32,8 @@ Account
   login              Sign in with a personal API token; it belongs to one workspace
   logout             Forget the token on this machine
   activity           Who deployed, restored or changed what: activity [--limit 30]
+  team               Members and open invitations of your workspace
+  team invite        Invite someone: team invite ada@example.com [--admin]
 
 Servers
   servers            List servers
@@ -169,6 +171,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return nil
 	case "activity":
 		return activity(ctx, rest, stdout)
+	case "team":
+		return team(ctx, rest, stdout)
 	case "servers":
 		return servers(ctx, rest, stdout)
 	case "apps":
@@ -252,7 +256,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	}
 	config.Token = *token
 	if config.Token == "" {
-		step(stdout, "Create a token with read and write access at %s", style.Bold.Render(config.URL+"/app/settings"))
+		step(stdout, "Create a token with read and write access under Settings at %s", style.Bold.Render(config.URL+"/app"))
 		fmt.Fprint(stdout, style.Muted.Render(style.SymbolStep)+" Paste it here: ")
 		config.Token, err = readSecret(stdin)
 		fmt.Fprintln(stdout)
@@ -312,7 +316,7 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		created, err := api.AddServer(ctx, name)
 		var apiErr *client.Error
 		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
-			return fmt.Errorf("adding servers needs the ops plan: subscribe at %s/app/billing", config.URL)
+			return fmt.Errorf("adding servers needs the ops plan: an owner subscribes under Billing at %s/app", config.URL)
 		}
 		if err != nil {
 			return err
