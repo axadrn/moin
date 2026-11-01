@@ -3,31 +3,27 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
-	"golang.org/x/term"
 )
 
 // secure sets how a server is reached; flags it does not get keep their
 // value.
 func secure(ctx context.Context, api *client.Client, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("servers secure", flag.ContinueOnError)
+	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]")
 	tunnel := flags.String("tunnel", "", "on: app traffic through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
 	ssh := flags.String("ssh", "", "tailscale: SSH only on the tailnet; open: everywhere")
 	firewall := flags.String("firewall", "", "on: drop every other inbound connection")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 1 {
-		return fmt.Errorf("usage: %s servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]", build.Name)
+		return flags.wrong()
 	}
 	servers, err := api.Servers(ctx)
 	if err != nil {
@@ -93,10 +89,16 @@ func printSecurity(w io.Writer, server client.Server) {
 
 // integrations shows or stores the Cloudflare token and the Tailscale key.
 func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	api, err := apiClient()
-	if err != nil {
+	// Help works without a login.
+	api, apiErr := apiClient()
+	flags := newFlags("integrations", "integrations, integrations cloudflare|tailscale with the key on stdin, or integrations rm cloudflare|tailscale [--yes]").withYes()
+	if err := flags.parse(args); err != nil {
 		return err
 	}
+	if apiErr != nil {
+		return apiErr
+	}
+	args = flags.Args()
 	if len(args) == 0 {
 		stored, err := api.Integrations(ctx)
 		if err != nil {
@@ -117,15 +119,21 @@ func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io
 		args = args[1:]
 	}
 	if len(args) != 1 || (args[0] != "cloudflare" && args[0] != "tailscale") {
-		return fmt.Errorf("usage: %s integrations [rm] cloudflare|tailscale; the key comes on stdin", build.Name)
+		return flags.wrong()
 	}
 	value := ""
-	if !remove {
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+	var err error
+	if remove {
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove the %s key?", args[0]))
+		if err != nil {
+			return err
+		}
+	} else {
+		if isTerminal(stdin) {
 			fmt.Fprintf(stdout, "%s key: ", args[0])
 		}
 		value, err = readSecret(stdin)
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		if isTerminal(stdin) {
 			fmt.Fprintln(stdout)
 		}
 		if err != nil {

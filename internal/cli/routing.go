@@ -2,38 +2,60 @@ package cli
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
-	"golang.org/x/term"
 )
+
+// domainCommands are the subcommands of domains. Any other first argument
+// is the app whose domains to list.
+var domainCommands = []string{"ls", "list", "add", "rm", "remove", "canonical"}
 
 // domains lists the domains of an app with their DNS state, and adds,
 // removes or picks the canonical one.
-func domains(ctx context.Context, args []string, stdout io.Writer) error {
+func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := "ls"
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+	if len(args) > 0 && slices.Contains(domainCommands, args[0]) {
 		command, args = args[0], args[1:]
 	}
-	flags := flag.NewFlagSet("domains "+command, flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := flags.Parse(args); err != nil {
+	usage := map[string]string{
+		"add":       "domains add [--app <app>] <domain> ...",
+		"rm":        "domains rm [--app <app>] <domain> ... [--yes]",
+		"remove":    "domains rm [--app <app>] <domain> ... [--yes]",
+		"canonical": "domains canonical [--app <app>] <domain|none>",
+	}[command]
+	if usage == "" {
+		usage = "domains [app]"
+	}
+	flags := newFlags("domains "+command, usage).withApp()
+	if command == "rm" || command == "remove" {
+		flags.withYes()
+	}
+	if err := flags.parse(args); err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
 	if command == "ls" || command == "list" {
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
+		name, err := flags.app(flags.Arg(0))
+		if err != nil {
+			return err
+		}
 		return printDomains(ctx, api, name, stdout)
+	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
 	}
 	detail, err := api.App(ctx, name)
 	if err != nil {
@@ -43,7 +65,7 @@ func domains(ctx context.Context, args []string, stdout io.Writer) error {
 	switch command {
 	case "add":
 		if flags.NArg() == 0 {
-			return fmt.Errorf("usage: %s domains add [--app <app>] <domain> ...", build.Name)
+			return flags.wrong()
 		}
 		for _, domain := range flags.Args() {
 			if !slices.Contains(list, strings.ToLower(domain)) {
@@ -52,7 +74,11 @@ func domains(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 	case "rm", "remove":
 		if flags.NArg() == 0 {
-			return fmt.Errorf("usage: %s domains rm [--app <app>] <domain> ...", build.Name)
+			return flags.wrong()
+		}
+		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s? Visitors there stop reaching it.", strings.Join(flags.Args(), ", "), name))
+		if err != nil {
+			return err
 		}
 		list = slices.DeleteFunc(list, func(domain string) bool { return slices.Contains(flags.Args(), domain) })
 		if slices.Contains(flags.Args(), canonical) {
@@ -60,14 +86,12 @@ func domains(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 	case "canonical":
 		if flags.NArg() != 1 {
-			return fmt.Errorf("usage: %s domains canonical [--app <app>] <domain|none>", build.Name)
+			return flags.wrong()
 		}
 		canonical = flags.Arg(0)
 		if canonical == "none" {
 			canonical = ""
 		}
-	default:
-		return fmt.Errorf("unknown command %q. Run `%s help`", "domains "+command, build.Name)
 	}
 	change, err := api.SetDomains(ctx, name, list, canonical)
 	if err != nil {
@@ -110,18 +134,28 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 
 // protect puts a password in front of an app, or takes it away with off.
 func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := flag.NewFlagSet("protect", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+	flags := newFlags("protect", "protect [--user ops] [app], password on stdin; protect off [app]").withApp()
 	user := flags.String("user", "ops", "username for the password prompt in the browser")
-	if err := flags.Parse(args); err != nil {
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	off := flags.Arg(0) == "off"
+	argument := flags.Arg(0)
+	if off {
+		argument = flags.Arg(1)
+	}
+	if flags.NArg() > 2 || (!off && flags.NArg() > 1) {
+		return flags.wrong()
+	}
+	name, err := flags.app(argument)
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
-	if flags.Arg(0) == "off" {
+	if off {
 		change, err := api.RemoveProtection(ctx, name)
 		if err != nil {
 			return err
@@ -130,11 +164,11 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		reportChange(ctx, api, name, change, stdout)
 		return nil
 	}
-	if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+	if isTerminal(stdin) {
 		fmt.Fprintf(stdout, "Password for %s (user %s): ", name, *user)
 	}
 	password, err := readSecret(stdin)
-	if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+	if isTerminal(stdin) {
 		fmt.Fprintln(stdout)
 	}
 	if err != nil {
@@ -151,14 +185,21 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 
 // apply restarts the running release with the env and routing as they are now.
 func apply(ctx context.Context, args []string, stdout io.Writer) error {
-	if len(args) > 1 {
-		return fmt.Errorf("usage: %s apply [app]", build.Name)
+	flags := newFlags("apply", "apply [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(strings.Join(args, ""), ".")
 	started, err := api.Apply(ctx, name)
 	if err != nil {
 		return err

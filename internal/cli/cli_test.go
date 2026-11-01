@@ -1,0 +1,203 @@
+package cli
+
+import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+)
+
+// fakeAPI answers the paths a test gives and records every request.
+type fakeAPI struct {
+	mu       sync.Mutex
+	requests []string
+	answers  map[string]string
+	status   int
+}
+
+func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	key := r.Method + " " + r.URL.Path
+	f.mu.Lock()
+	parts := []string{key}
+	for _, part := range []string{r.URL.RawQuery, string(body)} {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	f.requests = append(f.requests, strings.Join(parts, " "))
+	answer, ok := f.answers[key]
+	status := f.status
+	f.mu.Unlock()
+	if status != 0 {
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{"error":{"code":"unauthenticated","message":"Sign in to continue."}}`))
+		return
+	}
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"code":"not_found","message":"The app was not found."}}`))
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/events") {
+		w.Header().Set("Content-Type", "text/event-stream")
+	}
+	_, _ = w.Write([]byte(answer))
+}
+
+func (f *fakeAPI) seen(want string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, request := range f.requests {
+		if strings.HasPrefix(request, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// runCLI runs one command against the fake API, without a terminal.
+func runCLI(t *testing.T, api *fakeAPI, args ...string) (code int, stdout, stderr string) {
+	t.Helper()
+	server := httptest.NewServer(api)
+	t.Cleanup(server.Close)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("OPS_URL", server.URL)
+	t.Setenv("OPS_TOKEN", "ops_test")
+	t.Setenv("NO_COLOR", "1")
+	var out, errOut strings.Builder
+	code = Run(args, strings.NewReader(""), &out, &errOut)
+	return code, out.String(), errOut.String()
+}
+
+func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
+	env := `{"items":{"KEY":"secret"}}`
+	for _, args := range [][]string{
+		{"env", "shop", "--show"},
+		{"env", "--show", "--app", "shop"},
+		{"env", "--app", "shop", "--show"},
+		{"env", "ls", "shop", "--show"},
+	} {
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": env}}
+		code, stdout, stderr := runCLI(t, api, args...)
+		if code != 0 || !strings.Contains(stdout, "KEY=secret") {
+			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
+		}
+	}
+
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/logs": `{"lines":["web-1  | hello"]}`}}
+	code, stdout, stderr := runCLI(t, api, "logs", "--app", "shop", "--tail", "5")
+	if code != 0 || !strings.Contains(stdout, "hello") || !api.seen("GET /api/v1/apps/shop/logs tail=5") {
+		t.Errorf("logs: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+
+	rollback := map[string]string{
+		"POST /api/v1/apps/shop/rollback":        `{"number":4,"status":"running","from_number":3}`,
+		"GET /api/v1/apps/shop/deploys/4/events": "event: done\ndata: {\"number\":4,\"status\":\"succeeded\"}\n\n",
+	}
+	for _, args := range [][]string{{"rollback", "v3", "--app", "shop"}, {"rollback", "shop", "v3"}, {"rollback", "3", "shop"}} {
+		api := &fakeAPI{answers: rollback}
+		code, stdout, stderr := runCLI(t, api, args...)
+		if code != 0 || !api.seen(`POST /api/v1/apps/shop/rollback {"number":3}`) {
+			t.Errorf("%v: code %d, stdout %q, stderr %q, requests %v", args, code, stdout, stderr, api.requests)
+		}
+	}
+
+	code, _, stderr = runCLI(t, &fakeAPI{}, "logs", "--app", "shop", "blog")
+	if code != 1 || !strings.Contains(stderr, "Two apps") {
+		t.Errorf("two apps: code %d, stderr %q", code, stderr)
+	}
+}
+
+func TestOwnUsageNotGoFlags(t *testing.T) {
+	code, stdout, stderr := runCLI(t, &fakeAPI{}, "logs", "--bogus")
+	if code != 1 || !strings.Contains(stderr, "Unknown flag -bogus. Usage: `ops logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {
+		t.Errorf("bad flag: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runCLI(t, &fakeAPI{}, "logs", "--help")
+	if code != 0 || !strings.Contains(stdout, "ops logs [--tail 200] [app]") || !strings.Contains(stdout, "--tail") || strings.Contains(stdout+stderr, "Usage of") {
+		t.Errorf("help: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, _ = runCLI(t, &fakeAPI{}, "login", "--help")
+	if code != 0 || !strings.Contains(stdout, "stdin") || !strings.Contains(stdout, "(default http") {
+		t.Errorf("login help: code %d, stdout %q", code, stdout)
+	}
+}
+
+func TestDestructiveCommandsAsk(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": ``}}
+	code, _, stderr := runCLI(t, api, "servers", "rm", "web-1")
+	if code != 1 || !strings.Contains(stderr, "--yes") || api.seen("DELETE") {
+		t.Errorf("without --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--yes")
+	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") {
+		t.Errorf("with --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	for _, args := range [][]string{
+		{"apps", "rm", "shop"},
+		{"env", "rm", "--app", "shop", "KEY"},
+		{"restore", "--app", "shop", "snap-1"},
+		{"domains", "rm", "--app", "shop", "blog.de"},
+		{"unlink", "shop"},
+		{"backups", "bucket", "rm"},
+		{"registry", "rm", "ghcr.io"},
+		{"integrations", "rm", "tailscale"},
+	} {
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`}}
+		code, _, stderr := runCLI(t, api, args...)
+		if code != 1 || !strings.Contains(stderr, "--yes") {
+			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
+		}
+		for _, request := range api.requests {
+			if !strings.HasPrefix(request, "GET ") {
+				t.Errorf("%v changed something without --yes: %v", args, api.requests)
+			}
+		}
+	}
+}
+
+func TestErrorsSayWhatToDo(t *testing.T) {
+	code, _, stderr := runCLI(t, &fakeAPI{status: http.StatusUnauthorized}, "apps")
+	if code != 1 || !strings.Contains(stderr, "OPS_TOKEN") || strings.Contains(stderr, "..") {
+		t.Errorf("rejected token: code %d, stderr %q", code, stderr)
+	}
+
+	code, _, stderr = runCLI(t, &fakeAPI{}, "logs", "--app", "nope")
+	if code != 1 || !strings.Contains(stderr, "There is no app nope; the name came from --app") {
+		t.Errorf("unknown app from the flag: code %d, stderr %q", code, stderr)
+	}
+
+	dir := filepath.Join(t.TempDir(), "my-shop")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	code, _, stderr = runCLI(t, &fakeAPI{}, "logs")
+	if code != 1 || !strings.Contains(stderr, "There is no app my-shop; the name came from the directory name") {
+		t.Errorf("unknown app from the directory: code %d, stderr %q", code, stderr)
+	}
+}
+
+func TestDeploys(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps/shop": `{"app":{"name":"shop","live_number":2},"deploys":[
+			{"number":3,"status":"failed","error":"health check failed","created_at":"2026-11-01T10:00:00Z","finished_at":"2026-11-01T10:00:41Z"},
+			{"number":2,"status":"succeeded","image":"ghcr.io/me/shop:2","created_at":"2026-11-01T09:00:00Z","finished_at":"2026-11-01T09:00:20Z"},
+			{"number":1,"status":"succeeded","created_at":"2026-11-01T08:00:00Z"}]}`,
+		"GET /api/v1/apps/shop/deploys/3": `{"number":3,"status":"failed","error":"health check failed","created_at":"2026-11-01T10:00:00Z","log":["→ building","step 1/3"]}`,
+	}}
+	code, stdout, stderr := runCLI(t, api, "deploys", "shop")
+	if code != 0 || !strings.Contains(stdout, "v3") || !strings.Contains(stdout, "41s") || !strings.Contains(stdout, "health check failed") || !strings.Contains(stdout, "live") || !strings.Contains(stdout, "ghcr.io/me/shop:2") {
+		t.Errorf("history: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runCLI(t, api, "deploys", "v3", "--app", "shop")
+	if code != 0 || !strings.Contains(stdout, "building") || !strings.Contains(stdout, "step 1/3") {
+		t.Errorf("one deploy: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}

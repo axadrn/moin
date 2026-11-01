@@ -29,7 +29,7 @@ Usage
   ops <command>      Run one command
 
 Account
-  login              Sign in with a personal API token; it belongs to one workspace
+  login              Sign in with a personal API token: login [--url <url>], token asked or on stdin
   logout             Forget the token on this machine
   activity           Who deployed, restored or changed what: activity [--limit 30]
   team               Members and open invitations of your workspace
@@ -37,66 +37,69 @@ Account
 
 Servers
   servers            List servers
-  servers add        Add a server and print its install command
-  servers rm         Remove a server
+  servers add        Add a server and print its install command: servers add [web-1]
+  servers rm         Remove a server: servers rm web-1 [--yes]
+  servers update     Update the agent to the control plane's version: servers update [web-1]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]
   servers rules      The server's own rules for ops, from /etc/ops/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
+  integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
 
 Apps
   apps               List apps
   apps add           Add an app: apps add --server <server> <name>
-  apps rm            Remove an app; its data stays on the server
+  apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
 
 Deploys
-  deploy             Deploy this directory: deploy [--server <server>] [app]
+  deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
   deploy --image     Deploy an image built in CI: deploy --image <image> [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Run the newest source or image again with the current env
-  rollback           Start an earlier release again: rollback [v<number>]
+  deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
+  rollback           Start an earlier release again: rollback [app] [v<number>]
   logs               Show the last lines of the app: logs [--tail 200] [app]
 
 Domains
   domains            List domains and their DNS: domains [app]
   domains add        Add domains: domains add blog.de www.blog.de
-  domains rm         Remove domains: domains rm www.blog.de
+  domains rm         Remove domains: domains rm www.blog.de [--yes]
   domains canonical  Redirect the others to one: domains canonical blog.de|none
   protect            Ask for a password: protect [--user ops], password on stdin
-  protect off        Make the app public again
+  protect off        Make the app public again: protect off [app]
   apply              Restart the running release with the current env and domains
 
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
   github repos       Repos ops may read
   link               Follow a repo: link owner/name [--branch main] [--auto=false]
-  unlink             Stop following it
+  unlink             Stop following it: unlink [app] [--yes]
 
 CI
   hook               New deploy hook URL for CI: hook [app]
   registry           List registry logins for private images
   registry set       Save a login: registry set <host> <username>
-  registry rm        Remove a login: registry rm <host>
+  registry rm        Remove a login: registry rm <host> [--yes]
 
 Data
-  db                 Tables, rows and migration of the app's SQLite database
-  db rows            A page of a table, newest first: db rows orders [--limit 20]
+  db                 Tables, rows and migration of the app's SQLite database: db [app]
+  db rows            A page of a table, newest first: db rows orders [--limit 20] [--offset 20]
   db schema          The CREATE statements: db schema [table]
   sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"
   sql --write        Run SQL that changes data, in one transaction
 
 Backups
-  backups            Snapshots, point in time window and restore drills of an app
+  backups            Snapshots, point in time window and restore drills of an app: backups [app]
   backup             Take a snapshot now: backup [app]
-  restore            Restore a snapshot: restore <snapshot>, or a time: restore --at "2026-10-31 14:02"
+  restore            Restore a snapshot: restore <snapshot>, or a time: restore --at "2026-10-31 14:02" [--yes]
   backups auto       Snapshot before every change: backups auto on|off
   backups bucket     Show the bucket backups go to
   backups bucket set Set it: --endpoint https://… --bucket … --access-key …, secret key on stdin
-  backups bucket rm  Stop backups; the bucket keeps what is in it
+  backups bucket rm  Stop backups; the bucket keeps what is in it: backups bucket rm [--yes]
 
 Env
-  env                List env vars: env [--show]
-  env set            Set env vars: env set KEY=value ...
-  env rm             Remove env vars: env rm KEY ...
+  env                List env vars: env [--show] [app]
+  env set            Set env vars: env set [app] KEY=value ...
+  env rm             Remove env vars: env rm KEY ... [--yes]
   env pull           Write the env vars to .env
   run                Run a command with the env vars: run -- go run .
 
@@ -107,8 +110,11 @@ Agent
   version            Show the version
   help               Show this help
 
-Commands that work on an app take it from --app, from x-ops.app in
-compose.yml, or from the name of the current directory.
+Commands that work on an app take it as an argument or from --app, then
+from x-ops.app in compose.yml, then from the name of the current directory.
+Flags may come before or after the arguments. Commands that remove or
+replace something ask first; --yes skips the question, and without a
+terminal they need it. Every command shows its usage with --help.
 `
 
 // printUsage writes the help: section names bold, descriptions muted on a
@@ -135,9 +141,14 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer stop()
 
 	stdout, stderr = terminal(stdout), terminal(stderr)
+	picked = pickedApp{}
 	err := run(ctx, args, stdin, stdout)
+	var help helpError
 	switch {
 	case err == nil, errors.Is(err, flag.ErrHelp):
+		return 0
+	case errors.As(err, &help):
+		help.print(stdout)
 		return 0
 	case errors.Is(err, errReported):
 	case ctx.Err() != nil:
@@ -175,11 +186,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "team":
 		return team(ctx, rest, stdout)
 	case "servers":
-		return servers(ctx, rest, stdout)
+		return servers(ctx, rest, stdin, stdout)
 	case "apps":
-		return apps(ctx, rest, stdout)
+		return apps(ctx, rest, stdin, stdout)
 	case "deploy":
 		return deploy(ctx, rest, stdout)
+	case "deploys":
+		return deploys(ctx, rest, stdout)
 	case "rollback":
 		return rollback(ctx, rest, stdout)
 	case "redeploy":
@@ -199,17 +212,17 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "link":
 		return link(ctx, rest, stdout)
 	case "unlink":
-		return unlink(ctx, rest, stdout)
+		return unlink(ctx, rest, stdin, stdout)
 	case "backup":
 		return backUp(ctx, rest, stdout)
 	case "restore":
-		return restore(ctx, rest, stdout)
+		return restore(ctx, rest, stdin, stdout)
 	case "env":
-		return env(ctx, rest, stdout)
+		return env(ctx, rest, stdin, stdout)
 	case "hook":
 		return hook(ctx, rest, stdout)
 	case "domains":
-		return domains(ctx, rest, stdout)
+		return domains(ctx, rest, stdin, stdout)
 	case "protect":
 		return protect(ctx, rest, stdin, stdout)
 	case "apply":
@@ -241,28 +254,35 @@ func openTUI(ctx context.Context) error {
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := flag.NewFlagSet("login", flag.ContinueOnError)
-	baseURL := flags.String("url", "", "control plane URL")
-	token := flags.String("token", "", "personal API token (default: asks)")
-	err := flags.Parse(args)
-	if err != nil {
-		return err
-	}
 	config, err := client.LoadConfig()
 	if err != nil {
 		return err
 	}
-	if *baseURL != "" {
-		config.URL = strings.TrimRight(*baseURL, "/")
+	flags := newFlags("login", "login [--url <control plane>] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
+	baseURL := flags.String("url", config.URL, "control plane URL")
+	token := flags.String("token", "", "personal API token; without it "+build.Name+" asks for it, or reads it from stdin")
+	if err := flags.parse(args); err != nil {
+		return err
 	}
-	config.Token = *token
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	config.URL = strings.TrimRight(*baseURL, "/")
+	config.Token, config.TokenFromEnv = *token, false
 	if config.Token == "" {
-		step(stdout, "Create a token with read and write access under Settings at %s", style.Bold.Render(config.URL+"/app"))
-		fmt.Fprint(stdout, style.Muted.Render(style.SymbolStep)+" Paste it here: ")
+		if isTerminal(stdin) {
+			step(stdout, "Create a token with read and write access under Settings at %s", style.Bold.Render(config.URL+"/app"))
+			fmt.Fprint(stdout, style.Muted.Render(style.SymbolStep)+" Paste it here: ")
+		}
 		config.Token, err = readSecret(stdin)
-		fmt.Fprintln(stdout)
+		if isTerminal(stdin) {
+			fmt.Fprintln(stdout)
+		}
 		if err != nil {
 			return err
+		}
+		if config.Token == "" {
+			return fmt.Errorf("no token. Create one under Settings at %s/app and paste it, or pass it with --token", config.URL)
 		}
 	}
 	api, err := client.New(config)
@@ -278,6 +298,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 		return err
 	}
 	done(stdout, "Logged in as %s %s", style.Bold.Render(account.Email), style.Muted.Render("on "+config.URL))
+	if os.Getenv("OPS_TOKEN") != "" {
+		hint(stdout, "OPS_TOKEN is set and wins over this login. Use the new one with", "unset OPS_TOKEN")
+	}
 	return nil
 }
 
@@ -287,6 +310,11 @@ func readSecret(stdin io.Reader) (string, error) {
 		secret, err := term.ReadPassword(int(file.Fd()))
 		return strings.TrimSpace(string(secret)), err
 	}
+	return readLine(stdin)
+}
+
+// readLine reads one line and trims it.
+func readLine(stdin io.Reader) (string, error) {
 	line, err := bufio.NewReader(stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
@@ -294,27 +322,43 @@ func readSecret(stdin io.Reader) (string, error) {
 	return strings.TrimSpace(line), nil
 }
 
-func servers(ctx context.Context, args []string, stdout io.Writer) error {
+func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	config, err := client.LoadConfig()
 	if err != nil {
 		return err
 	}
-	api, err := client.New(config)
-	if err != nil {
-		return err
+	// Help works without a login.
+	api, apiErr := client.New(config)
+	command := "ls"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command, args = args[0], args[1:]
 	}
-	if len(args) == 0 || args[0] == "ls" || args[0] == "list" {
+	switch command {
+	case "ls", "list":
+		flags := newFlags("servers", "servers")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
 		list, err := api.Servers(ctx)
 		if err != nil {
 			return err
 		}
-		PrintServers(stdout, list)
+		meta, _ := api.Meta(ctx)
+		PrintServers(stdout, list, meta.Version)
 		return nil
-	}
-	switch args[0] {
 	case "add":
-		name := strings.Join(args[1:], " ")
-		created, err := api.AddServer(ctx, name)
+		flags := newFlags("servers add", "servers add [name]")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		// Without a name the control plane picks the next free web-<n>.
+		created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
 		var apiErr *client.Error
 		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
 			return fmt.Errorf("adding servers needs the ops plan: an owner subscribes under Billing at %s/app", config.URL)
@@ -330,39 +374,131 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		hint(stdout, "It shows online in", build.Name+" servers")
 		return nil
 	case "secure":
-		return secure(ctx, api, args[1:], stdout)
+		if apiErr != nil {
+			return apiErr
+		}
+		return secure(ctx, api, args, stdout)
 	case "rules":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: %s servers rules <name or id>", build.Name)
+		flags := newFlags("servers rules", "servers rules <server>")
+		if err := flags.parse(args); err != nil {
+			return err
 		}
-		return printRules(ctx, api, args[1], stdout)
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 1 {
+			return flags.wrong()
+		}
+		return printRules(ctx, api, flags.Arg(0), stdout)
+	case "update":
+		if apiErr != nil {
+			return apiErr
+		}
+		return updateAgents(ctx, api, args, stdout)
 	case "rm", "remove":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: %s servers rm <name or id>", build.Name)
+		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
+		if err := flags.parse(args); err != nil {
+			return err
 		}
-		err := api.RemoveServer(ctx, args[1])
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 1 {
+			return flags.wrong()
+		}
+		name := flags.Arg(0)
+		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name))
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(args[1]))
+		err = api.RemoveServer(ctx, name)
+		if err != nil {
+			return err
+		}
+		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
 		return nil
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+args[0], build.Name)
+	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+command, build.Name)
 }
 
-// PrintServers writes the server table.
-func PrintServers(stdout io.Writer, list []client.Server) {
+// updateAgents updates the agent of one server, or of every online server
+// whose agent is not the control plane's version.
+func updateAgents(ctx context.Context, api *client.Client, args []string, stdout io.Writer) error {
+	flags := newFlags("servers update", "servers update [server]")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	list, err := api.Servers(ctx)
+	if err != nil {
+		return err
+	}
+	meta, err := api.Meta(ctx)
+	if err != nil {
+		return err
+	}
+	targets := []client.Server{}
+	for _, server := range list {
+		switch {
+		case flags.NArg() == 1:
+			if server.Name == flags.Arg(0) || server.ID == flags.Arg(0) {
+				targets = append(targets, server)
+			}
+		case server.Online && server.Outdated(meta.Version):
+			targets = append(targets, server)
+		}
+	}
+	if flags.NArg() == 1 && len(targets) == 0 {
+		return fmt.Errorf("no server %q", flags.Arg(0))
+	}
+	if len(targets) == 0 {
+		done(stdout, "Every online agent runs %s, like the control plane.", dash(meta.Version))
+		return nil
+	}
+	failed := false
+	for _, server := range targets {
+		progress := newProgress(stdout, fmt.Sprintf("updating the agent of %s from %s to %s", server.Name, dash(server.AgentVersion), dash(meta.Version)))
+		updated, err := api.UpdateAgent(ctx, server.ID)
+		progress.end()
+		if err != nil {
+			printError(stdout, fmt.Errorf("%s: %w", server.Name, err))
+			failed = true
+			continue
+		}
+		done(stdout, "%s runs agent %s now", style.Bold.Render(updated.Name), updated.AgentVersion)
+	}
+	if failed {
+		return errReported
+	}
+	return nil
+}
+
+// PrintServers writes the server table. An agent that is not the control
+// plane's version gets a note to update it.
+func PrintServers(stdout io.Writer, list []client.Server, version string) {
 	if len(list) == 0 {
 		fmt.Fprintln(stdout, "No servers yet.")
-		hint(stdout, "Add one with", build.Name+" servers add <name>")
+		hint(stdout, "Add one with", build.Name+" servers add web-1")
 		return
 	}
 	now := time.Now()
 	rows := make([][]string, 0, len(list))
+	outdated := 0
 	for _, server := range list {
-		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access(), server.RulesText()})
+		agentVersion := dash(server.AgentVersion)
+		if server.Outdated(version) {
+			agentVersion += " " + style.Warning.Render("update to "+version)
+			outdated++
+		}
+		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), agentVersion, server.LastSeen(now), server.Access(), server.RulesText()})
 	}
 	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS", "RULES"}, rows)
+	if outdated > 0 {
+		fmt.Fprintln(stdout)
+		hint(stdout, fmt.Sprintf("The control plane runs %s. Update the agents with", version), build.Name+" servers update")
+	}
 }
 
 func dash(value string) string {
@@ -375,15 +511,15 @@ func dash(value string) string {
 func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 	dir := agent.StateDir()
 	if len(args) > 0 && args[0] == "register" {
-		flags := flag.NewFlagSet("agent register", flag.ContinueOnError)
+		flags := newFlags("agent register", "agent register --url <control plane> --token <install token>")
 		baseURL := flags.String("url", client.DefaultURL, "control plane URL")
 		token := flags.String("token", "", "install token")
-		err := flags.Parse(args[1:])
+		err := flags.parse(args[1:])
 		if err != nil {
 			return err
 		}
-		if *token == "" {
-			return errors.New("--token is required")
+		if *token == "" || flags.NArg() > 0 {
+			return flags.wrong()
 		}
 		state, err := agent.Register(ctx, dir, *baseURL, *token)
 		if err != nil {

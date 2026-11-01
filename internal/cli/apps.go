@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -12,11 +11,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
-	"golang.org/x/term"
 )
 
 func apiClient() (*client.Client, error) {
@@ -27,30 +26,39 @@ func apiClient() (*client.Client, error) {
 	return client.New(config)
 }
 
-func appName(flagValue, dir string) string { return client.AppName(flagValue, dir) }
-
-func apps(ctx context.Context, args []string, stdout io.Writer) error {
-	api, err := apiClient()
-	if err != nil {
-		return err
+func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	command := "ls"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command, args = args[0], args[1:]
 	}
-	if len(args) == 0 || args[0] == "ls" || args[0] == "list" {
+	// Help works without a login.
+	api, apiErr := apiClient()
+	switch command {
+	case "ls", "list":
+		flags := newFlags("apps", "apps")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
 		list, err := api.Apps(ctx)
 		if err != nil {
 			return err
 		}
 		PrintApps(stdout, list)
 		return nil
-	}
-	switch args[0] {
 	case "add":
-		flags := flag.NewFlagSet("apps add", flag.ContinueOnError)
+		flags := newFlags("apps add", "apps add --server <server> <name>")
 		server := flags.String("server", "", "server name or ID")
-		if err := flags.Parse(args[1:]); err != nil {
+		if err := flags.parse(args); err != nil {
 			return err
 		}
+		if apiErr != nil {
+			return apiErr
+		}
 		if flags.NArg() != 1 || *server == "" {
-			return fmt.Errorf("usage: %s apps add --server <server> <name>", build.Name)
+			return flags.wrong()
 		}
 		app, err := api.AddApp(ctx, flags.Arg(0), *server)
 		if err != nil {
@@ -60,17 +68,32 @@ func apps(ctx context.Context, args []string, stdout io.Writer) error {
 		hint(stdout, "Deploy it with", build.Name+" deploy "+app.Name)
 		return nil
 	case "rm", "remove":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: %s apps rm <name>", build.Name)
+		flags := newFlags("apps rm", "apps rm <app> [--yes]").withApp().withYes()
+		if err := flags.parse(args); err != nil {
+			return err
 		}
-		err := api.RemoveApp(ctx, args[1])
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() > 1 || (flags.NArg() == 0 && *flags.appFlag == "") {
+			return flags.wrong()
+		}
+		name, err := flags.app(flags.Arg(0))
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed %s. Its data stays on the server", style.Bold.Render(args[1]))
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name))
+		if err != nil {
+			return err
+		}
+		err = api.RemoveApp(ctx, name)
+		if err != nil {
+			return err
+		}
+		done(stdout, "Removed %s. Its data stays on the server", style.Bold.Render(name))
 		return nil
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+args[0], build.Name)
+	return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+command, build.Name)
 }
 
 // PrintApps writes the app table.
@@ -91,25 +114,25 @@ func PrintApps(stdout io.Writer, list []client.App) {
 // does not exist yet is created on the server x-ops or --server names, or on
 // the only server.
 func deploy(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("deploy", flag.ContinueOnError)
+	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [app]").withApp()
 	dir := flags.String("dir", ".", "directory to deploy")
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
 	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service")
 	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo")
-	if err := flags.Parse(args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 1 {
-		return fmt.Errorf("usage: %s deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [app]", build.Name)
+		return flags.wrong()
+	}
+	name, err := flags.appIn(flags.Arg(0), *dir)
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
-	}
-	name := appName(flags.Arg(0), *dir)
-	if name == "" {
-		return errors.New("cannot tell the app name: pass it, or set x-ops.app in compose.yml")
 	}
 	if *ref != "" {
 		// The control plane downloads the commit from GitHub; nothing is
@@ -194,7 +217,7 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 	}
 	step(stdout, "%s v%d of %s%s started", what, started.Number, style.Bold.Render(name), to)
 	if detach {
-		hint(stdout, "It goes on on the server. Watch it with", build.Name+" apps")
+		hint(stdout, "It goes on on the server. Watch it with", build.Name+" deploys "+name)
 		return nil
 	}
 	progress := newProgress(stdout, "waiting for the server")
@@ -209,12 +232,12 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 	switch {
 	case ctx.Err() != nil:
 		fmt.Fprintln(stdout)
-		hint(stdout, "Stopped watching. The deploy goes on on the server. See it with", build.Name+" apps")
+		hint(stdout, "Stopped watching. The deploy goes on on the server. See it with", fmt.Sprintf("%s deploys %s v%d", build.Name, name, started.Number))
 		return errReported
 	case err != nil:
 		return err
 	case result.Status != "succeeded":
-		fmt.Fprintln(stdout, style.Danger.Render(fmt.Sprintf("%s v%d of %s failed: %s", style.SymbolFailed, result.Number, name, result.Error)))
+		fmt.Fprintln(stdout, style.Danger.Render(fmt.Sprintf("%s %s v%d of %s failed: %s", style.SymbolFailed, what, result.Number, name, result.Error)))
 		if app, err := api.App(ctx, name); err == nil && app.App.LiveNumber > 0 {
 			hint(stdout, fmt.Sprintf("v%d stays live. Its logs:", app.App.LiveNumber), build.Name+" logs "+name)
 		} else {
@@ -238,28 +261,46 @@ func isResult(line string) bool {
 	return ok && strings.HasPrefix(number, "v") && err == nil
 }
 
+// deployNumber reads "v3" or "3".
+func deployNumber(text string) (int, bool) {
+	number, err := strconv.Atoi(strings.TrimPrefix(text, "v"))
+	return number, err == nil && number > 0
+}
+
+// appAndNumber splits the arguments of rollback and deploys: an app and a
+// deploy number like v3, both optional, in any order.
+func appAndNumber(flags *flagSet) (string, int, error) {
+	app, number := "", 0
+	for _, argument := range flags.Args() {
+		if parsed, ok := deployNumber(argument); ok && number == 0 {
+			number = parsed
+			continue
+		}
+		if app != "" {
+			return "", 0, flags.wrong()
+		}
+		app = argument
+	}
+	name, err := flags.app(app)
+	return name, number, err
+}
+
 func rollback(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("rollback", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := flags.Parse(args); err != nil {
+	flags := newFlags("rollback", "rollback [--app <app>] [app] [v<number>]").withApp()
+	if err := flags.parse(args); err != nil {
 		return err
 	}
-	number := 0
-	if flags.NArg() > 1 {
-		return fmt.Errorf("usage: %s rollback [--app <app>] [v<number>]", build.Name)
+	if flags.NArg() > 2 {
+		return flags.wrong()
 	}
-	if flags.NArg() == 1 {
-		parsed, err := strconv.Atoi(strings.TrimPrefix(flags.Arg(0), "v"))
-		if err != nil || parsed < 1 {
-			return fmt.Errorf("%q is not a deploy number like v3", flags.Arg(0))
-		}
-		number = parsed
+	name, number, err := appAndNumber(flags)
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
 	started, err := api.Rollback(ctx, name, number)
 	if err != nil {
 		return err
@@ -267,15 +308,124 @@ func rollback(ctx context.Context, args []string, stdout io.Writer) error {
 	return follow(ctx, api, name, started, "Rollback", false, stdout)
 }
 
-func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
+// deploys lists the newest deploys of an app, or prints one with its log.
+func deploys(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("deploys", "deploys [--app <app>] [app] [v<number>]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 2 {
+		return flags.wrong()
+	}
+	name, number, err := appAndNumber(flags)
+	if err != nil {
+		return err
+	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	if len(args) > 1 {
-		return fmt.Errorf("usage: %s redeploy [app]", build.Name)
+	now := time.Now()
+	if number > 0 {
+		deploy, err := api.GetDeploy(ctx, name, number)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, style.Bold.Render(fmt.Sprintf("v%d of %s", deploy.Number, name))+" "+badge(stdout, style.Deploy(deploy, 0), deploy.Status)+style.Muted.Render(" · "+deployTimes(deploy, now)))
+		if note := deployNote(deploy); note != "" {
+			fmt.Fprintln(stdout, style.Muted.Render(note))
+		}
+		fmt.Fprintln(stdout)
+		for _, line := range deploy.Log {
+			text, isStep := style.LogLine(line)
+			switch {
+			case text == "":
+			case isStep:
+				fmt.Fprintln(stdout, style.Step(text))
+			default:
+				fmt.Fprintln(stdout, "    "+style.Noise(text))
+			}
+		}
+		if len(deploy.Log) == 0 {
+			fmt.Fprintln(stdout, style.Muted.Render("No log lines."))
+		}
+		if deploy.Status == "failed" && deploy.Error != "" {
+			fmt.Fprintln(stdout, style.Danger.Render(style.SymbolFailed+" "+deploy.Error))
+		}
+		return nil
 	}
-	name := appName(strings.Join(args, ""), ".")
+	detail, err := api.App(ctx, name)
+	if err != nil {
+		return err
+	}
+	if len(detail.Deploys) == 0 {
+		fmt.Fprintf(stdout, "%s has no deploys yet.\n", name)
+		hint(stdout, "Deploy it with", build.Name+" deploy")
+		return nil
+	}
+	rows := make([][]string, 0, len(detail.Deploys))
+	for _, deploy := range detail.Deploys {
+		took := "-"
+		if deploy.FinishedAt != nil {
+			took = duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+		}
+		status := deploy.Status
+		if deploy.Number == detail.App.LiveNumber && status == "succeeded" {
+			status = "live"
+		}
+		rows = append(rows, []string{fmt.Sprintf("v%d", deploy.Number), badge(stdout, style.Deploy(deploy, detail.App.LiveNumber), status), since(deploy.CreatedAt, now), took, deployNote(deploy)})
+	}
+	table(stdout, []string{"DEPLOY", "STATUS", "STARTED", "TOOK", "NOTE"}, rows)
+	fmt.Fprintln(stdout)
+	hint(stdout, "The log of one:", fmt.Sprintf("%s deploys %s v%d", build.Name, name, detail.Deploys[0].Number))
+	return nil
+}
+
+// deployTimes is "started 3 min ago, took 41s".
+func deployTimes(deploy client.Deploy, now time.Time) string {
+	text := "started " + since(deploy.CreatedAt, now)
+	if deploy.FinishedAt != nil {
+		text += ", took " + duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+	}
+	return text
+}
+
+// deployNote says where a deploy came from, or why it failed.
+func deployNote(deploy client.Deploy) string {
+	note := ""
+	switch {
+	case deploy.FromNumber > 0:
+		note = fmt.Sprintf("rollback to v%d", deploy.FromNumber)
+	case deploy.Commit != "":
+		note = deploy.Ref + " " + deploy.Commit[:min(7, len(deploy.Commit))] + " " + deploy.CommitMessage
+	case deploy.Image != "":
+		note = deploy.Image
+	}
+	if deploy.Status == "failed" && deploy.Error != "" {
+		if note != "" {
+			note += ": "
+		}
+		note += deploy.Error
+	}
+	return clip(strings.TrimSpace(strings.ReplaceAll(note, "\n", " ")), 70)
+}
+
+func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("redeploy", "redeploy [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
 	started, err := api.Redeploy(ctx, name)
 	if err != nil {
 		return err
@@ -285,14 +435,21 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 
 // hook gives the app a new deploy hook URL for CI.
 func hook(ctx context.Context, args []string, stdout io.Writer) error {
-	if len(args) > 1 {
-		return fmt.Errorf("usage: %s hook [app]", build.Name)
+	flags := newFlags("hook", "hook [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(strings.Join(args, ""), ".")
 	url, err := api.RotateDeployHook(ctx, name)
 	if err != nil {
 		return err
@@ -305,11 +462,21 @@ func hook(ctx context.Context, args []string, stdout io.Writer) error {
 
 // registry manages the logins agents use to pull private images.
 func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	api, err := apiClient()
-	if err != nil {
-		return err
+	command := "ls"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command, args = args[0], args[1:]
 	}
-	if len(args) == 0 || args[0] == "ls" || args[0] == "list" {
+	// Help works without a login.
+	api, apiErr := apiClient()
+	switch command {
+	case "ls", "list":
+		flags := newFlags("registry", "registry")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
 		list, err := api.Registries(ctx)
 		if err != nil {
 			return err
@@ -324,53 +491,77 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		table(stdout, []string{"HOST", "USERNAME", "ADDED"}, rows)
 		return nil
-	}
-	switch args[0] {
 	case "set", "add":
-		if len(args) != 3 {
-			return fmt.Errorf("usage: %s registry set <host> <username>, then the password or token on stdin", build.Name)
+		flags := newFlags("registry set", "registry set <host> <username>, then the password or token on stdin")
+		if err := flags.parse(args); err != nil {
+			return err
 		}
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
-			fmt.Fprintf(stdout, "Password or token for %s on %s: ", args[2], args[1])
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 2 {
+			return flags.wrong()
+		}
+		host, username := flags.Arg(0), flags.Arg(1)
+		if isTerminal(stdin) {
+			fmt.Fprintf(stdout, "Password or token for %s on %s: ", username, host)
 		}
 		password, err := readSecret(stdin)
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		if isTerminal(stdin) {
 			fmt.Fprintln(stdout)
 		}
 		if err != nil {
 			return err
 		}
-		err = api.SetRegistry(ctx, args[1], args[2], password)
+		err = api.SetRegistry(ctx, host, username, password)
 		if err != nil {
 			return err
 		}
-		done(stdout, "Saved the login for %s. Image deploys from it pull with it.", args[1])
+		done(stdout, "Saved the login for %s. Image deploys from it pull with it.", host)
 		return nil
 	case "rm", "remove":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: %s registry rm <host>", build.Name)
+		flags := newFlags("registry rm", "registry rm <host> [--yes]").withYes()
+		if err := flags.parse(args); err != nil {
+			return err
 		}
-		err := api.RemoveRegistry(ctx, args[1])
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 1 {
+			return flags.wrong()
+		}
+		host := flags.Arg(0)
+		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove the login for %s? Private images from it stop pulling.", host))
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed the login for %s.", args[1])
+		err = api.RemoveRegistry(ctx, host)
+		if err != nil {
+			return err
+		}
+		done(stdout, "Removed the login for %s.", host)
 		return nil
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", "registry "+args[0], build.Name)
+	return fmt.Errorf("unknown command %q. Run `%s help`", "registry "+command, build.Name)
 }
 
 func logs(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("logs", flag.ContinueOnError)
+	flags := newFlags("logs", "logs [--tail 200] [app]").withApp()
 	tail := flags.Int("tail", 200, "lines per container")
-	if err := flags.Parse(args); err != nil {
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(flags.Arg(0), ".")
 	lines, err := api.Logs(ctx, name, *tail)
 	if err != nil {
 		return err
@@ -384,25 +575,49 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
+// envCommands are the subcommands of env. Any other first argument is the
+// app whose env vars to list.
+var envCommands = []string{"ls", "list", "set", "rm", "remove", "unset", "pull"}
+
 // env manages the env vars of an app: ls, set, rm and pull.
-func env(ctx context.Context, args []string, stdout io.Writer) error {
+func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := "ls"
-	if len(args) > 0 {
+	if len(args) > 0 && slices.Contains(envCommands, args[0]) {
 		command, args = args[0], args[1:]
 	}
-	flags := flag.NewFlagSet("env "+command, flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+	usage := map[string]string{
+		"set":  "env set [--app <app>] [app] KEY=value ...",
+		"rm":   "env rm [--app <app>] KEY ... [--yes]",
+		"pull": "env pull [--app <app>] [file]",
+	}[command]
+	if usage == "" {
+		usage = "env [--show] [app]"
+		if command == "remove" || command == "unset" {
+			usage = "env rm [--app <app>] KEY ... [--yes]"
+		}
+	}
+	flags := newFlags("env "+command, usage).withApp()
 	show := flags.Bool("show", false, "show the values")
-	if err := flags.Parse(args); err != nil {
+	if command == "rm" || command == "remove" || command == "unset" {
+		flags.withYes()
+	}
+	if err := flags.parse(args); err != nil {
 		return err
 	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	name := appName(*appFlag, ".")
+	// Usage mistakes show before a missing login.
+	api, apiErr := apiClient()
 	switch command {
 	case "ls", "list":
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
+		name, err := flags.app(flags.Arg(0))
+		if err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
 		values, err := api.Env(ctx, name)
 		if err != nil {
 			return err
@@ -424,8 +639,13 @@ func env(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	case "set":
+		pairs := flags.Args()
+		app := ""
+		if len(pairs) > 0 && !strings.Contains(pairs[0], "=") {
+			app, pairs = pairs[0], pairs[1:]
+		}
 		set := map[string]string{}
-		for _, pair := range flags.Args() {
+		for _, pair := range pairs {
 			key, value, ok := strings.Cut(pair, "=")
 			if !ok {
 				return fmt.Errorf("%q is not KEY=value", pair)
@@ -433,9 +653,16 @@ func env(ctx context.Context, args []string, stdout io.Writer) error {
 			set[key] = value
 		}
 		if len(set) == 0 {
-			return fmt.Errorf("usage: %s env set [--app <app>] KEY=value ...", build.Name)
+			return flags.wrong()
 		}
-		_, err := api.SetEnv(ctx, name, set, nil)
+		name, err := flags.app(app)
+		if err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		_, err = api.SetEnv(ctx, name, set, nil)
 		if err != nil {
 			return err
 		}
@@ -444,19 +671,41 @@ func env(ctx context.Context, args []string, stdout io.Writer) error {
 		return nil
 	case "rm", "remove", "unset":
 		if flags.NArg() == 0 {
-			return fmt.Errorf("usage: %s env rm [--app <app>] KEY ...", build.Name)
+			return flags.wrong()
 		}
-		_, err := api.SetEnv(ctx, name, nil, flags.Args())
+		name, err := flags.app("")
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed %s from %s", strings.Join(flags.Args(), ", "), style.Bold.Render(name))
+		if apiErr != nil {
+			return apiErr
+		}
+		keys := strings.Join(flags.Args(), ", ")
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s?", keys, name))
+		if err != nil {
+			return err
+		}
+		_, err = api.SetEnv(ctx, name, nil, flags.Args())
+		if err != nil {
+			return err
+		}
+		done(stdout, "Removed %s from %s", keys, style.Bold.Render(name))
 		hint(stdout, "The next deploy drops them. Now:", build.Name+" redeploy "+name)
 		return nil
 	case "pull":
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
 		path := ".env"
 		if flags.NArg() == 1 {
 			path = flags.Arg(0)
+		}
+		name, err := flags.app("")
+		if err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
 		}
 		values, err := api.Env(ctx, name)
 		if err != nil {
@@ -478,19 +727,23 @@ func env(ctx context.Context, args []string, stdout io.Writer) error {
 
 // runWithEnv starts a local command with the env vars of an app, without a file.
 func runWithEnv(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := flag.NewFlagSet("run", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := flags.Parse(args); err != nil {
+	flags := newFlags("run", "run [--app <app>] -- <command> [args]").withApp()
+	// The command's own flags stay its own.
+	if err := flags.parseStrict(args); err != nil {
 		return err
 	}
 	if flags.NArg() == 0 {
-		return fmt.Errorf("usage: %s run [--app <app>] -- <command> [args]", build.Name)
+		return flags.wrong()
+	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	values, err := api.Env(ctx, appName(*appFlag, "."))
+	values, err := api.Env(ctx, name)
 	if err != nil {
 		return err
 	}

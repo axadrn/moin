@@ -3,17 +3,14 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
-	"golang.org/x/term"
 )
 
 // backups lists an app's backups, or manages the bucket and the snapshot
@@ -22,27 +19,39 @@ func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if len(args) > 0 && args[0] == "bucket" {
 		return bucket(ctx, args[1:], stdin, stdout)
 	}
-	flags := flag.NewFlagSet("backups", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := parseAnywhere(flags, args); err != nil {
+	flags := newFlags("backups", "backups [app], or backups auto on|off [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.Arg(0) == "auto" {
+		if flags.NArg() > 3 || (flags.Arg(1) != "on" && flags.Arg(1) != "off") {
+			return fmt.Errorf("usage: `%s backups auto on|off [app]`", build.Name)
+		}
+		name, err := flags.app(flags.Arg(2))
+		if err != nil {
+			return err
+		}
+		api, err := apiClient()
+		if err != nil {
+			return err
+		}
+		err = api.SetSnapshotBeforeChanges(ctx, name, flags.Arg(1) == "on")
+		if err != nil {
+			return err
+		}
+		done(stdout, "Snapshot before every change of %s: %s.", name, flags.Arg(1))
+		return nil
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
-	}
-	name := appName(*appFlag, ".")
-	if flags.Arg(0) == "auto" {
-		switch flags.Arg(1) {
-		case "on", "off":
-			err = api.SetSnapshotBeforeChanges(ctx, name, flags.Arg(1) == "on")
-			if err != nil {
-				return err
-			}
-			done(stdout, "Snapshot before every change of %s: %s.", name, flags.Arg(1))
-			return nil
-		}
-		return fmt.Errorf("use %s backups auto on or off", build.Name)
 	}
 	list, err := api.Backups(ctx, name)
 	if err != nil {
@@ -54,20 +63,21 @@ func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 
 // backUp takes a snapshot now.
 func backUp(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("backup", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := parseAnywhere(flags, args); err != nil {
+	flags := newFlags("backup", "backup [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	app := *appFlag
-	if app == "" {
-		app = flags.Arg(0)
-	}
-	name := appName(app, ".")
 	list, err := api.BackUp(ctx, name)
 	if err != nil {
 		return err
@@ -81,13 +91,15 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // restore puts a database back from a snapshot or to a point in time.
-func restore(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("restore", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("restore", `restore [--app <app>] [--db <path>] <snapshot> [--yes], or restore --at "2026-10-31 14:02" [--yes]`).withApp().withYes()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
 	at := flags.String("at", "", `point in time in UTC, like "2026-10-31 14:02:00"`)
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
 	}
 	snapshot := flags.Arg(0)
 	if (snapshot == "") == (*at == "") {
@@ -101,12 +113,23 @@ func restore(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		when = &parsed
 	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
+	}
+	target := "snapshot " + snapshot
+	if when != nil {
+		target = when.Format("2006-01-02 15:04:05") + " UTC"
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s takes a snapshot of it first.", name, target, build.Name))
+	if err != nil {
+		return err
+	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
-	step(stdout, "restoring %s; ops takes a snapshot of the current state first", name)
+	step(stdout, "restoring %s; %s takes a snapshot of the current state first", name, build.Name)
 	err = api.Restore(ctx, name, *database, snapshot, when)
 	if err != nil {
 		return err
@@ -126,20 +149,37 @@ func parseTime(text string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("cannot read %q as a time: use \"2026-10-31 14:02:00\" in UTC", text)
 }
 
-// bucket shows, sets or removes the bucket backups go to.
+// bucket shows, sets or removes the bucket backups go to. It is the same
+// for every app of the workspace.
 func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := "show"
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		command, args = args[0], args[1:]
 	}
-	flags := flag.NewFlagSet("backups bucket "+command, flag.ContinueOnError)
+	usage := map[string]string{
+		"set": "backups bucket set --endpoint https://… --bucket <bucket> --access-key <key> [--region auto] [--path <folder>], then the secret key on stdin",
+		"rm":  "backups bucket rm [--yes]",
+	}[command]
+	if usage == "" {
+		usage = "backups bucket"
+	}
+	flags := newFlags("backups bucket "+command, usage).withApp()
 	endpoint := flags.String("endpoint", "", "https:// URL of an S3-compatible store; empty for AWS S3")
 	region := flags.String("region", "", "region; auto for Cloudflare R2")
 	name := flags.String("bucket", "", "bucket name")
 	folder := flags.String("path", "", "folder inside the bucket")
 	accessKey := flags.String("access-key", "", "access key ID")
-	if err := flags.Parse(args); err != nil {
+	if command == "rm" {
+		flags.withYes()
+	}
+	if err := flags.parse(args); err != nil {
 		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	if *flags.appFlag != "" {
+		fmt.Fprintln(stdout, style.Muted.Render("The bucket is the same for every app; --app changes nothing here."))
 	}
 	api, err := apiClient()
 	if err != nil {
@@ -161,11 +201,11 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		if *name == "" || *accessKey == "" {
 			return fmt.Errorf("give --bucket and --access-key; the secret key comes on stdin: %s backups bucket set --endpoint https://… --bucket ops-backups --access-key …", build.Name)
 		}
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		if isTerminal(stdin) {
 			fmt.Fprint(stdout, "Secret key: ")
 		}
 		secret, err := readSecret(stdin)
-		if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		if isTerminal(stdin) {
 			fmt.Fprintln(stdout)
 		}
 		if err != nil {
@@ -181,7 +221,11 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		done(stdout, "Backups go to %s now, for every app.", *name)
 		return nil
 	case "rm":
-		err := api.RemoveBackupStorage(ctx)
+		err := confirm(stdin, stdout, flags.yes(), "Stop backups of every app? What is in the bucket stays.")
+		if err != nil {
+			return err
+		}
+		err = api.RemoveBackupStorage(ctx)
 		if err != nil {
 			return err
 		}
