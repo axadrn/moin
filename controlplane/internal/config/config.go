@@ -77,6 +77,10 @@ type Config struct {
 	// SignupsOpen false runs a private beta: new accounts only for admins,
 	// invited people and people let in from the waitlist.
 	SignupsOpen bool
+	// BackupDatabase sends every change of the control plane's own SQLite
+	// database to its bucket and restores it on start when it is missing.
+	// On by default in production.
+	BackupDatabase bool
 	// Telemetry has a self-hosted control plane send a few anonymous counts
 	// to TelemetryURL every five minutes. The hosted one never sends.
 	Telemetry    bool
@@ -178,6 +182,7 @@ func Load() (*Config, error) {
 		S3PresignExpiryPublic:  s3PresignExpiryPublic,
 		S3PresignExpiryPrivate: s3PresignExpiryPrivate,
 	}
+	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction())
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
 	cfg.GitHubClientSecret = r.string("GITHUB_CLIENT_SECRET", "")

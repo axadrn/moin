@@ -133,10 +133,16 @@ Turn it off with one setting:
 TELEMETRY=false
 ```
 
+## Database backup
+
+The control plane keeps its own SQLite database safe the way it keeps your apps' databases: every change goes to its bucket within seconds (`S3_BUCKET`, folder `controlplane/litestream`), with Litestream. In production this is on by default; `BACKUP_DATABASE=false` turns it off.
+
+When the control plane starts and finds no database, it restores the newest one from the bucket by itself. An empty bucket means a fresh start.
+
 ## Updates
 
 Run `update.sh` again. It pulls the newest image and restarts; the database migrates itself on start.
 
 ## Move or rebuild
 
-When the server dies or you move: prepare a new server with `setup.sh`, copy `/etc/ops-controlplane/` and the database in `/var/lib/ops-controlplane/` over, run `update.sh`. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.
+When the server dies or you move: prepare a new server with `setup.sh`, put your settings in `/etc/ops-controlplane/` again and run `update.sh`. The database comes back from the bucket by itself. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.

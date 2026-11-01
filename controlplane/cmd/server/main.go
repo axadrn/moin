@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/dbbackup"
 	"log/slog"
 	"net/http"
 	"os"
@@ -40,9 +41,30 @@ func main() {
 }
 
 func run(cfg *config.Config) error {
+	// The database comes back from the bucket before anything opens it.
+	bucket := dbbackup.Bucket{Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket, AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey}
+	file := dbbackup.File(cfg.DBConnection)
+	backup := cfg.BackupDatabase && file != ""
+	if backup {
+		restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		err := dbbackup.RestoreIfMissing(restoreCtx, bucket, file)
+		cancel()
+		if err != nil {
+			return err
+		}
+	} else if cfg.IsProduction() {
+		slog.Warn("database backup off: a dead server takes the database with it; set BACKUP_DATABASE=true")
+	}
 	application, err := app.New(cfg)
 	if err != nil {
 		return fmt.Errorf("initialize app: %w", err)
+	}
+	if backup {
+		stopBackup, err := dbbackup.Start(context.Background(), bucket, file)
+		if err != nil {
+			return err
+		}
+		defer stopBackup()
 	}
 	telemetry, stopTelemetry := context.WithCancel(context.Background())
 	defer stopTelemetry()
