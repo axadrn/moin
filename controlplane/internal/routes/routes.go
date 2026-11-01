@@ -31,7 +31,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	securityHeaders := func(next http.Handler) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
 	}
-	home := handler.NewHomeHandler()
+	home := handler.NewHomeHandler(app.TelemetryService)
 	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
@@ -203,6 +203,10 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST "+protocol.RegisterPath, registerLimiter(agent.Register))
 	// CI calls deploy hooks; the token is the credential, the limit stops guessing.
 	hooks := handler.NewHooksHandler(app.AppService)
+	// The hosted control plane counts what self-hosted ones report.
+	if app.Cfg.Billing {
+		mux.HandleFunc("POST /webhooks/telemetry", registerLimiter(handler.NewTelemetryHandler(app.TelemetryService).Receive))
+	}
 	mux.HandleFunc("POST /webhooks/deploy/{token}", registerLimiter(hooks.Deploy))
 	mux.HandleFunc("POST /webhooks/github", hooks.GitHubWebhook)
 	mux.HandleFunc("GET "+protocol.SessionPath, agent.Session)

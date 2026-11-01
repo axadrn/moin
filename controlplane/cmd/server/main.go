@@ -44,6 +44,9 @@ func run(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("initialize app: %w", err)
 	}
+	telemetry, stopTelemetry := context.WithCancel(context.Background())
+	defer stopTelemetry()
+	go application.TelemetryService.Run(telemetry)
 	defer func() {
 		if closeErr := application.Close(); closeErr != nil {
 			slog.Error("failed to close app", "error", closeErr)

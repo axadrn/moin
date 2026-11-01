@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/access"
+	"github.com/axadrn/ops/internal/build"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/config"
@@ -29,6 +30,7 @@ type App struct {
 	SubscriptionService *service.SubscriptionService
 	AdminService        *service.AdminService
 	PaymentService      payment.Provider
+	TelemetryService    *service.TelemetryService
 	WorkspaceService    *service.WorkspaceService
 	APITokenService     *service.APITokenService
 	ServerService       *service.ServerService
@@ -122,10 +124,12 @@ func New(cfg *config.Config) (*App, error) {
 		SubscriptionService: subscriptionService,
 		AdminService:        service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails),
 		PaymentService:      paymentProvider,
-		WorkspaceService:    workspaceService,
-		APITokenService:     apiTokenService,
-		ServerService:       serverService,
-		AppService:          appService,
+		// Only a self-hosted control plane reports; the hosted one counts.
+		TelemetryService: service.NewTelemetryService(repository.NewTelemetryRepository(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
+		WorkspaceService: workspaceService,
+		APITokenService:  apiTokenService,
+		ServerService:    serverService,
+		AppService:       appService,
 	}
 	initialized = true
 	return application, nil

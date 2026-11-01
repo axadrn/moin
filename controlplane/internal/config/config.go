@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/axadrn/ops/internal/client"
 	"net/mail"
 	"net/netip"
 	"net/url"
@@ -73,6 +74,10 @@ type Config struct {
 	// Billing off runs a self-hosted control plane: no Stripe, no prices,
 	// every workspace gets everything.
 	Billing bool
+	// Telemetry has a self-hosted control plane send a few anonymous counts
+	// to TelemetryURL every five minutes. The hosted one never sends.
+	Telemetry    bool
+	TelemetryURL string
 	// Payment, Stripe
 	StripeSecretKey         string
 	StripeWebhookSecret     string
@@ -145,6 +150,8 @@ func Load() (*Config, error) {
 		CloudflareAccountID:     r.string("CLOUDFLARE_ACCOUNT_ID", ""),
 		CloudflareAPIToken:      r.string("CLOUDFLARE_API_TOKEN", ""),
 		Billing:                 r.boolean("BILLING", true),
+		Telemetry:               r.boolean("TELEMETRY", true),
+		TelemetryURL:            r.string("TELEMETRY_URL", client.DefaultURL+"/webhooks/telemetry"),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:     r.string("STRIPE_WEBHOOK_SECRET", ""),
 		StripePriceIDProMonthly: r.string("STRIPE_PRICE_ID_PRO_MONTHLY", ""),

@@ -3,17 +3,20 @@ package handler
 import (
 	"net/http"
 
+	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
-type HomeHandler struct{}
+type HomeHandler struct {
+	telemetry *service.TelemetryService
+}
 
-func NewHomeHandler() *HomeHandler {
-	return &HomeHandler{}
+func NewHomeHandler(telemetry *service.TelemetryService) *HomeHandler {
+	return &HomeHandler{telemetry: telemetry}
 }
 
 func (h *HomeHandler) HomePage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Home())
+	render(w, r, pages.Home(h.telemetry.Network()))
 }
 
 func (h *HomeHandler) NotFoundPage(w http.ResponseWriter, r *http.Request) {

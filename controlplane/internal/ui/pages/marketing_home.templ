@@ -5,6 +5,7 @@ import (
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
@@ -15,7 +16,7 @@ const (
 	homeSurface = "rounded-[24px] bg-card"
 )
 
-templ Home() {
+templ Home(network model.Network) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy to servers you own",
 		Description: brand.Name + " deploys your apps to servers you own, backs up every change of their SQLite database to your bucket and lets you edit the data live. From the web, the CLI, a terminal UI and MCP.",
@@ -23,6 +24,9 @@ templ Home() {
 	}) {
 		<main>
 			@HomeHero()
+			if ctxkeys.RenderConfig(ctx).Billing {
+				@HomeLive(network)
+			}
 			@HomeCommands()
 			@HomeWaysIn()
 			@HomeBackups()
@@ -201,6 +205,38 @@ templ homeChip(app, kind, text string) {
 				</span>
 		}
 	</span>
+}
+
+// ---------------------------------------------------------------- live
+// HomeLive is what ops runs right now: the hosted control plane counts
+// itself, self-hosted ones report every five minutes. Zero is fine: we say
+// what is true.
+templ HomeLive(network model.Network) {
+	<section id="live" class="scroll-mt-24 pt-24 sm:pt-32" data-live>
+		<div class={ homeWrap }>
+			<p class="flex items-center gap-2.5 text-sm font-semibold text-muted-foreground">
+				<span class="lp-pulse size-2 rounded-full bg-live"></span>
+				Running on ops right now
+			</p>
+			<dl class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+				@homeLiveNumber(network.SelfHosted, "self-hosted control planes", "self-hosted")
+				@homeLiveNumber(network.HostedWorkspaces, "teams on hosted ops", "hosted")
+				@homeLiveNumber(network.Servers, "servers", "servers")
+				@homeLiveNumber(network.Apps, "apps live", "apps")
+				@homeLiveNumber(network.Deploys, "deploys so far", "deploys")
+			</dl>
+		</div>
+	</section>
+}
+
+templ homeLiveNumber(count int, label, name string) {
+	<div class={ homeSurface, "px-6 py-5" } data-live-number={ name }>
+		<dt class="sr-only">{ label }</dt>
+		<dd>
+			<span class={ homeDisplay, "block text-[clamp(2rem,4vw,2.8rem)] tabular-nums" }>{ liveCount(count) }</span>
+			<span class="mt-2 block text-sm text-muted-foreground">{ label }</span>
+		</dd>
+	</div>
 }
 
 // ---------------------------------------------------------------- commands
@@ -446,27 +482,32 @@ templ HomeStatement() {
 
 // ---------------------------------------------------------------- pricing
 // HomePricing puts the free self-hosted ops next to the hosted one: the same
-// product, the only difference is who runs the control plane.
+// product, so the rows say what running it takes. Both cards have the same
+// rows in the same order, short enough to stay on one line.
 templ HomePricing() {
 	<section id="pricing" class="scroll-mt-24 py-32 sm:py-44">
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Free to run. Or we run it.</h2>
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				The same ops either way, every feature and no limits. The only difference is who runs the control plane.
+				<span class="text-foreground">Both get every feature, with unlimited servers, apps and members, all open source.</span>
+				The difference is the work around it.
 			</p>
 			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
 				<div class={ homeSurface, "flex flex-col p-7 sm:p-10" } data-plan="self-hosted">
 					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Self-hosted</p>
-					<p class="mt-6 flex items-baseline gap-2">
+					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
 						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$0</span>
 						<span class="text-lg text-muted-foreground">free forever</span>
 					</p>
-					<ul class="mt-8 flex flex-col gap-3 text-[17px] leading-7 text-muted-foreground">
-						@homePlanLine("Open source under AGPL-3.0, all of it")
-						@homePlanLine("Every feature, unlimited servers, apps and members")
-						@homePlanLine("Your control plane on your own server")
-						@homePlanLine("Updates with a git pull")
-					</ul>
+					<dl class="mt-8 divide-y divide-border border-y border-border">
+						@homePlanRow("Setup", "About an hour", false)
+						@homePlanRow("Control plane", "On your own server", false)
+						@homePlanRow("Updates", "You pull and rebuild", false)
+						@homePlanRow("GitHub App, email", "You set them up", false)
+						@homePlanRow("Control plane backups", "Yours to run", false)
+						@homePlanRow("Support", "GitHub issues", false)
+						@homePlanRow("goilerplate", "Not included", false)
+					</dl>
 					<div class="mt-auto pt-10">
 						<a href="/docs/self-hosting" class="inline-flex h-12 items-center gap-2 rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">
 							Host it yourself
@@ -476,16 +517,19 @@ templ HomePricing() {
 				</div>
 				<div class="flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10" data-plan="hosted">
 					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Hosted</p>
-					<p class="mt-6 flex flex-wrap items-baseline gap-x-2">
+					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
 						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
 						<span class="text-lg text-background/65">a month, or $290 a year</span>
 					</p>
-					<ul class="mt-8 flex flex-col gap-3 text-[17px] leading-7 text-background/75">
-						@homePlanLine("Everything of self-hosted, run by us")
-						@homePlanLine("Updates, backups and uptime of the control plane")
-						@homePlanLine("Your apps still run on your servers")
-						@homePlanLine("Yearly: goilerplate included, worth $99")
-					</ul>
+					<dl class="mt-8 divide-y divide-background/15 border-y border-background/15">
+						@homePlanRow("Setup", "Two minutes", true)
+						@homePlanRow("Control plane", "Ours, nothing to run", true)
+						@homePlanRow("Updates", "The day they ship", true)
+						@homePlanRow("GitHub App, email", "Ready to use", true)
+						@homePlanRow("Control plane backups", "Every day, by us", true)
+						@homePlanRow("Support", "Email, from the team", true)
+						@homePlanRow("goilerplate", "Free with yearly, $99", true)
+					</dl>
 					<div class="mt-auto pt-10">
 						<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-background px-7 text-[15px] font-semibold text-foreground transition-opacity hover:opacity-85">
 							Get started
@@ -494,15 +538,16 @@ templ HomePricing() {
 					</div>
 				</div>
 			</div>
+			<p class="mt-5 text-center text-sm text-muted-foreground">Your apps run on your servers either way, and your data never leaves them.</p>
 		</div>
 	</section>
 }
 
-templ homePlanLine(text string) {
-	<li class="flex gap-3">
-		<span class="mt-[0.7em] size-1.5 shrink-0 rounded-full bg-current opacity-60"></span>
-		<span>{ text }</span>
-	</li>
+templ homePlanRow(label, value string, dark bool) {
+	<div class="flex items-baseline justify-between gap-4 py-3.5">
+		<dt class={ "shrink-0 text-[15px]", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/60", dark) }>{ label }</dt>
+		<dd class="truncate text-right text-[15px] font-semibold">{ value }</dd>
+	</div>
 }
 
 // ---------------------------------------------------------------- faq

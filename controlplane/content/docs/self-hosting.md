@@ -8,13 +8,19 @@ order: 3
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
-| Price | free forever | $29 a month or $290 a year, yearly with goilerplate included |
+| Price | free forever | $29 a month or $290 a year |
 | Features | all | all |
 | Servers, apps, members | unlimited | unlimited |
-| Who runs the control plane | you | us: updates, backups, uptime |
-| Where your apps run | your servers | your servers |
+| Setup | about an hour | two minutes |
+| Control plane | on your own server | ours, nothing to run |
+| Updates | you pull and rebuild | the day they ship |
+| GitHub App, email | you set them up | ready to use |
+| Backups of the control plane | yours to run | every day, by us |
+| Support | GitHub issues | email, from the team |
+| goilerplate | not included | free with yearly, worth $99 |
+| Where your apps and data are | your servers | your servers |
 
-You need nothing from us: no license key, and it never calls us. Prefer not to run it? Our hosted control plane is the same code.
+You need nothing from us, not even a license key. Prefer not to run it? Our hosted control plane is the same code.
 
 ## What is different
 
@@ -79,6 +85,22 @@ ops login --url https://ops.example.com
 ```
 
 The install line for a server, the CLI, the terminal UI and MCP all talk to your control plane from then on. The rest of these docs apply as they are.
+
+## What it sends us
+
+Every five minutes a self-hosted control plane tells us that it runs, with a few counts and nothing else:
+
+```json
+{"instance": "8f14e45f-ceea-467a-9575-6c6f2b2b8f1e", "version": "v0.1.0", "counts": {"servers": 3, "apps": 7, "deploys": 412}}
+```
+
+The instance ID is random and made once, on the first start. There is no name, domain, email, address or data of your apps in it, and we do not keep the address it comes from. The numbers add up to what the landing page shows as running on ops right now; a control plane that stops sending drops off within fifteen minutes. The code is in `controlplane/internal/service/telemetry.go`, and the control plane says so in its log when it starts.
+
+Turn it off with one setting:
+
+```bash
+TELEMETRY=false
+```
 
 ## Updates
 
