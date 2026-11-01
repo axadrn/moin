@@ -237,6 +237,15 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 	case err != nil:
 		return err
 	case result.Status != "succeeded":
+		// The stream may end before the error is stored: ask once more.
+		if result.Error == "" {
+			if stored, err := api.GetDeploy(ctx, name, result.Number); err == nil {
+				result.Error = stored.Error
+			}
+		}
+		if result.Error == "" {
+			result.Error = fmt.Sprintf("see %s deploys %s v%d", build.Name, name, result.Number)
+		}
 		fmt.Fprintln(stdout, style.Danger.Render(fmt.Sprintf("%s %s v%d of %s failed: %s", style.SymbolFailed, what, result.Number, name, result.Error)))
 		if app, err := api.App(ctx, name); err == nil && app.App.LiveNumber > 0 {
 			hint(stdout, fmt.Sprintf("v%d stays live. Its logs:", app.App.LiveNumber), build.Name+" logs "+name)
