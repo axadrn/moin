@@ -93,7 +93,7 @@ MCP: unlink_repo
 ## How a deploy from GitHub runs
 
 1. ops resolves the ref to a commit: `main` becomes `5ee5ee5`.
-2. The control plane downloads that commit as a tarball from GitHub and stores it like an `ops deploy` upload.
+2. Your server downloads that commit straight from GitHub, with a short-lived token the control plane gets for it. The code never passes through ops.
 3. Your server builds and starts it the same way, with a snapshot of the database first.
 4. The commit gets the status **pending**, then **success** or **failure** with a link to the app.
 
