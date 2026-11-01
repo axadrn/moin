@@ -239,3 +239,23 @@ Decided 2026-11-01, after research:
 - The name and logo are outside the license (`TRADEMARKS.md`). No
   registration for now; register the name at the paid launch or at its
   first misuse.
+
+## Renaming later
+
+ops launches as "ops by goilerplate" at ops.goilerplate.com with the
+command `ops`. A distinct name may come later; the command then changes with
+it. The way out stays clean when these hold from the start:
+
+- The product name lives only in `internal/build.Name`. Never write it
+  anywhere else in code; docs and pages use it from there or are updated in
+  one pass.
+- The new command ships next to `ops`, which stays as an alias for about
+  three months: it works and says once that the command has a new name.
+- The control plane answers on the old and the new host until every agent
+  has moved: agents dial the URL they registered with, and a WebSocket does
+  not follow redirects. The web pages and docs redirect.
+- Paths on servers stay as they are: `/etc/ops/rules`, `/var/lib/ops`, the
+  `ops-agent` service, the `ops-` container names. Nobody needs to change
+  them.
+- GitHub redirects a renamed repo, the GitHub Action included. The install
+  script and the CLI downloads keep working at the old URLs.
