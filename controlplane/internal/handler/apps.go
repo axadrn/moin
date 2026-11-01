@@ -182,6 +182,17 @@ func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	h.Detail(w, r)
 }
 
+// Apply restarts the running release with the env and routing as they are
+// now, without a build. The page follows the new deploy.
+func (h *AppsHandler) Apply(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.Apply(actor(r), r.PathValue("app"))
+	if err != nil {
+		h.toast(w, r, "Apply could not start", err)
+		return
+	}
+	h.Detail(w, r)
+}
+
 // DeployImage deploys an image built elsewhere. The page follows the new deploy.
 func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
 	_, err := h.apps.Deploy(actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")))

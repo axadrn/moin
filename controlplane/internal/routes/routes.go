@@ -128,6 +128,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/apps/{app}", workspace(apps.Delete))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/rollback", workspace(apps.Rollback))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/redeploy", workspace(apps.Redeploy))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/apply", workspace(apps.Apply))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/image", workspace(apps.DeployImage))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/hook", workspace(apps.RotateHook))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/routing", workspace(apps.Routing))
