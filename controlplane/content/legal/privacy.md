@@ -1,10 +1,10 @@
 ---
 title: Privacy Policy
 description: What ops stores, why, where it lives and how to get rid of it
-lastUpdated: October 31, 2026
+lastUpdated: November 1, 2026
 ---
 
-Short version: ops stores what it needs to run your servers and apps, encrypts every secret, uses no tracking and no advertising, and deletes your data when you delete your account. Your apps and their data stay on your own servers.
+Short version: ops stores what it needs to run your servers and apps, encrypts every secret, uses no tracking cookies and no advertising, and deletes your data when you delete your account. Your apps and their data stay on your own servers.
 
 ## Who we are
 
@@ -18,7 +18,7 @@ The website runs on a server of Hetzner Online GmbH in Germany. Cloudflare, Inc.
 
 ## Cookies and browser storage
 
-ops sets only cookies it needs to work: a session cookie that keeps you signed in, a CSRF cookie that protects forms, and a short-lived state cookie while you sign in with GitHub. There are no analytics, advertising or tracking cookies, so there is no cookie banner. Your light or dark theme choice stays in your browser's local storage and is never sent to us.
+ops sets only cookies it needs to work: a session cookie that keeps you signed in, a CSRF cookie that protects forms, and a short-lived state cookie while you sign in with GitHub. There are no analytics, advertising or tracking cookies, so there is no cookie banner. Page views on the hosted ops are counted with Umami on our own server; Umami sets no cookies and stores no IP addresses, and we only see totals, such as which pages are read and which site sent a visitor. A control plane you host yourself counts nothing unless you set it up. Your light or dark theme choice stays in your browser's local storage and is never sent to us.
 
 ## Your account
 

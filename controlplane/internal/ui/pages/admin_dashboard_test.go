@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/config"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
@@ -49,7 +48,7 @@ func TestAdminDashboardRendersOperatorDataAndProtectedActions(t *testing.T) {
 		t.Fatalf("render AdminDashboard(): %v", err)
 	}
 	html := output.String()
-	for _, expected := range []string{"noindex, nofollow", brand.Name + " Admin", "target@example.com", "View as user", "Workspace deleted", "180 days"} {
+	for _, expected := range []string{"noindex, nofollow", ">Admin</span>", "target@example.com", "View as user", "Workspace deleted", "180 days"} {
 		if !strings.Contains(html, expected) {
 			t.Fatalf("admin dashboard missing %q", expected)
 		}
