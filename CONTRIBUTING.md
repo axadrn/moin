@@ -8,16 +8,15 @@ ops is licensed under AGPL-3.0. Your contribution comes in under the
 Apache License 2.0, so the project can keep choosing its license later. You
 keep the copyright of your work.
 
-Say so in every commit with a sign-off:
+On your first pull request a bot asks you to agree to the
+[Contributor License Agreement](CLA.md). Agree once with a comment:
 
-```bash
-git commit -s
+```
+I have read the CLA Document and I hereby sign the CLA
 ```
 
-It adds `Signed-off-by: Your Name <you@example.com>` and means you agree to
-the [Developer Certificate of Origin](https://developercertificate.org) and
-license this contribution under the Apache License 2.0. A pull request
-without it cannot be merged.
+It covers every later pull request. A pull request without it cannot be
+merged.
 
 ## Never commit
 
