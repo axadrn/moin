@@ -46,7 +46,7 @@ phrases ("supercharge", "unleash", "seamless", "effortless",
 | `running` | running, deploying |
 | `failed` | failed, offline, destructive |
 | `idle` | new, unknown, neutral |
-| `terminal`, `terminal-foreground` | log and command blocks, in both themes |
+| `terminal`, `terminal-foreground` | log and command blocks, in both themes. One step lighter than anything it sits on: dark on light pages, `#2c2c2e` over the black page and `#1c1c1e` cards in dark |
 | neutrals | `background`, `card`, `muted`, `border`: pure grays, no tint |
 
 Tailwind: `font-display` (Geist 800, tight), `bg-brand text-brand-foreground`, `text-live`,

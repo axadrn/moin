@@ -1,0 +1,44 @@
+package blocks
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
+)
+
+// ShadcnTemplURL is the component library by the same maker.
+const ShadcnTemplURL = "https://shadcn-templ.com"
+
+// OpsURL is the public home of ops.
+const OpsURL = "https://ops.goilerplate.com"
+
+// makerProject is one of the three projects by the same maker.
+type makerProject struct {
+	Name, Text, Href string
+}
+
+var makerProjects = []makerProject{
+	{"shadcn-templ", "The Go port of shadcn/ui", ShadcnTemplURL},
+	{"goilerplate", "The Go SaaS starter, free and open source", GoilerplateURL},
+	{"ops", "Deploys and backups on your own server", OpsURL},
+}
+
+// MakerProjects links shadcn-templ, goilerplate and ops side by side.
+templ MakerProjects(class string) {
+	@item.Group(item.GroupProps{Class: "grid gap-3 sm:grid-cols-3 " + class}) {
+		for _, p := range makerProjects {
+			@item.Item(item.Props{Href: p.Href, Variant: item.VariantOutline, Class: "items-start"}) {
+				@item.Content() {
+					@item.Title() {
+						{ p.Name }
+					}
+					@item.Description() {
+						{ p.Text }
+					}
+				}
+				@item.Actions() {
+					@icon.ArrowUpRight(icon.Props{Class: "size-4 text-muted-foreground"})
+				}
+			}
+		}
+	}
+}

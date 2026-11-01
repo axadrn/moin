@@ -16,6 +16,9 @@ import (
 // GitHubURL is the open source repository of ops.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
+// GoilerplateURL is goilerplate, the Go SaaS starter by the same author.
+const GoilerplateURL = "https://goilerplate.com"
+
 // Wordmark is the brand name in the display face with a terminal cursor.
 templ Wordmark(class ...string) {
 	<span class={ "inline-flex items-baseline gap-[0.12em] font-display text-foreground", class }>
@@ -40,6 +43,7 @@ templ Navbar() {
 					@NavbarPricingDesktop()
 					@NavbarBlogDesktop()
 					@NavbarDocsDesktop()
+					@navLink(GoilerplateURL, "goilerplate")
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
@@ -96,6 +100,7 @@ templ MobileNav() {
 			@NavbarPricingMobile()
 			@NavbarBlogMobile()
 			@NavbarDocsMobile()
+			@MobileLink(GoilerplateURL, "goilerplate")
 			@MobileLink(GitHubURL, "GitHub")
 		</div>
 		<div class="space-y-2.5 border-t p-6">

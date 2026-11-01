@@ -12,6 +12,8 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
@@ -42,6 +44,7 @@ templ Home(network model.Network) {
 				@HomePricing()
 			}
 			@HomeFAQ()
+			@HomeMaker()
 		</main>
 	}
 }
@@ -61,7 +64,8 @@ templ HomeHero() {
 	<section class="pt-16 sm:pt-28">
 		<div class={ homeWrap, "grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
 			<div>
-				<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
+				@homeGoilerplatePill()
+				<h1 class={ homeDisplay, "mt-8 text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
 					<span class="block">Deploy.</span>
 					<span class="block">Back up.</span>
 					<span class="block">Edit live.</span>
@@ -82,6 +86,18 @@ templ HomeHero() {
 			@homeStage()
 		</div>
 	</section>
+}
+
+// homeGoilerplatePill is the small news above the headline: goilerplate
+// is free and open source now.
+templ homeGoilerplatePill() {
+	@badge.Badge(badge.Props{Href: blocks.GoilerplateURL, Variant: badge.VariantOutline, Class: "h-8 gap-2 pl-1 text-[13px]"}) {
+		@badge.Badge(badge.Props{Class: "h-6 px-2.5"}) {
+			New
+		}
+		<span>goilerplate is now free and open source</span>
+		@icon.ArrowRight(icon.Props{Class: "text-muted-foreground", Attributes: templ.Attributes{"data-icon": "inline-end"}})
+	}
 }
 
 // homeTerminal is a real session: a deploy that snapshots the database
@@ -455,7 +471,42 @@ templ homeFile(name, note, kind string) {
 	</div>
 }
 
+// ---------------------------------------------------------------- maker
+templ HomeMaker() {
+	<section id="maker" class="scroll-mt-24 pb-32 sm:pb-44">
+		<div class={ homeWrap, "grid gap-10 md:grid-cols-[auto_minmax(0,1fr)] md:gap-16" }>
+			<a href="https://x.com/axadrn" target="_blank" rel="me noopener" aria-label="Axel Adrian on X" class="shrink-0">
+				<img src="https://github.com/axadrn.png?size=320" alt="Axel Adrian" width="320" height="320" loading="lazy" class="size-32 rounded-4xl object-cover sm:size-40"/>
+			</a>
+			<div class="max-w-3xl">
+				<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Built by the maker of shadcn-templ and goilerplate.</h2>
+				<p class="mt-5 text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">I'm Axel. I maintain shadcn-templ, the Go port of shadcn/ui, and goilerplate, the Go SaaS starter. ops is how I deploy and back up my own products, on my own servers.</p>
+				@blocks.MakerProjects("mt-8")
+				<div class="mt-6 flex items-center gap-1">
+					@button.Button(button.Props{Href: "https://x.com/axadrn", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Attributes: templ.Attributes{"rel": "me noopener", "aria-label": "Axel Adrian on X"}}) {
+						@icons.X(icons.Props{Class: "size-4"})
+					}
+					@button.Button(button.Props{Href: "https://github.com/axadrn", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Attributes: templ.Attributes{"rel": "me noopener", "aria-label": "Axel Adrian on GitHub"}}) {
+						@icons.Github(icons.Props{Class: "size-[18px]"})
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
 // ---------------------------------------------------------------- statement
+
+// homeSecretStep is one step of where secrets live: now, next, then.
+templ homeSecretStep(when, title, body string) {
+	<li class="flex flex-col gap-2 bg-foreground p-6 sm:p-7">
+		@badge.Badge(badge.Props{Class: "h-auto self-start leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
+			{ when }
+		}
+		<p class="mt-2 text-[17px] font-semibold text-background">{ title }</p>
+		<p class="text-[15px] leading-6 text-background/65">{ body }</p>
+	</li>
+}
 templ HomeStatement() {
 	<section class="pt-3">
 		<div class={ homeWrap }>
@@ -468,22 +519,11 @@ templ HomeStatement() {
 				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
 					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
 				</p>
-				<div class="mt-10 flex max-w-xl flex-col gap-3 text-[17px] leading-7 sm:text-lg" data-coming-soon>
-					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
-							coming soon
-						}
-						<span class="text-background">Hosted ops stores your login. Nothing else.</span>
-						<span class="text-background/65">Env vars and keys live only on your servers.</span>
-					</p>
-					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
-							coming soon
-						}
-						<span class="text-background">End-to-end encrypted.</span>
-						<span class="text-background/65">We can't read your secrets or your data. Not won't, can't.</span>
-					</p>
-				</div>
+				<ol class="mt-12 grid gap-px overflow-hidden rounded-3xl bg-background/15 sm:grid-cols-3" data-secrets-roadmap>
+					@homeSecretStep("Now", "Encrypted with us", "Env vars and registry logins are sealed with AES-256-GCM in the control plane. Your code and data never pass through it.")
+					@homeSecretStep("Next", "Only on your servers", "Secrets move to the agent. Hosted ops keeps your login and nothing else.")
+					@homeSecretStep("Then", "End-to-end encrypted", "We can't read your secrets or your data. Not won't, can't.")
+				</ol>
 			}
 		</div>
 	</section>
@@ -538,18 +578,18 @@ templ HomePricing() {
 						<span class="text-lg text-background/65">a month, or $290 a year</span>
 					</p>
 					<dl class="mt-8 divide-y divide-background/15 border-y border-background/15">
+						@homePlanRow("Free trial", "30 days, no card", true)
 						@homePlanRow("Setup", "Two minutes", true)
 						@homePlanRow("Control plane", "Ours, nothing to run", true)
 						@homePlanRow("Updates", "The day they ship", true)
 						@homePlanRow("GitHub App, email", "Ready to use", true)
 						@homePlanRow("Control plane backups", "Every day, by us", true)
 						@homePlanRow("Support", "Email, from the team", true)
-						@homePlanRow("goilerplate", "Free with yearly, $99", true)
 					</dl>
 					<div class="mt-auto pt-10">
 						@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: homeCTA + " bg-background text-foreground hover:bg-background/85"}) {
 							if ctxkeys.RenderConfig(ctx).SignupsOpen {
-								Get started
+								Start free trial
 							} else {
 								Join the waitlist
 							}
@@ -600,10 +640,19 @@ templ HomeFAQ() {
 				@homeQuestion("Can my AI agent use it?") {
 					Yes. ops has an MCP server: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
 				}
+				@homeQuestion("Where are my env vars?") {
+					Today in the control plane, sealed with AES-256-GCM, and handed to your server with each deploy. Next they move to your servers only, so hosted ops keeps your login and nothing else. After that, end-to-end encryption: we can't read them at all.
+				}
+				@homeQuestion("Will the name change?") {
+					Maybe. If it does, your servers, the CLI and the agents move over by themselves, and the old address keeps working for a while. Nothing breaks.
+				}
 				@homeQuestion("Can my team use it?") {
 					Yes, for free. Invite them and everyone deploys to the same servers. The activity shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
 				if ctxkeys.RenderConfig(ctx).Billing {
+					@homeQuestion("How does the trial work?") {
+						Sign up and you get 30 days with everything, no card. Afterwards ops turns read-only until you subscribe: your apps keep running, their backups too, and you can still stop and start them.
+					}
 					@homeQuestion("Can I cancel?") {
 						Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
 					}
