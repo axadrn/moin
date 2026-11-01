@@ -69,7 +69,7 @@ Commands that work on an app take it as an argument or as `--app`, then from `x-
 
 ## Asking first
 
-Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
+Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
 
 ## Agent updates
 
