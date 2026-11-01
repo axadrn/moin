@@ -153,9 +153,9 @@ templ homeStage() {
 		</div>
 		@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible rounded-[22px] bg-card p-1.5 sm:rounded-[32px] sm:p-3"}) {
 			<div class="overflow-hidden rounded-[17px] sm:rounded-[22px]">
-				@homeShot("deploys", "The app page: the live release, the deploy log with the snapshot before the deploy, every deploy with its commit", true)
-				@homeShot("data", "The data page: tables, rows to edit in place, and a SQL console", false)
-				@homeShot("backups", "The backups page: continuous backups, the point in time window, snapshots and the newest restore drill", false)
+				@homeShot("deploys", "The app page of a shop: the live release, every deploy, and the deploy log with the snapshot before the deploy", true)
+				@homeShot("data", "The data page: the tables of the shop database, and its customers table with rows to edit in place", false)
+				@homeShot("backups", "The backups page: continuous backup, restore to any second in the window, and the snapshots", false)
 			</div>
 		}
 		<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5" aria-label="What ops reports">
