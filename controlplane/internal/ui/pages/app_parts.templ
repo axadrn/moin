@@ -252,7 +252,7 @@ templ pageNotice(failed bool, attrs templ.Attributes) {
 
 // docsLink is the quiet link from a card to its guide.
 templ docsLink(href, label string) {
-	@button.Button(button.Props{Href: href, Variant: button.VariantGhost, Size: button.SizeSm, Class: "text-muted-foreground"}) {
+	@button.Button(button.Props{Href: href, Variant: button.VariantSecondary, Size: button.SizeSm}) {
 		@icon.BookOpen(icon.Props{Class: "size-3.5"})
 		{ label }
 	}
