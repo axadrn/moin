@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"cmp"
 	"compress/gzip"
 	"context"
 	"database/sql"
@@ -323,6 +324,16 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 	}
 	now := time.Now().UTC()
 	snapshot := protocol.Snapshot{ID: now.Format(snapshotIDLayout) + "-" + cleanReason(reason), Reason: cleanReason(reason), Size: info.Size(), CreatedAt: now}
+	// Changes in the same second, like a few SQL writes in a row, each keep
+	// their own snapshot instead of replacing the first one.
+	snapshots, listErr := b.snapshots(ctx, app, database.Path)
+	taken := func(id string) bool {
+		return slices.ContainsFunc(snapshots, func(other protocol.Snapshot) bool { return other.ID == id })
+	}
+	for n := 2; listErr == nil && taken(snapshot.ID); n++ {
+		snapshot.Reason = fmt.Sprintf("%s-%d", cleanReason(reason), n)
+		snapshot.ID = now.Format(snapshotIDLayout) + "-" + snapshot.Reason
+	}
 	b.mu.Lock()
 	client, bucket, key := b.s3Client(), b.storage.Bucket, b.prefix(app, database.Path)+"/snapshots/"+snapshot.ID+".db.gz"
 	b.mu.Unlock()
@@ -330,8 +341,8 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 	if err != nil {
 		return protocol.Snapshot{}, fmt.Errorf("upload: %w", err)
 	}
-	snapshots, err := b.snapshots(ctx, app, database.Path)
-	if err == nil && len(snapshots) > keepSnapshots {
+	snapshots = append([]protocol.Snapshot{snapshot}, snapshots...)
+	if listErr == nil && len(snapshots) > keepSnapshots {
 		for _, old := range snapshots[keepSnapshots:] {
 			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(b.prefix(app, database.Path) + "/snapshots/" + old.ID + ".db.gz")})
 		}
@@ -421,7 +432,11 @@ func (b *backups) snapshots(ctx context.Context, app, database string) ([]protoc
 			snapshots = append(snapshots, protocol.Snapshot{ID: id, Reason: reason, Size: aws.ToInt64(object.Size), CreatedAt: created})
 		}
 	}
-	slices.SortFunc(snapshots, func(x, y protocol.Snapshot) int { return y.CreatedAt.Compare(x.CreatedAt) })
+	// Newest first; in one second the numbered ones like before-sql-2 came
+	// after the first.
+	slices.SortFunc(snapshots, func(x, y protocol.Snapshot) int {
+		return cmp.Or(y.CreatedAt.Compare(x.CreatedAt), cmp.Compare(len(y.ID), len(x.ID)), strings.Compare(y.ID, x.ID))
+	})
 	return snapshots, nil
 }
 

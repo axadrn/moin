@@ -76,6 +76,19 @@ func TestBackups(t *testing.T) {
 	}
 	snapshot := backups.Databases[0].Snapshots[0]
 
+	// Two snapshots in one second keep both, the second numbered.
+	first, err := b.snapshotOne(ctx, app, a.runningDatabases(app)[0], "burst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := b.snapshotOne(ctx, app, a.runningDatabases(app)[0], "burst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.CreatedAt.Truncate(time.Second).Equal(second.CreatedAt.Truncate(time.Second)) && (second.ID == first.ID || second.Reason != "burst-2") {
+		t.Fatalf("snapshots in one second: %s, %s", first.ID, second.ID)
+	}
+
 	_, err = db.Exec(`INSERT INTO notes (body) VALUES ('three')`)
 	if err != nil {
 		t.Fatal(err)

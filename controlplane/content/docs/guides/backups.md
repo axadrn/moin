@@ -122,7 +122,7 @@ API: PUT /api/v1/apps/{app}/backups/settings
 MCP: set_backup_settings
 ```
 
-ops then takes a snapshot before a deploy (`before-v4`), before a cell edit, a deleted row or SQL with **Allow changes** (`before-sql`), and before a restore.
+ops then takes a snapshot before a deploy (`before-v4`), before a cell edit, a deleted row or SQL with **Allow changes** (`before-sql`), and before a restore. More changes in the same second each get their own snapshot: `before-sql-2`, `before-sql-3`.
 
 ## Stop backups
 
