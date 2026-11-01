@@ -51,6 +51,11 @@ const (
 
 const FeaturePrioritySupport Feature = "priority_support"
 
+// FeatureChanges lets a workspace change what runs: deploys, servers, env,
+// domains, data. Without it the workspace is read-only, but its apps keep
+// running and can still be stopped and started.
+const FeatureChanges Feature = "changes"
+
 const LimitMembers Limit = "members"
 
 // LimitServers is how many servers an account may add.

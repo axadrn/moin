@@ -37,6 +37,9 @@ type App struct {
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
 	Protected    bool     `json:"protected"`
+	// Stopped is set when the app was stopped; a deploy, restart or start
+	// runs it again.
+	Stopped bool `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
 	Repo                  string    `json:"repo"`
 	Branch                string    `json:"branch"`
@@ -121,6 +124,7 @@ func NewApp(app model.App) App {
 		Domains:               app.DomainList(),
 		Canonical:             app.Canonical,
 		Protected:             app.Protect != "",
+		Stopped:               app.Stopped,
 		Repo:                  app.Repo,
 		Branch:                app.Branch,
 		AutoDeploy:            app.AutoDeploy,
@@ -675,14 +679,35 @@ func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
 	h.change(w, workspace.ID, r.PathValue("app"), deploy)
 }
 
-// Apply restarts the running release with the env and routing as they are now.
-func (h *AppsHandler) Apply(w http.ResponseWriter, r *http.Request) {
-	deploy, err := h.apps.Apply(actor(r), r.PathValue("app"))
+// Restart starts the live release again with the env and routing as they
+// are now.
+func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
+	deploy, err := h.apps.Restart(actor(r), r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
 	JSON(w, http.StatusAccepted, NewDeploy(*deploy))
+}
+
+// Start runs a stopped app again.
+func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
+	deploy, err := h.apps.Start(actor(r), r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusAccepted, NewDeploy(*deploy))
+}
+
+// Stop stops the app's containers. Its data stays.
+func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
+	err := h.apps.Stop(r.Context(), actor(r), r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	NoContent(w)
 }
 
 // actor is who sends the request: an API token or MCP goes as "api", a

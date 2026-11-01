@@ -201,6 +201,10 @@ func (s *AppService) GitHubPush(ctx context.Context, installationID int64, repo,
 		return
 	}
 	for _, app := range apps {
+		if err := s.servers.RequireChanges(app.WorkspaceID); err != nil {
+			slog.Info("auto deploy skipped", "app_id", app.ID, "repo", repo, "error", err)
+			continue
+		}
 		deploy, err := s.DeployRef(ctx, Actor{WorkspaceID: app.WorkspaceID, Via: "github"}, app.ID, sha)
 		if err != nil {
 			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)

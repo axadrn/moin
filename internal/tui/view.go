@@ -438,6 +438,9 @@ func (m model) prompt() ([]string, [][2]string) {
 		return bar(style.Danger, style.Bold.Render(question), detail), [][2]string{{"y", "remove"}, cancel}
 	case modeConfirmSecurity:
 		return bar(style.Warning, style.Bold.Render(m.pendingSecurity.question), m.pendingSecurity.detail), [][2]string{{"y", "apply"}, cancel}
+	case modeConfirmStop:
+		app, _ := m.currentApp()
+		return bar(style.Warning, style.Bold.Render("Stop "+app.Name+"?"), "It is offline until you start it; its data stays."), [][2]string{{"y", "stop"}, cancel}
 	case modeConfirmRollback:
 		app, _ := m.currentApp()
 		question := fmt.Sprintf("Roll %s back to the deploy before v%d?", app.Name, app.LiveNumber)
@@ -457,7 +460,11 @@ func (m model) prompt() ([]string, [][2]string) {
 	if m.detail != nil && m.deployPick != 0 {
 		rollback = [2]string{"r", fmt.Sprintf("roll back to v%d", m.deployPick)}
 	}
-	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, rollback, {"x", "remove"}}...)
+	power := [2]string{"S", "stop"}
+	if app, ok := m.currentApp(); ok && app.Stopped {
+		power = [2]string{"S", "start"}
+	}
+	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, rollback, {"x", "remove"}}...)
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}

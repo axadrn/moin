@@ -54,10 +54,10 @@ x-ops:
 
 Fields in `x-ops` win over the settings in ops.
 
-## Apply by hand
+## Restart by hand
 
 | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- |
-| **Apply** on the app page | `ops apply [app]` | changes from `o` and `p` apply by themselves | `POST /api/v1/apps/{app}/apply` | `apply_app` |
+| **Restart** on the app page | `ops restart [app]` | `t` | `POST /api/v1/apps/{app}/restart` | `restart_app` |
 
-It restarts the running release with the env vars, domains and password as they are now, without a build.
+It starts the live release again with the env vars, domains and password as they are now, without a build. Changes from `o` and `p` restart by themselves.

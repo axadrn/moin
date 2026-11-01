@@ -50,7 +50,9 @@ claude mcp add --transport http ops https://ops.example.com/mcp --header "Author
 | `set_domains` | domains and the canonical one | write |
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |
-| `apply_app` | restarts the running release with the current settings | write |
+| `restart_app` | starts the live release again with the current settings | write |
+| `stop_app` | takes the app offline; its data stays | write |
+| `start_app` | runs a stopped app again | write |
 | `get_env` | env vars in plain text | write |
 | `set_env` | sets and removes env vars | write |
 | `get_github` | GitHub installations and the install link | read |

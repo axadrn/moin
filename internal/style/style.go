@@ -130,6 +130,8 @@ func App(app client.App) string {
 		return Badge(StatusIdle, "new")
 	case app.LatestStatus == "running":
 		return Badge(StatusRunning, fmt.Sprintf("deploying v%d", app.LatestNumber))
+	case app.Stopped:
+		return Badge(StatusIdle, fmt.Sprintf("stopped v%d", app.LiveNumber))
 	case app.LatestStatus == "failed" && app.LiveNumber > 0:
 		return Badge(StatusFailed, fmt.Sprintf("failed v%d", app.LatestNumber)) + Muted.Render(fmt.Sprintf(" · v%d live", app.LiveNumber))
 	case app.LatestStatus == "failed":

@@ -35,6 +35,18 @@ func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In,
 	}
 }
 
+// changes runs a tool that changes the workspace: only for members, and only
+// while its plan allows changes.
+func changes[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In, Out] {
+	return member(services, func(ctx context.Context, caller Caller, input In) (Out, error) {
+		var empty Out
+		if err := services.Servers.RequireChanges(caller.Token.WorkspaceID); err != nil {
+			return empty, err
+		}
+		return tool(ctx, caller, input)
+	})
+}
+
 func registerOpsTools(server *mcpsdk.Server, services Services) {
 	tools := opsTools{services: services}
 	add := func(name, title, description string, annotations *mcpsdk.ToolAnnotations) *mcpsdk.Tool {
@@ -46,13 +58,13 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		readOnly("")), Read(member(services, tools.listServers)))
 	mcpsdk.AddTool(server, add("add_server", "Add a server",
 		"Adds a server and returns its one-time install command. The user runs it as root on the machine within an hour; the agent then connects. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.addServer)))
+		change(false, false)), Write(changes(services, tools.addServer)))
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
 		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeServer)))
+		change(true, true)), Write(changes(services, tools.removeServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.updateAgent)))
+		change(false, true)), Write(changes(services, tools.updateAgent)))
 	mcpsdk.AddTool(server, add("list_apps", "List apps",
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
@@ -61,88 +73,94 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, add("create_app", "Create an app",
 		"Creates an app on a server. Deploys come from `ops deploy` in the repo, which can also create the app. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.createApp)))
+		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, add("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeApp)))
+		change(true, true)), Write(changes(services, tools.removeApp)))
 	mcpsdk.AddTool(server, add("get_deploy", "Get a deploy",
 		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getDeploy)))
 	mcpsdk.AddTool(server, add("rollback_app", "Roll back an app",
 		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.rollback)))
+		change(false, false)), Write(changes(services, tools.rollback)))
 	mcpsdk.AddTool(server, add("redeploy_app", "Redeploy an app",
 		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.redeploy)))
+		change(false, false)), Write(changes(services, tools.redeploy)))
 	mcpsdk.AddTool(server, add("deploy_image", "Deploy an image",
 		"Deploys an image built elsewhere, such as in CI, as the app's main service. It reuses the compose file of the running release and pulls with the registry login for the image's host. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.deployImage)))
+		change(false, false)), Write(changes(services, tools.deployImage)))
 	mcpsdk.AddTool(server, add("create_deploy_hook", "Create a deploy hook",
 		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. CI calls POST <url> with {\"image\": \"...\"}. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.createDeployHook)))
+		change(false, false)), Write(changes(services, tools.createDeployHook)))
 	mcpsdk.AddTool(server, add("list_registries", "List registry logins",
 		"Lists the registry logins agents use to pull private images, without passwords. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRegistries)))
 	mcpsdk.AddTool(server, add("set_registry", "Set a registry login",
 		"Stores the login for a registry host such as ghcr.io, sealed. Image deploys from that host pull with it. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setRegistry)))
+		change(false, true)), Write(changes(services, tools.setRegistry)))
 	mcpsdk.AddTool(server, add("remove_registry", "Remove a registry login",
 		"Removes the login for a registry host. Private images from it no longer pull. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeRegistry)))
-	mcpsdk.AddTool(server, add("apply_app", "Apply env and routing",
-		"Restarts the running release of an app with its env vars, domains and protection as they are now, without a build. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.apply)))
+		change(true, true)), Write(changes(services, tools.removeRegistry)))
+	mcpsdk.AddTool(server, add("restart_app", "Restart an app",
+		"Starts the live release of an app again with its env vars, domains and protection as they are now, without a build. Use it after set_env. A stopped app runs again. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
+		change(false, false)), Write(changes(services, tools.restart)))
+	mcpsdk.AddTool(server, add("stop_app", "Stop an app",
+		"Stops the containers of an app. It stays offline, also after a reboot of the server, until start_app, restart_app or a deploy. Its data and settings stay. Needs a token with read and write access.",
+		change(true, true)), Write(member(services, tools.stop)))
+	mcpsdk.AddTool(server, add("start_app", "Start an app",
+		"Runs a stopped app again, with its env vars, domains and protection as they are now. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
+		change(false, false)), Write(member(services, tools.start)))
 	mcpsdk.AddTool(server, add("check_domains", "Check domains",
 		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, add("set_domains", "Set domains",
 		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. HTTPS is always on. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setDomains)))
+		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setProtection)))
+		change(false, true)), Write(changes(services, tools.setProtection)))
 	mcpsdk.AddTool(server, add("remove_protection", "Remove the password",
 		"Takes the password away from an app, then applies it; the app is public again. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeProtection)))
+		change(true, true)), Write(changes(services, tools.removeProtection)))
 	mcpsdk.AddTool(server, add("get_logs", "Get app logs",
 		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getLogs)))
 	mcpsdk.AddTool(server, add("get_env", "Get env vars",
 		"Returns the env vars of an app in plain text. Reading secrets is as strong as writing them. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.getEnv)))
+		change(false, true)), Write(changes(services, tools.getEnv)))
 	mcpsdk.AddTool(server, add("set_env", "Set env vars",
-		"Sets and removes env vars of an app. They are stored encrypted and reach the app with its next deploy. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setEnv)))
+		"Sets and removes env vars of an app. They are stored encrypted and reach the app with its next restart_app or deploy. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.setEnv)))
 	mcpsdk.AddTool(server, add("list_tables", "List database tables",
 		"Lists the tables and views of an app's SQLite database with their columns and row counts, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listTables)))
 	mcpsdk.AddTool(server, add("query_database", "Query a database",
 		"Runs one read-only SQL statement with positional parameters on an app's SQLite database and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.queryDatabase)))
+		change(false, true)), Write(changes(services, tools.queryDatabase)))
 	mcpsdk.AddTool(server, add("execute_sql", "Change a database",
 		"Runs one SQL statement that changes an app's SQLite database (INSERT, UPDATE, DELETE, CREATE, ...) in one transaction and returns the changed rows. Take a backup first for anything you cannot undo. Needs a token with read and write access.",
-		change(true, false)), Write(member(services, tools.executeSQL)))
+		change(true, false)), Write(changes(services, tools.executeSQL)))
 	mcpsdk.AddTool(server, add("get_backups", "List backups",
 		"Lists the snapshots of every database of an app, the window a point in time restore can reach and the newest restore drill. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getBackups)))
 	mcpsdk.AddTool(server, add("back_up_app", "Back up now",
 		"Takes a snapshot of every database of an app now. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.backUpApp)))
+		change(false, false)), Write(changes(services, tools.backUpApp)))
 	mcpsdk.AddTool(server, add("restore_app", "Restore a database",
 		"Puts a database of an app back from a snapshot or as it was at a point in time. ops takes a snapshot of the current state first; the app stops for the swap and starts again. Needs a token with read and write access.",
-		change(true, false)), Write(member(services, tools.restoreApp)))
+		change(true, false)), Write(changes(services, tools.restoreApp)))
 	mcpsdk.AddTool(server, add("set_backup_settings", "Snapshot before changes",
 		"Turns the snapshot before every deploy, restore and data change made through ops on or off for an app. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setBackupSettings)))
+		change(false, true)), Write(changes(services, tools.setBackupSettings)))
 	mcpsdk.AddTool(server, add("get_backup_storage", "Get the backup bucket",
 		"Returns the S3-compatible bucket backups go to, without its secret key. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getBackupStorage)))
 	mcpsdk.AddTool(server, add("set_backup_storage", "Set the backup bucket",
 		"Checks and stores the S3-compatible bucket backups go to; every online server starts backing up there. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setBackupStorage)))
+		change(false, true)), Write(changes(services, tools.setBackupStorage)))
 	mcpsdk.AddTool(server, add("remove_backup_storage", "Remove the backup bucket",
 		"Stops backups. What is in the bucket stays. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeBackupStorage)))
+		change(true, true)), Write(changes(services, tools.removeBackupStorage)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
 		"Returns where the ops GitHub App is installed and the link that installs it on another account; installing happens on github.com. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getGitHub)))
@@ -151,22 +169,22 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		readOnly("")), Read(member(services, tools.listRepos)))
 	mcpsdk.AddTool(server, add("link_repo", "Link a repo",
 		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.linkRepo)))
+		change(false, true)), Write(changes(services, tools.linkRepo)))
 	mcpsdk.AddTool(server, add("unlink_repo", "Unlink the repo",
 		"Stops an app from following its GitHub repo. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.unlinkRepo)))
+		change(true, true)), Write(changes(services, tools.unlinkRepo)))
 	mcpsdk.AddTool(server, add("deploy_ref", "Deploy from GitHub",
 		"Deploys a branch, tag or commit of the app's linked GitHub repo, without a checkout; empty ref deploys the linked branch. Follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.deployRef)))
+		change(false, false)), Write(changes(services, tools.deployRef)))
 	mcpsdk.AddTool(server, add("get_integrations", "Get integrations",
 		"Says whether a Cloudflare API token and a Tailscale auth key are stored; the keys never come back. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getIntegrations)))
 	mcpsdk.AddTool(server, add("set_integrations", "Set integrations",
 		"Stores the Cloudflare API token (checked first) and the Tailscale auth key, encrypted. A missing field keeps its key, an empty one removes it. Needs a token with read and write access.",
-		change(false, true)), Write(member(services, tools.setIntegrations)))
+		change(false, true)), Write(changes(services, tools.setIntegrations)))
 	mcpsdk.AddTool(server, add("set_server_security", "Lock down a server",
 		"Sets how a server is reached: tunnel routes app traffic through a Cloudflare Tunnel and closes 80 and 443, ssh_tailscale answers SSH only on the tailnet, firewall drops every other inbound connection. Returns what the agent set up. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.setServerSecurity)))
+		change(true, true)), Write(changes(services, tools.setServerSecurity)))
 }
 
 // change annotates a tool that changes data.
@@ -597,12 +615,28 @@ func (t opsTools) removeRegistry(_ context.Context, caller Caller, input HostInp
 	return Done{Message: "Removed the login for " + input.Host + "."}, nil
 }
 
-func (t opsTools) apply(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Apply(caller.actor(), input.Name)
+func (t opsTools) restart(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Restart(caller.actor(), input.Name)
 	if err != nil {
 		return Deploy{}, err
 	}
 	return Deploy{api.NewDeploy(*deploy)}, nil
+}
+
+func (t opsTools) start(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Start(caller.actor(), input.Name)
+	if err != nil {
+		return Deploy{}, err
+	}
+	return Deploy{api.NewDeploy(*deploy)}, nil
+}
+
+func (t opsTools) stop(ctx context.Context, caller Caller, input NameInput) (Done, error) {
+	err := t.services.Apps.Stop(ctx, caller.actor(), input.Name)
+	if err != nil {
+		return Done{}, err
+	}
+	return Done{Message: "Stopped " + input.Name + ". Its data stays; start_app runs it again."}, nil
 }
 
 // DomainChecks is the output of check_domains.
@@ -647,7 +681,7 @@ type Change struct {
 
 func (c Change) Summary() string {
 	if c.Deploy == nil {
-		return "Saved. The next deploy applies it."
+		return "Saved. The app takes it with its next deploy or start."
 	}
 	return fmt.Sprintf("Saved. Deploy v%d applies it now.", c.Deploy.Number)
 }

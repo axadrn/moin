@@ -105,8 +105,12 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "redeployed " + target + " as" + version
 	case "app.rolled_back":
 		return "rolled " + target + " back to v" + d["from"] + " as" + version
-	case "app.applied":
+	case "app.restarted":
 		return "restarted " + target + " with its current settings as" + version
+	case "app.started":
+		return "started " + target + " with its current settings as" + version
+	case "app.stopped":
+		return "stopped " + target
 	case "app.domains_set":
 		if d["domains"] == "" {
 			return "removed the domains of " + target

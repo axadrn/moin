@@ -108,6 +108,11 @@ func (s *WorkspaceService) insert(userID, name, slug string) (*model.Workspace, 
 		CreatedAt:   now,
 	}
 	initial := access.Initial(now)
+	// The trial comes once per person: a second workspace of its creator
+	// starts on the free plan.
+	if initial.Status == access.StatusTrialing && s.createdWorkspace(userID) {
+		initial = access.InitialSubscription{PlanID: access.PlanFree, Status: access.StatusActive}
+	}
 	subscription := &model.Subscription{
 		ID:               uuid.New().String(),
 		WorkspaceID:      workspaceID,
@@ -126,6 +131,20 @@ func (s *WorkspaceService) insert(userID, name, slug string) (*model.Workspace, 
 		return nil, fmt.Errorf("create workspace: %w", err)
 	}
 	return workspace, nil
+}
+
+// createdWorkspace says whether the user created a workspace before.
+func (s *WorkspaceService) createdWorkspace(userID string) bool {
+	workspaces, err := s.ListForUser(userID)
+	if err != nil {
+		return true
+	}
+	for _, workspace := range workspaces {
+		if workspace.CreatedBy != nil && *workspace.CreatedBy == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *WorkspaceService) CreateDefault(userID, userName string) (*model.Workspace, error) {

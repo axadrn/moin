@@ -4,7 +4,7 @@ description: "Encrypted settings and secrets per app"
 order: 10
 ---
 
-Env vars are stored encrypted with AES-256-GCM. The next deploy or redeploy hands them to every service ops builds. A rollback keeps the env vars of its release.
+Env vars are stored encrypted with AES-256-GCM. A restart, a start or the next deploy hands them to every service ops builds: `ops restart` after `ops env set`. A rollback keeps the env vars of its release.
 
 | Action | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |

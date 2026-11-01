@@ -261,6 +261,26 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 // server.
 var ErrSubscriptionRequired = errors.New("subscribe to ops to add servers")
 
+// ErrTrialEnded means the workspace has no plan with changes, such as after
+// its trial: it is read-only until it subscribes.
+var ErrTrialEnded = errors.New("the trial has ended: subscribe to make changes")
+
+// RequireChanges says ErrTrialEnded when the workspace's plan allows no
+// changes.
+func (s *ServerService) RequireChanges(workspaceID string) error {
+	if s.accessOf == nil {
+		return nil
+	}
+	plan, err := s.accessOf(workspaceID)
+	if err != nil {
+		return err
+	}
+	if !plan.Has(access.FeatureChanges) {
+		return ErrTrialEnded
+	}
+	return nil
+}
+
 // RequirePlanFor makes adding a server check the account's plan. Wiring
 // sets it; without it every account may add servers.
 func (s *ServerService) RequirePlanFor(accessOf func(workspaceID string) (access.Access, error)) {

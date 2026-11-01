@@ -57,5 +57,7 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the bucket backups go to |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |
-| `POST /api/v1/apps/{app}/apply` | restarts the running release with the current settings |
+| `POST /api/v1/apps/{app}/restart` | starts the live release again with the current settings |
+| `POST /api/v1/apps/{app}/stop` | takes the app offline; its data stays |
+| `POST /api/v1/apps/{app}/start` | runs a stopped app again |
 | `GET` · `PATCH /api/v1/apps/{app}/env` | env vars |

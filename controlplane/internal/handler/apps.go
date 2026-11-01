@@ -182,12 +182,32 @@ func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	h.Detail(w, r)
 }
 
-// Apply restarts the running release with the env and routing as they are
-// now, without a build. The page follows the new deploy.
-func (h *AppsHandler) Apply(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.Apply(actor(r), r.PathValue("app"))
+// Restart starts the live release again with the env and routing as they
+// are now, without a build. The page follows the new deploy.
+func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.Restart(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Apply could not start", err)
+		h.toast(w, r, "Restart could not start", err)
+		return
+	}
+	h.Detail(w, r)
+}
+
+// Start runs a stopped app again. The page follows the new deploy.
+func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.Start(actor(r), r.PathValue("app"))
+	if err != nil {
+		h.toast(w, r, "Start failed", err)
+		return
+	}
+	h.Detail(w, r)
+}
+
+// Stop stops the app's containers. Its data stays.
+func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
+	err := h.apps.Stop(r.Context(), actor(r), r.PathValue("app"))
+	if err != nil {
+		h.toast(w, r, "Stop failed", err)
 		return
 	}
 	h.Detail(w, r)
@@ -401,7 +421,7 @@ func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
 
 func appliedNotice(deploy *model.Deploy) string {
 	if deploy == nil {
-		return "Saved. The next deploy applies it."
+		return "Saved. The app takes it with its next deploy or start."
 	}
 	return "Saved. Deploy v" + strconv.Itoa(deploy.Number) + " applies it now."
 }

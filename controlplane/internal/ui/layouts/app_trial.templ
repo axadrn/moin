@@ -1,0 +1,56 @@
+package layouts
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/access"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+)
+
+// trialDaysLeft is how many days of the trial remain, at least 1 while it
+// runs.
+func trialDaysLeft(ends *time.Time, now time.Time) int {
+	if ends == nil {
+		return 0
+	}
+	return max(1, int(ends.Sub(now).Hours()/24+0.999))
+}
+
+// AppTrialCard shows how long the trial runs, or that the workspace is
+// read-only without a plan. It shows nothing with billing off or a plan.
+templ AppTrialCard() {
+	{{ subscription := ctxkeys.Subscription(ctx) }}
+	{{ member := ctxkeys.WorkspaceMember(ctx) }}
+	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
+		{{ current := subscription.Access() }}
+		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
+			@card.Card(card.Props{Class: "gap-2 px-4 py-3.5 text-sm shadow-none", Attributes: templ.Attributes{"data-trial": string(current.State)}}) {
+				if current.State == access.StateTrial {
+					{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
+					<p class="font-medium">
+						if days == 1 {
+							Trial: last day
+						} else {
+							{ "Trial: " + strconv.Itoa(days) + " days left" }
+						}
+					</p>
+					<p class="text-xs text-muted-foreground">Everything works. Afterwards ops turns read-only; your apps keep running.</p>
+				} else {
+					<p class="font-medium">Read-only</p>
+					<p class="text-xs text-muted-foreground">Your trial has ended. Your apps keep running, and you can stop and start them.</p>
+				}
+				if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
+					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/billing", Size: button.SizeSm, Class: "mt-1 w-full"}) {
+						Subscribe
+					}
+				} else {
+					<p class="text-xs text-muted-foreground">An owner subscribes under Billing.</p>
+				}
+			}
+		}
+	}
+}

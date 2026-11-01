@@ -1390,14 +1390,14 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/apps/{app}/apply:
+  /api/v1/apps/{app}/restart:
     parameters:
       - $ref: '#/components/parameters/AppName'
     post:
       tags: [Apps]
-      operationId: applyApp
-      summary: Apply env and routing
-      description: Restarts the running release with the env vars, domains and protection as they are now, without a build.
+      operationId: restartApp
+      summary: Restart an app
+      description: Starts the live release again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1418,7 +1418,69 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `deploy_running` or `no_source` before the first deploy.'
+          description: '`server_offline`, `deploy_running` or `not_live` before the first deploy.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/start:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    post:
+      tags: [Apps]
+      operationId: startApp
+      summary: Start an app
+      description: Runs a stopped app again. Like a restart, it takes the env vars, domains and protection as they are now.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '202':
+          description: The started deploy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deploy'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline`, `deploy_running` or `not_live` before the first deploy.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/stop:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    post:
+      tags: [Apps]
+      operationId: stopApp
+      summary: Stop an app
+      description: Stops the containers of the app. They stay stopped, also after a reboot of the server, until a deploy, a restart or a start. Data and settings stay. Changes to domains and protection wait for the start.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The app is stopped.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline`, `deploy_running` or `not_live` before the first deploy.'
+        '424':
+          $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3683,7 +3745,7 @@ components:
           format: date-time
     App:
       type: object
-      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, created_at]
+      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, stopped, created_at]
       properties:
         id:
           type: string
@@ -3712,6 +3774,9 @@ components:
         protected:
           type: boolean
           description: A password guards the app.
+        stopped:
+          type: boolean
+          description: The app was stopped. A deploy, a restart or a start runs it again.
         repo:
           type: string
           description: The GitHub repo the app follows, as owner/name. Empty for none.

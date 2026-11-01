@@ -358,6 +358,17 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeAppStop:
+		var request protocol.AppStop
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		if err := r.apps.stop(ctx, request.App); err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeOK, message.RequestID, nil)
 	case protocol.TypeDBTables:
 		var request protocol.DBRequest
 		if err := message.Decode(&request); err != nil {

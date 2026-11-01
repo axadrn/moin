@@ -48,6 +48,10 @@ const (
 	// (AppRemove). Its data directory stays. The agent answers with TypeOK
 	// or TypeError.
 	TypeAppRemove MessageType = "app.remove"
+	// TypeAppStop stops the containers of an app and keeps them, so they
+	// stay stopped after a reboot (AppStop). A deploy or a restart starts
+	// them again. The agent answers with TypeOK or TypeError.
+	TypeAppStop MessageType = "app.stop"
 
 	// TypeDBTables lists the tables of an app's SQLite database
 	// (DBRequest). The agent answers with TypeDBTablesResult or TypeError.
@@ -309,6 +313,11 @@ type LogsResult struct {
 
 // AppRemove names the app to remove.
 type AppRemove struct {
+	App string `json:"app"`
+}
+
+// AppStop names the app to stop.
+type AppStop struct {
 	App string `json:"app"`
 }
 

@@ -105,8 +105,10 @@ templ activityIcon(action string) {
 	switch  {
 		case action == "app.rolled_back":
 			@icon.Undo2(icon.Props{Class: "size-3.5"})
-		case action == "app.deployed" || action == "app.redeployed" || action == "app.applied":
+		case action == "app.deployed" || action == "app.redeployed" || action == "app.restarted" || action == "app.started":
 			@icon.Rocket(icon.Props{Class: "size-3.5"})
+		case action == "app.stopped":
+			@icon.Square(icon.Props{Class: "size-3.5"})
 		case strings.HasPrefix(action, "data."):
 			@icon.Database(icon.Props{Class: "size-3.5"})
 		case strings.HasPrefix(action, "backup."):

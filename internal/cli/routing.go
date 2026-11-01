@@ -183,9 +183,10 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	return nil
 }
 
-// apply restarts the running release with the env and routing as they are now.
-func apply(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("apply", "apply [app]").withApp()
+// restart starts the live release again with the env and routing as they
+// are now; start runs a stopped app the same way.
+func restart(ctx context.Context, command string, args []string, stdout io.Writer) error {
+	flags := newFlags(command, command+" [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -200,20 +201,58 @@ func apply(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	started, err := api.Apply(ctx, name)
+	run, title := api.Restart, "Restart"
+	if command == "start" {
+		run, title = api.Start, "Start"
+	}
+	started, err := run(ctx, name)
 	if err != nil {
 		return err
 	}
-	return follow(ctx, api, name, started, "Apply", false, stdout)
+	return follow(ctx, api, name, started, title, false, stdout)
+}
+
+// stop takes the app offline until it starts again. Its data stays.
+func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("stop", "stop [app] [--yes]").withApp().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Stop %s? It is offline until you start it; its data stays.", name))
+	if err != nil {
+		return err
+	}
+	err = api.Stop(ctx, name)
+	if err != nil {
+		return err
+	}
+	done(stdout, "Stopped %s. It stays off, also after a reboot", style.Bold.Render(name))
+	hint(stdout, "Run it again with", build.Name+" start "+name)
+	return nil
 }
 
 // reportChange follows the deploy that applies a change, or says when it applies.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
+	if change.Deploy == nil && change.App.Stopped {
+		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
+		return
+	}
 	if change.Deploy == nil {
 		hint(stdout, "It applies with the next deploy:", build.Name+" deploy "+name)
 		return
 	}
-	err := follow(ctx, api, name, *change.Deploy, "Apply", false, stdout)
+	err := follow(ctx, api, name, *change.Deploy, "Restart", false, stdout)
 	if err != nil {
 		printError(stdout, err)
 	}

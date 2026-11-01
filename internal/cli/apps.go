@@ -667,7 +667,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 			return err
 		}
 		done(stdout, "Set %s on %s", strings.Join(sortedKeys(set), ", "), style.Bold.Render(name))
-		hint(stdout, "The next deploy gets them. Now:", build.Name+" redeploy "+name)
+		hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
 		return nil
 	case "rm", "remove", "unset":
 		if flags.NArg() == 0 {
@@ -690,7 +690,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 			return err
 		}
 		done(stdout, "Removed %s from %s", keys, style.Bold.Render(name))
-		hint(stdout, "The next deploy drops them. Now:", build.Name+" redeploy "+name)
+		hint(stdout, "The app drops them when it restarts. Now:", build.Name+" restart "+name)
 		return nil
 	case "pull":
 		if flags.NArg() > 1 {

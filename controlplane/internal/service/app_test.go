@@ -97,6 +97,25 @@ func agentSays(t *testing.T, servers *ServerService, serverID string, messageTyp
 	servers.Receive(serverID, message)
 }
 
+// agentAnswers waits for the request of the given type and answers it: what
+// the agent gets on connect may arrive in between.
+func agentAnswers(servers *ServerService, serverID string, agent *fakeAgent, requestType, messageType protocol.MessageType, data any) {
+	var request protocol.Message
+	for request.RequestID == "" {
+		agent.mu.Lock()
+		for _, sent := range agent.sent {
+			if sent.Type == requestType {
+				request = sent
+			}
+		}
+		agent.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	message, _ := protocol.NewMessage(messageType, data)
+	message.RequestID = request.RequestID
+	servers.Receive(serverID, message)
+}
+
 func TestDeployRollbackAndEnv(t *testing.T) {
 	apps, servers, server, agent := newAppService(t)
 	_, err := apps.Create(owner, "Blog", "web-1")
@@ -216,23 +235,8 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// answer waits for the request of the given type: what the agent gets on
-	// connect may arrive in between.
 	answer := func(requestType, messageType protocol.MessageType, data any) {
-		var request protocol.Message
-		for request.RequestID == "" {
-			agent.mu.Lock()
-			for _, sent := range agent.sent {
-				if sent.Type == requestType {
-					request = sent
-				}
-			}
-			agent.mu.Unlock()
-			time.Sleep(time.Millisecond)
-		}
-		message, _ := protocol.NewMessage(messageType, data)
-		message.RequestID = request.RequestID
-		servers.Receive(server.ID, message)
+		agentAnswers(servers, server.ID, agent, requestType, messageType, data)
 	}
 
 	go answer(protocol.TypeLogs, protocol.TypeLogsResult, protocol.LogsResult{Lines: []string{"web-1  | hello"}})
@@ -401,5 +405,77 @@ func TestServerAddressesAndAdvice(t *testing.T) {
 	}
 	if !resolvesTo([]string{"203.0.113.7"}, ipv4, ipv6) || !resolvesTo([]string{"2a01:04f8:0::1"}, ipv4, ipv6) || resolvesTo([]string{"198.51.100.1"}, ipv4, ipv6) {
 		t.Fatal("resolvesTo does not accept either address")
+	}
+}
+
+func TestStopStartAndRestart(t *testing.T) {
+	apps, servers, server, agent := newAppService(t)
+	_, err := apps.Create(owner, "blog", "web-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Before the first deploy there is nothing to stop or restart.
+	if err := apps.Stop(context.Background(), owner, "blog"); !errors.Is(err, ErrNotLive) {
+		t.Fatalf("stop before a deploy: err = %v", err)
+	}
+	if _, err := apps.Restart(owner, "blog"); !errors.Is(err, ErrNotLive) {
+		t.Fatalf("restart before a deploy: err = %v", err)
+	}
+	first, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
+
+	// A failed stop leaves the app as it was.
+	go agentAnswers(servers, server.ID, agent, protocol.TypeAppStop, protocol.TypeError, protocol.Error{Message: "docker is not running"})
+	var agentErr *AgentError
+	if err := apps.Stop(context.Background(), owner, "blog"); !errors.As(err, &agentErr) {
+		t.Fatalf("stop with an agent error: err = %v", err)
+	}
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Stopped {
+		t.Fatal("a failed stop marked the app stopped")
+	}
+
+	agent.mu.Lock()
+	agent.sent = nil
+	agent.mu.Unlock()
+	go agentAnswers(servers, server.ID, agent, protocol.TypeAppStop, protocol.TypeOK, nil)
+	if err := apps.Stop(context.Background(), owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	var stop protocol.AppStop
+	agent.last(t, protocol.TypeAppStop, &stop)
+	if stop.App != "blog" {
+		t.Fatalf("app.stop = %+v", stop)
+	}
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); !app.Stopped {
+		t.Fatal("the app is not marked stopped")
+	}
+
+	// A stopped app keeps a domain change for its start.
+	deploy, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "")
+	if err != nil || deploy != nil {
+		t.Fatalf("set domains of a stopped app = %v, %v", deploy, err)
+	}
+
+	// Start runs the live release with the settings as they are now.
+	started, err := apps.Start(owner, "blog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var start protocol.DeployStart
+	agent.last(t, protocol.TypeDeployStart, &start)
+	if start.SourceURL != "" || start.Image != "" || start.FromNumber != 0 || len(start.Routing.Domains) != 1 {
+		t.Fatalf("start deploy.start = %+v", start)
+	}
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Stopped {
+		t.Fatal("a started app is still marked stopped")
+	}
+	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: started.ID, OK: true})
+
+	restarted, err := apps.Restart(owner, "blog")
+	if err != nil || restarted.Number != started.Number+1 {
+		t.Fatalf("restart = %+v, %v", restarted, err)
 	}
 }

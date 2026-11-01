@@ -2,9 +2,9 @@ package access
 
 var Product = Catalog{
 	Signup: SignupPolicy{
-		Mode:          SignupFreemium,
+		Mode:          SignupTrial,
 		TrialPlanID:   PlanPro,
-		TrialDays:     7,
+		TrialDays:     30,
 		TrialFallback: FallbackFree,
 	},
 	Lifecycle: LifecyclePolicy{
@@ -15,11 +15,12 @@ var Product = Catalog{
 		{
 			ID:          PlanFree,
 			Name:        "Free",
-			Description: "For looking around before you subscribe",
+			Description: "Read-only after the trial; your apps keep running",
 			Limits:      map[Limit]int{LimitServers: 0, LimitMembers: Unlimited},
 			Benefits: []string{
-				"Invite your team",
-				"Community support",
+				"Your apps keep running, and so do their backups",
+				"See apps, deploys, logs and data",
+				"Stop and start apps",
 			},
 		},
 		{
@@ -28,6 +29,7 @@ var Product = Catalog{
 			Description:  "Deploys, backups and data for your servers",
 			MonthlyPrice: 2900,
 			YearlyPrice:  29000,
+			Features:     []Feature{FeatureChanges},
 			Limits:       map[Limit]int{LimitServers: Unlimited, LimitMembers: Unlimited},
 			Benefits: []string{
 				"Unlimited servers and apps",
@@ -50,6 +52,7 @@ var SelfHosted = Catalog{
 		ID:          PlanFree,
 		Name:        "Self-hosted",
 		Description: "Everything, on your own control plane",
+		Features:    []Feature{FeatureChanges},
 		Limits:      map[Limit]int{LimitServers: Unlimited, LimitMembers: Unlimited},
 	}},
 }

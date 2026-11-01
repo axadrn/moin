@@ -49,6 +49,9 @@ func Error(w http.ResponseWriter, status int, code, message string) {
 // ValidationMessage is the message of every validation_failed error.
 const ValidationMessage = "Check the highlighted fields and try again."
 
+// TrialEndedMessage answers a change to a workspace whose trial has ended.
+const TrialEndedMessage = "Your trial has ended. Subscribe under Billing to make changes. Your apps keep running, and you can still stop and start them."
+
 // ValidationError writes a 422 validation_failed envelope with one message
 // per invalid field.
 func ValidationError(w http.ResponseWriter, fields map[string]string) {
@@ -203,6 +206,7 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrDuplicateServer, field: "name", message: "A server with this name already exists."},
 	{err: service.ErrServerName, field: "name", message: "Name must contain between 1 and 64 characters."},
 	{err: repository.ErrServerHasApps, status: http.StatusConflict, code: "server_has_apps", message: "Remove the apps on this server first."},
+	{err: service.ErrTrialEnded, status: http.StatusPaymentRequired, code: "trial_ended", message: TrialEndedMessage},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to ops under Billing to add servers."},
 	{err: service.ErrNoAgentBinary, status: http.StatusConflict, code: "no_agent_binary", message: "This control plane serves no agent binary for the server's system. Update the agent on the server instead."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its agent and try again."},
@@ -219,6 +223,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrDomain, field: "domains", message: "Use host names like blog.de."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrProtect, field: "password", message: "Use a username without spaces or colons and a password of 8 to 72 characters."},
+	{err: service.ErrNotLive, status: http.StatusConflict, code: "not_live", message: "The app has no live release yet. Run ops deploy in the repo first."},
 	{err: service.ErrNoSource, status: http.StatusConflict, code: "no_source", message: "No deploy has a source or an image yet. Run ops deploy in the repo first."},
 	{err: service.ErrNoRollback, status: http.StatusConflict, code: "no_rollback", message: "There is no earlier successful deploy to roll back to."},
 	{err: service.ErrEnvKey, field: "set", message: "Env keys are letters, digits and underscores and do not start with a digit."},

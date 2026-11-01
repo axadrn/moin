@@ -54,7 +54,10 @@ Deploys
   deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
   deploy --image     Deploy an image built in CI: deploy --image <image> [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
-  redeploy           Run the newest source or image again with the current env
+  redeploy           Build the newest source or pull the image again, with the current env
+  restart            Start the live release again with the current env and domains: restart [app]
+  stop               Take the app offline; its data stays: stop [app] [--yes]
+  start              Run a stopped app again: start [app]
   deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
   rollback           Start an earlier release again: rollback [app] [v<number>]
   logs               Show the last lines of the app: logs [--tail 200] [app]
@@ -66,7 +69,6 @@ Domains
   domains canonical  Redirect the others to one: domains canonical blog.de|none
   protect            Ask for a password: protect [--user ops], password on stdin
   protect off        Make the app public again: protect off [app]
-  apply              Restart the running release with the current env and domains
 
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
@@ -225,8 +227,10 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return domains(ctx, rest, stdin, stdout)
 	case "protect":
 		return protect(ctx, rest, stdin, stdout)
-	case "apply":
-		return apply(ctx, rest, stdout)
+	case "restart", "start":
+		return restart(ctx, command, rest, stdout)
+	case "stop":
+		return stop(ctx, rest, stdin, stdout)
 	case "registry":
 		return registry(ctx, rest, stdin, stdout)
 	case "run":

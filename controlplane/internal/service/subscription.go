@@ -68,16 +68,16 @@ func (s *SubscriptionService) EnsureSubscription(workspaceID string) (*model.Sub
 		return nil, fmt.Errorf("failed to get subscription: %w", err)
 	}
 
+	// A restored row is free, never a new trial: the trial came with the
+	// workspace.
 	now := time.Now()
-	initial := access.Initial(now)
 	subscription := &model.Subscription{
-		ID:               uuid.New().String(),
-		WorkspaceID:      workspaceID,
-		PlanID:           initial.PlanID,
-		Status:           initial.Status,
-		CurrentPeriodEnd: initial.CurrentPeriodEnd,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:          uuid.New().String(),
+		WorkspaceID: workspaceID,
+		PlanID:      access.PlanFree,
+		Status:      access.StatusActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := s.repo.CreateIfMissing(subscription); err != nil {
 		return nil, fmt.Errorf("failed to restore subscription: %w", err)

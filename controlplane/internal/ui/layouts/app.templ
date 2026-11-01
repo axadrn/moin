@@ -63,6 +63,7 @@ templ AppShell(p AppProps) {
 					></div>
 				}
 				@sidebar.Footer(sidebar.FooterProps{Class: "gap-2 px-3.5 pb-4"}) {
+					@AppTrialCard()
 					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
 						@sidebar.MenuItem() {
 							@sidebar.MenuButton(sidebar.MenuButtonProps{

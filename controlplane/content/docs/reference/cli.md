@@ -23,6 +23,9 @@ order: 1
 | `ops deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |
 | `ops deploy --image <image> [app]` | deploys an image built in CI |
 | `ops redeploy [app]` | runs the newest source or image again |
+| `ops restart [app]` | starts the live release again with the current env and domains |
+| `ops stop [app] [--yes]` | takes the app offline; its data stays |
+| `ops start [app]` | runs a stopped app again |
 | `ops deploys [app]` | the newest deploys: number, status, started, took, note |
 | `ops deploys [app] v<number>` | one deploy with its whole log |
 | `ops hook [app]` | prints a new deploy hook URL for CI |
@@ -37,7 +40,6 @@ order: 1
 | `ops domains canonical <domain\|none>` | the domain the others redirect to |
 | `ops protect [--user ops] [app]` | asks for a password; the password comes from stdin |
 | `ops protect off [app]` | makes the app public again |
-| `ops apply [app]` | restarts the running release with the current env and domains |
 | `ops db [--db <path>] [app]` | tables, row counts and migration of the database |
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |

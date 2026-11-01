@@ -37,6 +37,7 @@ type AppRepository interface {
 
 	SetRouting(appID, domains, canonical string) error
 	SetProtect(appID, protect string) error
+	SetStopped(appID string, stopped bool) error
 
 	ByDeployHookHash(hash string) (*model.App, error)
 	SetDeployHookHash(appID, hash string) error
@@ -252,6 +253,12 @@ func (r *appRepository) SetRouting(appID, domains, canonical string) error {
 // SetProtect stores the htpasswd line, or clears it.
 func (r *appRepository) SetProtect(appID, protect string) error {
 	_, err := r.db.Exec(`UPDATE apps SET protect = $1 WHERE id = $2`, protect, appID)
+	return err
+}
+
+// SetStopped marks the app as stopped by its owner, or as running again.
+func (r *appRepository) SetStopped(appID string, stopped bool) error {
+	_, err := r.db.Exec(`UPDATE apps SET stopped = $1 WHERE id = $2`, stopped, appID)
 	return err
 }
 

@@ -37,6 +37,7 @@ var (
 	ErrDeployRunning = errors.New("a deploy of this app is still running")
 	ErrNoRollback    = errors.New("there is no earlier successful deploy to roll back to")
 	ErrNoSource      = errors.New("no deploy has a source yet")
+	ErrNotLive       = errors.New("the app has no live release yet")
 	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
 	ErrDeployHook    = errors.New("deploy hook is invalid")
 	ErrRegistryHost  = errors.New("registry host must be a host name like ghcr.io")
@@ -205,6 +206,10 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 	if err != nil {
 		return nil, nil, err
 	}
+	err = s.servers.RequireChanges(app.WorkspaceID)
+	if err != nil {
+		return app, nil, err
+	}
 	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Via: "hook"}, app.ID, image)
 	return app, deploy, err
 }
@@ -343,10 +348,41 @@ func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, erro
 	return nil, ErrNoSource
 }
 
-// Apply restarts the running release with the env and routing as they are
-// now, without a build.
-func (s *AppService) Apply(actor Actor, idOrName string) (*model.Deploy, error) {
-	return s.apply(actor, "app.applied", idOrName)
+// Restart starts the live release again with the env and routing as they
+// are now, without a build.
+func (s *AppService) Restart(actor Actor, idOrName string) (*model.Deploy, error) {
+	return s.apply(actor, "app.restarted", idOrName)
+}
+
+// Start runs a stopped app again. Like a restart, it takes the env and
+// routing as they are now.
+func (s *AppService) Start(actor Actor, idOrName string) (*model.Deploy, error) {
+	return s.apply(actor, "app.started", idOrName)
+}
+
+// Stop stops the containers of the app on its server. They stay stopped,
+// also after a reboot, until a deploy, a restart or a start. Data stays.
+func (s *AppService) Stop(ctx context.Context, actor Actor, idOrName string) error {
+	app, err := s.ready(actor.WorkspaceID, idOrName)
+	if err != nil {
+		return err
+	}
+	if app.LiveNumber == 0 {
+		return ErrNotLive
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppStop, protocol.AppStop{App: app.Name}, nil)
+	if err != nil {
+		return err
+	}
+	err = s.apps.SetStopped(app.ID, true)
+	if err != nil {
+		return err
+	}
+	s.servers.record(actor, "app.stopped", "app", app.Name, nil)
+	s.notify(actor.WorkspaceID)
+	return nil
 }
 
 func (s *AppService) apply(actor Actor, action, idOrName string) (*model.Deploy, error) {
@@ -355,7 +391,7 @@ func (s *AppService) apply(actor Actor, action, idOrName string) (*model.Deploy,
 		return nil, err
 	}
 	if app.LiveNumber == 0 {
-		return nil, ErrNoSource
+		return nil, ErrNotLive
 	}
 	deploy := &model.Deploy{ID: uuid.New().String(), AppID: app.ID, Status: model.DeployRunning, CreatedAt: s.now().UTC()}
 	return s.start(actor, action, app, deploy, protocol.DeployStart{})
@@ -431,7 +467,8 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 // in the activity, so the restart is not.
 func (s *AppService) applyIfLive(actor Actor, app *model.App) (*model.Deploy, error) {
 	s.notify(actor.WorkspaceID)
-	if app.LiveNumber == 0 || !s.servers.Online(app.ServerID) {
+	// A stopped app takes the change when it starts.
+	if app.LiveNumber == 0 || app.Stopped || !s.servers.Online(app.ServerID) {
 		return nil, nil
 	}
 	deploy, err := s.apply(actor, "", app.ID)
@@ -631,6 +668,13 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 		return nil, ErrServerOffline
 	}
 	slog.Info("deploy started", "app_id", app.ID, "number", deploy.Number, "from_number", deploy.FromNumber)
+	// Every deploy runs the app, so it is no longer stopped.
+	if app.Stopped {
+		err = s.apps.SetStopped(app.ID, false)
+		if err != nil {
+			slog.Error("app started, but it is still marked stopped", "app_id", app.ID, "error", err)
+		}
+	}
 	if action != "" {
 		details := map[string]string{"number": strconv.Itoa(deploy.Number)}
 		for key, value := range map[string]string{"image": deploy.Image, "ref": deploy.Ref, "commit": clipText(deploy.CommitSHA, 7), "message": deploy.CommitMessage} {

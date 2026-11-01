@@ -110,6 +110,7 @@ const (
 	modeList mode = iota
 	modeAdd
 	modeConfirmRemove
+	modeConfirmStop
 	modeConfirmRollback
 	modeEnv
 	modeImage
@@ -347,6 +348,12 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if app, ok := m.currentApp(); m.tab == tabApps && ok {
 			m.detail = nil
 			return m, m.removeApp(app.Name)
+		}
+		return m, nil
+	case modeConfirmStop:
+		m.mode = modeList
+		if app, ok := m.currentApp(); key == "y" && ok {
+			return m, m.stop(app.Name)
 		}
 		return m, nil
 	case modeConfirmRollback:
@@ -723,6 +730,17 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 	case "R":
 		if ok {
 			return m, m.redeploy(app.Name)
+		}
+	case "t":
+		if ok {
+			return m, m.restart(app.Name, false)
+		}
+	case "S":
+		if ok && app.Stopped {
+			return m, m.restart(app.Name, true)
+		}
+		if ok {
+			m.mode = modeConfirmStop
 		}
 	case "e":
 		if ok {
@@ -1123,9 +1141,9 @@ func (m model) changeDomains(app client.App, input string) tea.Cmd {
 			return errMsg{err}
 		}
 		if change.Deploy != nil {
-			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("apply v%d of %s", change.Deploy.Number, app.Name))
+			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, app.Name))
 		}
-		return noticeMsg("Saved. The next deploy of " + app.Name + " applies it.")
+		return noticeMsg("Saved. " + app.Name + " takes it with its next deploy or start.")
 	}
 }
 
@@ -1147,9 +1165,9 @@ func (m model) changeProtect(name, input string) tea.Cmd {
 			return errMsg{err}
 		}
 		if change.Deploy != nil {
-			return m.follow(name, *change.Deploy, fmt.Sprintf("apply v%d of %s", change.Deploy.Number, name))
+			return m.follow(name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, name))
 		}
-		return noticeMsg("Saved. The next deploy of " + name + " applies it.")
+		return noticeMsg("Saved. " + name + " takes it with its next deploy or start.")
 	}
 }
 
@@ -1162,6 +1180,34 @@ func (m model) newHook(name string) tea.Cmd {
 		}
 		lines := []string{url, "", "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + name + `:$GITHUB_SHA"`}
 		return outputMsg{id: m.shared.outputs.Add(1), title: "deploy hook of " + name, note: style.Warning.Render("shown once · the old one stops working"), lines: lines}
+	}
+}
+
+// restart starts the live release again with the current settings; start
+// runs a stopped app the same way.
+func (m model) restart(name string, start bool) tea.Cmd {
+	return func() tea.Msg {
+		run, verb := m.api.Restart, "restart"
+		if start {
+			run, verb = m.api.Start, "start"
+		}
+		started, err := run(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return m.follow(name, started, fmt.Sprintf("%s v%d of %s", verb, started.Number, name))
+	}
+}
+
+// stop takes the app offline. The app list shows it stopped with its next
+// refresh.
+func (m model) stop(name string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.api.Stop(m.ctx, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return noticeMsg(name + " stopped. Press S to start it again")
 	}
 }
 

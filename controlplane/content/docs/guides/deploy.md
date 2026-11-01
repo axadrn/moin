@@ -51,13 +51,27 @@ The web page follows every new deploy by itself, also the ones started from the 
 
 ## Redeploy
 
-Builds the newest source again, from the copy the server kept, with the env vars as they are now. Nothing is uploaded. Use it after changing env vars.
+Builds the newest source again, from the copy the server kept, with the env vars as they are now. Nothing is uploaded. After changing env vars a restart is enough and faster.
 
 | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- |
 | **Redeploy** | `ops redeploy [app]` | `R` | `POST /api/v1/apps/{app}/redeploy` | `redeploy_app` |
 
 An app deployed from an image runs the newest image again instead.
+
+## Restart, stop and start
+
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Restart | **Restart** | `ops restart [app]` | `t` | `POST /api/v1/apps/{app}/restart` | `restart_app` |
+| Stop | **Stop** | `ops stop [app] [--yes]` | `S`, then `y` | `POST /api/v1/apps/{app}/stop` | `stop_app` |
+| Start | **Start** | `ops start [app]` | `S` | `POST /api/v1/apps/{app}/start` | `start_app` |
+
+- **Restart** starts the live release again with the env vars, domains and password as they are now. Nothing is built. Use it after changing env vars.
+- **Stop** takes the app offline. It stays off, also after a reboot of the server. Data and settings stay.
+- **Start** runs a stopped app again, like a restart. A deploy starts it too.
+
+Changes to domains or the password of a stopped app wait for its start.
 
 ## Roll back
 

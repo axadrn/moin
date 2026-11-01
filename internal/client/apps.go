@@ -27,6 +27,7 @@ type App struct {
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
 	Protected    bool     `json:"protected"`
+	Stopped      bool     `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
 	Repo                  string    `json:"repo"`
 	Branch                string    `json:"branch"`
@@ -225,6 +226,8 @@ func (a App) Status() string {
 		return "new"
 	case a.LatestStatus == "running":
 		return fmt.Sprintf("deploying v%d", a.LatestNumber)
+	case a.Stopped:
+		return fmt.Sprintf("stopped v%d", a.LiveNumber)
 	case a.LatestStatus == "failed" && a.LiveNumber > 0:
 		return fmt.Sprintf("failed v%d · v%d live", a.LatestNumber, a.LiveNumber)
 	case a.LatestStatus == "failed":
@@ -332,9 +335,22 @@ func (c *Client) RemoveProtection(ctx context.Context, app string) (Change, erro
 	return response, err
 }
 
-// Apply restarts the running release with the env and routing as they are now.
-func (c *Client) Apply(ctx context.Context, app string) (Deploy, error) {
+// Restart starts the live release again with the env and routing as they
+// are now.
+func (c *Client) Restart(ctx context.Context, app string) (Deploy, error) {
 	var response Deploy
-	err := c.do(ctx, http.MethodPost, appPath(app, "apply"), nil, &response)
+	err := c.do(ctx, http.MethodPost, appPath(app, "restart"), nil, &response)
 	return response, err
+}
+
+// Start runs a stopped app again.
+func (c *Client) Start(ctx context.Context, app string) (Deploy, error) {
+	var response Deploy
+	err := c.do(ctx, http.MethodPost, appPath(app, "start"), nil, &response)
+	return response, err
+}
+
+// Stop takes the app offline until it starts again. Its data stays.
+func (c *Client) Stop(ctx context.Context, app string) error {
+	return c.do(ctx, http.MethodPost, appPath(app, "stop"), nil, nil)
 }

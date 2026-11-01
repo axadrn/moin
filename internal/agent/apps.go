@@ -931,6 +931,21 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	return nil
 }
 
+// stop stops the containers of the app's current release. Their restart
+// policy is unless-stopped, so they stay stopped after a reboot.
+func (a *apps) stop(ctx context.Context, app string) error {
+	if !appNamePattern.MatchString(app) {
+		return errors.New("invalid app name")
+	}
+	defer a.lock(app)()
+	current := a.current(app)
+	if current == 0 {
+		return errors.New("the app has no release on this server")
+	}
+	_, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", filepath.Join(a.releaseDir(app, current), "compose.json"), "stop")
+	return err
+}
+
 // compose runs docker compose on a release and streams its output as log lines.
 func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
 	return a.run(ctx, logf, nil, append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)

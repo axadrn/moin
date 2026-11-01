@@ -28,11 +28,14 @@ type App struct {
 	Branch         string `db:"branch"`
 	AutoDeploy     bool   `db:"auto_deploy"`
 	InstallationID int64  `db:"installation_id"`
-	ServerName     string `db:"server_name"`
-	WorkspaceSlug  string `db:"workspace_slug"`
-	LatestNumber   int    `db:"latest_number"`
-	LatestStatus   string `db:"latest_status"`
-	LiveNumber     int    `db:"live_number"`
+	// Stopped is set when its owner stopped the app. A deploy, a restart
+	// or a start clears it.
+	Stopped       bool   `db:"stopped"`
+	ServerName    string `db:"server_name"`
+	WorkspaceSlug string `db:"workspace_slug"`
+	LatestNumber  int    `db:"latest_number"`
+	LatestStatus  string `db:"latest_status"`
+	LiveNumber    int    `db:"live_number"`
 }
 
 // Deploy statuses.

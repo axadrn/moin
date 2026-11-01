@@ -38,6 +38,8 @@ removing members, leaving and deleting the workspace are web only.
 | `d` | apps | deploys the directory `ops` started in, when its app exists |
 | `g` | apps | GitHub: shows the repo and the repos ops may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `unlink` stops |
 | `R` | apps | redeploys the newest source or image |
+| `t` | apps | restarts the app with the current env and domains |
+| `S` | apps | stops the app, after `y`; starts a stopped one |
 | `i` | apps | deploys an image built in CI; type the image, then `enter` |
 | `h` | apps | shows a new deploy hook URL for CI, once |
 | `o` | apps | shows domains and DNS; type `blog.de`, `-blog.de` or `=blog.de` |

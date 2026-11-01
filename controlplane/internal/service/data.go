@@ -74,6 +74,11 @@ func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database
 // and goes into the activity with what it did and how many rows it changed,
 // such as "UPDATE on orders", never its SQL: that may hold your users' data.
 func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database, sql string, params []any, write bool, limit int) (protocol.DBResult, error) {
+	if write {
+		if err := s.servers.RequireChanges(actor.WorkspaceID); err != nil {
+			return protocol.DBResult{}, err
+		}
+	}
 	result, err := s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, write, limit)
 	if err == nil && write {
 		s.servers.record(actor, "data.sql", "app", idOrName, map[string]string{"database": database, "statements": sqlSummary(sql), "changes": strconv.FormatInt(result.Changes, 10)})
