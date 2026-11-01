@@ -34,12 +34,12 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 		}
 		@panelPage() {
 			@pageHeader("Settings", "Your profile, how you sign in, and the tokens your scripts and servers use.")
-			<nav class="flex h-9 w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit" aria-label="Settings">
-				@appTab(settingsPath, "Profile", activeTab == "profile")
-				@appTab(settingsPath+"?tab=security", "Security", activeTab == "security")
-				@appTab(settingsPath+"?tab=tokens", "Tokens", activeTab == "tokens")
-			</nav>
-			<div class="flex max-w-3xl flex-col gap-6">
+			@tabNav("Settings") {
+				@tabLink(settingsPath, "Profile", activeTab == "profile", nil)
+				@tabLink(settingsPath+"?tab=security", "Security", activeTab == "security", nil)
+				@tabLink(settingsPath+"?tab=tokens", "Tokens", activeTab == "tokens", nil)
+			}
+			<div class="flex flex-col gap-6">
 				switch activeTab {
 					case "security":
 						@SettingsPasswordSection()
@@ -204,7 +204,7 @@ templ SettingsPasswordSection() {
 						hx-disable="find button[type='submit']"
 					>
 						@csrf.Token()
-						<div class="flex flex-col gap-3">
+						<div class="grid items-start gap-3 lg:grid-cols-3">
 							@settingsField("current_password", "Current password", "") {
 								@input.Input(input.Props{Type: "password", ID: "current_password", Name: "current_password", Attributes: templ.Attributes{"autocomplete": "current-password"}})
 							}
@@ -261,7 +261,7 @@ templ SettingsPasswordSection() {
 						hx-disable="find button[type='submit']"
 					>
 						@csrf.Token()
-						<div class="flex flex-col gap-3">
+						<div class="grid items-start gap-3 lg:grid-cols-2">
 							@settingsField("new_password", "New password", "At least 12 characters.") {
 								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
 							}

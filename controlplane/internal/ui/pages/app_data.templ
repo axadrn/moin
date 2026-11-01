@@ -290,10 +290,10 @@ templ dataToolbar(view DataView) {
 	{{ table := *view.Table }}
 	{{ shown := view.Offset + len(view.Result.Rows) }}
 	<div class="flex flex-wrap items-center justify-between gap-2 px-6 pb-4">
-		<nav class="flex gap-1" aria-label="Table view">
-			@dataViewLink(dataURL(view, table.Name, 0), "Rows", !view.Schema, nil)
-			@dataViewLink(schemaURL(view, table.Name), "Schema", view.Schema, templ.Attributes{"data-schema-link": true})
-		</nav>
+		@tabNav("Table view") {
+			@tabLink(dataURL(view, table.Name, 0), "Rows", !view.Schema, nil)
+			@tabLink(schemaURL(view, table.Name), "Schema", view.Schema, templ.Attributes{"data-schema-link": true})
+		}
 		if !view.Schema && (view.Offset > 0 || int64(shown) < table.Rows) {
 			<div class="flex items-center gap-2" data-pager>
 				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
@@ -306,25 +306,6 @@ templ dataToolbar(view DataView) {
 			</div>
 		}
 	</div>
-}
-
-// dataViewLink is the Rows or the Schema link of a table.
-templ dataViewLink(href, label string, active bool, attrs templ.Attributes) {
-	{{ all := templ.Attributes{} }}
-	for k, v := range attrs {
-		{{ all[k] = v }}
-	}
-	if active {
-		{{ all["aria-current"] = "page" }}
-	}
-	@button.Button(button.Props{
-		Href:       href,
-		Size:       button.SizeSm,
-		Variant:    utils.IfElse(active, button.VariantSecondary, button.VariantGhost),
-		Attributes: all,
-	}) {
-		{ label }
-	}
 }
 
 templ dataSchema(table protocol.DBTable) {

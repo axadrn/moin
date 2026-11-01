@@ -68,48 +68,30 @@ func appKind(app model.App) status.Kind {
 // appHeader is the head of every page of an app: its name, the status chip,
 // one line, the actions (children) and the tabs.
 templ appHeader(app model.App, tab, description string) {
-	<header class="flex flex-col gap-6">
-		<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-			<div class="min-w-0">
-				<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-					<h1 class="truncate text-3xl font-bold tracking-tight">{ app.Name }</h1>
-					if tab == "overview" {
-						@appSummary(app)
-					} else {
-						@appStatus(app)
-					}
-				</div>
-				if description != "" {
-					<p class="mt-1 text-sm text-pretty text-muted-foreground">{ description }</p>
-				}
-			</div>
-			<div class="flex shrink-0 flex-wrap items-center gap-2 empty:hidden">
-				{ children... }
-			</div>
-		</div>
+	<div class="flex flex-col gap-6">
+		@statusHeader(app.Name, appHeaderChip(app, tab), description) {
+			{ children... }
+		}
 		@appTabs(app.Name, tab)
-	</header>
+	</div>
+}
+
+// appHeaderChip is the status of the app next to its name: the overview
+// keeps it in step with the deploys, the other tabs show it as it was.
+func appHeaderChip(app model.App, tab string) templ.Component {
+	if tab == "overview" {
+		return appSummary(app)
+	}
+	return appStatus(app)
 }
 
 // appTabs switches between the pages of an app: plain links the boost
 // swaps into #main, as a segmented control.
 templ appTabs(appName, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
-	<nav class="flex h-9 w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit" aria-label="App">
-		@appTab(appPath, "Overview", active == "overview")
-		@appTab(appPath+"/data", "Data", active == "data")
-		@appTab(appPath+"/backups", "Backups", active == "backups")
-	</nav>
-}
-
-templ appTab(href, label string, active bool) {
-	<a
-		href={ templ.SafeURL(href) }
-		class={ "flex h-full flex-1 items-center justify-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none",
-			templ.KV("bg-background text-foreground shadow-sm", active),
-			templ.KV("text-muted-foreground hover:text-foreground", !active) }
-		if active {
-			aria-current="page"
-		}
-	>{ label }</a>
+	@tabNav("App") {
+		@tabLink(appPath, "Overview", active == "overview", nil)
+		@tabLink(appPath+"/data", "Data", active == "data", nil)
+		@tabLink(appPath+"/backups", "Backups", active == "backups", nil)
+	}
 }
