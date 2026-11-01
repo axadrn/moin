@@ -89,7 +89,7 @@ func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
-	if err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("email"), r.FormValue("role")); err != nil {
+	if err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("email"), r.FormValue("role"), "web"); err != nil {
 		h.handleError(w, r, err)
 		return
 	}
@@ -97,7 +97,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) {
-	if err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID")); err != nil {
+	if err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), "web"); err != nil {
 		h.handleError(w, r, err)
 		return
 	}
@@ -106,7 +106,7 @@ func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Reque
 
 func (h *WorkspaceHandler) RevokeInvitation(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	if err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), workspace.ID, r.PathValue("invitationID")); err != nil {
+	if err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), workspace.ID, r.PathValue("invitationID"), "web"); err != nil {
 		h.handleError(w, r, err)
 		return
 	}

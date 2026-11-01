@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ type WorkspaceInvitationRepository interface {
 	ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error)
 	ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error)
 	Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error
-	Accept(tokenHash, userID, email, memberID, auditID string, now time.Time) (*model.WorkspaceMember, error)
+	Accept(tokenHash, userID, email, memberID, auditID, via string, now time.Time) (*model.WorkspaceMember, error)
 }
 
 type workspaceInvitationRepository struct {
@@ -151,7 +152,7 @@ func (r *workspaceInvitationRepository) Revoke(workspaceID, invitationID string,
 }
 
 func (r *workspaceInvitationRepository) Accept(
-	tokenHash, userID, email, memberID, auditID string,
+	tokenHash, userID, email, memberID, auditID, via string,
 	now time.Time,
 ) (*model.WorkspaceMember, error) {
 	var workspaceID string
@@ -258,6 +259,10 @@ func (r *workspaceInvitationRepository) Accept(
 		TargetID:    invitation.ID,
 		Metadata:    "{}",
 		CreatedAt:   now,
+	}
+	if via != "" {
+		metadata, _ := json.Marshal(map[string]string{"via": via})
+		event.Metadata = string(metadata)
 	}
 	if err := insertAuditEvent(tx, event); err != nil {
 		return nil, err

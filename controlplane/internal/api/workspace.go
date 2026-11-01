@@ -260,7 +260,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), request.Email, request.Role)
+	err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), request.Email, request.Role, via(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -270,7 +270,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 
 // ResendInvitation sends a pending invitation again.
 func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) {
-	err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"))
+	err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), via(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -280,7 +280,7 @@ func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Reque
 
 // RevokeInvitation revokes a pending invitation.
 func (h *WorkspaceHandler) RevokeInvitation(w http.ResponseWriter, r *http.Request) {
-	err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()).ID, r.PathValue("invitationID"))
+	err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()).ID, r.PathValue("invitationID"), via(r))
 	if err != nil {
 		ServiceError(w, err)
 		return

@@ -238,7 +238,9 @@ func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *m
 	return nil
 }
 
-func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model.Workspace, email, role string) error {
+// Invite, ResendInvitation, RevokeInvitation and AcceptInvitation take via,
+// how the change came in (web, api or mcp), for the activity.
+func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model.Workspace, email, role, via string) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
@@ -287,7 +289,7 @@ func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model
 		ExpiresAt:   now.Add(7 * 24 * time.Hour),
 		CreatedAt:   now,
 	}
-	metadata := map[string]string{"email": email, "role": role}
+	metadata := withVia(map[string]string{"email": email, "role": role}, via)
 	event := workspaceAuditEvent(workspace.ID, actor.UserID, "workspace.invitation.created", "workspace_invitation", invitation.ID, metadata, now)
 	if err := s.invitations.Create(invitation, event); err != nil {
 		return fmt.Errorf("create invitation: %w", err)
@@ -306,7 +308,7 @@ func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model
 	return nil
 }
 
-func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, workspace *model.Workspace, invitationID string) error {
+func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, workspace *model.Workspace, invitationID, via string) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
@@ -317,15 +319,15 @@ func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, worksp
 	if invitation.AcceptedAt != nil || invitation.RevokedAt != nil {
 		return repository.ErrWorkspaceInvitationNotFound
 	}
-	return s.Invite(actor, workspace, invitation.Email, invitation.Role)
+	return s.Invite(actor, workspace, invitation.Email, invitation.Role, via)
 }
 
-func (s *WorkspaceService) RevokeInvitation(actor *model.WorkspaceMember, workspaceID, invitationID string) error {
+func (s *WorkspaceService) RevokeInvitation(actor *model.WorkspaceMember, workspaceID, invitationID, via string) error {
 	if actor == nil || actor.WorkspaceID != workspaceID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
 	now := time.Now()
-	event := workspaceAuditEvent(workspaceID, actor.UserID, "workspace.invitation.revoked", "workspace_invitation", invitationID, nil, now)
+	event := workspaceAuditEvent(workspaceID, actor.UserID, "workspace.invitation.revoked", "workspace_invitation", invitationID, withVia(nil, via), now)
 	return s.invitations.Revoke(workspaceID, invitationID, now, event)
 }
 
@@ -346,7 +348,7 @@ func (s *WorkspaceService) WorkspaceInvitation(token string) (*model.WorkspaceIn
 	return invitation, nil
 }
 
-func (s *WorkspaceService) AcceptInvitation(token string, user *model.User) (*model.Workspace, error) {
+func (s *WorkspaceService) AcceptInvitation(token string, user *model.User, via string) (*model.Workspace, error) {
 	invitation, err := s.WorkspaceInvitation(token)
 	if err != nil {
 		return nil, err
@@ -357,6 +359,7 @@ func (s *WorkspaceService) AcceptInvitation(token string, user *model.User) (*mo
 		user.Email,
 		uuid.New().String(),
 		uuid.New().String(),
+		via,
 		time.Now(),
 	); err != nil {
 		return nil, err
@@ -491,6 +494,18 @@ func workspaceSlug(name string) string {
 		return "team"
 	}
 	return base
+}
+
+// withVia adds how the change came in to the details of an event.
+func withVia(metadata map[string]string, via string) map[string]string {
+	if via == "" {
+		return metadata
+	}
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
+	metadata["via"] = via
+	return metadata
 }
 
 func workspaceAuditEvent(workspaceID, actorUserID, action, targetType, targetID string, metadata map[string]string, now time.Time) *model.WorkspaceAuditEvent {

@@ -163,7 +163,7 @@ func TestInvitationAcceptanceValidatesEmailAndExpiry(t *testing.T) {
 	now := time.Now()
 
 	createInvitation(t, workspaceInvitationRepository, owner, "email-invitation", invitee.Email, "email-secret", now)
-	if _, err := workspaceInvitationRepository.Accept(invitationHash("email-secret"), invitee.ID, "someone-else@example.com", "wrong-email-member", "wrong-email-audit", now); !errors.Is(err, repository.ErrWorkspaceInvitationEmail) {
+	if _, err := workspaceInvitationRepository.Accept(invitationHash("email-secret"), invitee.ID, "someone-else@example.com", "wrong-email-member", "wrong-email-audit", "", now); !errors.Is(err, repository.ErrWorkspaceInvitationEmail) {
 		t.Fatalf("wrong email error = %v, want ErrWorkspaceInvitationEmail", err)
 	}
 
@@ -180,7 +180,7 @@ func TestInvitationAcceptanceValidatesEmailAndExpiry(t *testing.T) {
 	if err := workspaceInvitationRepository.Create(expired, testAudit(owner.Workspace.ID, owner.User.ID, "expired-invitation")); err != nil {
 		t.Fatalf("create expired invitation: %v", err)
 	}
-	if _, err := workspaceInvitationRepository.Accept(invitationHash("expired-secret"), invitee.ID, expired.Email, "expired-member", "expired-audit", now); !errors.Is(err, repository.ErrWorkspaceInvitationExpired) {
+	if _, err := workspaceInvitationRepository.Accept(invitationHash("expired-secret"), invitee.ID, expired.Email, "expired-member", "expired-audit", "", now); !errors.Is(err, repository.ErrWorkspaceInvitationExpired) {
 		t.Fatalf("expired invitation error = %v, want ErrWorkspaceInvitationExpired", err)
 	}
 }
@@ -199,7 +199,7 @@ func TestInvitationCannotBeAcceptedAndRevokedConcurrently(t *testing.T) {
 	results := make(chan error, 2)
 	go func() {
 		<-start
-		_, err := workspaceInvitationRepository.Accept(invitationHash("revoke-race-secret"), invitee.ID, invitee.Email, "revoke-race-member", "revoke-race-accept-audit", time.Now())
+		_, err := workspaceInvitationRepository.Accept(invitationHash("revoke-race-secret"), invitee.ID, invitee.Email, "revoke-race-member", "revoke-race-accept-audit", "", time.Now())
 		results <- err
 	}()
 	go func() {

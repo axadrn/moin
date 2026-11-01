@@ -20,13 +20,24 @@ func TestWorkspaceServiceInvitationFlowAndMultipleWorkspaces(t *testing.T) {
 	invitee := createWorkspaceTestUser(t, database, "invited-user", "invited@example.com")
 
 	// Teams are free: the Free plan invites without a seat limit.
-	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember); err != nil {
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, "mcp"); err != nil {
 		t.Fatalf("Invite() on the Free plan error = %v", err)
 	}
 	token := invitationTokenFromLastEmail(t, mailer)
-	joined, err := workspaces.AcceptInvitation(token, invitee)
+	joined, err := workspaces.AcceptInvitation(token, invitee, "api")
 	if err != nil {
 		t.Fatalf("AcceptInvitation() error = %v", err)
+	}
+	events, err := workspaces.AuditEvents(owner.Workspace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vias := map[string]string{}
+	for _, event := range events {
+		vias[event.Action] = event.Via()
+	}
+	if vias["workspace.invitation.created"] != "mcp" || vias["workspace.invitation.sent"] != "mcp" || vias["workspace.invitation.accepted"] != "api" {
+		t.Fatalf("invitation vias = %v", vias)
 	}
 	if joined.ID != owner.Workspace.ID {
 		t.Fatalf("joined workspace = %q, want %q", joined.ID, owner.Workspace.ID)
@@ -46,10 +57,10 @@ func TestWorkspaceServiceInvitationFlowAndMultipleWorkspaces(t *testing.T) {
 	}
 
 	multi := testutil.SeedUser(t, database, testutil.UserOptions{ID: "multi-user", Email: "multi@example.com", Name: "Multi User"})
-	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, multi.User.Email, model.WorkspaceRoleAdmin); err != nil {
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, multi.User.Email, model.WorkspaceRoleAdmin, "web"); err != nil {
 		t.Fatalf("Invite() multi-workspace user error = %v", err)
 	}
-	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), multi.User); err != nil {
+	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), multi.User, "web"); err != nil {
 		t.Fatalf("AcceptInvitation() multi-workspace user error = %v", err)
 	}
 	workspace_members, err := workspaces.ListForUser(multi.User.ID)
@@ -67,7 +78,7 @@ func TestWorkspaceServiceInvitationFlowAndMultipleWorkspaces(t *testing.T) {
 		t.Fatalf("RecordBillingAction() error = %v", err)
 	}
 
-	events, err := workspaces.AuditEvents(owner.Workspace.ID)
+	events, err = workspaces.AuditEvents(owner.Workspace.ID)
 	if err != nil {
 		t.Fatalf("AuditEvents() error = %v", err)
 	}
@@ -86,16 +97,16 @@ func TestWorkspaceServiceRoleBoundaries(t *testing.T) {
 	admin := createWorkspaceTestUser(t, database, "roles-admin", "admin@example.com")
 	member := createWorkspaceTestUser(t, database, "roles-member", "member@example.com")
 
-	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, admin.Email, model.WorkspaceRoleAdmin); err != nil {
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, admin.Email, model.WorkspaceRoleAdmin, "web"); err != nil {
 		t.Fatalf("invite admin: %v", err)
 	}
-	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), admin); err != nil {
+	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), admin, "web"); err != nil {
 		t.Fatalf("accept admin: %v", err)
 	}
-	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, member.Email, model.WorkspaceRoleMember); err != nil {
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, member.Email, model.WorkspaceRoleMember, "web"); err != nil {
 		t.Fatalf("invite member: %v", err)
 	}
-	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), member); err != nil {
+	if _, err := workspaces.AcceptInvitation(invitationTokenFromLastEmail(t, mailer), member, "web"); err != nil {
 		t.Fatalf("accept member: %v", err)
 	}
 

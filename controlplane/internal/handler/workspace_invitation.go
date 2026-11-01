@@ -52,7 +52,7 @@ func (h *WorkspaceInvitationHandler) Accept(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	token := r.PathValue("token")
-	workspace, err := h.workspaces.AcceptInvitation(token, user)
+	workspace, err := h.workspaces.AcceptInvitation(token, user, "web")
 	if err != nil {
 		invitation, _ := h.workspaces.WorkspaceInvitation(token)
 		if errors.Is(err, repository.ErrAlreadyMember) && invitation != nil {

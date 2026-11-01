@@ -710,12 +710,16 @@ func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// actor is who sends the request: an API token or MCP goes as "api", a
-// session as "web".
+// actor is who sends the request.
 func actor(r *http.Request) service.Actor {
-	via := "web"
+	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Via: via(r)}
+}
+
+// via is how a request came in: an API token goes as "api", a session as
+// "web".
+func via(r *http.Request) string {
 	if ctxkeys.APIToken(r.Context()) != nil {
-		via = "api"
+		return "api"
 	}
-	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Via: via}
+	return "web"
 }

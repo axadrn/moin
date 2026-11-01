@@ -47,7 +47,7 @@ func (h *WorkspaceInvitationHandler) Show(w http.ResponseWriter, r *http.Request
 // returns the membership.
 func (h *WorkspaceInvitationHandler) Accept(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
-	workspace, err := h.workspaces.AcceptInvitation(r.PathValue("token"), user)
+	workspace, err := h.workspaces.AcceptInvitation(r.PathValue("token"), user, via(r))
 	if err != nil {
 		ServiceError(w, err)
 		return

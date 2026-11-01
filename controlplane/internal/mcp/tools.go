@@ -288,7 +288,7 @@ func (t builtinTools) inviteMember(_ context.Context, caller Caller, input Invit
 	if member.Can(model.WorkspacePermissionManageMembers) && !t.services.Invitations.Allow(member.WorkspaceID+":"+member.UserID) {
 		return Invitation{}, &ToolError{Code: "rate_limited", Message: "Too many invitations. Try again in an hour."}
 	}
-	err = t.services.Workspaces.Invite(member, workspace, input.Email, input.Role)
+	err = t.services.Workspaces.Invite(member, workspace, input.Email, input.Role, "mcp")
 	if err != nil {
 		return Invitation{}, err
 	}
