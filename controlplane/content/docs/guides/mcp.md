@@ -6,7 +6,7 @@ order: 12
 
 The control plane serves an MCP server at `/mcp`. Every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back blog and show me its logs"*.
 
-Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Removing a server or an app is marked destructive, so clients ask before they call it.
+Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them.
 
 ## Connect Claude Code
 
@@ -52,7 +52,7 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |
 | `restart_app` | starts the live release again with the current settings | write |
-| `stop_app` | takes the app offline; its data stays | write |
+| `stop_app` | takes the app offline; its data stays | write, destructive |
 | `start_app` | runs a stopped app again | write |
 | `get_env` | env vars in plain text | write |
 | `set_env` | sets and removes env vars | write |
