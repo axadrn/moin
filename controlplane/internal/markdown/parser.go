@@ -12,6 +12,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	goldmarkhtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 	"go.abhg.dev/goldmark/frontmatter"
 )
 
@@ -33,6 +34,8 @@ func NewParser() *Parser {
 		goldmark.WithRendererOptions(
 			goldmarkhtml.WithHardWraps(),
 			goldmarkhtml.WithXHTML(),
+			// Above the GFM table renderer, which registers at 500.
+			renderer.WithNodeRenderers(util.Prioritized(scrollTables{}, 100)),
 		),
 	)
 
