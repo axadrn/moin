@@ -311,10 +311,10 @@ type ServerOutput struct {
 
 // RestoreInput is the input of restore_app.
 type RestoreInput struct {
-	App      string     `json:"app" jsonschema:"the app name or ID"`
-	Database string     `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
-	Snapshot string     `json:"snapshot,omitempty" jsonschema:"a snapshot ID from get_backups"`
-	At       *time.Time `json:"at,omitempty" jsonschema:"a point in time inside the database's window, RFC 3339"`
+	App      string  `json:"app" jsonschema:"the app name or ID"`
+	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
+	Snapshot string  `json:"snapshot,omitempty" jsonschema:"a snapshot ID from get_backups"`
+	At       *string `json:"at,omitempty" jsonschema:"a point in time inside the database's window, RFC 3339"`
 }
 
 // BackupSettingsInput is the input of set_backup_settings.
@@ -846,7 +846,15 @@ func (t opsTools) backUpApp(ctx context.Context, caller Caller, input NameInput)
 }
 
 func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (Done, error) {
-	err := t.services.Apps.Restore(ctx, caller.actor(), input.App, input.Database, input.Snapshot, input.At)
+	var at *time.Time
+	if input.At != nil && *input.At != "" {
+		parsed, err := time.Parse(time.RFC3339, *input.At)
+		if err != nil {
+			return Done{}, InvalidField("at", "Use an RFC 3339 time like 2026-10-31T14:02:00Z.")
+		}
+		at = &parsed
+	}
+	err := t.services.Apps.Restore(ctx, caller.actor(), input.App, input.Database, input.Snapshot, at)
 	if err != nil {
 		return Done{}, err
 	}
