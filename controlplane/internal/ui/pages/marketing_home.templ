@@ -570,7 +570,7 @@ templ HomePricing() {
 					</div>
 					<p class="mt-4 flex flex-wrap items-baseline gap-x-3">
 						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$249</span>
-						<span class="text-lg text-background/65">a year</span>
+						<span class="text-lg text-background/65">a year, per workspace</span>
 					</p>
 					<p class="mt-2 text-base text-background/65">or $29 a month</p>
 					<p class="mt-2 text-sm text-background/55">Plus sales tax or VAT where it applies, shown at checkout.</p>
@@ -656,6 +656,12 @@ templ HomeFAQ() {
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@homeQuestion("How does the trial work?") {
 						Sign up and you get 30 days with everything, no card. Afterwards ops turns read-only until you subscribe: your apps keep running, their backups too, and you can still stop and start them.
+					}
+					@homeQuestion("What is a workspace?") {
+						Your team in ops: its servers, apps, bucket, settings and people. Invite teammates and everyone works on the same servers. The plan, the trial and the activity belong to the workspace.
+					}
+					@homeQuestion("Do I pay per workspace?") {
+						Yes. A plan covers one workspace with unlimited servers, apps and teammates. Most teams need one. A second workspace, say for a client, has its own plan; the free trial comes once, with your first.
 					}
 					@homeQuestion("Can I cancel?") {
 						Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.

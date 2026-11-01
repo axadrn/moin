@@ -296,16 +296,16 @@ func serverLastSeen(server model.Server, now time.Time) string {
 // the add form: the price and the way to Stripe Checkout.
 templ subscribeCard() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base text-background mt-6 overflow-hidden bg-foreground px-7 py-10 text-background sm:px-12 sm:py-14", Attributes: templ.Attributes{"data-subscribe": true}}) {
+	@card.Card(card.Props{Class: "block gap-0 py-0 text-base mt-6 overflow-hidden border-brand/40 px-7 py-10 sm:px-12 sm:py-14", Attributes: templ.Attributes{"data-subscribe": true}}) {
 		<h2 class="font-display text-[clamp(2rem,4vw,3rem)] leading-none">Start ops Hosted.</h2>
-		<p class="mt-5 max-w-xl text-lg leading-8 text-background/70">
-			Unlimited servers and apps, continuous backups with daily restore drills, the data browser, the GitHub App. Cancel any time; your apps keep running on your servers.
+		<p class="mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
+			Unlimited servers, apps and teammates in this workspace, continuous backups with daily restore drills, the data browser, the GitHub App. Cancel any time; your apps keep running on your servers.
 		</p>
 		<div class="mt-8 flex flex-wrap items-center gap-2">
-			@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background px-3 py-1 text-[13px] font-semibold text-foreground"}) {
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-brand px-3 py-1 text-[13px] font-semibold text-brand-foreground"}) {
 				Best value · Save $99
 			}
-			@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 text-[13px] font-semibold text-background"}) {
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "h-auto leading-normal rounded-full px-3 py-1 text-[13px] font-semibold"}) {
 				3+ months free
 			}
 		</div>
@@ -314,7 +314,7 @@ templ subscribeCard() {
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
 				<input type="hidden" name="interval" value="yearly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full bg-background text-foreground hover:bg-background/85 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-yearly": true}}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full sm:w-auto", Attributes: templ.Attributes{"data-subscribe-yearly": true}}) {
 					$249 a year
 				}
 			</form>
@@ -322,11 +322,11 @@ templ subscribeCard() {
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
 				<input type="hidden" name="interval" value="monthly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full bg-background/12 text-background hover:bg-background/20 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Variant: button.VariantSecondary, Class: "w-full sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
 					or $29 a month
 				}
 			</form>
 		</div>
-		<p class="mt-4 text-sm text-background/55">Plus sales tax or VAT where it applies, shown at checkout.</p>
+		<p class="mt-4 text-sm text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout.</p>
 	}
 }

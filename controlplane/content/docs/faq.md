@@ -28,6 +28,14 @@ Only what you ask for. A table you open, a query you run or the logs you read pa
 
 Today in the control plane, sealed with AES-256-GCM, and handed to your server with each deploy. Next they move to your servers only, so hosted ops keeps your login and nothing else. After that comes end-to-end encryption: we can't read them at all.
 
+## What is a workspace?
+
+Your team in ops: its servers, apps, bucket, settings and people. Invite teammates from the **Team** page and everyone works on the same servers. The plan, the trial and the [activity](/docs/guides/team) belong to the workspace. You can be in several workspaces and switch between them at the top of the sidebar.
+
+## Do I pay per workspace?
+
+Yes. A plan covers one workspace with unlimited servers, apps and teammates. Most teams need one. A second workspace, for example for a client, has its own plan, and the free trial comes once, with your first workspace.
+
 ## How does the hosted trial work?
 
 A new account gets 30 days with everything, without a card. Afterwards the workspace is read-only until you subscribe: your apps keep running, their backups too, and you can still see everything, stop and start apps and manage your account and team.
