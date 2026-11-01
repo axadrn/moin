@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/checkbox"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/kbd"
 	tablecomp "github.com/axadrn/ops/controlplane/internal/ui/components/table"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/textarea"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -43,52 +43,31 @@ type DataView struct {
 	Error string
 }
 
+// AppData is the data page of an app: the tables of its database next to
+// the rows or the schema of one, then the SQL console.
 templ AppData(view DataView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " data", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Data"}}}) {
 		@panelPage(templ.Attributes{"data-app-data": view.App.Name}) {
-			<div class="min-w-0">
-				<h1 class="truncate font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ view.App.Name }</h1>
-				<p class="mt-2.5 text-sm text-muted-foreground">
-					SQLite on <span class="text-foreground">{ view.App.ServerName }</span>
-					<span aria-hidden="true">·</span>
-					read live from the server, edits write to it
-				</p>
-			</div>
-			@appTabs(view.App.Name, "data")
+			@appHeader(view.App, "data", "The SQLite database on "+view.App.ServerName+", read live. Edits write straight to it.")
 			if view.Error != "" {
-				@card.Card(card.Props{Class: panelClasses + " mt-4", Attributes: templ.Attributes{"role": "alert"}}) {
-					@empty.Empty(empty.Props{Class: "gap-1.5 rounded-none px-6 py-10"}) {
-						@empty.Title(empty.TitleProps{Class: "font-sans text-lg font-semibold"}) {
-							The data could not be read
-						}
-						@empty.Description(empty.DescriptionProps{Class: "text-sm"}) {
-							{ view.Error }
+				<div role="alert">
+					@emptyState("The data could not be read", view.Error, "")
+				</div>
+			} else if len(view.Databases) == 0 {
+				@emptyState("No SQLite database yet", "ops finds SQLite files on the volumes of the live release. Deploy an app that keeps its database on a volume, like /data/app.db.", "ops deploy "+view.App.Name)
+			} else {
+				<div class="grid items-stretch gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+					@dataSidebar(view)
+					if view.Table != nil {
+						@dataTable(view)
+					} else {
+						@panel(panelProps{Title: "No tables yet", Description: "Tables come from the migrations in your repo and show up here after the next deploy."}) {
+							@emptyHint("Or create one with SQL below.", "")
 						}
 					}
-				}
-			} else if len(view.Databases) == 0 {
-				<div class="mt-4">
-					@emptyState("No SQLite database yet", "ops finds SQLite files on the volumes of the live release. Deploy an app that keeps its database on a volume, like /data/app.db.", "ops deploy "+view.App.Name)
 				</div>
-			} else {
-				<div class="mt-4 grid items-start gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-					@dataSidebar(view)
-					<div class="flex min-w-0 flex-col gap-4">
-						if view.Table != nil {
-							@dataTable(view)
-						} else {
-							@card.Card(card.Props{Class: panelClasses}) {
-								@empty.Empty(empty.Props{Class: "rounded-none px-6 py-10"}) {
-									@empty.Description(empty.DescriptionProps{Class: "text-sm"}) {
-										This database has no tables yet.
-									}
-								}
-							}
-						}
-						@dataConsole(view)
-					</div>
-				</div>
+				@dataConsole(view)
 			}
 		}
 	}
@@ -110,127 +89,107 @@ func schemaURL(view DataView, table string) string {
 	return dataURL(view, table, 0) + "&view=schema"
 }
 
+// dataSidebar lists the databases and tables, and says how the schema
+// changes.
 templ dataSidebar(view DataView) {
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden lg:sticky lg:top-4", Attributes: templ.Attributes{"aria-label": "Tables", "role": "navigation"}}) {
+	@panel(panelProps{Title: "Tables", Description: tablesLine(view), Body: panelBodyRows}) {
 		if len(view.Databases) > 1 {
-			<div class="flex flex-wrap gap-1 px-3 pt-3">
-				for _, database := range view.Databases {
-					<a
-						href={ templ.SafeURL("?db=" + url.QueryEscape(database.Path)) }
-						class={ "truncate rounded-full px-3 py-1 font-mono text-xs",
-							templ.KV("bg-secondary text-foreground", database.Path == view.Database),
-							templ.KV("text-muted-foreground hover:text-foreground", database.Path != view.Database) }
-					>{ shortPath(database.Path) }</a>
-				}
-			</div>
-		}
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				Tables
-			}
-			<span class="truncate font-mono text-xs text-muted-foreground" title={ view.Database }>{ shortPath(view.Database) }</span>
-		}
-		<ul class="flex flex-col gap-0.5 px-2 pb-2" role="list">
-			for _, table := range view.Tables {
-				{{ active := view.Table != nil && view.Table.Name == table.Name }}
-				<li>
-					<a
-						href={ templ.SafeURL(dataURL(view, table.Name, 0)) }
-						data-table-link={ table.Name }
-						class={ "flex h-10 items-center justify-between gap-3 rounded-xl px-3 text-sm transition-colors",
-							templ.KV("bg-foreground text-background", active),
-							templ.KV("hover:bg-muted/60", !active) }
-						if active {
-							aria-current="page"
-						}
-					>
-						<span class="flex min-w-0 items-center gap-2">
-							if table.Type == "view" {
-								@icon.Eye(icon.Props{Class: "size-3.5 shrink-0 opacity-60"})
-							} else {
-								@icon.Table(icon.Props{Class: "size-3.5 shrink-0 opacity-60"})
+			<nav aria-label="Databases" class="mb-6">
+				<p class="px-3 pb-1 text-xs text-muted-foreground">Database</p>
+				<ul class="flex flex-col gap-1" role="list">
+					for _, database := range view.Databases {
+						<li>
+							@dataNavItem("?db="+url.QueryEscape(database.Path), database.Path == view.Database, templ.Attributes{"title": database.Path}) {
+								@icon.Database(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
+								<span class="min-w-0 flex-1 truncate font-mono">{ shortPath(database.Path) }</span>
 							}
-							<span class="truncate font-medium">{ table.Name }</span>
-						</span>
-						<span class={ "shrink-0 text-xs tabular-nums", templ.KV("text-muted-foreground", !active), templ.KV("text-background/70", active) }>{ fmt.Sprint(table.Rows) }</span>
-					</a>
-				</li>
-			}
-		</ul>
-		<div class="border-t border-border px-5 py-3.5 text-xs leading-5 text-muted-foreground" data-migration>
+						</li>
+					}
+				</ul>
+			</nav>
+		}
+		<nav aria-label="Tables">
+			<ul class="flex flex-col gap-1" role="list">
+				for _, table := range view.Tables {
+					<li>
+						@dataNavItem(dataURL(view, table.Name, 0), view.Table != nil && view.Table.Name == table.Name, templ.Attributes{"data-table-link": table.Name}) {
+							if table.Type == "view" {
+								@icon.Eye(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
+							} else {
+								@icon.Table(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
+							}
+							<span class="min-w-0 flex-1 truncate">{ table.Name }</span>
+							<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ fmt.Sprint(table.Rows) }</span>
+						}
+					</li>
+				}
+			</ul>
+		</nav>
+		<div class="flex flex-col gap-1 px-3 pt-6 text-xs text-muted-foreground" data-migration>
+			<p class="text-sm font-medium text-foreground">Migrations</p>
 			if view.Migration != nil {
-				<p><span class="font-semibold text-foreground">{ view.Migration.Tool }</span> at <span class="font-mono text-foreground">{ view.Migration.Version }</span></p>
+				<p><span class="text-foreground">{ view.Migration.Tool }</span> at <span class="font-mono text-foreground">{ view.Migration.Version }</span></p>
 				if view.Migration.AppliedAt != "" {
-					<p class="font-mono">{ view.Migration.AppliedAt }</p>
+					<p class="tabular-nums">applied { view.Migration.AppliedAt }</p>
 				}
 			} else {
 				<p>No migration tool found.</p>
 			}
-			<p class="mt-1">The schema changes with migrations in your repo, on deploy.</p>
+			<p>The schema changes with the migrations in your repo, on deploy.</p>
 		</div>
 	}
+}
+
+// tablesLine is the line under the Tables title: how many, in which file.
+func tablesLine(view DataView) string {
+	return plural(len(view.Tables), "table", "tables") + " in " + shortPath(view.Database)
+}
+
+// dataNavItem is one row of the sidebar lists, soft gray when selected.
+templ dataNavItem(href string, active bool, attrs templ.Attributes) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "flex h-9 items-center gap-2.5 rounded-xl px-3 text-sm transition-colors",
+			templ.KV("bg-muted font-medium", active),
+			templ.KV("hover:bg-muted/60", !active) }
+		if active {
+			aria-current="page"
+		}
+		{ attrs... }
+	>
+		{ children... }
+	</a>
 }
 
 templ dataTable(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
 	{{ table := *view.Table }}
 	{{ withRowID := table.RowID }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "data-table-heading", "role": "region"}}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			<div class="flex min-w-0 items-baseline gap-3">
-				@card.Title(card.TitleProps{ID: "data-table-heading", Class: "truncate", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-					{ table.Name }
-				}
-				<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ plural(int(table.Rows), "row", "rows") }</span>
-			</div>
-			<div class="flex shrink-0 items-center gap-2">
-				<nav class="flex gap-0.5 rounded-full bg-secondary p-0.5 text-xs font-semibold" aria-label="Table view">
-					<a href={ templ.SafeURL(dataURL(view, table.Name, 0)) } class={ "rounded-full px-3 py-1.5", templ.KV("bg-card text-foreground shadow-sm", !view.Schema), templ.KV("text-muted-foreground hover:text-foreground", view.Schema) }>Rows</a>
-					<a href={ templ.SafeURL(schemaURL(view, table.Name)) } data-schema-link class={ "rounded-full px-3 py-1.5", templ.KV("bg-card text-foreground shadow-sm", view.Schema), templ.KV("text-muted-foreground hover:text-foreground", !view.Schema) }>Schema</a>
-				</nav>
-				if table.Type == "table" && !view.Schema {
-					@button.Button(button.Props{
-						Size:       button.SizeSm,
-						Attributes: templ.Attributes{"data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"},
-					}) {
-						@icon.Plus(icon.Props{Class: "size-3.5"})
-						Row
-					}
-				}
-			</div>
-		}
+	@panel(panelProps{Heading: "data-table-heading", Title: table.Name, Description: tableLine(view), Body: panelBodyFlush, Action: addRowAction(view)}) {
+		@dataToolbar(view)
 		if view.Schema {
 			@dataSchema(table)
 		} else {
 			if table.Type == "table" {
 				@newRowForm(dataPath, view.Database, table)
 			}
-			<p class="px-5 pb-2 text-xs text-muted-foreground">
-				if withRowID {
-					Click a cell to edit. Enter saves, Esc cancels.
-				} else if table.Type == "view" {
-					A view: read only.
-				} else {
-					A WITHOUT ROWID table: add rows here, change them with SQL below.
-				}
-			</p>
-			<div class="max-h-[30rem] overflow-auto overscroll-contain px-2 pb-2 [&>[data-slot=table-container]]:overflow-visible">
-				@tablecomp.Table(tablecomp.Props{Class: "border-separate border-spacing-0 text-left text-[0.8125rem]", Attributes: templ.Attributes{"data-rows": true}}) {
+			<div class={ dataScrollClasses + " max-h-[32rem]" }>
+				@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-rows": true}}) {
 					@tablecomp.Header() {
-						@tablecomp.Row(tablecomp.RowProps{Class: dataRowClasses}) {
+						@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
 							for _, column := range table.Columns {
-								@tablecomp.Head(tablecomp.HeadProps{Class: "sticky top-0 h-auto border-b border-border bg-card px-3 pt-2 pb-2.5 align-bottom text-[0.8125rem] font-semibold text-foreground"}) {
-									<span class="flex items-center gap-1.5">
+								@tablecomp.Head(tablecomp.HeadProps{Class: utils.CN(dataHeadClasses, map[string]bool{"text-right": isNumeric(column)})}) {
+									<span class="inline-flex items-center gap-1.5">
 										if column.PrimaryKey {
-											@icon.KeyRound(icon.Props{Class: "size-3 text-muted-foreground"})
+											@icon.KeyRound(icon.Props{Class: "size-3.5 text-muted-foreground", Attributes: templ.Attributes{"aria-label": "primary key"}})
 										}
-										{ column.Name }
+										<span>{ column.Name }</span>
+										<span class="font-mono text-xs font-normal text-muted-foreground">{ strings.ToLower(column.Type) }</span>
 									</span>
-									<span class="block font-mono text-[0.6875rem] font-normal text-muted-foreground">{ strings.ToLower(orDash(column.Type)) }</span>
 								}
 							}
 							if withRowID {
-								@tablecomp.Head(tablecomp.HeadProps{Class: "sticky top-0 h-auto w-10 border-b border-border bg-card px-0"}) {
+								@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses + " w-12"}) {
 									<span class="sr-only">Delete</span>
 								}
 							}
@@ -239,23 +198,25 @@ templ dataTable(view DataView) {
 					@tablecomp.Body() {
 						for _, row := range view.Result.Rows {
 							{{ rowID := rowIDOf(row, withRowID) }}
-							@tablecomp.Row(tablecomp.RowProps{Class: "group/row " + dataRowClasses, Attributes: templ.Attributes{"data-row": rowID}}) {
+							@tablecomp.Row(tablecomp.RowProps{Class: "group/row", Attributes: templ.Attributes{"data-row": rowID}}) {
 								for index, column := range table.Columns {
 									{{ value := cellValue(row, index, withRowID) }}
-									@tablecomp.Cell(tablecomp.CellProps{Class: "max-w-[22rem] border-b border-border/60 p-0 align-top whitespace-normal group-last/row:border-b-0"}) {
-										if withRowID && !isBlob(column) {
+									if withRowID && !isBlob(column) {
+										@tablecomp.Cell(tablecomp.CellProps{Class: dataEditCellClasses}) {
 											@DataCell(dataPath, view.Database, table.Name, rowID, column, value, "")
-										} else {
-											<span class={ "block truncate px-3 py-2.5 font-mono", templ.KV("text-muted-foreground/60 italic", value == nil) }>{ cellText(value) }</span>
+										}
+									} else {
+										@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-right": isNumeric(column), "text-muted-foreground italic": value == nil})}) {
+											{ cellText(value) }
 										}
 									}
 								}
 								if withRowID {
-									@tablecomp.Cell(tablecomp.CellProps{Class: "border-b border-border/60 p-0 text-right align-middle group-last/row:border-b-0"}) {
+									@tablecomp.Cell(tablecomp.CellProps{Class: "py-0 pr-4 text-right"}) {
 										@button.Button(button.Props{
 											Variant: button.VariantGhost,
-											Size:    button.SizeIconXs,
-											Class:   "text-muted-foreground hover:bg-failed/15 hover:text-failed focus-visible:opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100",
+											Size:    button.SizeIconSm,
+											Class:   "text-muted-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100",
 											Attributes: templ.Attributes{
 												"aria-label": "Delete row " + rowID,
 												"title":      "Delete this row",
@@ -266,7 +227,7 @@ templ dataTable(view DataView) {
 												"hx-confirm": "Delete row " + rowID + " of " + table.Name + "? This cannot be undone.",
 											},
 										}) {
-											@icon.Trash2(icon.Props{Class: "size-3.5"})
+											@icon.Trash2()
 										}
 									}
 								}
@@ -275,67 +236,188 @@ templ dataTable(view DataView) {
 					}
 				}
 				if len(view.Result.Rows) == 0 {
-					<p class="px-3 py-8 text-center text-sm text-muted-foreground">No rows.</p>
-				}
-			</div>
-			if view.Offset > 0 || view.Result.Truncated || int64(view.Offset+len(view.Result.Rows)) < table.Rows {
-				<div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-xs text-muted-foreground">
-					<span class="tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, view.Offset+len(view.Result.Rows), table.Rows) }</span>
-					<div class="flex gap-2">
-						if view.Offset > 0 {
-							@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Href: dataURL(view, table.Name, max(view.Offset-view.Limit, 0))}) {
-								Newer
-							}
-						}
-						if int64(view.Offset+len(view.Result.Rows)) < table.Rows {
-							@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Href: dataURL(view, table.Name, view.Offset+view.Limit)}) {
-								Older
-							}
+					<div class="px-6 pt-6">
+						if table.Type == "table" {
+							@emptyHint("No rows yet. Add the first one with Add row, or with SQL below.", "")
+						} else {
+							@emptyHint("This view returns no rows right now.", "")
 						}
 					</div>
-				</div>
-			}
+				}
+			</div>
 		}
 	}
 }
 
-templ dataSchema(table protocol.DBTable) {
-	<div class="flex flex-col gap-3 px-4 pb-4">
-		<pre class="ops-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 text-[0.8125rem] whitespace-pre-wrap text-terminal-foreground" data-table-sql>{ table.SQL }</pre>
-		for _, index := range table.Indexes {
-			<pre class="ops-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 text-[0.8125rem] whitespace-pre-wrap text-terminal-foreground">{ index }</pre>
+// tableLine is the line under the table's name: its size and how to work
+// with what is shown.
+func tableLine(view DataView) string {
+	table := *view.Table
+	rows := plural(int(table.Rows), "row", "rows")
+	switch {
+	case view.Schema:
+		return rows + ". Its columns, indexes and the statement that created it."
+	case table.Type == "view":
+		return rows + ". A view, read only."
+	case table.RowID:
+		return rows + ". Click a cell to edit, Enter saves, Esc cancels."
+	}
+	return rows + ". A WITHOUT ROWID table: add rows here, change them with SQL below."
+}
+
+// addRowAction is the one action of the table card: Add row, on the rows
+// of a table (not a view, not the schema).
+func addRowAction(view DataView) templ.Component {
+	if view.Schema || view.Table.Type != "table" {
+		return nil
+	}
+	return addRowButton()
+}
+
+templ addRowButton() {
+	@button.Button(button.Props{
+		Size:       button.SizeSm,
+		Attributes: templ.Attributes{"data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"},
+	}) {
+		@icon.Plus(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
+		Add row
+	}
+}
+
+// dataToolbar switches between the rows and the schema of a table, and
+// pages through the rows.
+templ dataToolbar(view DataView) {
+	{{ table := *view.Table }}
+	{{ shown := view.Offset + len(view.Result.Rows) }}
+	<div class="flex flex-wrap items-center justify-between gap-2 px-6 pb-4">
+		<nav class="flex gap-1" aria-label="Table view">
+			@dataViewLink(dataURL(view, table.Name, 0), "Rows", !view.Schema, nil)
+			@dataViewLink(schemaURL(view, table.Name), "Schema", view.Schema, templ.Attributes{"data-schema-link": true})
+		</nav>
+		if !view.Schema && (view.Offset > 0 || int64(shown) < table.Rows) {
+			<div class="flex items-center gap-2" data-pager>
+				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
+				@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Disabled: view.Offset == 0, Href: dataURL(view, table.Name, max(view.Offset-view.Limit, 0))}) {
+					Newer
+				}
+				@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Disabled: int64(shown) >= table.Rows, Href: dataURL(view, table.Name, view.Offset+view.Limit)}) {
+					Older
+				}
+			</div>
 		}
-		<p class="px-1 text-xs text-muted-foreground">To change the schema, add a migration to your repo and deploy. ops takes a snapshot before every deploy.</p>
+	</div>
+}
+
+// dataViewLink is the Rows or the Schema link of a table.
+templ dataViewLink(href, label string, active bool, attrs templ.Attributes) {
+	{{ all := templ.Attributes{} }}
+	for k, v := range attrs {
+		{{ all[k] = v }}
+	}
+	if active {
+		{{ all["aria-current"] = "page" }}
+	}
+	@button.Button(button.Props{
+		Href:       href,
+		Size:       button.SizeSm,
+		Variant:    utils.IfElse(active, button.VariantSecondary, button.VariantGhost),
+		Attributes: all,
+	}) {
+		{ label }
+	}
+}
+
+templ dataSchema(table protocol.DBTable) {
+	<div class={ dataScrollClasses }>
+		@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-schema-columns": true}}) {
+			@tablecomp.Header() {
+				@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
+					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses}) {
+						Column
+					}
+					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses}) {
+						Type
+					}
+					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses + " w-full"}) {
+						Constraints
+					}
+				}
+			}
+			@tablecomp.Body() {
+				for _, column := range table.Columns {
+					@tablecomp.Row() {
+						@tablecomp.Cell(tablecomp.CellProps{Class: dataCellClasses + " font-sans font-medium"}) {
+							{ column.Name }
+						}
+						@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-muted-foreground": column.Type == ""})}) {
+							{ strings.ToLower(orDash(column.Type)) }
+						}
+						@tablecomp.Cell(tablecomp.CellProps{Class: "first:pl-6 last:pr-6"}) {
+							<span class="flex gap-1.5">
+								if column.PrimaryKey {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										primary key
+									}
+								}
+								if column.NotNull {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										not null
+									}
+								}
+							</span>
+						}
+					}
+				}
+			}
+		}
+	</div>
+	<div class="flex flex-col gap-3 px-6 pt-6">
+		<p class="text-sm font-medium">Statement</p>
+		<pre class={ dataTermClasses } data-table-sql>{ table.SQL }</pre>
+		if len(table.Indexes) > 0 {
+			<p class="pt-3 text-sm font-medium">Indexes</p>
+			for _, index := range table.Indexes {
+				<pre class={ dataTermClasses }>{ index }</pre>
+			}
+		}
+		<p class="text-xs text-muted-foreground">To change the schema, add a migration to your repo and deploy. ops takes a snapshot before every deploy.</p>
 	</div>
 }
 
 templ newRowForm(dataPath, database string, table protocol.DBTable) {
-	<form id="new-row" hidden class="mx-4 mb-3 rounded-2xl bg-muted/60 p-3" hx-post={ dataPath + "/insert" } hx-swap="none" data-new-row>
+	<form id="new-row" hidden class="px-6 pb-6" hx-post={ dataPath + "/insert" } hx-swap="none" data-new-row>
 		@csrf.Token()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
-		<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-			for _, column := range table.Columns {
-				<label class="flex min-w-0 flex-col gap-1">
-					<span class="flex items-center gap-1.5 text-xs font-semibold">
-						{ column.Name }
-						<span class="font-mono font-normal text-muted-foreground">{ strings.ToLower(orDash(column.Type)) }</span>
-					</span>
-					@input.Input(input.Props{
-						Type:        "text",
-						Name:        "value:" + column.Name,
-						Placeholder: newRowPlaceholder(column),
-						Class:       "font-mono",
-						Attributes:  templ.Attributes{"spellcheck": "false", "autocomplete": "off"},
-					})
-				</label>
-			}
-		</div>
-		<div class="mt-3 flex items-center justify-between gap-3">
-			<span class="text-xs text-muted-foreground">Empty fields get the column's default.</span>
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
-				Add row
-			}
+		<div class="rounded-2xl bg-muted/60 p-4">
+			<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+				for _, column := range table.Columns {
+					<label class="flex min-w-0 flex-col gap-1">
+						<span class="flex items-baseline gap-1.5 text-sm font-medium">
+							{ column.Name }
+							<span class="font-mono text-xs font-normal text-muted-foreground">{ strings.ToLower(column.Type) }</span>
+						</span>
+						@input.Input(input.Props{
+							Type:        "text",
+							Name:        "value:" + column.Name,
+							Placeholder: newRowPlaceholder(column),
+							Class:       "font-mono",
+							Attributes:  templ.Attributes{"spellcheck": "false", "autocomplete": "off"},
+						})
+					</label>
+				}
+			</div>
+			<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+				<span class="text-xs text-muted-foreground">Empty fields get the column's default.</span>
+				<div class="flex gap-2">
+					@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: templ.Attributes{"data-new-row-cancel": true}}) {
+						Cancel
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit}) {
+						Save row
+					}
+				</div>
+			</div>
 		</div>
 	</form>
 }
@@ -375,8 +457,8 @@ templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn
 			Placeholder: utils.IfElse(value == nil, "NULL", ""),
 			Class: utils.CN(
 				// A cell of the table: no box until it has focus.
-				"block h-auto w-full min-w-[6rem] truncate rounded-lg border-0 bg-transparent px-3 py-2.5 font-mono text-[0.8125rem] md:text-[0.8125rem] placeholder:text-muted-foreground/60 placeholder:italic focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset dark:bg-transparent dark:focus-visible:bg-muted",
-				map[string]bool{"text-live": state == "saved", "text-failed": state == "failed"},
+				"field-sizing-content w-full min-w-24 max-w-[22rem] truncate rounded-xl bg-transparent px-3 font-mono placeholder:italic focus-visible:bg-background dark:bg-transparent",
+				map[string]bool{"text-right": isNumeric(column), "text-live": state == "saved", "text-failed": state == "failed"},
 			),
 			Attributes: templ.Attributes{"aria-label": column.Name, "spellcheck": "false", "autocomplete": "off", "data-original": cellInput(value)},
 		})
@@ -385,14 +467,8 @@ templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn
 
 templ dataConsole(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "sql-heading", "role": "region"}}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{ID: "sql-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				SQL
-			}
-			<span class="text-xs text-muted-foreground">Same as <span class="font-mono text-foreground">ops sql { view.App.Name }</span></span>
-		}
-		<form class="flex flex-col gap-3 px-4 pt-1 pb-4" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML">
+	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Description: "Reads only, until you allow changes. The same as ops sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
+		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML">
 			@csrf.Token()
 			<input type="hidden" name="db" value={ view.Database }/>
 			<label for="sql" class="sr-only">SQL</label>
@@ -401,21 +477,28 @@ templ dataConsole(view DataView) {
 				Name:        "sql",
 				Rows:        4,
 				Placeholder: sqlPlaceholder(view),
-				Class:       "ops-term field-sizing-fixed min-h-0 w-full resize-y rounded-2xl border-0 bg-terminal px-4 py-3 font-mono text-[0.8125rem] md:text-[0.8125rem] text-terminal-foreground focus-visible:ring-2 focus-visible:ring-ring dark:bg-terminal",
+				Class:       "ops-term field-sizing-fixed min-h-0 w-full resize-y border-0 bg-terminal font-mono text-terminal-foreground dark:bg-terminal",
 				Attributes:  templ.Attributes{"spellcheck": "false", "data-sql": true},
 			})
-			<p hidden class="px-1 text-xs text-running" data-sql-schema-hint>This changes the schema. Put it in a migration in your repo, or the next deploy will not know about it.</p>
+			<p hidden class="flex items-center gap-2 text-xs text-running" data-sql-schema-hint>
+				@icon.TriangleAlert(icon.Props{Class: "size-3.5 shrink-0"})
+				This changes the schema. Put it in a migration in your repo, or the next deploy will not know about it.
+			</p>
 			<div class="flex flex-wrap items-center justify-between gap-3">
-				<label class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-					@checkbox.Checkbox(checkbox.Props{Name: "write", Value: "1", Class: "data-checked:border-failed data-checked:bg-failed data-checked:text-white dark:data-checked:bg-failed"})
+				<label class="flex cursor-pointer items-center gap-2 text-sm">
+					@checkbox.Checkbox(checkbox.Props{Name: "write", Value: "1"})
 					Allow changes
+					<span class="text-xs text-muted-foreground">INSERT, UPDATE, DELETE</span>
 				</label>
-				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
-					Run
-					@kbd.Kbd(kbd.Props{Class: "ml-1 hidden h-auto bg-transparent px-0 text-current opacity-60 sm:inline-flex"}) {
+				<div class="flex items-center gap-2">
+					@kbd.Kbd(kbd.Props{Class: "hidden sm:inline-flex"}) {
 						⌘↵
 					}
-				}
+					@button.Button(button.Props{Type: button.TypeSubmit}) {
+						@icon.Play(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
+						Run
+					}
+				</div>
 			</div>
 		</form>
 		<div id="sql-result" class="min-w-0"></div>
@@ -428,12 +511,17 @@ templ dataConsole(view DataView) {
 			sql?.addEventListener('input', () => {
 				hint.hidden = !/^\s*(create|alter|drop)\b/i.test(sql.value);
 			});
-			page.querySelector('[data-new-row-toggle]')?.addEventListener('click', event => {
-				const form = page.querySelector('[data-new-row]');
-				form.hidden = !form.hidden;
-				event.currentTarget.setAttribute('aria-expanded', String(!form.hidden));
-				if (!form.hidden) form.querySelector('input[type=text]')?.focus();
-			});
+			// Add row opens the new row form, Cancel closes it again.
+			const toggle = page.querySelector('[data-new-row-toggle]');
+			const form = page.querySelector('[data-new-row]');
+			const showForm = open => {
+				form.hidden = !open;
+				toggle.setAttribute('aria-expanded', String(open));
+				if (open) form.querySelector('input[type=text]')?.focus();
+				else toggle.focus();
+			};
+			toggle?.addEventListener('click', () => showForm(form.hidden));
+			page.querySelector('[data-new-row-cancel]')?.addEventListener('click', () => showForm(false));
 			sql?.addEventListener('keydown', event => {
 				if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
 					event.preventDefault();
@@ -464,50 +552,100 @@ func sqlPlaceholder(view DataView) string {
 	return "SELECT * FROM " + view.Table.Name + " LIMIT 20"
 }
 
-// DataResult is the answer of the SQL console.
+// DataResult is the answer of the SQL console: an error is an alert, a
+// change a status line, a read the rows it found.
 templ DataResult(result protocol.DBResult, write bool, message string) {
 	if message != "" {
-		@alert.Alert(alert.Props{Class: "border-0 w-auto mx-4 mb-4 rounded-2xl bg-failed/12 px-4 py-3 font-mono text-[0.8125rem] text-failed"}) {
-			{ message }
-		}
+		<div class="px-6 pt-6">
+			@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-sql-error": true}}) {
+				@icon.CircleAlert()
+				@alert.Title(alert.TitleProps{Class: "font-mono font-normal"}) {
+					{ message }
+				}
+			}
+		</div>
 	} else if write {
-		@alert.Alert(alert.Props{Class: "border-0 w-auto mx-4 mb-4 rounded-2xl bg-live/12 px-4 py-3 text-sm font-medium text-live"}) {
+		<p role="status" class="flex items-center gap-2 px-6 pt-6 text-sm font-medium" data-sql-changes>
+			@icon.Check(icon.Props{Class: "size-4 shrink-0 text-live"})
 			{ plural(int(result.Changes), "row changed", "rows changed") }
-		}
+		</p>
 	} else {
-		<div class="border-t border-border">
-			<p class="px-5 pt-3 text-xs text-muted-foreground tabular-nums">
+		<div class="flex flex-col gap-3 pt-6">
+			<p role="status" class="px-6 text-xs text-muted-foreground tabular-nums">
 				{ plural(len(result.Rows), "row", "rows") }
 				if result.Truncated {
 					, more not shown
 				}
 			</p>
-			<div class="max-h-[24rem] overflow-auto overscroll-contain px-2 pb-2 [&>[data-slot=table-container]]:overflow-visible">
-				@tablecomp.Table(tablecomp.Props{Class: "border-separate border-spacing-0 text-left text-[0.8125rem]", Attributes: templ.Attributes{"data-sql-result": true}}) {
-					@tablecomp.Header() {
-						@tablecomp.Row(tablecomp.RowProps{Class: dataRowClasses}) {
-							for _, column := range result.Columns {
-								@tablecomp.Head(tablecomp.HeadProps{Class: "sticky top-0 h-auto border-b border-border bg-card px-3 py-2 text-[0.8125rem] font-semibold text-foreground"}) {
-									{ column }
+			if len(result.Columns) > 0 {
+				{{ numeric := numericColumns(result) }}
+				<div class={ dataScrollClasses + " max-h-[24rem]" }>
+					@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-sql-result": true}}) {
+						@tablecomp.Header() {
+							@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
+								for index, column := range result.Columns {
+									@tablecomp.Head(tablecomp.HeadProps{Class: utils.CN(dataHeadClasses, map[string]bool{"text-right": numeric[index]})}) {
+										{ column }
+									}
 								}
 							}
 						}
-					}
-					@tablecomp.Body() {
-						for _, row := range result.Rows {
-							@tablecomp.Row(tablecomp.RowProps{Class: dataRowClasses}) {
-								for _, value := range row {
-									@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN("max-w-[22rem] truncate border-b border-border/60 px-3 py-2 font-mono", map[string]bool{"text-muted-foreground/60 italic": value == nil})}) {
-										{ cellText(value) }
+						@tablecomp.Body() {
+							for _, row := range result.Rows {
+								@tablecomp.Row() {
+									for index, value := range row {
+										@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-right": numeric[index], "text-muted-foreground italic": value == nil})}) {
+											{ cellText(value) }
+										}
 									}
 								}
 							}
 						}
 					}
-				}
-			</div>
+				</div>
+			}
 		</div>
 	}
+}
+
+// The tables of the data page run edge to edge in their card with the
+// table's own row lines; the first and the last column sit on the card's
+// 24 px, so values line up with the title.
+const (
+	dataScrollClasses   = "overflow-auto overscroll-contain [&>[data-slot=table-container]]:overflow-visible"
+	dataHeadClasses     = "sticky top-0 z-10 bg-card text-muted-foreground first:pl-6 last:pr-6"
+	dataCellClasses     = "max-w-[22rem] truncate font-mono first:pl-6 last:pr-6"
+	dataEditCellClasses = "max-w-[22rem] py-1 px-0 first:pl-3 whitespace-normal"
+	dataTermClasses     = "ops-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 font-mono text-sm whitespace-pre-wrap text-terminal-foreground"
+)
+
+// isNumeric says whether a column holds numbers, by SQLite's type affinity,
+// so its values align right.
+func isNumeric(column protocol.DBColumn) bool {
+	kind := strings.ToUpper(column.Type)
+	for _, part := range []string{"INT", "REAL", "FLOA", "DOUB", "NUMERIC", "DECIMAL"} {
+		if strings.Contains(kind, part) {
+			return true
+		}
+	}
+	return false
+}
+
+// numericColumns says per column of a query result whether every value is
+// a number or NULL, so the column aligns right, its head too.
+func numericColumns(result protocol.DBResult) []bool {
+	numeric := make([]bool, len(result.Columns))
+	for index := range numeric {
+		numeric[index] = slices.ContainsFunc(result.Rows, func(row []any) bool { return index < len(row) && isNumber(row[index]) }) &&
+			!slices.ContainsFunc(result.Rows, func(row []any) bool { return index < len(row) && row[index] != nil && !isNumber(row[index]) })
+	}
+	return numeric
+}
+
+// isNumber says whether a value of a query result is a number.
+func isNumber(value any) bool {
+	_, ok := value.(float64)
+	return ok
 }
 
 // deleteRowVals are the hx-vals of the delete button of a row.
@@ -516,9 +654,6 @@ func deleteRowVals(database, table, rowID string) string {
 	return string(vals)
 }
 
-// dataRowClasses keeps the rows of the data tables plain: the cells draw
-// the lines, a row has no hover.
-const dataRowClasses = "border-b-0 hover:bg-transparent"
 
 func rowIDOf(row []any, withRowID bool) string {
 	if !withRowID || len(row) == 0 {
