@@ -66,14 +66,11 @@ templ navGroup(label string, items []navItem) {
 // navKey is the go-to hint: g, then the key. It shows on hover.
 templ navKey(key string) {
 	@kbd.Group(kbd.GroupProps{Class: "ml-auto hidden gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden group-data-[collapsible=icon]:hidden md:flex", Attributes: templ.Attributes{"aria-hidden": "true"}}) {
-		@kbd.Kbd(kbd.Props{Class: navKeyClasses}) {
+		@kbd.Kbd() {
 			G
 		}
-		@kbd.Kbd(kbd.Props{Class: navKeyClasses}) {
+		@kbd.Kbd() {
 			{ key }
 		}
 	}
 }
-
-// navKeyClasses keep the go-to keys small and mono next to the labels.
-const navKeyClasses = "h-[1.125rem] min-w-[1.125rem] rounded-[5px] px-1 font-mono text-[10px] leading-none"

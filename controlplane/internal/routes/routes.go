@@ -19,6 +19,10 @@ import (
 
 var immutableAssetPathPattern = regexp.MustCompile(`^/?js/(?:.+\.[0-9a-f]{8}(?:\.min)?|shadcn-templ-[0-9a-f]{16})\.js$`)
 
+// fontAssetPathPattern is the font files. Their names carry no hash, but a
+// font changes so rarely that browsers may keep it for a year.
+var fontAssetPathPattern = regexp.MustCompile(`^/?fonts/.+\.(?:woff2|ttf)$`)
+
 func SetupRoutes(app *app.App) http.Handler {
 	renderConfig := app.Cfg.Render()
 	clientIPs := middleware.NewClientIPResolver(app.Cfg.TrustedProxyCIDRs)
@@ -57,8 +61,11 @@ func SetupRoutes(app *app.App) http.Handler {
 		sub, _ := fs.Sub(assets.AssetsFS, ".")
 		fileServer := http.FileServer(http.FS(sub))
 		assetHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if immutableAssetPathPattern.MatchString(r.URL.Path) {
+			switch {
+			case immutableAssetPathPattern.MatchString(r.URL.Path):
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			case fontAssetPathPattern.MatchString(r.URL.Path):
+				w.Header().Set("Cache-Control", "public, max-age=31536000")
 			}
 			fileServer.ServeHTTP(w, r)
 		})

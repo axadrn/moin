@@ -20,7 +20,7 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 			Class:      "data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground",
 			Attributes: dropdown.Trigger(ctx),
 		}) {
-			<div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
+			<div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-medium text-sidebar-primary-foreground">
 				{ workspaceInitial(current.Name) }
 			</div>
 			<div class="grid flex-1 text-left text-sm leading-tight">
@@ -40,8 +40,8 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 					Workspaces
 				}
 				for _, item := range workspaces {
-					@dropdown.Item(dropdown.ItemProps{Href: "/app/" + item.Slug + "/dashboard", Class: "gap-2 p-2"}) {
-						<div class="flex size-6 shrink-0 items-center justify-center rounded-md border text-xs font-semibold">
+					@dropdown.Item(dropdown.ItemProps{Href: "/app/" + item.Slug + "/dashboard", Class: "gap-2 p-2", Attributes: fullLoad}) {
+						<div class="flex size-6 shrink-0 items-center justify-center rounded-md border text-xs font-medium">
 							{ workspaceInitial(item.Name) }
 						</div>
 						<span class="min-w-0 flex-1 truncate">{ item.Name }</span>
@@ -63,7 +63,7 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 					</div>
 					<div class="font-medium text-muted-foreground">Workspace settings</div>
 				}
-				@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new", Class: "gap-2 p-2"}) {
+				@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new", Class: "gap-2 p-2", Attributes: fullLoad}) {
 					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
 						@icon.Plus(icon.Props{Class: "size-4"})
 					</div>
@@ -73,6 +73,10 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 		}
 	}
 }
+
+// fullLoad opts a link out of the boosted navigation: it changes the
+// context, so the whole page loads (DESIGN.md, Navigation).
+var fullLoad = templ.Attributes{"hx-boost": "false"}
 
 // workspaceInitial is the first letter of a name, also when it is not ASCII.
 func workspaceInitial(name string) string {

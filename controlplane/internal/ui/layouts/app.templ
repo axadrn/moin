@@ -1,8 +1,6 @@
 package layouts
 
 import (
-	"net/url"
-
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
@@ -35,8 +33,10 @@ templ AppShell(p AppProps) {
 		Title:       p.Title,
 		Description: "The ops control panel",
 		Path:        ctxkeys.URLPath(ctx),
+		Boost:       appBoost,
 	}) {
 		@sidebar.Provider(sidebar.ProviderProps{
+			ID:                 "app-sidebar",
 			Class:              "bg-background",
 			DisableDefaultOpen: ctxkeys.SidebarCollapsed(ctx),
 			Attributes:         templ.Attributes{"style": "--sidebar-width: 16rem; --sidebar-width-icon: 3rem; --header-height: 3.5rem;"},
@@ -46,12 +46,16 @@ templ AppShell(p AppProps) {
 					@AppSidebarIdentity()
 				}
 				@sidebar.Content() {
-					@AppSidebarNavigation()
+					<div id="sidebar-nav" class="contents">
+						@AppSidebarNavigation()
+					</div>
+					// The apps load after the page and again after every boosted
+					// swap, which pushes the new URL, so the open app stays marked.
 					<div
 						id="sidebar-apps"
 						class="contents"
-						hx-get={ basePath + "/apps/nav?at=" + url.QueryEscape(ctxkeys.URLPath(ctx)) }
-						hx-trigger="load, apps-changed from:body"
+						hx-get={ basePath + "/apps/nav" }
+						hx-trigger="load, apps-changed from:body, htmx:after:history:push from:document"
 						hx-swap="innerHTML"
 					></div>
 				}
@@ -104,6 +108,12 @@ func appCrumbs(p AppProps) []blocks.Crumb {
 	return crumbs
 }
 
+// appBoost makes every link and form of the panel swap only #main, and
+// brings the sidebar places and the top bar of the new page along, so the
+// active place and the path stay right. Links that change the context opt
+// out with hx-boost="false" (DESIGN.md, Navigation).
+const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML","selectOOB":"#sidebar-nav,#app-header"}`
+
 // appShellScript adds what every page of the panel shares: copy buttons
 // ([data-copy] copies its value, or the text of the element its
 // data-copy-target selects), the go-to keys (g then a, s, b, y, t or ,) and / or n to
@@ -146,6 +156,25 @@ templ appShellScript() {
 					if (label) label.textContent = label.dataset.before;
 				}, 1400);
 			});
+			// A boosted answer is a whole page: its parts marked hx-swap-oob
+			// for their own fragment answers stay in place in #main instead of
+			// being pulled out of it.
+			document.addEventListener("htmx:after:request", (event) => {
+				const ctx = event.detail.ctx;
+				if (ctx.request.headers["HX-Boosted"] === "true") ctx.text = ctx.text.replaceAll(/ hx-swap-oob="[^"]*"/g, "");
+			});
+			// A boosted link to a page outside the panel (no #main) loads as
+			// a full page instead of swapping in nothing.
+			document.addEventListener("htmx:before:swap", (event) => {
+				const ctx = event.detail.ctx;
+				if (ctx.request.headers["HX-Boosted"] !== "true" || ctx.text.includes('id="main"')) return;
+				event.preventDefault();
+				location.replace(ctx.response?.raw?.url || ctx.request.action);
+			});
+			// On phones the sidebar sheet closes once the new page is in.
+			document.addEventListener("htmx:after:swap", (event) => {
+				if (event.detail.ctx.request.headers["HX-Boosted"] === "true") window.templ.sidebar.setOpenMobile(false);
+			});
 			const places = { a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", ",": "/settings" };
 			let leader = 0;
 			document.addEventListener("keydown", (event) => {
@@ -163,7 +192,12 @@ templ appShellScript() {
 					leader = 0;
 					event.preventDefault();
 					const base = document.querySelector("[data-app-base]");
-					if (base) location.assign(base.dataset.appBase + places[event.key]);
+					if (!base) return;
+					// The sidebar link swaps the page like a click on it.
+					const url = base.dataset.appBase + places[event.key];
+					const link = document.querySelector(`#sidebar-nav a[href="${url}"]`);
+					if (link) link.click();
+					else location.assign(url);
 					return;
 				}
 				leader = 0;

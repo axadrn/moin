@@ -80,6 +80,52 @@ highlighted item. To change the look, change the style or `--radius`, not a
 page. Marketing illustrations (terminal, chat, the product frame) keep their
 own shapes.
 
+## Navigation
+
+htmx boosted navigation (swap `#main`) for every click inside the app:
+sidebar nav, app list, tabs, settings. Full page loads only where the
+context changes: sign in/out, switching workspace, the Stripe checkout
+redirect, and the first load.
+
+How it works (`internal/ui/layouts/app.templ`, `appBoost`):
+
+- The body of every control panel page carries
+  `hx-boost:inherited='{"target":"#main","select":"#main","swap":"outerHTML","selectOOB":"#sidebar-nav,#app-header"}'`.
+  Every plain link and form inside the app is boosted without any attribute
+  of its own: htmx fetches the full page, swaps its `#main` and brings the
+  sidebar places (`#sidebar-nav`) and the top bar with the path
+  (`#app-header`) along, pushes the URL and updates the title. The apps list
+  reloads itself after every push. Reload, back and a link opened directly
+  give the full page, as every route still renders one.
+- A tab is a plain `<a href>` to its own URL that renders the full page with
+  that tab open. Do not add `hx-get`, `hx-target` or `hx-push-url` to it: the
+  boost does all of it. Elements with their own `hx-get`/`hx-post` are not
+  boosted and keep working as before.
+- A part that refreshes itself (`hx-get` with `hx-trigger="… from:body"`)
+  renders its content with the page and may carry `hx-swap-oob="true"` for
+  its fragment answer: a boosted answer drops those markers, so the part
+  stays in `#main`. Never leave a part empty until an event fills it.
+- A link that changes the context opts out with `hx-boost="false"`: another
+  workspace, `/workspaces/new`, `/admin`, sign in and out. A link to a page
+  outside the panel (no `#main`) loads as a full page by itself; a link with
+  `target="_blank"`, `mailto:` or another origin is never boosted. Forms
+  that end in a redirect (checkout, sign out) answer with `HX-Redirect`
+  through `redirect()`, which loads the whole page.
+- Scripts in swapped content run again with the page's nonce
+  (`inlineScriptNonce`). A page script runs once per visit, so it binds to
+  its own elements (`document.currentScript.closest(...)`), never once per
+  document. When it must listen on `document` or `window`, or holds an
+  `EventSource` or timer, it stops all of it when the page goes:
+
+  ```js
+  const gone = new AbortController();
+  document.addEventListener("htmx:before:history:update", () => gone.abort(), { once: true });
+  document.addEventListener("click", onClick, { signal: gone.signal });
+  gone.signal.addEventListener("abort", () => events.close());
+  ```
+
+  Never wait for `DOMContentLoaded` or `load`: they do not fire after a swap.
+
 ## Status
 
 Every status shows as a colored dot or symbol plus a word, everywhere:

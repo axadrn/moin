@@ -15,7 +15,7 @@ templ AppSidebarAccountLinks() {
 		Settings
 	}
 	if ctxkeys.IsAdmin(ctx) {
-		@dropdown.Item(dropdown.ItemProps{Href: "/admin"}) {
+		@dropdown.Item(dropdown.ItemProps{Href: "/admin", Attributes: fullLoad}) {
 			@icon.Shield()
 			Admin
 		}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -87,7 +88,9 @@ func (h *AppsHandler) newestDeploys(workspaceID string, apps []model.App) map[st
 	return newest
 }
 
-// Nav answers the apps in the sidebar. at is the page the sidebar is on.
+// Nav answers the apps in the sidebar. htmx names the page the sidebar is
+// on in HX-Current-URL, so the app open there is marked, also after a
+// boosted swap.
 func (h *AppsHandler) Nav(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	apps, err := h.apps.List(workspace.ID)
@@ -95,7 +98,11 @@ func (h *AppsHandler) Nav(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list apps failed", err)
 		return
 	}
-	render(w, r, pages.AppsNav(apps, r.URL.Query().Get("at")))
+	var at string
+	if current, err := url.Parse(r.Header.Get("HX-Current-URL")); err == nil {
+		at = current.Path
+	}
+	render(w, r, pages.AppsNav(apps, at))
 }
 
 // Create adds an app and answers the reset form. The event stream reloads the table.

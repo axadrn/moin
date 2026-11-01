@@ -25,3 +25,18 @@ func TestImmutableAssetPathPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestFontAssetPathPattern(t *testing.T) {
+	t.Parallel()
+
+	for path, want := range map[string]bool{
+		"fonts/geist/geist-variable.woff2":              true,
+		"/fonts/bricolage/bricolage-grotesque-bold.ttf": true,
+		"/fonts/geist/README.md":                        false,
+		"/css/output.css":                               false,
+	} {
+		if got := fontAssetPathPattern.MatchString(path); got != want {
+			t.Errorf("fontAssetPathPattern.MatchString(%q) = %t, want %t", path, got, want)
+		}
+	}
+}
