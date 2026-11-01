@@ -260,15 +260,25 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		return fmt.Errorf("start: %w", err)
 	}
 	// A process that crashes right after starting passes --wait without a
-	// healthcheck. Give it a moment.
+	// healthcheck, and with its restart policy it may even be running again
+	// a moment later. Give it a moment and count its restarts meanwhile.
+	restarts := func() string {
+		ids, _ := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "-a", "-q", detected.Service)
+		if len(strings.Fields(ids)) == 0 {
+			return ""
+		}
+		count, _ := a.output(ctx, "docker", "inspect", "-f", "{{.RestartCount}}", strings.Fields(ids)[0])
+		return strings.TrimSpace(count)
+	}
+	before := restarts()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 	}
 	running, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
-	if err != nil || strings.TrimSpace(running) == "" {
-		return fmt.Errorf("service %s stopped right after it started; see ops logs", detected.Service)
+	if err != nil || strings.TrimSpace(running) == "" || restarts() != before {
+		return fmt.Errorf("service %s keeps stopping right after it starts; see ops logs", detected.Service)
 	}
 	if detected.Config == nil || detected.Config.Health == "" {
 		return nil
