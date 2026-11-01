@@ -216,13 +216,16 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	answer := func(messageType protocol.MessageType, data any) {
+	// answer waits for the request of the given type: what the agent gets on
+	// connect may arrive in between.
+	answer := func(requestType, messageType protocol.MessageType, data any) {
 		var request protocol.Message
 		for request.RequestID == "" {
 			agent.mu.Lock()
-			// The backup config the agent gets on connect is not the request.
-			if len(agent.sent) > 0 && agent.sent[len(agent.sent)-1].Type != protocol.TypeBackupConfig {
-				request = agent.sent[len(agent.sent)-1]
+			for _, sent := range agent.sent {
+				if sent.Type == requestType {
+					request = sent
+				}
 			}
 			agent.mu.Unlock()
 			time.Sleep(time.Millisecond)
@@ -232,7 +235,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 		servers.Receive(server.ID, message)
 	}
 
-	go answer(protocol.TypeLogsResult, protocol.LogsResult{Lines: []string{"web-1  | hello"}})
+	go answer(protocol.TypeLogs, protocol.TypeLogsResult, protocol.LogsResult{Lines: []string{"web-1  | hello"}})
 	lines, err := apps.Logs(context.Background(), owner.WorkspaceID, "blog", 10)
 	if err != nil || len(lines) != 1 {
 		t.Fatalf("logs = %v, %v", lines, err)
@@ -241,7 +244,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	agent.mu.Lock()
 	agent.sent = nil
 	agent.mu.Unlock()
-	go answer(protocol.TypeError, protocol.Error{Message: "docker is not running"})
+	go answer(protocol.TypeAppRemove, protocol.TypeError, protocol.Error{Message: "docker is not running"})
 	err = apps.Delete(context.Background(), owner, "blog")
 	var agentErr *AgentError
 	if !errors.As(err, &agentErr) || agentErr.Message != "docker is not running" {
@@ -257,7 +260,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	agent.mu.Lock()
 	agent.sent = nil
 	agent.mu.Unlock()
-	go answer(protocol.TypeOK, nil)
+	go answer(protocol.TypeAppRemove, protocol.TypeOK, nil)
 	err = apps.Delete(context.Background(), owner, "blog")
 	if err != nil {
 		t.Fatal(err)
