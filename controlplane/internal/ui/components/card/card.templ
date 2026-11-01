@@ -67,7 +67,7 @@ templ Card(props ...Props) {
 		}
 		data-slot="card"
 		data-size={ string(p.Size) }
-		class={ utils.CN("ops-panel gap-(--card-spacing) overflow-hidden py-(--card-spacing) text-sm [--card-spacing:--spacing(6)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-[22px] *:[img:last-child]:rounded-b-[22px] group/card flex flex-col", p.Class) }
+		class={ utils.CN("bg-card text-card-foreground ring-foreground/5 dark:ring-foreground/10 gap-(--card-spacing) overflow-hidden rounded-4xl py-(--card-spacing) text-sm shadow-md ring-1 [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-4xl *:[img:last-child]:rounded-b-4xl group/card flex flex-col", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -86,7 +86,7 @@ templ Header(props ...HeaderProps) {
 		data-slot="card-header"
 		class={
 			utils.CN(
-				"gap-1 rounded-t-[22px] px-(--card-spacing) [.border-b]:pb-(--card-spacing) group/card-header @container/card-header grid auto-rows-min items-start has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+				"gap-1.5 rounded-t-4xl px-(--card-spacing) [.border-b]:pb-(--card-spacing) group/card-header @container/card-header grid auto-rows-min items-start has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
 				p.Class,
 			),
 		}
@@ -106,7 +106,7 @@ templ Title(props ...TitleProps) {
 			id={ p.ID }
 		}
 		data-slot="card-title"
-		class={ utils.CN("text-[1.25rem] leading-tight font-bold tracking-[-0.02em] group-data-[size=sm]/card:text-base", p.Class) }
+		class={ utils.CN("text-base font-medium font-heading", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -180,7 +180,7 @@ templ Footer(props ...FooterProps) {
 			id={ p.ID }
 		}
 		data-slot="card-footer"
-		class={ utils.CN("bg-muted/40 rounded-b-[22px] border-t px-(--card-spacing) py-4 flex items-center", p.Class) }
+		class={ utils.CN("rounded-b-4xl px-(--card-spacing) [.border-t]:pt-(--card-spacing) flex items-center", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }

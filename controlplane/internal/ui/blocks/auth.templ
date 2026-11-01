@@ -12,14 +12,12 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 )
 
-// AuthPrimary is the class of the main button on auth pages.
-const AuthPrimary = "h-12 w-full rounded-full bg-brand text-[15px] font-semibold text-brand-foreground hover:bg-brand hover:opacity-85"
+// AuthPrimary is the class of the main button on auth pages: full width,
+// the shape and height come from the theme.
+const AuthPrimary = "w-full"
 
-// AuthSecondary is the class of the other buttons: gray pills.
-const AuthSecondary = "h-12 w-full rounded-full border-0 bg-secondary text-[15px] font-semibold shadow-none hover:bg-secondary hover:opacity-80 dark:bg-secondary dark:hover:bg-secondary"
-
-// AuthInput is the class of the inputs: white or dark gray fields on the ground.
-const AuthInput = "h-12 rounded-[14px] border-0 bg-card px-4 text-[15px] shadow-none dark:bg-card"
+// AuthSecondary is the class of the other buttons on auth pages.
+const AuthSecondary = "w-full"
 
 // AuthShell is the split auth screen: the form on the left, what happens
 // after sign-up on the right.
@@ -73,10 +71,10 @@ templ authCmd(command string) {
 templ authAside() {
 	{{ host := authHost(ctxkeys.RenderConfig(ctx).AppURL) }}
 	<aside class="hidden p-3 lg:flex">
-		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex flex-1 items-center rounded-[32px] bg-card"}) {
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex flex-1 items-center"}) {
 			<div class="mx-auto w-full max-w-xl px-12 py-16">
 				<h2 class="font-display text-[2.6rem] leading-[1.02] text-balance">From a fresh server to a live app in five minutes.</h2>
-				<ol class="mt-10 divide-y divide-border rounded-[22px] bg-background">
+				<ol class="mt-10 divide-y divide-border rounded-3xl bg-background">
 					@authStep("1", "Install ops on your computer") {
 						@authCmd("go install github.com/axadrn/ops/cmd/ops@latest")
 					}

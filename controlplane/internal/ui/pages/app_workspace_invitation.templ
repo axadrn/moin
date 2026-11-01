@@ -37,12 +37,12 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 				}
 				@card.Content() {
 					if errorMessage != "" {
-						<div class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+						<div class="mb-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
 							{ errorMessage }
 						</div>
 					}
 					if invitation != nil && user != nil {
-						<div class="mb-5 rounded-lg border bg-muted/40 p-4 text-sm">
+						<div class="mb-5 rounded-2xl border bg-muted/40 p-4 text-sm">
 							<p class="font-medium">Signed in as { user.Email }</p>
 							<p class="mt-1 text-muted-foreground">This must match { invitation.Email }.</p>
 						</div>

@@ -56,7 +56,7 @@ templ AppRepo(view RepoView) {
 			} else if !view.Connected {
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<p class="max-w-xl text-sm text-muted-foreground">Connect GitHub to deploy a branch or commit from here, without a checkout, and on every push. ops writes the result as a commit status.</p>
-					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath, Variant: button.VariantBrand, Size: button.SizeLg, Attributes: templ.Attributes{"data-connect-github": true}}) {
+					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath, Variant: button.VariantDefault, Attributes: templ.Attributes{"data-connect-github": true}}) {
 						@icons.Github(icons.Props{Class: "size-4"})
 						Connect GitHub
 					}
@@ -67,13 +67,15 @@ templ AppRepo(view RepoView) {
 					<div class="flex min-w-0 flex-col gap-1">
 						<label for="link-repo" class="text-xs font-semibold">Repo</label>
 						@selectcomp.Select(selectcomp.Props{Name: "repo", Required: true, DefaultValue: firstRepo(view.Repos), Items: repoItems(view.Repos)}) {
-							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 rounded-xl font-mono text-[0.8125rem] data-[size=default]:h-10"}) {
+							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 font-mono"}) {
 								@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No repo"})
 							}
 							@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-								for _, repo := range view.Repos {
-									@selectcomp.Item(selectcomp.ItemProps{Value: repo.FullName, Class: "font-mono text-[0.8125rem]"}) {
-										{ repo.FullName }
+								@selectcomp.Group() {
+									for _, repo := range view.Repos {
+										@selectcomp.Item(selectcomp.ItemProps{Value: repo.FullName, Class: "font-mono"}) {
+											{ repo.FullName }
+										}
 									}
 								}
 							}
@@ -81,10 +83,10 @@ templ AppRepo(view RepoView) {
 					</div>
 					<label class="flex min-w-0 flex-col gap-1">
 						<span class="text-xs font-semibold">Branch</span>
-						@input.Input(input.Props{Name: "branch", Placeholder: "default branch", Class: "font-mono text-[0.8125rem] md:text-[0.8125rem]", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
+						@input.Input(input.Props{Name: "branch", Placeholder: "default branch", Class: "font-mono", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
 					</label>
 					<div class="flex items-end">
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Class: "w-full"}) {
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault, Class: "w-full"}) {
 							Link
 						}
 					</div>
@@ -114,14 +116,13 @@ templ AppRepo(view RepoView) {
 						<form class="flex gap-2" hx-post={ appPath + "/repo/deploy" } { swap... } data-deploy-ref>
 							@csrf.Token()
 							<label for="deploy-ref" class="sr-only">Branch, tag or commit</label>
-							@input.Input(input.Props{ID: "deploy-ref", Name: "ref", Placeholder: view.App.Branch, Class: "w-40 font-mono text-[0.8125rem] md:text-[0.8125rem]", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
-							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+							@input.Input(input.Props{ID: "deploy-ref", Name: "ref", Placeholder: view.App.Branch, Class: "w-40 font-mono", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
 								Deploy
 							}
 						</form>
 						@button.Button(button.Props{
 							Variant:    button.VariantGhost,
-							Size:       button.SizeLg,
 							Class:      "px-3 text-muted-foreground hover:bg-transparent hover:text-failed",
 							Attributes: utils.MergeAttributes(swap, templ.Attributes{"hx-post": appPath + "/repo/unlink", "hx-confirm": "Stop following " + view.App.Repo + "?"}),
 						}) {

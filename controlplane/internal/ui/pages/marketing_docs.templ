@@ -105,16 +105,16 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 						}
 						<div class="ml-auto flex items-center gap-1">
 							@docsSearch(docsTree)
-							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "ops on GitHub"}}) {
+							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "ops on GitHub"}}) {
 								@icons.Github(icons.Props{Class: "size-4"})
 							}
 							@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground hover:text-foreground"})
 							if ctxkeys.User(ctx) != nil {
-								@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Class: "ml-1.5 text-[13.5px]"}) {
+								@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Class: "ml-1.5 text-[13.5px]"}) {
 									Dashboard
 								}
 							} else {
-								@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Class: "ml-1.5 text-[13.5px]"}) {
+								@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Class: "ml-1.5 text-[13.5px]"}) {
 									Get started
 								}
 							}
@@ -380,7 +380,7 @@ templ docsPager(page *model.DocPage, label string, next bool) {
 		hx-sync="#docs-content-wrapper:replace"
 		hx-status:4xx="swap:none push:false"
 		hx-status:5xx="swap:none push:false"
-		class={ "group flex flex-col gap-1 rounded-[20px] bg-card px-6 py-5 transition-opacity hover:opacity-80", templ.KV("sm:items-end sm:text-right", next) }
+		class={ "group flex flex-col gap-1 rounded-4xl bg-card px-6 py-5 transition-opacity hover:opacity-80", templ.KV("sm:items-end sm:text-right", next) }
 	>
 		<span class="text-[13px] text-muted-foreground">{ label }</span>
 		<span class="flex items-center gap-1.5 font-medium">

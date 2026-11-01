@@ -87,7 +87,7 @@ templ ServerSecurity(view SecurityView) {
 						@securityToggle("ssh_tailscale", "SSH only on Tailscale", "The server joins your tailnet; SSH answers there and nowhere else. It only closes once Tailscale is up.", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Add a Tailscale auth key below first.")
 						@securityToggle("firewall", "Firewall", "Drops every inbound connection the server does not need. Open stays only what the switches above leave open.", view.Server.Firewall, false, "")
 						<div class="flex justify-end py-4">
-							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
 								Apply
 							}
 						</div>
@@ -129,7 +129,7 @@ templ ServerSecurity(view SecurityView) {
 									<span class="font-normal text-live">stored · account { view.Integrations.CloudflareAccount }</span>
 								}
 							</span>
-							@input.Input(input.Props{Name: "cloudflare_token", Type: "password", Placeholder: "Tunnel Edit, DNS Edit, Zone Settings Edit", Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off"}})
+							@input.Input(input.Props{Name: "cloudflare_token", Type: "password", Placeholder: "Tunnel Edit, DNS Edit, Zone Settings Edit", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off"}})
 						</label>
 						<label class="flex min-w-0 flex-col gap-1">
 							<span class="text-xs font-semibold">
@@ -138,10 +138,10 @@ templ ServerSecurity(view SecurityView) {
 									<span class="font-normal text-live">stored</span>
 								}
 							</span>
-							@input.Input(input.Props{Name: "tailscale_key", Type: "password", Placeholder: "tskey-auth-…, reusable", Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off"}})
+							@input.Input(input.Props{Name: "tailscale_key", Type: "password", Placeholder: "tskey-auth-…, reusable", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off"}})
 						</label>
 						<div class="flex justify-end sm:col-span-2">
-							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg}) {
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 								Save keys
 							}
 						</div>

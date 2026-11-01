@@ -93,7 +93,7 @@ type SeparatorProps struct {
 // 1:1 base/ui/item.tsx: structure lives here, the look comes from the
 // active style-*.css via the classes.
 func itemClasses(variant Variant, size Size) string {
-	base := "[a]:hover:bg-muted rounded-lg border text-sm group/item flex w-full flex-wrap items-center transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors"
+	base := "[a]:hover:bg-muted rounded-2xl border text-sm group/item flex w-full flex-wrap items-center transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors"
 	return utils.CN(base, variantClasses(variant), sizeClasses(size))
 }
 
@@ -111,11 +111,11 @@ func variantClasses(variant Variant) string {
 func sizeClasses(size Size) string {
 	switch size {
 	case SizeSm:
-		return "gap-2.5 px-3 py-2.5"
+		return "gap-3.5 px-3.5 py-3"
 	case SizeXs:
-		return "gap-2 px-2.5 py-2 in-data-[slot=dropdown-menu-content]:p-0"
+		return "gap-2.5 px-3 py-2.5 in-data-[slot=dropdown-menu-content]:p-0"
 	default:
-		return "gap-2.5 px-3 py-2.5"
+		return "gap-3.5 px-4 py-3.5"
 	}
 }
 
@@ -124,7 +124,7 @@ func mediaClasses(variant MediaVariant) string {
 	case MediaVariantIcon:
 		return "[&_svg:not([class*='size-'])]:size-4"
 	case MediaVariantImage:
-		return "size-10 overflow-hidden rounded-sm group-data-[size=sm]/item:size-8 group-data-[size=xs]/item:size-6 [&_img]:size-full [&_img]:object-cover"
+		return "size-10 overflow-hidden rounded-xl group-data-[size=sm]/item:size-8 group-data-[size=xs]/item:size-6 group-data-[size=xs]/item:rounded-lg [&_img]:size-full [&_img]:object-cover"
 	default:
 		return "bg-transparent"
 	}
@@ -222,7 +222,7 @@ templ Content(props ...ContentProps) {
 	if len(props) > 0 {
 		{{ p = props[0] }}
 	}
-	{{ class := "gap-1 group-data-[size=xs]/item:gap-0 flex flex-1 flex-col [&+[data-slot=item-content]]:flex-none" }}
+	{{ class := "gap-1 group-data-[size=xs]/item:gap-0.5 flex flex-1 flex-col [&+[data-slot=item-content]]:flex-none" }}
 	{{ class = utils.CN(class, p.Class) }}
 	<div
 		if p.ID != "" {
@@ -258,7 +258,7 @@ templ Description(props ...DescriptionProps) {
 	if len(props) > 0 {
 		{{ p = props[0] }}
 	}
-	{{ class := "text-muted-foreground text-left text-sm leading-normal group-data-[size=xs]/item:text-xs line-clamp-2 font-normal [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary" }}
+	{{ class := "text-muted-foreground text-left text-sm line-clamp-2 font-normal [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary" }}
 	{{ class = utils.CN(class, p.Class) }}
 	<p
 		if p.ID != "" {

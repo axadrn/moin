@@ -95,7 +95,7 @@ templ AppRouting(view RoutingView) {
 				<form class="flex flex-col gap-2 sm:flex-row" hx-post={ routingPath + "/add" } hx-target="#app-routing" hx-swap="outerHTML">
 					@csrf.Token()
 					<label for="domain-name" class="sr-only">Domain</label>
-					@input.Input(input.Props{ID: "domain-name", Name: "domain", Type: "text", Placeholder: "blog.de", Class: "min-w-0 font-mono text-sm", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+					@input.Input(input.Props{ID: "domain-name", Name: "domain", Type: "text", Placeholder: "blog.de", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-add-domain": true}}) {
 						Add domain
 					}
@@ -140,9 +140,9 @@ templ AppRouting(view RoutingView) {
 					<form class="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto]" hx-post={ routingPath + "/protect" } hx-target="#app-routing" hx-swap="outerHTML">
 						@csrf.Token()
 						<label for="protect-user" class="sr-only">Username</label>
-						@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "ops", Class: "text-sm", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+						@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "ops", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
 						<label for="protect-password" class="sr-only">Password</label>
-						@input.Input(input.Props{ID: "protect-password", Name: "password", Type: "password", Placeholder: "8+ characters", Class: "min-w-0 text-sm", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "minlength": "8"}})
+						@input.Input(input.Props{ID: "protect-password", Name: "password", Type: "password", Placeholder: "8+ characters", Class: "min-w-0", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "minlength": "8"}})
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Attributes: templ.Attributes{"data-protect": true}}) {
 							Protect
 						}

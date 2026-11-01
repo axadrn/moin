@@ -47,7 +47,7 @@ templ AppBackups(view BackupsView) {
 				if view.Storage != nil && len(view.Backups.Databases) > 0 {
 					<form hx-post={ basePath + "/apps/" + view.App.Name + "/backups/now" } hx-target="#app-backups" hx-select="#app-backups" hx-swap="outerHTML">
 						@csrf.Token()
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Attributes: templ.Attributes{"data-back-up": true}}) {
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault, Attributes: templ.Attributes{"data-back-up": true}}) {
 							Back up now
 						}
 					</form>
@@ -74,7 +74,7 @@ templ AppBackups(view BackupsView) {
 							@empty.Description(empty.DescriptionProps{Class: "mt-1.5 max-w-xl text-sm"}) {
 								Add one S3-compatible bucket for all your apps, and every SQLite database is backed up from then on. The same bucket carries your code on ops deploy.
 							}
-							@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Variant: button.VariantBrand, Size: button.SizeLg, Class: "mt-5 h-11 px-6", Attributes: templ.Attributes{"data-add-bucket": true}}) {
+							@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Variant: button.VariantDefault, Class: "mt-5", Attributes: templ.Attributes{"data-add-bucket": true}}) {
 								Add your bucket
 							}
 						}
@@ -185,10 +185,10 @@ templ databaseBackup(view BackupsView, database protocol.DatabaseBackup) {
 					Name:       "at",
 					Value:      pointInTimeValue(database.ReplicatedAt),
 					Required:   true,
-					Class:      "font-mono text-[0.8125rem] md:text-[0.8125rem]",
+					Class:      "font-mono",
 					Attributes: pointInTimeAttrs(database.Since, database.ReplicatedAt),
 				})
-				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg, Disabled: database.Since == nil}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Disabled: database.Since == nil}) {
 					Restore to this time
 				}
 			</form>
@@ -249,7 +249,7 @@ templ storageField(name, label, placeholder, note, kind string, wide bool) {
 				<span class="font-normal text-muted-foreground">{ note }</span>
 			}
 		</span>
-		@input.Input(input.Props{Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
+		@input.Input(input.Props{Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
 	</label>
 }
 

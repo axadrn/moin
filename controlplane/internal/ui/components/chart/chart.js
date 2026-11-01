@@ -23,7 +23,7 @@
  * (xAxisHeight 0, minTickGap 5, tickCount 5, innerRadius 0).
  */
 
-const TOOLTIP_CLASS = "border-border/50 bg-background gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl grid min-w-32 items-start";
+const TOOLTIP_CLASS = "bg-popover text-popover-foreground ring-foreground/5 dark:ring-foreground/10 gap-1.5 rounded-xl px-2.5 py-1.5 text-xs shadow-lg ring-1 grid min-w-32 items-start";
 
 /* ---------------------------------------------------------------- */
 /* Geometry (ports of the Go engine)                                */

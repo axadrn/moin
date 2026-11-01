@@ -106,9 +106,11 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 					@selectcomp.Value()
 				}
 				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					for _, item := range apiTokenAccessItems {
-						@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
-							{ item.Label.(string) }
+					@selectcomp.Group() {
+						for _, item := range apiTokenAccessItems {
+							@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
+								{ item.Label.(string) }
+							}
 						}
 					}
 				}
@@ -131,9 +133,11 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 					@selectcomp.Value()
 				}
 				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					for _, item := range apiTokenExpiryItems {
-						@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
-							{ item.Label.(string) }
+					@selectcomp.Group() {
+						for _, item := range apiTokenExpiryItems {
+							@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
+								{ item.Label.(string) }
+							}
 						}
 					}
 				}
@@ -154,9 +158,11 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 						@selectcomp.Value()
 					}
 					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-						for _, workspace := range view.Workspaces {
-							@selectcomp.Item(selectcomp.ItemProps{Value: workspace.ID}) {
-								{ workspace.Name }
+						@selectcomp.Group() {
+							for _, workspace := range view.Workspaces {
+								@selectcomp.Item(selectcomp.ItemProps{Value: workspace.ID}) {
+									{ workspace.Name }
+								}
 							}
 						}
 					}
@@ -192,11 +198,11 @@ templ APITokenList(view APITokensView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="api-token-list" hx-swap-oob="true">
 		if len(view.Tokens) == 0 {
-			<p class="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+			<p class="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
 				No API tokens yet. Create one to connect a script or an AI agent.
 			</p>
 		} else {
-			<div class="overflow-hidden rounded-lg border">
+			<div class="overflow-hidden rounded-2xl border">
 				@table.Table() {
 					@table.Header() {
 						@table.Row() {
@@ -286,7 +292,7 @@ templ APITokenReveal(raw string) {
 						Token
 					}
 					<div class="flex gap-2">
-						@input.Input(input.Props{ID: "api-token-value", Type: "text", Value: raw, ReadOnly: true, Class: "font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
+						@input.Input(input.Props{ID: "api-token-value", Type: "text", Value: raw, ReadOnly: true, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
 						@button.Button(button.Props{Type: "button", Variant: button.VariantOutline, Attributes: templ.Attributes{"data-api-token-copy": "api-token-value"}}) {
 							@icon.Copy(icon.Props{Class: "size-4"})
 							<span data-api-token-copy-label>Copy</span>

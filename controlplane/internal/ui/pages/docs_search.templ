@@ -15,13 +15,13 @@ import (
 // section of a page. ⌘K, ctrl+K or "/" opens it; enter goes there.
 templ docsSearch(tree *model.DocPage) {
 	@button.Button(button.Props{
-		Variant:    button.VariantGhost,
-		Class:      "h-8 w-9 gap-2 rounded-lg bg-muted px-0 text-[13px] font-normal tracking-normal text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-muted sm:w-56 sm:justify-start sm:px-3",
+		Variant:    button.VariantSecondary,
+		Class:      "w-9 px-0 font-normal text-muted-foreground sm:w-56 sm:justify-start sm:px-3",
 		Attributes: utils.MergeAttributes(dialog.TriggerFor("docs-search"), templ.Attributes{"aria-label": "Search the docs", "data-docs-search-open": true}),
 	}) {
 		@icon.Search(icon.Props{Class: "size-4 shrink-0"})
 		<span class="hidden sm:inline">Search the docs…</span>
-		@kbd.Kbd(kbd.Props{Class: "ml-auto hidden h-auto rounded border bg-background px-1.5 text-[11px] sm:inline-flex"}) {
+		@kbd.Kbd(kbd.Props{Class: "ml-auto hidden sm:inline-flex"}) {
 			⌘K
 		}
 	}

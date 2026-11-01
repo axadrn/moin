@@ -66,11 +66,11 @@ templ AppAddForm(servers []model.Server, name, server, nameError string) {
 				Type:        "text",
 				Value:       name,
 				Placeholder: "New app, e.g. blog",
-				Class:       "rounded-full px-4 font-mono text-[0.8125rem] placeholder:font-sans",
+				Class:       "font-mono placeholder:font-sans",
 				Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "app-name-error", "data-hotkey-focus": true},
 			})
 			if nameError != "" {
-				@field.Error(field.ErrorProps{ID: "app-name-error", Class: "font-normal px-4 text-xs text-failed"}) {
+				@field.Error(field.ErrorProps{ID: "app-name-error", Class: "font-normal px-3 text-xs text-failed"}) {
 					{ nameError }
 				}
 			}
@@ -78,18 +78,23 @@ templ AppAddForm(servers []model.Server, name, server, nameError string) {
 		<div class="flex gap-2">
 			<label for="app-server" class="sr-only">Server</label>
 			@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: appAddServer(servers, server), Items: appAddServerItems(servers), Disabled: len(servers) == 0}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-server", Class: "min-w-0 flex-1 rounded-full border-transparent bg-secondary pr-3 pl-4 font-medium data-[size=default]:h-10 sm:w-36 sm:flex-none dark:bg-white/[0.03]"}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-server", Class: "min-w-0 flex-1 sm:w-36 sm:flex-none"}) {
 					@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No server"})
 				}
 				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					for _, option := range servers {
-						@selectcomp.Item(selectcomp.ItemProps{Value: option.Name}) {
-							{ option.Name }
+					@selectcomp.Group() {
+						@selectcomp.Label() {
+							Servers
+						}
+						for _, option := range servers {
+							@selectcomp.Item(selectcomp.ItemProps{Value: option.Name}) {
+								{ option.Name }
+							}
 						}
 					}
 				}
 			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Disabled: len(servers) == 0}) {
+			@button.Button(button.Props{Type: button.TypeSubmit, Disabled: len(servers) == 0}) {
 				@icon.Plus(icon.Props{Class: "size-4"})
 				Add app
 			}
@@ -306,7 +311,6 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				<div class="flex shrink-0 gap-2.5">
 					@button.Button(button.Props{
 						Variant: button.VariantSecondary,
-						Size:    button.SizeLg,
 						Class:   "hover:bg-failed/15 hover:text-failed",
 						Attributes: templ.Attributes{
 							"hx-delete":  basePath + "/apps/" + app.Name,
@@ -318,8 +322,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 						Remove
 					}
 					@button.Button(button.Props{
-						Variant: button.VariantBrand,
-						Size:    button.SizeLg,
+						Variant: button.VariantDefault,
 						Attributes: templ.Attributes{
 							"hx-post":       basePath + "/apps/" + app.Name + "/redeploy",
 							"hx-swap":       "none",
@@ -592,8 +595,7 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 			if len(deploys) > deploysShown {
 				@button.Button(button.Props{
 					Variant:    button.VariantGhost,
-					Size:       button.SizeLg,
-					Class:      "mx-2 mb-2 gap-1.5 rounded-xl text-[0.8125rem] font-semibold text-muted-foreground hover:bg-muted/60",
+					Class:      "mx-2 mb-2 gap-1.5 text-muted-foreground",
 					Attributes: templ.Attributes{"data-show-all": true},
 				}) {
 					{ fmt.Sprintf("Show %d older", len(deploys)-deploysShown) }
@@ -762,10 +764,10 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 		>
 			@csrf.Token()
 			<label for="env-key" class="sr-only">Key</label>
-			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono text-xs sm:w-32 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-invalid": apiTokenInvalid(formError)}})
+			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono sm:w-32 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-invalid": apiTokenInvalid(formError)}})
 			<label for="env-value" class="sr-only">Value</label>
-			@input.Input(input.Props{ID: "env-value", Name: "value", Type: "password", Placeholder: "value", Class: "min-w-0 font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off"}})
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg, Class: "shrink-0"}) {
+			@input.Input(input.Props{ID: "env-value", Name: "value", Type: "password", Placeholder: "value", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off"}})
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0"}) {
 				Set
 			}
 		</form>

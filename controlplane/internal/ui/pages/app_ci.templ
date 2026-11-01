@@ -34,7 +34,7 @@ templ appCI(appName string) {
 				@csrf.Token()
 				<label for="image-ref" class="text-xs font-medium">Deploy image</label>
 				<div class="flex flex-col gap-2 sm:flex-row">
-					@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+					@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
 						@icon.Upload(icon.Props{Class: "size-3.5"})
 						Deploy image
@@ -98,7 +98,7 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 			}
 			@card.Content() {
 				if len(logins) > 0 {
-					<ul class="mb-4 divide-y rounded-md border" role="list">
+					<ul class="mb-4 divide-y rounded-2xl border" role="list">
 						for _, login := range logins {
 							<li data-registry={ login.Host }>
 								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex h-11 items-center gap-3 px-3 text-sm"}) {
@@ -129,11 +129,11 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 				>
 					@csrf.Token()
 					<label for="registry-host" class="sr-only">Host</label>
-					@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+					@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
 					<label for="registry-username" class="sr-only">Username</label>
-					@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Placeholder: "username", Class: "text-xs", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+					@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Placeholder: "username", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
 					<label for="registry-password" class="sr-only">Password or token</label>
-					@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Placeholder: "token", Class: "text-xs", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
+					@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Placeholder: "token", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 						Save
 					}

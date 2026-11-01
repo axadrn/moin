@@ -54,15 +54,15 @@ templ Navbar() {
 					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
 				</div>
 				if user != nil {
-					@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Size: button.SizeLg, Class: "ml-1 gap-1.5 text-[14px] sm:h-12 sm:px-6"}) {
+					@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 gap-1.5"}) {
 						Dashboard
 						@icon.ArrowRight(icon.Props{Class: "size-3.5"})
 					}
 				} else {
-					@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "hidden text-[14px] sm:inline-flex sm:h-12 sm:px-6"}) {
+					@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "hidden sm:inline-flex"}) {
 						Sign in
 					}
-					@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: "ml-1 text-[14px] sm:h-12 sm:px-6"}) {
+					@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1"}) {
 						Get started
 					}
 				}
@@ -100,14 +100,14 @@ templ MobileNav() {
 		</div>
 		<div class="space-y-2.5 border-t p-6">
 			if user != nil {
-				@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px]"}) {
+				@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
 					Dashboard
 				}
 			} else {
-				@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px]"}) {
+				@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
 					Get started
 				}
-				@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px] text-foreground"}) {
+				@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "flex w-full"}) {
 					Sign in
 				}
 			}

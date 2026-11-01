@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/access"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
@@ -14,7 +15,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
-	"fmt"
 )
 
 // workspaceRoleItems gives the role selects their labels, so the trigger
@@ -112,11 +112,13 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 									@selectcomp.Value()
 								}
 								@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-									@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleMember}) {
-										Member 
-									}
-									@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleAdmin}) {
-										Admin 
+									@selectcomp.Group() {
+										@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleMember}) {
+											Member 
+										}
+										@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleAdmin}) {
+											Admin 
+										}
 									}
 								}
 							}
@@ -138,7 +140,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				}
 			}
 			@card.Content() {
-				<div class="divide-y rounded-lg border">
+				<div class="divide-y rounded-2xl border">
 					for _, member := range members {
 						<div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
 							<div class="min-w-0">
@@ -163,20 +165,25 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 												@selectcomp.Value()
 											}
 											@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-												if viewer.Can(model.WorkspacePermissionManageOwners) {
-													@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleOwner}) {
-														Owner 
+												@selectcomp.Group() {
+													@selectcomp.Label() {
+														Role
 													}
-												}
-												@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleAdmin}) {
-													Admin 
-												}
-												@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleMember}) {
-													Member 
+													if viewer.Can(model.WorkspacePermissionManageOwners) {
+														@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleOwner}) {
+															Owner 
+														}
+													}
+													@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleAdmin}) {
+														Admin 
+													}
+													@selectcomp.Item(selectcomp.ItemProps{Value: model.WorkspaceRoleMember}) {
+														Member 
+													}
 												}
 											}
 										}
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
 											Save 
 										}
 									</form>
@@ -188,7 +195,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 										hx-disable="find button[type='submit']"
 									>
 										@csrf.Token()
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost}) {
 											Remove 
 										}
 									</form>
@@ -211,7 +218,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 					}
 				}
 				@card.Content() {
-					<div class="divide-y rounded-lg border">
+					<div class="divide-y rounded-2xl border">
 						for _, invitation := range invitations {
 							<div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
 								<div>
@@ -227,7 +234,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 										hx-disable="find button[type='submit']"
 									>
 										@csrf.Token()
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
 											Resend 
 										}
 									</form>
@@ -239,7 +246,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 										hx-disable="find button[type='submit']"
 									>
 										@csrf.Token()
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost}) {
 											Revoke 
 										}
 									</form>

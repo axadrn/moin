@@ -18,7 +18,7 @@ import (
 const (
 	homeWrap    = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
 	homeDisplay = "font-display leading-[0.95]"
-	homeSurface = "rounded-[24px] bg-card"
+	homeSurface = "rounded-4xl bg-card"
 )
 
 templ Home(network model.Network) {
@@ -47,10 +47,10 @@ templ Home(network model.Network) {
 }
 
 // homeCTA is the size of the big buttons of the home page.
-const homeCTA = "h-12 gap-2 px-7 text-[15px]"
+const homeCTA = "gap-2"
 
 templ homePrimary(label string) {
-	@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: homeCTA}) {
+	@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA}) {
 		{ label }
 		@icon.ArrowRight(icon.Props{Class: "size-4"})
 	}
@@ -87,7 +87,7 @@ templ HomeHero() {
 // homeTerminal is a real session: a deploy that snapshots the database
 // first, a wrong query, and the restore to the second before it.
 templ homeTerminal() {
-	<div class="ops-term min-w-0 overflow-hidden rounded-[24px] bg-terminal text-[13px] leading-[1.75] text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
+	<div class="ops-term min-w-0 overflow-hidden rounded-4xl bg-terminal text-[13px] leading-[1.75] text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
 		<div class="flex items-center gap-2 border-b border-terminal-foreground/10 px-5 py-3.5">
 			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
 			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
@@ -269,7 +269,7 @@ templ HomeWaysIn() {
 					@homeWayWeb()
 				}
 				@homeWay("CLI", "For your repo, scripts and CI.") {
-					<div class="ops-term overflow-x-auto rounded-[18px] bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]">
+					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]">
 						<p><span class="text-terminal-foreground/50">$ </span>ops rollback v12</p>
 						<p class="text-terminal-foreground/60">→ Rollback v14 of shop to v12 started</p>
 						<p class="text-live">✓ v14 of shop is live <span class="text-terminal-foreground/50">in 3s</span></p>
@@ -279,7 +279,7 @@ templ HomeWaysIn() {
 					@homeWayTUI()
 				}
 				@homeWay("AI agent", "Claude, Cursor or any MCP client.") {
-					<div class="flex flex-col gap-3 rounded-[18px] bg-background p-5 text-[15px] leading-6">
+					<div class="flex flex-col gap-3 rounded-3xl bg-background p-5 text-[15px] leading-6">
 						<p class="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background">shop is broken since the last deploy. Roll it back.</p>
 						<p class="self-start font-mono text-[12px] text-muted-foreground">rollback_app · shop</p>
 						<p class="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-card px-4 py-2.5">Rolled back. v14 of shop runs the release of v12, your data stays as it is.</p>
@@ -313,7 +313,7 @@ templ homeWay(name, text string) {
 
 // homeWayWeb is the deploy list of the app page, the pointer on v12.
 templ homeWayWeb() {
-	<div class="rounded-[18px] bg-background p-2 text-[14px]" aria-label="The deploy list of shop with a Roll back button on v12">
+	<div class="rounded-3xl bg-background p-2 text-[14px]" aria-label="The deploy list of shop with a Roll back button on v12">
 		@homeWayDeploy("v13", "live", "4m · 5s", false)
 		@homeWayDeploy("v12", "succeeded", "5m · 5s", true)
 		@homeWayDeploy("v11", "succeeded", "5m · 5s", false)
@@ -342,7 +342,7 @@ templ homeWayDeploy(number, status, when string, hover bool) {
 // homeWayTUI is the app screen of the terminal UI asking before the
 // rollback, as ops draws it.
 templ homeWayTUI() {
-	<div class="ops-term overflow-x-auto rounded-[18px] bg-terminal py-4 text-[12px] leading-[1.65] whitespace-pre text-terminal-foreground sm:text-[13px]" aria-label="The terminal UI asks before it rolls shop back">
+	<div class="ops-term overflow-x-auto rounded-3xl bg-terminal py-4 text-[12px] leading-[1.65] whitespace-pre text-terminal-foreground sm:text-[13px]" aria-label="The terminal UI asks before it rolls shop back">
 		<p class="px-5"><span class="font-semibold">ops</span>{ "   " }<span class="text-terminal-foreground/50">servers 1</span>{ "   apps › shop   " }<span class="text-terminal-foreground/50">activity</span></p>
 		<p class="mt-3 px-5">{ "  " }<span class="font-semibold">shop</span>{ "   " }<span class="text-live">● live v13</span></p>
 		<p class="mt-2 px-5 text-terminal-foreground/50">{ "  DEPLOY   STATUS        TOOK" }</p>
@@ -400,7 +400,7 @@ templ HomeData() {
 						The schema stays in your code: your migrations run on deploy, and { brand.Name } shows which one ran last.
 					</p>
 				</div>
-				<div class="ops-term self-center overflow-x-auto rounded-[18px] bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-[14px]">
+				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-[14px]">
 					<p><span class="text-terminal-foreground/50">$ </span>ops sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
 					<p class="mt-2 text-terminal-foreground/50">STATUS      COUNT(*)</p>
 					<p>delivered   38</p>
@@ -430,7 +430,7 @@ templ HomeNoDocker() {
 						Already have a Dockerfile or a compose.yml? It uses yours. Other languages bring their own Dockerfile.
 					</p>
 				</div>
-				<div class="self-center divide-y divide-border rounded-[18px] bg-background px-1">
+				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1">
 					@homeFile("go.mod", "your code", "")
 					@homeFile("Dockerfile", "written by ops", "")
 					@homeFile("compose.yml", "written by ops", "")
@@ -459,7 +459,7 @@ templ homeFile(name, note, kind string) {
 templ HomeStatement() {
 	<section class="pt-3">
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible text-background rounded-[28px] bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20"}) {
+			@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible text-background bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20"}) {
 				<p class={ homeDisplay, "text-[clamp(2.4rem,7.2vw,6rem)]" }>
 					<span class="block">Your servers.</span>
 					<span class="block">Your data.</span>
@@ -524,7 +524,7 @@ templ HomePricing() {
 						}
 					</div>
 				}
-				@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible text-background flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10", Attributes: templ.Attributes{"data-plan": "hosted"}}) {
+				@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible text-background flex flex-col bg-foreground p-7 text-background sm:p-10", Attributes: templ.Attributes{"data-plan": "hosted"}}) {
 					<p class="flex flex-wrap items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
 						Hosted
 						if !ctxkeys.RenderConfig(ctx).SignupsOpen {

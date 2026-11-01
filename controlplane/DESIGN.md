@@ -10,8 +10,8 @@ in iOS and macOS), not a website and not a dashboard template. The owner
 chose this look from three candidates (ops Looks artifact).
 
 - **Grouped and rounded.** Content sits in grouped lists and cards with big
-  radii (20–22 px on panels, 12 px on rows), soft system grays, no hairline
-  borders between panels; separators only between rows inside a group.
+  radii (see Geometry), soft system grays; separators only between rows
+  inside a group.
 - **Large titles.** Page titles big and heavy (`font-display`: Geist 800,
   tracking -0.03em), panel titles 20 px bold, like iOS large titles and
   section headers.
@@ -52,6 +52,32 @@ phrases ("supercharge", "unleash", "seamless", "effortless",
 Tailwind: `font-display` (Geist 800, tight), `bg-brand text-brand-foreground`, `text-live`,
 `bg-live/12`, `text-running`, `text-failed`, `bg-terminal`. Numbers
 `tabular-nums`.
+
+## Geometry
+
+One system, set globally, never per page. The components come from
+shadcn-templ in the `base-luma` style (`components.json`, applied with
+`shadcn-templ apply bKsE3bpA`: luma, stone, Geist, lucide), the corners from
+one token, `--radius: 0.5rem` in `assets/css/globals.css`, with the radius
+scale of the shadcn-templ theming docs (`sm` 0.6×, `md` 0.8×, `lg` 1×, `xl`
+1.4×, `2xl` 1.8×, `3xl` 2.2×, `4xl` 2.6×).
+
+| Part | Value |
+| --- | --- |
+| Input, select trigger, button (default), next to each other | 36 px high, pill |
+| Button `sm` / `lg` | 32 px / 40 px, pill |
+| Textarea, menu and command items | `rounded-2xl` (14.4 px) |
+| Select, dropdown and popover menus | `rounded-3xl` (17.6 px), 6 px padding around the items |
+| Cards, dialogs, panels | `rounded-4xl` (20.8 px) |
+| Boxes and rows inside a card | `rounded-2xl` or `rounded-xl` |
+
+Pages pass layout classes (width, margins, `font-mono`) to components, never
+heights, radii, paddings or colors of a control. Every select puts its items
+in `select.Group` (with a `select.Label` when nothing else names the list), every
+dropdown its items in `dropdown.Group`, so the open menu keeps space around the
+highlighted item. To change the look, change the style or `--radius`, not a
+page. Marketing illustrations (terminal, chat, the product frame) keep their
+own shapes.
 
 ## Status
 

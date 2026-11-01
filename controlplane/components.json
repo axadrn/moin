@@ -4,7 +4,7 @@
     "path": "/assets/js"
   },
   "$schema": "https://shadcn-templ.com/schema/components.json",
-  "style": "base-nova",
+  "style": "base-luma",
   "tailwind": {
     "css": "assets/css/globals.css",
     "baseColor": "stone",

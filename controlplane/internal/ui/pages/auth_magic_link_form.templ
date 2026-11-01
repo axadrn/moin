@@ -32,7 +32,6 @@ templ AuthMagicLinkForm(errorMsg string) {
 					Name:        "email",
 					Type:        "email",
 					Placeholder: "you@company.com",
-					Class:       blocks.AuthInput,
 					Attributes: templ.Attributes{
 						"aria-invalid": strconv.FormatBool(errorMsg != ""),
 						"autocomplete": "email",

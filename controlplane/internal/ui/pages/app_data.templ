@@ -213,7 +213,6 @@ templ dataTable(view DataView) {
 				if table.Type == "table" && !view.Schema {
 					@button.Button(button.Props{
 						Size:       button.SizeSm,
-						Class:      "bg-foreground text-xs text-background hover:bg-foreground/85 aria-expanded:bg-foreground aria-expanded:text-background",
 						Attributes: templ.Attributes{"data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"},
 					}) {
 						@icon.Plus(icon.Props{Class: "size-3.5"})
@@ -348,7 +347,7 @@ templ newRowForm(dataPath, database string, table protocol.DBTable) {
 						Type:        "text",
 						Name:        "value:" + column.Name,
 						Placeholder: newRowPlaceholder(column),
-						Class:       "h-9 px-3 font-mono text-[0.8125rem] md:text-[0.8125rem]",
+						Class:       "font-mono",
 						Attributes:  templ.Attributes{"spellcheck": "false", "autocomplete": "off"},
 					})
 				</label>
@@ -356,7 +355,7 @@ templ newRowForm(dataPath, database string, table protocol.DBTable) {
 		</div>
 		<div class="mt-3 flex items-center justify-between gap-3">
 			<span class="text-xs text-muted-foreground">Empty fields get the column's default.</span>
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeSm}) {
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
 				Add row
 			}
 		</div>
@@ -433,7 +432,7 @@ templ dataConsole(view DataView) {
 					@checkbox.Checkbox(checkbox.Props{Name: "write", Value: "1", Class: "data-checked:border-failed data-checked:bg-failed data-checked:text-white dark:data-checked:bg-failed"})
 					Allow changes
 				</label>
-				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
 					Run
 					@kbd.Kbd(kbd.Props{Class: "ml-1 hidden h-auto bg-transparent px-0 text-current opacity-60 sm:inline-flex"}) {
 						⌘↵

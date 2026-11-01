@@ -65,7 +65,7 @@ templ ServerAddForm(name, nameError string) {
 				Type:        "text",
 				Value:       name,
 				Placeholder: "Server name, e.g. web-1",
-				Class:       "rounded-full px-4 font-mono text-[0.8125rem] placeholder:font-sans",
+				Class:       "font-mono placeholder:font-sans",
 				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "server-name-error", "data-hotkey-focus": true},
 			})
 			if nameError != "" {
@@ -74,7 +74,7 @@ templ ServerAddForm(name, nameError string) {
 				}
 			}
 		</div>
-		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
 			@icon.Plus(icon.Props{Class: "size-4"})
 			Add server
 		}
@@ -100,7 +100,7 @@ templ ServerAdded(added AddedServer) {
 			<span class="ops-term-dim pt-1 select-none" aria-hidden="true">$</span>
 			<code id="install-command" class="min-w-0 flex-1 overflow-x-auto pt-1 pb-1 break-all whitespace-pre-wrap" data-install-command>{ added.Command }</code>
 			@button.Button(button.Props{
-				Variant:    button.VariantBrand,
+				Variant:    button.VariantDefault,
 				Size:       button.SizeSm,
 				Class:      "group/copy text-xs",
 				Attributes: templ.Attributes{"data-copy-target": "#install-command", "data-copy": ""},
@@ -262,7 +262,7 @@ func serverLastSeen(server model.Server, now time.Time) string {
 // the add form: the price and the way to Stripe Checkout.
 templ subscribeCard() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base text-background mt-6 overflow-hidden rounded-[28px] bg-foreground px-7 py-10 text-background sm:px-12 sm:py-14", Attributes: templ.Attributes{"data-subscribe": true}}) {
+	@card.Card(card.Props{Class: "block gap-0 py-0 text-base text-background mt-6 overflow-hidden bg-foreground px-7 py-10 text-background sm:px-12 sm:py-14", Attributes: templ.Attributes{"data-subscribe": true}}) {
 		<h2 class="font-display text-[clamp(2rem,4vw,3rem)] leading-none">Start ops.</h2>
 		<p class="mt-5 max-w-xl text-lg leading-8 text-background/70">
 			Unlimited servers and apps, continuous backups with daily restore drills, the data browser, the GitHub App. Cancel any time; your apps keep running on your servers.
@@ -272,7 +272,7 @@ templ subscribeCard() {
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
 				<input type="hidden" name="interval" value="monthly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "h-12 w-full bg-background px-7 text-[15px] text-foreground hover:bg-background/85 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full bg-background text-foreground hover:bg-background/85 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
 					$29 a month
 				}
 			</form>
@@ -280,7 +280,7 @@ templ subscribeCard() {
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
 				<input type="hidden" name="interval" value="yearly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "h-12 w-full bg-background/12 px-7 text-[15px] text-background hover:bg-background/20 sm:w-auto"}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full bg-background/12 text-background hover:bg-background/20 sm:w-auto"}) {
 					$290 a year, two months free
 				}
 			</form>

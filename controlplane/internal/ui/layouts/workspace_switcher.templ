@@ -23,30 +23,34 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 			@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4"})
 		}
 		@dropdown.Content(dropdown.ContentProps{Class: "w-72", Side: dropdown.SideBottom, Align: dropdown.AlignStart}) {
-			@dropdown.Label() {
-				Workspaces
-			}
-			for _, item := range workspaces {
-				@dropdown.Item(dropdown.ItemProps{Href: "/app/" + item.Slug + "/dashboard", Class: "py-2"}) {
-					@icon.Building2(icon.Props{Class: "size-4 shrink-0"})
-					<div class="min-w-0 flex-1">
-						<span class="block truncate">{ item.Name }</span>
-						<span class="block text-xs text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
-					</div>
-					if item.ID == current.ID {
-						@icon.Check(icon.Props{Class: "ml-auto size-4 shrink-0"})
-						<span class="sr-only">Current workspace</span>
+			@dropdown.Group() {
+				@dropdown.Label() {
+					Workspaces
+				}
+				for _, item := range workspaces {
+					@dropdown.Item(dropdown.ItemProps{Href: "/app/" + item.Slug + "/dashboard"}) {
+						@icon.Building2(icon.Props{Class: "size-4 shrink-0"})
+						<div class="min-w-0 flex-1">
+							<span class="block truncate">{ item.Name }</span>
+							<span class="block text-xs text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
+						</div>
+						if item.ID == current.ID {
+							@icon.Check(icon.Props{Class: "ml-auto size-4 shrink-0"})
+							<span class="sr-only">Current workspace</span>
+						}
 					}
 				}
 			}
 			@dropdown.Separator()
-			@dropdown.Item(dropdown.ItemProps{Href: "/app/" + current.Slug + "/workspace"}) {
-				@icon.Settings(icon.Props{Class: "size-4"})
-				Workspace settings
-			}
-			@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new"}) {
-				@icon.Plus(icon.Props{Class: "size-4"})
-				New workspace
+			@dropdown.Group() {
+				@dropdown.Item(dropdown.ItemProps{Href: "/app/" + current.Slug + "/workspace"}) {
+					@icon.Settings(icon.Props{Class: "size-4"})
+					Workspace settings
+				}
+				@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new"}) {
+					@icon.Plus(icon.Props{Class: "size-4"})
+					New workspace
+				}
 			}
 		}
 	}

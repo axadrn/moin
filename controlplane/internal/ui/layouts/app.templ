@@ -139,9 +139,13 @@ templ AppSidebarDropdown(user *model.User) {
 		}) {
 			@AppSidebarUserLabel(user)
 			@dropdown.Separator()
-			@AppSidebarAccountLinks()
+			@dropdown.Group() {
+				@AppSidebarAccountLinks()
+			}
 			@dropdown.Separator()
-			@AppSidebarLogout()
+			@dropdown.Group() {
+				@AppSidebarLogout()
+			}
 		}
 	}
 }

@@ -126,7 +126,7 @@ templ Accordion(props ...Props) {
 		}
 		class={
 			utils.CN(
-				"flex w-full flex-col",
+				"overflow-hidden rounded-2xl border flex w-full flex-col",
 				p.Class,
 			),
 		}
@@ -163,7 +163,7 @@ templ Item(props ...ItemProps) {
 		{ itemStateAttrs(ctx)... }
 		class={
 			utils.CN(
-				"not-last:border-b",
+				"data-open:bg-muted/50 not-last:border-b",
 				p.Class,
 			),
 		}
@@ -223,7 +223,7 @@ templ Trigger(props ...TriggerProps) {
 			aria-disabled={ utils.IfElse(itemDisabled(ctx), "true", "false") }
 			class={
 				utils.CN(
-					"focus-visible:ring-ring/50 focus-visible:border-ring focus-visible:after:border-ring **:data-[slot=accordion-trigger-icon]:text-muted-foreground rounded-lg py-2.5 text-left text-sm font-medium hover:underline focus-visible:ring-3 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent transition-all outline-none aria-disabled:pointer-events-none aria-disabled:opacity-50",
+					"**:data-[slot=accordion-trigger-icon]:text-muted-foreground gap-6 p-4 text-left text-sm font-medium hover:underline **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent transition-all outline-none aria-disabled:pointer-events-none aria-disabled:opacity-50",
 					p.Class,
 				),
 			}
@@ -259,13 +259,13 @@ templ Content(props ...ContentProps) {
 		data-slot="accordion-content"
 		{ itemStateAttrs(ctx)... }
 		hidden?={ !itemOpen(ctx) }
-		class="data-open:animate-accordion-down data-closed:animate-accordion-up text-sm overflow-hidden"
+		class="data-open:animate-accordion-down data-closed:animate-accordion-up px-4 text-sm overflow-hidden"
 		{ p.Attributes... }
 	>
 		<div
 			class={
 				utils.CN(
-					"pt-0 pb-2.5 h-(--accordion-panel-height) data-ending-style:h-0 data-starting-style:h-0 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+					"pt-0 pb-4 h-(--accordion-panel-height) data-ending-style:h-0 data-starting-style:h-0 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
 					p.Class,
 				),
 			}

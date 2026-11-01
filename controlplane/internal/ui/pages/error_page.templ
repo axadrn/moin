@@ -50,11 +50,11 @@ templ StatusScreen(code, title, description, line string) {
 				<span class="truncate">{ line }</span>
 			</p>
 			<div class="mt-10 flex flex-wrap gap-3">
-				@button.Button(button.Props{Href: "/", Variant: button.VariantBrand, Size: button.SizeLg, Class: "h-12 gap-2 px-6 text-[15px]"}) {
+				@button.Button(button.Props{Href: "/", Variant: button.VariantDefault, Size: button.SizeLg, Class: "gap-2"}) {
 					@icon.ArrowLeft(icon.Props{Class: "size-4"})
 					Back to home
 				}
-				@button.Button(button.Props{Href: "/docs", Variant: button.VariantGhost, Size: button.SizeLg, Class: "h-12 border-border px-6 text-[15px] text-foreground hover:bg-accent"}) {
+				@button.Button(button.Props{Href: "/docs", Variant: button.VariantGhost, Size: button.SizeLg, Class: "text-foreground"}) {
 					Read the docs
 				}
 			</div>

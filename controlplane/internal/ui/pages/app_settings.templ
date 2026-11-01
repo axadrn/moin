@@ -32,36 +32,36 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 		}
 		@panelPage() {
 			<div class="max-w-[52rem]">
-			@pageTitle("Settings", "Your profile, how you sign in, sessions and API tokens.")
-			@tabs.Tabs(tabs.Props{DefaultValue: activeTab, Class: "mt-8"}) {
-				@tabs.List(tabs.ListProps{Class: "w-full sm:w-fit sm:self-start"}) {
-					@tabs.Trigger(tabs.TriggerProps{Value: "profile", Class: "flex-1 sm:flex-none"}) {
-						@icon.User(icon.Props{Class: "size-4"})
-						Profile
-					}
-					@tabs.Trigger(tabs.TriggerProps{Value: "security", Class: "flex-1 sm:flex-none"}) {
-						@icon.Shield(icon.Props{Class: "size-4"})
-						Security
-					}
-				}
-				@tabs.Content(tabs.ContentProps{Value: "profile"}) {
-					<div class="mt-6 space-y-5">
-						@SettingsNameSection(user)
-						@SettingsAvatarSection(user)
-					</div>
-				}
-				@tabs.Content(tabs.ContentProps{Value: "security"}) {
-					<div class="mt-6 space-y-5">
-						@SettingsEmailSection(user)
-						@SettingsPasswordSection()
-						@SettingsSessionsSection(sessions, currentSessionID)
-						for _, section := range securitySections {
-							@section
+				@pageTitle("Settings", "Your profile, how you sign in, sessions and API tokens.")
+				@tabs.Tabs(tabs.Props{DefaultValue: activeTab, Class: "mt-8"}) {
+					@tabs.List(tabs.ListProps{Class: "w-full sm:w-fit sm:self-start"}) {
+						@tabs.Trigger(tabs.TriggerProps{Value: "profile", Class: "flex-1 sm:flex-none"}) {
+							@icon.User(icon.Props{Class: "size-4"})
+							Profile
 						}
-						@SettingsDangerZoneSection()
-					</div>
+						@tabs.Trigger(tabs.TriggerProps{Value: "security", Class: "flex-1 sm:flex-none"}) {
+							@icon.Shield(icon.Props{Class: "size-4"})
+							Security
+						}
+					}
+					@tabs.Content(tabs.ContentProps{Value: "profile"}) {
+						<div class="mt-6 space-y-5">
+							@SettingsNameSection(user)
+							@SettingsAvatarSection(user)
+						</div>
+					}
+					@tabs.Content(tabs.ContentProps{Value: "security"}) {
+						<div class="mt-6 space-y-5">
+							@SettingsEmailSection(user)
+							@SettingsPasswordSection()
+							@SettingsSessionsSection(sessions, currentSessionID)
+							for _, section := range securitySections {
+								@section
+							}
+							@SettingsDangerZoneSection()
+						</div>
+					}
 				}
-			}
 			</div>
 		}
 	}
@@ -79,11 +79,11 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 			}
 		}
 		@card.Content() {
-			<div class="divide-y rounded-lg border">
+			<div class="divide-y rounded-2xl border">
 				for _, session := range sessions {
 					<div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
 						<div class="flex min-w-0 items-start gap-3">
-							<div class="mt-0.5 rounded-md border bg-muted/50 p-2 text-muted-foreground">
+							<div class="mt-0.5 rounded-xl border bg-muted/50 p-2 text-muted-foreground">
 								@icon.Monitor(icon.Props{Class: "size-4"})
 							</div>
 							<div class="min-w-0 space-y-1">
@@ -101,9 +101,9 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 							</div>
 						</div>
 						@button.Button(button.Props{
-							Type:       "button",
-							Variant:    button.VariantOutline,
-							Class:      "w-full sm:w-auto",
+							Type:    "button",
+							Variant: button.VariantOutline,
+							Class:   "w-full sm:w-auto",
 							Attributes: templ.Attributes{
 								"hx-delete":  basePath + "/settings/sessions/" + session.ID,
 								"hx-swap":    "none",
@@ -121,8 +121,8 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 			</div>
 			<div class="mt-4 flex justify-end">
 				@button.Button(button.Props{
-					Type:       "button",
-					Variant:    button.VariantOutline,
+					Type:    "button",
+					Variant: button.VariantOutline,
 					Attributes: templ.Attributes{
 						"hx-delete":  basePath + "/settings/sessions",
 						"hx-swap":    "none",
@@ -318,11 +318,11 @@ templ SettingsPasswordSection() {
 											@button.Button(button.Props{
 												Attributes: utils.MergeAttributes(
 													dialog.Close(ctx),
-											templ.Attributes{
-												"hx-delete":  basePath + "/account/password",
-												"hx-swap":    "none",
-												"hx-disable": "this",
-											},
+													templ.Attributes{
+														"hx-delete":  basePath + "/account/password",
+														"hx-swap":    "none",
+														"hx-disable": "this",
+													},
 												),
 											}) {
 												Remove password
@@ -340,7 +340,7 @@ templ SettingsPasswordSection() {
 					} else {
 						<!-- Set password Form -->
 						<div class="space-y-4">
-							<div class="rounded-lg border bg-muted/50 p-4">
+							<div class="rounded-2xl border bg-muted/50 p-4">
 								<p class="text-sm text-muted-foreground">
 									Set a password to enable password-based sign in. You can still use magic links anytime.
 								</p>
@@ -406,7 +406,7 @@ templ SettingsDangerZoneSection() {
 		}
 		@card.Content() {
 			<div class="space-y-4">
-				<div class="rounded-md border border-destructive/30 bg-destructive/5 p-4">
+				<div class="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
 					<h3 class="mb-1 text-sm font-semibold text-destructive">Delete account</h3>
 					<p class="text-sm text-muted-foreground mb-4">
 						Your account, servers, apps and tokens are removed from ops for good. This cannot be undone.

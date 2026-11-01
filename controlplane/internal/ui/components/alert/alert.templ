@@ -47,7 +47,7 @@ templ Alert(props ...Props) {
 		role="alert"
 		class={
 			utils.CN(
-				"grid gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4 group/alert relative w-full",
+				"grid gap-0.5 rounded-2xl border px-4 py-3 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2.5 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4 group/alert relative w-full",
 				variantClasses(p.Variant),
 				p.Class,
 			),
@@ -113,7 +113,7 @@ templ Action(props ...ActionProps) {
 			id={ p.ID }
 		}
 		data-slot="alert-action"
-		class={ utils.CN("absolute top-2 right-2", p.Class) }
+		class={ utils.CN("absolute top-2.5 right-3", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
