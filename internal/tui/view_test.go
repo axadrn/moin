@@ -410,3 +410,21 @@ func TestViewFits(t *testing.T) {
 var escapes = regexp.MustCompile("\x1b\\[[0-9;:]*[A-Za-z]")
 
 func strip(text string) string { return escapes.ReplaceAllString(text, "") }
+
+// TestStopThenStart: once the stop went through, S starts the open app and
+// asks no second time to stop it.
+func TestStopThenStart(t *testing.T) {
+	m := frames()["detail"]
+	if m = press(m, "S"); m.mode != modeConfirmStop {
+		t.Fatalf("S on a running app asks nothing")
+	}
+	m = press(m, "y")
+	next, _ := m.Update(stoppedMsg("hello"))
+	m = next.(model)
+	if !m.detail.App.Stopped || !m.apps[0].Stopped {
+		t.Fatalf("the app does not know hello stopped")
+	}
+	if m = press(m, "S"); m.mode == modeConfirmStop {
+		t.Errorf("S on a stopped app asks to stop it again")
+	}
+}

@@ -86,7 +86,10 @@ type (
 		err    error
 	}
 	noticeMsg string
-	tickMsg   time.Time
+	// stoppedMsg names the app that went offline, so the open app knows
+	// before the live list says so.
+	stoppedMsg string
+	tickMsg    time.Time
 	// settingsMsg is what the settings tab shows.
 	settingsMsg settings
 )
@@ -302,6 +305,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case noticeMsg:
 		m.notice = string(msg)
+	case stoppedMsg:
+		name := string(msg)
+		m.notice = name + " stopped. Press S to start it again"
+		m.apps = slices.Clone(m.apps)
+		for i := range m.apps {
+			if m.apps[i].Name == name {
+				m.apps[i].Stopped = true
+			}
+		}
+		if m.detail != nil && m.detail.App.Name == name {
+			detail := *m.detail
+			detail.App.Stopped = true
+			m.detail = &detail
+		}
 	case errMsg:
 		m.err = msg.err
 	case streamErrMsg:
@@ -1243,7 +1260,7 @@ func (m model) stop(name string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		return noticeMsg(name + " stopped. Press S to start it again")
+		return stoppedMsg(name)
 	}
 }
 
