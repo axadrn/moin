@@ -107,6 +107,10 @@ Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Pas
 
 `SIGNUPS_OPEN=false` closes sign-up. New addresses go on a waitlist, and admins (`ADMIN_EMAILS`) let people in under **Admin**, **Waitlist**: they get a sign-in email and their workspace has everything unlocked. Invited teammates can always join.
 
+### Analytics
+
+Off by default. To count visitors with your own Umami, set `UMAMI_WEBSITE_ID` and, for a self-hosted Umami, `UMAMI_HOST` (like `umami.example.com`). The page then loads its script, and the content security policy allows it.
+
 ## Use it
 
 Sign up at your `APP_URL`, then point the CLI at it:
