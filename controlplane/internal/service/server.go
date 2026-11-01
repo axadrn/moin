@@ -47,6 +47,8 @@ type ServerService struct {
 	servers repository.ServerRepository
 	appURL  string
 	now     func() time.Time
+	// downloads holds the binaries agents update to.
+	downloads string
 
 	mu          sync.Mutex
 	sessions    map[string]*agentSession
@@ -69,6 +71,7 @@ func NewServerService(servers repository.ServerRepository, audit repository.Work
 		audit:       audit,
 		servers:     servers,
 		appURL:      strings.TrimRight(appURL, "/"),
+		downloads:   DownloadsDir,
 		now:         time.Now,
 		sessions:    map[string]*agentSession{},
 		subscribers: map[string]map[chan struct{}]struct{}{},

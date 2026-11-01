@@ -140,6 +140,17 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
+// Update has the server's agent swap its binary for the control plane's and
+// answers the server once the new agent is back.
+func (h *ServersHandler) Update(w http.ResponseWriter, r *http.Request) {
+	server, err := h.servers.UpdateAgent(r.Context(), actor(r), r.PathValue("id"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewServer(*server))
+}
+
 // Events streams the server list as server-sent events: once on connect and
 // again after every change.
 func (h *ServersHandler) Events(w http.ResponseWriter, r *http.Request) {

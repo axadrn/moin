@@ -171,6 +171,8 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "added the server " + target
 	case "server.removed":
 		return "removed the server " + target
+	case "server.agent_updated":
+		return "updated the agent of " + target + " from " + d["from"] + " to " + d["to"]
 	case "server.security_set":
 		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
 	default:

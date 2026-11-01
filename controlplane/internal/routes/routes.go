@@ -118,6 +118,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/list", workspace(servers.List))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers", workspace(servers.Create))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/servers/{id}", workspace(servers.Delete))
+	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/update", workspace(servers.UpdateAgent))
 	apps := handler.NewAppsHandler(app.AppService, app.ServerService)
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps", workspace(apps.AppsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/list", workspace(apps.List))

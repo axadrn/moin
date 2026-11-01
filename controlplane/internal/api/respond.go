@@ -204,6 +204,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrServerName, field: "name", message: "Name must contain between 1 and 64 characters."},
 	{err: repository.ErrServerHasApps, status: http.StatusConflict, code: "server_has_apps", message: "Remove the apps on this server first."},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to ops under Billing to add servers."},
+	{err: service.ErrNoAgentBinary, status: http.StatusConflict, code: "no_agent_binary", message: "This control plane serves no agent binary for the server's system. Update the agent on the server instead."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its agent and try again."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
 	{err: repository.ErrDuplicateApp, field: "name", message: "An app with this name already exists."},
