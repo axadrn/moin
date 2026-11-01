@@ -192,6 +192,9 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if _, err := apps.Rollback(owner, "blog", 2); !errors.Is(err, ErrNoRollback) {
 		t.Fatalf("rollback to a failed deploy: err = %v", err)
 	}
+	if _, err := apps.Rollback(owner, "blog", 9); !errors.Is(err, repository.ErrDeployNotFound) {
+		t.Fatalf("rollback to a deploy that does not exist: err = %v", err)
+	}
 
 	// v3 succeeds, then a rollback to v1 starts its release without env.
 	third, err := deployUpload(apps)

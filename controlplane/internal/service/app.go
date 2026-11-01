@@ -596,13 +596,17 @@ func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.
 				break
 			}
 		}
+		if number == 0 {
+			return nil, ErrNoRollback
+		}
 	}
+	// A deploy number that does not exist is not found.
 	target, err := s.apps.Deploy(app.ID, number)
-	if errors.Is(err, repository.ErrDeployNotFound) || (err == nil && target.Status != model.DeploySucceeded) {
-		return nil, ErrNoRollback
-	}
 	if err != nil {
 		return nil, err
+	}
+	if target.Status != model.DeploySucceeded {
+		return nil, ErrNoRollback
 	}
 	deploys, err := s.apps.ListDeploys(app.ID, 100)
 	if err != nil {
