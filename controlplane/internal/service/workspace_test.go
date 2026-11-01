@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/ops/controlplane/internal/access"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/testutil"
@@ -397,5 +398,39 @@ func TestWorkspaceSlugsTakeASuffixOnlyWhenTaken(t *testing.T) {
 	}
 	if personal.Slug != "ada-lovelace" || personal.Name != "Ada Lovelace's Workspace" {
 		t.Fatalf("default workspace = %q %q", personal.Name, personal.Slug)
+	}
+}
+
+func TestTheTrialComesOncePerPerson(t *testing.T) {
+	database, workspaces, _ := workspaceTestService(t)
+	user := createWorkspaceTestUser(t, database, "trial-user", "trial@example.com")
+	subscriptions := repository.NewSubscriptionRepository(database)
+
+	first, err := workspaces.CreateDefault(user.ID, "Trial")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trial, err := subscriptions.ByWorkspaceID(first.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ends := trial.CurrentPeriodEnd
+	if trial.Status != access.StatusTrialing || ends == nil || ends.Before(time.Now().AddDate(0, 0, 29)) || ends.After(time.Now().AddDate(0, 0, 31)) {
+		t.Fatalf("first workspace = %s until %v, want a 30-day trial", trial.Status, ends)
+	}
+	if current := trial.Access(); current.State != access.StateTrial || !current.Has(access.FeatureChanges) {
+		t.Fatalf("access in the trial = %s, changes %v", current.State, current.Has(access.FeatureChanges))
+	}
+
+	second, err := workspaces.Create(user.ID, "Second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	free, err := subscriptions.ByWorkspaceID(second.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if free.Status != access.StatusActive || free.PlanID != access.PlanFree || free.Access().Has(access.FeatureChanges) {
+		t.Fatalf("second workspace = %s %s, want free and read-only", free.PlanID, free.Status)
 	}
 }
