@@ -1,7 +1,9 @@
 package model
 
 import (
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type User struct {
@@ -21,4 +23,18 @@ type User struct {
 
 func (u *User) HasPassword() bool {
 	return u.PasswordSet || (u.PasswordHash != nil && *u.PasswordHash != "")
+}
+
+// Initial is the letter of the avatar without a picture: the first of the
+// name, or of the email when there is no name. Every avatar shows the same.
+func (u *User) Initial() string {
+	text := strings.TrimSpace(u.Name)
+	if text == "" {
+		text = strings.TrimSpace(u.Email)
+	}
+	first, _ := utf8.DecodeRuneInString(text)
+	if first == utf8.RuneError {
+		return "?"
+	}
+	return strings.ToUpper(string(first))
 }

@@ -1,7 +1,6 @@
 package layouts
 
 import (
-	"strings"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/avatar"
 )
@@ -12,7 +11,7 @@ templ AppSidebarAvatarContent(user *model.User) {
 			@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: user.Name})
 		}
 		@avatar.Fallback() {
-			{ strings.ToUpper(string(user.Name[0])) }
+			{ user.Initial() }
 		}
 	}
 }
