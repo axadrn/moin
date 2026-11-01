@@ -78,6 +78,15 @@ func frames() map[string]model {
 	})
 	add("activity-empty", func(m *model) { m.tab = tabActivity })
 	add("apps-empty", func(m *model) { m.tab, m.apps = tabApps, nil })
+	add("apps-env", func(m *model) {
+		m.tab, m.outputID, m.outputTitle, m.output = tabApps, 1, "env of hello", []string{"GREETING=••••••", "TUI_KEY=••••••"}
+		m.mode, m.input = modeEnv, "TUI_KEY=sec"
+	})
+	add("apps-sql", func(m *model) {
+		m.tab, m.outputID, m.outputTitle, m.outputNote = tabApps, 1, "data of hello", "/data/app.db"
+		m.output = resultLines([]string{"table", "type", "rows"}, [][]any{{"orders", "table", float64(1)}, {"products", "table", float64(12)}})
+		m.mode = modeSQL
+	})
 	add("detail", func(m *model) { m.tab, m.detail = tabApps, detail })
 	add("detail-deploy", func(m *model) {
 		m.tab, m.detail, m.outputID, m.outputTitle, m.output = tabApps, detail, 1, "deploy v43 of hello", log
@@ -186,6 +195,8 @@ func press(m model, keys ...string) model {
 			msg = tea.KeyPressMsg{Code: tea.KeyDown}
 		case "up":
 			msg = tea.KeyPressMsg{Code: tea.KeyUp}
+		case "ctrl+u":
+			msg = tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}
 		}
 		next, _ := m.Update(msg)
 		m = next.(model)
@@ -303,6 +314,64 @@ func TestTeamKeys(t *testing.T) {
 	m = press(m, "a")
 	if m.mode != modeList || m.err == nil {
 		t.Errorf("a member can invite")
+	}
+}
+
+// TestListPanel: the app keys open their output panel on the list too,
+// moving to another app closes it, and esc closes it.
+func TestListPanel(t *testing.T) {
+	m := frames()["apps-env"]
+	m.width, m.height = 120, 30
+	content := strip(m.View().Content)
+	if !strings.Contains(content, "env of hello") || !strings.Contains(content, "GREETING=") {
+		t.Errorf("the list shows no env:\n%s", content)
+	}
+	for _, msg := range []outputMsg{
+		{id: 2, title: "logs of hello", lines: []string{"web-1  | listening"}},
+		{id: 3, title: "data of hello", lines: []string{"TABLE"}},
+		{id: 4, title: "backups of hello", lines: []string{"/data/app.db"}},
+		{id: 5, title: "domains of hello", lines: []string{"hello.example.com"}},
+		{id: 6, title: "GitHub of hello", lines: []string{"acme/hello"}},
+	} {
+		next, _ := frames()["apps"].Update(msg)
+		shown := next.(model)
+		shown.width, shown.height = 120, 30
+		if content := strip(shown.View().Content); !strings.Contains(content, msg.title) || !strings.Contains(content, msg.lines[0]) {
+			t.Errorf("the list shows no %s:\n%s", msg.title, content)
+		}
+	}
+	m = press(m, "esc")
+	if m.mode != modeList || m.outputTitle == "" {
+		t.Errorf("esc in the prompt closes the panel too")
+	}
+	if moved := press(m, "down"); moved.outputTitle != "" {
+		t.Errorf("another app keeps the panel of hello")
+	}
+	if closed := press(m, "esc"); closed.outputTitle != "" {
+		t.Errorf("esc keeps the panel")
+	}
+}
+
+// TestCtrlU clears the input of every prompt.
+func TestCtrlU(t *testing.T) {
+	for _, mode := range []mode{modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeGitHub} {
+		m := frames()["apps"]
+		m.mode, m.input = mode, "SELECT 1"
+		if m = press(m, "ctrl+u"); m.input != "" || m.mode != mode {
+			t.Errorf("mode %d: ctrl+u leaves %q, mode %d", mode, m.input, m.mode)
+		}
+	}
+	m := press(frames()["apps-add"], "ctrl+u")
+	if m.input != "" || m.mode != modeForm {
+		t.Errorf("form: ctrl+u leaves %q", m.input)
+	}
+}
+
+func TestPlural(t *testing.T) {
+	for count, want := range map[int]string{0: "0 rows", 1: "1 row", 2: "2 rows"} {
+		if got := plural(count, "row"); got != want {
+			t.Errorf("plural(%d) = %q, want %q", count, got, want)
+		}
 	}
 }
 

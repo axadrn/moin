@@ -116,7 +116,7 @@ func (m model) body(width, room int) []string {
 	case m.detail != nil:
 		return m.detailView(width, room)
 	}
-	return m.appsView(room)
+	return m.appsView(width, room)
 }
 
 // activityView is who did what, newest first, as many as fit.
@@ -176,7 +176,7 @@ func (m model) serversView(width, room int) []string {
 	return append(table([]string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS", "RULES"}, rows, m.selected, tableRoom), added...)
 }
 
-func (m model) appsView(room int) []string {
+func (m model) appsView(width, room int) []string {
 	if len(m.apps) == 0 {
 		return empty("No apps yet.", fmt.Sprintf("Press a to create one, or run %s deploy in a repo to create and deploy it.", build.Name))
 	}
@@ -184,7 +184,17 @@ func (m model) appsView(room int) []string {
 	for index, app := range m.apps {
 		rows = append(rows, []string{name(app.Name, index == m.appSelected), app.ServerName, style.App(app)})
 	}
-	return table([]string{"NAME", "SERVER", "STATUS"}, rows, m.appSelected, room)
+	if m.outputTitle == "" {
+		return table([]string{"NAME", "SERVER", "STATUS"}, rows, m.appSelected, room)
+	}
+	// With the output panel open the list leaves it at least 6 lines, like
+	// the history of an open app.
+	tableRoom := -1
+	if room >= 0 {
+		tableRoom = max(min(len(rows)+1, room-1-6), 2)
+	}
+	lines := append(table([]string{"NAME", "SERVER", "STATUS"}, rows, m.appSelected, tableRoom), "")
+	return append(lines, m.panel(width, room-len(lines))...)
 }
 
 func (m model) detailView(width, room int) []string {
@@ -629,4 +639,12 @@ func wrap(text string, width int, indent string) []string {
 		line += word
 	}
 	return append(lines, line)
+}
+
+// plural counts a word: "1 row", "2 rows".
+func plural(count int, word string) string {
+	if count == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", count, word)
 }

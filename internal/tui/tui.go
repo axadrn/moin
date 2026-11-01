@@ -324,6 +324,10 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	// Notices and errors stay until the next key.
 	m.notice, m.err = "", nil
+	if key == "ctrl+u" && m.typing() {
+		m.input = ""
+		return m, nil
+	}
 	switch m.mode {
 	case modeAdd:
 		switch key {
@@ -511,7 +515,10 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case m.detail != nil && m.deployPick != 0:
 			m.deployPick = 0
 		case m.detail != nil:
-			m.detail, m.output, m.outputTitle, m.outputID, m.running = nil, nil, "", 0, false
+			m.detail = nil
+			m = m.closePanel()
+		case m.tab == tabApps:
+			m = m.closePanel()
 		}
 		return m, nil
 	case "tab":
@@ -583,6 +590,21 @@ func (m model) ask(title string, submit func([]string) tea.Cmd, fields ...formFi
 func (m model) confirmFirst(question, detail, verb string, danger bool, run tea.Cmd) model {
 	m.confirm = confirmation{question: question, detail: detail, verb: verb, danger: danger, back: m.mode, run: run}
 	m.mode = modeConfirm
+	return m
+}
+
+// typing reports whether the footer holds a text input.
+func (m model) typing() bool {
+	switch m.mode {
+	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub:
+		return true
+	}
+	return false
+}
+
+// closePanel empties the output panel.
+func (m model) closePanel() model {
+	m.output, m.outputTitle, m.outputNote, m.outputID, m.running = nil, "", "", 0, false
 	return m
 }
 
@@ -680,15 +702,23 @@ func (m model) updateAgent(server client.Server) tea.Cmd {
 func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 	if m.detail == nil {
 		switch key {
-		case "up", "k":
-			m.appSelected = max(m.appSelected-1, 0)
-			return m, nil
-		case "down", "j":
-			m.appSelected = min(m.appSelected+1, max(len(m.apps)-1, 0))
+		case "up", "k", "down", "j":
+			// The panel belongs to the app it was opened for; a deploy
+			// streams on.
+			selected := m.appSelected
+			if key == "up" || key == "k" {
+				m.appSelected = max(m.appSelected-1, 0)
+			} else {
+				m.appSelected = min(m.appSelected+1, max(len(m.apps)-1, 0))
+			}
+			if m.appSelected != selected && !m.running {
+				m = m.closePanel()
+			}
 			return m, nil
 		case "enter":
 			if app, ok := m.currentApp(); ok {
-				m.output, m.outputTitle, m.outputID, m.running, m.deployPick = nil, "", 0, false, 0
+				m = m.closePanel()
+				m.deployPick = 0
 				return m, m.loadDetail(app.Name)
 			}
 			return m, nil
@@ -1343,9 +1373,9 @@ func (m model) runSQL(name, query string, write bool) tea.Cmd {
 			return errMsg{err}
 		}
 		if write {
-			return noticeMsg(fmt.Sprintf("%d rows changed", result.Changes))
+			return noticeMsg(plural(int(result.Changes), "row") + " changed")
 		}
-		note := style.Muted.Render(fmt.Sprintf("%d rows", len(result.Rows)))
+		note := style.Muted.Render(plural(len(result.Rows), "row"))
 		if result.Truncated {
 			note += style.Muted.Render(", more not shown")
 		}
