@@ -176,12 +176,20 @@ func (h *AppsHandler) ServerSecurity(w http.ResponseWriter, r *http.Request) {
 	h.renderSecurity(w, r, "", "")
 }
 
-// SetServerSecurity applies the switches.
+// SetServerSecurity applies the switches. The form also sends what the page
+// showed (was_*): a switch nobody flipped keeps the server's setting as it is
+// now, so a page opened before a change elsewhere does not undo it.
 func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.SetServerSecurity(r.Context(), actor(r), r.PathValue("id"), service.SecurityInput{
-		Tunnel:       r.FormValue("tunnel") == "1",
-		SSHTailscale: r.FormValue("ssh_tailscale") == "1",
-		Firewall:     r.FormValue("firewall") == "1",
+	workspace := ctxkeys.Workspace(r.Context())
+	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	_, err = h.apps.SetServerSecurity(r.Context(), actor(r), server.ID, service.SecurityInput{
+		Tunnel:       flipped(r, "tunnel", server.Tunnel),
+		SSHTailscale: flipped(r, "ssh_tailscale", server.SSHTailscale),
+		Firewall:     flipped(r, "firewall", server.Firewall),
 	})
 	if err != nil {
 		h.renderSecurity(w, r, "", errorMessage(err))
@@ -190,10 +198,30 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 	h.renderSecurity(w, r, "Applied.", "")
 }
 
-// SetIntegrations stores the keys; an empty field keeps its key.
+// flipped is the switch's new value when the form flipped it, else now.
+func flipped(r *http.Request, name string, now bool) bool {
+	on := r.FormValue(name) == "1"
+	was := r.FormValue("was_" + name)
+	if was != "" && on == (was == "1") {
+		return now
+	}
+	return on
+}
+
+// SetIntegrations stores the keys; an empty field keeps its key. remove
+// names a key to take away instead.
 func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	var cloudflare, tailscale *string
 	cloudflareToken, tailscaleKey := r.FormValue("cloudflare_token"), r.FormValue("tailscale_key")
+	notice := "Keys saved."
+	switch r.FormValue("remove") {
+	case "cloudflare":
+		cloudflareToken, tailscaleKey, notice = "", "", "Cloudflare API token removed."
+		cloudflare = &cloudflareToken
+	case "tailscale":
+		cloudflareToken, tailscaleKey, notice = "", "", "Tailscale auth key removed."
+		tailscale = &tailscaleKey
+	}
 	if cloudflareToken != "" {
 		cloudflare = &cloudflareToken
 	}
@@ -206,7 +234,7 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 		h.renderSecurity(w, r, "", errorMessage(err))
 		return
 	}
-	h.renderSecurity(w, r, "Keys saved.", "")
+	h.renderSecurity(w, r, notice, "")
 }
 
 func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request, notice, failure string) {
