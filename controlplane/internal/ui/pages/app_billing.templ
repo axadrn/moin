@@ -184,7 +184,7 @@ templ BillingPricingCard(
 				if plan.ID == model.SubscriptionPlanFree {
 					<div class="flex items-baseline gap-1">
 						<span class="text-4xl font-bold tracking-tighter tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
-						<span class="text-muted-foreground">/ Free forever</span>
+						<span class="text-muted-foreground">/ read-only</span>
 					</div>
 				} else {
 					<div class="price-monthly hidden flex items-baseline gap-1">
