@@ -19,7 +19,8 @@ import (
 func TestUpdateAgent(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
-	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://ops.example.com")
+	audit := repository.NewWorkspaceAuditRepository(database)
+	servers := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")
 	servers.downloads = t.TempDir()
 	server, installToken, err := servers.Create(owner, "web-1")
 	if err != nil {
@@ -78,5 +79,25 @@ func TestUpdateAgent(t *testing.T) {
 	sum := sha256.Sum256(binary)
 	if want := build.Version + "+" + hex.EncodeToString(sum[:])[:8]; updated.AgentVersion != want || !updated.Online {
 		t.Fatalf("updated = %s online %v, want %s", updated.AgentVersion, updated.Online, want)
+	}
+	// The same version again changes nothing: the activity keeps one row.
+	current := testHello
+	current.AgentVersion = updated.AgentVersion
+	servers.Connect(server, current, "203.0.113.5", func() {}, answer(ok, true))
+	if _, err := servers.UpdateAgent(ctx, owner, "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	events, err := audit.ListByWorkspace(owner.WorkspaceID, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, event := range events {
+		if event.Action == "server.agent_updated" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("agent_updated rows = %d, want 1", count)
 	}
 }

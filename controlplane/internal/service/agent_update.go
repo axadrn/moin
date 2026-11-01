@@ -97,6 +97,9 @@ func (s *ServerService) UpdateAgent(ctx context.Context, actor Actor, idOrName s
 	if err != nil {
 		return nil, err
 	}
-	s.record(actor, "server.agent_updated", "server", server.Name, map[string]string{"from": server.AgentVersion, "to": updated.AgentVersion})
+	// An agent that already ran this version changed nothing worth a row.
+	if updated.AgentVersion != server.AgentVersion {
+		s.record(actor, "server.agent_updated", "server", server.Name, map[string]string{"from": server.AgentVersion, "to": updated.AgentVersion})
+	}
 	return updated, nil
 }
