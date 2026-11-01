@@ -358,7 +358,9 @@ func deploys(ctx context.Context, args []string, stdout io.Writer) error {
 		if len(deploy.Log) == 0 {
 			fmt.Fprintln(stdout, style.Muted.Render("No log lines."))
 		}
-		if deploy.Status == "failed" && deploy.Error != "" {
+		// The agent's log usually ends with the error already.
+		logged := len(deploy.Log) > 0 && strings.HasSuffix(deploy.Log[len(deploy.Log)-1], "deploy failed: "+deploy.Error)
+		if deploy.Status == "failed" && deploy.Error != "" && !logged {
 			fmt.Fprintln(stdout, style.Danger.Render(style.SymbolFailed+" "+deploy.Error))
 		}
 		return nil
