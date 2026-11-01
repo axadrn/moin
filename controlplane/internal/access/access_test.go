@@ -194,4 +194,12 @@ func TestSelfHostedGivesEverything(t *testing.T) {
 	if got.Limit(LimitServers) != Unlimited || got.Limit(LimitMembers) != Unlimited || got.RequireProduct() != nil {
 		t.Fatalf("self-hosted access = %+v", got)
 	}
+	// No trial and no read-only: every workspace may change everything,
+	// also long after it was created.
+	if initial.Status == StatusTrialing || !got.Has(FeatureChanges) {
+		t.Fatalf("self-hosted starts %s, changes %v", initial.Status, got.Has(FeatureChanges))
+	}
+	if later := Resolve(Subscription{PlanID: initial.PlanID, Status: initial.Status}, now.AddDate(2, 0, 0)); !later.Has(FeatureChanges) {
+		t.Fatal("self-hosted lost changes two years later")
+	}
 }

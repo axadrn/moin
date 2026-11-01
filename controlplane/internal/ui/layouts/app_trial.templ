@@ -7,8 +7,10 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/access"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
 // trialDaysLeft is how many days of the trial remain, at least 1 while it
@@ -31,13 +33,18 @@ templ AppTrialCard() {
 			@card.Card(card.Props{Class: "gap-2 px-4 py-3.5 text-sm shadow-none group-data-[collapsible=icon]:hidden", Attributes: templ.Attributes{"data-trial": string(current.State)}}) {
 				if current.State == access.StateTrial {
 					{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
-					<p class="font-medium">
-						if days == 1 {
-							Trial: last day
-						} else {
-							{ "Trial: " + strconv.Itoa(days) + " days left" }
+					<div class="flex items-center justify-between gap-2">
+						<p class="font-medium">Trial</p>
+						// The last week stands out in the running color of the
+						// status chips, so the end does not come as a surprise.
+						@badge.Badge(badge.Props{Class: utils.IfElse(days <= 7, "bg-running/14 text-running", "bg-secondary text-secondary-foreground"), Attributes: templ.Attributes{"data-trial-days": strconv.Itoa(days)}}) {
+							if days == 1 {
+								last day
+							} else {
+								{ strconv.Itoa(days) + " days left" }
+							}
 						}
-					</p>
+					</div>
 					<p class="text-xs text-muted-foreground">Everything works. Afterwards ops turns read-only; your apps keep running.</p>
 				} else {
 					<p class="font-medium">Read-only</p>
