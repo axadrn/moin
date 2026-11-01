@@ -6,6 +6,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/protocol"
+	"strconv"
 	"strings"
 	"time"
 
@@ -775,12 +776,46 @@ func (t opsTools) getEnv(_ context.Context, caller Caller, input NameInput) (Env
 	return Env{api.Env{Items: env}}, nil
 }
 
-func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (Env, error) {
+// EnvSet is the output of set_env: the env vars after the change.
+type EnvSet struct {
+	Env
+	set, unset int
+}
+
+// Summary says what changed and that the app needs a restart to see it.
+func (e EnvSet) Summary() string {
+	var parts []string
+	if e.set > 0 {
+		parts = append(parts, "set "+envVars(e.set))
+	}
+	if e.unset > 0 {
+		parts = append(parts, "removed "+envVars(e.unset))
+	}
+	if len(parts) == 0 {
+		return "Nothing changed."
+	}
+	changed := strings.Join(parts, " and ")
+	it := "them"
+	if e.set+e.unset == 1 {
+		it = "it"
+	}
+	return strings.ToUpper(changed[:1]) + changed[1:] + ". Restart the app to apply " + it + ": restart_app."
+}
+
+func envVars(n int) string {
+	if n == 1 {
+		return "1 env var"
+	}
+	return strconv.Itoa(n) + " env vars"
+}
+
+func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
 	err := t.services.Apps.SetEnv(caller.actor(), input.App, input.Set, input.Unset)
 	if err != nil {
-		return Env{}, err
+		return EnvSet{}, err
 	}
-	return t.getEnv(context.Background(), caller, NameInput{Name: input.App})
+	env, err := t.getEnv(context.Background(), caller, NameInput{Name: input.App})
+	return EnvSet{Env: env, set: len(input.Set), unset: len(input.Unset)}, err
 }
 
 func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {
