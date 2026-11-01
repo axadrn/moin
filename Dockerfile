@@ -32,19 +32,24 @@ RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 # Generate Go files from .templ files.
 RUN go tool templ generate
 
-# Build the application as a static binary.
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server/main.go
-
-# The ops binary that install.sh, cli.sh and CI download from /download,
-# built from the same commit as the control plane.
+# Build the application as a static binary. It knows its version, the one
+# agents update to.
 ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=linux go build \
+      -ldflags "-X github.com/axadrn/ops/internal/build.Version=$VERSION" \
+      -o main ./cmd/server/main.go
+
+# The ops binary that install.sh, cli.sh, CI and agent updates download from
+# /download, built from the same commit as the control plane, with
+# SHA256SUMS for checking a download by hand.
 RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os="${target%/*}" arch="${target#*/}" && \
       CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
         -ldflags "-s -w -X github.com/axadrn/ops/internal/build.Version=$VERSION" \
         -o "downloads/ops-$os-$arch" ../cmd/ops; \
-    done
+    done && \
+    (cd downloads && sha256sum ops-* > SHA256SUMS)
 
 # Deploy-Stage
 FROM alpine:3.24

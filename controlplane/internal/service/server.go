@@ -48,6 +48,8 @@ type ServerService struct {
 	servers repository.ServerRepository
 	appURL  string
 	now     func() time.Time
+	// downloads holds the binaries agents update to.
+	downloads string
 
 	mu          sync.Mutex
 	sessions    map[string]*agentSession
@@ -70,6 +72,7 @@ func NewServerService(servers repository.ServerRepository, audit repository.Work
 		audit:       audit,
 		servers:     servers,
 		appURL:      strings.TrimRight(appURL, "/"),
+		downloads:   DownloadsDir,
 		now:         time.Now,
 		sessions:    map[string]*agentSession{},
 		subscribers: map[string]map[chan struct{}]struct{}{},
@@ -81,7 +84,7 @@ func NewServerService(servers repository.ServerRepository, audit repository.Work
 func (s *ServerService) Create(actor Actor, name string) (*model.Server, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		name = "server-" + randomToken()[:6]
+		name = s.freeName(actor.WorkspaceID)
 	}
 	if utf8.RuneCountInString(name) > maxServerNameLength || strings.IndexFunc(name, unicode.IsControl) >= 0 {
 		return nil, "", ErrServerName
@@ -109,6 +112,23 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 	s.record(actor, "server.added", "server", name, nil)
 	s.notify(actor.WorkspaceID)
 	return server, raw, nil
+}
+
+// freeName is the first web-<n> no server of the workspace has.
+func (s *ServerService) freeName(workspaceID string) string {
+	taken := map[string]bool{}
+	servers, err := s.servers.ListByWorkspaceID(workspaceID)
+	if err == nil {
+		for _, server := range servers {
+			taken[server.Name] = true
+		}
+	}
+	for number := 1; ; number++ {
+		name := fmt.Sprintf("web-%d", number)
+		if !taken[name] {
+			return name
+		}
+	}
 }
 
 // InstallCommand is what people run on the server.

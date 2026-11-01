@@ -40,6 +40,7 @@ type Deploy struct {
 	Number     int    `json:"number"`
 	Status     string `json:"status"`
 	FromNumber int    `json:"from_number"`
+	Image      string `json:"image"`
 	// Ref and Commit name the GitHub commit the deploy came from.
 	Ref           string             `json:"ref"`
 	Commit        string             `json:"commit"`
@@ -136,6 +137,13 @@ func (c *Client) Rollback(ctx context.Context, app string, number int) (Deploy, 
 func (c *Client) Redeploy(ctx context.Context, app string) (Deploy, error) {
 	var response Deploy
 	err := c.do(ctx, http.MethodPost, appPath(app, "redeploy"), nil, &response)
+	return response, err
+}
+
+// GetDeploy returns one deploy with its whole log.
+func (c *Client) GetDeploy(ctx context.Context, app string, number int) (Deploy, error) {
+	var response Deploy
+	err := c.do(ctx, http.MethodGet, appPath(app, "deploys", strconv.Itoa(number)), nil, &response)
 	return response, err
 }
 

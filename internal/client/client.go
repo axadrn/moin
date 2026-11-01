@@ -30,6 +30,8 @@ var ErrNotLoggedIn = errors.New("not logged in: run `" + build.Name + " login`")
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
+	// TokenFromEnv is true when the token came from OPS_TOKEN.
+	TokenFromEnv bool `json:"-"`
 }
 
 func configPath() (string, error) {
@@ -61,7 +63,7 @@ func LoadConfig() (Config, error) {
 		config.URL = value
 	}
 	if value := os.Getenv("OPS_TOKEN"); value != "" {
-		config.Token = value
+		config.Token, config.TokenFromEnv = value, true
 	}
 	if config.URL == "" {
 		config.URL = DefaultURL
@@ -171,9 +173,10 @@ type Account struct {
 
 // Client calls the control plane with a personal API token.
 type Client struct {
-	url   string
-	token string
-	http  *http.Client
+	url          string
+	token        string
+	tokenFromEnv bool
+	http         *http.Client
 }
 
 // New returns a client for the config, or ErrNotLoggedIn.
@@ -181,7 +184,7 @@ func New(config Config) (*Client, error) {
 	if config.Token == "" {
 		return nil, ErrNotLoggedIn
 	}
-	return &Client{url: config.URL, token: config.Token, http: &http.Client{}}, nil
+	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, http: &http.Client{}}, nil
 }
 
 // Account returns the user the token belongs to.
@@ -207,6 +210,36 @@ func (c *Client) AddServer(ctx context.Context, name string) (NewServer, error) 
 	var response NewServer
 	err := c.do(ctx, http.MethodPost, "/api/v1/servers", map[string]string{"name": name}, &response)
 	return response, err
+}
+
+// UpdateAgent has the agent of a server download the control plane's ops
+// binary, swap it in and restart. It returns the server once the new agent
+// is back.
+func (c *Client) UpdateAgent(ctx context.Context, idOrName string) (Server, error) {
+	var response Server
+	err := c.do(ctx, http.MethodPost, "/api/v1/servers/"+url.PathEscape(idOrName)+"/update", map[string]any{}, &response)
+	return response, err
+}
+
+// Meta is what the control plane says about itself.
+type Meta struct {
+	Name string `json:"name"`
+	// Version is the version of the control plane and of the ops binary
+	// it serves; "dev" for a build without one.
+	Version string `json:"version"`
+}
+
+// Meta returns the control plane's name and version.
+func (c *Client) Meta(ctx context.Context) (Meta, error) {
+	var response Meta
+	err := c.do(ctx, http.MethodGet, "/api/v1/meta", nil, &response)
+	return response, err
+}
+
+// Outdated reports whether the server's agent runs another version than
+// the control plane. Development builds never count.
+func (s Server) Outdated(version string) bool {
+	return version != "" && version != "dev" && s.AgentVersion != "" && s.AgentVersion != version
 }
 
 // RemoveServer deletes a server by ID or name. Its agent is disconnected.
@@ -247,7 +280,7 @@ func (c *Client) stream(ctx context.Context, path string, fn func(event string, 
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return responseError(response)
+		return c.responseError(response)
 	}
 	scanner := bufio.NewScanner(response.Body)
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
@@ -310,7 +343,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 300 {
-		return responseError(response)
+		return c.responseError(response)
 	}
 	if target == nil {
 		return nil
@@ -334,8 +367,11 @@ func IsNotFound(err error) bool {
 }
 
 // responseError turns an API error body into an error people can read.
-func responseError(response *http.Response) error {
+func (c *Client) responseError(response *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(response.Body, 64*1024))
+	if response.StatusCode == http.StatusUnauthorized {
+		return &Error{Status: response.StatusCode, Code: "unauthenticated", Message: c.rejected()}
+	}
 	var problem struct {
 		Error struct {
 			Code    string            `json:"code"`
@@ -348,15 +384,17 @@ func responseError(response *http.Response) error {
 		for field, detail := range problem.Error.Fields {
 			message += fmt.Sprintf(" %s: %s", field, detail)
 		}
-		if response.StatusCode == http.StatusUnauthorized {
-			message = fmt.Sprintf("%s. Run `%s login` again", message, build.Name)
-		}
 		return &Error{Status: response.StatusCode, Code: problem.Error.Code, Message: message}
 	}
-	if response.StatusCode == http.StatusUnauthorized {
-		return &Error{Status: response.StatusCode, Code: "unauthenticated", Message: fmt.Sprintf("token rejected. Run `%s login` again", build.Name)}
-	}
 	return &Error{Status: response.StatusCode, Message: fmt.Sprintf("%s %s: %s", response.Request.Method, response.Request.URL.Path, response.Status)}
+}
+
+// rejected says what to do about a token the control plane does not take.
+func (c *Client) rejected() string {
+	if c.tokenFromEnv {
+		return "The control plane rejected the token in OPS_TOKEN: it is wrong, expired or revoked. Set OPS_TOKEN to a valid token, or unset it to use the one from `" + build.Name + " login`"
+	}
+	return "The control plane rejected your token: it is wrong, expired or revoked. Run `" + build.Name + " login` for a new one"
 }
 
 // Status is "online", "offline" or "waiting" for a server whose agent never connected.

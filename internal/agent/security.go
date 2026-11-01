@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -231,6 +232,19 @@ func applyFirewall(ctx context.Context, rules string) error {
 		return fmt.Errorf("%s", strings.TrimSpace(string(output)))
 	}
 	return nil
+}
+
+// resetNetwork takes down the firewall and the tunnel an earlier server
+// entry set up, when the agent registers again. The new entry starts with
+// both off; the control plane sends its config on connect when it has more.
+func resetNetwork(ctx context.Context, dir string) {
+	if err := removeFirewall(ctx); err != nil {
+		slog.Warn("remove the firewall of the earlier server entry", "error", err)
+	}
+	if _, err := exec.LookPath("docker"); err == nil {
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName).Run()
+	}
+	_ = os.Remove(filepath.Join(dir, serverConfigFile))
 }
 
 func removeFirewall(ctx context.Context) error {

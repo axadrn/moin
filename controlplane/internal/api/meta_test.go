@@ -5,16 +5,17 @@ import (
 	"testing"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/internal/build"
 )
 
-func TestMetaNamesTheProjectAndTheSupportAddress(t *testing.T) {
+func TestMetaNamesTheProjectTheSupportAddressAndTheVersion(t *testing.T) {
 	environment := newAPIEnvironment(t)
 
 	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/meta"})
 
 	expectStatus(t, recorder, http.StatusOK)
 	body := decodeBody[map[string]string](t, recorder)
-	if len(body) != 2 || body["name"] != brand.Name || body["support_email"] != testSupportEmail {
+	if len(body) != 3 || body["name"] != brand.Name || body["support_email"] != testSupportEmail || body["version"] != build.Version {
 		t.Fatalf("body = %v", body)
 	}
 }

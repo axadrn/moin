@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,22 +16,40 @@ import (
 // db shows an app's SQLite database: its tables, or a page of rows.
 func db(ctx context.Context, args []string, stdout io.Writer) error {
 	command := "tables"
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+	if len(args) > 0 && slices.Contains([]string{"tables", "ls", "rows", "schema"}, args[0]) {
 		command, args = args[0], args[1:]
 	}
-	flags := flag.NewFlagSet("db "+command, flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+	usage := map[string]string{
+		"rows":   "db rows [--app <app>] [--db <path>] <table> [--limit 20] [--offset 0]",
+		"schema": "db schema [--app <app>] [--db <path>] [table]",
+	}[command]
+	if usage == "" {
+		usage = "db [--db <path>] [app]"
+	}
+	flags := newFlags("db "+command, usage).withApp()
 	database := flags.String("db", "", "database path in the container; default the first")
 	limit := flags.Int("limit", 20, "rows to show")
 	offset := flags.Int("offset", 0, "rows to skip")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	// Only the table list takes the app as an argument; rows and schema
+	// take a table.
+	argument := ""
+	if command == "tables" || command == "ls" {
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
+		argument = flags.Arg(0)
+	}
+	name, err := flags.app(argument)
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
 	switch command {
 	case "tables", "ls":
 		tables, err := api.Tables(ctx, name, *database)
@@ -50,7 +68,7 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 		return nil
 	case "rows":
 		if flags.NArg() != 1 {
-			return errors.New("name the table: " + build.Name + " db rows <table>")
+			return flags.wrong()
 		}
 		page, err := api.Rows(ctx, name, *database, flags.Arg(0), *offset, *limit)
 		if err != nil {
@@ -91,12 +109,15 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 
 // sql runs one statement. Changes need --write.
 func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := flag.NewFlagSet("sql", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+	flags := newFlags("sql", `sql [--app <app>] [--db <path>] [--write] [--limit 100] "<sql>", or the SQL on stdin`).withApp()
 	database := flags.String("db", "", "database path in the container; default the first")
 	write := flags.Bool("write", false, "allow changes")
 	limit := flags.Int("limit", 100, "rows to show")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	name, err := flags.app("")
+	if err != nil {
 		return err
 	}
 	query := strings.Join(flags.Args(), " ")
@@ -114,7 +135,7 @@ func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	if err != nil {
 		return err
 	}
-	result, err := api.Query(ctx, appName(*appFlag, "."), *database, query, *write, *limit)
+	result, err := api.Query(ctx, name, *database, query, *write, *limit)
 	if err != nil {
 		if !*write && strings.Contains(err.Error(), "readonly") {
 			return errors.New("this query changes data: run it again with --write")
@@ -130,23 +151,6 @@ func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("first %d rows, more with --limit", len(result.Rows))))
 	}
 	return nil
-}
-
-// parseAnywhere parses flags before and after the arguments, so
-// `db rows orders --limit 5` works like `db rows --limit 5 orders`.
-func parseAnywhere(flags *flag.FlagSet, args []string) error {
-	rest := []string{}
-	for {
-		if err := flags.Parse(args); err != nil {
-			return err
-		}
-		if flags.NArg() == 0 {
-			break
-		}
-		rest = append(rest, flags.Arg(0))
-		args = flags.Args()[1:]
-	}
-	return flags.Parse(rest)
 }
 
 func printResult(w io.Writer, columns []string, rows [][]any) {

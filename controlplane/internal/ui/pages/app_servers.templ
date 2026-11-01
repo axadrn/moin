@@ -15,6 +15,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/internal/build"
 )
 
 // AddedServer is the one-time install command of a server just added.
@@ -169,6 +170,22 @@ templ ServerList(servers []model.Server) {
 									<dd class="mt-1 truncate font-medium tabular-nums" title={ serverLastSeenTitle(server) }>{ serverLastSeen(server, now) }</dd>
 								</div>
 							</dl>
+							if server.Online && agentOutdated(server) {
+								<div class="mt-3 flex items-center justify-between gap-3 text-xs">
+									<p class="text-muted-foreground">The control plane runs { build.Version }.</p>
+									@button.Button(button.Props{
+										Variant: button.VariantSecondary,
+										Size:    button.SizeXs,
+										Attributes: templ.Attributes{
+											"hx-post":    basePath + "/servers/" + server.ID + "/update",
+											"hx-swap":    "none",
+											"hx-disable": "this",
+										},
+									}) {
+										Update agent
+									}
+								</div>
+							}
 							@serverAccess(server)
 						}
 					</li>
@@ -234,6 +251,12 @@ func serverSystem(server model.Server) string {
 		return "-"
 	}
 	return server.OS + "/" + server.Arch
+}
+
+// agentOutdated reports whether the agent runs another version than the
+// control plane. Development builds never count.
+func agentOutdated(server model.Server) bool {
+	return build.Version != "dev" && server.AgentVersion != "" && server.AgentVersion != build.Version
 }
 
 func dashIfEmpty(value string) string {

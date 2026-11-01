@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 
@@ -54,21 +53,24 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 
 // link makes an app follow a GitHub repo and branch.
 func link(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("link", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
+	flags := newFlags("link", "link owner/name [--branch main] [--auto=false] [app]").withApp()
 	branch := flags.String("branch", "", "branch to follow; default the repo's default branch")
 	auto := flags.Bool("auto", true, "deploy every push to the branch")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 1 {
-		return fmt.Errorf("name the repo: %s link owner/name [--branch main] [--auto=false]", build.Name)
+	if flags.NArg() < 1 || flags.NArg() > 2 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(1))
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	app, err := api.LinkRepo(ctx, appName(*appFlag, "."), flags.Arg(0), *branch, *auto)
+	app, err := api.LinkRepo(ctx, name, flags.Arg(0), *branch, *auto)
 	if err != nil {
 		return err
 	}
@@ -80,17 +82,26 @@ func link(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // unlink stops an app from following its repo.
-func unlink(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("unlink", flag.ContinueOnError)
-	appFlag := flags.String("app", "", "app name")
-	if err := parseAnywhere(flags, args); err != nil {
+func unlink(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("unlink", "unlink [app] [--yes]").withApp().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Stop %s from following its repo? Pushes no longer deploy it.", name))
+	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	name := appName(*appFlag, ".")
 	err = api.UnlinkRepo(ctx, name)
 	if err != nil {
 		return err

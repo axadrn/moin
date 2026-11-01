@@ -108,7 +108,9 @@ func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol
 	defer db.Close()
 
 	result := protocol.DBTables{Database: database.Path, Tables: []protocol.DBTable{}}
-	rows, err := db.QueryContext(ctx, `SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	// Litestream keeps its own _litestream_seq and _litestream_lock tables
+	// in the database; they are not the app's.
+	rows, err := db.QueryContext(ctx, `SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\_litestream\_%' ESCAPE '\' ORDER BY name`)
 	if err != nil {
 		return result, err
 	}

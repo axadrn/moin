@@ -50,6 +50,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
 		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. Needs a token with read and write access.",
 		change(true, true)), Write(member(services, tools.removeServer)))
+	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
+		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
+		change(false, true)), Write(member(services, tools.updateAgent)))
 	mcpsdk.AddTool(server, add("list_apps", "List apps",
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
@@ -386,6 +389,14 @@ func (t opsTools) removeServer(_ context.Context, caller Caller, input NameInput
 		return Done{}, err
 	}
 	return Done{Message: "Removed server " + input.Name + "."}, nil
+}
+
+func (t opsTools) updateAgent(ctx context.Context, caller Caller, input NameInput) (ServerOutput, error) {
+	server, err := t.services.Servers.UpdateAgent(ctx, caller.actor(), input.Name)
+	if err != nil {
+		return ServerOutput{}, err
+	}
+	return ServerOutput{api.NewServer(*server)}, nil
 }
 
 // AppList is the output of list_apps.

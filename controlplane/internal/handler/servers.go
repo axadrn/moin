@@ -83,3 +83,14 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	render(w, r, pages.ServerList(servers))
 }
+
+// UpdateAgent has the server's agent update itself and says how it went. The
+// event stream reloads the list with the new version.
+func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
+	server, err := h.servers.UpdateAgent(r.Context(), actor(r), r.PathValue("id"))
+	if err != nil {
+		renderOOB(w, r, toast.Toast(toast.Props{Title: "The agent was not updated", Description: errorMessage(err), Type: toast.TypeError}), "beforeend:#toast-container")
+		return
+	}
+	renderOOB(w, r, toast.Toast(toast.Props{Title: "Agent updated", Description: server.Name + " runs agent " + server.AgentVersion + " now.", Type: toast.TypeSuccess}), "beforeend:#toast-container")
+}

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"time"
@@ -13,9 +12,9 @@ import (
 
 // activity prints what the team did, newest first.
 func activity(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("activity", flag.ContinueOnError)
+	flags := newFlags("activity", "activity [--limit 30]")
 	limit := flags.Int("limit", 30, "how many events, at most 200")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
 	}
 	api, err := apiClient()
@@ -58,9 +57,9 @@ func viaName(via string) string {
 
 // team lists the members of the token's workspace, or invites one.
 func team(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("team", flag.ContinueOnError)
+	flags := newFlags("team", "team, or team invite <email> [--admin]")
 	admin := flags.Bool("admin", false, "invite as admin, who may invite others")
-	if err := parseAnywhere(flags, args); err != nil {
+	if err := flags.parse(args); err != nil {
 		return err
 	}
 	api, err := apiClient()

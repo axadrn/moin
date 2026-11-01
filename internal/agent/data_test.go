@@ -25,6 +25,8 @@ func TestTablesAndQueries(t *testing.T) {
 		CREATE TABLE tags (name TEXT PRIMARY KEY) WITHOUT ROWID;
 		CREATE VIEW titles AS SELECT title FROM posts;
 		CREATE INDEX posts_title ON posts (title);
+		CREATE TABLE _litestream_seq (id INTEGER PRIMARY KEY, seq INTEGER);
+		CREATE TABLE _litestream_lock (id INTEGER);
 		CREATE TABLE goose_db_version (id INTEGER PRIMARY KEY AUTOINCREMENT, version_id INTEGER NOT NULL, is_applied INTEGER NOT NULL, tstamp TIMESTAMP DEFAULT (datetime('now')));
 		INSERT INTO goose_db_version (version_id, is_applied, tstamp) VALUES (0, 1, '2026-10-01 10:00:00'), (20261030, 1, '2026-10-30 12:00:00');
 		INSERT INTO posts (title, body) VALUES ('hello', x'00ff'), ('world', 'text');`)

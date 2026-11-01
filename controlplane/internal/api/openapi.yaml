@@ -115,7 +115,7 @@ paths:
     get:
       tags: [Meta]
       operationId: getMeta
-      summary: Get the project name and support address
+      summary: Get the project name, support address and version
       security: []
       responses:
         '200':
@@ -867,6 +867,40 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_has_apps`. Remove its apps first.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/servers/{id}/update:
+    parameters:
+      - $ref: '#/components/parameters/ServerID'
+    post:
+      tags: [Servers]
+      operationId: updateAgent
+      summary: Update the agent of a server
+      description: The agent downloads the binary this control plane serves for its OS and CPU, from the control plane URL it is registered with, checks it against the SHA-256 the control plane sends, swaps it in and restarts through systemd. The answer comes once the new agent is connected, within three minutes. An agent refuses while a deploy runs, without systemd, and when its server has rules in `/etc/ops/rules`; agents older than the update say so with the command that updates them on the server.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The server with the new agent version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No server with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline`, or `no_agent_binary` when the control plane serves no binary for the server.'
+        '502':
+          $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3328,7 +3362,7 @@ components:
           type: string
     Meta:
       type: object
-      required: [name, support_email]
+      required: [name, support_email, version]
       properties:
         name:
           type: string
@@ -3337,6 +3371,9 @@ components:
           type: string
           format: email
           description: The `SUPPORT_EMAIL` address.
+        version:
+          type: string
+          description: The control plane's version, like `v3.2.3`, or `dev`. Agents update to it.
     EmailRequest:
       type: object
       additionalProperties: false

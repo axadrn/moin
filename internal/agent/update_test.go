@@ -1,0 +1,64 @@
+package agent
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/protocol"
+)
+
+func TestUpdateSwapsAVerifiedBinary(t *testing.T) {
+	binary := []byte("#!/bin/sh\necho " + build.Name + " v9.9.9\n")
+	sum := sha256.Sum256(binary)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != protocol.DownloadPath+build.Name+"-"+runtime.GOOS+"-"+runtime.GOARCH {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(binary)
+	}))
+	defer server.Close()
+
+	executable := filepath.Join(t.TempDir(), build.Name)
+	if err := os.WriteFile(executable, []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	u := &updater{url: server.URL, executable: executable, systemd: build.Name + "-agent"}
+	ctx := context.Background()
+
+	for _, wrong := range []protocol.AgentUpdate{
+		{Version: "v9.9.9", SHA256: strings.Repeat("0", 64)},
+		{Version: "v9.9.8", SHA256: hex.EncodeToString(sum[:])},
+		{Version: "v9.9.9"},
+	} {
+		if err := u.install(ctx, wrong); err == nil {
+			t.Fatalf("installed %+v", wrong)
+		}
+		if body, _ := os.ReadFile(executable); string(body) != "old" {
+			t.Fatalf("a failed update changed the binary: %q", body)
+		}
+	}
+	if err := u.install(ctx, protocol.AgentUpdate{Version: "v9.9.9", SHA256: hex.EncodeToString(sum[:])}); err != nil {
+		t.Fatal(err)
+	}
+	if body, _ := os.ReadFile(executable); string(body) != string(binary) {
+		t.Fatalf("binary = %q", body)
+	}
+	if leftovers, _ := filepath.Glob(filepath.Join(filepath.Dir(executable), ".*")); len(leftovers) > 0 {
+		t.Fatalf("left %v", leftovers)
+	}
+
+	u.systemd = ""
+	if err := u.install(ctx, protocol.AgentUpdate{Version: "v9.9.9", SHA256: hex.EncodeToString(sum[:])}); err == nil || !strings.Contains(err.Error(), "systemd") {
+		t.Fatalf("without systemd: %v", err)
+	}
+}
