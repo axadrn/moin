@@ -55,7 +55,7 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `PUT /api/v1/apps/{app}/backups/settings` | snapshot before every change |
 | `POST /api/v1/apps/{app}/restore` | restores a snapshot or a point in time |
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the bucket backups go to |
-| `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks; domains and canonical |
+| `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |
 | `POST /api/v1/apps/{app}/apply` | restarts the running release with the current settings |
 | `GET` · `PATCH /api/v1/apps/{app}/env` | env vars |

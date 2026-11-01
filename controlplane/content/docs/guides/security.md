@@ -6,15 +6,16 @@ order: 8
 
 A server ops runs can have no open port at all. The agent only dials out; app traffic can come through a Cloudflare Tunnel, SSH can answer only on your Tailscale network, and a firewall drops the rest. Each is a switch per server, and ops sets it all up.
 
-| Action | Web | CLI | TUI | MCP |
-| --- | --- | --- | --- | --- |
-| Store the keys | server, **Security**, **Keys** | `ops integrations cloudflare` · `tailscale`, key on stdin | – | `set_integrations` |
-| Remove a key | **Keys**, **Remove Cloudflare token** · **Remove Tailscale key** | `ops integrations rm cloudflare` · `tailscale` | – | `set_integrations` with an empty key |
-| Cloudflare Tunnel | **Cloudflare Tunnel**, then **Apply** | `ops servers secure web-1 --tunnel on` | `t`, then `y` | `set_server_security` |
-| SSH only on Tailscale | **SSH only on Tailscale**, then **Apply** | `ops servers secure web-1 --ssh tailscale` | – | `set_server_security` |
-| Firewall | **Firewall**, then **Apply** | `ops servers secure web-1 --firewall on` | `f`, then `y` | `set_server_security` |
-| See what is open | **What the agent set up** | `ops servers` (ACCESS) and the output of `secure` | ACCESS column | `list_servers` |
-| See the rules of a server | **Rules** | `ops servers rules web-1`, `ops servers` (RULES) | RULES column | `list_servers` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Store the keys | server, **Security**, **Keys** | `ops integrations cloudflare` · `tailscale`, key on stdin | settings tab, **Cloudflare token** · **Tailscale key**, `enter` | `PUT /api/v1/integrations` | `set_integrations` |
+| See which keys are stored | **Keys** | `ops integrations` | settings tab | `GET /api/v1/integrations` | `get_integrations` |
+| Remove a key | **Keys**, **Remove Cloudflare token** · **Remove Tailscale key** | `ops integrations rm cloudflare` · `tailscale` | settings tab, the key, `x`, then `y` | `PUT /api/v1/integrations` with an empty key | `set_integrations` with an empty key |
+| Cloudflare Tunnel | **Cloudflare Tunnel**, then **Apply** | `ops servers secure web-1 --tunnel on` | `t`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
+| SSH only on Tailscale | **SSH only on Tailscale**, then **Apply** | `ops servers secure web-1 --ssh tailscale` | `s`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
+| Firewall | **Firewall**, then **Apply** | `ops servers secure web-1 --firewall on` | `f`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
+| See what is open | **What the agent set up** | `ops servers` (ACCESS) and the output of `secure` | ACCESS column | `GET /api/v1/servers` (`security`) | `list_servers` |
+| See the rules of a server | **Rules** | `ops servers rules web-1`, `ops servers` (RULES) | RULES column | `GET /api/v1/servers` (`rules`) | `list_servers` |
 
 On the web, flip the switches and press **Apply**. Apply changes only the switches you flipped: a change made meanwhile in the CLI, the TUI or by an agent stays. The page updates by itself when the server changes, except while a flipped switch waits for Apply.
 

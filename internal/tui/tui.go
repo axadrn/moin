@@ -1045,9 +1045,9 @@ func (m model) showDomains(name string) tea.Cmd {
 			return errMsg{err}
 		}
 		lines := []string{}
-		address := ""
+		advice := ""
 		for _, check := range checks {
-			address = check.Address
+			advice = check.Advice
 			state := "set DNS"
 			if check.Points {
 				state = "points here"
@@ -1062,8 +1062,8 @@ func (m model) showDomains(name string) tea.Cmd {
 			lines = append(lines, "no domains yet")
 		}
 		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical"
-		if address != "" {
-			note = "point an A record at " + address
+		if advice != "" {
+			note = "set DNS: " + advice
 		}
 		return outputMsg{id: m.shared.outputs.Add(1), title: "domains of " + name, note: style.Muted.Render(note), lines: lines}
 	}

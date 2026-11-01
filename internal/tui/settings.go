@@ -196,9 +196,9 @@ func (m model) removeSetting(row settingRow) model {
 	case "bucket":
 		return m.confirmFirst("Stop backups?", "The bucket keeps what is in it.", "stop", true, m.done(func() error { return m.api.RemoveBackupStorage(m.ctx) }, "Backups stopped; the bucket keeps what is in it"))
 	case "cloudflare":
-		return m.confirmFirst("Remove the Cloudflare token?", "Tunnels need it again to change.", "remove", true, m.setKeys(&blank, nil))
+		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it ops cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
 	case "tailscale":
-		return m.confirmFirst("Remove the Tailscale key?", "Servers already on the tailnet stay on it.", "remove", true, m.setKeys(nil, &blank))
+		return m.confirmFirst("Remove the Tailscale key?", "The next security change of a server opens SSH on every interface again.", "remove", true, m.setKeys(nil, &blank))
 	case "registry":
 		host := row.host
 		return m.confirmFirst("Remove the login for "+host+"?", "Private images from there no longer pull.", "remove", true, m.done(func() error { return m.api.RemoveRegistry(m.ctx, host) }, "Removed the login for "+host))

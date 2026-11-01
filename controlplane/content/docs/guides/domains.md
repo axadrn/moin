@@ -56,4 +56,8 @@ Fields in `x-ops` win over the settings in ops.
 
 ## Apply by hand
 
-**Apply** on the app page, `ops apply` (or `apply_app` in MCP) restarts the running release with the env vars, domains and password as they are now, without a build.
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Apply** on the app page | `ops apply [app]` | changes from `o` and `p` apply by themselves | `POST /api/v1/apps/{app}/apply` | `apply_app` |
+
+It restarts the running release with the env vars, domains and password as they are now, without a build.
