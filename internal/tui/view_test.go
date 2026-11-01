@@ -21,7 +21,7 @@ func frames() map[string]model {
 	finished := now.Add(-time.Hour + 16*time.Second)
 	servers := []client.Server{
 		{ID: "1", Name: "dock-1", Online: true, OS: "linux", Arch: "arm64", AgentVersion: "dev", LastSeenAt: &now},
-		{ID: "2", Name: "web-2", OS: "linux", Arch: "amd64", AgentVersion: "v3.2.1", LastSeenAt: &seen},
+		{ID: "2", Name: "web-2", OS: "linux", Arch: "amd64", AgentVersion: "v3.2.1", LastSeenAt: &seen, Rules: &protocol.Rules{DataOff: true, DeployFrom: []string{"github.com/acme/*"}, NetworkLocked: true}},
 		{ID: "3", Name: "tui-1"},
 	}
 	apps := []client.App{

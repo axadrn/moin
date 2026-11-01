@@ -1,0 +1,511 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+const (
+	homeWrap    = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
+	homeDisplay = "font-display leading-[0.95]"
+	homeSurface = "rounded-[24px] bg-card"
+)
+
+templ Home() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Deploy to servers you own",
+		Description: brand.Name + " deploys your apps to servers you own, backs up every change of their SQLite database to your bucket and lets you edit the data live. From the web, the CLI, a terminal UI and MCP.",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		<main>
+			@HomeHero()
+			@HomeCommands()
+			@HomeWaysIn()
+			@HomeBackups()
+			@HomeData()
+			@HomeNoDocker()
+			@HomeStatement()
+			if ctxkeys.RenderConfig(ctx).Billing {
+				@HomePricing()
+			}
+			@HomeFAQ()
+		</main>
+	}
+}
+
+templ homePrimary(label string) {
+	<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">
+		{ label }
+		@icon.ArrowRight(icon.Props{Class: "size-4"})
+	</a>
+}
+
+// ---------------------------------------------------------------- hero
+templ HomeHero() {
+	<section class="pt-16 sm:pt-28">
+		<div class={ homeWrap, "grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
+			<div>
+				<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
+					<span class="block">Deploy.</span>
+					<span class="block">Back up.</span>
+					<span class="block">Edit live.</span>
+				</h1>
+				<p class="mt-7 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
+					{ brand.Name } puts your apps on servers you own, backs up every change of their SQLite database to your bucket and lets you edit the data live. From the browser, the CLI, a terminal UI or your AI agent.
+				</p>
+				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+					@homePrimary("Get started")
+					<a href="/docs" class="inline-flex h-12 items-center justify-center rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">Read the docs</a>
+				</div>
+			</div>
+			@homeTerminal()
+		</div>
+		<div class={ homeWrap, "mt-16 sm:mt-24" }>
+			@homeStage()
+		</div>
+	</section>
+}
+
+// homeTerminal is a real session: a deploy that snapshots the database
+// first, a wrong query, and the restore to the second before it.
+templ homeTerminal() {
+	<div class="ops-term min-w-0 overflow-hidden rounded-[24px] bg-terminal text-[13px] leading-[1.75] text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
+		<div class="flex items-center gap-2 border-b border-terminal-foreground/10 px-5 py-3.5">
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="ml-3 text-xs text-terminal-foreground/50">~/shop</span>
+		</div>
+		<div class="overflow-x-auto px-5 py-5 whitespace-pre sm:px-6">
+			<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
+			<p class="text-terminal-foreground/60">→ building on web-1</p>
+			<p class="text-terminal-foreground/60">→ snapshot of /data/app.db: before-v14</p>
+			<p class="text-terminal-foreground/60">→ health check /healthz</p>
+			<p class="text-live">✓ v14 of shop is live in 38s</p>
+			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>ops sql --write "DELETE FROM orders"</p>
+			<p class="text-running">✓ 282 rows changed</p>
+			<p class="mt-4 text-terminal-foreground/45"># oops</p>
+			<p><span class="text-terminal-foreground/45">$ </span>ops restore --at "14:01:59"</p>
+			<p class="text-terminal-foreground/60">→ snapshot of now first: before-restore</p>
+			<p class="text-live">✓ Restored. shop runs again.</p>
+			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span><span class="ops-dot-run inline-block h-[1.1em] w-[0.55em] translate-y-[0.2em] bg-terminal-foreground/80"></span></p>
+		</div>
+	</div>
+}
+
+// homeStage is the control panel, big, with a switch between its three
+// pages and live states around it.
+templ homeStage() {
+	<div class="relative" data-stage>
+		<div class="mb-4 flex justify-center">
+			<div class="flex gap-1 rounded-full bg-card p-1" role="tablist" aria-label="Product">
+				@homeStageTab("deploys", "Deploys", true)
+				@homeStageTab("data", "Data", false)
+				@homeStageTab("backups", "Backups", false)
+			</div>
+		</div>
+		<div class="rounded-[22px] bg-card p-1.5 sm:rounded-[32px] sm:p-3">
+			<div class="overflow-hidden rounded-[17px] sm:rounded-[22px]">
+				@homeShot("deploys", "The app page: the live release, the deploy log with the snapshot before the deploy, every deploy with its commit", true)
+				@homeShot("data", "The data page: tables, rows to edit in place, and a SQL console", false)
+				@homeShot("backups", "The backups page: continuous backups, the point in time window, snapshots and the newest restore drill", false)
+			</div>
+		</div>
+		<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5" aria-label="What ops reports">
+			@homeChip("blog", "live", "live v6")
+			@homeChip("shop.db", "live", "verified by restore")
+			@homeChip("api", "failed", "v3 failed · v2 runs again")
+		</div>
+	</div>
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const stage = document.currentScript.previousElementSibling;
+			stage.addEventListener('click', event => {
+				const tab = event.target.closest('[data-stage-tab]');
+				if (!tab) return;
+				for (const other of stage.querySelectorAll('[data-stage-tab]')) {
+					const active = other === tab;
+					other.setAttribute('aria-selected', String(active));
+					other.classList.toggle('bg-foreground', active);
+					other.classList.toggle('text-background', active);
+					other.classList.toggle('text-muted-foreground', !active);
+				}
+				for (const shot of stage.querySelectorAll('[data-stage-shot]')) {
+					shot.hidden = shot.dataset.stageShot !== tab.dataset.stageTab;
+				}
+			});
+		})();
+	</script>
+}
+
+templ homeStageTab(name, label string, active bool) {
+	<button
+		type="button"
+		role="tab"
+		data-stage-tab={ name }
+		aria-selected={ fmt.Sprint(active) }
+		class={ "cursor-pointer rounded-full px-5 py-2 text-sm font-semibold transition-colors", templ.KV("bg-foreground text-background", active), templ.KV("text-muted-foreground hover:text-foreground", !active) }
+	>{ label }</button>
+}
+
+// homeShot is one page of the panel, light and dark: the theme switch
+// picks the one that shows.
+templ homeShot(name, alt string, first bool) {
+	<div data-stage-shot={ name } hidden?={ !first }>
+		<img
+			src={ "/assets/img/product-" + name + "-light.png" }
+			alt={ alt }
+			width="2880"
+			height="1800"
+			if !first {
+				loading="lazy"
+			}
+			decoding="async"
+			class="block aspect-[4/3] w-full object-cover object-left-top sm:aspect-[1440/900] dark:hidden"
+		/>
+		<img
+			src={ "/assets/img/product-" + name + "-dark.png" }
+			alt={ alt }
+			width="2880"
+			height="1800"
+			loading="lazy"
+			decoding="async"
+			class="hidden aspect-[4/3] w-full object-cover object-left-top sm:aspect-[1440/900] dark:block"
+		/>
+	</div>
+}
+
+// homeChip is a status pill on a solid backing: the app name and its state.
+templ homeChip(app, kind, text string) {
+	<span class="inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5 shadow-[0_10px_30px_-14px_rgb(0_0_0/0.45)]">
+		<span class="font-mono text-[13px] font-medium">{ app }</span>
+		switch kind {
+			case "live":
+				<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3.5 py-1.5 text-[13px] font-medium text-live">
+					<span class="lp-pulse size-2 rounded-full bg-live"></span>
+					{ text }
+				</span>
+			case "running":
+				<span class="inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running">
+					<span class="ops-turn inline-block leading-none">◐</span>
+					{ text }
+				</span>
+			default:
+				<span class="inline-flex items-center gap-2 rounded-full bg-failed/12 px-3.5 py-1.5 text-[13px] font-medium text-failed">
+					<span class="leading-none">✗</span>
+					{ text }
+				</span>
+		}
+	</span>
+}
+
+// ---------------------------------------------------------------- commands
+templ HomeCommands() {
+	<section id="how" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "text-[clamp(2.4rem,6.4vw,5rem)]" }>Three commands.</h2>
+			<div class="mt-12 grid gap-3 sm:mt-16">
+				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server and its agent dials out. No open port.")
+				@homeCommand("ops deploy", "Packs your repo. Your server builds it, checks its health and puts it live.")
+				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops took a snapshot of now first.")
+			</div>
+		</div>
+	</section>
+}
+
+templ homeCommand(command, text string) {
+	<div class={ homeSurface, "grid gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12" }>
+		<p class="font-mono text-[clamp(1.35rem,5.4vw,2.6rem)] leading-tight font-medium tracking-[-0.04em] break-words">
+			<span class="text-muted-foreground/60">$ </span>{ command }
+		</p>
+		<p class="max-w-md text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+	</div>
+}
+
+// ---------------------------------------------------------------- ways in
+// HomeWaysIn is one rollback of shop, done four ways: each frame is what
+// that surface really shows.
+templ HomeWaysIn() {
+	<section id="ways" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>One tool. Four ways in.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<span class="text-foreground">Click it, type it, press a key or ask your agent.</span>
+				Every feature works in all four, with the same account and the same activity log. Here is one rollback of shop, four times.
+			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeWay("Browser", "For a look around, and for your team.") {
+					@homeWayWeb()
+				}
+				@homeWay("CLI", "For your repo, scripts and CI.") {
+					<div class="ops-term overflow-x-auto rounded-[18px] bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]">
+						<p><span class="text-terminal-foreground/50">$ </span>ops rollback v12</p>
+						<p class="text-terminal-foreground/60">→ Rollback v14 of shop to v12 started</p>
+						<p class="text-live">✓ v14 of shop is live <span class="text-terminal-foreground/50">in 3s</span></p>
+					</div>
+				}
+				@homeWay("Terminal UI", "Everything live, one key away. Run ops.") {
+					@homeWayTUI()
+				}
+				@homeWay("AI agent", "Claude, Cursor or any MCP client.") {
+					<div class="flex flex-col gap-3 rounded-[18px] bg-background p-5 text-[15px] leading-6">
+						<p class="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background">shop is broken since the last deploy. Roll it back.</p>
+						<p class="self-start font-mono text-[12px] text-muted-foreground">rollback_app · shop</p>
+						<p class="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-card px-4 py-2.5">Rolled back. v14 of shop runs the release of v12, your data stays as it is.</p>
+					</div>
+				}
+			</div>
+			<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+				<span class="inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5">
+					<span class="text-[14px] font-semibold">Desktop app</span>
+					<span class="inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running">
+						<span class="ops-turn inline-block leading-none">◐</span>
+						coming soon
+					</span>
+				</span>
+			</div>
+		</div>
+	</section>
+}
+
+templ homeWay(name, text string) {
+	<div class={ homeSurface, "flex min-w-0 flex-col gap-6 p-5 sm:p-8" }>
+		<div class="px-2 pt-2 sm:px-0 sm:pt-0">
+			<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ name }</p>
+			<p class="mt-2 text-[17px] leading-7 text-muted-foreground">{ text }</p>
+		</div>
+		<div class="mt-auto min-w-0">
+			{ children... }
+		</div>
+	</div>
+}
+
+// homeWayWeb is the deploy list of the app page, the pointer on v12.
+templ homeWayWeb() {
+	<div class="rounded-[18px] bg-background p-2 text-[14px]" aria-label="The deploy list of shop with a Roll back button on v12">
+		@homeWayDeploy("v13", "live", "4m · 5s", false)
+		@homeWayDeploy("v12", "succeeded", "5m · 5s", true)
+		@homeWayDeploy("v11", "succeeded", "5m · 5s", false)
+	</div>
+}
+
+templ homeWayDeploy(number, status, when string, hover bool) {
+	<div class={ "flex items-center gap-4 rounded-xl px-4 py-3", templ.KV("bg-muted", hover) }>
+		if status == "live" {
+			<span class="size-2.5 rounded-full bg-live"></span>
+		} else {
+			<span class="size-2.5 rounded-full border-2 border-muted-foreground/60"></span>
+		}
+		<span class="w-10 font-mono font-semibold">{ number }</span>
+		<span class={ "font-semibold", templ.KV("text-live", status == "live") }>{ status }</span>
+		if hover {
+			<span class="ml-auto rounded-full bg-card px-3 py-1 text-[13px] font-semibold shadow-[0_6px_18px_-10px_rgb(0_0_0/0.5)]">Roll back</span>
+		} else {
+			<span class="ml-auto text-[13px] text-muted-foreground tabular-nums">{ when }</span>
+		}
+	</div>
+}
+
+// homeWayTUI is the app screen of the terminal UI asking before the
+// rollback, as ops draws it.
+templ homeWayTUI() {
+	<div class="ops-term overflow-x-auto rounded-[18px] bg-terminal py-4 text-[12px] leading-[1.65] whitespace-pre text-terminal-foreground sm:text-[13px]" aria-label="The terminal UI asks before it rolls shop back">
+		<p class="px-5"><span class="font-semibold">ops</span>{ "   " }<span class="text-terminal-foreground/50">servers 1</span>{ "   apps › shop   " }<span class="text-terminal-foreground/50">activity</span></p>
+		<p class="mt-3 px-5">{ "  " }<span class="font-semibold">shop</span>{ "   " }<span class="text-live">● live v13</span></p>
+		<p class="mt-2 px-5 text-terminal-foreground/50">{ "  DEPLOY   STATUS        TOOK" }</p>
+		<p class="px-5">{ "  v13      " }<span class="text-live">● live</span>{ "         5s" }</p>
+		<p class="px-5">{ "  v12      " }<span class="text-live">✓</span>{ " succeeded   5s" }</p>
+		<p class="px-5">{ "  v11      " }<span class="text-live">✓</span>{ " succeeded   5s" }</p>
+		<p class="mt-3 border-t border-terminal-foreground/10 px-5 pt-3"><span class="text-running">▌</span>{ " Roll shop back to the deploy before v13?" }</p>
+		<p class="px-5"><span class="text-running">▌</span>{ " " }<span class="text-terminal-foreground/60">It starts the old images with the env they had.</span></p>
+		<p class="px-5">{ "  " }<span class="font-semibold">y</span>{ " " }<span class="text-terminal-foreground/60">{ "roll back   any other key cancels" }</span></p>
+	</div>
+}
+
+// ---------------------------------------------------------------- backups
+templ HomeBackups() {
+	<section id="backups" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[14ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Every change, backed up.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				Most apps lose data the boring way: a migration that goes wrong, an <code class="font-mono text-foreground">UPDATE</code> without <code class="font-mono text-foreground">WHERE</code>, a disk that dies. { brand.Name } makes all three a click to undo.
+			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeFact("Every second", "Each change of every SQLite database streams to your own bucket with Litestream. Restore to any second of the last week.", "")
+				@homeFact("Before every change", "A full snapshot before every deploy, every restore and every edit made through "+brand.Name+". On by default.", "")
+				@homeFact("Proven every day", "The agent restores the newest state into a temp file and runs the integrity check. You see “verified by restore”, not “backup job ran”.", "live")
+				@homeFact("Your bucket", "R2, S3, B2, Hetzner or MinIO. Backups go from your server to your bucket and never through us. A snapshot is a plain gzipped SQLite file.", "")
+			</div>
+		</div>
+	</section>
+}
+
+templ homeFact(title, text, kind string) {
+	<div class={ homeSurface, "p-7 sm:p-10" }>
+		<p class="flex items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
+			if kind == "live" {
+				<span class="lp-pulse size-2.5 rounded-full bg-live"></span>
+			}
+			{ title }
+		</p>
+		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+	</div>
+}
+
+// ---------------------------------------------------------------- data
+templ HomeData() {
+	<section id="data" class="scroll-mt-24 pt-3">
+		<div class={ homeWrap }>
+			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16" }>
+				<div>
+					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Your data, live.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+						<span class="text-foreground">Browse every table, edit a cell, run SQL.</span>
+						Read live from your server, from the browser, the terminal or your AI agent. Reads can never change a row; changes take a snapshot first.
+					</p>
+					<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground">
+						The schema stays in your code: your migrations run on deploy, and { brand.Name } shows which one ran last.
+					</p>
+				</div>
+				<div class="ops-term self-center overflow-x-auto rounded-[18px] bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-[14px]">
+					<p><span class="text-terminal-foreground/50">$ </span>ops sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
+					<p class="mt-2 text-terminal-foreground/50">STATUS      COUNT(*)</p>
+					<p>delivered   38</p>
+					<p>paid        126</p>
+					<p>refunded    39</p>
+					<p>shipped     74</p>
+					<p class="mt-4"><span class="text-terminal-foreground/50">$ </span>ops sql --write "UPDATE orders SET status = 'shipped' WHERE id = 412"</p>
+					<p class="text-live">✓ 1 row changed</p>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- no docker
+templ HomeNoDocker() {
+	<section class="pt-3">
+		<div class={ homeWrap }>
+			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16" }>
+				<div>
+					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Never touched Docker? Fine.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+						<span class="text-foreground">Run ops deploy in your Go repo.</span>
+						{ brand.Name } writes the Dockerfile and the compose file, keeps your data and finds your SQLite database.
+					</p>
+					<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground">
+						Already have a Dockerfile or a compose.yml? It uses yours. Other languages bring their own Dockerfile.
+					</p>
+				</div>
+				<div class="self-center divide-y divide-border rounded-[18px] bg-background px-1">
+					@homeFile("go.mod", "your code", "")
+					@homeFile("Dockerfile", "written by ops", "")
+					@homeFile("compose.yml", "written by ops", "")
+					@homeFile("/data/app.db", "found and kept", "live")
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ homeFile(name, note, kind string) {
+	<div class="flex items-center justify-between gap-4 px-5 py-4">
+		<span class="font-mono text-[14px] font-medium">{ name }</span>
+		if kind == "live" {
+			<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live">
+				<span class="size-1.5 rounded-full bg-live"></span>
+				{ note }
+			</span>
+		} else {
+			<span class="text-[14px] text-muted-foreground">{ note }</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------- statement
+templ HomeStatement() {
+	<section class="pt-3">
+		<div class={ homeWrap }>
+			<div class="rounded-[28px] bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20">
+				<p class={ homeDisplay, "text-[clamp(2.4rem,7.2vw,6rem)]" }>
+					<span class="block">Your servers.</span>
+					<span class="block">Your data.</span>
+					<span class="block">Nothing listens for&nbsp;us.</span>
+				</p>
+				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
+					The agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. Your code builds on your server, your backups go to your bucket.
+				</p>
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- pricing
+templ HomePricing() {
+	<section id="pricing" class="scroll-mt-24 py-32 sm:py-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "text-[clamp(2.4rem,6.4vw,5rem)]" }>One subscription.</h2>
+			<div class="mt-10 max-w-2xl space-y-5 text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<p>The price is announced at launch. Pay monthly or yearly, and yearly saves two months.</p>
+				<p><span class="text-foreground">Founding members lock the lowest price.</span> goilerplate customers get 50% off the first year.</p>
+			</div>
+			<div class="mt-10">
+				@homePrimary("Get started")
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- faq
+templ HomeFAQ() {
+	<section id="faq" class="scroll-mt-24 pb-32 sm:pb-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Questions.</h2>
+			<div class={ homeSurface, "mt-10 divide-y divide-border px-2 sm:px-4" }>
+				@homeQuestion("What can I deploy?") {
+					Any repo with a compose.yml, a Dockerfile or a go.mod. ops builds it on your server, checks that it comes up healthy and starts the previous version again when it does not.
+				}
+				@homeQuestion("Which databases?") {
+					SQLite. That is the focus: ops finds your database, backs it up continuously, lets you browse and edit it and runs your migrations. Postgres or Redis still run as services from your compose.yml, without those tools.
+				}
+				@homeQuestion("Which servers?") {
+					Any Linux server you can log in to as root, at any provider. The install script sets up Docker and the agent. The agent only needs outbound HTTPS.
+				}
+				@homeQuestion("Where does my code go?") {
+					Into your own bucket, never to us. ops deploy puts it there through a link ops signs, your server picks it up and deletes it. Deploys from GitHub go from GitHub straight to your server. Your backups live in the same bucket.
+				}
+				@homeQuestion("What happens if ops is down?") {
+					Your apps keep running. They live on your servers, not on ours. You only cannot deploy or change them through ops until it is back.
+				}
+				@homeQuestion("Is it open source?") {
+					Yes, all of it: the agent, the CLI, the terminal UI and the control plane, under AGPL-3.0. Read exactly what runs on your server and what we run. Self-host it for free, or let us run it for you.
+				}
+				@homeQuestion("Can my AI agent use it?") {
+					Yes. ops has an MCP server: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
+				}
+				@homeQuestion("Can my team use it?") {
+					Yes, for free. Invite them and everyone deploys to the same servers. The activity shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
+				}
+				@homeQuestion("Can I cancel?") {
+					Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
+				}
+			</div>
+		</div>
+	</section>
+}
+
+templ homeQuestion(question string) {
+	<details class="group">
+		<summary class="flex cursor-pointer list-none items-center justify-between gap-6 px-4 py-5 text-[17px] font-semibold sm:px-5 sm:py-6 sm:text-lg [&::-webkit-details-marker]:hidden">
+			{ question }
+			@icon.Plus(icon.Props{Class: "size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-45"})
+		</summary>
+		<p class="max-w-2xl px-4 pb-6 text-[16px] leading-7 text-muted-foreground sm:px-5 sm:text-[17px]">
+			{ children... }
+		</p>
+	</details>
+}

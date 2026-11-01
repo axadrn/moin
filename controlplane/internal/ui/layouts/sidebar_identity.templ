@@ -1,0 +1,9 @@
+package layouts
+
+import "github.com/axadrn/ops/controlplane/internal/model"
+
+templ SidebarIdentityUpdates(user *model.User) {
+	@AppSidebarAvatar(user)
+	@AppSidebarUserSummary(user)
+	@AppSidebarUserLabel(user)
+}

@@ -1,0 +1,143 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+)
+
+// appCI is the "Build in CI" row of the app page: deploy an image built
+// elsewhere, and the deploy hook CI calls.
+templ appCI(appName string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<section aria-labelledby="app-ci-heading" class="ops-panel mt-4 min-w-0 overflow-hidden">
+		<div class="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-4">
+			<div>
+				<h2 id="app-ci-heading" class="text-base font-semibold tracking-tight">Build in CI</h2>
+				<p class="mt-0.5 text-xs text-pretty text-muted-foreground">Ship an image built elsewhere. The server keeps the compose file of the live release and only pulls the image.</p>
+			</div>
+			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/ci">How it works</a>
+		</div>
+		<div class="grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+			<form
+				class="flex flex-col gap-3 p-4"
+				hx-post={ basePath + "/apps/" + appName + "/image" }
+				hx-swap="none"
+				hx-disable="find button[type='submit']"
+			>
+				@csrf.Token()
+				<label for="image-ref" class="text-xs font-medium">Deploy image</label>
+				<div class="flex flex-col gap-2 sm:flex-row">
+					@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
+						@icon.Upload(icon.Props{Class: "size-3.5"})
+						Deploy image
+					}
+				</div>
+				<p class="text-xs text-muted-foreground">Same as <code class="font-mono text-foreground/80">ops deploy --image</code>. Private registries need a login under Settings → Security.</p>
+			</form>
+			<div class="flex flex-col gap-3 p-4">
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-xs font-medium">Deploy hook</span>
+					@button.Button(button.Props{
+						Variant: button.VariantSecondary,
+						Size:    button.SizeSm,
+						Attributes: templ.Attributes{
+							"hx-post":       basePath + "/apps/" + appName + "/hook",
+							"hx-target":     "#app-hook",
+							"hx-swap":       "outerHTML",
+							"hx-disable":    "this",
+							"hx-confirm":    "Create a new deploy hook? The old URL stops working.",
+							"data-new-hook": true,
+						},
+					}) {
+						@icon.Key(icon.Props{Class: "size-3.5"})
+						New deploy hook
+					}
+				</div>
+				@AppHook(appName, "")
+			</div>
+		</div>
+	</section>
+}
+
+// AppHook shows a new deploy hook URL once, with the curl CI runs.
+templ AppHook(appName, url string) {
+	<div id="app-hook" class="space-y-2">
+		if url == "" {
+			<p class="text-xs text-muted-foreground">A secret URL CI calls after pushing the image. It is shown once; store it as the CI secret <code class="font-mono text-foreground/80">OPS_DEPLOY_HOOK</code>.</p>
+		} else {
+			<p class="text-xs font-medium text-running">Shown once. Store it as the CI secret OPS_DEPLOY_HOOK now.</p>
+			<div data-deploy-hook>
+				@command(url)
+			</div>
+			<p class="text-xs text-muted-foreground">Then, after pushing the image:</p>
+			@command(`curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
+		}
+	</div>
+}
+
+// SettingsRegistriesSection lists the registry logins agents pull private images with.
+templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div id="settings-registries">
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Registries
+				}
+				@card.Description() {
+					Logins your servers use to pull private images built in CI. Passwords and tokens are stored encrypted and only handed to the agent for the pull.
+				}
+			}
+			@card.Content() {
+				if len(logins) > 0 {
+					<ul class="mb-4 divide-y rounded-md border" role="list">
+						for _, login := range logins {
+							<li data-registry={ login.Host } class="flex h-11 items-center gap-3 px-3 text-sm">
+								<span class="font-mono text-xs font-medium">{ login.Host }</span>
+								<span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{ login.Username }</span>
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Size:    button.SizeXs,
+									Attributes: templ.Attributes{
+										"hx-delete":  basePath + "/settings/registries/" + login.Host,
+										"hx-target":  "#settings-registries",
+										"hx-swap":    "outerHTML",
+										"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
+									},
+								}) {
+									Remove
+								}
+							</li>
+						}
+					</ul>
+				}
+				<form
+					class="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+					hx-post={ basePath + "/settings/registries" }
+					hx-target="#settings-registries"
+					hx-swap="outerHTML"
+				>
+					@csrf.Token()
+					<label for="registry-host" class="sr-only">Host</label>
+					@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+					<label for="registry-username" class="sr-only">Username</label>
+					@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Placeholder: "username", Class: "text-xs", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+					<label for="registry-password" class="sr-only">Password or token</label>
+					@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Placeholder: "token", Class: "text-xs", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
+						Save
+					}
+				</form>
+				if formError != "" {
+					<p class="mt-2 text-xs text-failed" role="alert" data-registry-error>{ formError }</p>
+				}
+			}
+		}
+	</div>
+}

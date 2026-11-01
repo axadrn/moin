@@ -1,0 +1,55 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+)
+
+templ AuthMagicLinkForm(errorMsg string) {
+	<form
+		id="magic-link-form"
+		action="/auth/magic-link"
+		method="POST"
+		hx-post="/auth/magic-link"
+		hx-target="#magic-link-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		@field.Group() {
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "email"}) {
+					Email
+				}
+				@input.Input(input.Props{
+					ID:          "email",
+					Name:        "email",
+					Type:        "email",
+					Placeholder: "you@company.com",
+					Class:       blocks.AuthInput,
+					Attributes: templ.Attributes{
+						"aria-invalid": strconv.FormatBool(errorMsg != ""),
+						"autocomplete": "email",
+						"autofocus":    "",
+						"required":     "",
+					},
+				})
+				if errorMsg != "" {
+					@field.Error() {
+						{ errorMsg }
+					}
+				}
+			}
+			@button.Button(button.Props{Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
+				Continue with email
+				@icon.ArrowRight(icon.Props{Class: "size-4"})
+			}
+		}
+	</form>
+}

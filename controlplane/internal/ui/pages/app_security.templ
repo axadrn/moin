@@ -1,0 +1,181 @@
+package pages
+
+import (
+	"strings"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// SecurityView is the security page of a server.
+type SecurityView struct {
+	Server       model.Server
+	Integrations service.Integrations
+	Notice       string
+	Error        string
+}
+
+// serverAccess is the line on a server card that says how it is reached.
+templ serverAccess(server model.Server) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div class="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-4" data-server-access>
+		if server.Tunnel {
+			<span class="rounded-full bg-live/12 px-2.5 py-1 text-xs font-semibold text-live">Cloudflare Tunnel</span>
+		} else {
+			<span class="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">Ports 80, 443</span>
+		}
+		if server.Firewall {
+			<span class="rounded-full bg-live/12 px-2.5 py-1 text-xs font-semibold text-live">Firewall</span>
+		}
+		if server.SSHTailscale {
+			<span class="rounded-full bg-live/12 px-2.5 py-1 text-xs font-semibold text-live">SSH on Tailscale</span>
+		}
+		if rules := service.ServerRules(server); rules != nil {
+			<span class="rounded-full bg-live/12 px-2.5 py-1 text-xs font-semibold text-live" title={ strings.Join(rules.Lines(), "\n") } data-server-rules>Rules</span>
+		}
+		<a href={ templ.SafeURL(basePath + "/servers/" + server.ID + "/security") } class="ml-auto text-xs font-semibold text-muted-foreground hover:text-foreground" data-security-link>Security</a>
+	</div>
+}
+
+templ ServerSecurity(view SecurityView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ securityPath := basePath + "/servers/" + view.Server.ID + "/security" }}
+	{{ report := service.SecurityReport(view.Server) }}
+	@layouts.AppShell(layouts.AppProps{Title: view.Server.Name + " security", Crumbs: []layouts.Crumb{{Label: "Servers", Href: basePath + "/servers"}, {Label: view.Server.Name}, {Label: "Security"}}}) {
+		@panelPage(templ.Attributes{"data-server-security": view.Server.Name}) {
+			@pageTitle(view.Server.Name, "No open port, SSH only on your tailnet, everything else dropped. Each switch applies at once.")
+			<div id="server-security" class="mt-6 flex flex-col gap-4">
+				if view.Notice != "" {
+					<p class="rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live" role="status" data-security-notice>{ view.Notice }</p>
+				}
+				if view.Error != "" {
+					<p class="rounded-2xl bg-failed/12 px-5 py-3.5 text-sm font-medium text-failed" role="alert" data-security-error>{ view.Error }</p>
+				}
+				<section class="ops-panel min-w-0 overflow-hidden">
+					<div class={ panelHeadClasses }>
+						<h2 class="ops-panel-title">Access</h2>
+						<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/security">How it works</a>
+					</div>
+					<form class="flex flex-col divide-y divide-border px-5 pb-2" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" data-security-form>
+						@csrf.Token()
+						@securityToggle("tunnel", "Cloudflare Tunnel", "All app traffic comes through a tunnel from Cloudflare. Ports 80 and 443 close, ops points your domains at the tunnel and Cloudflare serves HTTPS.", view.Server.Tunnel, !view.Integrations.Cloudflare, "Add a Cloudflare API token below first.")
+						@securityToggle("ssh_tailscale", "SSH only on Tailscale", "The server joins your tailnet; SSH answers there and nowhere else. It only closes once Tailscale is up.", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Add a Tailscale auth key below first.")
+						@securityToggle("firewall", "Firewall", "Drops every inbound connection the server does not need. Open stays only what the switches above leave open.", view.Server.Firewall, false, "")
+						<div class="flex justify-end py-4">
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+								Apply
+							}
+						</div>
+					</form>
+				</section>
+				if report != nil {
+					<section class="ops-panel min-w-0 overflow-hidden" data-security-report>
+						<div class={ panelHeadClasses }>
+							<h2 class="ops-panel-title">What the agent set up</h2>
+						</div>
+						<dl class="grid gap-3 px-4 pb-4 sm:grid-cols-3">
+							@backupFact("Traffic", proxyText(report.Proxy), "")
+							@backupFact("Open to everyone", portsText(report.Firewall, report.OpenPorts), "")
+							@backupFact("Tailnet", orDash(report.TailscaleIP), "")
+						</dl>
+						for _, problem := range report.Problems {
+							<p class="mx-4 mb-3 rounded-2xl bg-running/12 px-4 py-3 text-sm text-running">{ problem }</p>
+						}
+					</section>
+				}
+				@serverRules(view.Server)
+				<section class="ops-panel min-w-0 overflow-hidden">
+					<div class={ panelHeadClasses }>
+						<h2 class="ops-panel-title">Keys</h2>
+						<span class="text-xs text-muted-foreground">Used by all your servers, stored encrypted</span>
+					</div>
+					<form class="grid gap-3 px-5 pb-5 sm:grid-cols-2" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
+						@csrf.Token()
+						<label class="flex min-w-0 flex-col gap-1">
+							<span class="text-xs font-semibold">
+								Cloudflare API token
+								if view.Integrations.Cloudflare {
+									<span class="font-normal text-live">stored · account { view.Integrations.CloudflareAccount }</span>
+								}
+							</span>
+							@input.Input(input.Props{Name: "cloudflare_token", Type: "password", Placeholder: "Tunnel Edit, DNS Edit, Zone Settings Edit", Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off"}})
+						</label>
+						<label class="flex min-w-0 flex-col gap-1">
+							<span class="text-xs font-semibold">
+								Tailscale auth key
+								if view.Integrations.Tailscale {
+									<span class="font-normal text-live">stored</span>
+								}
+							</span>
+							@input.Input(input.Props{Name: "tailscale_key", Type: "password", Placeholder: "tskey-auth-…, reusable", Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off"}})
+						</label>
+						<div class="flex justify-end sm:col-span-2">
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg}) {
+								Save keys
+							}
+						</div>
+					</form>
+				</section>
+			</div>
+		}
+	}
+}
+
+templ securityToggle(name, title, text string, on, locked bool, lockedText string) {
+	<label class="flex items-start justify-between gap-6 py-4" data-toggle={ name }>
+		<span class="min-w-0 text-sm text-muted-foreground">
+			<span class="block font-semibold text-foreground">{ title }</span>
+			{ text }
+			if locked && !on {
+				<span class="mt-1 block text-running">{ lockedText }</span>
+			}
+		</span>
+		<input type="checkbox" name={ name } value="1" checked?={ on } disabled?={ locked && !on } class="mt-1 size-5 shrink-0 accent-[var(--foreground)]"/>
+	</label>
+}
+
+func proxyText(proxy string) string {
+	if proxy == "tunnel" {
+		return "Cloudflare Tunnel"
+	}
+	return "Ports 80, 443"
+}
+
+func portsText(firewall bool, ports []string) string {
+	if !firewall {
+		return "no firewall"
+	}
+	if len(ports) == 0 {
+		return "nothing"
+	}
+	return strings.Join(ports, ", ")
+}
+
+// serverRules shows /etc/ops/rules of the server as the agent reported it.
+// Only the owner of the server changes them, on the server.
+templ serverRules(server model.Server) {
+	{{ rules := service.ServerRules(server) }}
+	<section class="ops-panel min-w-0 overflow-hidden" data-rules-panel>
+		<div class={ panelHeadClasses }>
+			<h2 class="ops-panel-title">Rules</h2>
+			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/security#rules">How they work</a>
+		</div>
+		<div class="flex flex-col gap-3 px-5 pb-5">
+			if len(rules.Lines()) == 0 {
+				<p class="text-sm text-muted-foreground">
+					No rules: ops may do everything on this server. Write <code class="font-mono text-foreground">/etc/ops/rules</code> on the server to turn off data or logs, or to allow deploys only from your own repos.
+				</p>
+			} else {
+				<p class="text-sm text-muted-foreground">
+					Set in <code class="font-mono text-foreground">/etc/ops/rules</code> on the server. The agent refuses everything they do not allow, and nobody can change them through ops.
+				</p>
+				<pre class="ops-term overflow-x-auto rounded-xl bg-muted px-4 py-3 text-xs" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
+			}
+		</div>
+	</section>
+}

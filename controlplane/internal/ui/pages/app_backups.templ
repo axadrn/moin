@@ -1,0 +1,309 @@
+package pages
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/protocol"
+)
+
+// BackupsView is the backups page of an app.
+type BackupsView struct {
+	App     model.App
+	Storage *service.BackupStorage
+	Backups protocol.Backups
+	// Notice says what just happened; Error why the server could not answer
+	// or a change failed.
+	Notice string
+	Error  string
+	Now          time.Time
+}
+
+templ AppBackups(view BackupsView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " backups", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Backups"}}}) {
+		@panelPage(templ.Attributes{"data-app-backups": view.App.Name}) {
+			<div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+				<div class="min-w-0">
+					<h1 class="truncate font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ view.App.Name }</h1>
+					<p class="mt-2.5 text-sm text-muted-foreground">
+						Every change replicated, a snapshot before every change, a restore drill every day.
+					</p>
+				</div>
+				if view.Storage != nil && len(view.Backups.Databases) > 0 {
+					<form hx-post={ basePath + "/apps/" + view.App.Name + "/backups/now" } hx-target="#app-backups" hx-select="#app-backups" hx-swap="outerHTML">
+						@csrf.Token()
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Attributes: templ.Attributes{"data-back-up": true}}) {
+							Back up now
+						}
+					</form>
+				}
+			</div>
+			@appTabs(view.App.Name, "backups")
+			<div id="app-backups" class="mt-4 flex flex-col gap-4">
+				if view.Notice != "" {
+					<p class="rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live" role="status" data-backup-notice>{ view.Notice }</p>
+				}
+				if view.Error != "" {
+					<p class="rounded-2xl bg-failed/12 px-5 py-3.5 text-sm font-medium text-failed" role="alert" data-backup-error>{ view.Error }</p>
+				}
+				if view.Storage == nil {
+					<div class="ops-panel px-6 py-10">
+						<p class="text-lg font-semibold">Backups go to your own bucket</p>
+						<p class="mt-1.5 max-w-xl text-sm text-muted-foreground">Add one S3-compatible bucket for all your apps, and every SQLite database is backed up from then on. The same bucket carries your code on ops deploy.</p>
+						<a href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/bucket") } class="mt-5 inline-flex h-11 items-center rounded-full bg-brand px-6 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-85" data-add-bucket>Add your bucket</a>
+					</div>
+				} else {
+					for _, database := range view.Backups.Databases {
+						@databaseBackup(view, database)
+					}
+					if len(view.Backups.Databases) == 0 && view.Error == "" {
+						<div class="ops-panel">
+							@emptyState("No SQLite database yet", "Backups start as soon as the live release keeps a SQLite database on a volume.", "ops deploy "+view.App.Name)
+						</div>
+					}
+					<div class="grid items-start gap-4 lg:grid-cols-2">
+						@backupSettings(view)
+						@bucketSummary(view)
+					</div>
+				}
+			</div>
+		}
+	}
+}
+
+templ databaseBackup(view BackupsView, database protocol.DatabaseBackup) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	<section class="ops-panel min-w-0 overflow-hidden" data-database-backup={ database.Database }>
+		<div class={ panelHeadClasses }>
+			<h2 class="ops-panel-title font-mono text-[17px]">{ database.Database }</h2>
+			if database.Error != "" {
+				<span class="inline-flex items-center gap-2 rounded-full bg-failed/12 px-3 py-1 text-xs font-semibold text-failed">
+					<span class="size-1.5 rounded-full bg-failed"></span>
+					Needs attention
+				</span>
+			} else if database.VerifiedAt != nil {
+				<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-xs font-semibold text-live" data-verified>
+					<span class="lp-pulse size-1.5 rounded-full bg-live"></span>
+					Verified by restore { ago(*database.VerifiedAt, view.Now) }
+				</span>
+			} else if database.ReplicatedAt != nil {
+				<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-xs font-semibold text-live">
+					<span class="lp-pulse size-1.5 rounded-full bg-live"></span>
+					Replicating
+				</span>
+			} else {
+				<span class="inline-flex items-center gap-2 rounded-full bg-running/12 px-3 py-1 text-xs font-semibold text-running">
+					<span class="size-1.5 rounded-full bg-running"></span>
+					Starting
+				</span>
+			}
+		</div>
+		if database.Error != "" {
+			<p class="px-5 pb-2 text-sm text-failed">{ database.Error }</p>
+		}
+		<div class="grid gap-3 px-4 pb-4 sm:grid-cols-3">
+			@backupFact("Continuous", replicatedText(database, view.Now), "every change, about once a second")
+			@backupFact("Point in time", windowText(database), "restore to any second in it")
+			@backupFact("Snapshots", fmt.Sprint(len(database.Snapshots)), latestSnapshot(database, view.Now))
+		</div>
+		<div class="grid gap-4 border-t border-border px-4 pt-4 pb-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+			<div class="min-w-0">
+				<h3 class="px-1 text-sm font-semibold">Snapshots</h3>
+				if len(database.Snapshots) == 0 {
+					<p class="px-1 pt-2 text-sm text-muted-foreground">None yet. ops takes one before every deploy and change, or now with Back up now.</p>
+				} else {
+					<ul class="mt-2 flex max-h-[22rem] flex-col gap-0.5 overflow-y-auto" role="list" data-snapshots>
+						for _, snapshot := range database.Snapshots {
+							<li class="group/snap flex h-12 items-center gap-3 rounded-xl px-3 transition-colors hover:bg-muted/60" data-snapshot={ snapshot.ID }>
+								<span class="w-28 shrink-0 text-sm tabular-nums">{ ago(snapshot.CreatedAt, view.Now) }</span>
+								<span class={ "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", reasonClass(snapshot.Reason) }>{ reasonText(snapshot.Reason) }</span>
+								<span class="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground" title={ snapshot.CreatedAt.Format(time.RFC3339) }>{ size(snapshot.Size) }</span>
+								<form
+									hx-post={ appPath + "/backups/restore" }
+									hx-target="#app-backups"
+									hx-select="#app-backups"
+									hx-swap="outerHTML"
+									hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.Format("Jan 2, 15:04") + " UTC? ops takes a snapshot of the current state first. The app stops for a moment." }
+								>
+									@csrf.Token()
+									<input type="hidden" name="database" value={ database.Database }/>
+									<input type="hidden" name="snapshot" value={ snapshot.ID }/>
+									<button type="submit" class="inline-flex h-8 cursor-pointer items-center rounded-full bg-secondary px-3.5 text-xs font-semibold transition-opacity hover:opacity-80 sm:opacity-0 sm:group-hover/snap:opacity-100 focus-visible:opacity-100">Restore</button>
+								</form>
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			<form
+				class="flex flex-col gap-3 rounded-2xl bg-muted/60 p-4"
+				hx-post={ appPath + "/backups/restore" }
+				hx-target="#app-backups"
+				hx-select="#app-backups"
+				hx-swap="outerHTML"
+				hx-confirm={ "Restore " + database.Database + " to this point in time? ops takes a snapshot of the current state first. The app stops for a moment." }
+			>
+				@csrf.Token()
+				<input type="hidden" name="database" value={ database.Database }/>
+				<h3 class="text-sm font-semibold">Back to a point in time</h3>
+				<p class="text-xs text-muted-foreground">Any second in the window, in UTC. Deleted the wrong rows at 14:02? Restore to 14:01.</p>
+				<input
+					type="datetime-local"
+					name="at"
+					step="1"
+					required
+					if database.Since != nil {
+						min={ database.Since.UTC().Format("2006-01-02T15:04:05") }
+					}
+					if database.ReplicatedAt != nil {
+						max={ database.ReplicatedAt.UTC().Format("2006-01-02T15:04:05") }
+						value={ database.ReplicatedAt.UTC().Format("2006-01-02T15:04:05") }
+					}
+					class="h-10 rounded-xl bg-card px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring"
+				/>
+				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg, Disabled: database.Since == nil}) {
+					Restore to this time
+				}
+			</form>
+		</div>
+	</section>
+}
+
+templ backupFact(label, value, note string) {
+	<div class="rounded-2xl bg-muted/60 px-4 py-3.5">
+		<p class="text-xs text-muted-foreground">{ label }</p>
+		<p class="mt-1 text-lg font-semibold tabular-nums">{ value }</p>
+		<p class="text-xs text-muted-foreground">{ note }</p>
+	</div>
+}
+
+templ backupSettings(view BackupsView) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ on := view.App.SnapshotBeforeChanges }}
+	<section class="ops-panel min-w-0 overflow-hidden">
+		<div class={ panelHeadClasses }>
+			<h2 class="ops-panel-title">Before every change</h2>
+		</div>
+		<form class="flex items-start justify-between gap-4 px-5 pt-1 pb-5" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
+			@csrf.Token()
+			<label for="snapshot-before-changes" class="text-sm text-muted-foreground">
+				<span class="block font-semibold text-foreground">Take a snapshot first</span>
+				Before every deploy, restore, cell edit and SQL change made through ops. One click undoes a bad migration or a wrong UPDATE.
+			</label>
+			@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: on})
+		</form>
+	</section>
+}
+
+templ bucketSummary(view BackupsView) {
+	<section class="ops-panel min-w-0 overflow-hidden" data-backup-storage>
+		<div class={ panelHeadClasses }>
+			<h2 class="ops-panel-title">Bucket</h2>
+			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/bucket") }>Change</a>
+		</div>
+		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 px-5 pb-5 text-sm">
+			<dt class="text-muted-foreground">Bucket</dt>
+			<dd class="truncate font-mono text-[0.8125rem]" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+			<dt class="text-muted-foreground">Endpoint</dt>
+			<dd class="truncate font-mono text-[0.8125rem]">{ orAWS(view.Storage.Endpoint) }</dd>
+		</dl>
+	</section>
+}
+
+templ storageField(name, label, placeholder, note, kind string, wide bool) {
+	<label class={ "flex min-w-0 flex-col gap-1", templ.KV("sm:col-span-2", wide) }>
+		<span class="flex items-baseline gap-2 text-xs font-semibold">
+			{ label }
+			if note != "" {
+				<span class="font-normal text-muted-foreground">{ note }</span>
+			}
+		</span>
+		@input.Input(input.Props{Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono text-[0.8125rem]", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
+	</label>
+}
+
+func storagePathText(path string) string {
+	if path == "" {
+		return ""
+	}
+	return "/" + path
+}
+
+func orAWS(endpoint string) string {
+	if endpoint == "" {
+		return "AWS S3"
+	}
+	return endpoint
+}
+
+func replicatedText(database protocol.DatabaseBackup, now time.Time) string {
+	if database.ReplicatedAt == nil {
+		return "starting"
+	}
+	return ago(*database.ReplicatedAt, now)
+}
+
+func windowText(database protocol.DatabaseBackup) string {
+	if database.Since == nil || database.ReplicatedAt == nil {
+		return "–"
+	}
+	span := database.ReplicatedAt.Sub(*database.Since)
+	switch {
+	case span < time.Hour:
+		return fmt.Sprintf("%d min", max(int(span.Minutes()), 1))
+	case span < 48*time.Hour:
+		return fmt.Sprintf("%d h", int(span.Hours()))
+	}
+	return fmt.Sprintf("%d days", int(span.Hours()/24))
+}
+
+func latestSnapshot(database protocol.DatabaseBackup, now time.Time) string {
+	if len(database.Snapshots) == 0 {
+		return "none yet"
+	}
+	return "newest " + ago(database.Snapshots[0].CreatedAt, now)
+}
+
+func reasonText(reason string) string {
+	switch reason {
+	case "manual":
+		return "by hand"
+	case "before-sql":
+		return "before a change"
+	case "before-restore":
+		return "before a restore"
+	}
+	if len(reason) > 7 && reason[:7] == "before-" {
+		return "before " + reason[7:]
+	}
+	return reason
+}
+
+func reasonClass(reason string) string {
+	if reason == "manual" {
+		return "bg-foreground text-background"
+	}
+	return "bg-secondary text-muted-foreground"
+}
+
+func size(bytes int64) string {
+	switch {
+	case bytes < 1<<10:
+		return fmt.Sprintf("%d B", bytes)
+	case bytes < 1<<20:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/(1<<10))
+	case bytes < 1<<30:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/(1<<20))
+	}
+	return fmt.Sprintf("%.1f GB", float64(bytes)/(1<<30))
+}
+

@@ -1,0 +1,967 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/protocol"
+)
+
+// AppsView is what the apps page shows: the apps, the servers they run on
+// and the newest deploy of every app by app ID.
+type AppsView struct {
+	Apps    []model.App
+	Servers []model.Server
+	Newest  map[string]api.Deploy
+}
+
+templ Apps(view AppsView) {
+	@layouts.App("Apps") {
+		@panelPage() {
+			<div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+				@pageTitle("Apps", "Docker Compose projects on your servers. The first ops deploy in a repo creates its app.")
+				@AppAddForm(view.Servers, "", "", "")
+			</div>
+			<div class="mt-8">
+				@AppList(view)
+			</div>
+		}
+		@appsScript()
+	}
+}
+
+// AppAddForm is the add form. A request replaces it to show an error or to reset it.
+templ AppAddForm(servers []model.Server, name, server, nameError string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<form
+		id="app-add-form"
+		hx-swap-oob="true"
+		class="flex w-full flex-col gap-2 sm:flex-row sm:items-start lg:w-auto"
+		hx-post={ basePath + "/apps" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		<div class="flex min-w-0 flex-1 flex-col gap-1.5 lg:w-60 lg:flex-none">
+			<label for="app-name" class="sr-only">App name</label>
+			@input.Input(input.Props{
+				ID:          "app-name",
+				Name:        "name",
+				Type:        "text",
+				Value:       name,
+				Placeholder: "New app, e.g. blog",
+				Class:       "rounded-full px-4 font-mono text-[0.8125rem] placeholder:font-sans",
+				Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "app-name-error", "data-hotkey-focus": true},
+			})
+			if nameError != "" {
+				<p id="app-name-error" class="px-4 text-xs text-failed" role="alert">{ nameError }</p>
+			}
+		</div>
+		<div class="flex gap-2">
+			<label for="app-server" class="sr-only">Server</label>
+			<select id="app-server" name="server" class={ selectClasses + " min-w-0 flex-1 sm:w-36 sm:flex-none" } disabled?={ len(servers) == 0 }>
+				if len(servers) == 0 {
+					<option value="">No server</option>
+				}
+				for _, option := range servers {
+					<option value={ option.Name } selected?={ option.Name == server }>{ option.Name }</option>
+				}
+			</select>
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Disabled: len(servers) == 0}) {
+				@icon.Plus(icon.Props{Class: "size-4"})
+				Add app
+			}
+		</div>
+	</form>
+}
+
+// AppList is the overview and the apps. The page reloads it on every change
+// the app event stream reports.
+templ AppList(view AppsView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<div
+		id="app-list"
+		hx-swap-oob="true"
+		hx-get={ basePath + "/apps/list" }
+		hx-trigger="apps-changed from:body"
+		hx-swap="none"
+	>
+		if len(view.Apps) == 0 {
+			@emptyState("No apps yet", "Run ops deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "ops deploy")
+		} else {
+			{{ live, deploying, failed := appCounts(view.Apps) }}
+			<dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+				@statTile("Live", strconv.Itoa(live), "of "+plural(len(view.Apps), "app", "apps"))
+				@statTile("Deploying", strconv.Itoa(deploying), "right now")
+				@statTile("Failed", strconv.Itoa(failed), failedNote(failed))
+				@statTile("Servers online", strconv.Itoa(onlineServers(view.Servers)), "of "+strconv.Itoa(len(view.Servers)))
+			</dl>
+			<section class="ops-panel mt-4 overflow-hidden" aria-labelledby="apps-heading">
+				<div class="flex items-baseline justify-between px-5 pt-4 pb-1.5">
+					<h2 id="apps-heading" class="ops-panel-title">All apps</h2>
+					<span class="text-xs text-muted-foreground">{ plural(len(view.Apps), "app", "apps") }</span>
+				</div>
+				<ul class="ops-group px-2 pb-2 [--ops-inset:1.25rem]" role="list">
+					for _, app := range view.Apps {
+						{{ newest, hasNewest := view.Newest[app.ID] }}
+						<li data-app={ app.Name } class="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-xl px-3 py-3 transition-colors hover:bg-muted/70 has-[a:focus-visible]:bg-muted/70 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_1rem]">
+							<div class="min-w-0">
+								<a
+									href={ templ.SafeURL(basePath + "/apps/" + app.Name) }
+									class="block truncate text-[0.9375rem] font-semibold tracking-[-0.01em] outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
+								>{ app.Name }</a>
+								<p class="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">
+									if hasNewest && newest.Detected != nil {
+										<span class="font-mono text-xs">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
+										<span class="opacity-60">·</span>
+										{ newest.Detected.Kind }
+										<span class="opacity-60">·</span>
+									}
+									{ app.ServerName }
+								</p>
+							</div>
+							<span class="justify-self-end md:justify-self-start">
+								@appStatus(app)
+							</span>
+							<span class="hidden text-[0.8125rem] text-muted-foreground tabular-nums md:block">
+								if hasNewest {
+									<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
+								} else {
+									never deployed
+								}
+							</span>
+							@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground md:block"})
+						</li>
+					}
+				</ul>
+			</section>
+		}
+	</div>
+}
+
+// statTile is a number with its label, big, and a short note next to it.
+templ statTile(label, value, note string) {
+	<div class="ops-panel min-w-0 px-5 py-[1.125rem]">
+		<dt class="text-xs text-muted-foreground">{ label }</dt>
+		<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
+			<span class="font-display text-[1.875rem] leading-none tabular-nums">{ value }</span>
+			if note != "" {
+				<span class="truncate text-[0.8125rem] font-medium text-muted-foreground">{ note }</span>
+			}
+		</dd>
+	</div>
+}
+
+func failedNote(failed int) string {
+	if failed == 0 {
+		return "none failing"
+	}
+	return "newest failed"
+}
+
+func appCounts(apps []model.App) (live, deploying, failed int) {
+	for _, app := range apps {
+		switch {
+		case app.LatestStatus == model.DeployRunning:
+			deploying++
+		case app.LatestStatus == model.DeployFailed:
+			failed++
+		}
+		if app.LiveNumber > 0 {
+			live++
+		}
+	}
+	return live, deploying, failed
+}
+
+func onlineServers(servers []model.Server) int {
+	online := 0
+	for _, server := range servers {
+		if server.Online {
+			online++
+		}
+	}
+	return online
+}
+
+// serverKind is the status symbol of the server an app runs on.
+func serverKind(servers []model.Server, id string) status.Kind {
+	for _, server := range servers {
+		if server.ID != id {
+			continue
+		}
+		switch {
+		case server.Online:
+			return status.KindLive
+		case server.LastSeenAt == nil:
+			return status.KindWaiting
+		}
+		return status.KindFailed
+	}
+	return status.KindIdle
+}
+
+templ appStatus(app model.App) {
+	<span data-status class="inline-flex flex-wrap items-center gap-2">
+		switch {
+			case app.LatestNumber == 0:
+				@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
+					new
+				}
+			case app.LatestStatus == model.DeployRunning:
+				@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
+					{ fmt.Sprintf("deploying v%d", app.LatestNumber) }
+				}
+			case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
+				@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
+				}
+				<span class="font-mono text-xs text-muted-foreground">{ fmt.Sprintf("v%d live", app.LiveNumber) }</span>
+			case app.LatestStatus == model.DeployFailed:
+				@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
+				}
+			default:
+				@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+					{ fmt.Sprintf("live v%d", app.LiveNumber) }
+				}
+		}
+	</span>
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + many
+}
+
+const panelHeadClasses = "flex min-h-14 items-center justify-between gap-3 px-5 pt-4 pb-1.5"
+
+templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@layouts.AppShell(layouts.AppProps{Title: app.Name, Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: app.Name}}}) {
+		@panelPage(templ.Attributes{"data-app-page": app.Name}) {
+			<div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+				<div class="min-w-0">
+					<div class="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+						<h1 class="truncate font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ app.Name }</h1>
+						@appSummary(app)
+					</div>
+					<p class="mt-2.5 text-sm text-muted-foreground">
+						on <span class="text-foreground">{ app.ServerName }</span>
+						<span aria-hidden="true">·</span>
+						deploy with <code class="font-mono text-[0.8125rem] text-foreground">ops deploy { app.Name }</code>
+					</p>
+				</div>
+				<div class="flex shrink-0 gap-2.5">
+					@button.Button(button.Props{
+						Variant: button.VariantSecondary,
+						Size:    button.SizeLg,
+						Class:   "hover:bg-failed/15 hover:text-failed",
+						Attributes: templ.Attributes{
+							"hx-delete":  basePath + "/apps/" + app.Name,
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"hx-confirm": "Remove " + app.Name + "? Its containers stop and are removed. Its data stays on the server.",
+						},
+					}) {
+						Remove
+					}
+					@button.Button(button.Props{
+						Variant: button.VariantBrand,
+						Size:    button.SizeLg,
+						Attributes: templ.Attributes{
+							"hx-post":       basePath + "/apps/" + app.Name + "/redeploy",
+							"hx-swap":       "none",
+							"hx-disable":    "this",
+							"data-redeploy": true,
+							"title":         "Build the newest source again",
+						},
+					}) {
+						Redeploy
+					}
+				</div>
+			</div>
+			@appTabs(app.Name, "overview")
+			@appFacts(app, deploys)
+			<div class="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+				<div class="flex min-w-0 flex-col gap-4">
+					<section aria-labelledby="deploy-log-heading" class="ops-panel flex min-w-0 flex-col overflow-hidden">
+						<div class={ panelHeadClasses }>
+							<h2 id="deploy-log-heading" class="ops-panel-title">Deploy log <span id="deploy-log-version" class="text-muted-foreground"></span></h2>
+							<div class="flex items-center gap-1">
+								<span id="deploy-log-state" class="flex"></span>
+								<span data-deploy-log-copy class="contents">
+									@copyButton("", "", "Copy the log")
+								</span>
+							</div>
+						</div>
+						<div
+							id="deploy-log"
+							class="ops-term ops-term-lines max-h-[34rem] min-h-[12rem] overflow-auto overscroll-contain pt-2.5 pb-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+							data-deploy-log
+							tabindex="0"
+							aria-label="Deploy log"
+						>
+							<p class="px-5 py-1 text-muted-foreground">No deploy yet. Run <span class="text-foreground">ops deploy { app.Name }</span> in its repo.</p>
+						</div>
+					</section>
+					<section aria-labelledby="app-logs-heading" class="ops-panel flex min-w-0 flex-col overflow-hidden">
+						<div class={ panelHeadClasses }>
+							<h2 id="app-logs-heading" class="ops-panel-title">Container logs</h2>
+							<button
+								type="button"
+								class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[0.8125rem] font-semibold text-secondary-foreground transition-[background-color,transform] outline-none hover:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_8%)] focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
+								hx-get={ basePath + "/apps/" + app.Name + "/logs" }
+								hx-target="#app-logs"
+								hx-swap="outerHTML"
+								hx-disable="this"
+							>
+								Load logs
+							</button>
+						</div>
+						<div id="app-logs" class="ops-term px-5 pt-1.5 pb-5 text-muted-foreground">
+							<p>The last 200 lines of every container on { app.ServerName }. Same as <span class="text-foreground">ops logs { app.Name }</span>.</p>
+						</div>
+					</section>
+				</div>
+				<div class="flex min-w-0 flex-col gap-4">
+					@appDeploys(app, deploys)
+					<section aria-labelledby="app-env-heading" class="ops-panel min-w-0 overflow-hidden">
+						<div class={ panelHeadClasses }>
+							<h2 id="app-env-heading" class="ops-panel-title">Environment</h2>
+							<span class="text-xs text-muted-foreground">{ plural(len(envKeys), "encrypted", "encrypted") }</span>
+						</div>
+						@AppEnv(app.Name, envKeys, nil, "")
+					</section>
+				</div>
+			</div>
+			<div hx-get={ basePath + "/apps/" + app.Name + "/repo" } hx-trigger="load" hx-swap="outerHTML">
+				@AppRepo(RepoView{App: app})
+			</div>
+			<div hx-get={ basePath + "/apps/" + app.Name + "/routing" } hx-trigger="load" hx-swap="outerHTML">
+				@AppRouting(RoutingView{App: app})
+			</div>
+			@appCI(app.Name)
+		}
+		@appsScript()
+		@appScript(app.Name)
+	}
+}
+
+// AppDetail is the status, the facts and the deploys of an app. The page
+// reloads it on every change the app event stream reports, and follows a
+// running deploy.
+templ AppDetail(app model.App, deploys []api.Deploy) {
+	@appSummary(app)
+	@appFacts(app, deploys)
+	@appDeploys(app, deploys)
+}
+
+// appSummary is the status chip next to the app name.
+templ appSummary(app model.App) {
+	<div id="app-summary" hx-swap-oob="true" class="flex items-center">
+		@appStatus(app)
+	</div>
+}
+
+// appFacts is what runs, in big numbers: the live version, how long the last
+// deploy took, the deploys, the service and its databases.
+templ appFacts(app model.App, deploys []api.Deploy) {
+	{{ detected := liveDetected(deploys) }}
+	{{ now := time.Now() }}
+	{{ live, hasLive := deployByNumber(deploys, app.LiveNumber) }}
+	<dl id="app-facts" hx-swap-oob="true" class="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+			<dt class="text-xs text-muted-foreground">Live</dt>
+			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
+				if app.LiveNumber > 0 {
+					<span class="font-display text-[1.875rem] leading-none tabular-nums">{ fmt.Sprintf("v%d", app.LiveNumber) }</span>
+					if hasLive {
+						<span class="truncate text-[0.8125rem] font-medium text-muted-foreground" title={ stamp(live.CreatedAt) }>since { strings.TrimSuffix(ago(live.CreatedAt, now), " ago") }</span>
+					}
+				} else {
+					<span class="font-display text-[1.875rem] leading-none text-muted-foreground/60">none</span>
+				}
+			</dd>
+		</div>
+		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+			<dt class="text-xs text-muted-foreground">Last deploy took</dt>
+			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
+				if d, number := lastTook(deploys); d != "" {
+					<span class="font-display text-[1.875rem] leading-none tabular-nums">{ d }</span>
+					<span class="truncate text-[0.8125rem] font-medium text-muted-foreground">{ fmt.Sprintf("v%d", number) }</span>
+				} else {
+					<span class="font-display text-[1.875rem] leading-none text-muted-foreground/60">—</span>
+				}
+			</dd>
+		</div>
+		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+			<dt class="text-xs text-muted-foreground">Deploys</dt>
+			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
+				<span class="font-display text-[1.875rem] leading-none tabular-nums">{ strconv.Itoa(app.LatestNumber) }</span>
+				if n := failedCount(deploys); n > 0 {
+					<span class="truncate text-[0.8125rem] font-medium text-muted-foreground">{ strconv.Itoa(n) } failed</span>
+				} else if len(deploys) > 0 {
+					<span class="truncate text-[0.8125rem] font-medium text-muted-foreground" title={ stamp(deploys[0].CreatedAt) }>last { ago(deploys[0].CreatedAt, now) }</span>
+				}
+			</dd>
+		</div>
+		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]" data-detected?={ detected != nil }>
+			<dt class="text-xs text-muted-foreground">Service</dt>
+			if detected != nil {
+				<dd class="mt-2 min-w-0">
+					<span class="flex min-w-0 items-baseline gap-2.5">
+						<span class="font-display text-[1.875rem] leading-none tabular-nums">{ strconv.Itoa(detected.Port) }</span>
+						<span class="truncate text-[0.8125rem] font-medium text-muted-foreground">{ detected.Service } · { detected.Kind }</span>
+					</span>
+					for _, database := range detected.Databases {
+						<span class="mt-1.5 block truncate text-xs text-muted-foreground" title={ "On the server: " + database.HostPath }>database <span class="font-mono text-foreground">{ database.Path }</span></span>
+					}
+				</dd>
+			} else {
+				<dd class="mt-2 text-[0.8125rem] text-muted-foreground">found on the first deploy</dd>
+			}
+		</div>
+	</dl>
+}
+
+func failedCount(deploys []api.Deploy) int {
+	n := 0
+	for _, deploy := range deploys {
+		if deploy.Status == model.DeployFailed {
+			n++
+		}
+	}
+	return n
+}
+
+func deployByNumber(deploys []api.Deploy, number int) (api.Deploy, bool) {
+	for _, deploy := range deploys {
+		if deploy.Number == number {
+			return deploy, true
+		}
+	}
+	return api.Deploy{}, false
+}
+
+// lastTook is how long the newest finished deploy took, and its number.
+func lastTook(deploys []api.Deploy) (string, int) {
+	for _, deploy := range deploys {
+		if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
+			return d, deploy.Number
+		}
+	}
+	return "", 0
+}
+
+// appDeploys is the deploys as a timeline. A row shows its log on click.
+templ appDeploys(app model.App, deploys []api.Deploy) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<section
+		id="app-detail"
+		hx-swap-oob="true"
+		hx-get={ basePath + "/apps/" + app.Name + "/detail" }
+		hx-trigger="apps-changed from:body"
+		hx-swap="none"
+		data-latest-number={ strconv.Itoa(app.LatestNumber) }
+		data-latest-status={ app.LatestStatus }
+		aria-labelledby="deploys-heading"
+		class="ops-panel flex min-w-0 flex-col overflow-hidden"
+	>
+		<div class={ panelHeadClasses }>
+			<h2 id="deploys-heading" class="ops-panel-title">Deploys</h2>
+			if len(deploys) > 0 {
+				<span class="text-xs text-muted-foreground">newest first</span>
+			}
+		</div>
+		if len(deploys) == 0 {
+			<div class="flex flex-col items-start gap-3 px-5 pt-1 pb-5">
+				<p class="text-sm text-muted-foreground">No deploys yet. Run this in the repo of { app.Name }:</p>
+				<div class="w-full">
+					@command("ops deploy " + app.Name)
+				</div>
+			</div>
+		} else {
+			<ol class="ops-timeline px-2 pt-1 pb-2" role="list">
+				for i, deploy := range deploys {
+					<li
+						data-deploy={ strconv.Itoa(deploy.Number) }
+						data-extra?={ i >= deploysShown }
+						data-line-cut?={ i == deploysShown-1 && i < len(deploys)-1 }
+						class="group/deploy grid grid-cols-[1.375rem_2.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50 has-[[data-follow-deploy]:focus-visible]:bg-muted/50 data-selected:bg-muted"
+					>
+						<span class="ops-node mt-[0.3125rem]" data-kind={ nodeKind(deploy, app.LiveNumber) } aria-hidden="true"></span>
+						<span class="text-[0.9375rem] font-bold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
+						<button
+							type="button"
+							data-follow-deploy={ strconv.Itoa(deploy.Number) }
+							class="min-w-0 cursor-pointer text-left text-[0.8125rem] text-muted-foreground outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
+							aria-label={ fmt.Sprintf("Show the log of v%d", deploy.Number) }
+						>
+							@deployStatus(deploy, app.LiveNumber)
+							if deploy.Commit != "" {
+								<span class="block truncate" title={ deploy.CommitMessage } data-deploy-commit>
+									<span class="font-mono text-foreground">{ shortCommit(deploy.Commit) }</span>
+									{ deploy.CommitMessage }
+								</span>
+							}
+							if deploy.FromNumber > 0 {
+								<span class="block truncate">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
+							}
+							if deploy.Error != "" {
+								<span class="mt-0.5 block text-failed" title={ deploy.Error }>{ deploy.Error }</span>
+							}
+						</button>
+						<span class="relative flex items-center justify-end pt-0.5">
+							<span class={ "text-xs whitespace-nowrap text-muted-foreground tabular-nums transition-opacity", templ.KV("sm:group-hover/deploy:opacity-0 sm:group-data-selected/deploy:opacity-0 sm:group-has-[button:focus-visible]/deploy:opacity-0", canRollBack(app, deploy)) } title={ stamp(deploy.CreatedAt) }>
+								{ strings.TrimSuffix(ago(deploy.CreatedAt, now), " ago") }
+								if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
+									· { d }
+								}
+							</span>
+							if canRollBack(app, deploy) {
+								@button.Button(button.Props{
+									Variant: button.VariantSecondary,
+									Size:    button.SizeXs,
+									Class:   "relative z-10 group-data-selected/deploy:bg-card max-sm:ml-2 sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 sm:opacity-0 sm:group-hover/deploy:opacity-100 sm:group-data-selected/deploy:opacity-100 sm:focus-visible:opacity-100",
+									Attributes: templ.Attributes{
+										"hx-post":    basePath + "/apps/" + app.Name + "/rollback",
+										"hx-vals":    fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
+										"hx-swap":    "none",
+										"hx-disable": "this",
+										"hx-confirm": fmt.Sprintf("Start the release of v%d again?", deploy.Number),
+										"title":      fmt.Sprintf("Release v%d again", deploy.Number),
+									},
+								}) {
+									Roll back
+								}
+							}
+						</span>
+					</li>
+				}
+			</ol>
+			if len(deploys) > deploysShown {
+				<button
+					type="button"
+					data-show-all
+					class="mx-2 mb-2 flex h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-[0.8125rem] font-semibold text-muted-foreground transition-colors outline-none hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{ fmt.Sprintf("Show %d older", len(deploys)-deploysShown) }
+				</button>
+			}
+		}
+	</section>
+}
+
+// nodeKind is the color of a deploy's node on the timeline.
+func nodeKind(deploy api.Deploy, liveNumber int) string {
+	switch {
+	case deploy.Status == model.DeployRunning:
+		return "running"
+	case deploy.Status == model.DeployFailed:
+		return "failed"
+	case deploy.Number == liveNumber:
+		return "live"
+	}
+	return "done"
+}
+
+// canRollBack is whether a deploy can be released again: it succeeded, is not
+// live, and nothing deploys right now.
+func canRollBack(app model.App, deploy api.Deploy) bool {
+	return deploy.Status == model.DeploySucceeded && deploy.Number != app.LiveNumber && app.LatestStatus != model.DeployRunning
+}
+
+// deploysShown is how many deploys the list shows before "Show older".
+const deploysShown = 8
+
+templ deployStatus(deploy api.Deploy, liveNumber int) {
+	switch {
+		case deploy.Status == model.DeployRunning:
+			<strong class="block font-semibold text-running">deploying</strong>
+		case deploy.Status == model.DeployFailed:
+			<strong class="block font-semibold text-foreground">failed</strong>
+		case deploy.Number == liveNumber:
+			<strong class="block font-semibold text-foreground">live</strong>
+		default:
+			<strong class="block font-semibold text-foreground">succeeded</strong>
+	}
+}
+
+// AppLogs shows the container logs, or why they could not be read.
+templ AppLogs(lines []string, message string) {
+	if message != "" {
+		<div id="app-logs" class="ops-term flex items-center gap-2 px-5 pt-1.5 pb-5 text-failed">
+			<span aria-hidden="true">✗</span>
+			<span>{ message }</span>
+		</div>
+	} else if len(lines) == 0 {
+		<div id="app-logs" class="ops-term px-5 pt-1.5 pb-5 text-muted-foreground">No log lines yet.</div>
+	} else {
+		<div id="app-logs" class="ops-term ops-term-lines max-h-[30rem] overflow-auto overscroll-contain pt-1.5 pb-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" data-app-logs tabindex="0" aria-label="Container logs">
+			for _, line := range lines {
+				{{ entry := parseLogLine(line) }}
+				<div class="ops-term-line ops-term-log">
+					if entry.Service != "" {
+						<span class="ops-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
+						<span class="ops-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
+					}
+					<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
+				</div>
+			}
+		</div>
+	}
+}
+
+// logLine is one line of docker compose logs --timestamps:
+// "web-1  | 2026-10-31T10:31:30.123456789Z message".
+type logLine struct {
+	Service string
+	Time    string
+	Clock   string
+	Message string
+}
+
+func parseLogLine(line string) logLine {
+	service, rest, found := strings.Cut(line, " | ")
+	service = strings.TrimSpace(service)
+	if !found || service == "" || strings.Contains(service, " ") {
+		return logLine{Message: line}
+	}
+	entry := logLine{Service: service, Message: rest}
+	if stampText, message, ok := strings.Cut(rest, " "); ok {
+		if t, err := time.Parse(time.RFC3339Nano, stampText); err == nil {
+			entry.Time = stamp(t)
+			entry.Clock = t.UTC().Format("15:04:05")
+			entry.Message = message
+		}
+	}
+	return entry
+}
+
+// AppEnv is the env list with its add form. values holds the shown values;
+// keys without one show as dots.
+templ AppEnv(appName string, keys []string, values map[string]string, formError string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ envPath := basePath + "/apps/" + appName + "/env" }}
+	<div id="app-env">
+		if len(keys) > 0 {
+			<div class="flex h-9 items-center justify-between px-5">
+				<span class="text-xs text-muted-foreground">{ plural(len(keys), "variable", "variables") }</span>
+				if len(values) == 0 {
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Size:       button.SizeXs,
+						Class:      "-mr-2 text-muted-foreground",
+						Attributes: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML"},
+					}) {
+						@icon.Eye(icon.Props{Class: "size-3.5"})
+						Show values
+					}
+				} else {
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Size:       button.SizeXs,
+						Class:      "-mr-2 text-muted-foreground",
+						Attributes: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"},
+					}) {
+						@icon.EyeOff(icon.Props{Class: "size-3.5"})
+						Hide values
+					}
+				}
+			</div>
+			<ul class="ops-group px-2 pb-2 [--ops-inset:1.25rem]" role="list">
+				for _, key := range keys {
+					<li data-env={ key } class="group/env flex h-11 items-center gap-3 rounded-xl pr-1.5 pl-3 transition-colors hover:bg-muted/60">
+						<span class="max-w-[55%] shrink-0 truncate font-mono text-[0.8125rem]" title={ key }>{ key }</span>
+						<span class="min-w-0 flex-1 truncate text-right font-mono text-[0.8125rem] text-muted-foreground">
+							if value, ok := values[key]; ok {
+								<span data-env-value class="text-foreground/80">{ value }</span>
+							} else {
+								<span class="tracking-[0.2em]">••••••</span>
+							}
+						</span>
+						<button
+							type="button"
+							class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,opacity] outline-none hover:bg-failed/15 hover:text-failed focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring sm:opacity-0 sm:group-hover/env:opacity-100"
+							aria-label={ "Remove " + key }
+							title={ "Remove " + key }
+							hx-delete={ envPath + "/" + key }
+							hx-target="#app-env"
+							hx-swap="outerHTML"
+							hx-confirm={ "Remove " + key + "? The next deploy drops it." }
+						>
+							@icon.X(icon.Props{Class: "size-3.5"})
+						</button>
+					</li>
+				}
+			</ul>
+		} else {
+			<p class="px-5 pt-1 text-sm text-muted-foreground">No variables yet.</p>
+		}
+		<form
+			class="flex flex-col gap-2 px-4 pt-2 pb-4 sm:flex-row"
+			hx-post={ envPath }
+			hx-target="#app-env"
+			hx-swap="outerHTML"
+		>
+			@csrf.Token()
+			<label for="env-key" class="sr-only">Key</label>
+			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono text-xs sm:w-32 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-invalid": apiTokenInvalid(formError)}})
+			<label for="env-value" class="sr-only">Value</label>
+			@input.Input(input.Props{ID: "env-value", Name: "value", Type: "password", Placeholder: "value", Class: "min-w-0 font-mono text-xs", Attributes: templ.Attributes{"autocomplete": "off"}})
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeLg, Class: "shrink-0"}) {
+				Set
+			}
+		</form>
+		if formError != "" {
+			<p class="-mt-2 px-5 pb-4 text-xs text-failed" role="alert" data-env-error>{ formError }</p>
+		}
+	</div>
+}
+
+// appsScript reloads apps whenever the event stream reports a change.
+templ appsScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const events = new EventSource("/api/v1/apps/events");
+			events.addEventListener("apps", () => document.body.dispatchEvent(new Event("apps-changed")));
+			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+		})();
+	</script>
+}
+
+// appScript follows deploy logs: the newest deploy on load, a running one as
+// soon as it shows up, and the one whose row was clicked. Lines show as they
+// come; the log keeps to the bottom unless you scroll up. The agent's steps
+// show; the tool output between two steps folds into one line that opens on
+// click, and errors in it stay visible.
+templ appScript(appName string) {
+	<script nonce={ templ.GetNonce(ctx) } data-app={ appName }>
+		(() => {
+			const app = document.currentScript.dataset.app;
+			const log = document.getElementById("deploy-log");
+			const version = document.getElementById("deploy-log-version");
+			const state = document.getElementById("deploy-log-state");
+			const copy = document.querySelector("[data-deploy-log-copy] [data-copy]");
+			let stream = null;
+			let followed = 0;
+			let queue = [];
+			let frame = 0;
+			let raw = [];
+			let fold = null;
+			let step = "";
+			let showAll = false;
+			const isOutput = (line) => !line.trim() || /^\s|^#\d|^\[/.test(line);
+			const isError = (line) => /\b(error|failed|fatal)\b/i.test(line);
+			const kindOf = (line) => {
+				if (isOutput(line)) return isError(line) ? "err" : "out";
+				if (/^v\d+ is live$/.test(line)) return "ok";
+				if (isError(line)) return "err";
+				return "step";
+			};
+			const shorten = (path) => {
+				const parts = path.split("/").filter(Boolean);
+				return parts.length > 3 ? "…/" + parts.slice(-3).join("/") : path;
+			};
+			const row = (text, kind, number) => {
+				const div = document.createElement("div");
+				div.className = "ops-term-line";
+				div.dataset.kind = kind;
+				div.dataset.n = number;
+				const span = document.createElement("span");
+				const path = kind === "step" && text.match(/^(.*\S)\s+\((\/[^)\s]{24,})\)$/);
+				if (path) {
+					const host = document.createElement("span");
+					host.className = "ops-term-dim";
+					host.title = path[2];
+					host.textContent = ` (${shorten(path[2])})`;
+					span.append(path[1], host);
+				} else {
+					span.textContent = text;
+				}
+				div.appendChild(span);
+				return div;
+			};
+			const label = (group) => {
+				const count = group.querySelectorAll(".ops-term-line").length;
+				const what = { building: "build", starting: "compose", pulling: "pull" }[group.dataset.step] || "output";
+				group.firstChild.lastChild.textContent = `${count} ${what} ${count === 1 ? "line" : "lines"}`;
+			};
+			const newFold = () => {
+				const group = document.createElement("div");
+				group.className = "ops-term-fold";
+				group.dataset.step = step;
+				const toggle = document.createElement("button");
+				toggle.type = "button";
+				toggle.className = "ops-term-toggle";
+				toggle.setAttribute("aria-expanded", "false");
+				const arrow = document.createElement("span");
+				arrow.className = "ops-term-arrow";
+				arrow.setAttribute("aria-hidden", "true");
+				arrow.textContent = "▸";
+				toggle.append(arrow, document.createElement("span"));
+				group.appendChild(toggle);
+				return group;
+			};
+			const flush = () => {
+				frame = 0;
+				if (!queue.length) return;
+				const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+				const touched = new Set();
+				for (const [text, forced] of queue) {
+					raw.push(text);
+					const kind = forced || kindOf(text);
+					if (!forced && isOutput(text)) {
+						if (!fold) {
+							fold = newFold();
+							log.appendChild(fold);
+						}
+						if (text.trim()) fold.appendChild(row(text, kind, raw.length));
+						touched.add(fold);
+					} else {
+						fold = null;
+						step = text.trim().split(/\s+/)[0];
+						log.appendChild(row(text, kind, raw.length));
+					}
+				}
+				queue = [];
+				touched.forEach(label);
+				if (copy) copy.dataset.copy = raw.join("\n");
+				if (stick) log.scrollTop = log.scrollHeight;
+			};
+			const add = (text, kind) => {
+				queue.push([text, kind]);
+				if (!frame) frame = requestAnimationFrame(flush);
+			};
+			const chips = {
+				running: ["bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "ops-dot-run bg-running"],
+				live: ["bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "ops-dot-live bg-live"],
+				failed: ["bg-failed/15 text-[color-mix(in_oklab,var(--failed),var(--foreground)_12%)]", "bg-failed"],
+			};
+			const show = (text, kind) => {
+				const [chip, dot] = chips[kind] || ["bg-muted text-muted-foreground", "bg-muted-foreground"];
+				state.className = "inline-flex h-7 items-center gap-2 rounded-full pr-3 pl-2.5 text-[0.8125rem] font-semibold " + chip;
+				const mark = document.createElement("span");
+				mark.className = "inline-block size-2 rounded-full " + dot;
+				state.replaceChildren(mark, document.createTextNode(text));
+			};
+			const select = () => {
+				const detail = document.getElementById("app-detail");
+				if (detail && showAll) detail.dataset.all = "";
+				document.querySelectorAll("[data-deploy]").forEach((item) => {
+					if (Number(item.dataset.deploy) === followed) item.dataset.selected = "true";
+					else delete item.dataset.selected;
+				});
+			};
+			const follow = (number) => {
+				if (stream) stream.close();
+				if (frame) cancelAnimationFrame(frame);
+				frame = 0;
+				followed = number;
+				queue = [];
+				raw = [];
+				fold = null;
+				step = "";
+				log.replaceChildren();
+				log.scrollTop = 0;
+				log.dataset.following = number;
+				delete log.dataset.done;
+				version.textContent = `· v${number}`;
+				show("following", "running");
+				select();
+				stream = new EventSource(`/api/v1/apps/${encodeURIComponent(app)}/deploys/${number}/events`);
+				stream.addEventListener("line", (event) => add(JSON.parse(event.data).line));
+				stream.addEventListener("done", (event) => {
+					const deploy = JSON.parse(event.data);
+					if (frame) cancelAnimationFrame(frame);
+					flush();
+					const end = deploy.status === "succeeded" ? `v${deploy.number} is live` : deploy.status === "failed" ? `v${deploy.number} failed: ${deploy.error}` : "";
+					if (end && raw[raw.length - 1] !== end) {
+						add(end, deploy.status === "succeeded" ? "ok" : "err");
+						flush();
+					}
+					log.dataset.done = deploy.status;
+					show(deploy.status === "running" ? "stopped following" : deploy.status, { succeeded: "live", failed: "failed" }[deploy.status]);
+					stream.close();
+					stream = null;
+				});
+			};
+			const check = () => {
+				const detail = document.getElementById("app-detail");
+				if (!detail) return;
+				const number = Number(detail.dataset.latestNumber);
+				if (number > 0 && (followed === 0 || (detail.dataset.latestStatus === "running" && number !== followed))) follow(number);
+				else select();
+			};
+			document.addEventListener("click", (event) => {
+				const toggle = event.target.closest(".ops-term-toggle");
+				if (toggle) {
+					const group = toggle.parentElement;
+					const open = !group.hasAttribute("data-open");
+					group.toggleAttribute("data-open", open);
+					toggle.setAttribute("aria-expanded", String(open));
+					return;
+				}
+				const more = event.target.closest("[data-show-all]");
+				if (more) {
+					showAll = true;
+					select();
+					return;
+				}
+				const button = event.target.closest("[data-follow-deploy]");
+				if (button) follow(Number(button.dataset.followDeploy));
+			});
+			document.addEventListener("htmx:after:swap", () => {
+				check();
+				const logs = document.querySelector("[data-app-logs]:not([data-scrolled])");
+				if (logs) {
+					logs.scrollTop = logs.scrollHeight;
+					logs.dataset.scrolled = "";
+				}
+			});
+			check();
+			document.addEventListener("htmx:before:history:update", () => stream && stream.close(), { once: true });
+		})();
+	</script>
+}
+
+// shortPath keeps the last three parts of a long path: …/volumes/data/app.db.
+func shortPath(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) <= 3 {
+		return path
+	}
+	return "…/" + strings.Join(parts[len(parts)-3:], "/")
+}
+
+func liveDetected(deploys []api.Deploy) *protocol.Detected {
+	for _, deploy := range deploys {
+		if deploy.Status == model.DeploySucceeded && deploy.Detected != nil {
+			return deploy.Detected
+		}
+	}
+	return nil
+}
+
+func shortCommit(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}

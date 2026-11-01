@@ -1,0 +1,134 @@
+package api
+
+import (
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+)
+
+// APITokensHandler lists, creates and revokes the personal API tokens of the
+// signed-in user. Only session callers reach it: a token never manages
+// tokens.
+type APITokensHandler struct {
+	tokens *service.APITokenService
+}
+
+func NewAPITokensHandler(tokens *service.APITokenService) *APITokensHandler {
+	return &APITokensHandler{tokens: tokens}
+}
+
+// APIToken is the public JSON shape of a personal API token. It never carries
+// the token or its hash.
+type APIToken struct {
+	ID string `json:"id"`
+	// Name is the label the user gave the token.
+	Name string `json:"name"`
+	// Prefix is the start of the token after "pat_", for telling tokens
+	// apart.
+	Prefix string   `json:"prefix"`
+	Scopes []string `json:"scopes"`
+	// WorkspaceID is the only workspace the token can reach.
+	WorkspaceID string     `json:"workspace_id"`
+	LastUsedAt  *time.Time `json:"last_used_at"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	Expired     bool       `json:"expired"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
+// APITokenList is the answer of GET /api/v1/account/tokens.
+type APITokenList struct {
+	Items []APIToken `json:"items"`
+}
+
+// CreatedAPIToken is the answer of POST /api/v1/account/tokens. Token is the
+// raw token, shown this one time only.
+type CreatedAPIToken struct {
+	Token    string   `json:"token"`
+	APIToken APIToken `json:"api_token"`
+}
+
+type createAPITokenRequest struct {
+	Name   string   `json:"name"`
+	Scopes []string `json:"scopes"`
+	// ExpiresInDays is 1 to 365, or null for a token that never expires.
+	ExpiresInDays *int   `json:"expires_in_days"`
+	WorkspaceID   string `json:"workspace_id"`
+}
+
+// List returns every token of the user, newest first.
+func (h *APITokensHandler) List(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	tokens, err := h.tokens.List(user.ID)
+	if err != nil {
+		slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
+		ServiceError(w, err)
+		return
+	}
+	now := time.Now()
+	items := make([]APIToken, 0, len(tokens))
+	for _, token := range tokens {
+		items = append(items, NewAPIToken(token, now))
+	}
+	JSON(w, http.StatusOK, APITokenList{Items: items})
+}
+
+// Create stores a new token and answers 201 with the raw token.
+func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	var request createAPITokenRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	expiresInDays := 0
+	if request.ExpiresInDays != nil {
+		expiresInDays = *request.ExpiresInDays
+		if expiresInDays < 1 {
+			ServiceError(w, service.ErrAPITokenExpiry)
+			return
+		}
+	}
+	token, raw, err := h.tokens.Create(user.ID, service.CreateAPITokenInput{
+		Name:          request.Name,
+		Scopes:        request.Scopes,
+		ExpiresInDays: expiresInDays,
+		WorkspaceID:   request.WorkspaceID,
+	})
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	slog.Info("api token created", "token_id", token.ID, "user_id", user.ID)
+	JSON(w, http.StatusCreated, CreatedAPIToken{Token: raw, APIToken: NewAPIToken(*token, time.Now())})
+}
+
+// Revoke deletes one token of the user. Requests with it fail from then on.
+func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	tokenID := r.PathValue("id")
+	err := h.tokens.Revoke(user.ID, tokenID)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	slog.Info("api token revoked", "token_id", tokenID, "user_id", user.ID)
+	NoContent(w)
+}
+
+// NewAPIToken converts a token model into its public JSON shape.
+func NewAPIToken(token model.APIToken, now time.Time) APIToken {
+	return APIToken{
+		ID:          token.ID,
+		Name:        token.Name,
+		Prefix:      token.Prefix,
+		Scopes:      token.ScopeList(),
+		WorkspaceID: token.WorkspaceID,
+		LastUsedAt:  utcTime(token.LastUsedAt),
+		ExpiresAt:   utcTime(token.ExpiresAt),
+		Expired:     token.IsExpired(now),
+		CreatedAt:   token.CreatedAt.UTC(),
+	}
+}

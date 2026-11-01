@@ -1,0 +1,46 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
+)
+
+// AppsNav is the apps in the sidebar, each with its status. at is the page
+// the sidebar is on, so the app shown there is marked.
+templ AppsNav(apps []model.App, at string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	if len(apps) > 0 {
+		<p class="mb-1.5 px-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">Apps</p>
+		<ul class="flex flex-col gap-0.5" role="list">
+			for _, app := range apps {
+				{{ href := basePath + "/apps/" + app.Name }}
+				<li>
+					<a
+						href={ templ.SafeURL(href) }
+						class={ "flex h-10 items-center gap-3 rounded-xl px-3 text-[0.875rem] outline-none transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring", templ.KV("bg-sidebar-accent font-medium text-foreground", at == href), templ.KV("text-muted-foreground", at != href) }
+						if at == href {
+							aria-current="page"
+						}
+					>
+						<span class="min-w-0 flex-1 truncate">{ app.Name }</span>
+						@status.Symbol(appKind(app))
+					</a>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// appKind is the status symbol of an app: its newest deploy.
+func appKind(app model.App) status.Kind {
+	switch {
+	case app.LatestNumber == 0:
+		return status.KindIdle
+	case app.LatestStatus == model.DeployRunning:
+		return status.KindRunning
+	case app.LatestStatus == model.DeployFailed:
+		return status.KindFailed
+	}
+	return status.KindLive
+}

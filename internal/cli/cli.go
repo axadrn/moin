@@ -40,6 +40,7 @@ Servers
   servers add        Add a server and print its install command
   servers rm         Remove a server
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]
+  servers rules      The server's own rules for ops, from /etc/ops/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
 
 Apps
@@ -330,6 +331,11 @@ func servers(ctx context.Context, args []string, stdout io.Writer) error {
 		return nil
 	case "secure":
 		return secure(ctx, api, args[1:], stdout)
+	case "rules":
+		if len(args) != 2 {
+			return fmt.Errorf("usage: %s servers rules <name or id>", build.Name)
+		}
+		return printRules(ctx, api, args[1], stdout)
 	case "rm", "remove":
 		if len(args) != 2 {
 			return fmt.Errorf("usage: %s servers rm <name or id>", build.Name)
@@ -354,9 +360,9 @@ func PrintServers(stdout io.Writer, list []client.Server) {
 	now := time.Now()
 	rows := make([][]string, 0, len(list))
 	for _, server := range list {
-		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access()})
+		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access(), server.RulesText()})
 	}
-	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS"}, rows)
+	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS", "RULES"}, rows)
 }
 
 func dash(value string) string {
@@ -394,4 +400,31 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return agent.Run(ctx, dir, state)
+}
+
+// printRules shows /etc/ops/rules of a server as its agent reported it.
+func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout io.Writer) error {
+	list, err := api.Servers(ctx)
+	if err != nil {
+		return err
+	}
+	for _, server := range list {
+		if server.Name != nameOrID && server.ID != nameOrID {
+			continue
+		}
+		lines := server.Rules.Lines()
+		if len(lines) == 0 {
+			fmt.Fprintf(stdout, "%s has no rules: %s may do everything there.\n", style.Bold.Render(server.Name), build.Name)
+			hint(stdout, "Write them on the server in", "/etc/ops/rules")
+			return nil
+		}
+		fmt.Fprintf(stdout, "/etc/ops/rules on %s:\n\n", style.Bold.Render(server.Name))
+		for _, line := range lines {
+			fmt.Fprintln(stdout, "  "+line)
+		}
+		fmt.Fprintln(stdout)
+		hint(stdout, "Only the owner of the server changes them, on the server. See", "/docs/guides/security#rules")
+		return nil
+	}
+	return fmt.Errorf("no server %q", nameOrID)
 }

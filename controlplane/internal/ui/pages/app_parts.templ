@@ -1,0 +1,115 @@
+package pages
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+)
+
+// The parts every page of the control panel is built from.
+
+// panelPage is the width and the padding of a page.
+templ panelPage(attrs ...templ.Attributes) {
+	{{ var a templ.Attributes }}
+	if len(attrs) > 0 {
+		{{ a = attrs[0] }}
+	}
+	<div class="mx-auto w-full max-w-[80rem] px-4 pt-3 pb-20 sm:px-6 lg:px-10 lg:pt-4" { a... }>
+		{ children... }
+	</div>
+}
+
+// pageTitle is the headline of a page with one line below it.
+templ pageTitle(title, description string) {
+	<div class="min-w-0">
+		<h1 class="font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ title }</h1>
+		if description != "" {
+			<p class="mt-2.5 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
+		}
+	</div>
+}
+
+// sectionTitle heads a block of a page.
+templ sectionTitle(title string) {
+	<h2 class="text-[0.8125rem] font-semibold tracking-tight text-foreground">{ title }</h2>
+}
+
+// command is a command to copy: a prompt, the command, a copy button.
+templ command(cmd string) {
+	<div class="ops-term group/cmd flex h-11 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1.5 pl-5 text-[0.8125rem]">
+		<span class="ops-term-dim select-none" aria-hidden="true">$</span>
+		<code class="min-w-0 flex-1 truncate">{ cmd }</code>
+		@copyButton(cmd, "", "Copy command")
+	</div>
+}
+
+// copyButton copies value, or the text of the element target selects.
+templ copyButton(value, target, label string) {
+	<button
+		type="button"
+		data-copy={ value }
+		if target != "" {
+			data-copy-target={ target }
+		}
+		aria-label={ label }
+		title={ label }
+		class="group/copy inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+	>
+		@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
+		@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
+	</button>
+}
+
+// emptyState is a box that says what is missing and the command that adds it.
+templ emptyState(title, body, cmd string) {
+	<div class="ops-panel flex flex-col items-start gap-5 px-6 py-10 sm:items-center sm:px-10 sm:py-16 sm:text-center">
+		<div class="space-y-1.5">
+			<p class="ops-panel-title">{ title }</p>
+			if body != "" {
+				<p class="max-w-md text-sm text-pretty text-muted-foreground">{ body }</p>
+			}
+		</div>
+		if cmd != "" {
+			<div class="w-full max-w-xs">
+				@command(cmd)
+			</div>
+		}
+		{ children... }
+	</div>
+}
+
+// selectClasses gives a native select the look of an input.
+const selectClasses = "ops-select h-10 cursor-pointer appearance-none rounded-full border border-transparent bg-secondary pr-9 pl-4 text-sm font-medium transition-[border-color,box-shadow] outline-none hover:border-[color-mix(in_oklch,var(--input),var(--foreground)_15%)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 dark:bg-white/[0.03]"
+
+// ago is how long ago t was, short: "now", "4m ago", "3h ago", "12d ago".
+func ago(t time.Time, now time.Time) string {
+	age := now.Sub(t)
+	switch {
+	case age < 45*time.Second:
+		return "just now"
+	case age < time.Hour:
+		return fmt.Sprintf("%dm ago", max(1, int(age.Minutes()+0.5)))
+	case age < 48*time.Hour:
+		return fmt.Sprintf("%dh ago", int(age.Hours()))
+	case age < 60*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(age.Hours()/24))
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+// took is the length of a deploy: "14s", "1m 05s".
+func took(start time.Time, end *time.Time) string {
+	if end == nil {
+		return ""
+	}
+	d := end.Sub(start).Round(time.Second)
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", max(0, int(d.Seconds())))
+	}
+	return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
+}
+
+func stamp(t time.Time) string {
+	return t.UTC().Format("Jan 2, 2006 15:04:05 UTC")
+}

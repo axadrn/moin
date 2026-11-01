@@ -1,0 +1,113 @@
+package pages
+
+import (
+	"strings"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// ActivityView is one page of the workspace activity, newest first. Next is
+// the event to continue after, empty on the last page.
+type ActivityView struct {
+	Events []model.WorkspaceAuditEvent
+	Next   string
+}
+
+templ Activity(view ActivityView) {
+	@layouts.App("Activity") {
+		@panelPage() {
+			@pageTitle("Activity", "Who deployed, rolled back, restored or changed what, from the web, the CLI, an agent or GitHub.")
+			<div class="mt-6">
+				if len(view.Events) == 0 {
+					@emptyState("Nothing happened yet", "Deploys, restores, SQL writes and every other change of the team show up here.", "ops activity")
+				} else {
+					<ol class="ops-panel divide-y divide-border overflow-hidden" data-activity>
+						@ActivityRows(view)
+					</ol>
+				}
+			</div>
+		}
+	}
+}
+
+// ActivityRows are the rows of a page and the button that loads the next one
+// in its place.
+templ ActivityRows(view ActivityView) {
+	{{ now := time.Now() }}
+	for _, event := range view.Events {
+		{{ details := event.Details() }}
+		<li class="flex items-start gap-3.5 px-5 py-3.5" data-event={ event.Action }>
+			<span class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+				@activityIcon(event.Action)
+			</span>
+			<div class="min-w-0 flex-1">
+				<p class="text-sm text-pretty">
+					<span class="font-semibold">{ event.Actor() }</span>
+					{ " " + event.Summary() }
+				</p>
+				if details["message"] != "" {
+					<p class="mt-0.5 truncate text-xs text-muted-foreground">{ details["message"] }</p>
+				}
+			</div>
+			<div class="flex shrink-0 flex-col items-end gap-1">
+				<time class="font-mono text-xs text-muted-foreground" datetime={ event.CreatedAt.UTC().Format(time.RFC3339) } title={ stamp(event.CreatedAt) }>{ ago(event.CreatedAt, now) }</time>
+				if label := viaLabel(event.Via()); label != "" {
+					<span class="rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-semibold text-muted-foreground">{ label }</span>
+				}
+			</div>
+		</li>
+	}
+	if view.Next != "" {
+		<li class="px-5 py-3" id="activity-more">
+			<button
+				type="button"
+				class="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground"
+				hx-get={ ctxkeys.AppBasePath(ctx) + "/activity?after=" + view.Next }
+				hx-target="#activity-more"
+				hx-swap="outerHTML"
+			>Show older</button>
+		</li>
+	}
+}
+
+// viaLabel names how a change came in.
+func viaLabel(via string) string {
+	switch via {
+	case "web":
+		return "Web"
+	case "api":
+		return "CLI"
+	case "mcp":
+		return "Agent"
+	case "hook":
+		return "Deploy hook"
+	case "github":
+		return "GitHub"
+	}
+	return ""
+}
+
+templ activityIcon(action string) {
+	switch {
+		case action == "app.rolled_back":
+			@icon.Undo2(icon.Props{Class: "size-3.5"})
+		case action == "app.deployed" || action == "app.redeployed" || action == "app.applied":
+			@icon.Rocket(icon.Props{Class: "size-3.5"})
+		case strings.HasPrefix(action, "data."):
+			@icon.Database(icon.Props{Class: "size-3.5"})
+		case strings.HasPrefix(action, "backup."):
+			@icon.Archive(icon.Props{Class: "size-3.5"})
+		case strings.HasPrefix(action, "server."):
+			@icon.Server(icon.Props{Class: "size-3.5"})
+		case strings.HasPrefix(action, "env."):
+			@icon.KeyRound(icon.Props{Class: "size-3.5"})
+		case strings.HasPrefix(action, "workspace."):
+			@icon.Users(icon.Props{Class: "size-3.5"})
+		default:
+			@icon.Activity(icon.Props{Class: "size-3.5"})
+	}
+}

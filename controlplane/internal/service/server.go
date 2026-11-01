@@ -1,0 +1,480 @@
+package service
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/access"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/ops/protocol"
+	"github.com/google/uuid"
+)
+
+const (
+	installTokenMarker = "ins_"
+	agentTokenMarker   = "agt_"
+	// InstallTokenLifetime is how long an install command works.
+	InstallTokenLifetime = time.Hour
+	maxServerNameLength  = 64
+)
+
+var (
+	ErrServerName        = errors.New("server name must contain between 1 and 64 characters")
+	ErrInstallTokenValid = errors.New("install token is invalid, used or expired")
+	ErrAgentToken        = errors.New("agent token is invalid")
+	ErrServerOffline     = errors.New("server is offline")
+)
+
+// AgentError is a request the agent answered with an error.
+type AgentError struct{ Message string }
+
+func (e *AgentError) Error() string { return "agent: " + e.Message }
+
+// ServerService manages servers and the live sessions of their agents. The
+// sessions live in memory: there is one control plane process.
+type ServerService struct {
+	audit   repository.WorkspaceAuditRepository
+	servers repository.ServerRepository
+	appURL  string
+	now     func() time.Time
+
+	mu          sync.Mutex
+	sessions    map[string]*agentSession
+	subscribers map[string]map[chan struct{}]struct{}
+	onMessage   func(serverID string, message protocol.Message)
+	onConnect   func(serverID, workspaceID string)
+	accessOf    func(workspaceID string) (access.Access, error)
+}
+
+type agentSession struct {
+	workspaceID string
+	kick        func()
+	send        func(protocol.Message) error
+	// waiting maps request IDs to the requests waiting for their answer.
+	waiting map[string]chan protocol.Message
+}
+
+func NewServerService(servers repository.ServerRepository, audit repository.WorkspaceAuditRepository, appURL string) *ServerService {
+	return &ServerService{
+		audit:       audit,
+		servers:     servers,
+		appURL:      strings.TrimRight(appURL, "/"),
+		now:         time.Now,
+		sessions:    map[string]*agentSession{},
+		subscribers: map[string]map[chan struct{}]struct{}{},
+	}
+}
+
+// Create adds a server that waits for its agent and returns the raw install
+// token, which works once within InstallTokenLifetime.
+func (s *ServerService) Create(actor Actor, name string) (*model.Server, string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "server-" + randomToken()[:6]
+	}
+	if utf8.RuneCountInString(name) > maxServerNameLength || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+		return nil, "", ErrServerName
+	}
+	err := s.allowed(actor.WorkspaceID)
+	if err != nil {
+		return nil, "", err
+	}
+	raw := installTokenMarker + randomToken()
+	hash := hashToken(raw)
+	now := s.now().UTC()
+	expiresAt := now.Add(InstallTokenLifetime)
+	server := &model.Server{
+		ID:               uuid.New().String(),
+		WorkspaceID:      actor.WorkspaceID,
+		Name:             name,
+		InstallTokenHash: &hash,
+		InstallExpiresAt: &expiresAt,
+		CreatedAt:        now,
+	}
+	err = s.servers.Create(server)
+	if err != nil {
+		return nil, "", err
+	}
+	s.record(actor, "server.added", "server", name, nil)
+	s.notify(actor.WorkspaceID)
+	return server, raw, nil
+}
+
+// InstallCommand is what people run on the server.
+func (s *ServerService) InstallCommand(installToken string) string {
+	return fmt.Sprintf("curl -fsSL %s/install.sh | sudo sh -s -- %s", s.appURL, installToken)
+}
+
+// List returns the servers of a user with their live status.
+func (s *ServerService) List(workspaceID string) ([]model.Server, error) {
+	servers, err := s.servers.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for index := range servers {
+		_, servers[index].Online = s.sessions[servers[index].ID]
+	}
+	return servers, nil
+}
+
+// Delete removes a server by ID or name and disconnects its agent. The agent
+// token stops working.
+func (s *ServerService) Delete(actor Actor, idOrName string) error {
+	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	err = s.servers.DeleteForWorkspace(server.ID, actor.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	session := s.sessions[server.ID]
+	s.mu.Unlock()
+	if session != nil {
+		session.kick()
+	}
+	s.record(actor, "server.removed", "server", server.Name, nil)
+	s.notify(actor.WorkspaceID)
+	return nil
+}
+
+// Register trades a raw install token for an agent token. The install token
+// stops working.
+func (s *ServerService) Register(installToken string, hello protocol.Hello) (*model.Server, string, error) {
+	if !strings.HasPrefix(installToken, installTokenMarker) {
+		return nil, "", ErrInstallTokenValid
+	}
+	server, err := s.servers.ByInstallTokenHash(hashToken(installToken))
+	if errors.Is(err, repository.ErrServerNotFound) {
+		return nil, "", ErrInstallTokenValid
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if server.InstallExpiresAt == nil || !s.now().Before(*server.InstallExpiresAt) {
+		return nil, "", ErrInstallTokenValid
+	}
+	raw := agentTokenMarker + randomToken()
+	err = s.servers.Register(server.ID, hashToken(raw), helloServer(hello, nil))
+	if err != nil {
+		return nil, "", err
+	}
+	slog.Info("agent registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
+	s.notify(server.WorkspaceID)
+	return server, raw, nil
+}
+
+// Authenticate returns the server of a raw agent token.
+func (s *ServerService) Authenticate(agentToken string) (*model.Server, error) {
+	if !strings.HasPrefix(agentToken, agentTokenMarker) {
+		return nil, ErrAgentToken
+	}
+	server, err := s.servers.ByAgentTokenHash(hashToken(agentToken))
+	if errors.Is(err, repository.ErrServerNotFound) {
+		return nil, ErrAgentToken
+	}
+	return server, err
+}
+
+// Connect marks the server online and remembers the address the agent
+// connected from, which the DNS check compares domains with. kick ends the session; Connect calls it
+// for an older session of the same server, and Delete calls it too. send
+// writes one message to the agent. The session calls the returned disconnect
+// when it ends.
+func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, address string, kick func(), send func(protocol.Message) error) (disconnect func()) {
+	now := s.now().UTC()
+	update := helloServer(hello, &now)
+	update.Address = clip(address)
+	err := s.servers.UpdateHello(server.ID, update)
+	if err != nil {
+		slog.Error("store agent hello failed", "error", err, "server_id", server.ID)
+	}
+	session := &agentSession{workspaceID: server.WorkspaceID, kick: kick, send: send, waiting: map[string]chan protocol.Message{}}
+	s.mu.Lock()
+	previous := s.sessions[server.ID]
+	s.sessions[server.ID] = session
+	s.mu.Unlock()
+	if previous != nil {
+		previous.kick()
+	}
+	s.notify(server.WorkspaceID)
+	s.mu.Lock()
+	onConnect := s.onConnect
+	s.mu.Unlock()
+	if onConnect != nil {
+		go onConnect(server.ID, server.WorkspaceID)
+	}
+
+	return func() {
+		s.mu.Lock()
+		current := s.sessions[server.ID] == session
+		if current {
+			delete(s.sessions, server.ID)
+		}
+		s.mu.Unlock()
+		if !current {
+			return
+		}
+		err := s.servers.TouchLastSeen(server.ID, s.now().UTC())
+		if err != nil {
+			slog.Error("store last seen failed", "error", err, "server_id", server.ID)
+		}
+		s.notify(server.WorkspaceID)
+	}
+}
+
+// ErrSubscriptionRequired means the account needs the ops plan to add a
+// server.
+var ErrSubscriptionRequired = errors.New("subscribe to ops to add servers")
+
+// RequirePlanFor makes adding a server check the account's plan. Wiring
+// sets it; without it every account may add servers.
+func (s *ServerService) RequirePlanFor(accessOf func(workspaceID string) (access.Access, error)) {
+	s.accessOf = accessOf
+}
+
+// CanAdd says whether the user's plan allows another server.
+func (s *ServerService) CanAdd(workspaceID string) bool {
+	return s.allowed(workspaceID) == nil
+}
+
+func (s *ServerService) allowed(workspaceID string) error {
+	if s.accessOf == nil {
+		return nil
+	}
+	plan, err := s.accessOf(workspaceID)
+	if err != nil {
+		return err
+	}
+	servers, err := s.servers.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		return err
+	}
+	if plan.RequireWithin(access.LimitServers, len(servers)) != nil {
+		return ErrSubscriptionRequired
+	}
+	return nil
+}
+
+// Get returns one of the user's servers by ID or name.
+func (s *ServerService) Get(workspaceID, idOrName string) (*model.Server, error) {
+	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	server.Online = s.Online(server.ID)
+	return server, nil
+}
+
+// UserOf returns the user of a connected server.
+func (s *ServerService) UserOf(serverID string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session := s.sessions[serverID]
+	if session == nil {
+		return "", false
+	}
+	return session.workspaceID, true
+}
+
+// OnAgentConnect sets who learns that an agent connected, to send it what
+// it needs to know. Wiring calls it once.
+func (s *ServerService) OnAgentConnect(handle func(serverID, workspaceID string)) {
+	s.mu.Lock()
+	s.onConnect = handle
+	s.mu.Unlock()
+}
+
+// OnAgentMessage sets who gets the agent messages that answer no request,
+// such as deploy logs. Wiring calls it once.
+func (s *ServerService) OnAgentMessage(handle func(serverID string, message protocol.Message)) {
+	s.mu.Lock()
+	s.onMessage = handle
+	s.mu.Unlock()
+}
+
+// Online reports whether the server holds a session.
+func (s *ServerService) Online(serverID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sessions[serverID] != nil
+}
+
+// Send writes one message to the agent of a server.
+func (s *ServerService) Send(serverID string, messageType protocol.MessageType, data any) error {
+	message, err := protocol.NewMessage(messageType, data)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	session := s.sessions[serverID]
+	s.mu.Unlock()
+	if session == nil {
+		return ErrServerOffline
+	}
+	return session.send(message)
+}
+
+// Request sends a message to the agent and decodes its answer into result,
+// which may be nil. An error answer returns an *AgentError.
+func (s *ServerService) Request(ctx context.Context, serverID string, messageType protocol.MessageType, data, result any) error {
+	message, err := protocol.NewMessage(messageType, data)
+	if err != nil {
+		return err
+	}
+	message.RequestID = randomToken()[:20]
+	answer := make(chan protocol.Message, 1)
+	s.mu.Lock()
+	session := s.sessions[serverID]
+	if session != nil {
+		session.waiting[message.RequestID] = answer
+	}
+	s.mu.Unlock()
+	if session == nil {
+		return ErrServerOffline
+	}
+	defer func() {
+		s.mu.Lock()
+		delete(session.waiting, message.RequestID)
+		s.mu.Unlock()
+	}()
+	err = session.send(message)
+	if err != nil {
+		return ErrServerOffline
+	}
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("the agent did not answer: %w", ctx.Err())
+	case reply := <-answer:
+		if reply.Type == protocol.TypeError {
+			var agentErr protocol.Error
+			_ = reply.Decode(&agentErr)
+			return &AgentError{Message: agentErr.Message}
+		}
+		if result == nil {
+			return nil
+		}
+		return reply.Decode(result)
+	}
+}
+
+// Receive takes one message the agent of a server sent.
+func (s *ServerService) Receive(serverID string, message protocol.Message) {
+	s.mu.Lock()
+	var answer chan protocol.Message
+	if session := s.sessions[serverID]; session != nil && message.RequestID != "" {
+		answer = session.waiting[message.RequestID]
+	}
+	handle := s.onMessage
+	s.mu.Unlock()
+	if answer != nil {
+		select {
+		case answer <- message:
+		default:
+		}
+		return
+	}
+	if handle != nil && message.RequestID == "" {
+		handle(serverID, message)
+	}
+}
+
+// Subscribe returns a channel that receives a value whenever a server of the
+// user changes. Changes that arrive while one is pending fold into it.
+func (s *ServerService) Subscribe(workspaceID string) (<-chan struct{}, func()) {
+	changes := make(chan struct{}, 1)
+	s.mu.Lock()
+	if s.subscribers[workspaceID] == nil {
+		s.subscribers[workspaceID] = map[chan struct{}]struct{}{}
+	}
+	s.subscribers[workspaceID][changes] = struct{}{}
+	s.mu.Unlock()
+	return changes, func() {
+		s.mu.Lock()
+		delete(s.subscribers[workspaceID], changes)
+		if len(s.subscribers[workspaceID]) == 0 {
+			delete(s.subscribers, workspaceID)
+		}
+		s.mu.Unlock()
+	}
+}
+
+func (s *ServerService) notify(workspaceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for changes := range s.subscribers[workspaceID] {
+		select {
+		case changes <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func helloServer(hello protocol.Hello, seenAt *time.Time) model.Server {
+	return model.Server{
+		Hostname:     clip(hello.Hostname),
+		OS:           clip(hello.OS),
+		Arch:         clip(hello.Arch),
+		AgentVersion: clip(hello.AgentVersion),
+		Rules:        rulesJSON(hello.Rules),
+		LastSeenAt:   seenAt,
+	}
+}
+
+// rulesJSON keeps what an agent reports about its rules short.
+func rulesJSON(rules *protocol.Rules) string {
+	if rules == nil {
+		return ""
+	}
+	clipped := *rules
+	clipped.BackupsTo = clip(rules.BackupsTo)
+	clipped.DeployFrom = nil
+	for _, source := range rules.DeployFrom {
+		if len(clipped.DeployFrom) == 50 {
+			break
+		}
+		clipped.DeployFrom = append(clipped.DeployFrom, clip(source))
+	}
+	body, _ := json.Marshal(clipped)
+	return string(body)
+}
+
+// ServerRules are the rules the server's agent last reported, nil without.
+func ServerRules(server model.Server) *protocol.Rules {
+	if server.Rules == "" {
+		return nil
+	}
+	var rules protocol.Rules
+	if json.Unmarshal([]byte(server.Rules), &rules) != nil {
+		return nil
+	}
+	return &rules
+}
+
+// clip keeps what an agent reports short.
+func clip(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 128 {
+		return value[:128]
+	}
+	return value
+}
+
+func randomToken() string {
+	secret := make([]byte, 32)
+	_, _ = rand.Read(secret)
+	return strings.ToLower(apiTokenEncoding.EncodeToString(secret))
+}

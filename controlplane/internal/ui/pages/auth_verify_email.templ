@@ -1,0 +1,79 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+templ VerifyEmailSuccess() {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Email Changed",
+		Description: "Your email has been changed",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Email verified", "Your email address has been updated") {
+				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
+					@empty.Header() {
+						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-live/10 text-live"}) {
+							@icon.CircleCheck()
+						}
+						@empty.Description() {
+							Redirecting you to settings. 
+						}
+					}
+					@empty.Content() {
+						<script nonce={ templ.GetNonce(ctx) }>
+							setTimeout(() => {
+								window.location.href = '/app';
+							}, 3000);
+						</script>
+						@button.Button(button.Props{Href: "/app", Class: blocks.AuthPrimary}) {
+							Go to settings 
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ VerifyEmailError(errorMessage string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Verification Failed",
+		Description: "Email verification failed",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Verification failed", "We couldn't verify your email") {
+				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
+					@empty.Header() {
+						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-destructive/10 text-destructive"}) {
+							@icon.CircleX()
+						}
+						@empty.Description() {
+							The verification link may have expired or already been used. 
+						}
+					}
+					@empty.Content(empty.ContentProps{Class: "max-w-none"}) {
+						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+							@icon.CircleAlert()
+							@alert.Description() {
+								{ errorMessage }
+							}
+						}
+						@button.Button(button.Props{Href: "/auth", Class: blocks.AuthPrimary}) {
+							Try again 
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -158,13 +158,13 @@ func (m model) serversView(width, room int) []string {
 	now := time.Now()
 	rows := make([][]string, 0, len(m.servers))
 	for index, server := range m.servers {
-		rows = append(rows, []string{name(server.Name, index == m.selected), style.Server(server), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access()})
+		rows = append(rows, []string{name(server.Name, index == m.selected), style.Server(server), server.System(), dash(server.AgentVersion), server.LastSeen(now), server.Access(), server.RulesText()})
 	}
 	tableRoom := -1
 	if room >= 0 {
 		tableRoom = max(room-len(added), 2)
 	}
-	return append(table([]string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS"}, rows, m.selected, tableRoom), added...)
+	return append(table([]string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS", "RULES"}, rows, m.selected, tableRoom), added...)
 }
 
 func (m model) appsView(room int) []string {

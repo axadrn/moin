@@ -1,0 +1,61 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+templ AuthMagicLinkSent(email string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Check Your Email",
+		Description: "Magic link sent to your email",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Check your email", "We sent a sign-in link to "+email+". It works once and expires soon.") {
+				@field.Group() {
+					@field.Field() {
+						@AuthMagicLinkResend(email, false)
+						@field.Description(field.DescriptionProps{Class: "text-center"}) {
+							<a href="/auth">Use another email</a>
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ AuthMagicLinkResend(email string, sent bool) {
+	<div id="magic-link-resend" class="space-y-2">
+		<form
+			id="magic-link-resend-form"
+			hx-post="/auth/magic-link?resend=true"
+			hx-target="#magic-link-resend"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+		>
+			@csrf.Token()
+			<input type="hidden" name="email" value={ email }/>
+			@button.Button(button.Props{Variant: button.VariantSecondary, Class: blocks.AuthSecondary, Type: button.TypeSubmit}) {
+				if sent {
+					Resend again
+				} else {
+					Resend email
+				}
+			}
+		</form>
+		if sent {
+			<p role="status" class="flex items-center justify-center gap-1.5 text-center text-sm text-live">
+				@icon.Check(icon.Props{Class: "size-4"})
+				Sent. A new link is on its way.
+			</p>
+		}
+	</div>
+}

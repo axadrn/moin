@@ -1,0 +1,55 @@
+package blocks
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
+)
+
+// Crumb is one step of the path in the top bar.
+type Crumb struct {
+	Label string
+	Href  string
+}
+
+type AppHeaderProps struct {
+	Title  string
+	Crumbs []Crumb
+}
+
+// AppHeader is the top bar of the control panel: the sidebar toggle, where
+// you are, and the theme.
+templ AppHeader(p AppHeaderProps) {
+	<header class="flex h-(--header-height) shrink-0 items-center gap-2 px-3 sm:px-5 lg:px-7">
+		@sidebar.Trigger(sidebar.TriggerProps{Class: "-ml-1 text-muted-foreground hover:text-foreground"})
+		<nav aria-label="Breadcrumb" class="min-w-0 flex-1">
+			<ol class="flex min-w-0 items-center gap-0.5 text-sm">
+				for i, crumb := range p.Crumbs {
+					if i > 0 {
+						<li aria-hidden="true" class="text-muted-foreground/50">
+							@icon.ChevronRight(icon.Props{Class: "size-3.5"})
+						</li>
+					}
+					if crumb.Href != "" && i < len(p.Crumbs)-1 {
+						<li class="shrink-0">
+							<a href={ templ.SafeURL(crumb.Href) } class="rounded-full px-2 py-1 text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{ crumb.Label }</a>
+						</li>
+					} else {
+						<li class="min-w-0 truncate px-2 font-medium" aria-current="page">{ crumb.Label }</li>
+					}
+				}
+			</ol>
+		</nav>
+		<div class="ml-auto flex items-center gap-1">
+			<a
+				href="/docs"
+				target="_blank"
+				rel="noopener"
+				class="hidden h-8 items-center gap-1 rounded-full px-3 text-[0.8125rem] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
+			>
+				Docs
+				@icon.ArrowUpRight(icon.Props{Class: "size-3.5"})
+			</a>
+			@ThemeSwitcher(ThemeSwitcherProps{Class: "size-8 text-muted-foreground hover:text-foreground"})
+		</div>
+	</header>
+}

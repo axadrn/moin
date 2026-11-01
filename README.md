@@ -21,6 +21,8 @@ Everything else is in the docs, under `/docs` in the control plane.
 go install github.com/axadrn/ops/cmd/ops@latest
 ```
 
+The control plane is in [`controlplane`](controlplane).
+
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+AGPL-3.0, all of it. See [LICENSE](LICENSE) and [CONTRIBUTING.md](CONTRIBUTING.md).

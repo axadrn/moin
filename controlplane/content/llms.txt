@@ -1,0 +1,10 @@
+# ops
+
+> ops is a server-rendered product built with Go, templ, htmx 4.0, Tailwind CSS, and SQLite, with a JSON API and an MCP server for AI agents.
+
+## Public pages
+
+- [Home](/): Product overview and primary actions.
+- [Sign in](/auth): Account access.
+- [Privacy](/legal/privacy): Privacy policy.
+- [Terms](/legal/terms): Terms of service.

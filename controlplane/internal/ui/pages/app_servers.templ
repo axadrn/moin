@@ -1,0 +1,274 @@
+package pages
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// AddedServer is the one-time install command of a server just added.
+type AddedServer struct {
+	Name    string
+	Command string
+}
+
+templ Servers(servers []model.Server, canAdd bool) {
+	@layouts.App("Servers") {
+		@panelPage() {
+			<div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+				@pageTitle("Servers", "Every server runs the ops agent. It dials out to ops, so nothing listens on your server.")
+				if canAdd {
+					@ServerAddForm("", "")
+				}
+			</div>
+			if !canAdd {
+				@subscribeCard()
+			}
+			<div id="server-added"></div>
+			<div class="mt-6">
+				@ServerList(servers)
+			</div>
+		}
+		@serversScript()
+	}
+}
+
+// ServerAddForm is the add form. A request replaces it to show an error or
+// to reset it.
+templ ServerAddForm(name, nameError string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<form
+		id="server-add-form"
+		hx-swap-oob="true"
+		class="flex w-full flex-col gap-2 sm:flex-row sm:items-start lg:w-auto"
+		hx-post={ basePath + "/servers" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		<div class="flex min-w-0 flex-1 flex-col gap-1.5 lg:w-64 lg:flex-none">
+			<label for="server-name" class="sr-only">Server name</label>
+			@input.Input(input.Props{
+				ID:          "server-name",
+				Name:        "name",
+				Type:        "text",
+				Value:       name,
+				Placeholder: "Server name, e.g. web-1",
+				Class:       "rounded-full px-4 font-mono text-[0.8125rem] placeholder:font-sans",
+				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "server-name-error", "data-hotkey-focus": true},
+			})
+			if nameError != "" {
+				<p id="server-name-error" class="px-4 text-xs text-failed" role="alert">{ nameError }</p>
+			}
+		</div>
+		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+			@icon.Plus(icon.Props{Class: "size-4"})
+			Add server
+		}
+	</form>
+}
+
+// ServerAdded shows the install command of the server just added.
+templ ServerAdded(added AddedServer) {
+	<section id="server-added" hx-swap-oob="true" class="ops-panel mt-8 overflow-hidden" aria-labelledby="server-added-heading">
+		<div class="flex flex-col gap-2 px-5 pt-5 pb-4 sm:flex-row sm:items-center sm:justify-between">
+			<div>
+				<h2 id="server-added-heading" class="ops-panel-title">Install the agent on <span class="font-mono">{ added.Name }</span></h2>
+				<p class="mt-0.5 text-xs text-muted-foreground">Run this on the server as root. It works once, within the next hour.</p>
+			</div>
+			<p class="inline-flex h-7 items-center gap-2 rounded-full bg-running/16 pr-3 pl-2.5 text-[0.8125rem] font-semibold text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]">
+				@status.Symbol(status.KindWaiting)
+				This page shows it online when the agent connects.
+			</p>
+		</div>
+		<div class="ops-term mx-3 mb-3 flex items-start gap-2.5 rounded-2xl bg-muted py-3.5 pr-3 pl-5 text-[0.8125rem]">
+			<span class="ops-term-dim pt-1 select-none" aria-hidden="true">$</span>
+			<code id="install-command" class="min-w-0 flex-1 overflow-x-auto pt-1 pb-1 break-all whitespace-pre-wrap" data-install-command>{ added.Command }</code>
+			<button
+				type="button"
+				data-copy-target="#install-command"
+				data-copy=""
+				class="group/copy inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-brand px-3.5 text-xs font-semibold text-brand-foreground transition-[background-color,transform] outline-none hover:bg-brand/85 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
+			>
+				@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
+				@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
+				<span data-copy-label>Copy</span>
+			</button>
+		</div>
+	</section>
+}
+
+// ServerList is the list of servers. The page reloads it on every change the
+// server event stream reports.
+templ ServerList(servers []model.Server) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<div
+		id="server-list"
+		hx-swap-oob="true"
+		hx-get={ basePath + "/servers/list" }
+		hx-trigger="servers-changed from:body"
+		hx-swap="none"
+	>
+		if len(servers) == 0 {
+			@emptyState("No servers yet", "Name your first server above and run the install command it gives you. Or add it from your terminal:", "ops servers add web-1")
+		} else {
+			<ul class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" role="list">
+				for _, server := range servers {
+					<li data-server={ server.Name } class="ops-panel flex flex-col px-5 pt-4 pb-5">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="ops-panel-title truncate">{ server.Name }</p>
+								<div class="mt-2">
+									@serverStatus(server)
+								</div>
+							</div>
+							@button.Button(button.Props{
+								Variant: button.VariantSecondary,
+								Size:    button.SizeXs,
+								Class:   "-mr-1 hover:bg-failed/15 hover:text-failed",
+								Attributes: templ.Attributes{
+									"hx-delete":  basePath + "/servers/" + server.ID,
+									"hx-swap":    "none",
+									"hx-disable": "this",
+									"hx-confirm": "Remove " + server.Name + "? Its agent is disconnected.",
+								},
+							}) {
+								Remove
+							}
+						</div>
+						<dl class="mt-5 grid grid-cols-3 gap-3 border-t pt-4 text-xs">
+							<div class="min-w-0">
+								<dt class="text-muted-foreground">System</dt>
+								<dd class="mt-1 truncate font-mono font-medium">{ serverSystem(server) }</dd>
+							</div>
+							<div class="min-w-0">
+								<dt class="text-muted-foreground">Agent</dt>
+								<dd class="mt-1 truncate font-mono font-medium">{ dashIfEmpty(server.AgentVersion) }</dd>
+							</div>
+							<div class="min-w-0">
+								<dt class="text-muted-foreground">Last seen</dt>
+								<dd class="mt-1 truncate font-medium tabular-nums" title={ serverLastSeenTitle(server) }>{ serverLastSeen(server, now) }</dd>
+							</div>
+						</dl>
+						@serverAccess(server)
+					</li>
+				}
+			</ul>
+			<p class="mt-4 px-1 font-mono text-xs text-muted-foreground tabular-nums">{ serversSummary(servers) }</p>
+		}
+	</div>
+}
+
+templ serverStatus(server model.Server) {
+	switch {
+		case server.Online:
+			@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+				online
+			}
+		case server.LastSeenAt == nil:
+			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
+				waiting
+			}
+		default:
+			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+				offline
+			}
+	}
+}
+
+// serversScript reloads the list whenever the event stream reports a change.
+// EventSource reconnects on its own.
+templ serversScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const events = new EventSource("/api/v1/servers/events");
+			events.addEventListener("servers", () => document.body.dispatchEvent(new Event("servers-changed")));
+			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+		})();
+	</script>
+}
+
+func serversSummary(servers []model.Server) string {
+	online := 0
+	for _, server := range servers {
+		if server.Online {
+			online++
+		}
+	}
+	return fmt.Sprintf("%s · %d online", plural(len(servers), "server", "servers"), online)
+}
+
+func serverSystem(server model.Server) string {
+	if server.OS == "" {
+		return "-"
+	}
+	return server.OS + "/" + server.Arch
+}
+
+func dashIfEmpty(value string) string {
+	if value == "" {
+		return "-"
+	}
+	return value
+}
+
+func serverLastSeenTitle(server model.Server) string {
+	if server.LastSeenAt == nil {
+		return "Never connected"
+	}
+	return stamp(*server.LastSeenAt)
+}
+
+func serverLastSeen(server model.Server, now time.Time) string {
+	if server.Online {
+		return "now"
+	}
+	if server.LastSeenAt == nil {
+		return "never"
+	}
+	age := now.Sub(*server.LastSeenAt)
+	switch {
+	case age < time.Minute:
+		return "just now"
+	case age < time.Hour:
+		return fmt.Sprintf("%dm ago", int(age.Minutes()))
+	case age < 48*time.Hour:
+		return fmt.Sprintf("%dh ago", int(age.Hours()))
+	}
+	return fmt.Sprintf("%dd ago", int(age.Hours()/24))
+}
+
+// subscribeCard is what an account without the ops plan sees instead of
+// the add form: the price and the way to Stripe Checkout.
+templ subscribeCard() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<section class="mt-6 overflow-hidden rounded-[28px] bg-foreground px-7 py-10 text-background sm:px-12 sm:py-14" data-subscribe>
+		<h2 class="font-display text-[clamp(2rem,4vw,3rem)] leading-none">Start ops.</h2>
+		<p class="mt-5 max-w-xl text-lg leading-8 text-background/70">
+			Unlimited servers and apps, continuous backups with daily restore drills, the data browser, the GitHub App. Cancel any time; your apps keep running on your servers.
+		</p>
+		<div class="mt-8 flex flex-col gap-3 sm:flex-row">
+			<form method="post" action={ templ.SafeURL(basePath + "/billing/checkout") }>
+				@csrf.Token()
+				<input type="hidden" name="plan_id" value="pro"/>
+				<input type="hidden" name="interval" value="monthly"/>
+				<button type="submit" class="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-background px-7 text-[15px] font-semibold text-foreground transition-opacity hover:opacity-85 sm:w-auto" data-subscribe-monthly>$29 a month</button>
+			</form>
+			<form method="post" action={ templ.SafeURL(basePath + "/billing/checkout") }>
+				@csrf.Token()
+				<input type="hidden" name="plan_id" value="pro"/>
+				<input type="hidden" name="interval" value="yearly"/>
+				<button type="submit" class="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-background/12 px-7 text-[15px] font-semibold transition-opacity hover:opacity-85 sm:w-auto">$290 a year, two months free</button>
+			</form>
+		</div>
+	</section>
+}

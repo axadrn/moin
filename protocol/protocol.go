@@ -1,12 +1,13 @@
 // Package protocol is the contract between the ops agent and the control
 // plane. The agent dials out: it registers once over HTTP, then holds one
-// WebSocket session. Both repos import this package, so a change here is a
-// change on both sides.
+// WebSocket session. The agent and the control plane both import this package,
+// so a change here is a change on both sides.
 package protocol
 
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -123,6 +124,52 @@ type Hello struct {
 	Hostname        string `json:"hostname"`
 	OS              string `json:"os"`
 	Arch            string `json:"arch"`
+	// Rules are the server's own rules for ops, from /etc/ops/rules. Nil
+	// means the server has none and ops may do everything.
+	Rules *Rules `json:"rules,omitempty"`
+}
+
+// Rules are what the owner of a server allows ops to do there, written in
+// /etc/ops/rules on the server. The control plane cannot change them; the
+// agent refuses every request they do not allow.
+type Rules struct {
+	// DataOff refuses tables, SQL and row edits.
+	DataOff bool `json:"data_off,omitempty"`
+	// LogsOff refuses container logs.
+	LogsOff bool `json:"logs_off,omitempty"`
+	// DeployFrom lists where deploys may come from, such as
+	// "github.com/acme/*", "ghcr.io/acme/*" or "upload". Empty allows all.
+	DeployFrom []string `json:"deploy_from,omitempty"`
+	// BackupsTo is the only bucket backups may go to and come from, as
+	// "<endpoint host>/<bucket>". Empty allows any.
+	BackupsTo string `json:"backups_to,omitempty"`
+	// NetworkLocked refuses changes to the tunnel, Tailscale and firewall.
+	NetworkLocked bool `json:"network_locked,omitempty"`
+}
+
+// Lines are the rules as written in the rules file, for every surface to
+// show them the same way.
+func (r *Rules) Lines() []string {
+	if r == nil {
+		return nil
+	}
+	var lines []string
+	if r.DataOff {
+		lines = append(lines, "data: off")
+	}
+	if r.LogsOff {
+		lines = append(lines, "logs: off")
+	}
+	if len(r.DeployFrom) > 0 {
+		lines = append(lines, "deploy-from: "+strings.Join(r.DeployFrom, ", "))
+	}
+	if r.BackupsTo != "" {
+		lines = append(lines, "backups-to: "+r.BackupsTo)
+	}
+	if r.NetworkLocked {
+		lines = append(lines, "network: locked")
+	}
+	return lines
 }
 
 // RegisterRequest is the body of a register call.

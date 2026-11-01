@@ -1,0 +1,26 @@
+package layouts
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+)
+
+// AppSidebarIdentity is the brand mark, which leads to the apps, and the
+// workspace switcher under it.
+templ AppSidebarIdentity() {
+	<div class="flex flex-col gap-3" data-app-base={ ctxkeys.AppBasePath(ctx) }>
+		<a
+			href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/apps") }
+			class="flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		>
+			@OpsMark("size-[26px]")
+			<span class="text-[1.0625rem] leading-none font-bold tracking-[-0.02em]">{ brand.Name }</span>
+		</a>
+		@WorkspaceIdentity(ctxkeys.Workspace(ctx), ctxkeys.Workspaces(ctx))
+	</div>
+}
+
+// OpsMark is the brand mark: a prompt in reverse video, like the CLI's.
+templ OpsMark(class string) {
+	<span class={ "inline-flex shrink-0 items-center justify-center rounded-[8px] bg-brand font-mono text-[13px] font-bold tracking-[-0.04em] text-brand-foreground", class } aria-hidden="true">&gt;_</span>
+}

@@ -1,0 +1,78 @@
+package layouts
+
+import (
+	"strings"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
+)
+
+// navButtonClasses is a place in the sidebar: a pill, inverted when active.
+const navButtonClasses = "h-10 gap-3 rounded-xl px-3 text-[0.875rem] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-active:bg-brand data-active:font-semibold data-active:text-brand-foreground data-active:hover:bg-brand data-active:hover:text-brand-foreground [&>span:last-child]:overflow-visible"
+
+// AppSidebarNavigation is the places of the panel, each with its go-to key.
+templ AppSidebarNavigation() {
+	{{ member := ctxkeys.WorkspaceMember(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ path := ctxkeys.URLPath(ctx) }}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/apps", IsActive: path == basePath+"/apps", Class: navButtonClasses}) {
+			@icon.Boxes(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Apps</span>
+			@navKey("A")
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/servers", IsActive: strings.HasPrefix(path, basePath+"/servers"), Class: navButtonClasses}) {
+			@icon.Server(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Servers</span>
+			@navKey("S")
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/bucket", IsActive: strings.HasPrefix(path, basePath+"/bucket"), Class: navButtonClasses}) {
+			@icon.Archive(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Bucket</span>
+			@navKey("B")
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/activity", IsActive: strings.HasPrefix(path, basePath+"/activity"), Class: navButtonClasses}) {
+			@icon.Activity(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Activity</span>
+			@navKey("Y")
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/workspace", IsActive: path == basePath+"/workspace", Class: navButtonClasses}) {
+			@icon.Users(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Team</span>
+			@navKey("T")
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/settings", IsActive: strings.HasPrefix(path, basePath+"/settings"), Class: navButtonClasses}) {
+			@icon.Settings(icon.Props{Class: "size-[1.0625rem]"})
+			<span class="flex-1">Settings</span>
+			@navKey(",")
+		}
+	}
+	if member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(ctx).Billing {
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/billing", IsActive: strings.HasPrefix(path, basePath+"/billing"), Class: navButtonClasses}) {
+				@icon.CreditCard(icon.Props{Class: "size-[1.0625rem]"})
+				<span class="flex-1">Billing</span>
+			}
+		}
+	}
+}
+
+// navKey is the go-to hint: g, then the key. It shows on hover.
+templ navKey(key string) {
+	<span class="hidden items-center gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden md:flex" aria-hidden="true">
+		<kbd class="ops-kbd">G</kbd>
+		<kbd class="ops-kbd">{ key }</kbd>
+	</span>
+}

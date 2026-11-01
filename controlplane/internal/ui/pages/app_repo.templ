@@ -1,0 +1,111 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/icons"
+)
+
+// RepoView is the repository panel of an app.
+type RepoView struct {
+	App model.App
+	// Enabled is whether this control plane has the GitHub App; Connected
+	// whether the user installed it anywhere.
+	Enabled   bool
+	Connected bool
+	Repos     []service.GitHubRepoOf
+	Notice    string
+	Error     string
+}
+
+// AppRepo is the repository panel: connect GitHub, link a repo and branch,
+// deploy a ref, auto deploy on push.
+templ AppRepo(view RepoView) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ swap := templ.Attributes{"hx-target": "#app-repo", "hx-swap": "outerHTML"} }}
+	<section id="app-repo" aria-labelledby="app-repo-heading" class="ops-panel mt-4 min-w-0 overflow-hidden">
+		<div class={ panelHeadClasses }>
+			<h2 id="app-repo-heading" class="ops-panel-title flex items-center gap-2.5">
+				@icons.Github(icons.Props{Class: "size-5"})
+				Repository
+			</h2>
+			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/github">How it works</a>
+		</div>
+		<div class="px-5 pb-5">
+			if view.Notice != "" {
+				<p class="mb-3 rounded-2xl bg-live/12 px-4 py-3 text-sm font-medium text-live" role="status" data-repo-notice>{ view.Notice }</p>
+			}
+			if view.Error != "" {
+				<p class="mb-3 rounded-2xl bg-failed/12 px-4 py-3 text-sm font-medium text-failed" role="alert" data-repo-error>{ view.Error }</p>
+			}
+			if !view.Enabled {
+				<p class="text-sm text-muted-foreground">This control plane has no GitHub App. Deploy with <code class="font-mono text-foreground">ops deploy</code> or from CI.</p>
+			} else if !view.Connected {
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<p class="max-w-xl text-sm text-muted-foreground">Connect GitHub to deploy a branch or commit from here, without a checkout, and on every push. ops writes the result as a commit status.</p>
+					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath, Variant: button.VariantBrand, Size: button.SizeLg, Attributes: templ.Attributes{"data-connect-github": true}}) {
+						@icons.Github(icons.Props{Class: "size-4"})
+						Connect GitHub
+					}
+				</div>
+			} else if view.App.Repo == "" {
+				<form class="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]" hx-post={ appPath + "/repo" } { swap... } data-link-repo>
+					@csrf.Token()
+					<label class="flex min-w-0 flex-col gap-1">
+						<span class="text-xs font-semibold">Repo</span>
+						<select name="repo" required class="h-10 min-w-0 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring">
+							for _, repo := range view.Repos {
+								<option value={ repo.FullName }>{ repo.FullName }</option>
+							}
+						</select>
+					</label>
+					<label class="flex min-w-0 flex-col gap-1">
+						<span class="text-xs font-semibold">Branch</span>
+						<input name="branch" placeholder="default branch" spellcheck="false" autocomplete="off" class="h-10 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring"/>
+					</label>
+					<div class="flex items-end">
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Class: "w-full"}) {
+							Link
+						}
+					</div>
+					<label class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
+						<input type="checkbox" name="auto_deploy" value="1" checked class="size-4 accent-[var(--foreground)]"/>
+						Deploy every push to the branch
+					</label>
+					if len(view.Repos) == 0 {
+						<p class="text-sm text-muted-foreground sm:col-span-3">The ops GitHub App sees no repo yet. <a class="font-semibold text-foreground underline underline-offset-4" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath) }>Choose repos on GitHub</a>.</p>
+					}
+				</form>
+			} else {
+				<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+					<div class="min-w-0">
+						<p class="truncate font-mono text-[0.9375rem]" data-linked-repo>{ view.App.Repo }<span class="text-muted-foreground">{ "@" + view.App.Branch }</span></p>
+						<form class="mt-2 flex items-center gap-2 text-sm text-muted-foreground" hx-post={ appPath + "/repo" } hx-trigger="change" { swap... }>
+							@csrf.Token()
+							<input type="hidden" name="repo" value={ view.App.Repo }/>
+							<input type="hidden" name="branch" value={ view.App.Branch }/>
+							<label class="flex cursor-pointer items-center gap-2">
+								<input type="checkbox" name="auto_deploy" value="1" checked?={ view.App.AutoDeploy } class="size-4 accent-[var(--foreground)]" data-auto-deploy/>
+								Deploy every push to { view.App.Branch }
+							</label>
+						</form>
+					</div>
+					<div class="flex flex-wrap items-center gap-2">
+						<form class="flex gap-2" hx-post={ appPath + "/repo/deploy" } { swap... } data-deploy-ref>
+							@csrf.Token()
+							<label for="deploy-ref" class="sr-only">Branch, tag or commit</label>
+							<input id="deploy-ref" name="ref" placeholder={ view.App.Branch } spellcheck="false" autocomplete="off" class="h-10 w-40 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring"/>
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+								Deploy
+							}
+						</form>
+						<button type="button" class="h-10 cursor-pointer rounded-full px-3 text-sm font-semibold text-muted-foreground hover:text-failed" hx-post={ appPath + "/repo/unlink" } { swap... } hx-confirm={ "Stop following " + view.App.Repo + "?" }>Unlink</button>
+					</div>
+				</div>
+			}
+		</div>
+	</section>
+}

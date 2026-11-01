@@ -1,8 +1,10 @@
 # AGENTS.md
 
-This repo is public (Apache 2.0). The control plane lives in the private repo
-`github.com/axadrn/ops-cloud`; its `PLAN.md` is the plan for both. Nothing
-closed goes here: no control plane code, no secrets, no customer data.
+All of ops in one repo, open source under AGPL-3.0: the `ops` binary (agent,
+CLI, TUI) at the root and the control plane in `controlplane/`, with its own
+`AGENTS.md`. `controlplane/PLAN.md` is the plan for both. Never commit
+secrets, customer data, `.env` files or anything private: names of companies,
+addresses, personal details.
 
 ## Rules
 
@@ -10,7 +12,7 @@ closed goes here: no control plane code, no secrets, no customer data.
 - The agent only dials out. Never add a listener for ops.
 - Clients (CLI, TUI) only call the control plane API (`/api/v1`) and its SSE streams. They never talk to an agent.
 - Every feature works in all surfaces: web UI, CLI, TUI, the control plane API and an MCP tool. A feature is done when each one works end to end.
-- Every feature is documented in the control plane docs (`ops-cloud/content/docs`), the only source of truth. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands. `README.md` stays short and punchy, like shadcn/ui's: what ops is, the first commands, a pointer to the docs, the license. It never repeats the docs.
+- Every feature is documented in the control plane docs (`controlplane/content/docs`), the only source of truth. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands. `README.md` stays short and punchy, like shadcn/ui's: what ops is, the first commands, a pointer to the docs, the license. It never repeats the docs.
 - `protocol` is the contract with the control plane. Change it in a way old agents keep working, or bump `protocol.Version`.
 - The product name lives only in `internal/build.Name`.
 - Words: control plane, agent, server, app, deploy, backup. Not "node" or "host".

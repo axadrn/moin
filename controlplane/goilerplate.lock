@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "template_version": "v3.2.1",
+  "config": {
+    "project_name": "ops",
+    "module_path": "github.com/axadrn/ops/controlplane",
+    "edition": "paid",
+    "framework": "htmx",
+    "database": "sqlite",
+    "payment": "stripe",
+    "mail": "smtp",
+    "workspaces": true,
+    "oauth": [
+      "github"
+    ],
+    "storage": true,
+    "content": [
+      "docs"
+    ],
+    "api": true,
+    "mcp": true
+  }
+}

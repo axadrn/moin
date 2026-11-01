@@ -87,10 +87,12 @@ func saveState(dir string, state State) error {
 	return os.WriteFile(filepath.Join(dir, stateFile), body, 0o600)
 }
 
-// Hello describes this agent and server.
+// Hello describes this agent and server, with its rules.
 func Hello() protocol.Hello {
 	hostname, _ := os.Hostname()
+	rules, _ := LoadRules(RulesFile())
 	return protocol.Hello{
+		Rules:           rules,
 		ProtocolVersion: protocol.Version,
 		AgentVersion:    build.Version,
 		Hostname:        hostname,
@@ -143,7 +145,11 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 // rejected agent token ends Run, because retrying cannot fix it. Deploys
 // keep running across reconnects.
 func Run(ctx context.Context, dir string, state State) error {
-	agent := &runner{state: state, pending: map[string]protocol.DeployDone{}}
+	rulesFile := RulesFile()
+	if _, err := LoadRules(rulesFile); err != nil {
+		return err
+	}
+	agent := &runner{state: state, rulesFile: rulesFile, pending: map[string]protocol.DeployDone{}}
 	agent.apps = newApps(dir, agent.send)
 	agent.backups = newBackups(agent.apps, agent.send)
 	agent.apps.backups = agent.backups
@@ -178,10 +184,12 @@ var errRejected = errors.New("the control plane rejected the agent token: regist
 // runner is one agent process. conn is the current session, nil between
 // sessions.
 type runner struct {
-	state    State
-	apps     *apps
-	backups  *backups
-	security *security
+	state State
+	// rulesFile is read for every request, so a change to it counts at once.
+	rulesFile string
+	apps      *apps
+	backups   *backups
+	security  *security
 
 	mu   sync.Mutex
 	conn *websocket.Conn
@@ -284,11 +292,29 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	fail := func(err error) {
 		r.send(protocol.TypeError, message.RequestID, protocol.Error{Message: err.Error()})
 	}
+	// A rules file with a mistake refuses everything until it is fixed.
+	rules, err := LoadRules(r.rulesFile)
+	if err != nil {
+		slog.Error("rules", "error", err)
+		if message.Type == protocol.TypeDeployStart {
+			var start protocol.DeployStart
+			_ = message.Decode(&start)
+			r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
+		} else if message.RequestID != "" {
+			fail(err)
+		}
+		return
+	}
 	switch message.Type {
 	case protocol.TypeDeployStart:
 		var start protocol.DeployStart
 		if err := message.Decode(&start); err != nil {
 			slog.Error("bad deploy.start", "error", err)
+			return
+		}
+		if err := checkDeploy(rules, r.rulesFile, start); err != nil {
+			slog.Warn("deploy refused", "app", start.App, "number", start.Number, "error", err)
+			r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
 			return
 		}
 		slog.Info("deploy", "app", start.App, "number", start.Number)
@@ -297,6 +323,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		var request protocol.LogsRequest
 		if err := message.Decode(&request); err != nil {
 			fail(err)
+			return
+		}
+		if rules != nil && rules.LogsOff {
+			fail(refused(r.rulesFile, "logs: off"))
 			return
 		}
 		result, err := r.apps.logs(ctx, request)
@@ -322,6 +352,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
+		if rules != nil && rules.DataOff {
+			fail(refused(r.rulesFile, "data: off"))
+			return
+		}
 		result, err := r.apps.tables(ctx, request)
 		if err != nil {
 			fail(err)
@@ -332,6 +366,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		var request protocol.DBQuery
 		if err := message.Decode(&request); err != nil {
 			fail(err)
+			return
+		}
+		if rules != nil && rules.DataOff {
+			fail(refused(r.rulesFile, "data: off"))
 			return
 		}
 		result, err := r.apps.query(ctx, request)
@@ -346,10 +384,18 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
+		if rules != nil && rules.NetworkLocked {
+			fail(refused(r.rulesFile, "network: locked"))
+			return
+		}
 		r.send(protocol.TypeServerConfigResult, message.RequestID, r.security.apply(ctx, config))
 	case protocol.TypeBackupConfig:
 		var config protocol.BackupConfig
 		if err := message.Decode(&config); err != nil {
+			fail(err)
+			return
+		}
+		if err := checkStorage(rules, r.rulesFile, config.Storage); err != nil {
 			fail(err)
 			return
 		}

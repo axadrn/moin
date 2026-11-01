@@ -1,0 +1,118 @@
+package pages
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/tooltip"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// BucketView is the bucket page: the account's own S3-compatible bucket.
+type BucketView struct {
+	Storage *service.BackupStorage
+	Notice  string
+	Error   string
+}
+
+templ Bucket(view BucketView) {
+	@layouts.App("Bucket") {
+		@panelPage(templ.Attributes{"data-bucket-page": true}) {
+			<div class="min-w-0">
+				<h1 class="flex items-center gap-3 font-display text-[2.5rem] leading-none sm:text-[2.875rem]">
+					Bucket
+					@tooltip.Tooltip() {
+						<button type="button" class="inline-flex size-8 cursor-help items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="What the bucket is for" { tooltip.Trigger(ctx)... }>
+							@icon.Info(icon.Props{Class: "size-[1.125rem]"})
+						</button>
+						@tooltip.Content(tooltip.ContentProps{Side: tooltip.SideBottom, Class: "max-w-xs text-pretty"}) {
+							Your own storage box. Your code and your backups go in there, never to us. ops only signs the links.
+						}
+					}
+				</h1>
+				<p class="mt-2.5 max-w-2xl text-sm text-pretty text-muted-foreground">One S3-compatible bucket for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.</p>
+			</div>
+			<div id="bucket" class="mt-6 flex flex-col gap-4">
+				if view.Notice != "" {
+					<p class="rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live" role="status" data-bucket-notice>{ view.Notice }</p>
+				}
+				<section class="ops-panel grid gap-3 px-5 py-5 sm:grid-cols-3" aria-label="What goes in the bucket">
+					@bucketUse("Your code", "ops deploy puts it there, your server picks it up and deletes it. Code from GitHub goes from GitHub straight to your server.")
+					@bucketUse("Your backups", "Every change of every SQLite database, and a snapshot before every change. Restore any second of the last week.")
+					@bucketUse("Nothing of ours", "ops keeps the key encrypted and only signs short links. Your data never passes through ops.")
+				</section>
+				@bucketForm(view)
+			</div>
+		}
+	}
+}
+
+templ bucketUse(title, text string) {
+	<div class="rounded-2xl bg-muted/60 px-4 py-4">
+		<p class="text-sm font-semibold">{ title }</p>
+		<p class="mt-1.5 text-sm text-pretty text-muted-foreground">{ text }</p>
+	</div>
+}
+
+templ bucketForm(view BucketView) {
+	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket" }}
+	<section class="ops-panel min-w-0 overflow-hidden" data-backup-storage>
+		<div class={ panelHeadClasses }>
+			<h2 class="ops-panel-title">
+				if view.Storage == nil {
+					Add your bucket
+				} else {
+					Your bucket
+				}
+			</h2>
+			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/bucket">How it works</a>
+		</div>
+		if view.Storage != nil {
+			<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 px-5 pb-3 text-sm">
+				<dt class="text-muted-foreground">Bucket</dt>
+				<dd class="truncate font-mono text-[0.8125rem]" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+				<dt class="text-muted-foreground">Endpoint</dt>
+				<dd class="truncate font-mono text-[0.8125rem]">{ orAWS(view.Storage.Endpoint) }</dd>
+				<dt class="text-muted-foreground">Access key</dt>
+				<dd class="truncate font-mono text-[0.8125rem]">{ view.Storage.AccessKey }</dd>
+			</dl>
+		}
+		<details class="px-5 pb-5" open?={ view.Storage == nil || view.Error != "" }>
+			if view.Storage != nil {
+				<summary class="cursor-pointer list-none text-sm font-semibold text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Change the bucket</summary>
+			}
+			<form class="mt-3 grid gap-3 sm:grid-cols-2" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" data-storage-form>
+				@csrf.Token()
+				@storageField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3", "text", true)
+				@storageField("bucket", "Bucket", "my-ops", "", "text", false)
+				@storageField("region", "Region", "auto", "auto for R2", "text", false)
+				@storageField("path", "Folder", "optional", "inside the bucket", "text", false)
+				@storageField("access_key", "Access key", "", "", "text", false)
+				@storageField("secret_key", "Secret key", "", "stored encrypted", "password", false)
+				if view.Error != "" {
+					<p class="text-sm text-failed sm:col-span-2" role="alert" data-storage-error>{ view.Error }</p>
+				}
+				<div class="flex items-center justify-between gap-3 sm:col-span-2">
+					if view.Storage != nil {
+						<button
+							type="button"
+							class="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-failed"
+							hx-post={ bucketPath + "/remove" }
+							hx-target="#bucket"
+							hx-select="#bucket"
+							hx-swap="outerHTML"
+							hx-confirm="Remove the bucket? Backups stop and ops deploy needs a bucket again. What is in it stays."
+						>Remove</button>
+					} else {
+						<span class="text-xs text-muted-foreground">ops writes and deletes a test file first.</span>
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
+						Save
+					}
+				</div>
+			</form>
+		</details>
+	</section>
+}

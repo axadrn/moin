@@ -116,7 +116,28 @@ type Server struct {
 	SSHTailscale bool                         `json:"ssh_tailscale"`
 	Firewall     bool                         `json:"firewall"`
 	Security     *protocol.ServerConfigResult `json:"security"`
-	CreatedAt    time.Time                    `json:"created_at"`
+	// Rules are what the owner allows ops to do on the server, from
+	// /etc/ops/rules there. Nil without rules.
+	Rules     *protocol.Rules `json:"rules"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// RulesText names the server's rules in a few words, or "-" without.
+func (s Server) RulesText() string {
+	var names []string
+	for _, line := range s.Rules.Lines() {
+		key, value, _ := strings.Cut(line, ": ")
+		switch key {
+		case "deploy-from", "backups-to":
+			names = append(names, key)
+		default:
+			names = append(names, key+" "+value)
+		}
+	}
+	if len(names) == 0 {
+		return "-"
+	}
+	return strings.Join(names, ", ")
 }
 
 // Access says in a few words how the server is reached.
