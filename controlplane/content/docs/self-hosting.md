@@ -17,7 +17,6 @@ order: 3
 | GitHub App, email | you set them up | ready to use |
 | Backups of the control plane | yours to run | every day, by us |
 | Support | GitHub issues | email, from the team |
-| goilerplate | not included | free with yearly, worth $99 |
 | Where your apps and data are | your servers | your servers |
 
 You need nothing from us, not even a license key. Prefer not to run it? Our hosted control plane is the same code.
