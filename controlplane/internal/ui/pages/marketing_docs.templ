@@ -99,6 +99,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 							</div>
 						}
 						<div class="ml-auto flex items-center gap-1">
+							@docsSearch(docsTree)
 							<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:inline-flex" aria-label="ops on GitHub">
 								@icons.Github(icons.Props{Class: "size-4"})
 							</a>
