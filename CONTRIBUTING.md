@@ -18,6 +18,18 @@ I have read the CLA Document and I hereby sign the CLA
 It covers every later pull request. A pull request without it cannot be
 merged.
 
+## Commits and releases
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org):
+
+```
+feat: stop, start and restart apps
+fix(tui): say stopping at once
+docs: why AGPL and how to contribute
+```
+
+`feat`, `fix`, `docs`, `chore`, `refactor` or `test`, an optional scope, a short first line. Release notes list what is new, what is fixed and how to upgrade.
+
 ## Never commit
 
 Secrets, `.env` files, customer data or private details.

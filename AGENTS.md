@@ -19,6 +19,9 @@ addresses, personal details.
 - Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - `gofmt` clean, `go vet ./...` clean.
+- Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
+- Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
+- Release notes have three sections, empty ones left out: `### New`, `### Fixed`, `### Upgrade` (how to update, one line). They come from the `feat:` and `fix:` commits.
 
 ## Test
 
