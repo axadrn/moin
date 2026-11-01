@@ -7,6 +7,7 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -80,6 +81,12 @@ const (
 	// it changes. The agent answers with TypeServerConfigResult.
 	TypeServerConfig       MessageType = "server.config"
 	TypeServerConfigResult MessageType = "server.config.result"
+
+	// TypeAgentUpdate has the agent replace its binary with the one the
+	// control plane serves under DownloadPath, check it against SHA256 and
+	// restart (AgentUpdate). The agent answers with TypeOK before it
+	// restarts, or with TypeError and changes nothing.
+	TypeAgentUpdate MessageType = "agent.update"
 
 	// TypeOK answers a request that has no result.
 	TypeOK MessageType = "ok"
@@ -456,4 +463,25 @@ type ServerConfigResult struct {
 // Error is the answer to a request that failed.
 type Error struct {
 	Message string `json:"message"`
+}
+
+// DownloadPath is where the control plane serves the binaries, as
+// <name>-<os>-<arch>: the install script and agent updates take them from
+// there.
+const DownloadPath = "/download/"
+
+// AgentUpdate is the binary the agent should run: the control plane's
+// version and the SHA-256 of the binary it serves for the agent's OS and
+// CPU. The agent downloads it from its own control plane URL.
+type AgentUpdate struct {
+	Version string `json:"version"`
+	SHA256  string `json:"sha256"`
+}
+
+// UpdateCommand updates an agent by hand on the server, as root: for an
+// agent too old to update itself, or one whose rules keep it from doing so.
+func UpdateCommand(baseURL, name, arch string) string {
+	binary := "/usr/local/bin/" + name
+	return fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && systemctl restart %s-agent",
+		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary, name)
 }

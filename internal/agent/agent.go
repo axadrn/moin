@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/axadrn/ops/internal/build"
@@ -159,6 +160,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.apps.backups = agent.backups
 	agent.security = newSecurity(dir, agent.apps)
 	agent.apps.proxyMode = agent.security.proxyMode
+	agent.updater = newUpdater(state.URL)
 	go agent.backups.drills(ctx)
 	defer agent.backups.configure(context.Background(), nil)
 	wait := minReconnect
@@ -194,6 +196,9 @@ type runner struct {
 	apps      *apps
 	backups   *backups
 	security  *security
+	updater   *updater
+	// deploying counts the deploys that run now; an update waits for them.
+	deploying atomic.Int32
 
 	mu   sync.Mutex
 	conn *websocket.Conn
@@ -322,6 +327,8 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		slog.Info("deploy", "app", start.App, "number", start.Number)
+		r.deploying.Add(1)
+		defer r.deploying.Add(-1)
 		r.apps.deploy(ctx, start)
 	case protocol.TypeLogs:
 		var request protocol.LogsRequest
@@ -435,6 +442,30 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeAgentUpdate:
+		var update protocol.AgentUpdate
+		if err := message.Decode(&update); err != nil {
+			fail(err)
+			return
+		}
+		// A new binary could allow what the rules stop, so with rules only
+		// the owner updates it, on the server.
+		if rules != nil {
+			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.state.URL, build.Name, runtime.GOARCH)))
+			return
+		}
+		if r.deploying.Load() > 0 {
+			fail(errors.New("a deploy is running: update the agent when it is done"))
+			return
+		}
+		slog.Info("update", "from", build.Version, "to", update.Version)
+		if err := r.updater.install(ctx, update); err != nil {
+			slog.Error("update failed", "error", err)
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeOK, message.RequestID, nil)
+		r.updater.restart()
 	default:
 		if message.RequestID != "" {
 			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))
