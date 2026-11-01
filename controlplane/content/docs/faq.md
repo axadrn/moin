@@ -6,7 +6,7 @@ order: 6
 
 ## Does my server need open ports?
 
-Not for ops: the agent dials out. Visitors reach your apps through the proxy on ports 80 and 443 as soon as you add a [domain](/docs/guides/domains). A Cloudflare Tunnel with no open port at all is coming next.
+Not for ops: the agent dials out. Visitors reach your apps through the proxy on ports 80 and 443 as soon as you add a [domain](/docs/guides/domains). With a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), not even those are open.
 
 ## Does ops build on its own servers?
 

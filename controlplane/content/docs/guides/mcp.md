@@ -11,7 +11,8 @@ Agents authenticate with a personal API token. A read-only token can call the re
 ## Connect Claude Code
 
 ```bash
-claude mcp add --transport http ops https://ops.example.com/mcp --header "Authorization: Bearer pat_…"
+claude mcp add --transport http ops https://ops.example.com/mcp \
+  --header "Authorization: Bearer pat_…"
 ```
 
 ## Tools

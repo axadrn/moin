@@ -21,23 +21,73 @@ You get a workspace when you sign up. Make more from the workspace switcher at t
 | Invite people, rename the workspace | | ✓ | ✓ |
 | Change roles, billing, delete the workspace | | | ✓ |
 
-## Invite someone and manage the team
+## See the team
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| See members and invitations | **Team** | `ops team` | the `team` tab | `GET /api/v1/workspaces/{slug}` | `get_workspace` |
-| Invite | **Team**, then **Send invite** | `ops team invite ada@example.com [--admin]` | team tab, `a` | `POST /api/v1/workspaces/{slug}/invitations` | `invite_member` |
-| Send an invitation again | **Resend** under **Pending invitations** | – | team tab, the invitation, `enter` | `POST …/invitations/{id}/resend` | – |
-| Revoke an invitation | **Revoke** under **Pending invitations** | – | team tab, the invitation, `x`, then `y` | `DELETE …/invitations/{id}` | – |
-| Rename the workspace | **Team**, **General**, **Save** | – | team tab, `n` | `PATCH /api/v1/workspaces/{slug}/name` | `rename_workspace` |
-| Change a role | **Role** on a member, **Save** | web only | web only | session only | web only |
-| Remove a member | **Remove** on a member | web only | web only | session only | web only |
-| Leave a workspace | **Leave workspace** | web only | web only | session only | web only |
-| Delete a workspace | **Delete workspace** | web only | web only | session only | web only |
+Lists the members of the workspace and the invitations that wait for an answer.
 
-The invitation is an email that works for seven days. When someone is removed, their tokens stop reaching the workspace right away.
+```surfaces
+Web: **Team**
+CLI: ops team
+TUI: the **team** tab
+API: GET /api/v1/workspaces/{slug}
+MCP: get_workspace
+```
 
-Changing roles, removing people, leaving and deleting a workspace work only in the web, signed in: an API token, and so the CLI, the terminal UI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
+## Invite someone
+
+Sends an email that lets someone join the workspace. The invitation works for seven days.
+
+```surfaces
+Web: **Team**, **Invite a teammate**, **Send invite**
+CLI: ops team invite ada@example.com
+TUI: on the team tab, `a`
+API: POST /api/v1/workspaces/{slug}/invitations
+MCP: invite_member
+```
+
+`--admin` in the CLI invites them as an admin.
+
+## Send an invitation again
+
+Sends the email again, for example when it landed in spam.
+
+```surfaces
+Web: **Team**, **Pending invitations**, **Resend**
+TUI: on the team tab, pick the invitation, then `enter`
+API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
+```
+
+## Revoke an invitation
+
+Takes an invitation back before someone accepts it.
+
+```surfaces
+Web: **Team**, **Pending invitations**, **Revoke**
+TUI: on the team tab, pick the invitation, `x`, then `y`
+API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
+```
+
+## Rename the workspace
+
+Changes the name everyone in the workspace sees.
+
+```surfaces
+Web: **Team**, **Workspace name**, **Save**
+TUI: on the team tab, `n`
+API: PATCH /api/v1/workspaces/{slug}/name
+MCP: rename_workspace
+```
+
+## Change roles, remove people, leave or delete
+
+These four work only on the web, signed in:
+
+- **Change a role:** **Team**, **Role** on a member, then **Save**.
+- **Remove a member:** **Team**, **Remove** on a member. Their tokens stop reaching the workspace right away.
+- **Leave a workspace:** **Team**, **Leave workspace**.
+- **Delete a workspace:** **Team**, **Delete workspace**.
+
+An API token, and so the CLI, the TUI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
 
 ## Tokens and workspaces
 
@@ -51,9 +101,19 @@ ops login --token pat_…
 
 Every change goes into the activity of the workspace: who did it, when, and how it came in.
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| **Activity**, or `g` then `y` | `ops activity [--limit 30]` | the `activity` tab | `GET /api/v1/activity` | `list_activity` |
+### See the activity
+
+Lists who changed what, newest first.
+
+```surfaces
+Web: **Activity** in the sidebar
+CLI: ops activity
+TUI: the **activity** tab
+API: GET /api/v1/activity
+MCP: list_activity
+```
+
+On the web, `g` then `y` opens it too. `ops activity --limit 30` shows fewer or more.
 
 It records deploys, redeploys, restarts, stops, starts, rollbacks, restores, snapshots, SQL writes, row edits, env vars, domains, passwords, registry logins, the bucket, GitHub, servers, their security and every member change. **Via** says how it came in: the web, the CLI (any API token), an agent over MCP, a deploy hook or a GitHub push.
 

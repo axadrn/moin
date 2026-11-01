@@ -4,7 +4,7 @@ description: "Your code and your backups live in your own storage, never with us
 order: 2
 ---
 
-**The short version:** you bring one storage bucket. Your code and your backups go in there, and nothing of yours is ever stored by ops. ops only signs short-lived links into it.
+**The short version:** you bring one storage bucket. A bucket is a folder in an online storage service such as Cloudflare R2 or AWS S3. Your code and your backups go in there, and nothing of yours is ever stored by ops. ops only signs short-lived links into it.
 
 ## Why a bucket
 
@@ -29,13 +29,22 @@ ops keeps the bucket's secret key encrypted and uses it for one thing: to sign l
 
 ## Add it
 
-Any S3-compatible store works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in. Create a bucket and a key that may read, write and delete in it, then:
+Tells ops which bucket to use. Do it once per workspace: one bucket serves all your servers and apps.
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| **Bucket** in the sidebar | `ops backups bucket set --endpoint … --bucket … --access-key …`, secret key on stdin | settings tab, **Bucket**, `enter` | `PUT /api/v1/backup-storage` | `set_backup_storage` |
+```surfaces
+Web: **Bucket** in the sidebar, then **Save bucket**
+CLI: ops backups bucket set \
+  --endpoint https://<account>.r2.cloudflarestorage.com \
+  --bucket my-ops \
+  --access-key <key id>
+TUI: settings tab, **Bucket**, then `enter`
+API: PUT /api/v1/backup-storage
+MCP: set_backup_storage
+```
 
-ops writes and deletes a test file first, so a wrong key fails right away. One bucket serves all your servers and apps:
+Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in. Create a bucket and a key that may read, write and delete in it first. The CLI asks for the secret key on stdin.
+
+ops writes and deletes a test file first, so a wrong key fails right away. In the bucket each app gets a folder:
 
 ```
 <folder>/<app>/uploads/      code on its way to the server, gone after the deploy starts

@@ -4,17 +4,30 @@ description: "Deploy, redeploy and roll back apps"
 order: 3
 ---
 
+A deploy puts a new version of your app live on its server. ops numbers them per app: v1, v2, v3.
+
 ## Deploy from a repo
 
+Sends the code in your current folder to the server, which builds and starts it.
+
+```surfaces
+CLI: ops deploy
+TUI: on the app, `d`
+API: POST /api/v1/apps/{app}/uploads
+API: POST /api/v1/apps/{app}/deploys
+```
+
+The web and MCP cannot reach the files on your computer. They deploy from [GitHub](/docs/guides/github) or an [image](/docs/guides/ci) instead. In the API, upload first, then start the deploy.
+
 ```bash
-ops deploy               # the app from x-ops.app or the directory name
+ops deploy               # the app from x-ops.app or the folder name
 ops deploy blog          # a named app
 ops deploy --server web-1 --dir ./site blog
 ```
 
-ops packs the files git knows, including uncommitted changes and new files that are not ignored. Outside a git repo it packs everything but `.git`. The archive goes straight into [your bucket](/docs/guides/bucket); the agent downloads it there, deletes it and builds and starts it with Docker Compose on the app's server. ops never stores your code.
+ops packs the files git knows, including changes you have not committed and new files that are not ignored. Outside a git repo it packs everything but `.git`. The archive goes straight into [your bucket](/docs/guides/bucket). The agent downloads it from there, deletes it, and builds and starts it with Docker Compose on the app's server. ops never stores your code.
 
-What the repo brings decides how:
+What the repo brings decides how ops builds it:
 
 | The repo has | ops does |
 | --- | --- |
@@ -22,76 +35,154 @@ What the repo brings decides how:
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
 | a Go module | also writes the Dockerfile: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
 
+## Create an app
+
+Makes an empty app on a server, ready for its first deploy. The first `ops deploy` in a repo does this by itself.
+
+```surfaces
+Web: **Apps**, **Add app**
+CLI: ops apps add --server web-1 blog
+TUI: on the apps tab, `a`
+API: POST /api/v1/apps
+MCP: create_app
+```
+
 ## What a deploy does
 
-1. Downloads the source from your bucket, or the commit from GitHub, checks it and keeps it with the release.
-2. Reads the compose file through `docker compose config`, with the [x-ops block](/docs/guides/config).
+1. Downloads the code from your bucket, or the commit from GitHub, checks it and keeps it with the release.
+2. Reads the compose file with `docker compose config`, together with the [x-ops block](/docs/guides/config).
 3. Tags the built images per deploy, sets the env vars and `restart: unless-stopped`.
 4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 3 seconds later.
 5. Calls the health path, if x-ops sets one, until it answers below 500.
-6. Reports the SQLite databases it finds on the app's mounts.
+6. Reports the SQLite databases it finds on the app's volumes.
 
-If the start fails, the previous release starts again and the deploy is **failed**, and its deploy log ends with the last log lines of the service that stopped. The server keeps the releases of the last 5 builds (a source or an image) and their images, and every restart, start, domain change and rollback after the oldest of them. Roll back goes to any of those; Redeploy builds the newest successful build again.
+If the start fails, the previous release starts again and the deploy is marked **failed**. Its log ends with the last lines of the service that stopped.
+
+The server keeps the releases of the last 5 builds (of code or of an image) with their images, and every restart, start, domain change and rollback since the oldest of them. Roll back can go to any of those.
 
 ## Your data survives every deploy
 
-A bind mount whose path the repo does not bring, like `./data`, moves to `/var/lib/ops/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Paths the repo brings, like a config file, belong to the release.
+A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/ops/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Files the repo brings, like a config file, belong to the release.
 
 ## Follow a deploy
 
-| | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| Create an app | **Apps**, **Add app** | `ops apps add --server web-1 blog`, or the first `ops deploy` | `a` on the apps tab | `POST /api/v1/apps` | `create_app` |
-| Deploy the current repo | – | `ops deploy` | `d` | `POST /api/v1/apps/{app}/uploads`, then `POST /api/v1/apps/{app}/deploys` | – |
-| Live log | app page, **Deploy log** | printed by `ops deploy` | output panel | `GET /api/v1/apps/{app}/deploys/{number}/events` | `get_deploy`, poll it |
-| Deploy history | app page, **Deploys** | `ops deploys [app]` | `enter` on the app | `GET /api/v1/apps/{app}` | `get_app` |
-| Log of one deploy | click its row in **Deploys** | `ops deploys v3` | pick it with `↑` `↓`, then `enter` | `GET /api/v1/apps/{app}/deploys/{number}` | `get_deploy` |
+Shows the log of a deploy while it runs, step by step.
 
-The web page follows every new deploy by itself, also the ones started from the CLI. Every deploy keeps its log, also a failed one, so you can read later what went wrong.
+```surfaces
+Web: the app page, **Deploy log**
+CLI: ops deploy
+TUI: the output panel
+API: GET /api/v1/apps/{app}/deploys/{number}/events
+MCP: get_deploy
+```
+
+`ops deploy` prints the log as it goes. An agent over MCP calls `get_deploy` again until the deploy is done. The web page follows every new deploy by itself, also one started from the CLI.
+
+## See past deploys
+
+Lists the deploys of an app, newest first, with their status.
+
+```surfaces
+Web: the app page, **Deploys**
+CLI: ops deploys blog
+TUI: on the app, `enter`
+API: GET /api/v1/apps/{app}
+MCP: get_app
+```
+
+## Read the log of one deploy
+
+Shows the full log of an earlier deploy. Every deploy keeps its log, a failed one too, so you can read later what went wrong.
+
+```surfaces
+Web: the app page, click the deploy under **Deploys**
+CLI: ops deploys v3
+TUI: on the app, pick the deploy with `↑` `↓`, then `enter`
+API: GET /api/v1/apps/{app}/deploys/{number}
+MCP: get_deploy
+```
 
 ## Redeploy
 
-Builds the newest source again, from the copy the server kept, with the env vars as they are now. Nothing is uploaded. After changing env vars a restart is enough and faster.
+Builds the newest code again from the copy the server kept, with the env vars as they are now. Nothing is uploaded.
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| **Redeploy** | `ops redeploy [app]` | `R` | `POST /api/v1/apps/{app}/redeploy` | `redeploy_app` |
+```surfaces
+Web: the app page, **Redeploy**
+CLI: ops redeploy blog
+TUI: on the app, `R`
+API: POST /api/v1/apps/{app}/redeploy
+MCP: redeploy_app
+```
 
-An app deployed from an image runs the newest image again instead.
+After changing env vars, a restart is enough and faster. An app deployed from an image pulls and runs the newest image again instead.
 
-## Restart, stop and start
+## Restart
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| Restart | **Restart** | `ops restart [app]` | `t` | `POST /api/v1/apps/{app}/restart` | `restart_app` |
-| Stop | **Stop** | `ops stop [app] [--yes]` | `S`, then `y` | `POST /api/v1/apps/{app}/stop` | `stop_app` |
-| Start | **Start** | `ops start [app]` | `S` | `POST /api/v1/apps/{app}/start` | `start_app` |
+Starts the live release again with the env vars, domains and password as they are now. Nothing is built. Use it after changing env vars.
 
-- **Restart** starts the live release again with the env vars, domains and password as they are now. Nothing is built. Use it after changing env vars.
-- **Stop** takes the app offline. It stays off, also after a reboot of the server. Data and settings stay.
-- **Start** runs a stopped app again, like a restart. A deploy starts it too.
+```surfaces
+Web: the app page, **Restart**
+CLI: ops restart blog
+TUI: on the app, `t`
+API: POST /api/v1/apps/{app}/restart
+MCP: restart_app
+```
 
-Changes to domains or the password of a stopped app wait for its start.
+## Stop
+
+Takes the app offline. It stays off, also after the server reboots. Its data and settings stay.
+
+```surfaces
+Web: the app page, **Stop**
+CLI: ops stop blog
+TUI: on the app, `S`, then `y`
+API: POST /api/v1/apps/{app}/stop
+MCP: stop_app
+```
+
+`ops stop` asks first; `--yes` skips the question. Changes to the domains or the password of a stopped app wait until it starts.
+
+## Start
+
+Runs a stopped app again, like a restart. A deploy starts it too.
+
+```surfaces
+Web: the app page, **Start**
+CLI: ops start blog
+TUI: on the app, `S`
+API: POST /api/v1/apps/{app}/start
+MCP: start_app
+```
 
 ## Roll back
 
-Starts the images of an earlier successful deploy again, with the env vars that deploy had. It is a new deploy, for example v4 with the note *rollback to v1*.
+Starts an earlier successful deploy again, with the env vars it had. Use it when a new version is broken.
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| **Roll back** on a deploy | `ops rollback` or `ops rollback v3` | `r`, then `y`; in the open app pick a deploy with `↑` `↓` first | `POST /api/v1/apps/{app}/rollback` with `{"number": 3}` | `rollback_app` |
+```surfaces
+Web: the app page, **Roll back** on a deploy
+CLI: ops rollback v3
+TUI: on the app, `r`, then `y`
+API: POST /api/v1/apps/{app}/rollback
+MCP: rollback_app
+```
 
-Without a number, or without a pick in the terminal UI, it picks the successful deploy before the live one.
+A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`ops rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` before `r` to choose one. In the API, send the deploy as `{"number": 3}`.
 
 ## Remove an app
 
-Stops it and removes its containers and images. Volumes and data stay on the server.
+Stops the app and removes its containers and images. Its volumes and data stay on the server.
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| **Remove** | `ops apps rm <app>` | `x`, then `y` | `DELETE /api/v1/apps/{app}` | `remove_app` |
+```surfaces
+Web: the app page, **Remove app**
+CLI: ops apps rm blog
+TUI: on the app, `x`, then `y`
+API: DELETE /api/v1/apps/{app}
+MCP: remove_app
+```
 
 ## Push to deploy with GitHub Actions
+
+This workflow deploys every push to `main`. The [GitHub](/docs/guides/github) guide shows a way without CI, and [Build in CI](/docs/guides/ci) builds the image in CI.
 
 ```yaml
 name: deploy

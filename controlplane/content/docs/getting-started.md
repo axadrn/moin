@@ -16,7 +16,7 @@ It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writabl
 
 ## 2. Log in
 
-Create a personal API token under **Settings → Tokens** with read and write access. It belongs to your workspace; teammates you invite later work in the same one. Then:
+Create a personal API token on the web under **Settings**, **Tokens**, with read and write access. It belongs to your workspace; teammates you invite later work in the same one. Then:
 
 ```bash
 ops login
@@ -42,13 +42,20 @@ It installs Docker when it is missing, installs the agent as the `ops-agent` sys
 
 ## 4. Add your bucket
 
-Your code and your backups go into your own S3-compatible bucket, never to us. Create one at Cloudflare R2, AWS, Backblaze, Hetzner or Exoscale, then add it under **Bucket** in the web UI, or:
+A bucket is a folder in an online storage service. Your code and your backups go into your own bucket, never to us. Create one at Cloudflare R2, AWS, Backblaze, Hetzner or Exoscale, then add it:
 
-```bash
-ops backups bucket set --endpoint https://<account>.r2.cloudflarestorage.com --bucket my-ops --access-key <key>
+```surfaces
+Web: **Bucket** in the sidebar, then **Save bucket**
+CLI: ops backups bucket set \
+  --endpoint https://<account>.r2.cloudflarestorage.com \
+  --bucket my-ops \
+  --access-key <key>
+TUI: settings tab, **Bucket**, then `enter`
+API: PUT /api/v1/backup-storage
+MCP: set_backup_storage
 ```
 
-[Why a bucket](/docs/guides/bucket).
+The CLI asks for the secret key. [Why a bucket](/docs/guides/bucket).
 
 ## 5. Deploy
 

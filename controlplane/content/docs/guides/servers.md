@@ -4,22 +4,63 @@ description: "Add, watch and remove servers"
 order: 1
 ---
 
-A server is a Linux machine with the ops agent. The agent dials out to the control plane, so the server needs no open port for ops.
+A server is a Linux machine with the ops agent on it. The agent is a small program that dials out to ops and does the work there, so the server needs no open port for ops.
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| List with live status | **Servers** | `ops servers` | `ops`, tab **servers** | `GET /api/v1/servers`, live: `GET /api/v1/servers/events` | `list_servers` |
-| Add | **Add server** | `ops servers add <name>` | `a` | `POST /api/v1/servers` | `add_server` |
-| Remove | **Remove** | `ops servers rm <name>` | `x`, then `y` | `DELETE /api/v1/servers/{id}` | `remove_server` |
-| Update the agent | **Update agent** | `ops servers update [name]` | `u` | `POST /api/v1/servers/{id}/update` | `update_agent` |
+## See your servers
 
-Adding a server gives one install command. It works once, within one hour. Run it as root on the machine.
+Lists every server with its live status. Lists update by themselves everywhere.
 
-A server shows **waiting** until its agent connects, **online** while it holds its session and **offline** when the session drops. Lists update live everywhere.
+```surfaces
+Web: **Servers**
+CLI: ops servers
+TUI: `ops`, then the **servers** tab
+API: GET /api/v1/servers
+MCP: list_servers
+```
 
-Removing a server disconnects its agent; its agent token stops working. A server with apps cannot be removed: remove the apps first.
+A server shows **waiting** until its agent connects, **online** while it is connected and **offline** when the connection drops. The API streams changes live from `GET /api/v1/servers/events`.
+
+## Add a server
+
+Gives you one install command for a new server. Run it as root on the machine within one hour; it works once.
+
+```surfaces
+Web: **Servers**, **Add server**
+CLI: ops servers add web-1
+TUI: on the servers tab, `a`
+API: POST /api/v1/servers
+MCP: add_server
+```
+
+## Update the agent
+
+Puts the agent version of your control plane on a server. Use it when ops says a newer agent is there.
+
+```surfaces
+Web: **Servers**, **Update agent** on the server
+CLI: ops servers update web-1
+TUI: on the server, `u`
+API: POST /api/v1/servers/{id}/update
+MCP: update_agent
+```
+
+`ops servers update` without a name updates every online server with an older agent.
+
+## Remove a server
+
+Disconnects the agent and makes its token stop working. A server with apps cannot be removed: remove the apps first.
+
+```surfaces
+Web: **Servers**, open the server, **Remove server**
+CLI: ops servers rm web-1
+TUI: on the server, `x`, then `y`
+API: DELETE /api/v1/servers/{id}
+MCP: remove_server
+```
 
 ## On the server
+
+See whether the agent runs, and follow its log:
 
 ```bash
 systemctl status ops-agent

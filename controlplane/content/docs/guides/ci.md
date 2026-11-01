@@ -8,31 +8,63 @@ By default your server builds the app. You can also build the image in CI, push 
 
 | | Server builds | CI builds |
 | --- | --- | --- |
-| Who builds | your server, from the source `ops deploy` uploads | GitHub Actions or any CI |
+| Who builds | your server, from the code `ops deploy` uploads | GitHub Actions or any CI |
 | Start it | `ops deploy` | the deploy hook, or `ops deploy --image` (after one `ops deploy` of the repo, whose compose file it reuses) |
 | Good for | small apps, no registry needed | heavy builds, build caches, many servers |
 
 An image deploy keeps the compose file of the running release and only swaps the image of the main service. So deploy the repo once with `ops deploy`; after that CI can ship images. Health check, automatic rollback, `ops rollback` and env vars work the same.
 
-## 1. A login for private images
+## 1. Save a registry login
 
-Public images pull without one. For GitHub Container Registry, create a token with `read:packages`:
+Lets your servers pull private images. A registry is where CI stores the images it builds, such as GitHub Container Registry. Public images need no login.
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| List logins | **Settings → Tokens**, Registries | `ops registry` | settings tab | `GET /api/v1/registries` | `list_registries` |
-| Save a login | **Settings → Tokens**, Registries | `ops registry set ghcr.io <user>`, then the token | settings tab, `a` | `PUT /api/v1/registries/{host}` | `set_registry` |
-| Remove a login | **Remove** on the login | `ops registry rm ghcr.io` | settings tab, `x`, `y` | `DELETE /api/v1/registries/{host}` | `remove_registry` |
+```surfaces
+Web: **Settings**, **Tokens** tab, **Registries**, **Save login**
+CLI: ops registry set ghcr.io <user>
+TUI: settings tab, `a`
+API: PUT /api/v1/registries/{host}
+MCP: set_registry
+```
 
-The token is stored encrypted. The agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
+For GitHub Container Registry, create a token with `read:packages`. The CLI asks for it on stdin. The token is stored encrypted. The agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
 
-## 2. A deploy hook
+### See the registry logins
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| app page, **Deploy hook** | `ops hook [app]` | `h` | `POST /api/v1/apps/{app}/hook` | `create_deploy_hook` |
+Lists the saved logins, without their passwords.
 
-It prints a secret URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. Creating a new one makes the old one stop working.
+```surfaces
+Web: **Settings**, **Tokens** tab, **Registries**
+CLI: ops registry
+TUI: settings tab
+API: GET /api/v1/registries
+MCP: list_registries
+```
+
+### Remove a registry login
+
+Deletes a saved login. Servers can then no longer pull private images from that registry.
+
+```surfaces
+Web: **Settings**, **Tokens** tab, **Registries**, **Remove** on the login
+CLI: ops registry rm ghcr.io
+TUI: settings tab, pick the login, `x`, then `y`
+API: DELETE /api/v1/registries/{host}
+MCP: remove_registry
+```
+
+## 2. Create a deploy hook
+
+Gives you a secret URL that deploys an image when CI calls it.
+
+```surfaces
+Web: the app page, **Deploy hook**, **New deploy hook**
+CLI: ops hook blog
+TUI: on the app, `h`
+API: POST /api/v1/apps/{app}/hook
+MCP: create_deploy_hook
+```
+
+ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working.
 
 ## 3. The workflow
 
@@ -60,7 +92,9 @@ jobs:
           push: true
           platforms: linux/arm64
           tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
-      - run: curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/${{ github.repository }}:${{ github.sha }}"
+      - run: |
+          curl -fsS -X POST \
+            "$OPS_DEPLOY_HOOK?image=ghcr.io/${{ github.repository }}:${{ github.sha }}"
         env:
           OPS_DEPLOY_HOOK: ${{ secrets.OPS_DEPLOY_HOOK }}
 ```
@@ -83,8 +117,14 @@ The step waits until the deploy is live and fails the job when the deploy fails.
 
 ## Deploy an image by hand
 
-| Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- |
-| app page, **Deploy image** | `ops deploy --image ghcr.io/me/blog:3f2a9c1 [app]` | `i` | `POST /api/v1/apps/{app}/deploys` with `{"image": …}` | `deploy_image` |
+Deploys an image that is already in a registry, without CI.
 
-A redeploy of an image deploy pulls the same image again.
+```surfaces
+Web: the app page, **Deploy an image**, **Deploy image**
+CLI: ops deploy --image ghcr.io/me/blog:3f2a9c1 blog
+TUI: on the app, `i`
+API: POST /api/v1/apps/{app}/deploys
+MCP: deploy_image
+```
+
+In the API, send `{"image": "ghcr.io/me/blog:3f2a9c1"}`. A redeploy of an image deploy pulls the same image again.

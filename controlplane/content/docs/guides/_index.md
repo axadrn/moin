@@ -4,4 +4,4 @@ description: "Servers, deploys, GitHub, data, backups, security, config, env var
 order: 4
 ---
 
-Each guide covers one job, in the web UI, the CLI, the terminal UI, the API and MCP.
+Each guide covers one job. Every task shows how to do it on the web, in the CLI, the terminal UI (TUI), the API and MCP: pick a tab, and the docs keep showing that one.

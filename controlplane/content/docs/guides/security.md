@@ -4,63 +4,151 @@ description: "No open port, SSH only on your tailnet, everything else dropped"
 order: 8
 ---
 
-A server ops runs can have no open port at all. The agent only dials out; app traffic can come through a Cloudflare Tunnel, SSH can answer only on your Tailscale network, and a firewall drops the rest. Each is a switch per server, and ops sets it all up.
+A server ops runs can have no open port at all. ops sets up three switches per server, and each one closes a door:
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| Store the keys | server, **Security**, **Keys** | `ops integrations cloudflare` · `tailscale`, key on stdin | settings tab, **Cloudflare token** · **Tailscale key**, `enter` | `PUT /api/v1/integrations` | `set_integrations` |
-| See which keys are stored | **Keys** | `ops integrations` | settings tab | `GET /api/v1/integrations` | `get_integrations` |
-| Remove a key | **Keys**, **Remove Cloudflare token** · **Remove Tailscale key** | `ops integrations rm cloudflare` · `tailscale` | settings tab, the key, `x`, then `y` | `PUT /api/v1/integrations` with an empty key | `set_integrations` with an empty key |
-| Cloudflare Tunnel | **Cloudflare Tunnel**, then **Apply** | `ops servers secure web-1 --tunnel on` | `t`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
-| SSH only on Tailscale | **SSH only on Tailscale**, then **Apply** | `ops servers secure web-1 --ssh tailscale` | `s`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
-| Firewall | **Firewall**, then **Apply** | `ops servers secure web-1 --firewall on` | `f`, then `y` | `PUT /api/v1/servers/{id}/security` | `set_server_security` |
-| See what is open | **What the agent set up** | `ops servers` (ACCESS) and the output of `secure` | ACCESS column | `GET /api/v1/servers` (`security`) | `list_servers` |
-| See the rules of a server | **Rules** | `ops servers rules web-1`, `ops servers` (RULES) | RULES column | `GET /api/v1/servers` (`rules`) | `list_servers` |
+- **Cloudflare Tunnel.** Visitors reach your apps through Cloudflare instead of ports 80 and 443. A tunnel is a connection your server opens to Cloudflare, so nothing has to come in.
+- **SSH only on Tailscale.** SSH answers only on your tailnet. A tailnet is your private Tailscale network: only your own devices are in it.
+- **Firewall.** The server drops every connection the other switches do not need.
 
-On the web, flip the switches and press **Apply**. Apply changes only the switches you flipped: a change made meanwhile in the CLI, the TUI or by an agent stays. The page updates by itself when the server changes, except while a flipped switch waits for Apply.
-
-**What the agent set up** shows the traffic, what is open to everyone and the tailnet. Without the firewall, **Open to everyone** lists the ports ops uses (SSH, and 80 and 443 without the tunnel); every other port a program listens on is open too. **Tailnet** shows the server's tailnet address, or says to add a Tailscale auth key when there is none.
+The agent only dials out to ops, so ops itself needs no open port either.
 
 ## Keys
 
-The keys are for all servers of the workspace and stored encrypted. Typing a new one replaces the old; an empty field keeps it. To take a key away, press **Remove Cloudflare token** or **Remove Tailscale key**, or run `ops integrations rm cloudflare` or `tailscale`. Removing a key changes no server at once. Turn the tunnels off first: without the token ops cannot delete a tunnel in Cloudflare. Without the Tailscale key, the next change of a server's security opens SSH again on every interface. Turning the tunnel or SSH on Tailscale on needs a key again.
+The switches need two keys: a Cloudflare API token for the tunnel and a Tailscale auth key for SSH. They belong to the workspace, work for all its servers and are stored encrypted. On the web they are under **Integrations** on the security page of any server.
+
+### Store a key
+
+Adds the Cloudflare token or the Tailscale key. A new key replaces the old one; an empty field keeps it.
+
+```surfaces
+Web: **Servers**, **Security** on the server, **Integrations**
+CLI: ops integrations cloudflare
+CLI: ops integrations tailscale
+TUI: settings tab, **Cloudflare token** or **Tailscale key**, then `enter`
+API: PUT /api/v1/integrations
+MCP: set_integrations
+```
+
+The CLI reads the key from stdin, so it never ends up in your shell history.
+
+### See which keys are stored
+
+Shows whether a Cloudflare token and a Tailscale key are there, never the keys themselves.
+
+```surfaces
+Web: **Servers**, **Security** on the server, **Integrations**
+CLI: ops integrations
+TUI: settings tab
+API: GET /api/v1/integrations
+MCP: get_integrations
+```
+
+### Remove a key
+
+Deletes a key from ops. Turn the tunnels off first: without the token ops cannot delete a tunnel in Cloudflare.
+
+```surfaces
+Web: **Servers**, **Security** on the server, **Integrations**, then **Remove Cloudflare token** or **Remove Tailscale key**
+CLI: ops integrations rm cloudflare
+CLI: ops integrations rm tailscale
+TUI: settings tab, pick the key, `x`, then `y`
+API: PUT /api/v1/integrations
+MCP: set_integrations
+```
+
+The API and MCP remove a key when you send it empty.
+
+Removing a key changes no server right away. Without the Tailscale key, the next security change of a server opens SSH again on every network. Turning the tunnel or SSH on Tailscale back on needs a key again.
+
+### Create the keys
+
+- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**. Give it Account **Cloudflare Tunnel: Edit**, Zone **DNS: Edit** and Zone **Zone Settings: Edit**, for the zones of your apps. ops checks the token before it stores it.
+- **Tailscale key:** in the Tailscale admin console under **Settings**, **Keys**. Make it reusable.
 
 ## Cloudflare Tunnel
 
-With the tunnel on, `cloudflared` runs next to Traefik and holds an outbound connection to Cloudflare. Visitors reach Cloudflare, Cloudflare sends their requests through the tunnel, Traefik routes them to your app. Ports 80 and 443 close: Traefik publishes no port at all.
+Sends all web traffic of a server through Cloudflare and closes ports 80 and 443. Use it when you want no web port open on the server.
 
-ops does the setup with your own Cloudflare API token:
+```surfaces
+Web: **Servers**, **Security** on the server, turn on **Cloudflare Tunnel**, then **Apply**
+CLI: ops servers secure web-1 --tunnel on
+TUI: on the server, `t`, then `y`
+API: PUT /api/v1/servers/{id}/security
+MCP: set_server_security
+```
 
-1. It creates a tunnel for the server and starts `cloudflared` with its token.
-2. It routes every domain of the server's apps through the tunnel, and sends anything else to a 404.
-3. It points each domain's DNS at the tunnel as a proxied CNAME, in the zone of your account that holds it.
-4. It turns on **Always Use HTTPS** for those zones. Cloudflare serves HTTPS; there is no certificate on the server.
+With the tunnel on, `cloudflared` runs next to Traefik, the proxy of the server, and keeps a connection open to Cloudflare. Visitors reach Cloudflare, Cloudflare sends their requests through the tunnel and Traefik hands them to your app.
 
-When you add a domain to an app, ops routes and points it the same way. A domain in a zone the token cannot reach shows up under **What the agent set up**: point it at `<tunnel>.cfargotunnel.com` yourself.
+ops does the setup with your Cloudflare token:
 
-Create the token under **My Profile, API Tokens** with these permissions: Account **Cloudflare Tunnel: Edit**, Zone **DNS: Edit** and Zone **Zone Settings: Edit**, for the zones of your apps. ops checks it before storing it, encrypted.
+1. It creates a tunnel for the server and starts `cloudflared`.
+2. It routes every domain of the server's apps through the tunnel. Anything else gets a 404.
+3. It points the DNS of each domain at the tunnel, in the Cloudflare zone that holds the domain.
+4. It turns on **Always Use HTTPS** for those zones. Cloudflare serves HTTPS, so the server needs no certificate.
 
-Turning the tunnel off deletes it; Traefik takes ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server.
+A domain you add later gets the same setup. If the token cannot reach the zone of a domain, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself.
+
+Turning the tunnel off deletes it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server.
 
 ## SSH only on Tailscale
 
-With a Tailscale auth key stored, the agent installs Tailscale when it is missing and joins the server to your tailnet. SSH then answers only on the tailnet interface. Port 22 closes only once Tailscale is up and has an address; until then it stays open and ops says why.
+Lets SSH answer only on your tailnet, so nobody else on the internet can even try to log in. Use it when you reach your servers from your own devices only.
 
-Create a reusable auth key in the Tailscale admin console under **Settings, Keys**. Keep one way into the server you trust, such as your provider's web console, before you close SSH.
+```surfaces
+Web: **Servers**, **Security** on the server, turn on **SSH only on Tailscale**, then **Apply**
+CLI: ops servers secure web-1 --ssh tailscale
+TUI: on the server, `s`, then `y`
+API: PUT /api/v1/servers/{id}/security
+MCP: set_server_security
+```
+
+The agent installs Tailscale when it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address. Until then it stays open and ops says why.
+
+Before you close SSH, keep a second way into the server, such as the web console of your provider.
 
 ## Firewall
 
-The agent owns one nftables table, `ops`. Inbound it accepts answers to connections the server made, loopback, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and Tailscale's port 41641. Everything else is dropped. The table changes in one transaction, so there is never a moment without rules.
+Drops every connection the server does not need. Turn it on for every server: without it, any program that listens on a port is open to the internet.
 
-Containers are not filtered by this table: Docker publishes their ports on its own chains. With the tunnel on, nothing is published.
+```surfaces
+Web: **Servers**, **Security** on the server, turn on **Firewall**, then **Apply**
+CLI: ops servers secure web-1 --firewall on
+TUI: on the server, `f`, then `y`
+API: PUT /api/v1/servers/{id}/security
+MCP: set_server_security
+```
+
+The firewall lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and port 41641 for Tailscale. It drops everything else.
+
+The agent keeps its rules in one nftables table, `ops`, and changes them in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table. With the tunnel on, no container port is published.
+
+## Apply on the web
+
+On the web, flip the switches and press **Apply**. The switches are in the **Access** box. Apply changes only the switches you flipped: a change someone made meanwhile in the CLI, the TUI or through an agent stays. The page updates by itself when the server changes, except while a flipped switch waits for Apply.
+
+## See what is open
+
+Shows what the agent set up on a server: how traffic comes in, which ports are open to everyone, and the tailnet address.
+
+```surfaces
+Web: **Servers**, **Security** on the server, **What the agent set up**
+CLI: ops servers
+TUI: the ACCESS column on the servers tab
+API: GET /api/v1/servers
+MCP: list_servers
+```
+
+In the CLI it is the ACCESS column, and `ops servers secure` prints it after each change. In the API it is the `security` field. Without the firewall, **Open to everyone** lists only the ports ops uses, but every other listening port is open too.
 
 ## No open port
 
-The tunnel, SSH on Tailscale and the firewall together leave nothing open to the internet. The agent dials out to ops, `cloudflared` dials out to Cloudflare and Tailscale dials out to its coordination server. **What the agent set up** shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
+With all three switches on, nothing is open to the internet. The agent dials out to ops, `cloudflared` dials out to Cloudflare and Tailscale dials out to its own servers. **What the agent set up** then shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
 
 ## Rules
 
-Your server decides what ops may do there, not ops. Write the rules into `/etc/ops/rules` on the server, one per line. The agent reads them for every request and refuses what they do not allow. Nobody can change them through ops: not us, not your team, not someone who breaks into ops. Changing them takes root on the server.
+Rules are a file on your server that says what ops may do there. The agent checks every request against it and refuses what it does not allow. Nobody can change the file through ops: not us, not your team, not someone who breaks into ops. Changing it takes root on the server.
+
+Write one rule per line into `/etc/ops/rules`:
 
 ```
 # /etc/ops/rules
@@ -73,16 +161,44 @@ network: locked
 
 | Rule | What it stops |
 | --- | --- |
-| `data: off` | tables, SQL and row edits through ops, from the web, the CLI, the terminal UI and MCP |
-| `logs: off` | container logs through ops; they often hold what your users sent |
-| `deploy-from: <sources>` | deploys of anything else. A source is a GitHub repo as `github.com/<owner>/<repo>`, an image without its tag such as `ghcr.io/acme/web`, or `upload` for `ops deploy` from your computer. `*` matches one part, so `github.com/acme/*` allows every repo of acme. Redeploys and rollbacks bring no new code and stay allowed |
-| `backups-to: <host>/<bucket>` | backups to or restores from any other bucket. With `upload` in `deploy-from`, an upload must come from this bucket too |
-| `network: locked` | changes to the Cloudflare Tunnel, SSH on Tailscale and the firewall. Set them up first, then lock them |
+| `data: off` | reading tables, running SQL and editing rows through ops |
+| `logs: off` | reading container logs through ops; logs often hold what your users sent |
+| `deploy-from: <sources>` | deploys from anywhere else, see below |
+| `backups-to: <host>/<bucket>` | backups to and restores from any other bucket |
+| `network: locked` | changes to the tunnel, SSH on Tailscale and the firewall. Set them up first, then lock them |
 
-Without the file, ops may do everything. Leave out a rule and ops may do what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it, so a typo never lets through what it meant to stop. The agent reports the rules when it connects: restart it after a change, with `systemctl restart ops-agent`, to show the new ones everywhere. They apply to every request at once either way.
+A source in `deploy-from` is one of these:
 
-A refused request says so, in the web, the CLI, the terminal UI and MCP: `refused by the rules of this server (/etc/ops/rules): data: off`.
+- a GitHub repo, as `github.com/<owner>/<repo>`,
+- an image without its tag, such as `ghcr.io/acme/web`,
+- `upload`, for `ops deploy` from your computer. With `backups-to` set, an upload must come from that bucket too.
+
+`*` stands for one part, so `github.com/acme/*` allows every repo of acme. A redeploy or a rollback brings no new code, so it is always allowed.
+
+Without the file, ops may do everything. A rule you leave out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it, so a typo never lets through what it was meant to stop.
+
+Rules apply to every request right away. The agent reports them when it connects, so restart it after a change to show the new rules everywhere:
+
+```bash
+systemctl restart ops-agent
+```
+
+### See the rules of a server
+
+Shows the rules a server has, as its agent reported them.
+
+```surfaces
+Web: **Servers**, **Security** on the server, **Rules**
+CLI: ops servers rules web-1
+TUI: the RULES column on the servers tab
+API: GET /api/v1/servers
+MCP: list_servers
+```
+
+`ops servers` shows them in its RULES column too. In the API they are the `rules` field.
+
+A refused request says why, on every surface: `refused by the rules of this server (/etc/ops/rules): data: off`.
 
 ### Why it matters
 
-`data: off` and `logs: off` keep your users' data from passing through ops. `deploy-from` is the other half: whoever controls ops could otherwise deploy code that copies your database. With both, a break-in at ops reads nothing and runs nothing of its own on your server.
+`data: off` and `logs: off` keep your users' data from passing through ops. `deploy-from` is the other half: without it, whoever controls ops could deploy code that copies your database. With both, a break-in at ops reads nothing and runs nothing of its own on your server.

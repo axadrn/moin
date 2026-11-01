@@ -4,35 +4,84 @@ description: "Browse, edit and query the SQLite database of an app"
 order: 6
 ---
 
-ops reads your app's SQLite database live from its server. You browse tables, edit a cell, add or delete a row and run SQL, from the web, the CLI, the terminal UI, the API and MCP. Nothing is copied to ops: every read goes to the server and back.
+ops reads your app's SQLite database live from its server. You can browse tables, edit a cell, add or delete a row and run SQL. Nothing is copied to ops: every read goes to the server and back.
 
-ops finds the database on its own: every SQLite file on a volume of the live release, up to three folders deep. Name one with `x-ops.database` when there are several.
+ops finds the database by itself: every SQLite file on a volume of the live release, up to three folders deep. When there are several, name one with `x-ops.database`.
 
-| Action | Web | CLI | TUI | API | MCP |
-| --- | --- | --- | --- | --- | --- |
-| Tables and row counts | app page, **Data** | `ops db` | `s` | `GET /api/v1/apps/{app}/databases/tables` | `list_tables` |
-| Browse rows | click a table | `ops db rows orders` | `s`, then `SELECT …` | `GET /api/v1/apps/{app}/databases/rows` | `query_database` |
-| Edit a cell | click it, type, `Enter` | `ops sql --write "UPDATE …"` | `s`, then `UPDATE …`, `y` | `PATCH /api/v1/apps/{app}/databases/rows` | `execute_sql` |
-| Add a row | **+ Row** | `ops sql --write "INSERT …"` | `s`, then `INSERT …`, `y` | `POST /api/v1/apps/{app}/databases/rows` | `execute_sql` |
-| Delete a row | trash icon on the row | `ops sql --write "DELETE …"` | `s`, then `DELETE …`, `y` | `DELETE /api/v1/apps/{app}/databases/rows` | `execute_sql` |
-| Schema | **Schema** | `ops db schema [table]` | `s`, then `SELECT sql FROM sqlite_schema` | `GET /api/v1/apps/{app}/databases/tables` | `list_tables` |
-| Run SQL | **SQL** box | `ops sql "…"` | `s` | `POST /api/v1/apps/{app}/databases/query` | `query_database` |
+## See the tables
+
+Lists the tables of the database with their row counts.
+
+```surfaces
+Web: the app page, **Data** tab
+CLI: ops db
+TUI: on the app, `s`
+API: GET /api/v1/apps/{app}/databases/tables
+MCP: list_tables
+```
+
+## Browse rows
+
+Shows the rows of one table, newest first.
+
+```surfaces
+Web: the app page, **Data** tab, click a table
+CLI: ops db rows orders
+TUI: on the app, `s`, then type `SELECT * FROM orders`
+API: GET /api/v1/apps/{app}/databases/rows
+MCP: query_database
+```
+
+A read returns at most 1000 rows. `--limit` in the CLI and `limit` in the API and MCP choose fewer.
+
+## See the schema
+
+Shows how a table is built: its `CREATE` statement and its indexes.
+
+```surfaces
+Web: the app page, **Data** tab, a table, **Schema**
+CLI: ops db schema orders
+TUI: on the app, `s`, then type `SELECT sql FROM sqlite_schema`
+API: GET /api/v1/apps/{app}/databases/tables
+MCP: list_tables
+```
+
+## Run SQL
+
+Runs a query on the live database. A query only reads, unless you say it may change data.
+
+```surfaces
+Web: the app page, **Data** tab, the **SQL** box, **Run**
+CLI: ops sql "SELECT status, count(*) FROM orders GROUP BY status"
+TUI: on the app, `s`, then type the query
+API: POST /api/v1/apps/{app}/databases/query
+MCP: query_database
+```
+
+## Change data
+
+Edits a cell, adds a row or deletes one. With [backups](/docs/guides/backups) set up, ops takes a snapshot first.
+
+```surfaces
+Web: the app page, **Data** tab: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
+Web: or tick **Allow changes** in the **SQL** box
+CLI: ops sql --write "UPDATE settings SET value = 'on' WHERE key = 'maintenance'"
+TUI: on the app, `s`, type the query, then `y` when ops asks **This query changes data. Run it?**
+API: PATCH /api/v1/apps/{app}/databases/rows
+MCP: execute_sql
+```
+
+The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. Agents see `execute_sql` as destructive, so they ask first.
 
 ## Reads cannot change anything
 
-A query opens the database read-only. A statement that would change data fails, so a typo cannot delete rows. To change data, say so:
+A query opens the database read-only. A statement that would change data fails, so a typo cannot delete rows. To change data you say so, as above. Every change runs in one transaction.
 
-- Web: tick **Allow changes** in the SQL box. Editing a cell or deleting a row in the table is a change you asked for.
-- CLI: `ops sql --write "UPDATE settings SET value = 'on' WHERE key = 'maintenance'"`.
-- TUI: run it; ops asks **This query changes data. Run it?** and `y` runs it.
-- MCP: `execute_sql`, which agents see as destructive.
-
-Every change runs in one transaction, and with [backups](/docs/guides/backups) set up ops takes a snapshot first. A read returns at most 1000 rows; `--limit` and `limit` choose fewer.
+More from the CLI:
 
 ```bash
 ops db                              # tables, rows, migration
 ops db rows orders --limit 5        # newest rows first
-ops sql "SELECT status, count(*) FROM orders GROUP BY status"
 echo "SELECT * FROM customers" | ops sql
 ```
 
@@ -40,14 +89,14 @@ echo "SELECT * FROM customers" | ops sql
 
 ops changes data, never the schema. Tables, columns and indexes change through migrations in your repo, which your app runs when it starts: goose, golang-migrate, Prisma, Drizzle or your own. That keeps the database on the server and the code in the repo the same.
 
-ops shows where the migrations are: the data page, `ops db` and `list_tables` name the tool and its newest version when they find a `goose_db_version`, `schema_migrations`, `_prisma_migrations` or `__drizzle_migrations` table. The **Schema** view shows each table's `CREATE` statement and its indexes.
+ops shows where the migrations are. The data page, `ops db` and `list_tables` name the tool and its newest version when they find a `goose_db_version`, `schema_migrations`, `_prisma_migrations` or `__drizzle_migrations` table.
 
-SQL that creates, alters or drops is still possible for an emergency. The web UI warns you that the next deploy will not know about it.
+SQL that creates, alters or drops is still possible for an emergency. The web warns you that the next deploy will not know about it.
 
 ## Who may read data
 
-Rows are your users' data, as sensitive as secrets. The API and MCP need a token with write access to read rows or run SQL; a read-only token sees the tables and their row counts.
+Rows are your users' data, as sensitive as secrets. The API and MCP need a token with write access to read rows or run SQL. A read-only token sees the tables and their row counts.
 
 ## Requirements
 
-The app keeps SQLite on a volume, as `/data/app.db` in the generated compose file. WAL mode is best: your app and ops then read and write at the same time without waiting. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
+The app keeps SQLite on a volume, as `/data/app.db` in the compose file ops writes. WAL mode is best: your app and ops then read and write at the same time without waiting. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
