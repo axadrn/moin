@@ -105,10 +105,10 @@ templ ServerSecurity(view SecurityView) {
 						</label>
 						<div class="flex flex-wrap justify-end gap-2.5 sm:col-span-2">
 							if view.Integrations.Cloudflare {
-								@removeKeyButton(view.Server.ID, "cloudflare", "Remove Cloudflare token", "Remove the Cloudflare API token? Tunnels that run keep running; turning one on needs a token again.")
+								@removeKeyButton(view.Server.ID, "cloudflare", "Remove Cloudflare token", "Remove the Cloudflare API token? Turn tunnels off first: without the token ops cannot delete them in Cloudflare.")
 							}
 							if view.Integrations.Tailscale {
-								@removeKeyButton(view.Server.ID, "tailscale", "Remove Tailscale key", "Remove the Tailscale auth key? Servers on your tailnet stay there; SSH only on Tailscale needs a key again.")
+								@removeKeyButton(view.Server.ID, "tailscale", "Remove Tailscale key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
 							}
 							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 								Save keys

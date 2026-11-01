@@ -9,11 +9,20 @@ A server ops runs can have no open port at all. The agent only dials out; app tr
 | Action | Web | CLI | TUI | MCP |
 | --- | --- | --- | --- | --- |
 | Store the keys | server, **Security**, **Keys** | `ops integrations cloudflare` · `tailscale`, key on stdin | – | `set_integrations` |
-| Cloudflare Tunnel | **Cloudflare Tunnel** | `ops servers secure web-1 --tunnel on` | `t`, then `y` | `set_server_security` |
-| SSH only on Tailscale | **SSH only on Tailscale** | `ops servers secure web-1 --ssh tailscale` | – | `set_server_security` |
-| Firewall | **Firewall** | `ops servers secure web-1 --firewall on` | `f`, then `y` | `set_server_security` |
+| Remove a key | **Keys**, **Remove Cloudflare token** · **Remove Tailscale key** | `ops integrations rm cloudflare` · `tailscale` | – | `set_integrations` with an empty key |
+| Cloudflare Tunnel | **Cloudflare Tunnel**, then **Apply** | `ops servers secure web-1 --tunnel on` | `t`, then `y` | `set_server_security` |
+| SSH only on Tailscale | **SSH only on Tailscale**, then **Apply** | `ops servers secure web-1 --ssh tailscale` | – | `set_server_security` |
+| Firewall | **Firewall**, then **Apply** | `ops servers secure web-1 --firewall on` | `f`, then `y` | `set_server_security` |
 | See what is open | **What the agent set up** | `ops servers` (ACCESS) and the output of `secure` | ACCESS column | `list_servers` |
 | See the rules of a server | **Rules** | `ops servers rules web-1`, `ops servers` (RULES) | RULES column | `list_servers` |
+
+On the web, flip the switches and press **Apply**. Apply changes only the switches you flipped: a change made meanwhile in the CLI, the TUI or by an agent stays. The page updates by itself when the server changes, except while a flipped switch waits for Apply.
+
+**What the agent set up** shows the traffic, what is open to everyone and the tailnet. Without the firewall, **Open to everyone** lists the ports ops uses (SSH, and 80 and 443 without the tunnel); every other port a program listens on is open too. **Tailnet** shows the server's tailnet address, or says to add a Tailscale auth key when there is none.
+
+## Keys
+
+The keys are for all servers of the workspace and stored encrypted. Typing a new one replaces the old; an empty field keeps it. To take a key away, press **Remove Cloudflare token** or **Remove Tailscale key**, or run `ops integrations rm cloudflare` or `tailscale`. Removing a key changes no server at once. Turn the tunnels off first: without the token ops cannot delete a tunnel in Cloudflare. Without the Tailscale key, the next change of a server's security opens SSH again on every interface. Turning the tunnel or SSH on Tailscale on needs a key again.
 
 ## Cloudflare Tunnel
 

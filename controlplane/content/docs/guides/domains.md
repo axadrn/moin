@@ -55,4 +55,4 @@ Fields in `x-ops` win over the settings in ops.
 
 ## Apply by hand
 
-`ops apply` (or `apply_app` in MCP) restarts the running release with the env vars, domains and password as they are now, without a build.
+**Apply** on the app page, `ops apply` (or `apply_app` in MCP) restarts the running release with the env vars, domains and password as they are now, without a build.
