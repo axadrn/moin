@@ -160,13 +160,19 @@ Rules every page follows:
 - **Page.** `@panelPage()` sets the width (`max-w-7xl`), the gutters and
   stacks its children with `gap-6`. Put sections straight into it. Never
   `mt-*`/`mb-*` between sections, and never inside a reusable panel.
+  Every card takes the full width of the page; no narrow `max-w-*` column
+  for some pages. Forms keep their fields short with grids (`lg:grid-cols-2`
+  or `-3`) or `sm:max-w-sm` on a single field.
+- **Forms.** A one-field form puts its button next to the field. A form
+  with more fields ends with its buttons right aligned.
 - **Header.** `@pageHeader(title, description) { actions }`: the page
   title, one muted body line below it, the actions right
   aligned at its bottom (below on phones). The description says what the
   page is for in one sentence. An app page uses
   `@appHeader(app, tab, description) { actions }`: the name, its status chip,
-  the line, the actions, and the tabs below.
-- **Tabs.** `@appTabs(app, tab)`: a segmented control of plain `<a href>`
+  the line, the actions, and the tabs below. A page about one server uses
+  `@statusHeader(name, chip, description)` the same way, without tabs.
+- **Tabs.** `@tabNav(label) { @tabLink(...) }` (`@appTabs(app, tab)` on app pages): a segmented control of plain `<a href>`
   links, one per page (boosted, see Navigation), the active one
   `aria-current="page"`. Tabs switch pages, never content in place.
 - **Cards.** Every block is a `card.Card`, one per topic, built with
