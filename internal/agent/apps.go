@@ -223,7 +223,10 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		}
 	}
 	logf("starting")
-	err = a.start(ctx, start.App, composeFile, detected, logf)
+	// A restart brings nothing new, so compose would leave the containers
+	// as they are: recreate them.
+	restart := start.SourceURL == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
+	err = a.start(ctx, start.App, composeFile, detected, restart, logf)
 	if err != nil {
 		if previous > 0 && previous != start.Number {
 			logf("starting v%d again", previous)
@@ -254,8 +257,12 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 }
 
 // start brings the release up and checks that it stays up.
-func (a *apps) start(ctx context.Context, app, composeFile string, detected protocol.Detected, logf func(string, ...any)) error {
-	err := a.compose(ctx, app, composeFile, logf, "up", "-d", "--remove-orphans", "--wait", "--wait-timeout", strconv.Itoa(int(waitTimeout.Seconds())))
+func (a *apps) start(ctx context.Context, app, composeFile string, detected protocol.Detected, recreate bool, logf func(string, ...any)) error {
+	args := []string{"up", "-d", "--remove-orphans", "--wait", "--wait-timeout", strconv.Itoa(int(waitTimeout.Seconds()))}
+	if recreate {
+		args = append(args, "--force-recreate")
+	}
+	err := a.compose(ctx, app, composeFile, logf, args...)
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
