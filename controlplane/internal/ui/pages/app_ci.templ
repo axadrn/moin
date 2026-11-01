@@ -6,78 +6,85 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 )
 
-// appCI is the "Build in CI" row of the app page: deploy an image built
+// appCI is the "Build in CI" part of the app page: deploy an image built
 // elsewhere, and the deploy hook CI calls.
 templ appCI(appName string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base mt-4 min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-ci-heading", "role": "region"}}) {
-		<div class="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-4">
-			<div>
-				<h2 id="app-ci-heading" class="text-base font-semibold tracking-tight">Build in CI</h2>
-				<p class="mt-0.5 text-xs text-pretty text-muted-foreground">Ship an image built elsewhere. The server keeps the compose file of the live release and only pulls the image.</p>
-			</div>
-			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/ci">How it works</a>
-		</div>
-		<div class="grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+	<div class="grid items-stretch gap-4 lg:grid-cols-2">
+		@panel(panelProps{
+			Heading:     "app-image-heading",
+			Title:       "Deploy an image",
+			Description: "Ship an image built in CI or anywhere else. The server keeps the compose file of the live release and only pulls the new image.",
+			Action:      docsLink("/docs/guides/ci", "How it works"),
+		}) {
 			<form
-				class="flex flex-col gap-3 p-4"
+				class="flex flex-col gap-3"
 				hx-post={ basePath + "/apps/" + appName + "/image" }
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
 			>
 				@csrf.Token()
-				<label for="image-ref" class="text-xs font-medium">Deploy image</label>
-				<div class="flex flex-col gap-2 sm:flex-row">
-					@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
-						@icon.Upload(icon.Props{Class: "size-3.5"})
-						Deploy image
+				@field.Field(field.Props{Class: "gap-1"}) {
+					@field.Label(field.LabelProps{For: "image-ref"}) {
+						Image
 					}
-				</div>
-				<p class="text-xs text-muted-foreground">Same as <code class="font-mono text-foreground/80">ops deploy --image</code>. Private registries need a login under Settings → Security.</p>
+					<div class="flex flex-col gap-2 sm:flex-row">
+						@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
+							Deploy image
+						}
+					</div>
+					@field.Description(field.DescriptionProps{Class: "text-xs"}) {
+						Same as <code class="font-mono">ops deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
+					}
+				}
 			</form>
-			<div class="flex flex-col gap-3 p-4">
-				<div class="flex items-center justify-between gap-2">
-					<span class="text-xs font-medium">Deploy hook</span>
-					@button.Button(button.Props{
-						Variant: button.VariantSecondary,
-						Size:    button.SizeSm,
-						Attributes: templ.Attributes{
-							"hx-post":       basePath + "/apps/" + appName + "/hook",
-							"hx-target":     "#app-hook",
-							"hx-swap":       "outerHTML",
-							"hx-disable":    "this",
-							"hx-confirm":    "Create a new deploy hook? The old URL stops working.",
-							"data-new-hook": true,
-						},
-					}) {
-						@icon.Key(icon.Props{Class: "size-3.5"})
-						New deploy hook
-					}
-				</div>
-				@AppHook(appName, "")
-			</div>
-		</div>
+		}
+		@panel(panelProps{
+			Heading:     "app-hook-heading",
+			Title:       "Deploy hook",
+			Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
+			Action:      newHookButton(appName),
+		}) {
+			@AppHook(appName, "")
+		}
+	</div>
+}
+
+// newHookButton makes a new deploy hook URL; the old URL stops working.
+templ newHookButton(appName string) {
+	@button.Button(button.Props{
+		Variant: button.VariantSecondary,
+		Size:    button.SizeSm,
+		Attributes: templ.Attributes{
+			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+			"hx-target":     "#app-hook",
+			"hx-swap":       "outerHTML",
+			"hx-disable":    "this",
+			"hx-confirm":    "Create a new deploy hook? The old URL stops working.",
+			"data-new-hook": true,
+		},
+	}) {
+		New deploy hook
 	}
 }
 
 // AppHook shows a new deploy hook URL once, with the curl CI runs.
 templ AppHook(appName, url string) {
-	<div id="app-hook" class="space-y-2">
+	<div id="app-hook" class="flex flex-col gap-3">
 		if url == "" {
-			<p class="text-xs text-muted-foreground">A secret URL CI calls after pushing the image. It is shown once; store it as the CI secret <code class="font-mono text-foreground/80">OPS_DEPLOY_HOOK</code>.</p>
+			<p class="text-sm text-muted-foreground">ops shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
 		} else {
-			<p class="text-xs font-medium text-running">Shown once. Store it as the CI secret OPS_DEPLOY_HOOK now.</p>
+			<p class="text-sm font-medium">Copy it now: ops shows it only this once. Store it as the CI secret <code class="font-mono">OPS_DEPLOY_HOOK</code>.</p>
 			<div data-deploy-hook>
 				@command(url)
 			</div>
-			<p class="text-xs text-muted-foreground">Then, after pushing the image:</p>
+			<p class="text-sm text-muted-foreground">Then let CI call it after pushing the image:</p>
 			@command(`curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
 		}
 	</div>
@@ -89,60 +96,84 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 	<div id="settings-registries">
 		@card.Card() {
 			@card.Header() {
-				@card.Title() {
+				@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
 					Registries
 				}
 				@card.Description() {
 					Logins your servers use to pull private images built in CI. Passwords and tokens are stored encrypted and only handed to the agent for the pull.
 				}
 			}
-			@card.Content() {
+			@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {
 				if len(logins) > 0 {
-					<ul class="mb-4 divide-y rounded-2xl border" role="list">
+					@item.Group(item.GroupProps{Class: "-mx-3 w-auto gap-1"}) {
 						for _, login := range logins {
-							<li data-registry={ login.Host }>
-								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex h-11 items-center gap-3 px-3 text-sm"}) {
-									<span class="font-mono text-xs font-medium">{ login.Host }</span>
-									<span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{ login.Username }</span>
+							@item.Item(item.Props{Size: item.SizeXs, Class: "rounded-xl hover:bg-muted/60", Attributes: templ.Attributes{"role": "listitem", "data-registry": login.Host}}) {
+								@item.Content(item.ContentProps{Class: "min-w-0"}) {
+									@item.Title() {
+										<span class="truncate font-mono">{ login.Host }</span>
+									}
+									@item.Description(item.DescriptionProps{Class: "text-xs"}) {
+										as { login.Username }
+									}
+								}
+								@item.Actions() {
 									@button.Button(button.Props{
 										Variant: button.VariantGhost,
-										Size:    button.SizeXs,
+										Size:    button.SizeSm,
 										Attributes: templ.Attributes{
 											"hx-delete":  basePath + "/settings/registries/" + login.Host,
 											"hx-target":  "#settings-registries",
 											"hx-swap":    "outerHTML",
+											"hx-disable": "this",
 											"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
 										},
 									}) {
 										Remove
 									}
 								}
-							</li>
+							}
 						}
-					</ul>
+					}
 				}
 				<form
-					class="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+					class="flex flex-col gap-3"
 					hx-post={ basePath + "/settings/registries" }
 					hx-target="#settings-registries"
 					hx-swap="outerHTML"
+					hx-disable="find button[type='submit']"
 				>
 					@csrf.Token()
-					<label for="registry-host" class="sr-only">Host</label>
-					@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
-					<label for="registry-username" class="sr-only">Username</label>
-					@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Placeholder: "username", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
-					<label for="registry-password" class="sr-only">Password or token</label>
-					@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Placeholder: "token", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
-						Save
+					<div class="grid gap-3 sm:grid-cols-3">
+						@field.Field(field.Props{Class: "gap-1"}) {
+							@field.Label(field.LabelProps{For: "registry-host"}) {
+								Registry
+							}
+							@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+						}
+						@field.Field(field.Props{Class: "gap-1"}) {
+							@field.Label(field.LabelProps{For: "registry-username"}) {
+								Username
+							}
+							@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+						}
+						@field.Field(field.Props{Class: "gap-1"}) {
+							@field.Label(field.LabelProps{For: "registry-password"}) {
+								Password or token
+							}
+							@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
+						}
+					</div>
+					if formError != "" {
+						@field.Error(field.ErrorProps{Attributes: templ.Attributes{"data-registry-error": true}}) {
+							{ formError }
+						}
 					}
+					<div>
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
+							Save login
+						}
+					</div>
 				</form>
-				if formError != "" {
-					@field.Error(field.ErrorProps{Class: "font-normal mt-2 text-xs text-failed", Attributes: templ.Attributes{"data-registry-error": true}}) {
-						{ formError }
-					}
-				}
 			}
 		}
 	</div>

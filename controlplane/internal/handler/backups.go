@@ -28,8 +28,10 @@ func (h *AppsHandler) BackupNow(w http.ResponseWriter, r *http.Request) {
 
 // BackupRestore restores a database from a snapshot or a point in time.
 func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
+	// The point in time form sends a date from its calendar and a time.
 	var at *time.Time
-	if raw := r.FormValue("at"); raw != "" {
+	if date := r.FormValue("date"); date != "" {
+		raw := date + "T" + r.FormValue("time")
 		parsed, err := time.Parse("2006-01-02T15:04:05", raw)
 		if err != nil {
 			parsed, err = time.Parse("2006-01-02T15:04", raw)

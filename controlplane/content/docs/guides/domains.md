@@ -40,7 +40,7 @@ Put a username and password in front of an app, for a staging app or a preview. 
 
 | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- |
-| **Password**, then **Protect** | `ops protect --user ops`, password on stdin | `p`, then `user:password` | `PUT /api/v1/apps/{app}/protection` | `set_protection` |
+| **Password**, then **Protect with password** | `ops protect --user ops`, password on stdin | `p`, then `user:password` | `PUT /api/v1/apps/{app}/protection` | `set_protection` |
 | **Remove password** | `ops protect off` | `p`, then `off` | `DELETE /api/v1/apps/{app}/protection` | `remove_protection` |
 
 ## In the repo

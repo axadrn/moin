@@ -2,22 +2,24 @@ package pages
 
 import (
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
-	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/calendar"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/popover"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -33,214 +35,312 @@ type BackupsView struct {
 	Now    time.Time
 }
 
+// AppBackups is the backups page: per database the continuous backup with
+// its point in time restore and the snapshots, then the automatic snapshot
+// and the bucket.
 templ AppBackups(view BackupsView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " backups", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Backups"}}}) {
 		@panelPage(templ.Attributes{"data-app-backups": view.App.Name}) {
-			<div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-				<div class="min-w-0">
-					<h1 class="truncate font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ view.App.Name }</h1>
-					<p class="mt-2.5 text-sm text-muted-foreground">
-						Every change replicated, a snapshot before every change, a restore drill every day.
-					</p>
-				</div>
+			@appHeader(view.App, "backups", "Your SQLite data, copied to your bucket within a second of every change. Go back to any second, or to a snapshot.") {
 				if view.Storage != nil && len(view.Backups.Databases) > 0 {
-					<form hx-post={ basePath + "/apps/" + view.App.Name + "/backups/now" } hx-target="#app-backups" hx-select="#app-backups" hx-swap="outerHTML">
+					<form hx-post={ basePath + "/apps/" + view.App.Name + "/backups/now" } hx-target="#app-backups" hx-select="#app-backups" hx-swap="outerHTML" hx-disable="find button[type='submit']">
 						@csrf.Token()
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault, Attributes: templ.Attributes{"data-back-up": true}}) {
+						@button.Button(button.Props{Type: button.TypeSubmit, Attributes: templ.Attributes{"data-back-up": true, "title": "Take a snapshot of every database now"}}) {
 							Back up now
 						}
 					</form>
 				}
-			</div>
-			@appTabs(view.App.Name, "backups")
-			<div id="app-backups" class="mt-4 flex flex-col gap-4">
+			}
+			<div id="app-backups" class="flex flex-col gap-6">
 				if view.Notice != "" {
-					@alert.Alert(alert.Props{Class: "border-0 rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live", Attributes: templ.Attributes{"data-backup-notice": true}}) {
-						{ view.Notice }
+					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-backup-notice": true}}) {
+						@icon.CircleCheck()
+						@alert.Title() {
+							{ view.Notice }
+						}
 					}
 				}
 				if view.Error != "" {
-					@alert.Alert(alert.Props{Class: "border-0 rounded-2xl bg-failed/12 px-5 py-3.5 text-sm font-medium text-failed", Attributes: templ.Attributes{"data-backup-error": true}}) {
-						{ view.Error }
+					@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-backup-error": true}}) {
+						@icon.CircleAlert()
+						@alert.Title() {
+							{ view.Error }
+						}
 					}
 				}
 				if view.Storage == nil {
-					@card.Card(card.Props{Class: panelClasses}) {
-						@empty.Empty(empty.Props{Class: "items-start gap-0 rounded-none px-6 py-10 text-left"}) {
-							@empty.Title(empty.TitleProps{Class: "font-sans text-lg font-semibold"}) {
-								Backups go to your own bucket
-							}
-							@empty.Description(empty.DescriptionProps{Class: "mt-1.5 max-w-xl text-sm"}) {
-								Add one S3-compatible bucket for all your apps, and every SQLite database is backed up from then on. The same bucket carries your code on ops deploy.
-							}
-							@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Variant: button.VariantDefault, Class: "mt-5", Attributes: templ.Attributes{"data-add-bucket": true}}) {
-								Add your bucket
-							}
+					@emptyState("Backups go to your own bucket", "Add one S3-compatible bucket for all your apps. From then on every SQLite database is backed up, and ops deploy keeps your code there too.", "") {
+						@button.Button(button.Props{Href: basePath + "/bucket", Attributes: templ.Attributes{"data-add-bucket": true}}) {
+							Add your bucket
 						}
 					}
 				} else {
-					for _, database := range view.Backups.Databases {
-						@databaseBackup(view, database)
+					for index, database := range view.Backups.Databases {
+						<div class="flex flex-col gap-6" data-database-backup={ database.Database }>
+							@continuousBackup(view, database, index)
+							@snapshotList(view, database)
+						</div>
 					}
 					if len(view.Backups.Databases) == 0 && view.Error == "" {
-						@emptyState("No SQLite database yet", "Backups start as soon as the live release keeps a SQLite database on a volume.", "ops deploy "+view.App.Name)
+						@emptyState("No SQLite database yet", "Backups start by themselves as soon as the live release keeps a SQLite database on a volume.", "ops deploy "+view.App.Name)
 					}
-					<div class="grid items-start gap-4 lg:grid-cols-2">
+					<div class="grid items-stretch gap-4 lg:grid-cols-2">
 						@backupSettings(view)
 						@bucketSummary(view)
 					</div>
 				}
+				@pointInTimeScript()
 			</div>
 		}
 	}
 }
 
-templ databaseBackup(view BackupsView, database protocol.DatabaseBackup) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"data-database-backup": database.Database}}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{Class: "font-mono text-[17px]", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				{ database.Database }
-			}
-			if database.Error != "" {
-				@badge.Badge(badge.Props{Class: "h-auto leading-4 inline-flex items-center gap-2 rounded-full bg-failed/12 px-3 py-1 text-xs font-semibold text-failed"}) {
-					<span class="size-1.5 rounded-full bg-failed"></span>
-					Needs attention
-				}
-			} else if database.VerifiedAt != nil {
-				@badge.Badge(badge.Props{Class: "h-auto leading-4 inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-xs font-semibold text-live", Attributes: templ.Attributes{"data-verified": true}}) {
-					<span class="lp-pulse size-1.5 rounded-full bg-live"></span>
-					Verified by restore { ago(*database.VerifiedAt, view.Now) }
-				}
-			} else if database.ReplicatedAt != nil {
-				@badge.Badge(badge.Props{Class: "h-auto leading-4 inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-xs font-semibold text-live"}) {
-					<span class="lp-pulse size-1.5 rounded-full bg-live"></span>
-					Replicating
-				}
-			} else {
-				@badge.Badge(badge.Props{Class: "h-auto leading-4 inline-flex items-center gap-2 rounded-full bg-running/12 px-3 py-1 text-xs font-semibold text-running"}) {
-					<span class="size-1.5 rounded-full bg-running"></span>
-					Starting
-				}
-			}
-		}
-		if database.Error != "" {
-			<p class="px-5 pb-2 text-sm text-failed">{ database.Error }</p>
-		}
-		<div class="grid gap-3 px-4 pb-4 sm:grid-cols-3">
-			@backupFact("Continuous", replicatedText(database, view.Now), "every change, about once a second")
-			@backupFact("Point in time", windowText(database), "restore to any second in it")
-			@backupFact("Snapshots", fmt.Sprint(len(database.Snapshots)), latestSnapshot(database, view.Now))
-		</div>
-		<div class="grid gap-4 border-t border-border px-4 pt-4 pb-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-			<div class="min-w-0">
-				<h3 class="px-1 text-sm font-semibold">Snapshots</h3>
-				if len(database.Snapshots) == 0 {
-					<p class="px-1 pt-2 text-sm text-muted-foreground">None yet. ops takes one before every deploy and change, or now with Back up now.</p>
-				} else {
-					<ul class="mt-2 flex max-h-[22rem] flex-col gap-0.5 overflow-y-auto" role="list" data-snapshots>
-						for _, snapshot := range database.Snapshots {
-							<li data-snapshot={ snapshot.ID }>
-								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none group/snap flex h-12 items-center gap-3 rounded-xl px-3 transition-colors hover:bg-muted/60"}) {
-									<span class="w-28 shrink-0 text-sm tabular-nums">{ ago(snapshot.CreatedAt, view.Now) }</span>
-									@badge.Badge(badge.Props{Class: utils.CN("h-auto leading-4", utils.CN("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", reasonClass(snapshot.Reason)))}) {
-										{ reasonText(snapshot.Reason) }
-									}
-									<span class="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground" title={ snapshot.CreatedAt.Format(time.RFC3339) }>{ size(snapshot.Size) }</span>
-									<form
-										hx-post={ appPath + "/backups/restore" }
-										hx-target="#app-backups"
-										hx-select="#app-backups"
-										hx-swap="outerHTML"
-										hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.Format("Jan 2, 15:04") + " UTC? ops takes a snapshot of the current state first. The app stops for a moment." }
-									>
-										@csrf.Token()
-										<input type="hidden" name="database" value={ database.Database }/>
-										<input type="hidden" name="snapshot" value={ snapshot.ID }/>
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm, Class: "text-xs focus-visible:opacity-100 sm:opacity-0 sm:group-hover/snap:opacity-100"}) {
-											Restore
-										}
-									</form>
-								}
-							</li>
-						}
-					</ul>
-				}
+// continuousBackup is how far the continuous backup of a database is, and
+// the restore to a point in time it makes possible.
+templ continuousBackup(view BackupsView, database protocol.DatabaseBackup, index int) {
+	@panel(panelProps{
+		Title:       "Continuous backup",
+		Description: "Every change to " + database.Database + " is copied to your bucket within a second. Every day ops restores a copy and checks it.",
+	}) {
+		<div class="flex flex-col gap-6">
+			<div class="flex">
+				@backupStatus(database, view.Now)
 			</div>
-			<form
-				class="flex flex-col gap-3 rounded-2xl bg-muted/60 p-4"
-				hx-post={ appPath + "/backups/restore" }
-				hx-target="#app-backups"
-				hx-select="#app-backups"
-				hx-swap="outerHTML"
-				hx-confirm={ "Restore " + database.Database + " to this point in time? ops takes a snapshot of the current state first. The app stops for a moment." }
-			>
-				@csrf.Token()
-				<input type="hidden" name="database" value={ database.Database }/>
-				<h3 class="text-sm font-semibold">Back to a point in time</h3>
-				<p class="text-xs text-muted-foreground">Any second in the window, in UTC. Deleted the wrong rows at 14:02? Restore to 14:01.</p>
-				@input.Input(input.Props{
-					Type:       "datetime-local",
-					Name:       "at",
-					Value:      pointInTimeValue(database.ReplicatedAt),
-					Required:   true,
-					Class:      "font-mono",
-					Attributes: pointInTimeAttrs(database.Since, database.ReplicatedAt),
-				})
-				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Disabled: database.Since == nil}) {
-					Restore to this time
+			if database.Error != "" {
+				@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+					@icon.CircleAlert()
+					@alert.Title() {
+						The backup needs attention
+					}
+					@alert.Description() {
+						{ database.Error }
+					}
 				}
-			</form>
+			}
+			<dl class="grid gap-4 sm:grid-cols-3">
+				@backupFact("Last change copied", replicatedText(database, view.Now), replicatedStamp(database))
+				@backupFact("Restore window", windowText(database), windowNote(database))
+				@backupFact("Restore check", verifiedText(database, view.Now), verifiedNote(database))
+			</dl>
+			@pointInTime(view, database, index)
 		</div>
+	}
+}
+
+// backupStatus is the one word about a database's backup: verified by a
+// restore, replicating, starting or failing.
+templ backupStatus(database protocol.DatabaseBackup, now time.Time) {
+	if database.Error != "" {
+		@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+			Needs attention
+		}
+	} else if database.VerifiedAt != nil {
+		@status.Status(status.Props{Kind: status.KindLive, Chip: true, Attributes: templ.Attributes{"data-verified": true, "title": stamp(*database.VerifiedAt)}}) {
+			Verified by restore { ago(*database.VerifiedAt, now) }
+		}
+	} else if database.ReplicatedAt != nil {
+		@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+			Replicating
+		}
+	} else {
+		@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
+			Starting
+		}
 	}
 }
 
 templ backupFact(label, value, note string) {
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible rounded-2xl bg-muted/60 px-4 py-3.5"}) {
-		<p class="text-xs text-muted-foreground">{ label }</p>
-		<p class="mt-1 text-lg font-semibold tabular-nums">{ value }</p>
-		<p class="text-xs text-muted-foreground">{ note }</p>
+	<div class="flex min-w-0 flex-col gap-1">
+		<dt class="text-sm text-muted-foreground">{ label }</dt>
+		<dd class="text-sm font-medium tabular-nums">{ value }</dd>
+		<dd class="text-xs text-muted-foreground">{ note }</dd>
+	</div>
+}
+
+// pointInTime restores a database to a second in its restore window: a
+// date from a calendar that offers only the days of the window, and a time.
+// The calendar keeps whole weeks (no Start/EndMonth, which would cut the
+// first and last week short); the disabled days bound the choice.
+templ pointInTime(view BackupsView, database protocol.DatabaseBackup, index int) {
+	{{ id := fmt.Sprintf("point-in-time-%d", index) }}
+	<div class="flex flex-col gap-3">
+		<div class="flex flex-col gap-1">
+			<p class="text-sm font-medium">Restore to a point in time</p>
+			<p class="text-sm text-pretty text-muted-foreground">
+				if database.Since != nil && database.ReplicatedAt != nil {
+					Pick a day and a second in UTC. Deleted the wrong rows at 14:02? Restore to 14:01. ops takes a snapshot of the current state first, and the app stops for a moment.
+				} else {
+					Possible as soon as the first change is copied.
+				}
+			</p>
+		</div>
+		if database.Since != nil && database.ReplicatedAt != nil {
+			<form
+				class="flex flex-col gap-3 sm:flex-row sm:items-end"
+				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/backups/restore" }
+				hx-target="#app-backups"
+				hx-select="#app-backups"
+				hx-swap="outerHTML"
+				hx-disable="find button[type='submit']"
+				hx-confirm={ "Restore " + database.Database + " to this point in time? ops takes a snapshot of the current state first. The app stops for a moment." }
+				data-point-in-time={ id }
+			>
+				@csrf.Token()
+				<input type="hidden" name="database" value={ database.Database }/>
+				<input type="hidden" name="date" value={ database.ReplicatedAt.UTC().Format("2006-01-02") }/>
+				@field.Field(field.Props{Class: "gap-1 sm:w-44"}) {
+					@field.Label(field.LabelProps{For: id + "-trigger"}) {
+						Date
+					}
+					@popover.Popover(popover.Props{ID: id}) {
+						@button.Button(button.Props{Variant: button.VariantOutline, Class: "w-full justify-between font-normal", Attributes: popover.Trigger(ctx)}) {
+							<span data-date-label>{ database.ReplicatedAt.UTC().Format("Jan 2, 2006") }</span>
+							@icon.ChevronDown(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-end"}})
+						}
+						@popover.Content(popover.ContentProps{Class: "w-auto overflow-hidden p-0", Align: popover.AlignStart}) {
+							@calendar.Calendar(calendar.Props{
+								ID:           id + "-calendar",
+								Mode:         calendar.ModeSingle,
+								Required:     utils.Ptr(true),
+								Selected:     database.ReplicatedAt.UTC(),
+								DefaultMonth: database.ReplicatedAt.UTC(),
+								Disabled:     []any{calendar.DateBefore{Before: database.Since.UTC()}, calendar.DateAfter{After: database.ReplicatedAt.UTC()}},
+							})
+						}
+					}
+				}
+				@field.Field(field.Props{Class: "gap-1 sm:w-36"}) {
+					@field.Label(field.LabelProps{For: id + "-time"}) {
+						Time (UTC)
+					}
+					@input.Input(input.Props{
+						ID:         id + "-time",
+						Type:       "time",
+						Name:       "time",
+						Value:      database.ReplicatedAt.UTC().Format("15:04:05"),
+						Required:   true,
+						Class:      "appearance-none tabular-nums [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
+						Attributes: templ.Attributes{"step": "1"},
+					})
+				}
+				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
+					Restore to this time
+				}
+			</form>
+		}
+	</div>
+}
+
+// snapshotList is the full copies of a database, newest first, each one
+// restorable.
+templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	@panel(panelProps{
+		Title:       "Snapshots",
+		Description: "Full copies of " + database.Database + ". ops takes one before every deploy and every change it makes; Back up now takes one by hand.",
+		Body:        snapshotBody(database),
+	}) {
+		if len(database.Snapshots) == 0 {
+			@emptyHint("No snapshot yet. The next deploy takes the first one, or click Back up now.", "")
+		} else {
+			@item.Group(item.GroupProps{Class: "max-h-[30rem] gap-1 overflow-y-auto", Attributes: templ.Attributes{"data-snapshots": true}}) {
+				for _, snapshot := range database.Snapshots {
+					@item.Item(item.Props{Size: item.SizeXs, Class: "rounded-xl hover:bg-muted/60", Attributes: templ.Attributes{"role": "listitem", "data-snapshot": snapshot.ID}}) {
+						@item.Content() {
+							@item.Title(item.TitleProps{Class: "tabular-nums"}) {
+								<span title={ stamp(snapshot.CreatedAt) }>{ snapshot.CreatedAt.UTC().Format("Jan 2, 15:04 UTC") }</span>
+							}
+							@item.Description(item.DescriptionProps{Class: "text-xs"}) {
+								{ reasonText(snapshot.Reason) } · { size(snapshot.Size) } · { ago(snapshot.CreatedAt, view.Now) }
+							}
+						}
+						@item.Actions() {
+							<form
+								hx-post={ appPath + "/backups/restore" }
+								hx-target="#app-backups"
+								hx-select="#app-backups"
+								hx-swap="outerHTML"
+								hx-disable="find button[type='submit']"
+								hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.UTC().Format("Jan 2, 15:04") + " UTC? ops takes a snapshot of the current state first. The app stops for a moment." }
+							>
+								@csrf.Token()
+								<input type="hidden" name="database" value={ database.Database }/>
+								<input type="hidden" name="snapshot" value={ snapshot.ID }/>
+								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+									Restore
+								}
+							</form>
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
 templ backupSettings(view BackupsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
-	{{ on := view.App.SnapshotBeforeChanges }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden"}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				Before every change
-			}
-		}
-		<form class="flex items-start justify-between gap-4 px-5 pt-1 pb-5" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
+	@panel(panelProps{Title: "Automatic snapshots", Description: "A snapshot before ops changes your data, so one click undoes it."}) {
+		<form hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
 			@csrf.Token()
-			<label for="snapshot-before-changes" class="text-sm text-muted-foreground">
-				<span class="block font-semibold text-foreground">Take a snapshot first</span>
-				Before every deploy, restore, cell edit and SQL change made through ops. One click undoes a bad migration or a wrong UPDATE.
-			</label>
-			@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: on})
+			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+				@field.Content() {
+					@field.Label(field.LabelProps{For: "snapshot-before-changes"}) {
+						Snapshot before every change
+					}
+					@field.Description() {
+						Before every deploy, restore, cell edit and SQL change made through ops. Undoes a bad migration or a wrong UPDATE.
+					}
+				}
+				@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: view.App.SnapshotBeforeChanges})
+			}
 		</form>
 	}
 }
 
 templ bucketSummary(view BackupsView) {
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"data-backup-storage": true}}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				Bucket
-			}
-			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/bucket") }>Change</a>
-		}
-		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 px-5 pb-5 text-sm">
+	@panel(panelProps{Title: "Bucket", Description: "Where the backups of all your apps go.", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": true}}) {
+		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
 			<dt class="text-muted-foreground">Bucket</dt>
-			<dd class="truncate font-mono text-[0.8125rem]" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+			<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
 			<dt class="text-muted-foreground">Endpoint</dt>
-			<dd class="truncate font-mono text-[0.8125rem]">{ orAWS(view.Storage.Endpoint) }</dd>
+			<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
 		</dl>
 	}
 }
 
+templ bucketChange() {
+	@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Variant: button.VariantSecondary, Size: button.SizeSm}) {
+		Change
+	}
+}
+
+// pointInTimeScript keeps the date of each point in time form: a day picked
+// in the calendar goes to the form and the button, and the popover closes.
+// It binds to the calendars of this render only, so a swap rebinds it.
+templ pointInTimeScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const root = document.currentScript.closest("#app-backups");
+			const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+			root.querySelectorAll("[data-point-in-time]").forEach((form) => {
+				const id = form.dataset.pointInTime;
+				const calendar = document.getElementById(id + "-calendar");
+				calendar.addEventListener("calendar-select", (event) => {
+					const day = event.detail.selected;
+					if (!day) return;
+					window.templ.calendar.setSelected(calendar, day);
+					form.elements.date.value = iso(day);
+					form.querySelector("[data-date-label]").textContent = day.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+					window.templ.popover.close(id);
+				});
+			});
+		})();
+	</script>
+}
+
+// storageField is one field of the bucket form.
 templ storageField(name, label, placeholder, note, kind string, wide bool) {
 	<label class={ "flex min-w-0 flex-col gap-1", templ.KV("sm:col-span-2", wide) }>
 		<span class="flex items-baseline gap-2 text-xs font-semibold">
@@ -251,26 +351,6 @@ templ storageField(name, label, placeholder, note, kind string, wide bool) {
 		</span>
 		@input.Input(input.Props{Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
 	</label>
-}
-
-// pointInTimeValue is the newest second the point in time form restores to.
-func pointInTimeValue(replicatedAt *time.Time) string {
-	if replicatedAt == nil {
-		return ""
-	}
-	return replicatedAt.UTC().Format("2006-01-02T15:04:05")
-}
-
-// pointInTimeAttrs bounds the point in time input by the backup window.
-func pointInTimeAttrs(since, replicatedAt *time.Time) templ.Attributes {
-	attrs := templ.Attributes{"step": "1"}
-	if since != nil {
-		attrs["min"] = since.UTC().Format("2006-01-02T15:04:05")
-	}
-	if replicatedAt != nil {
-		attrs["max"] = replicatedAt.UTC().Format("2006-01-02T15:04:05")
-	}
-	return attrs
 }
 
 func storagePathText(path string) string {
@@ -289,52 +369,75 @@ func orAWS(endpoint string) string {
 
 func replicatedText(database protocol.DatabaseBackup, now time.Time) string {
 	if database.ReplicatedAt == nil {
-		return "starting"
+		return "Starting"
 	}
 	return ago(*database.ReplicatedAt, now)
 }
 
+// windowText is how far back a point in time restore reaches.
 func windowText(database protocol.DatabaseBackup) string {
 	if database.Since == nil || database.ReplicatedAt == nil {
-		return "–"
+		return "Not yet"
 	}
 	span := database.ReplicatedAt.Sub(*database.Since)
 	switch {
 	case span < time.Hour:
 		return fmt.Sprintf("%d min", max(int(span.Minutes()), 1))
 	case span < 48*time.Hour:
-		return fmt.Sprintf("%d h", int(span.Hours()))
+		return fmt.Sprintf("%d hours", int(span.Hours()))
 	}
 	return fmt.Sprintf("%d days", int(span.Hours()/24))
 }
 
-func latestSnapshot(database protocol.DatabaseBackup, now time.Time) string {
+// snapshotBody lists the snapshots as rows, or the hint as text.
+func snapshotBody(database protocol.DatabaseBackup) panelBody {
 	if len(database.Snapshots) == 0 {
-		return "none yet"
+		return panelBodyText
 	}
-	return "newest " + ago(database.Snapshots[0].CreatedAt, now)
+	return panelBodyRows
+}
+
+func replicatedStamp(database protocol.DatabaseBackup) string {
+	if database.ReplicatedAt == nil {
+		return "Within a second of every change."
+	}
+	return database.ReplicatedAt.UTC().Format("Jan 2, 15:04:05") + " UTC"
+}
+
+func windowNote(database protocol.DatabaseBackup) string {
+	if database.Since == nil {
+		return "Starts with the first copied change."
+	}
+	return "Back to " + database.Since.UTC().Format("Jan 2, 15:04") + " UTC, to the second."
+}
+
+func verifiedText(database protocol.DatabaseBackup, now time.Time) string {
+	if database.VerifiedAt == nil {
+		return "Not yet"
+	}
+	return "Passed " + ago(*database.VerifiedAt, now)
+}
+
+func verifiedNote(database protocol.DatabaseBackup) string {
+	if database.VerifiedAt == nil {
+		return "Every day ops restores a copy and checks it."
+	}
+	return "Restored and checked, " + database.VerifiedAt.UTC().Format("Jan 2, 15:04") + " UTC."
 }
 
 func reasonText(reason string) string {
 	switch reason {
 	case "manual":
-		return "by hand"
+		return "Taken by hand"
 	case "before-sql":
-		return "before a change"
+		return "Before a change"
 	case "before-restore":
-		return "before a restore"
+		return "Before a restore"
 	}
 	if len(reason) > 7 && reason[:7] == "before-" {
-		return "before " + reason[7:]
+		return "Before " + reason[7:]
 	}
 	return reason
-}
-
-func reasonClass(reason string) string {
-	if reason == "manual" {
-		return "bg-foreground text-background"
-	}
-	return "bg-secondary text-muted-foreground"
 }
 
 func size(bytes int64) string {

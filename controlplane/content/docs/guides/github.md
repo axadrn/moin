@@ -9,9 +9,9 @@ Connect GitHub once, link a repo to an app, and ops deploys from GitHub: any bra
 | Action | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
 | Connect GitHub | app page, **Connect GitHub** | `ops github` prints the link | settings tab, **GitHub**, `enter` shows the link | `GET /api/v1/github` | `get_github` |
-| See where it is installed | **Repository** | `ops github` | settings tab, **GitHub** | `GET /api/v1/github` | `get_github` |
-| List repos | **Repository** | `ops github repos` | `g` | `GET /api/v1/github/repos` | `list_repos` |
-| Link a repo | **Repository**, choose it, **Link** | `ops link me/blog [--branch main]` | `g`, then `link me/blog [main]` | `PUT /api/v1/apps/{app}/repo` | `link_repo` |
+| See where it is installed | **GitHub** on the app page | `ops github` | settings tab, **GitHub** | `GET /api/v1/github` | `get_github` |
+| List repos | **GitHub** on the app page | `ops github repos` | `g` | `GET /api/v1/github/repos` | `list_repos` |
+| Link a repo | **GitHub**, choose it, **Link repo** | `ops link me/blog [--branch main]` | `g`, then `link me/blog [main]` | `PUT /api/v1/apps/{app}/repo` | `link_repo` |
 | Deploy the linked branch | **Deploy** | `ops deploy --ref main` | `g`, then `enter` | `POST /api/v1/apps/{app}/deploys` with `{"ref": ""}` | `deploy_ref` |
 | Deploy a branch, tag or commit | type it, **Deploy** | `ops deploy --ref v1.4.0` | `g`, then type it, `enter` | `POST /api/v1/apps/{app}/deploys` with `{"ref": "v1.4.0"}` | `deploy_ref` with `ref` |
 | Deploy every push | **Deploy every push** | `ops link me/blog` (on by default), `--auto=false` turns it off | `g`, then `link me/blog` (on), `link me/blog main manual` (off) | `PUT /api/v1/apps/{app}/repo` with `auto_deploy` | `link_repo` with `auto_deploy` |
