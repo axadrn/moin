@@ -65,6 +65,12 @@ func SetupRoutes(app *app.App) http.Handler {
 	}
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	// Browsers, link previews and analytics ask for /favicon.ico at the root.
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		asset := r.Clone(r.Context())
+		asset.URL.Path = "/img/favicon.ico"
+		assetHandler.ServeHTTP(w, asset)
+	})
 	mux.HandleFunc("GET /robots.txt", seo.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
