@@ -32,37 +32,38 @@ On its own small server, not on a server with your apps. The agent on an app ser
 
 ## What you need
 
-- A small Linux server with Docker for the control plane, reachable over HTTPS at your own domain.
-- An S3-compatible bucket for the files of the control plane, such as avatars.
-- Cloudflare Email Sending for sign-in links and invitations.
+- A small Linux server (Ubuntu or Debian) for the control plane, and a domain for it.
+- An S3-compatible bucket for the files of the control plane.
+- Cloudflare Email Sending, for sign-in links and invitations.
+- Optional: a Cloudflare Tunnel, so no web port has to be open.
 - Optional: your own GitHub App for GitHub deploys, see [GitHub](/docs/guides/github).
 
 ## Run it
 
-Build the image from the repo:
+Three files do the work. They are in the repo, in `controlplane/deploy/`:
+
+| File | What it does |
+| --- | --- |
+| `setup.sh` | Prepares the server once: Docker, security updates, and with `--tailscale` SSH on your tailnet |
+| `compose.yml` | Runs the control plane, and with a tunnel token also `cloudflared` |
+| `update.sh` | Starts the control plane, and later updates it to the newest version |
+
+**1. Prepare the server**, as root:
 
 ```bash
 git clone https://github.com/axadrn/ops
-cd ops
-docker build --build-arg VERSION=v0.1.0 -t ops-controlplane .
+cd ops/controlplane/deploy
+sh setup.sh
 ```
 
-Start it with its settings in an env file and its SQLite database on a volume:
-
-```bash
-docker run -d --name ops --restart unless-stopped \
-  -p 8090:8090 -v ops-data:/app/data --env-file ops.env \
-  ops-controlplane
-```
-
-The settings in `ops.env`:
+**2. Write the settings** into `/etc/ops-controlplane/env`:
 
 ```bash
 APP_ENV=production
 APP_URL=https://ops.example.com
 BILLING=false
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-# openssl rand -base64 32. Keep it: it seals the secrets of your apps.
+# openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
 SECRETS_KEY=
 EMAIL_FROM=ops@example.com
 CLOUDFLARE_ACCOUNT_ID=
@@ -74,7 +75,37 @@ S3_ACCESS_KEY=
 S3_SECRET_KEY=
 ```
 
-`controlplane/.env.example` in the repo lists every setting. Put HTTPS in front with the proxy you like, pointed at port 8090.
+`controlplane/.env.example` lists every setting. Keep the file readable by root only: `chmod 600 /etc/ops-controlplane/env`.
+
+**3. Start it:**
+
+```bash
+sh update.sh
+```
+
+The control plane listens on `127.0.0.1:8090`. Put it on your domain in one of two ways:
+
+- **Cloudflare Tunnel, no open port.** Create a tunnel in Cloudflare (Zero Trust, Networks, Tunnels) with a public hostname for your domain and the service `http://controlplane:8090`. Add its token and the Docker networks as trusted proxies to the settings, then run `update.sh` again:
+
+  ```bash
+  TUNNEL_TOKEN=
+  TRUSTED_PROXY_CIDRS=172.16.0.0/12
+  ```
+
+- **A proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
+
+### Keep the settings in 1Password
+
+Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Password:
+
+1. Create a 1Password service account that may read one vault, and put its token on the server: `/etc/ops-controlplane/op-token`, readable by root only.
+2. Write the settings as `/etc/ops-controlplane/env.tpl`, with references like `SECRETS_KEY={{ op://vault/item/field }}` in place of passwords.
+
+`update.sh` fills them in from 1Password on every start. A changed password counts after the next `update.sh`.
+
+### Private beta
+
+`SIGNUPS_OPEN=false` closes sign-up. New addresses go on a waitlist, and admins (`ADMIN_EMAILS`) let people in under **Admin**, **Waitlist**: they get a sign-in email and their workspace has everything unlocked. Invited teammates can always join.
 
 ## Use it
 
@@ -104,4 +135,8 @@ TELEMETRY=false
 
 ## Updates
 
-Pull the repo, build the image again and start the new one with the same volume. The database migrates itself on start.
+Run `update.sh` again. It pulls the newest image and restarts; the database migrates itself on start.
+
+## Move or rebuild
+
+When the server dies or you move: prepare a new server with `setup.sh`, copy `/etc/ops-controlplane/` and the database in `/var/lib/ops-controlplane/` over, run `update.sh`. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.

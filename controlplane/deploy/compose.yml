@@ -1,0 +1,25 @@
+# The ops control plane. update.sh starts it with the settings in
+# /etc/ops-controlplane/env; its SQLite database lives in
+# /var/lib/ops-controlplane.
+services:
+  controlplane:
+    image: ${OPS_IMAGE:-ghcr.io/axadrn/ops-controlplane:latest}
+    restart: unless-stopped
+    env_file: /etc/ops-controlplane/env
+    volumes:
+      - /var/lib/ops-controlplane:/app/data
+      # Files the settings point to, such as the GitHub App key.
+      - /etc/ops-controlplane:/run/ops-controlplane:ro
+    # Only this machine reaches the port: a proxy in front of it, or the
+    # tunnel below, serves it to the internet.
+    ports:
+      - "127.0.0.1:8090:8090"
+
+  # With TUNNEL_TOKEN in the settings, a Cloudflare Tunnel carries all
+  # traffic and no web port is open. update.sh turns it on.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file: /etc/ops-controlplane/env
+    profiles: [tunnel]
