@@ -56,5 +56,6 @@ removing members, leaving and deleting the workspace are web only.
 | `enter` | settings | sets the selected one: the bucket, a key or a registry login; on GitHub it shows the install link |
 | `a` | settings | adds a registry login |
 | `x`, then `y` | settings | removes the bucket, a key or a registry login |
+| `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
 | `esc` | app | drops the pick, then back to the list |
 | `q` | everywhere | quits |

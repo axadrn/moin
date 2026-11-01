@@ -313,6 +313,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.added, m.mode, m.input = &added, modeList, ""
 	case tea.KeyPressMsg:
 		return m.key(msg)
+	case tea.PasteMsg:
+		// Pasted text, like a token or SQL, goes into the open input on one line.
+		if m.typing() {
+			m.input += strings.Join(strings.FieldsFunc(msg.Content, func(r rune) bool { return r == '\n' || r == '\r' }), " ")
+		}
 	}
 	return m, nil
 }
