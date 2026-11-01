@@ -285,7 +285,11 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 	}
 	running, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
 	if err != nil || strings.TrimSpace(running) == "" || restarts() != before {
-		return fmt.Errorf("service %s keeps stopping right after it starts; see ops logs", detected.Service)
+		// The rollback replaces these containers, and their logs with them:
+		// keep the crash in the deploy log.
+		logf("last logs of %s:", detected.Service)
+		_ = a.compose(ctx, app, composeFile, logf, "logs", "--no-color", "--tail", "20", detected.Service)
+		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
 	}
 	if detected.Config == nil || detected.Config.Health == "" {
 		return nil

@@ -4,9 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -176,5 +179,27 @@ func TestRoutingLabels(t *testing.T) {
 	}
 	if _, err := route(protocol.Detected{}, &protocol.Routing{Domains: []string{"not a domain"}}); err == nil {
 		t.Fatal("a bad domain must fail")
+	}
+}
+
+func TestStartKeepsTheCrashInTheDeployLog(t *testing.T) {
+	// A docker that starts the app, finds it not running and has its last
+	// log line.
+	bin := t.TempDir()
+	script := "#!/bin/sh\ncase \"$*\" in\n*\" logs \"*) echo \"web-1  | panic: boom\" ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	var lines []string
+	logf := func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) }
+	a := &apps{}
+	err := a.start(context.Background(), "blog", "compose.yaml", protocol.Detected{Service: "web"}, false, logf)
+	if err == nil || !strings.Contains(err.Error(), "see the deploy log") {
+		t.Fatalf("err = %v", err)
+	}
+	if !slices.Contains(lines, "web-1  | panic: boom") {
+		t.Fatalf("deploy log = %q, want the crash", lines)
 	}
 }
