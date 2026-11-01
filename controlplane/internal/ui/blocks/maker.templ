@@ -11,14 +11,20 @@ const ShadcnTemplURL = "https://shadcn-templ.com"
 // OpsURL is the public home of ops.
 const OpsURL = "https://ops.goilerplate.com"
 
+// RefURL links another product of the same maker and tells it where on ops
+// the link sits, such as RefURL(GoilerplateURL, "nav").
+func RefURL(url, placement string) string {
+	return url + "/?ref=ops-" + placement
+}
+
 // makerProject is one of the three projects by the same maker.
 type makerProject struct {
 	Name, Text, Href string
 }
 
 var makerProjects = []makerProject{
-	{"shadcn-templ", "The Go port of shadcn/ui", ShadcnTemplURL},
-	{"goilerplate", "The Go SaaS starter, free and open source", GoilerplateURL},
+	{"shadcn-templ", "The Go port of shadcn/ui", RefURL(ShadcnTemplURL, "maker")},
+	{"goilerplate", "The Go SaaS starter, free and open source", RefURL(GoilerplateURL, "maker")},
 	{"ops", "Deploys and backups on your own server", OpsURL},
 }
 

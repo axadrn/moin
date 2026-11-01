@@ -43,7 +43,7 @@ templ Navbar() {
 					@NavbarPricingDesktop()
 					@NavbarBlogDesktop()
 					@NavbarDocsDesktop()
-					@navLink(GoilerplateURL, "goilerplate")
+					@navLink(RefURL(GoilerplateURL, "nav"), "goilerplate")
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
@@ -100,7 +100,7 @@ templ MobileNav() {
 			@NavbarPricingMobile()
 			@NavbarBlogMobile()
 			@NavbarDocsMobile()
-			@MobileLink(GoilerplateURL, "goilerplate")
+			@MobileLink(RefURL(GoilerplateURL, "nav"), "goilerplate")
 			@MobileLink(GitHubURL, "GitHub")
 		</div>
 		<div class="space-y-2.5 border-t p-6">
