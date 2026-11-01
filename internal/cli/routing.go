@@ -111,9 +111,9 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		return nil
 	}
 	rows := make([][]string, 0, len(checks))
-	address := ""
+	advice := ""
 	for _, check := range checks {
-		address = check.Address
+		advice = check.Advice
 		state := badge(stdout, style.Badge(style.StatusLive, "points here"), "points here")
 		if !check.Points {
 			state = badge(stdout, style.Badge(style.StatusWaiting, "set DNS"), "set DNS")
@@ -125,9 +125,9 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		rows = append(rows, []string{check.Domain, state, strings.Join(check.Found, " "), role})
 	}
 	table(stdout, []string{"DOMAIN", "DNS", "RESOLVES TO", ""}, rows)
-	if address != "" {
+	if advice != "" {
 		fmt.Fprintln(stdout)
-		hint(stdout, "Point an A record of each domain at", address)
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
 	}
 	return nil
 }

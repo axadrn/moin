@@ -11,6 +11,7 @@ A server is a Linux machine with the ops agent. The agent dials out to the contr
 | List with live status | **Servers** | `ops servers` | `ops`, tab **servers** | `GET /api/v1/servers`, live: `GET /api/v1/servers/events` | `list_servers` |
 | Add | **Add server** | `ops servers add <name>` | `a` | `POST /api/v1/servers` | `add_server` |
 | Remove | **Remove** | `ops servers rm <name>` | `x`, then `y` | `DELETE /api/v1/servers/{id}` | `remove_server` |
+| Update the agent | **Update agent** | `ops servers update [name]` | `u` | `POST /api/v1/servers/{id}/update` | `update_agent` |
 
 Adding a server gives one install command. It works once, within one hour. Run it as root on the machine.
 

@@ -598,6 +598,12 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 		if len(m.servers) > 0 {
 			m.mode = modeConfirmRemove
 		}
+	case "u":
+		if m.selected < len(m.servers) {
+			server := m.servers[m.selected]
+			m.notice = "updating the agent of " + server.Name + "…"
+			return m, m.updateAgent(server)
+		}
 	case "t", "f", "s":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
@@ -648,6 +654,18 @@ func (m model) applySecurity(change securityChange) tea.Cmd {
 			return errMsg{fmt.Errorf("%s; %s", notice, strings.Join(secured.Security.Problems, "; "))}
 		}
 		return noticeMsg(notice)
+	}
+}
+
+// updateAgent puts the control plane's version of the agent on a server
+// and waits until it is back.
+func (m model) updateAgent(server client.Server) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.api.UpdateAgent(m.ctx, server.ID)
+		if err != nil {
+			return errMsg{err}
+		}
+		return noticeMsg("the agent of " + updated.Name + " runs " + updated.AgentVersion)
 	}
 }
 

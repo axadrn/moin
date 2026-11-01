@@ -45,7 +45,7 @@ A bind mount whose path the repo does not bring, like `./data`, moves to `/var/l
 | Deploy the current repo | – | `ops deploy` | `d` | `POST /api/v1/apps/{app}/uploads`, then `POST /api/v1/apps/{app}/deploys` | – |
 | Live log | app page, **Deploy log** | printed by `ops deploy` | output panel | `GET /api/v1/apps/{app}/deploys/{number}/events` | `get_deploy`, poll it |
 | Deploy history | app page, **Deploys** | `ops deploys [app]` | `enter` on the app | `GET /api/v1/apps/{app}` | `get_app` |
-| Log of one deploy | click its row in **Deploys** | – | pick it with `↑` `↓`, then `enter` | `GET /api/v1/apps/{app}/deploys/{number}` | `get_deploy` |
+| Log of one deploy | click its row in **Deploys** | `ops deploys v3` | pick it with `↑` `↓`, then `enter` | `GET /api/v1/apps/{app}/deploys/{number}` | `get_deploy` |
 
 The web page follows every new deploy by itself, also the ones started from the CLI. Every deploy keeps its log, also a failed one, so you can read later what went wrong.
 
