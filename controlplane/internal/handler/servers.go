@@ -71,6 +71,10 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	err := h.servers.Delete(actor(r), r.PathValue("id"))
+	if errors.Is(err, repository.ErrServerHasApps) {
+		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server not removed", Description: "Remove the apps on this server first.", Type: toast.TypeError}), "beforeend:#toast-container")
+		return
+	}
 	if err != nil && !errors.Is(err, repository.ErrServerNotFound) {
 		slog.Error("failed to remove server", "error", err, "workspace_id", workspace.ID)
 		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server could not be removed", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
