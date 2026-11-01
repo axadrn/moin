@@ -899,7 +899,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, or `no_agent_binary` when the control plane serves no binary for the server.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1040,7 +1040,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1595,7 +1595,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.tail`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1664,7 +1664,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1721,7 +1721,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1756,7 +1756,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.column`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1791,7 +1791,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.column`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1823,7 +1823,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, `not_editable` for views and WITHOUT ROWID tables.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1866,7 +1866,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.sql`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1900,7 +1900,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_backups` without a bucket, `server_offline`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -1930,7 +1930,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_backups` without a bucket, `server_offline`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
@@ -2004,7 +2004,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.snapshot`.'
-        '502':
+        '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'

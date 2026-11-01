@@ -76,7 +76,7 @@ func ServiceError(w http.ResponseWriter, err error) {
 func ErrorFor(err error) (int, ErrorDetail, bool) {
 	var agentErr *service.AgentError
 	if errors.As(err, &agentErr) {
-		return http.StatusBadGateway, ErrorDetail{Code: "agent_error", Message: agentErr.Message}, true
+		return http.StatusFailedDependency, ErrorDetail{Code: "agent_error", Message: agentErr.Message}, true
 	}
 	for _, known := range serviceErrors {
 		if !errors.Is(err, known.err) {
