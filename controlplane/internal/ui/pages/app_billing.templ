@@ -51,7 +51,7 @@ templ billingCurrent(subscription *model.Subscription, basePath string) {
 			}
 			if subscription.ProviderCustomerID != nil {
 				@card.Action(card.ActionProps{Class: panelActionStack}) {
-					@button.Button(button.Props{Href: basePath + "/billing/manage", Variant: button.VariantSecondary, Size: button.SizeSm}) {
+					@button.Button(button.Props{Href: basePath + "/billing/manage", Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: templ.Attributes{"hx-boost": "false"}}) {
 						Manage subscription
 					}
 				}

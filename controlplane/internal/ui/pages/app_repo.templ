@@ -65,7 +65,7 @@ templ AppRepo(view RepoView) {
 templ repoConnect(view RepoView) {
 	<div class="flex flex-col items-start gap-3">
 		<p class="text-sm text-muted-foreground">First connect GitHub and choose the repos ops may read.</p>
-		@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name, Attributes: templ.Attributes{"data-connect-github": true}}) {
+		@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name, Attributes: templ.Attributes{"data-connect-github": true, "hx-boost": "false"}}) {
 			@icons.Github(icons.Props{Class: "size-4"})
 			Connect GitHub
 		}
@@ -105,7 +105,7 @@ templ repoLink(view RepoView) {
 			}
 		</div>
 		if len(view.Repos) == 0 {
-			<p class="text-sm text-muted-foreground">The ops GitHub App sees no repo yet. <a class="font-medium text-foreground underline underline-offset-4" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath) }>Choose repos on GitHub</a>.</p>
+			<p class="text-sm text-muted-foreground">The ops GitHub App sees no repo yet. <a class="font-medium text-foreground underline underline-offset-4" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath) } hx-boost="false">Choose repos on GitHub</a>.</p>
 		}
 		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 			@checkbox.Checkbox(checkbox.Props{ID: "link-auto-deploy", Name: "auto_deploy", Value: "1", DefaultChecked: true})
