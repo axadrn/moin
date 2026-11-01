@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -37,13 +38,19 @@ type Team struct {
 		Name string `json:"name"`
 		Slug string `json:"slug"`
 	} `json:"workspace"`
-	Role    string `json:"role"`
+	Role        string `json:"role"`
+	Permissions struct {
+		ManageWorkspace bool `json:"manage_workspace"`
+		ManageMembers   bool `json:"manage_members"`
+	} `json:"permissions"`
 	Members []struct {
+		ID    string `json:"id"`
 		Name  string `json:"name"`
 		Email string `json:"email"`
 		Role  string `json:"role"`
 	} `json:"members"`
 	Invitations []struct {
+		ID        string    `json:"id"`
 		Email     string    `json:"email"`
 		Role      string    `json:"role"`
 		ExpiresAt time.Time `json:"expires_at"`
@@ -79,4 +86,27 @@ func (c *Client) Invite(ctx context.Context, email, role string) error {
 		return err
 	}
 	return c.do(ctx, http.MethodPost, "/api/v1/workspaces/"+team.Workspace.Slug+"/invitations", map[string]string{"email": email, "role": role}, nil)
+}
+
+func workspacePath(slug string, rest ...string) string {
+	path := "/api/v1/workspaces/" + url.PathEscape(slug)
+	for _, part := range rest {
+		path += "/" + url.PathEscape(part)
+	}
+	return path
+}
+
+// ResendInvitation emails an open invitation again.
+func (c *Client) ResendInvitation(ctx context.Context, slug, id string) error {
+	return c.do(ctx, http.MethodPost, workspacePath(slug, "invitations", id, "resend"), nil, nil)
+}
+
+// RevokeInvitation takes an open invitation back.
+func (c *Client) RevokeInvitation(ctx context.Context, slug, id string) error {
+	return c.do(ctx, http.MethodDelete, workspacePath(slug, "invitations", id), nil, nil)
+}
+
+// RenameWorkspace gives the workspace a new name.
+func (c *Client) RenameWorkspace(ctx context.Context, slug, name string) error {
+	return c.do(ctx, http.MethodPatch, workspacePath(slug, "name"), map[string]string{"name": name}, nil)
 }

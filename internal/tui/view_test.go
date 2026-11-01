@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -142,6 +143,21 @@ func frames() map[string]model {
 		integrations: client.Integrations{Cloudflare: true, CloudflareAccount: "Acme"},
 		registries:   []client.Registry{{Host: "ghcr.io", Username: "acme"}}}
 	stored.github.Enabled = true
+	var team client.Team
+	if err := json.Unmarshal([]byte(`{"workspace":{"name":"Acme","slug":"acme"},"role":"owner","permissions":{"manage_workspace":true,"manage_members":true},
+		"members":[{"id":"m1","name":"Ada","email":"ada@example.com","role":"owner"},{"id":"m2","name":"Grace","email":"grace@example.com","role":"member"}],
+		"invitations":[{"id":"i1","email":"linus@example.com","role":"admin","expires_at":"`+now.Add(72*time.Hour).Format(time.RFC3339)+`"}]}`), &team); err != nil {
+		panic(err)
+	}
+	add("team", func(m *model) { m.tab, m.team = tabTeam, team })
+	add("team-invitation", func(m *model) { m.tab, m.team, m.teamSelected = tabTeam, team, 2 })
+	add("team-loading", func(m *model) { m.tab = tabTeam })
+	add("team-invite", func(m *model) {
+		m.tab, m.team = tabTeam, team
+		next, _ := m.teamKey("a")
+		*m = next.(model)
+		m.input = "linus@example.com"
+	})
 	add("settings", func(m *model) { m.tab, m.settings = tabSettings, stored })
 	add("settings-empty", func(m *model) { m.tab, m.settings = tabSettings, settings{loaded: true} })
 	add("settings-bucket", func(m *model) {
@@ -265,6 +281,28 @@ func TestForm(t *testing.T) {
 	m = press(m, "a", "enter")
 	if m.err == nil || m.form.step != 0 {
 		t.Errorf("an empty name with no default goes on")
+	}
+}
+
+// TestTeamKeys: resend and revoke only on an invitation, and a member
+// without rights changes nothing.
+func TestTeamKeys(t *testing.T) {
+	m := frames()["team-invitation"]
+	if _, keys := m.prompt(); !slices.Contains(keys, [2]string{"x", "revoke"}) {
+		t.Errorf("an invitation offers no revoke: %v", keys)
+	}
+	m = press(m, "x")
+	if m.mode != modeConfirm || !strings.Contains(m.confirm.question, "linus@example.com") {
+		t.Errorf("x asks %q", m.confirm.question)
+	}
+	m = frames()["team"]
+	if _, keys := m.prompt(); slices.Contains(keys, [2]string{"x", "revoke"}) {
+		t.Errorf("a member offers revoke")
+	}
+	m.team.Permissions.ManageMembers, m.team.Permissions.ManageWorkspace, m.team.Role = false, false, "member"
+	m = press(m, "a")
+	if m.mode != modeList || m.err == nil {
+		t.Errorf("a member can invite")
 	}
 }
 

@@ -69,11 +69,12 @@ func (m model) header(width int) []string {
 		return style.Muted.Render(name)
 	}
 	activity := label("activity", m.tab == tabActivity)
+	team := label("team", m.tab == tabTeam)
 	settings := label("settings", m.tab == tabSettings)
 	if m.tab == tabApps && m.detail != nil {
 		apps = style.Accent.Bold(true).Render("apps") + style.Muted.Render(" › ") + style.Bold.Render(m.detail.App.Name)
 	}
-	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps + "   " + activity + "   " + settings
+	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps + "   " + activity + "   " + team + "   " + settings
 
 	right := style.Muted.Render(host(m.url))
 	switch {
@@ -108,6 +109,8 @@ func (m model) body(width, room int) []string {
 		return m.serversView(width, room)
 	case m.tab == tabActivity:
 		return m.activityView(room)
+	case m.tab == tabTeam:
+		return m.teamView(room)
 	case m.tab == tabSettings:
 		return m.settingsView(room)
 	case m.detail != nil:
@@ -459,7 +462,9 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabActivity:
-		return nil, [][2]string{{"tab", "settings"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "team"}, {"q", "quit"}}
+	case m.tab == tabTeam:
+		return nil, m.teamKeys()
 	case m.tab == tabSettings:
 		keys := [][2]string{{"tab", "servers"}, {"↑↓", "select"}, {"enter", "set"}, {"a", "add a registry"}}
 		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].set {

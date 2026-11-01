@@ -25,11 +25,11 @@ You get a workspace when you sign up. Make more from the workspace switcher at t
 
 | Action | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
-| See members and invitations | **Team** | `ops team` | – | `GET /api/v1/workspaces/{slug}` | `get_workspace` |
-| Invite | **Team**, then **Send invite** | `ops team invite ada@example.com [--admin]` | – | `POST /api/v1/workspaces/{slug}/invitations` | `invite_member` |
-| Send an invitation again | **Resend** under **Pending invitations** | – | – | `POST …/invitations/{id}/resend` | – |
-| Revoke an invitation | **Revoke** under **Pending invitations** | – | – | `DELETE …/invitations/{id}` | – |
-| Rename the workspace | **Team**, **General**, **Save** | – | – | `PATCH /api/v1/workspaces/{slug}/name` | `rename_workspace` |
+| See members and invitations | **Team** | `ops team` | the `team` tab | `GET /api/v1/workspaces/{slug}` | `get_workspace` |
+| Invite | **Team**, then **Send invite** | `ops team invite ada@example.com [--admin]` | team tab, `a` | `POST /api/v1/workspaces/{slug}/invitations` | `invite_member` |
+| Send an invitation again | **Resend** under **Pending invitations** | – | team tab, the invitation, `enter` | `POST …/invitations/{id}/resend` | – |
+| Revoke an invitation | **Revoke** under **Pending invitations** | – | team tab, the invitation, `x`, then `y` | `DELETE …/invitations/{id}` | – |
+| Rename the workspace | **Team**, **General**, **Save** | – | team tab, `n` | `PATCH /api/v1/workspaces/{slug}/name` | `rename_workspace` |
 | Change a role | **Role** on a member, **Save** | web only | web only | session only | web only |
 | Remove a member | **Remove** on a member | web only | web only | session only | web only |
 | Leave a workspace | **Leave workspace** | web only | web only | session only | web only |

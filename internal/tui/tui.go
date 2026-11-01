@@ -97,11 +97,12 @@ const (
 	tabServers tab = iota
 	tabApps
 	tabActivity
+	tabTeam
 	tabSettings
 )
 
 // tabs is how many tabs the header shows.
-const tabs = 4
+const tabs = 5
 
 type mode int
 
@@ -218,6 +219,10 @@ type model struct {
 
 	settings        settings
 	settingSelected int
+
+	team         client.Team
+	teamErr      error
+	teamSelected int
 }
 
 func (m model) Init() tea.Cmd {
@@ -260,6 +265,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case eventsMsg:
 		m.events = msg
+	case teamMsg:
+		m.team, m.teamErr = msg.team, msg.err
+		m.teamSelected = min(m.teamSelected, max(len(m.teamRows())-1, 0))
 	case settingsMsg:
 		m.settings = settings(msg)
 		m.settingSelected = min(m.settingSelected, max(len(m.settingRows())-1, 0))
@@ -504,6 +512,8 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch m.tab {
 		case tabActivity:
 			return m, m.loadActivity()
+		case tabTeam:
+			return m, m.loadTeam()
 		case tabSettings:
 			return m, m.loadSettings()
 		}
@@ -514,6 +524,8 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.serverKey(key)
 	case tabActivity:
 		return m, nil
+	case tabTeam:
+		return m.teamKey(key)
 	case tabSettings:
 		return m.settingKey(key)
 	}

@@ -4,7 +4,7 @@ description: "Every key of ops without a command"
 order: 2
 ---
 
-Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
+Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, the team tab its members and open invitations, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Remove web-1?" waits
@@ -15,12 +15,16 @@ agent detected and a panel with a deploy log, the logs or the env vars. The
 server list shows how each server is reached (ACCESS) and its own rules for
 ops (RULES), from `/etc/ops/rules` on it. Notices clear with the next key.
 
+The team tab does what an API token may: inviting, resending and revoking
+invitations and renaming need an admin or the owner. Changing roles,
+removing members, leaving and deleting the workspace are web only.
+
 `esc` closes what is open and goes back; it never quits. Only `q` and
 `ctrl+c` quit.
 
 | Key | Where | Does |
 | --- | --- | --- |
-| `tab` | everywhere | switches between servers, apps, activity and settings |
+| `tab` | everywhere | switches between servers, apps, activity, team and settings |
 | `↑` `↓` or `k` `j` | lists | selects |
 | `a` | servers | adds a server and shows its install command |
 | `t`, then `y` | servers | turns the Cloudflare Tunnel on or off |
@@ -42,6 +46,10 @@ ops (RULES), from `/etc/ops/rules` on it. Notices clear with the next key.
 | `e` | apps | shows env keys; type `KEY=value` or `-KEY`, `show` or `hide` for the values, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
 | `b` | apps | shows the backups; `enter` backs up now, a snapshot ID or a time like `14:01` restores after `y`, `on` or `off` turns the snapshot before every change on or off |
+| `a` | team | invites someone: the email, then `member` or `admin` |
+| `enter` | team | sends the selected invitation again |
+| `x`, then `y` | team | revokes the selected invitation |
+| `n` | team | renames the workspace |
 | `enter` | settings | sets the selected one: the bucket, a key or a registry login; on GitHub it shows the install link |
 | `a` | settings | adds a registry login |
 | `x`, then `y` | settings | removes the bucket, a key or a registry login |
