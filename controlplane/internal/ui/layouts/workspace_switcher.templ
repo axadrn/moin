@@ -59,9 +59,9 @@ templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMe
 			@dropdown.Group() {
 				@dropdown.Item(dropdown.ItemProps{Href: "/app/" + current.Slug + "/workspace", Class: "gap-2 p-2"}) {
 					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
-						@icon.Settings(icon.Props{Class: "size-4"})
+						@icon.Users(icon.Props{Class: "size-4"})
 					</div>
-					<div class="font-medium text-muted-foreground">Workspace settings</div>
+					<div class="font-medium text-muted-foreground">Team</div>
 				}
 				@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new", Class: "gap-2 p-2", Attributes: fullLoad}) {
 					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">

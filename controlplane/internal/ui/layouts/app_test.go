@@ -13,7 +13,7 @@ import (
 
 func TestAppLayoutAlwaysShowsWorkspaceMenu(t *testing.T) {
 	oneWorkspace := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	for _, expected := range []string{"Switch workspace", "Current workspace", "Workspace settings", "New workspace", "Owner"} {
+	for _, expected := range []string{"Switch workspace", "Current workspace", "Team", "New workspace", "Owner"} {
 		if !strings.Contains(oneWorkspace, expected) {
 			t.Fatalf("single-workspace menu does not contain %q", expected)
 		}
