@@ -195,6 +195,9 @@ func SetupRoutes(app *app.App) http.Handler {
 		return middleware.RequireAuth(middleware.RequireAdmin(next))
 	}
 	mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
+	waitlist := handler.NewWaitlistHandler(app.BetaService)
+	mux.HandleFunc("GET /admin/waitlist", adminRoute(waitlist.Page))
+	mux.HandleFunc("POST /admin/waitlist", adminRoute(waitlist.LetIn))
 	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 	// Agents get their own budget: many servers behind one NAT must not lock

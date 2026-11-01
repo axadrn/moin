@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -98,6 +99,10 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Authenticate or create user
 	user, err := h.authService.AuthenticateOAuth(email, "github")
+	if errors.Is(err, service.ErrWaitlisted) {
+		render(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
+		return
+	}
 	if err != nil {
 		slog.Error("oauth authentication failed", "error", err)
 		render(w, r, pages.Auth("Authentication failed. Please try again."))

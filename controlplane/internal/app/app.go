@@ -29,6 +29,7 @@ type App struct {
 	FileService         *service.FileService
 	SubscriptionService *service.SubscriptionService
 	AdminService        *service.AdminService
+	BetaService         *service.BetaService
 	PaymentService      payment.Provider
 	TelemetryService    *service.TelemetryService
 	WorkspaceService    *service.WorkspaceService
@@ -96,6 +97,8 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
 		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
 	)
+	beta := service.NewBetaService(cfg.SignupsOpen, cfg.AdminEmails, repository.NewWaitlistRepository(database), subscriptions, email)
+	auth.SetBeta(beta)
 	userService := service.NewUserService(users,
 		fileService,
 		email, workspaceService,
@@ -123,6 +126,7 @@ func New(cfg *config.Config) (*App, error) {
 		FileService:         fileService,
 		SubscriptionService: subscriptionService,
 		AdminService:        service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails),
+		BetaService:         beta,
 		PaymentService:      paymentProvider,
 		// Only a self-hosted control plane reports; the hosted one counts.
 		TelemetryService: service.NewTelemetryService(repository.NewTelemetryRepository(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),

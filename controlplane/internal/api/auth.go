@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -161,6 +163,10 @@ func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.authService.SendMagicLink(email)
+	if errors.Is(err, service.ErrWaitlisted) {
+		Error(w, http.StatusForbidden, "waitlisted", err.Error())
+		return
+	}
 	if err != nil {
 		slog.Warn("magic link send failed", "error", err)
 	}

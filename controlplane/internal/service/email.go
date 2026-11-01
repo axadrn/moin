@@ -51,6 +51,11 @@ func (s *EmailService) SendEmailChangeNotification(oldEmail, newEmail, userName 
 	return s.send("email_change_notification", oldEmail, emailChangeNotificationTemplate(userName, newEmail, s.appName))
 }
 
+// SendBetaInvite tells someone from the waitlist that they are in.
+func (s *EmailService) SendBetaInvite(email string) error {
+	return s.send("beta_invite", email, betaInviteEmailTemplate(s.appURL+"/auth", s.appName))
+}
+
 func (s *EmailService) SendAccountDeletedEmail(email, name string) error {
 	return s.send("account_deleted", email, accountDeletedEmailTemplate(name, s.appName))
 }

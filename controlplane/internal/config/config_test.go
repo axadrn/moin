@@ -2,6 +2,8 @@ package config
 
 import (
 	"net/netip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -291,5 +293,21 @@ func TestLoadWithBillingOffNeedsNoStripe(t *testing.T) {
 	}
 	if cfg.Billing || cfg.Render().Billing {
 		t.Fatal("billing is on")
+	}
+}
+
+func TestGitHubAppKeyFromFile(t *testing.T) {
+	setCoreEnvironment(t)
+	file := filepath.Join(t.TempDir(), "app.pem")
+	os.WriteFile(file, []byte("-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n"), 0o600)
+	t.Setenv("GITHUB_APP_PRIVATE_KEY", "")
+	t.Setenv("GITHUB_APP_PRIVATE_KEY_FILE", file)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.GitHubAppPrivateKey, "\nabc\n") {
+		t.Fatalf("key = %q", cfg.GitHubAppPrivateKey)
 	}
 }

@@ -30,6 +30,8 @@ var (
 )
 
 type AuthService struct {
+	// beta closes sign-up to everyone it does not let in; nil keeps it open.
+	beta                     *BetaService
 	userRepository           repository.UserRepository
 	tokenRepository          repository.TokenRepository
 	sessionRepository        repository.SessionRepository
@@ -540,6 +542,9 @@ func (s *AuthService) SendMagicLink(email string) error {
 	// Check if user exists
 	user, err := s.userRepository.ByEmail(email)
 	if err != nil {
+		if err := s.mayCreate(email); err != nil {
+			return err
+		}
 		// User doesn't exist. Create new passwordless account
 		now := time.Now()
 		userID := uuid.New().String()
@@ -722,6 +727,11 @@ func (s *AuthService) CompleteOnboarding(userID, name string, createWorkspace bo
 
 	// Send welcome email now that we have the name
 	user, err := s.userRepository.ByID(userID)
+	if err == nil && workspace != nil && s.beta != nil {
+		if err := s.beta.Unlock(user.Email, workspace.ID); err != nil {
+			slog.Error("failed to unlock beta workspace", "error", err, "workspace_id", workspace.ID)
+		}
+	}
 	if err == nil {
 		err = s.emailService.SendWelcomeEmail(user.Email, name)
 		if err != nil {
@@ -751,6 +761,9 @@ func (s *AuthService) AuthenticateOAuth(email, provider string) (*model.User, er
 			return nil, fmt.Errorf("failed to lookup user: %w", err)
 		}
 
+		if err := s.mayCreate(email); err != nil {
+			return nil, err
+		}
 		// User doesn't exist. Create new account via OAuth
 		now := time.Now()
 		userID := uuid.New().String()
@@ -785,4 +798,27 @@ func (s *AuthService) AuthenticateOAuth(email, provider string) (*model.User, er
 
 	slog.Info("user authenticated via OAuth", "user_id", user.ID, "provider", provider)
 	return user, nil
+}
+
+// SetBeta closes sign-up to everyone the beta does not let in.
+func (s *AuthService) SetBeta(beta *BetaService) {
+	s.beta = beta
+}
+
+// mayCreate puts a new address on the waitlist when sign-up is closed.
+func (s *AuthService) mayCreate(email string) error {
+	if s.beta == nil {
+		return nil
+	}
+	allowed, err := s.beta.MayCreate(email)
+	if err != nil {
+		return err
+	}
+	if allowed {
+		return nil
+	}
+	if err := s.beta.Join(email); err != nil {
+		return err
+	}
+	return ErrWaitlisted
 }

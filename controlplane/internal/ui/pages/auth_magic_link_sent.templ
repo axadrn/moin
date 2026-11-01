@@ -59,3 +59,28 @@ templ AuthMagicLinkResend(email string, sent bool) {
 		}
 	</div>
 }
+
+// AuthWaitlisted is what a new address sees while sign-up is closed: it is
+// on the waitlist now.
+templ AuthWaitlisted(email string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "You're on the waitlist",
+		Description: brand.Name + " Hosted is in private beta",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("You're on the waitlist", brand.Name+" Hosted is in private beta. We let people in step by step and write to "+email+" when it is your turn.") {
+				@field.Group() {
+					@field.Field() {
+						<div data-waitlisted class="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
+							Can't wait? { brand.Name } is open source: <a class="font-semibold text-foreground underline-offset-4 hover:underline" href="/docs/self-hosting">host it yourself</a>, free forever.
+						</div>
+						@field.Description(field.DescriptionProps{Class: "text-center"}) {
+							<a href="/auth">Use another email</a>
+						}
+					}
+				}
+			}
+		}
+	}
+}

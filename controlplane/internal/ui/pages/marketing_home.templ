@@ -475,6 +475,18 @@ templ HomeStatement() {
 				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
 					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
 				</p>
+				<div class="mt-10 flex max-w-xl flex-col gap-3 text-[17px] leading-7 sm:text-lg" data-coming-soon>
+					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+						<span class="rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background">coming soon</span>
+						<span class="text-background">Hosted ops stores your login. Nothing else.</span>
+						<span class="text-background/65">Env vars and keys live only on your servers.</span>
+					</p>
+					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+						<span class="rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background">coming soon</span>
+						<span class="text-background">End-to-end encrypted.</span>
+						<span class="text-background/65">We can't read your secrets or your data. Not won't, can't.</span>
+					</p>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -516,7 +528,12 @@ templ HomePricing() {
 					</div>
 				</div>
 				<div class="flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10" data-plan="hosted">
-					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Hosted</p>
+					<p class="flex flex-wrap items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
+						Hosted
+						if !ctxkeys.RenderConfig(ctx).SignupsOpen {
+							<span class="rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold" data-private-beta>Private beta</span>
+						}
+					</p>
 					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
 						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
 						<span class="text-lg text-background/65">a month, or $290 a year</span>
@@ -532,7 +549,11 @@ templ HomePricing() {
 					</dl>
 					<div class="mt-auto pt-10">
 						<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-background px-7 text-[15px] font-semibold text-foreground transition-opacity hover:opacity-85">
-							Get started
+							if ctxkeys.RenderConfig(ctx).SignupsOpen {
+								Get started
+							} else {
+								Join the waitlist
+							}
 							@icon.ArrowRight(icon.Props{Class: "size-4"})
 						</a>
 					</div>

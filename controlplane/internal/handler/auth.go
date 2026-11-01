@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -155,6 +156,10 @@ func (h *authHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.authService.SendMagicLink(email)
+	if errors.Is(err, service.ErrWaitlisted) {
+		render(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
+		return
+	}
 	if err != nil {
 		// Don't reveal specific errors to prevent email enumeration
 		slog.Warn("magic link send failed", "error", err)

@@ -74,6 +74,9 @@ type Config struct {
 	// Billing off runs a self-hosted control plane: no Stripe, no prices,
 	// every workspace gets everything.
 	Billing bool
+	// SignupsOpen false runs a private beta: new accounts only for admins,
+	// invited people and people let in from the waitlist.
+	SignupsOpen bool
 	// Telemetry has a self-hosted control plane send a few anonymous counts
 	// to TelemetryURL every five minutes. The hosted one never sends.
 	Telemetry    bool
@@ -117,6 +120,7 @@ type RenderConfig struct {
 	PlausibleHost     string
 	GoogleAnalyticsID string
 	Billing           bool
+	SignupsOpen       bool
 }
 
 func Load() (*Config, error) {
@@ -150,6 +154,7 @@ func Load() (*Config, error) {
 		CloudflareAccountID:     r.string("CLOUDFLARE_ACCOUNT_ID", ""),
 		CloudflareAPIToken:      r.string("CLOUDFLARE_API_TOKEN", ""),
 		Billing:                 r.boolean("BILLING", true),
+		SignupsOpen:             r.boolean("SIGNUPS_OPEN", true),
 		Telemetry:               r.boolean("TELEMETRY", true),
 		TelemetryURL:            r.string("TELEMETRY_URL", client.DefaultURL+"/webhooks/telemetry"),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
@@ -179,6 +184,14 @@ func Load() (*Config, error) {
 	cfg.GitHubAppID = r.string("GITHUB_APP_ID", "")
 	cfg.GitHubAppSlug = r.string("GITHUB_APP_SLUG", "")
 	cfg.GitHubAppPrivateKey = r.string("GITHUB_APP_PRIVATE_KEY", "")
+	// A key with many lines reads better from a file than from an env var.
+	if file := r.string("GITHUB_APP_PRIVATE_KEY_FILE", ""); file != "" && cfg.GitHubAppPrivateKey == "" {
+		key, err := os.ReadFile(file)
+		if err != nil {
+			r.errors = append(r.errors, fmt.Errorf("GITHUB_APP_PRIVATE_KEY_FILE: %w", err))
+		}
+		cfg.GitHubAppPrivateKey = string(key)
+	}
 	cfg.GitHubAppWebhookSecret = r.string("GITHUB_APP_WEBHOOK_SECRET", "")
 	cfg.GitHubAPIURL = r.string("GITHUB_API_URL", "https://api.github.com")
 	cfg.GitHubURL = r.string("GITHUB_URL", "https://github.com")
@@ -449,6 +462,7 @@ func (c *Config) Render() RenderConfig {
 		PlausibleHost:     c.PlausibleHost,
 		GoogleAnalyticsID: c.GoogleAnalyticsID,
 		Billing:           c.Billing,
+		SignupsOpen:       c.SignupsOpen,
 	}
 }
 
