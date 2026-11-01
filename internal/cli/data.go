@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -107,9 +108,14 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 	return fmt.Errorf("unknown command %q: use %s db, db rows <table> or db schema", command, build.Name)
 }
 
-// sql runs one statement. Changes need --write.
+// dropsData matches SQL that drops or deletes, which sql --write asks
+// about first.
+var dropsData = regexp.MustCompile(`(?i)\b(drop|delete)\b`)
+
+// sql runs one statement. Changes need --write; one that drops or deletes
+// asks first.
 func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("sql", `sql [--app <app>] [--db <path>] [--write] [--limit 100] "<sql>", or the SQL on stdin`).withApp()
+	flags := newFlags("sql", `sql [--app <app>] [--db <path>] [--write] [--yes] [--limit 100] "<sql>", or the SQL on stdin`).withApp().withYes()
 	database := flags.String("db", "", "database path in the container; default the first")
 	write := flags.Bool("write", false, "allow changes")
 	limit := flags.Int("limit", 100, "rows to show")
@@ -130,6 +136,12 @@ func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	}
 	if strings.TrimSpace(query) == "" {
 		return errors.New("give the SQL as an argument or on stdin: " + build.Name + ` sql "SELECT 1"`)
+	}
+	if *write && dropsData.MatchString(query) {
+		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Run this on the database of %s? It drops or deletes data.", name))
+		if err != nil {
+			return err
+		}
 	}
 	api, err := apiClient()
 	if err != nil {

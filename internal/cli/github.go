@@ -5,18 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
 )
 
 // github shows where the ops GitHub App is installed and its repos.
 func github(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("github", "github, or github repos")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "repos") {
+		return flags.wrong()
+	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	if len(args) > 0 && args[0] == "repos" {
+	if flags.Arg(0) == "repos" {
 		repos, err := api.GitHubRepos(ctx)
 		if err != nil {
 			return err
@@ -71,6 +80,10 @@ func link(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	app, err := api.LinkRepo(ctx, name, flags.Arg(0), *branch, *auto)
+	var apiErr *client.Error
+	if errors.As(err, &apiErr) && apiErr.Code == "validation_failed" && strings.Contains(apiErr.Message, "cannot read this repo") {
+		return fmt.Errorf("%s cannot read %s. Install the %s GitHub App on its account and give it the repo: `%s github` shows where it is installed and the link", build.Name, flags.Arg(0), build.Name, build.Name)
+	}
 	if err != nil {
 		return err
 	}

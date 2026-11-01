@@ -14,7 +14,7 @@ import (
 
 // secure sets how a server is reached; flags it does not get keep their
 // value.
-func secure(ctx context.Context, api *client.Client, args []string, stdout io.Writer) error {
+func secure(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]")
 	tunnel := flags.String("tunnel", "", "on: app traffic through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
 	ssh := flags.String("ssh", "", "tailscale: SSH only on the tailnet; open: everywhere")
@@ -24,6 +24,10 @@ func secure(ctx context.Context, api *client.Client, args []string, stdout io.Wr
 	}
 	if flags.NArg() != 1 {
 		return flags.wrong()
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
 	}
 	servers, err := api.Servers(ctx)
 	if err != nil {

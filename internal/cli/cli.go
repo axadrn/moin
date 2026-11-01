@@ -52,7 +52,7 @@ Apps
 
 Deploys
   deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
-  deploy --image     Deploy an image built in CI: deploy --image <image> [app]
+  deploy --image     Deploy a CI image with the compose file of an earlier deploy: deploy --image <image> [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Build the newest source or pull the image again, with the current env
   restart            Start the live release again with the current env and domains: restart [app]
@@ -87,7 +87,7 @@ Data
   db rows            A page of a table, newest first: db rows orders [--limit 20] [--offset 20]
   db schema          The CREATE statements: db schema [table]
   sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"
-  sql --write        Run SQL that changes data, in one transaction
+  sql --write        Run SQL that changes data, in one transaction; DROP or DELETE asks [--yes]
 
 Backups
   backups            Snapshots, point in time window and restore drills of an app: backups [app]
@@ -102,7 +102,7 @@ Env
   env                List env vars: env [--show] [app]
   env set            Set env vars: env set [app] KEY=value ...
   env rm             Remove env vars: env rm KEY ... [--yes]
-  env pull           Write the env vars to .env
+  env pull           Write the env vars to .env: env pull [file] [--yes]
   run                Run a command with the env vars: run -- go run .
 
 Agent
@@ -172,11 +172,17 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		printUsage(stdout)
 		return nil
 	case "version", "--version":
+		if err := noArguments(command, rest); err != nil {
+			return err
+		}
 		fmt.Fprintln(stdout, build.Name, build.Version)
 		return nil
 	case "login":
 		return login(ctx, rest, stdin, stdout)
 	case "logout":
+		if err := noArguments(command, rest); err != nil {
+			return err
+		}
 		err := client.RemoveConfig()
 		if err != nil {
 			return err
@@ -239,6 +245,19 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return agentCommand(ctx, rest, stdout)
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help` for all of them", command, build.Name)
+}
+
+// noArguments parses the flags of a command that takes none, so --help
+// shows its usage instead of running it.
+func noArguments(command string, args []string) error {
+	flags := newFlags(command, command)
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	return nil
 }
 
 func openTUI(ctx context.Context) error {
@@ -378,10 +397,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		hint(stdout, "It shows online in", build.Name+" servers")
 		return nil
 	case "secure":
-		if apiErr != nil {
-			return apiErr
-		}
-		return secure(ctx, api, args, stdout)
+		return secure(ctx, args, stdout)
 	case "rules":
 		flags := newFlags("servers rules", "servers rules <server>")
 		if err := flags.parse(args); err != nil {
@@ -395,10 +411,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		}
 		return printRules(ctx, api, flags.Arg(0), stdout)
 	case "update":
-		if apiErr != nil {
-			return apiErr
-		}
-		return updateAgents(ctx, api, args, stdout)
+		return updateAgents(ctx, args, stdout)
 	case "rm", "remove":
 		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
 		if err := flags.parse(args); err != nil {
@@ -427,13 +440,17 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 
 // updateAgents updates the agent of one server, or of every online server
 // whose agent is not the control plane's version.
-func updateAgents(ctx context.Context, api *client.Client, args []string, stdout io.Writer) error {
+func updateAgents(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("servers update", "servers update [server]")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 1 {
 		return flags.wrong()
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
 	}
 	list, err := api.Servers(ctx)
 	if err != nil {
@@ -532,8 +549,12 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 		done(stdout, "Registered as server %s. State is in %s", state.ServerID, dir)
 		return nil
 	}
-	if len(args) > 0 {
-		return fmt.Errorf("unknown command %q. Run `%s help`", "agent "+args[0], build.Name)
+	flags := newFlags("agent", "agent, or agent register --url <control plane> --token <install token>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("unknown command %q. Run `%s help`", "agent "+flags.Arg(0), build.Name)
 	}
 	state, err := agent.LoadState(dir)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -116,7 +117,7 @@ func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
 
 func TestOwnUsageNotGoFlags(t *testing.T) {
 	code, stdout, stderr := runCLI(t, &fakeAPI{}, "logs", "--bogus")
-	if code != 1 || !strings.Contains(stderr, "Unknown flag -bogus. Usage: `ops logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {
+	if code != 1 || !strings.Contains(stderr, "Unknown flag --bogus. Usage: `ops logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {
 		t.Errorf("bad flag: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	code, stdout, stderr = runCLI(t, &fakeAPI{}, "logs", "--help")
@@ -148,6 +149,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"backups", "bucket", "rm"},
 		{"registry", "rm", "ghcr.io"},
 		{"integrations", "rm", "tailscale"},
+		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`}}
 		code, _, stderr := runCLI(t, api, args...)
@@ -199,5 +201,122 @@ func TestDeploys(t *testing.T) {
 	code, stdout, stderr = runCLI(t, api, "deploys", "v3", "--app", "shop")
 	if code != 0 || !strings.Contains(stdout, "building") || !strings.Contains(stdout, "step 1/3") {
 		t.Errorf("one deploy: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// TestHelpRunsNothing runs every command of the usage with --help and -h:
+// each prints its usage, exits with 0 and calls nothing, logged in or not.
+func TestHelpRunsNothing(t *testing.T) {
+	commands := [][]string{}
+	for _, line := range strings.Split(usage, "\n") {
+		name, _, ok := strings.Cut(strings.TrimPrefix(line, "  "), "  ")
+		if !strings.HasPrefix(line, "  ") || !ok || strings.HasPrefix(name, "ops") {
+			continue
+		}
+		words := []string{}
+		for _, word := range strings.Fields(name) {
+			if !strings.HasPrefix(word, "-") {
+				words = append(words, word)
+			}
+		}
+		commands = append(commands, words)
+	}
+	if len(commands) < 50 {
+		t.Fatalf("found only %d commands in the usage", len(commands))
+	}
+	for _, words := range commands {
+		for _, help := range []string{"--help", "-h"} {
+			args := append(slices.Clone(words), help)
+			for _, loggedIn := range []bool{true, false} {
+				api := &fakeAPI{}
+				server := httptest.NewServer(api)
+				config := filepath.Join(t.TempDir(), "ops", "config.json")
+				if err := os.MkdirAll(filepath.Dir(config), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(config, []byte(`{"url":"http://127.0.0.1:1"}`), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("XDG_CONFIG_HOME", filepath.Dir(filepath.Dir(config)))
+				t.Setenv("NO_COLOR", "1")
+				t.Setenv("OPS_URL", "")
+				t.Setenv("OPS_TOKEN", "")
+				if loggedIn {
+					t.Setenv("OPS_URL", server.URL)
+					t.Setenv("OPS_TOKEN", "ops_test")
+				}
+				var stdout, stderr strings.Builder
+				code := Run(args, strings.NewReader(""), &stdout, &stderr)
+				server.Close()
+				if code != 0 || !strings.Contains(stdout.String(), "Usage") || (words[0] != "help" && !strings.Contains(stdout.String(), "ops "+words[0])) || stderr.Len() > 0 || len(api.requests) > 0 {
+					t.Errorf("%v (logged in %v): code %d, stdout %q, stderr %q, requests %v", args, loggedIn, code, stdout.String(), stderr.String(), api.requests)
+				}
+				if _, err := os.Stat(config); err != nil {
+					t.Errorf("%v removed the config: %v", args, err)
+				}
+			}
+		}
+	}
+}
+
+func TestHelpListsOnlyItsFlags(t *testing.T) {
+	code, stdout, _ := runCLI(t, &fakeAPI{}, "backups", "bucket", "rm", "--help")
+	if code != 0 || !strings.Contains(stdout, "--yes") || strings.Contains(stdout, "--endpoint") || strings.Contains(stdout, "--app") {
+		t.Errorf("bucket rm help: code %d, stdout %q", code, stdout)
+	}
+	code, stdout, _ = runCLI(t, &fakeAPI{}, "backups", "bucket", "set", "--help")
+	if code != 0 || !strings.Contains(stdout, "--access-key") || strings.Contains(stdout, "--yes") {
+		t.Errorf("bucket set help: code %d, stdout %q", code, stdout)
+	}
+}
+
+func TestSQLWrite(t *testing.T) {
+	query := map[string]string{"POST /api/v1/apps/shop/databases/query": `{"changes":2}`}
+	api := &fakeAPI{answers: query}
+	code, stdout, stderr := runCLI(t, api, "sql", "--app", "shop", "--write", "--yes", "DELETE FROM orders")
+	if code != 0 || !strings.Contains(stdout, "2 rows changed") {
+		t.Errorf("--yes: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	api = &fakeAPI{answers: query}
+	code, stdout, stderr = runCLI(t, api, "sql", "--app", "shop", "--write", "UPDATE orders SET paid = 1")
+	if code != 0 || !strings.Contains(stdout, "2 rows changed") {
+		t.Errorf("update asks nothing: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}
+
+func TestEnvPullAsksBeforeReplacing(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile(".env", []byte("LOCAL=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
+	code, _, stderr := runCLI(t, api, "env", "pull", "--app", "shop")
+	body, _ := os.ReadFile(".env")
+	if code != 1 || !strings.Contains(stderr, "--yes") || string(body) != "LOCAL=1\n" {
+		t.Errorf("without --yes: code %d, stderr %q, .env %q", code, stderr, body)
+	}
+	code, _, stderr = runCLI(t, api, "env", "pull", "--app", "shop", "--yes")
+	body, _ = os.ReadFile(".env")
+	if code != 0 || string(body) != "KEY=secret\n" {
+		t.Errorf("with --yes: code %d, stderr %q, .env %q", code, stderr, body)
+	}
+}
+
+func TestLinkUnreadableRepo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"error":{"code":"validation_failed","message":"Check the highlighted fields and try again.","fields":{"repo":"ops cannot read this repo. Install the ops GitHub App on its account and give it the repo."}}}`))
+	}))
+	defer server.Close()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("OPS_URL", server.URL)
+	t.Setenv("OPS_TOKEN", "ops_test")
+	t.Setenv("NO_COLOR", "1")
+	var stdout, stderr strings.Builder
+	code := Run([]string{"link", "me/private", "--app", "shop"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "cannot read me/private") || !strings.Contains(stderr.String(), "ops github") || strings.Contains(stderr.String(), "highlighted") {
+		t.Errorf("code %d, stderr %q", code, stderr.String())
 	}
 }

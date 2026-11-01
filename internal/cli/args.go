@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/axadrn/ops/internal/build"
@@ -48,22 +49,27 @@ func (f *flagSet) withYes() *flagSet {
 // `rollback v3 --app shop` works like `rollback --app shop v3`. After
 // "--" everything is an argument.
 func (f *flagSet) parse(args []string) error {
-	return f.check(parseAnywhere(f.FlagSet, args))
+	return f.check(parseAnywhere(f.FlagSet, args), args)
 }
 
 // parseStrict reads flags only before the arguments, for commands like
 // `run -- <command>` whose arguments carry their own flags.
 func (f *flagSet) parseStrict(args []string) error {
-	return f.check(f.Parse(args))
+	return f.check(f.Parse(args), args)
 }
 
-func (f *flagSet) check(err error) error {
+// check turns a parse error into the command's help or a message with its
+// usage line. An unknown flag shows as typed: --yes, not Go's -yes.
+func (f *flagSet) check(err error, args []string) error {
 	if errors.Is(err, flag.ErrHelp) {
 		return helpError{f}
 	}
 	if err != nil {
 		message := err.Error()
 		if name, ok := strings.CutPrefix(message, "flag provided but not defined: "); ok {
+			if slices.ContainsFunc(args, func(arg string) bool { return arg == "-"+name || strings.HasPrefix(arg, "-"+name+"=") }) {
+				name = "-" + name
+			}
 			message = "unknown flag " + name
 		}
 		return fmt.Errorf("%s. Usage: `%s`", message, f.usage)

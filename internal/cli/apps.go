@@ -118,7 +118,7 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	dir := flags.String("dir", ".", "directory to deploy")
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
-	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service")
+	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service; needs one deploy of the repo before, whose compose file it reuses")
 	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -588,7 +588,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	usage := map[string]string{
 		"set":  "env set [--app <app>] [app] KEY=value ...",
 		"rm":   "env rm [--app <app>] KEY ... [--yes]",
-		"pull": "env pull [--app <app>] [file]",
+		"pull": "env pull [--app <app>] [file] [--yes]",
 	}[command]
 	if usage == "" {
 		usage = "env [--show] [app]"
@@ -598,7 +598,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	}
 	flags := newFlags("env "+command, usage).withApp()
 	show := flags.Bool("show", false, "show the values")
-	if command == "rm" || command == "remove" || command == "unset" {
+	if slices.Contains([]string{"rm", "remove", "unset", "pull"}, command) {
 		flags.withYes()
 	}
 	if err := flags.parse(args); err != nil {
@@ -703,6 +703,12 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		name, err := flags.app("")
 		if err != nil {
 			return err
+		}
+		if _, err := os.Stat(path); err == nil {
+			err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Replace %s with the env vars of %s?", path, name))
+			if err != nil {
+				return err
+			}
 		}
 		if apiErr != nil {
 			return apiErr

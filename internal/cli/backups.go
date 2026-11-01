@@ -163,13 +163,17 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if usage == "" {
 		usage = "backups bucket"
 	}
-	flags := newFlags("backups bucket "+command, usage).withApp()
-	endpoint := flags.String("endpoint", "", "https:// URL of an S3-compatible store; empty for AWS S3")
-	region := flags.String("region", "", "region; auto for Cloudflare R2")
-	name := flags.String("bucket", "", "bucket name")
-	folder := flags.String("path", "", "folder inside the bucket")
-	accessKey := flags.String("access-key", "", "access key ID")
-	if command == "rm" {
+	flags := newFlags("backups bucket "+command, usage)
+	// Only set takes the bucket's flags, only rm --yes.
+	var endpoint, region, name, folder, accessKey *string
+	switch command {
+	case "set":
+		endpoint = flags.String("endpoint", "", "https:// URL of an S3-compatible store; empty for AWS S3")
+		region = flags.String("region", "", "region; auto for Cloudflare R2")
+		name = flags.String("bucket", "", "bucket name")
+		folder = flags.String("path", "", "folder inside the bucket")
+		accessKey = flags.String("access-key", "", "access key ID")
+	case "rm":
 		flags.withYes()
 	}
 	if err := flags.parse(args); err != nil {
@@ -177,9 +181,6 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	if flags.NArg() > 0 {
 		return flags.wrong()
-	}
-	if *flags.appFlag != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("The bucket is the same for every app; --app changes nothing here."))
 	}
 	api, err := apiClient()
 	if err != nil {

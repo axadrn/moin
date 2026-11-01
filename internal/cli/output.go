@@ -90,6 +90,9 @@ func printError(w io.Writer, err error) {
 
 // explain turns an error into a sentence: capitalized, with the command to
 // run when there is one.
+// webValidationMessage leads every validation_failed message of the API.
+const webValidationMessage = "Check the highlighted fields and try again."
+
 func explain(err error) string {
 	var urlErr *url.Error
 	var netErr *net.OpError
@@ -99,6 +102,9 @@ func explain(err error) string {
 		return fmt.Sprintf("Not logged in. Run `%s login`, or set OPS_TOKEN in CI", build.Name)
 	case errors.As(err, &apiErr) && apiErr.Code == "not_found" && apiErr.Message == "The app was not found." && picked.name != "":
 		return fmt.Sprintf("There is no app %s; the name came from %s. Name another with --app, or see yours with `%s apps`", picked.name, picked.from, build.Name)
+	case errors.As(err, &apiErr) && apiErr.Code == "validation_failed":
+		// The message is the web form's; the field messages after it say what is wrong.
+		return sentence(strings.TrimSpace(strings.TrimPrefix(apiErr.Message, webValidationMessage)))
 	case errors.As(err, &urlErr) && errors.As(err, &netErr):
 		host := urlErr.URL
 		if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil {
