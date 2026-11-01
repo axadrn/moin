@@ -1924,7 +1924,7 @@ paths:
           description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`.'
+          description: '`server_offline`, or `read_only_query` when a read without `write` changes data.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.sql`.'

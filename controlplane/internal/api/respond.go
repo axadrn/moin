@@ -235,6 +235,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrNoColumn, field: "column", message: "The table has no such column."},
 	{err: service.ErrNoRowID, status: http.StatusConflict, code: "not_editable", message: "Rows of views and WITHOUT ROWID tables cannot be edited here. Use SQL."},
 	{err: service.ErrSQL, field: "sql", message: "Enter a query."},
+	{err: service.ErrReadOnly, status: http.StatusConflict, code: "read_only_query", message: "This query changes data. Run it with execute_sql (MCP), --write (CLI) or Allow changes (web)."},
 	{err: service.ErrUploadBucket, status: http.StatusConflict, code: "no_bucket", message: "ops deploy uploads your code to your own bucket. Add one under Bucket first."},
 	{err: service.ErrUpload, field: "upload", message: "The upload is unknown or expired. Run ops deploy again."},
 	{err: service.ErrNoBackups, status: http.StatusConflict, code: "no_backups", message: "Backups are not set up. Add a bucket first."},

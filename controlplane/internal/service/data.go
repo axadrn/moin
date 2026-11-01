@@ -20,6 +20,7 @@ var (
 	ErrNoRowID    = errors.New("rows of views and WITHOUT ROWID tables cannot be edited here: use SQL")
 	ErrNoColumn   = errors.New("the table has no such column")
 	ErrSQL        = errors.New("the query is empty")
+	ErrReadOnly   = errors.New("a read query tried to change data")
 )
 
 // Rows is one page of a table: its rows with the rowid first when the
@@ -109,7 +110,20 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	}
 	var result protocol.DBResult
 	err = s.servers.Request(ctx, app.ServerID, protocol.TypeDBQuery, query, &result)
+	if !write {
+		err = readOnlyError(err)
+	}
 	return result, err
+}
+
+// readOnlyError turns SQLite's answer to a write on the read-only handle a
+// read opens into ErrReadOnly.
+func readOnlyError(err error) error {
+	var agentErr *AgentError
+	if errors.As(err, &agentErr) && strings.Contains(agentErr.Message, "readonly database") {
+		return ErrReadOnly
+	}
+	return err
 }
 
 // Rows returns one page of a table, newest rowid first.
