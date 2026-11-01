@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/benbjohnson/litestream"
 	lss3 "github.com/benbjohnson/litestream/s3"
 
@@ -552,6 +553,10 @@ func (b *backups) download(ctx context.Context, app, database, id, target string
 	client, bucket, key := b.s3Client(), b.storage.Bucket, b.prefix(app, database)+"/snapshots/"+id+".db.gz"
 	b.mu.Unlock()
 	object, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+	var missing *types.NoSuchKey
+	if errors.As(err, &missing) {
+		return fmt.Errorf("there is no snapshot %s of %s", id, database)
+	}
 	if err != nil {
 		return fmt.Errorf("snapshot %s: %w", id, err)
 	}
