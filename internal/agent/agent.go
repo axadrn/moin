@@ -138,6 +138,10 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 	if err != nil {
 		return State{}, err
 	}
+	// The firewall and tunnel of an earlier server entry must not outlive it.
+	resetCtx, resetCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer resetCancel()
+	resetNetwork(resetCtx, dir)
 	return state, nil
 }
 

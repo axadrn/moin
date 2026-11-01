@@ -212,10 +212,17 @@ func (s *AppService) configureServer(ctx context.Context, server *model.Server, 
 }
 
 // configureServerOnConnect sends the config to an agent that just
-// connected, when the server has one.
+// connected, when the server has one, or when the agent last reported a
+// firewall or tunnel the server no longer has, such as one turned off while
+// the agent was offline.
 func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(serverID, workspaceID)
-	if err != nil || (!server.Tunnel && !server.Firewall && !server.SSHTailscale) {
+	if err != nil {
+		return
+	}
+	report := SecurityReport(*server)
+	leftover := report != nil && (report.Firewall || report.Proxy == "tunnel")
+	if !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftover {
 		return
 	}
 	s.configureServer(context.Background(), server, nil)
