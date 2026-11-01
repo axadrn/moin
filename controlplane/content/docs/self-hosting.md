@@ -8,7 +8,7 @@ order: 3
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
-| Price | free forever | $249 a year (save $99) or $29 a month |
+| Price | free forever | $249 a year (save $99) or $29 a month, per workspace |
 | Features | all | all |
 | Servers, apps, members | unlimited | unlimited |
 | Setup | about an hour | two minutes |
