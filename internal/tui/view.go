@@ -363,7 +363,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case modeBackups:
 		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"esc", "close"}}
 	case modeConfirmRestore:
-		return bar(style.Warning, style.Bold.Render("Restore "+m.pendingRestore+"?"), "ops takes a snapshot of the current state first."), [][2]string{{"y", "restore"}, cancel}
+		return bar(style.Warning, style.Bold.Render("Restore "+m.pendingRestore+"?"), build.Name+" takes a snapshot of the current state first."), [][2]string{{"y", "restore"}, cancel}
 	case modeConfirmWrite:
 		return bar(style.Warning, style.Bold.Render("This query changes data. Run it?"), m.pendingSQL), [][2]string{{"y", "run"}, cancel}
 	case modeDomains:
