@@ -34,6 +34,14 @@ func TestClosedSignupPutsNewAddressesOnTheWaitlist(t *testing.T) {
 	if err := environment.auth.SendMagicLink("admin@example.com"); err != nil {
 		t.Fatalf("an admin: err = %v", err)
 	}
+	admin, _ := environment.userRepository.ByEmail("admin@example.com")
+	adminWorkspace, err := environment.auth.CompleteOnboarding(admin.ID, "Ada Admin", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if subscription, _ := environment.subscriptionRepository.ByWorkspaceID(adminWorkspace.ID); subscription.PlanID != access.PlanPro {
+		t.Fatalf("the admin's workspace is on %s", subscription.PlanID)
+	}
 
 	if err := beta.LetIn("stranger@example.com", true); err != nil {
 		t.Fatal(err)

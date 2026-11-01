@@ -76,15 +76,18 @@ func (s *BetaService) Waitlist() ([]model.WaitlistEntry, error) {
 	return s.waitlist.List()
 }
 
-// Unlock makes the first workspace of someone let in a beta workspace:
-// everything unlocked, without a payment.
+// Unlock makes the first workspace of an admin, or of someone let in, a
+// beta workspace: everything unlocked, without a payment.
 func (s *BetaService) Unlock(email, workspaceID string) error {
 	if _, exists := access.PlanByID(access.PlanPro); !exists {
 		return nil
 	}
-	entry, err := s.waitlist.Get(strings.ToLower(strings.TrimSpace(email)))
-	if err != nil || entry == nil || entry.LetInAt == nil {
-		return err
+	email = strings.ToLower(strings.TrimSpace(email))
+	if _, admin := s.admins[email]; !admin {
+		entry, err := s.waitlist.Get(email)
+		if err != nil || entry == nil || entry.LetInAt == nil {
+			return err
+		}
 	}
 	subscription, err := s.subscriptions.ByWorkspaceID(workspaceID)
 	if err != nil {
