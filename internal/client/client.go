@@ -10,10 +10,12 @@ import (
 	"fmt"
 	"github.com/axadrn/ops/protocol"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -388,8 +390,14 @@ func (c *Client) responseError(response *http.Response) error {
 	}
 	if json.Unmarshal(body, &problem) == nil && problem.Error.Message != "" {
 		message := problem.Error.Message
-		for field, detail := range problem.Error.Fields {
-			message += fmt.Sprintf(" %s: %s", field, detail)
+		if len(problem.Error.Fields) > 0 {
+			// The message points at the highlighted fields of the web form;
+			// the fields themselves say what is wrong.
+			parts := []string{}
+			for _, field := range slices.Sorted(maps.Keys(problem.Error.Fields)) {
+				parts = append(parts, strings.ReplaceAll(field, "_", " ")+": "+problem.Error.Fields[field])
+			}
+			message = strings.Join(parts, " ")
 		}
 		return &Error{Status: response.StatusCode, Code: problem.Error.Code, Message: message}
 	}
