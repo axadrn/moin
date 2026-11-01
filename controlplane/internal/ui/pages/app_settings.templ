@@ -1,66 +1,58 @@
 package pages
 
 import (
+	"time"
+
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/dialog"
 	field "github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/tabs"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
-// Settings is the account settings page. securitySections are extra cards for
-// the Security tab, shown after the sessions.
-templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, securitySections ...templ.Component) {
+// Settings is the account settings page, one tab at a time: profile,
+// security (password, sessions, the account itself) and tokens.
+// tokenSections are the cards of the tokens tab.
+templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, tokenSections ...templ.Component) {
 	{{ user := ctxkeys.User(ctx) }}
+	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings" }}
 	@layouts.App("Settings") {
 		if passwordRemoved {
 			@toast.Toast(toast.Props{
-				Title:       "Password Removed",
-				Description: "For security, your password was removed. Set a new one below if you'd like.",
+				Title:       "Password removed",
+				Description: "For your safety the password was removed. Set a new one below if you like.",
 				Type:        toast.TypeInfo,
 				Timeout:     8000,
 			})
 		}
 		@panelPage() {
-			<div class="max-w-[52rem]">
-				@pageTitle("Settings", "Your profile, how you sign in, sessions and API tokens.")
-				@tabs.Tabs(tabs.Props{DefaultValue: activeTab, Class: "mt-8"}) {
-					@tabs.List(tabs.ListProps{Class: "w-full sm:w-fit sm:self-start"}) {
-						@tabs.Trigger(tabs.TriggerProps{Value: "profile", Class: "flex-1 sm:flex-none"}) {
-							@icon.User(icon.Props{Class: "size-4"})
-							Profile
+			@pageHeader("Settings", "Your profile, how you sign in, and the tokens your scripts and servers use.")
+			<nav class="flex h-9 w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit" aria-label="Settings">
+				@appTab(settingsPath, "Profile", activeTab == "profile")
+				@appTab(settingsPath+"?tab=security", "Security", activeTab == "security")
+				@appTab(settingsPath+"?tab=tokens", "Tokens", activeTab == "tokens")
+			</nav>
+			<div class="flex max-w-3xl flex-col gap-6">
+				switch activeTab {
+					case "security":
+						@SettingsPasswordSection()
+						@SettingsSessionsSection(sessions, currentSessionID)
+						@SettingsDangerZoneSection()
+					case "tokens":
+						for _, section := range tokenSections {
+							@section
 						}
-						@tabs.Trigger(tabs.TriggerProps{Value: "security", Class: "flex-1 sm:flex-none"}) {
-							@icon.Shield(icon.Props{Class: "size-4"})
-							Security
-						}
-					}
-					@tabs.Content(tabs.ContentProps{Value: "profile"}) {
-						<div class="mt-6 space-y-5">
-							@SettingsNameSection(user)
-							@SettingsAvatarSection(user)
-						</div>
-					}
-					@tabs.Content(tabs.ContentProps{Value: "security"}) {
-						<div class="mt-6 space-y-5">
-							@SettingsEmailSection(user)
-							@SettingsPasswordSection()
-							@SettingsSessionsSection(sessions, currentSessionID)
-							for _, section := range securitySections {
-								@section
-							}
-							@SettingsDangerZoneSection()
-						</div>
-					}
+					default:
+						@SettingsNameSection(user)
+						@SettingsAvatarSection(user)
+						@SettingsEmailSection(user)
 				}
 			</div>
 		}
@@ -69,433 +61,289 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 
 templ SettingsSessionsSection(sessions []model.Session, currentSessionID string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card(card.Props{ID: "settings-sessions", Attributes: templ.Attributes{"hx-swap-oob": "true"}}) {
-		@card.Header() {
-			@card.Title() {
-				Active sessions
-			}
-			@card.Description() {
-				Browsers and devices signed in to your account.
-			}
-		}
-		@card.Content() {
-			<div class="divide-y rounded-2xl border">
-				for _, session := range sessions {
-					<div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-						<div class="flex min-w-0 items-start gap-3">
-							<div class="mt-0.5 rounded-xl border bg-muted/50 p-2 text-muted-foreground">
-								@icon.Monitor(icon.Props{Class: "size-4"})
-							</div>
-							<div class="min-w-0 space-y-1">
-								<div class="flex flex-wrap items-center gap-2">
-									<p class="font-medium">{ session.DisplayName() }</p>
-									if session.ID == currentSessionID {
-										@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-											Current
-										}
+	{{ now := time.Now() }}
+	@panel(panelProps{
+		ID:          "settings-sessions",
+		Title:       "Sessions",
+		Description: "Browsers and devices signed in to your account.",
+		Action:      signOutEverywhere(),
+		Body:        panelBodyRows,
+		Attrs:       templ.Attributes{"hx-swap-oob": "true"},
+	}) {
+		<ul class="flex flex-col gap-1" role="list">
+			for _, session := range sessions {
+				<li class="flex items-center justify-between gap-4 rounded-xl px-3 py-2.5 hover:bg-muted/60" data-session={ session.ID }>
+					<div class="flex min-w-0 items-center gap-3">
+						<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+							@icon.Monitor(icon.Props{Class: "size-4"})
+						</span>
+						<div class="flex min-w-0 flex-col gap-0.5">
+							<div class="flex min-w-0 items-center gap-2">
+								<p class="truncate text-sm font-medium">{ session.DisplayName() }</p>
+								if session.ID == currentSessionID {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										This browser
 									}
-								</div>
-								<p class="text-xs text-muted-foreground">
-									Last active { session.LastSeenAt.Local().Format("Jan 2, 2006 at 15:04") }
-								</p>
+								}
 							</div>
+							<p class="text-xs text-muted-foreground tabular-nums" title={ stamp(session.LastSeenAt) }>
+								Active { ago(session.LastSeenAt, now) }
+							</p>
 						</div>
-						@button.Button(button.Props{
-							Type:    "button",
-							Variant: button.VariantOutline,
-							Class:   "w-full sm:w-auto",
-							Attributes: templ.Attributes{
-								"hx-delete":  basePath + "/settings/sessions/" + session.ID,
-								"hx-swap":    "none",
-								"hx-disable": "this",
-							},
-						}) {
-							if session.ID == currentSessionID {
-								Sign out
-							} else {
-								Revoke
-							}
-						}
 					</div>
-				}
-			</div>
-			<div class="mt-4 flex justify-end">
-				@button.Button(button.Props{
-					Type:    "button",
-					Variant: button.VariantOutline,
-					Attributes: templ.Attributes{
-						"hx-delete":  basePath + "/settings/sessions",
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"hx-confirm": "Sign out of every session, including this one?",
-					},
-				}) {
-					@icon.LogOut(icon.Props{Class: "size-4"})
-					Sign out everywhere
-				}
-			</div>
+					@button.Button(button.Props{
+						Type:    "button",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+						Attributes: templ.Attributes{
+							"hx-delete":  basePath + "/settings/sessions/" + session.ID,
+							"hx-swap":    "none",
+							"hx-disable": "this",
+						},
+					}) {
+						if session.ID == currentSessionID {
+							Sign out
+						} else {
+							Revoke
+						}
+					}
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ signOutEverywhere() {
+	@button.Button(button.Props{
+		Type:    "button",
+		Variant: button.VariantSecondary,
+		Size:    button.SizeSm,
+		Attributes: templ.Attributes{
+			"hx-delete":  ctxkeys.AppBasePath(ctx) + "/settings/sessions",
+			"hx-swap":    "none",
+			"hx-disable": "this",
+			"hx-confirm": "Sign out of every session, including this one?",
+		},
+	}) {
+		@icon.LogOut()
+		Sign out everywhere
+	}
+}
+
+// settingsField is a label, its input and an optional hint below.
+templ settingsField(id, label, hint string) {
+	@field.Field(field.Props{Class: "gap-1"}) {
+		@field.Label(field.LabelProps{For: id}) {
+			{ label }
+		}
+		{ children... }
+		if hint != "" {
+			<p class="text-xs text-muted-foreground">{ hint }</p>
 		}
 	}
 }
 
+// settingsSubmit is the button at the end of a settings form.
+templ settingsSubmit(label string) {
+	<div class="flex justify-end">
+		@button.Button(button.Props{Type: "submit"}) {
+			{ label }
+		}
+	</div>
+}
+
 templ SettingsNameSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Name
+	@panel(panelProps{Title: "Name", Description: "How your team sees you in ops and in the activity."}) {
+		<form
+			class="flex flex-col gap-2 sm:flex-row"
+			hx-patch={ basePath + "/profile/name" }
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@csrf.Token()
+			<label for="name" class="sr-only">Name</label>
+			@input.Input(input.Props{Type: "text", ID: "name", Name: "name", Value: user.Name, Placeholder: "Your name", Class: "sm:max-w-sm"})
+			@button.Button(button.Props{Type: "submit", Variant: button.VariantSecondary}) {
+				Save
 			}
-			@card.Description() {
-				Shown in the panel.
-			}
-		}
-		@card.Content() {
-			<form
-				class="space-y-4"
-				hx-patch={ basePath + "/profile/name" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@csrf.Token()
-				<div class="space-y-2">
-					@field.Label(field.LabelProps{For: "name"}) {
-						Name
-					}
-					@input.Input(input.Props{
-						Type:        "text",
-						ID:          "name",
-						Name:        "name",
-						Value:       user.Name,
-						Placeholder: "Your name",
-					})
-				</div>
-				<div class="flex justify-end">
-					@button.Button(button.Props{
-						Type: "submit",
-					}) {
-						Save
-					}
-				</div>
-			</form>
-		}
+		</form>
 	}
 }
 
 templ SettingsEmailSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Email
+	@panel(panelProps{Title: "Email", Description: "Where sign-in links and notices go. A new address gets a link to confirm it."}) {
+		<form
+			class="flex flex-col gap-2 sm:flex-row"
+			hx-patch={ basePath + "/account/email" }
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@csrf.Token()
+			<label for="email" class="sr-only">Email</label>
+			@input.Input(input.Props{Type: "email", ID: "email", Name: "email", Value: user.Email, Placeholder: "you@example.com", Class: "sm:max-w-sm"})
+			@button.Button(button.Props{Type: "submit", Variant: button.VariantSecondary}) {
+				Update email
 			}
-			@card.Description() {
-				Where sign-in links and notices go.
-			}
-		}
-		@card.Content() {
-			<form
-				class="space-y-4"
-				hx-patch={ basePath + "/account/email" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@csrf.Token()
-				<div class="space-y-2">
-					@field.Label(field.LabelProps{For: "email"}) {
-						Email
-					}
-					@input.Input(input.Props{
-						Type:        "email",
-						ID:          "email",
-						Name:        "email",
-						Value:       user.Email,
-						Placeholder: "your@email.com",
-					})
-				</div>
-				<div class="flex justify-end">
-					@button.Button(button.Props{
-						Type: "submit",
-					}) {
-						Update email
-					}
-				</div>
-			</form>
-		}
+		</form>
 	}
 }
 
 templ SettingsPasswordSection() {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Password
-			}
-			if user.HasPassword() {
-				@card.Description() {
-					You sign in with your password or a magic link.
-				}
-			} else {
-				@card.Description() {
-					You sign in with magic links only.
-				}
-			}
-		}
-		@card.Content() {
-			@templ.Fragment("settings-password-form") {
-				<div id="password-form" class="space-y-4" hx-swap-oob="true">
-					if user.HasPassword() {
-						<!-- Change Password Form -->
-						<form
-							class="space-y-4"
-							hx-post={ basePath + "/account/password" }
-							hx-swap="none"
-							hx-disable="find button[type='submit']"
-						>
-							@csrf.Token()
-							<div class="space-y-2">
-								@field.Label(field.LabelProps{For: "current_password"}) {
-									Current password
-								}
-								@input.Input(input.Props{
-									Type:        "password",
-									ID:          "current_password",
-									Name:        "current_password",
-									Placeholder: "Enter current password",
-								})
-							</div>
-							<div class="space-y-2">
-								@field.Label(field.LabelProps{For: "new_password"}) {
-									New password
-								}
-								@input.Input(input.Props{
-									Type:        "password",
-									ID:          "new_password",
-									Name:        "new_password",
-									Placeholder: "Enter new password",
-								})
-								<p class="text-sm text-muted-foreground">
-									Must be at least 12 characters long
-								</p>
-							</div>
-							<div class="space-y-2">
-								@field.Label(field.LabelProps{For: "confirm_password"}) {
-									Confirm New password
-								}
-								@input.Input(input.Props{
-									Type:        "password",
-									ID:          "confirm_password",
-									Name:        "confirm_password",
-									Placeholder: "Confirm new password",
-								})
-							</div>
-							<div class="flex justify-between items-center">
-								@dialog.Dialog(dialog.Props{ID: "remove-password-dialog"}) {
-									@button.Button(button.Props{
-										Type:       "button",
-										Variant:    button.VariantOutline,
-										Attributes: dialog.Trigger(ctx),
-									}) {
-										Remove password
-									}
-									@dialog.Content() {
-										@dialog.Header() {
-											@dialog.Title() {
-												Remove password
-											}
-											@dialog.Description() {
-												Are you sure? You'll only be able to sign in with magic links.
-											}
-										}
-										@dialog.Footer() {
-											@button.Button(button.Props{
-												Variant:    button.VariantOutline,
-												Attributes: dialog.Close(ctx),
-											}) {
-												Cancel
-											}
-											@button.Button(button.Props{
-												Attributes: utils.MergeAttributes(
-													dialog.Close(ctx),
-													templ.Attributes{
-														"hx-delete":  basePath + "/account/password",
-														"hx-swap":    "none",
-														"hx-disable": "this",
-													},
-												),
-											}) {
-												Remove password
-											}
-										}
-									}
-								}
-								@button.Button(button.Props{
-									Type: "submit",
-								}) {
-									Update password
-								}
-							</div>
-						</form>
-					} else {
-						<!-- Set password Form -->
-						<div class="space-y-4">
-							<div class="rounded-2xl border bg-muted/50 p-4">
-								<p class="text-sm text-muted-foreground">
-									Set a password to enable password-based sign in. You can still use magic links anytime.
-								</p>
-							</div>
-							<form
-								class="space-y-4"
-								hx-post={ basePath + "/account/password/set" }
-								hx-swap="none"
-								hx-disable="find button[type='submit']"
-							>
-								@csrf.Token()
-								<div class="space-y-2">
-									@field.Label(field.LabelProps{For: "new_password"}) {
-										New password
-									}
-									@input.Input(input.Props{
-										Type:        "password",
-										ID:          "new_password",
-										Name:        "new_password",
-										Placeholder: "Enter new password",
-									})
-									<p class="text-sm text-muted-foreground">
-										Must be at least 12 characters long
-									</p>
-								</div>
-								<div class="space-y-2">
-									@field.Label(field.LabelProps{For: "confirm_password"}) {
-										Confirm password
-									}
-									@input.Input(input.Props{
-										Type:        "password",
-										ID:          "confirm_password",
-										Name:        "confirm_password",
-										Placeholder: "Confirm new password",
-									})
-								</div>
-								<div class="flex justify-end">
-									@button.Button(button.Props{
-										Type: "submit",
-									}) {
-										Set password
-									}
-								</div>
-							</form>
+	@panel(panelProps{Title: "Password", Description: utils.IfElse(user.HasPassword(), "You sign in with your password or an email link.", "You sign in with email links only. Set a password to sign in with it too.")}) {
+		@templ.Fragment("settings-password-form") {
+			<div id="password-form" hx-swap-oob="true">
+				if user.HasPassword() {
+					<form
+						class="flex flex-col gap-6"
+						hx-post={ basePath + "/account/password" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@csrf.Token()
+						<div class="flex flex-col gap-3">
+							@settingsField("current_password", "Current password", "") {
+								@input.Input(input.Props{Type: "password", ID: "current_password", Name: "current_password", Attributes: templ.Attributes{"autocomplete": "current-password"}})
+							}
+							@settingsField("new_password", "New password", "At least 12 characters.") {
+								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+							}
+							@settingsField("confirm_password", "Repeat the new password", "") {
+								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+							}
 						</div>
-					}
-				</div>
-			}
+						<div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+							@dialog.Dialog(dialog.Props{ID: "remove-password-dialog"}) {
+								@button.Button(button.Props{Type: "button", Variant: button.VariantGhost, Attributes: dialog.Trigger(ctx)}) {
+									Remove password
+								}
+								@dialog.Content() {
+									@dialog.Header() {
+										@dialog.Title() {
+											Remove your password?
+										}
+										@dialog.Description() {
+											You then sign in with email links only.
+										}
+									}
+									@dialog.Footer() {
+										@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
+											Cancel
+										}
+										@button.Button(button.Props{
+											Attributes: utils.MergeAttributes(
+												dialog.Close(ctx),
+												templ.Attributes{
+													"hx-delete":  basePath + "/account/password",
+													"hx-swap":    "none",
+													"hx-disable": "this",
+												},
+											),
+										}) {
+											Remove password
+										}
+									}
+								}
+							}
+							@button.Button(button.Props{Type: "submit"}) {
+								Update password
+							}
+						</div>
+					</form>
+				} else {
+					<form
+						class="flex flex-col gap-6"
+						hx-post={ basePath + "/account/password/set" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@csrf.Token()
+						<div class="flex flex-col gap-3">
+							@settingsField("new_password", "New password", "At least 12 characters.") {
+								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+							}
+							@settingsField("confirm_password", "Repeat the password", "") {
+								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+							}
+						</div>
+						@settingsSubmit("Set password")
+					</form>
+				}
+			</div>
 		}
 	}
 }
 
 templ SettingsDangerZoneSection() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Danger zone
+	@dangerPanel("Delete your account", "Your account, profile and API tokens are removed from ops. This cannot be undone.") {
+		@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
+			@button.Button(button.Props{Type: "button", Variant: button.VariantDestructive, Attributes: dialog.Trigger(ctx)}) {
+				Delete account
 			}
-			@card.Description() {
-				Delete your account and everything in it.
-			}
-		}
-		@card.Content() {
-			<div class="space-y-4">
-				<div class="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-					<h3 class="mb-1 text-sm font-semibold text-destructive">Delete account</h3>
-					<p class="text-sm text-muted-foreground mb-4">
-						Your account, servers, apps and tokens are removed from ops for good. This cannot be undone.
-					</p>
-					@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
-						@button.Button(button.Props{
-							Type:       "button",
-							Variant:    button.VariantDestructive,
-							Attributes: dialog.Trigger(ctx),
-						}) {
-							@icon.Trash2(icon.Props{Class: "size-4"})
-							Delete account
+			@dialog.Content() {
+				@dialog.Header() {
+					@dialog.Title() {
+						Delete your account?
+					}
+					@dialog.Description() {
+						@SettingsDangerDescription()
+					}
+				}
+				<form
+					id="delete-account-form"
+					class="flex flex-col gap-6"
+					hx-delete={ basePath + "/account" }
+					hx-include="closest form"
+					hx-swap="none"
+					hx-disable="find button[type='submit']"
+				>
+					@csrf.Token()
+					@field.Field(field.Props{Class: "gap-1"}) {
+						@field.Label(field.LabelProps{For: "delete-confirmation"}) {
+							Type <span class="font-mono">DELETE</span> to confirm
 						}
-						@dialog.Content() {
-							@dialog.Header() {
-								@dialog.Title() {
-									Delete account
-								}
-								@dialog.Description() {
-									@SettingsDangerDescription()
-								}
-							}
-							<form
-								id="delete-account-form"
-								hx-delete={ basePath + "/account" }
-								hx-include="closest form"
-								hx-swap="none"
-								hx-disable="find button[type='submit']"
-							>
-								@csrf.Token()
-								<div class="px-6 py-4 space-y-2">
-									@field.Label(field.LabelProps{For: "delete-confirmation"}) {
-										Type <span class="font-mono font-semibold">DELETE</span> to confirm
-									}
-									@input.Input(input.Props{
-										Type:        "text",
-										ID:          "delete-confirmation",
-										Name:        "delete_confirmation",
-										Placeholder: "DELETE",
-										Attributes: templ.Attributes{
-											"autocomplete": "off",
-										},
-									})
-								</div>
-								@dialog.Footer() {
-									@button.Button(button.Props{
-										Type:       "button",
-										Variant:    button.VariantOutline,
-										Attributes: dialog.Close(ctx),
-									}) {
-										Cancel
-									}
-									@button.Button(button.Props{
-										Type:     "submit",
-										Disabled: true,
-										Attributes: utils.MergeAttributes(
-											dialog.Close(ctx),
-											templ.Attributes{"data-delete-submit": ""},
-										),
-									}) {
-										Delete my account
-									}
-								}
-							</form>
-							<script nonce={ templ.GetNonce(ctx) }>
-								(function() {
-									const form = document.getElementById("delete-account-form");
-									const input = document.getElementById("delete-confirmation");
-									const button = document.querySelector("[data-delete-submit]");
-									const dialogContent = button.closest("[data-slot=dialog-content]");
-
-									if (!form || !input || !button || !dialogContent) return;
-
-									// Enable button when "DELETE" is typed
-									input.addEventListener("input", function() {
-										button.disabled = this.value !== "DELETE";
-									});
-
-									// Reset the form once the dialog has closed and its exit animation finished.
-									dialogContent.addEventListener("dialog-close", function() {
-										form.reset();
-										button.disabled = true;
-									});
-								})();
-							</script>
+						@input.Input(input.Props{Type: "text", ID: "delete-confirmation", Name: "delete_confirmation", Placeholder: "DELETE", Attributes: templ.Attributes{"autocomplete": "off"}})
+					}
+					@dialog.Footer() {
+						@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
+							Cancel
+						}
+						@button.Button(button.Props{
+							Type:     "submit",
+							Variant:  button.VariantDestructive,
+							Disabled: true,
+							Attributes: utils.MergeAttributes(
+								dialog.Close(ctx),
+								templ.Attributes{"data-delete-submit": ""},
+							),
+						}) {
+							Delete my account
 						}
 					}
-				</div>
-			</div>
+				</form>
+				<script nonce={ templ.GetNonce(ctx) }>
+					(function() {
+						const form = document.getElementById("delete-account-form");
+						const input = document.getElementById("delete-confirmation");
+						const button = form && form.querySelector("[data-delete-submit]");
+						const dialogContent = button && button.closest("[data-slot=dialog-content]");
+						if (!form || !input || !button || !dialogContent) return;
+						// The button works only once DELETE is typed.
+						input.addEventListener("input", function() {
+							button.disabled = this.value !== "DELETE";
+						});
+						// Reset the form once the dialog has closed.
+						dialogContent.addEventListener("dialog-close", function() {
+							form.reset();
+							button.disabled = true;
+						});
+					})();
+				</script>
+			}
 		}
 	}
 }

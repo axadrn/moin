@@ -9,42 +9,41 @@ import (
 )
 
 templ SettingsAvatarFields() {
-	<div class="space-y-2">
+	@field.Field(field.Props{Class: "gap-1"}) {
 		@field.Label(field.LabelProps{For: "avatar"}) {
 			Choose an image
 		}
 		@input.Input(input.Props{Type: "file", ID: "avatar", Name: "avatar", Attributes: templ.Attributes{"accept": "image/jpeg,image/jpg,image/png,image/webp"}})
-		<p class="text-sm text-muted-foreground">JPEG, PNG or WebP. Max file size 5MB.</p>
-	</div>
+		<p class="text-xs text-muted-foreground">JPEG, PNG or WebP, up to 5 MB.</p>
+	}
 }
 
 templ SettingsAvatarUploadButton() {
 	@button.Button(button.Props{Type: "submit", Class: "w-full sm:w-auto"}) {
-		@icon.Upload(icon.Props{Class: "mr-2 size-4"})
-		Upload avatar
+		@icon.Upload()
+		Upload picture
 	}
 }
 
 templ SettingsAvatarDeleteTrigger() {
-	@button.Button(button.Props{Type: "button", Variant: button.VariantOutline, Class: "w-full sm:w-auto", Attributes: dialog.Trigger(ctx)}) {
-		@icon.Trash2(icon.Props{Class: "mr-2 size-4"})
-		Remove avatar
+	@button.Button(button.Props{Type: "button", Variant: button.VariantGhost, Class: "w-full sm:w-auto", Attributes: dialog.Trigger(ctx)}) {
+		Remove picture
 	}
 }
 
 templ SettingsAvatarDeleteDialog() {
 	@dialog.Header() {
 		@dialog.Title() {
-			Remove avatar
+			Remove your picture?
 		}
 		@dialog.Description() {
-			Are you sure you want to remove your avatar? This action cannot be undone.
+			Your initial shows in its place. You can upload a new picture any time.
 		}
 	}
 }
 
 templ SettingsAvatarDeleteCancel() {
-	@button.Button(button.Props{Variant: button.VariantOutline, Attributes: dialog.Close(ctx)}) {
+	@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
 		Cancel
 	}
 }

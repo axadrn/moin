@@ -67,7 +67,7 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
 }
 
-// Delete removes a server. The event stream reloads the table.
+// Delete removes a server from its page and goes back to the list.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	err := h.servers.Delete(actor(r), r.PathValue("id"))
@@ -76,12 +76,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server could not be removed", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
 		return
 	}
-	servers, err := h.servers.List(workspace.ID)
-	if err != nil {
-		renderError(w, "list servers failed", err)
-		return
-	}
-	render(w, r, pages.ServerList(servers))
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/servers", http.StatusSeeOther)
 }
 
 // UpdateAgent has the server's agent update itself and says how it went. The

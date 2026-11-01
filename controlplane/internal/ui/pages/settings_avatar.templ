@@ -1,27 +1,14 @@
 package pages
 
-import (
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
-)
+import "github.com/axadrn/ops/controlplane/internal/model"
 
 templ SettingsAvatarSection(user *model.User) {
-	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Avatar
-			}
-			@card.Description() {
-				Upload a profile picture (Max 5MB, JPG/PNG/WebP)
-			}
-		}
-		@card.Content() {
-			<div class="flex flex-col md:flex-row items-start gap-4 md:gap-6">
-				@SettingsAvatarDisplay(user)
-				<div class="flex-1 w-full space-y-4">
-					@SettingsAvatarForm()
-				</div>
+	@panel(panelProps{Title: "Picture", Description: "Shown next to your name in the sidebar and in the team."}) {
+		<div class="flex flex-col gap-6 sm:flex-row sm:items-start">
+			@SettingsAvatarDisplay(user)
+			<div class="min-w-0 flex-1">
+				@SettingsAvatarForm()
 			</div>
-		}
+		</div>
 	}
 }

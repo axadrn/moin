@@ -3,16 +3,13 @@ package pages
 import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/tooltip"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
-	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
 // BucketView is the bucket page: the account's own S3-compatible bucket.
@@ -25,120 +22,141 @@ type BucketView struct {
 templ Bucket(view BucketView) {
 	@layouts.App("Bucket") {
 		@panelPage(templ.Attributes{"data-bucket-page": true}) {
-			<div class="min-w-0">
-				<h1 class="flex items-center gap-3 font-display text-[2.5rem] leading-none sm:text-[2.875rem]">
-					Bucket
-					@tooltip.Tooltip() {
-						@button.Button(button.Props{
-							Variant:    button.VariantGhost,
-							Size:       button.SizeIconSm,
-							Class:      "cursor-help text-muted-foreground hover:bg-secondary hover:text-foreground",
-							Attributes: utils.MergeAttributes(tooltip.Trigger(ctx), templ.Attributes{"aria-label": "What the bucket is for"}),
-						}) {
-							@icon.Info(icon.Props{Class: "size-[1.125rem]"})
-						}
-						@tooltip.Content(tooltip.ContentProps{Side: tooltip.SideBottom, Class: "max-w-xs text-pretty"}) {
-							Your own storage box. Your code and your backups go in there, never to us. ops only signs the links.
-						}
-					}
-				</h1>
-				<p class="mt-2.5 max-w-2xl text-sm text-pretty text-muted-foreground">One S3-compatible bucket for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.</p>
-			</div>
-			<div id="bucket" class="mt-6 flex flex-col gap-4">
+			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
+			<div id="bucket" class="flex max-w-3xl flex-col gap-6">
 				if view.Notice != "" {
-					@alert.Alert(alert.Props{Class: "border-0 rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live", Attributes: templ.Attributes{"data-bucket-notice": true}}) {
+					@pageNotice(false, templ.Attributes{"data-bucket-notice": true}) {
 						{ view.Notice }
 					}
 				}
-				@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible grid gap-3 px-5 py-5 sm:grid-cols-3", Attributes: templ.Attributes{"aria-label": "What goes in the bucket", "role": "region"}}) {
-					@bucketUse("Your code", "ops deploy puts it there, your server picks it up and deletes it. Code from GitHub goes from GitHub straight to your server.")
+				@bucketForm(view)
+				<div class="grid items-stretch gap-4 md:grid-cols-3" role="region" aria-label="What goes in the bucket">
+					@bucketUse("Your code", "ops deploy puts it there, your server picks it up and deletes it. Code from GitHub goes straight to your server.")
 					@bucketUse("Your backups", "Every change of every SQLite database, and a snapshot before every change. Restore any second of the last week.")
 					@bucketUse("Nothing of ours", "ops keeps the key encrypted and only signs short links. Your data never passes through ops.")
+				</div>
+				if view.Storage != nil {
+					@dangerPanel("Remove the bucket", "Backups stop and ops deploy needs a bucket again. What is in the bucket stays there.") {
+						@button.Button(button.Props{
+							Variant: button.VariantDestructive,
+							Attributes: templ.Attributes{
+								"hx-post":    ctxkeys.AppBasePath(ctx) + "/bucket/remove",
+								"hx-target":  "#bucket",
+								"hx-select":  "#bucket",
+								"hx-swap":    "outerHTML",
+								"hx-confirm": "Remove the bucket? Backups stop and ops deploy needs a bucket again. What is in it stays.",
+							},
+						}) {
+							Remove bucket
+						}
+					}
 				}
-				@bucketForm(view)
 			</div>
 		}
 	}
 }
 
 templ bucketUse(title, text string) {
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible rounded-2xl bg-muted/60 px-4 py-4"}) {
-		<p class="text-sm font-semibold">{ title }</p>
-		<p class="mt-1.5 text-sm text-pretty text-muted-foreground">{ text }</p>
+	@card.Card(card.Props{Class: "h-full min-w-0"}) {
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
+				{ title }
+			}
+			@card.Description(card.DescriptionProps{Class: "text-pretty"}) {
+				{ text }
+			}
+		}
 	}
 }
 
+// bucketForm is the bucket: what is stored, and the form that adds or
+// changes it. Without a bucket the form is open.
 templ bucketForm(view BucketView) {
 	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket" }}
-	@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"data-backup-storage": true}}) {
-		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
-			@card.Title(card.TitleProps{Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				if view.Storage == nil {
-					Add your bucket
-				} else {
-					Your bucket
-				}
-			}
-			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/bucket">How it works</a>
-		}
-		if view.Storage != nil {
-			<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 px-5 pb-3 text-sm">
-				<dt class="text-muted-foreground">Bucket</dt>
-				<dd class="truncate font-mono text-[0.8125rem]" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
-				<dt class="text-muted-foreground">Endpoint</dt>
-				<dd class="truncate font-mono text-[0.8125rem]">{ orAWS(view.Storage.Endpoint) }</dd>
-				<dt class="text-muted-foreground">Access key</dt>
-				<dd class="truncate font-mono text-[0.8125rem]">{ view.Storage.AccessKey }</dd>
-			</dl>
-		}
-		@collapsible.Collapsible(collapsible.Props{DefaultOpen: view.Storage == nil || view.Error != "", Class: "px-5 pb-5"}) {
+	@panel(panelProps{
+		Title:       bucketTitle(view.Storage != nil),
+		Description: bucketDescription(view.Storage != nil),
+		Action:      docsLink("/docs/guides/bucket", "How it works"),
+		Attrs:       templ.Attributes{"data-backup-storage": true},
+	}) {
+		<div class="flex flex-col gap-6">
 			if view.Storage != nil {
-				@button.Button(button.Props{
-					Variant:    button.VariantLink,
-					Class:      "h-auto px-0 font-semibold text-muted-foreground hover:text-foreground hover:no-underline",
-					Attributes: collapsible.Trigger(ctx),
-				}) {
-					Change the bucket
-				}
+				<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
+					<dt class="text-muted-foreground">Bucket</dt>
+					<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+					<dt class="text-muted-foreground">Endpoint</dt>
+					<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
+					<dt class="text-muted-foreground">Access key</dt>
+					<dd class="truncate font-mono">{ view.Storage.AccessKey }</dd>
+				</dl>
 			}
-			@collapsible.Content() {
-				<form class="mt-3 grid gap-3 sm:grid-cols-2" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" data-storage-form>
-					@csrf.Token()
-					@storageField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3", "text", true)
-					@storageField("bucket", "Bucket", "my-ops", "", "text", false)
-					@storageField("region", "Region", "auto", "auto for R2", "text", false)
-					@storageField("path", "Folder", "optional", "inside the bucket", "text", false)
-					@storageField("access_key", "Access key", "", "", "text", false)
-					@storageField("secret_key", "Secret key", "", "stored encrypted", "password", false)
-					if view.Error != "" {
-						@field.Error(field.ErrorProps{Class: "font-normal text-sm text-failed sm:col-span-2", Attributes: templ.Attributes{"data-storage-error": true}}) {
-							{ view.Error }
-						}
-					}
-					<div class="flex items-center justify-between gap-3 sm:col-span-2">
-						if view.Storage != nil {
-							@button.Button(button.Props{
-								Variant: button.VariantLink,
-								Class:   "h-auto px-0 font-semibold text-muted-foreground hover:text-failed hover:no-underline",
-								Attributes: templ.Attributes{
-									"hx-post":    bucketPath + "/remove",
-									"hx-target":  "#bucket",
-									"hx-select":  "#bucket",
-									"hx-swap":    "outerHTML",
-									"hx-confirm": "Remove the bucket? Backups stop and ops deploy needs a bucket again. What is in it stays.",
-								},
-							}) {
-								Remove
-							}
-						} else {
-							<span class="text-xs text-muted-foreground">ops writes and deletes a test file first.</span>
-						}
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDefault}) {
-							Save
+			@collapsible.Collapsible(collapsible.Props{DefaultOpen: view.Storage == nil || view.Error != "", Class: "flex flex-col gap-6"}) {
+				if view.Storage != nil {
+					<div>
+						@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
+							Change the bucket
 						}
 					</div>
-				</form>
+				}
+				@collapsible.Content() {
+					<form class="flex flex-col gap-6" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" data-storage-form>
+						@csrf.Token()
+						<div class="grid gap-3 sm:grid-cols-2">
+							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3.", "text", true)
+							@bucketField("bucket", "Bucket", "my-ops", "", "text", false)
+							@bucketField("path", "Folder", "optional", "A folder inside the bucket.", "text", false)
+							@bucketField("access_key", "Access key", "", "", "text", false)
+							@bucketField("secret_key", "Secret key", "", "Stored encrypted.", "password", false)
+							@bucketField("region", "Region", "auto", "auto for R2.", "text", false)
+						</div>
+						if view.Error != "" {
+							@field.Error(field.ErrorProps{Attributes: templ.Attributes{"data-storage-error": true}}) {
+								{ view.Error }
+							}
+						}
+						<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<p class="text-xs text-muted-foreground">ops writes and deletes a test file first.</p>
+							@button.Button(button.Props{Type: button.TypeSubmit}) {
+								Save bucket
+							}
+						</div>
+					</form>
+				}
 			}
+		</div>
+	}
+}
+
+// bucketField is one field of the bucket form, with a hint below.
+templ bucketField(name, label, placeholder, hint, kind string, wide bool) {
+	@field.Field(field.Props{Class: "gap-1" + bucketWide(wide)}) {
+		@field.Label(field.LabelProps{For: "bucket-" + name}) {
+			{ label }
+		}
+		@input.Input(input.Props{ID: "bucket-" + name, Name: name, Type: kind, Placeholder: placeholder, Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
+		if hint != "" {
+			<p class="text-xs text-muted-foreground">{ hint }</p>
 		}
 	}
+}
+
+func bucketWide(wide bool) string {
+	if wide {
+		return " sm:col-span-2"
+	}
+	return ""
+}
+
+func bucketTitle(stored bool) string {
+	if stored {
+		return "Your bucket"
+	}
+	return "Add your bucket"
+}
+
+func bucketDescription(stored bool) string {
+	if stored {
+		return "ops deploy and the backups of every server use it."
+	}
+	return "Deploys from your terminal and backups need it. The keys need read and write access to this one bucket."
 }

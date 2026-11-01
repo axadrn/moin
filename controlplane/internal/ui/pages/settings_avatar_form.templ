@@ -14,7 +14,7 @@ templ SettingsAvatarForm() {
 		<form
 			id="avatar-upload-form"
 			enctype="multipart/form-data"
-			class="space-y-4"
+			class="flex flex-col gap-6"
 			hx-swap-oob="true"
 			hx-post={ basePath + "/account/avatar" }
 			hx-encoding="multipart/form-data"
@@ -23,7 +23,7 @@ templ SettingsAvatarForm() {
 		>
 			@csrf.Token()
 			@SettingsAvatarFields()
-			<div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+			<div class="flex flex-col gap-2 sm:flex-row-reverse">
 				@SettingsAvatarUploadButton()
 				@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
 					@SettingsAvatarDeleteTrigger()

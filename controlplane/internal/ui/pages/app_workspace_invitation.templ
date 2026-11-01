@@ -4,6 +4,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
@@ -21,31 +22,34 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 		<div class="flex min-h-screen items-center justify-center p-4">
 			@card.Card(card.Props{Class: "w-full max-w-md"}) {
 				@card.Header() {
-					<div class="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-						@icon.Users(icon.Props{Class: "size-5"})
-					</div>
-					@card.Title() {
-						Workspace invitation
+					@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
+						if invitation != nil {
+							Join { invitation.WorkspaceName }
+						} else {
+							Invitation not available
+						}
 					}
 					@card.Description() {
 						if invitation != nil {
-							{ invitation.InviterName } invited you to join { invitation.WorkspaceName } as { model.WorkspaceRoleLabel(invitation.Role) }.
+							{ invitation.InviterName } invited you as { model.WorkspaceRoleLabel(invitation.Role) }.
 						} else {
-							This invitation is not available.
+							It expired, was revoked or was used already. Ask for a new one.
 						}
 					}
 				}
-				@card.Content() {
+				@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {
 					if errorMessage != "" {
-						<div class="mb-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-							{ errorMessage }
-						</div>
+						@alert.Alert(alert.Props{Class: "border-0 bg-failed/12 text-failed"}) {
+							@icon.CircleAlert()
+							@alert.Title(alert.TitleProps{Class: "font-normal"}) {
+								{ errorMessage }
+							}
+						}
 					}
 					if invitation != nil && user != nil {
-						<div class="mb-5 rounded-2xl border bg-muted/40 p-4 text-sm">
-							<p class="font-medium">Signed in as { user.Email }</p>
-							<p class="mt-1 text-muted-foreground">This must match { invitation.Email }.</p>
-						</div>
+						<p class="text-sm text-muted-foreground">
+							You are signed in as <span class="font-medium text-foreground">{ user.Email }</span>. The invitation is for <span class="font-medium text-foreground">{ invitation.Email }</span>; the two must match.
+						</p>
 						<form
 							action={ templ.SafeURL(ctxkeys.URLPath(ctx)) }
 							method="POST"
@@ -56,8 +60,6 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 							}
 						</form>
 					}
-				}
-				@card.Footer() {
 					@button.Button(button.Props{Href: "/", Variant: button.VariantGhost, Class: "w-full"}) {
 						Back to { brand.Name }
 					}

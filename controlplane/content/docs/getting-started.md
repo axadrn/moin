@@ -16,7 +16,7 @@ It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writabl
 
 ## 2. Log in
 
-Create a personal API token under **Settings → Security** with read and write access. It belongs to your workspace; teammates you invite later work in the same one. Then:
+Create a personal API token under **Settings → Tokens** with read and write access. It belongs to your workspace; teammates you invite later work in the same one. Then:
 
 ```bash
 ops login

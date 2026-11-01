@@ -94,7 +94,7 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 
 The description tells the agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
 
-Client setup, with a token from Settings, Security and the public URL of this server:
+Client setup, with a token from Settings, Tokens and the public URL of this server:
 
 - Claude Code: `claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."`
 - Claude Desktop and claude.ai: Customize, Connectors, Add custom connector, the `/mcp` URL, Authentication "No sign in", and the request header `Authorization: Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be public. Request headers on custom connectors are in beta and not available to every organization yet. For a local server, or when your organization has no Request headers field, use the local `mcp-remote` bridge: run `npx mcp-remote http://localhost:8090/mcp --header Authorization:${AUTH_HEADER}` from `claude_desktop_config.json` with `AUTH_HEADER` set to `Bearer pat_...`.

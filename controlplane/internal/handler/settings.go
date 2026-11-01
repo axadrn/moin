@@ -34,7 +34,7 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	activeTab := r.URL.Query().Get("tab")
-	if activeTab != "security" {
+	if activeTab != "security" && activeTab != "tokens" {
 		activeTab = "profile"
 	}
 	currentSession := ctxkeys.Session(r.Context())

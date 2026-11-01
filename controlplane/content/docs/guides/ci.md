@@ -20,8 +20,8 @@ Public images pull without one. For GitHub Container Registry, create a token wi
 
 | Action | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
-| List logins | **Settings → Registries** | `ops registry` | settings tab | `GET /api/v1/registries` | `list_registries` |
-| Save a login | **Settings → Registries** | `ops registry set ghcr.io <user>`, then the token | settings tab, `a` | `PUT /api/v1/registries/{host}` | `set_registry` |
+| List logins | **Settings → Tokens**, Registries | `ops registry` | settings tab | `GET /api/v1/registries` | `list_registries` |
+| Save a login | **Settings → Tokens**, Registries | `ops registry set ghcr.io <user>`, then the token | settings tab, `a` | `PUT /api/v1/registries/{host}` | `set_registry` |
 | Remove a login | **Remove** on the login | `ops registry rm ghcr.io` | settings tab, `x`, `y` | `DELETE /api/v1/registries/{host}` | `remove_registry` |
 
 The token is stored encrypted. The agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
