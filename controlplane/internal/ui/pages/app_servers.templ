@@ -36,7 +36,7 @@ templ Servers(servers []model.Server, canAdd bool) {
 				@subscribeCard()
 			}
 			<div id="server-added"></div>
-			<div class="mt-6">
+			<div class="mt-6" data-server-list-wrap>
 				@ServerList(servers)
 			</div>
 		}
@@ -83,7 +83,7 @@ templ ServerAddForm(name, nameError string) {
 
 // ServerAdded shows the install command of the server just added.
 templ ServerAdded(added AddedServer) {
-	@card.Card(card.Props{ID: "server-added", Class: "block gap-0 py-0 text-base mt-8 overflow-hidden", Attributes: templ.Attributes{"hx-swap-oob": "true", "aria-labelledby": "server-added-heading", "role": "region"}}) {
+	@card.Card(card.Props{ID: "server-added", Class: "block gap-0 py-0 text-base mt-8 overflow-hidden", Attributes: templ.Attributes{"hx-swap-oob": "true", "aria-labelledby": "server-added-heading", "role": "region", "data-server-added": added.Name}}) {
 		<div class="flex flex-col gap-2 px-5 pt-5 pb-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				@card.Title(card.TitleProps{ID: "server-added-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
@@ -130,7 +130,7 @@ templ ServerList(servers []model.Server) {
 		} else {
 			<ul class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" role="list">
 				for _, server := range servers {
-					<li data-server={ server.Name } class="flex">
+					<li data-server={ server.Name } data-online?={ server.Online } class="flex">
 						@card.Card(card.Props{Class: "flex-1 gap-0 py-0 text-base overflow-visible flex flex-col px-5 pt-4 pb-5"}) {
 							<div class="flex items-start justify-between gap-3">
 								<div class="min-w-0">
@@ -204,6 +204,17 @@ templ serversScript() {
 			const events = new EventSource("/api/v1/servers/events");
 			events.addEventListener("servers", () => document.body.dispatchEvent(new Event("servers-changed")));
 			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+			// The install command works once: it goes when its agent is online.
+			const hideUsedCommand = () => {
+				const added = document.querySelector("[data-server-added]");
+				if (added && document.querySelector(`[data-server="${CSS.escape(added.dataset.serverAdded)}"][data-online]`)) {
+					added.replaceWith(Object.assign(document.createElement("div"), { id: "server-added" }));
+				}
+			};
+			const wrap = document.querySelector("[data-server-list-wrap]");
+			if (wrap) {
+				new MutationObserver(hideUsedCommand).observe(wrap, { childList: true });
+			}
 		})();
 	</script>
 }
