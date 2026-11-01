@@ -70,6 +70,9 @@ type Deploy struct {
 	CreatedAt     time.Time          `json:"created_at"`
 	FinishedAt    *time.Time         `json:"finished_at"`
 	Log           []string           `json:"log,omitempty"`
+	// OnServer says whether the server still keeps the release, so it can
+	// be rolled back to. Only in the deploys of an app's detail.
+	OnServer *bool `json:"on_server,omitempty"`
 }
 
 // AppDetail is the answer of GET /api/v1/apps/{app}: the app and its newest deploys.
@@ -149,6 +152,20 @@ func NewDeploy(deploy model.Deploy) Deploy {
 	}
 }
 
+// NewDeploys converts the newest deploys of an app with live release live,
+// newest first, and says which ones the server still keeps.
+func NewDeploys(deploys []model.Deploy, live int) []Deploy {
+	kept := service.KeptDeploys(deploys, live)
+	out := make([]Deploy, 0, len(deploys))
+	for _, deploy := range deploys {
+		converted := NewDeploy(deploy)
+		onServer := kept[deploy.Number]
+		converted.OnServer = &onServer
+		out = append(out, converted)
+	}
+	return out
+}
+
 func (h *AppsHandler) list(workspaceID string) (AppList, error) {
 	apps, err := h.apps.List(workspaceID)
 	if err != nil {
@@ -194,11 +211,7 @@ func (h *AppsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	detail := AppDetail{App: NewApp(*app), Deploys: make([]Deploy, 0, len(deploys))}
-	for _, deploy := range deploys {
-		detail.Deploys = append(detail.Deploys, NewDeploy(deploy))
-	}
-	JSON(w, http.StatusOK, detail)
+	JSON(w, http.StatusOK, AppDetail{App: NewApp(*app), Deploys: NewDeploys(deploys, app.LiveNumber)})
 }
 
 // Delete stops the app on its server and removes it. Its data stays there.

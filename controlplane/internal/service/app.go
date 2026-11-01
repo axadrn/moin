@@ -36,6 +36,7 @@ var (
 	ErrAppName       = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
 	ErrDeployRunning = errors.New("a deploy of this app is still running")
 	ErrNoRollback    = errors.New("there is no earlier successful deploy to roll back to")
+	ErrReleaseGone   = errors.New("the release of that deploy is no longer on the server")
 	ErrNoSource      = errors.New("no deploy has a source yet")
 	ErrNotLive       = errors.New("the app has no live release yet")
 	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
@@ -326,7 +327,7 @@ func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, erro
 		return nil, err
 	}
 	for _, previous := range deploys {
-		if previous.SourceKey == "" && previous.Image == "" {
+		if previous.Status != model.DeploySucceeded || !Builds(previous) {
 			continue
 		}
 		deploy := &model.Deploy{
@@ -603,6 +604,13 @@ func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.
 	if err != nil {
 		return nil, err
 	}
+	deploys, err := s.apps.ListDeploys(app.ID, 100)
+	if err != nil {
+		return nil, err
+	}
+	if !KeptDeploys(deploys, app.LiveNumber)[target.Number] {
+		return nil, ErrReleaseGone
+	}
 	deploy := &model.Deploy{
 		ID:         uuid.New().String(),
 		AppID:      app.ID,
@@ -611,6 +619,25 @@ func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.
 		CreatedAt:  s.now().UTC(),
 	}
 	return s.start(actor, "app.rolled_back", app, deploy, protocol.DeployStart{FromNumber: target.Number})
+}
+
+// Builds reports whether a deploy brought something new, a source build or
+// an image. Restarts, domain changes and rollbacks do not.
+func Builds(deploy model.Deploy) bool {
+	return deploy.SourceKey != "" || deploy.Image != ""
+}
+
+// KeptDeploys returns the numbers of the deploys whose release the server
+// still keeps, by the rule of protocol.KeptReleases, from deploys newest
+// first and the live number. Only succeeded deploys keep a release.
+func KeptDeploys(deploys []model.Deploy, live int) map[int]bool {
+	releases := make([]protocol.Release, 0, len(deploys))
+	for _, deploy := range deploys {
+		if deploy.Status == model.DeploySucceeded {
+			releases = append(releases, protocol.Release{Number: deploy.Number, Build: Builds(deploy)})
+		}
+	}
+	return protocol.KeptReleases(releases, live)
 }
 
 // ready returns an app whose server is online and that has no running deploy.

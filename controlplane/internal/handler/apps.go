@@ -141,7 +141,7 @@ func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load env failed", err)
 		return
 	}
-	render(w, r, pages.AppPage(*app, apiDeploys(deploys), sortedKeys(env)))
+	render(w, r, pages.AppPage(*app, api.NewDeploys(deploys, app.LiveNumber), sortedKeys(env)))
 }
 
 // Detail answers the header and deploys of an app, for the reload after a
@@ -157,7 +157,7 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load app failed", err)
 		return
 	}
-	render(w, r, pages.AppDetail(*app, apiDeploys(deploys)))
+	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber)))
 }
 
 // Rollback starts the release of an earlier deploy again. The page follows
@@ -342,14 +342,6 @@ func errorMessage(err error) string {
 		return message
 	}
 	return detail.Message
-}
-
-func apiDeploys(deploys []model.Deploy) []api.Deploy {
-	out := make([]api.Deploy, 0, len(deploys))
-	for _, deploy := range deploys {
-		out = append(out, api.NewDeploy(deploy))
-	}
-	return out
 }
 
 func sortedKeys(values map[string]string) []string {

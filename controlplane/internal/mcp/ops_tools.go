@@ -465,11 +465,7 @@ func (t opsTools) getApp(_ context.Context, caller Caller, input NameInput) (App
 	if err != nil {
 		return AppDetail{}, err
 	}
-	detail := AppDetail{api.AppDetail{App: api.NewApp(*app), Deploys: make([]api.Deploy, 0, len(deploys))}}
-	for _, deploy := range deploys {
-		detail.Deploys = append(detail.Deploys, api.NewDeploy(deploy))
-	}
-	return detail, nil
+	return AppDetail{api.AppDetail{App: api.NewApp(*app), Deploys: api.NewDeploys(deploys, app.LiveNumber)}}, nil
 }
 
 // App is the output of create_app.

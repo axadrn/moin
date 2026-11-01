@@ -33,6 +33,7 @@ import (
 //
 //	releases/<n>/src           the source of deploy n
 //	releases/<n>/compose.json  the resolved compose project ops runs, 0600
+//	releases/<n>/kind          build, apply or failed, for prune
 //	current                    the number of the running release
 //	volumes/                   bind mounts that are not part of the repo
 //
@@ -40,7 +41,6 @@ import (
 // image tags per release, the env and the data mounts filled in. Starting an
 // old compose.json again is a rollback: same images, same env.
 const (
-	keepReleases  = 5
 	maxSourceSize = 200 << 20
 	waitTimeout   = 120 * time.Second
 	healthTimeout = 30 * time.Second
@@ -103,6 +103,7 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 	if err != nil {
 		done.Error = err.Error()
 		logf("deploy failed: %s", err)
+		a.markFailed(start.App, start.Number)
 	} else {
 		done.OK = true
 		logf("v%d is live", start.Number)
@@ -120,6 +121,14 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	release := a.releaseDir(start.App, start.Number)
 	_ = os.RemoveAll(release)
 	err := os.MkdirAll(release, 0o700)
+	if err != nil {
+		return detected, err
+	}
+	kind := releaseApply
+	if start.SourceURL != "" || start.SourceNumber > 0 || start.Image != "" {
+		kind = releaseBuild
+	}
+	err = os.WriteFile(filepath.Join(release, "kind"), []byte(kind), 0o600)
 	if err != nil {
 		return detected, err
 	}
@@ -883,22 +892,35 @@ var imagePattern = regexp.MustCompile(`"image": "([^"]+)"`)
 // prune keeps the newest releases and the images they use.
 func (a *apps) prune(ctx context.Context, app string) {
 	entries, _ := os.ReadDir(filepath.Join(a.appDir(app), "releases"))
-	numbers := []int{}
-	for _, entry := range entries {
-		if number, err := strconv.Atoi(entry.Name()); err == nil {
-			numbers = append(numbers, number)
-		}
-	}
-	slices.Sort(numbers)
 	current := a.current(app)
-	for len(numbers) > keepReleases {
-		if numbers[0] != current {
-			_ = os.RemoveAll(a.releaseDir(app, numbers[0]))
+	releases := []protocol.Release{}
+	for _, entry := range entries {
+		number, err := strconv.Atoi(entry.Name())
+		if err != nil {
+			continue
 		}
-		numbers = numbers[1:]
+		kind, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "kind"))
+		if string(kind) == releaseFailed && number != current {
+			_ = os.RemoveAll(a.releaseDir(app, number))
+			continue
+		}
+		build := string(kind) == releaseBuild
+		if len(kind) == 0 {
+			// A release from before the kind file: one with a source was a
+			// build. Keeping an old image deploy a little longer is harmless.
+			_, err := os.Stat(filepath.Join(a.releaseDir(app, number), "src"))
+			build = err == nil
+		}
+		releases = append(releases, protocol.Release{Number: number, Build: build})
 	}
+	kept := protocol.KeptReleases(releases, current)
 	used := map[string]bool{}
-	for _, number := range append(numbers, current) {
+	for _, release := range releases {
+		if !kept[release.Number] {
+			_ = os.RemoveAll(a.releaseDir(app, release.Number))
+		}
+	}
+	for number := range kept {
 		body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "compose.json"))
 		for _, image := range imagePattern.FindAllStringSubmatch(string(body), -1) {
 			used[image[1]] = true
@@ -913,6 +935,27 @@ func (a *apps) prune(ctx context.Context, app string) {
 			_ = exec.CommandContext(ctx, "docker", "image", "rm", image).Run()
 		}
 	}
+}
+
+// The kind file of a release says what it brought: a build (source or
+// image), an apply without a build (restart, domains, rollback) or a failed
+// deploy. prune keeps releases by it.
+const (
+	releaseBuild  = "build"
+	releaseApply  = "apply"
+	releaseFailed = "failed"
+)
+
+// markFailed marks the release of a failed deploy, unless it is running.
+func (a *apps) markFailed(app string, number int) {
+	if !appNamePattern.MatchString(app) || number < 1 {
+		return
+	}
+	release := a.releaseDir(app, number)
+	if _, err := os.Stat(release); err != nil || number == a.current(app) {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(release, "kind"), []byte(releaseFailed), 0o600)
 }
 
 // logs returns the last lines of every container of the app.

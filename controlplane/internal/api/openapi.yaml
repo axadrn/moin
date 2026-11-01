@@ -1235,7 +1235,7 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `deploy_running` or `no_rollback`.'
+          description: '`server_offline`, `deploy_running`, `no_rollback` or `release_gone` when the server no longer keeps that release.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '500':
@@ -3859,6 +3859,9 @@ components:
           items:
             type: string
           description: Only on `GET /api/v1/apps/{app}/deploys/{number}`.
+        on_server:
+          type: boolean
+          description: Whether the server still keeps the release, so a rollback can go to it. It keeps the releases of the last 5 builds (source or image) and the restarts and rollbacks after the oldest of them. Only in the deploys of `GET /api/v1/apps/{app}`.
     Detected:
       type: object
       description: What the agent found in the repo and on the server.

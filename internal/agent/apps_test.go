@@ -203,3 +203,45 @@ func TestStartKeepsTheCrashInTheDeployLog(t *testing.T) {
 		t.Fatalf("deploy log = %q, want the crash", lines)
 	}
 }
+
+func TestPruneKeepsBuildsAndTheRestartsAfterThem(t *testing.T) {
+	t.Setenv("PATH", t.TempDir()) // no docker: prune leaves images alone
+	a := &apps{dir: t.TempDir()}
+	// v1 to v6 are builds, v7 to v13 restarts, v14 a failed deploy, and
+	// v2 a build from before the kind file.
+	for number := 1; number <= 14; number++ {
+		release := a.releaseDir("blog", number)
+		if err := os.MkdirAll(release, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		kind := releaseBuild
+		switch {
+		case number == 2:
+			// From before the kind file, with a source: a build.
+			if err := os.MkdirAll(filepath.Join(release, "src"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		case number == 14:
+			kind = releaseFailed
+		case number > 6:
+			kind = releaseApply
+		}
+		if err := os.WriteFile(filepath.Join(release, "kind"), []byte(kind), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(a.appDir("blog"), "current"), []byte("13"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a.prune(context.Background(), "blog")
+	var kept []int
+	for number := 1; number <= 14; number++ {
+		if _, err := os.Stat(a.releaseDir("blog", number)); err == nil {
+			kept = append(kept, number)
+		}
+	}
+	if want := []int{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}; !slices.Equal(kept, want) {
+		t.Fatalf("kept %v, want %v", kept, want)
+	}
+}

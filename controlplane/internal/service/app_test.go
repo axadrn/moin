@@ -227,6 +227,34 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if start.Number != 5 || start.SourceNumber != third.Number || start.SourceURL != "" || start.Env["SECRET"] != "new" || redeploy.SourceKey != third.SourceKey {
 		t.Fatalf("redeploy deploy.start = %+v", start)
 	}
+
+	// The redeploy fails: the next one builds v3 again, not v5.
+	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, Error: "build failed"})
+	redeploy, err = apps.Redeploy(owner, "blog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start = protocol.DeployStart{}
+	agent.last(t, protocol.TypeDeployStart, &start)
+	if start.Number != 6 || start.SourceNumber != third.Number {
+		t.Fatalf("redeploy after a failed one: deploy.start = %+v", start)
+	}
+	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, OK: true})
+
+	// Three more builds make v1 the sixth newest build: its release is gone.
+	for range 3 {
+		deploy, err := deployUpload(apps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	}
+	if _, err := apps.Rollback(owner, "blog", 1); !errors.Is(err, ErrReleaseGone) {
+		t.Fatalf("rollback out of the window: err = %v", err)
+	}
+	if _, err := apps.Rollback(owner, "blog", third.Number); err != nil {
+		t.Fatalf("rollback to the fifth newest build: %v", err)
+	}
 }
 
 func TestLogsAndDeleteAskTheAgent(t *testing.T) {

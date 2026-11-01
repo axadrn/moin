@@ -670,7 +670,8 @@ func nodeKind(deploy api.Deploy, liveNumber int) string {
 // canRollBack is whether a deploy can be released again: it succeeded, is not
 // live, and nothing deploys right now.
 func canRollBack(app model.App, deploy api.Deploy) bool {
-	return deploy.Status == model.DeploySucceeded && deploy.Number != app.LiveNumber && app.LatestStatus != model.DeployRunning
+	onServer := deploy.OnServer == nil || *deploy.OnServer
+	return deploy.Status == model.DeploySucceeded && deploy.Number != app.LiveNumber && app.LatestStatus != model.DeployRunning && onServer
 }
 
 // deploysShown is how many deploys the list shows before "Show older".

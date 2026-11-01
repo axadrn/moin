@@ -225,6 +225,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrProtect, field: "password", message: "Use a username without spaces or colons and a password of 8 to 72 characters."},
 	{err: service.ErrNotLive, status: http.StatusConflict, code: "not_live", message: "The app has no live release yet. Run ops deploy in the repo first."},
 	{err: service.ErrNoSource, status: http.StatusConflict, code: "no_source", message: "No deploy has a source or an image yet. Run ops deploy in the repo first."},
+	{err: service.ErrReleaseGone, status: http.StatusConflict, code: "release_gone", message: "The release of that deploy is no longer on the server: it keeps the releases of the last 5 builds. Deploy again or roll back to a newer deploy."},
 	{err: service.ErrNoRollback, status: http.StatusConflict, code: "no_rollback", message: "There is no earlier successful deploy to roll back to."},
 	{err: service.ErrEnvKey, field: "set", message: "Env keys are letters, digits and underscores and do not start with a digit."},
 	{err: service.ErrEnvValue, field: "set", message: "Env values are at most 32 KB."},

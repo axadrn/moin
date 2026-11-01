@@ -31,7 +31,7 @@ What the repo brings decides how:
 5. Calls the health path, if x-ops sets one, until it answers below 500.
 6. Reports the SQLite databases it finds on the app's mounts.
 
-If the start fails, the previous release starts again and the deploy is **failed**. The server keeps the last 5 releases and their images.
+If the start fails, the previous release starts again and the deploy is **failed**, and its deploy log ends with the last log lines of the service that stopped. The server keeps the releases of the last 5 builds (a source or an image) and their images, and every restart, start, domain change and rollback after the oldest of them. Roll back goes to any of those; Redeploy builds the newest successful build again.
 
 ## Your data survives every deploy
 

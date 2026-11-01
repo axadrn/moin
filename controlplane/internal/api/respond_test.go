@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
 )
 
@@ -14,5 +15,18 @@ func TestErrorForReadOnlyQuery(t *testing.T) {
 	}
 	if detail.Message != "This query changes data. Run it with execute_sql (MCP), --write (CLI) or Allow changes (web)." {
 		t.Fatalf("message = %q", detail.Message)
+	}
+}
+
+func TestNewDeploysSayWhichReleasesAreOnTheServer(t *testing.T) {
+	deploys := []model.Deploy{{Number: 7, Status: model.DeploySucceeded}}
+	for number := 6; number >= 1; number-- {
+		deploys = append(deploys, model.Deploy{Number: number, Status: model.DeploySucceeded, SourceKey: "server"})
+	}
+	converted := NewDeploys(deploys, 7)
+	for _, deploy := range converted {
+		if deploy.OnServer == nil || *deploy.OnServer != (deploy.Number > 1) {
+			t.Errorf("v%d on_server = %v", deploy.Number, deploy.OnServer)
+		}
 	}
 }
