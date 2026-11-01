@@ -29,8 +29,11 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	flags := newFlags("db "+command, usage).withApp()
 	database := flags.String("db", "", "database path in the container; default the first")
-	limit := flags.Int("limit", 20, "rows to show")
-	offset := flags.Int("offset", 0, "rows to skip")
+	limit, offset := new(int), new(int)
+	if command == "rows" {
+		flags.IntVar(limit, "limit", 20, "rows to show")
+		flags.IntVar(offset, "offset", 0, "rows to skip")
+	}
 	if err := flags.parse(args); err != nil {
 		return err
 	}

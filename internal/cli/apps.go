@@ -606,7 +606,10 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 	}
 	flags := newFlags("env "+command, usage).withApp()
-	show := flags.Bool("show", false, "show the values")
+	show := new(bool)
+	if command == "ls" || command == "list" {
+		flags.BoolVar(show, "show", false, "show the values")
+	}
 	if slices.Contains([]string{"rm", "remove", "unset", "pull"}, command) {
 		flags.withYes()
 	}
