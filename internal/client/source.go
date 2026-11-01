@@ -131,15 +131,22 @@ var unsafeName = regexp.MustCompile(`[^a-z0-9-]+`)
 // AppName picks the app: the flag, x-ops.app in compose.yml, or the name of
 // the directory.
 func AppName(flagValue, dir string) string {
+	name, _ := PickApp(flagValue, dir)
+	return name
+}
+
+// PickApp is AppName that also says where the name came from: "--app",
+// "x-ops.app in compose.yml" or "the directory name".
+func PickApp(flagValue, dir string) (name, from string) {
 	if flagValue != "" {
-		return flagValue
+		return flagValue, "--app"
 	}
 	if config := ReadLocalConfig(dir); config.App != "" {
-		return config.App
+		return config.App, "x-ops.app in compose.yml"
 	}
 	absolute, err := filepath.Abs(dir)
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(absolute)), "-"), "-")
+	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(absolute)), "-"), "-"), "the directory name"
 }
