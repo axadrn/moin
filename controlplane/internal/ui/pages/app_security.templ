@@ -145,12 +145,13 @@ templ keyField(id, name, label, placeholder string, stored bool, storedText, hel
 
 // securityScript reloads the switches and the report when the server
 // changes, like the servers page, but not while a flipped switch waits for
-// Apply.
+// Apply or the server is being removed.
 templ securityScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
 			const events = new EventSource("/api/v1/servers/events");
 			const waiting = () => {
+				if (document.querySelector("[data-remove-server]:disabled")) return true;
 				const form = document.querySelector("[data-security-form]");
 				if (!form) return false;
 				return [...form.querySelectorAll("input[type=checkbox][name]")].some((box) => {

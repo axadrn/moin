@@ -240,6 +240,11 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request, notice, failure string) {
 	workspace := ctxkeys.Workspace(r.Context())
 	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))
+	if err != nil && isAction(r) {
+		// A server removed meanwhile sends the page to the list.
+		w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/servers")
+		return
+	}
 	if err != nil {
 		http.NotFound(w, r)
 		return
