@@ -1379,15 +1379,16 @@ func (m model) setSnapshots(name string, on bool) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
+		notice := noticeMsg("snapshot before every change: off")
+		if on {
+			notice = "snapshot before every change: on"
+		}
 		list, err := m.api.Backups(m.ctx, name)
 		if err != nil {
-			return errMsg{err}
+			// The setting is saved; the list needs the server online.
+			return notice
 		}
-		state := "off"
-		if on {
-			state = "on"
-		}
-		m.shared.program.Send(noticeMsg("snapshot before every change: " + state))
+		m.shared.program.Send(notice)
 		return backupsOutput(m.shared.outputs.Add(1), name, list)
 	}
 }

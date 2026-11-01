@@ -311,7 +311,12 @@ func (m model) panel(width, room int) []string {
 // isDeployOutput reports whether the panel shows a deploy log rather than
 // container logs or env vars.
 func (m model) isDeployOutput() bool {
-	return !strings.HasPrefix(m.outputTitle, "logs of ") && !strings.HasPrefix(m.outputTitle, "env of ")
+	for _, prefix := range []string{"logs of ", "env of ", "GitHub of "} {
+		if strings.HasPrefix(m.outputTitle, prefix) {
+			return false
+		}
+	}
+	return true
 }
 
 // outputLine mutes the container prefix of a log line, "web-1  | ", and the
@@ -466,7 +471,10 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers:
 		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
-		keys := [][2]string{{"↑↓", "pick a deploy"}}
+		var keys [][2]string
+		if len(m.detail.Deploys) > 0 {
+			keys = append(keys, [2]string{"↑↓", "pick a deploy"})
+		}
 		if m.deployPick != 0 {
 			keys = append(keys, [2]string{"enter", "its log"})
 		}
