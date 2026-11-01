@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
@@ -28,22 +29,52 @@ templ panelPage(attrs ...templ.Attributes) {
 // pageHeader is the title of a page, its one line, and its actions
 // (children) right aligned, below on phones.
 templ pageHeader(title, description string) {
+	@statusHeader(title, nil, description) {
+		{ children... }
+	}
+}
+
+// statusHeader is the header of a page about one thing, a server or an
+// app: its name with its status chip, one line and the actions (children).
+templ statusHeader(title string, chip templ.Component, description string) {
 	<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-		@pageTitle(title, description)
+		<div class="min-w-0">
+			<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+				<h1 class="truncate text-3xl font-bold tracking-tight">{ title }</h1>
+				if chip != nil {
+					@chip
+				}
+			</div>
+			if description != "" {
+				<p class="mt-1 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
+			}
+		</div>
 		<div class="flex shrink-0 flex-wrap items-center gap-2 empty:hidden">
 			{ children... }
 		</div>
 	</header>
 }
 
-// pageTitle is the headline of a page with one line below it.
-templ pageTitle(title, description string) {
-	<div class="min-w-0">
-		<h1 class="truncate text-3xl font-bold tracking-tight">{ title }</h1>
-		if description != "" {
-			<p class="mt-1 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
+// tabNav is a row of tabs, a segmented control of plain links (tabLink),
+// one per page.
+templ tabNav(label string) {
+	<nav class="flex h-9 w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit" aria-label={ label }>
+		{ children... }
+	</nav>
+}
+
+// tabLink is one tab of a tabNav; the active one is the current page.
+templ tabLink(href, label string, active bool, attrs templ.Attributes) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "flex h-full flex-1 items-center justify-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none",
+			templ.KV("bg-background text-foreground shadow-sm", active),
+			templ.KV("text-muted-foreground hover:text-foreground", !active) }
+		if active {
+			aria-current="page"
 		}
-	</div>
+		{ attrs... }
+	>{ label }</a>
 }
 
 // sectionTitle heads a block of a page outside a card.
@@ -180,7 +211,7 @@ templ dangerPanel(title, body string) {
 
 // command is a command to copy: a prompt, the command, a copy button.
 templ command(cmd string) {
-	<div class="group/cmd flex h-10 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1 pl-4 font-mono text-xs">
+	<div class="group/cmd flex h-10 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1 pl-4 text-left font-mono text-xs">
 		<span class="text-muted-foreground select-none" aria-hidden="true">$</span>
 		<code class="min-w-0 flex-1 truncate">{ cmd }</code>
 		@copyButton(cmd, "", "Copy command")
@@ -201,6 +232,29 @@ templ copyButton(value, target, label string) {
 	}) {
 		@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
 		@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
+	}
+}
+
+// pageNotice is the answer to the last change on a page: a green line when
+// it worked, a red one when it did not.
+templ pageNotice(failed bool, attrs templ.Attributes) {
+	@alert.Alert(alert.Props{Class: utils.IfElse(failed, "border-0 bg-failed/12 text-failed", "border-0 bg-live/12 text-live"), Attributes: attrs}) {
+		if failed {
+			@icon.CircleAlert()
+		} else {
+			@icon.CircleCheck()
+		}
+		@alert.Title(alert.TitleProps{Class: "font-medium"}) {
+			{ children... }
+		}
+	}
+}
+
+// docsLink is the quiet link from a card to its guide.
+templ docsLink(href, label string) {
+	@button.Button(button.Props{Href: href, Variant: button.VariantGhost, Size: button.SizeSm, Class: "text-muted-foreground"}) {
+		@icon.BookOpen(icon.Props{Class: "size-3.5"})
+		{ label }
 	}
 }
 

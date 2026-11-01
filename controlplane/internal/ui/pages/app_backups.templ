@@ -54,19 +54,13 @@ templ AppBackups(view BackupsView) {
 			}
 			<div id="app-backups" class="flex flex-col gap-6">
 				if view.Notice != "" {
-					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-backup-notice": true}}) {
-						@icon.CircleCheck()
-						@alert.Title() {
-							{ view.Notice }
-						}
+					@pageNotice(false, templ.Attributes{"data-backup-notice": true}) {
+						{ view.Notice }
 					}
 				}
 				if view.Error != "" {
-					@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-backup-error": true}}) {
-						@icon.CircleAlert()
-						@alert.Title() {
-							{ view.Error }
-						}
+					@pageNotice(true, templ.Attributes{"data-backup-error": true}) {
+						{ view.Error }
 					}
 				}
 				if view.Storage == nil {

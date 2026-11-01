@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
@@ -34,19 +33,17 @@ templ AppRouting(view RoutingView) {
 	{{ routingPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/routing" }}
 	<div id="app-routing" class="grid items-stretch gap-4 lg:grid-cols-2">
 		if view.Error != "" {
-			@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Class: "lg:col-span-2", Attributes: templ.Attributes{"data-routing-error": true}}) {
-				@icon.CircleAlert()
-				@alert.Title() {
+			<div class="lg:col-span-2">
+				@pageNotice(true, templ.Attributes{"data-routing-error": true}) {
 					{ view.Error }
 				}
-			}
+			</div>
 		} else if view.Notice != "" {
-			@alert.Alert(alert.Props{Class: "lg:col-span-2", Attributes: templ.Attributes{"data-routing-notice": true}}) {
-				@icon.CircleCheck()
-				@alert.Title() {
+			<div class="lg:col-span-2">
+				@pageNotice(false, templ.Attributes{"data-routing-notice": true}) {
 					{ view.Notice }
 				}
-			}
+			</div>
 		}
 		@panel(panelProps{
 			Heading:     "app-domains-heading",
@@ -114,7 +111,7 @@ templ AppRouting(view RoutingView) {
 							@input.Input(input.Props{ID: "protect-password", Name: "password", Type: "password", Placeholder: "8 characters or more", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "minlength": "8"}})
 						}
 					</div>
-					<div>
+					<div class="flex justify-end">
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Attributes: templ.Attributes{"data-protect": true}}) {
 							Protect with password
 						}

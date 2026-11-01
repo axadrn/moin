@@ -4,10 +4,8 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/checkbox"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
@@ -41,19 +39,13 @@ templ AppRepo(view RepoView) {
 	}) {
 		<div class="flex flex-col gap-6">
 			if view.Notice != "" {
-				@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-repo-notice": true}}) {
-					@icon.CircleCheck()
-					@alert.Title() {
-						{ view.Notice }
-					}
+				@pageNotice(false, templ.Attributes{"data-repo-notice": true}) {
+					{ view.Notice }
 				}
 			}
 			if view.Error != "" {
-				@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-repo-error": true}}) {
-					@icon.CircleAlert()
-					@alert.Title() {
-						{ view.Error }
-					}
+				@pageNotice(true, templ.Attributes{"data-repo-error": true}) {
+					{ view.Error }
 				}
 			}
 			if !view.Enabled {

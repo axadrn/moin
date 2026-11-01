@@ -57,21 +57,6 @@ templ accessBadge(label string, on bool, attrs templ.Attributes) {
 	}
 }
 
-// pageNotice is the answer to the last change on a page: a green line when
-// it worked, a red one when it did not.
-templ pageNotice(failed bool, attrs templ.Attributes) {
-	@alert.Alert(alert.Props{Class: utils.IfElse(failed, "border-0 bg-failed/12 text-failed", "border-0 bg-live/12 text-live"), Attributes: attrs}) {
-		if failed {
-			@icon.CircleAlert()
-		} else {
-			@icon.CircleCheck()
-		}
-		@alert.Title(alert.TitleProps{Class: "font-medium"}) {
-			{ children... }
-		}
-	}
-}
-
 // ServerSecurity is the page of one server: its facts, how it is reached,
 // what the agent set up, its rules, the keys all servers share, and the way
 // to remove it.
@@ -80,10 +65,8 @@ templ ServerSecurity(view SecurityView) {
 	{{ securityPath := basePath + "/servers/" + view.Server.ID + "/security" }}
 	@layouts.AppShell(layouts.AppProps{Title: view.Server.Name + " security", Crumbs: []layouts.Crumb{{Label: "Servers", Href: basePath + "/servers"}, {Label: view.Server.Name}, {Label: "Security"}}}) {
 		@panelPage(templ.Attributes{"data-server-security": view.Server.Name}) {
-			@pageHeader(view.Server.Name, "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.") {
-				@serverStatus(view.Server)
-			}
-			<div id="server-security" class="flex max-w-3xl flex-col gap-6">
+			@statusHeader(view.Server.Name, serverStatus(view.Server), "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.")
+			<div id="server-security" class="flex flex-col gap-6">
 				if view.Notice != "" {
 					@pageNotice(false, templ.Attributes{"data-security-notice": true}) {
 						{ view.Notice }
@@ -98,8 +81,7 @@ templ ServerSecurity(view SecurityView) {
 				@securityKeys(view)
 				@serverRules(view.Server)
 			</div>
-			<div class="max-w-3xl">
-				@dangerPanel("Remove this server", "Its agent is disconnected and stops. The apps on the server keep running, but ops no longer reaches them.") {
+			@dangerPanel("Remove this server", "Its agent is disconnected and stops. The apps on the server keep running, but ops no longer reaches them.") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{
@@ -113,7 +95,6 @@ templ ServerSecurity(view SecurityView) {
 					Remove server
 				}
 			}
-			</div>
 		}
 		@securityScript()
 	}
@@ -126,7 +107,7 @@ templ securityKeys(view SecurityView) {
 	@panel(panelProps{Title: "Integrations", Description: "The keys the switches need. One set for all servers of this workspace, stored encrypted."}) {
 		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
 			@csrf.Token()
-			<div class="flex flex-col gap-3">
+			<div class="grid items-start gap-3 lg:grid-cols-2">
 				@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit, Zone Settings Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount+".", "For the tunnel: Tunnel Edit, DNS Edit and Zone Settings Edit.")
 				@keyField("tailscale-key", "tailscale_key", "Tailscale auth key", "tskey-auth-…", view.Integrations.Tailscale, "Stored.", "For SSH on Tailscale: a reusable auth key.")
 			</div>
@@ -230,14 +211,6 @@ templ securityState(view SecurityView, securityPath string) {
 			}
 		}
 	</div>
-}
-
-// docsLink is the quiet link from a card to its guide.
-templ docsLink(href, label string) {
-	@button.Button(button.Props{Href: href, Variant: button.VariantGhost, Size: button.SizeSm, Class: "text-muted-foreground"}) {
-		@icon.BookOpen(icon.Props{Class: "size-3.5"})
-		{ label }
-	}
 }
 
 // removeKeyButton takes one stored key away; the fields only add or replace.
