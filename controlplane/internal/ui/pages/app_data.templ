@@ -43,28 +43,6 @@ type DataView struct {
 	Error string
 }
 
-// appTabs switches between the pages of an app.
-templ appTabs(appName, active string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
-	<nav class="mt-5 flex gap-1 rounded-full bg-card p-1 sm:w-fit" aria-label="App">
-		@appTab(appPath, "Overview", active == "overview")
-		@appTab(appPath+"/data", "Data", active == "data")
-		@appTab(appPath+"/backups", "Backups", active == "backups")
-	</nav>
-}
-
-templ appTab(href, label string, active bool) {
-	<a
-		href={ templ.SafeURL(href) }
-		class={ "flex-1 rounded-full px-5 py-2 text-center text-sm font-semibold transition-colors sm:flex-none",
-			templ.KV("bg-foreground text-background", active),
-			templ.KV("text-muted-foreground hover:text-foreground", !active) }
-		if active {
-			aria-current="page"
-		}
-	>{ label }</a>
-}
-
 templ AppData(view DataView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " data", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Data"}}}) {

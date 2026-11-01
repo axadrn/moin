@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
@@ -12,36 +13,169 @@ import (
 
 // The parts every page of the control panel is built from.
 
-// panelPage is the width and the padding of a page.
+// panelPage is the width and the gutters of a page. It stacks its children
+// 24 px apart, so sections never bring margins of their own.
 templ panelPage(attrs ...templ.Attributes) {
 	{{ var a templ.Attributes }}
 	if len(attrs) > 0 {
 		{{ a = attrs[0] }}
 	}
-	<div class="mx-auto w-full max-w-[80rem] px-4 pt-3 pb-20 sm:px-6 lg:px-10 lg:pt-4" { a... }>
+	<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-6 pb-20 sm:px-6 lg:px-8" { a... }>
 		{ children... }
 	</div>
+}
+
+// pageHeader is the title of a page, its one line, and its actions
+// (children) right aligned, below on phones.
+templ pageHeader(title, description string) {
+	<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+		@pageTitle(title, description)
+		<div class="flex shrink-0 flex-wrap items-center gap-2 empty:hidden">
+			{ children... }
+		</div>
+	</header>
 }
 
 // pageTitle is the headline of a page with one line below it.
 templ pageTitle(title, description string) {
 	<div class="min-w-0">
-		<h1 class="font-display text-[2.5rem] leading-none sm:text-[2.875rem]">{ title }</h1>
+		<h1 class="truncate text-3xl font-bold tracking-tight">{ title }</h1>
 		if description != "" {
-			<p class="mt-2.5 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
+			<p class="mt-1 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
 		}
 	</div>
 }
 
-// sectionTitle heads a block of a page.
+// sectionTitle heads a block of a page outside a card.
 templ sectionTitle(title string) {
-	<h2 class="text-[0.8125rem] font-semibold tracking-tight text-foreground">{ title }</h2>
+	<h2 class="text-base font-semibold">{ title }</h2>
+}
+
+// panelBody is how the body of a panel sits in its card.
+type panelBody string
+
+const (
+	// panelBodyText pads text and forms like the header.
+	panelBodyText panelBody = ""
+	// panelBodyRows leaves 12 px; rows bring px-3, so their text lines up
+	// with the title.
+	panelBodyRows panelBody = "rows"
+	// panelBodyFlush runs logs and tables from edge to edge.
+	panelBodyFlush panelBody = "flush"
+)
+
+// panelProps is a card of a page: its title, one line, one action and how
+// its body sits.
+type panelProps struct {
+	// ID is the card's id; Heading the id of its title, for aria-labelledby.
+	ID          string
+	Heading     string
+	Title       string
+	Description string
+	// Action is the one small control right of the title.
+	Action templ.Component
+	Body   panelBody
+	Class  string
+	Attrs  templ.Attributes
+}
+
+// panel is a card with a title: one topic of a page.
+templ panel(p panelProps) {
+	{{ attrs := templ.Attributes{"role": "region"} }}
+	for k, v := range p.Attrs {
+		{{ attrs[k] = v }}
+	}
+	if p.Heading != "" {
+		{{ attrs["aria-labelledby"] = p.Heading }}
+	}
+	@card.Card(card.Props{ID: p.ID, Class: utils.CN("h-full min-w-0", p.Class), Attributes: attrs}) {
+		@card.Header() {
+			@card.Title(card.TitleProps{ID: p.Heading, Class: "flex min-w-0 items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+				{ p.Title }
+			}
+			if p.Description != "" {
+				@card.Description() {
+					{ p.Description }
+				}
+			}
+			if p.Action != nil {
+				@card.Action(card.ActionProps{Class: "flex items-center gap-1"}) {
+					@p.Action
+				}
+			}
+		}
+		@card.Content(card.ContentProps{Class: panelBodyClass(p.Body)}) {
+			{ children... }
+		}
+	}
+}
+
+func panelBodyClass(body panelBody) string {
+	switch body {
+	case panelBodyRows:
+		return "min-w-0 px-3"
+	case panelBodyFlush:
+		return "flex min-h-0 min-w-0 flex-1 flex-col px-0"
+	}
+	return "min-w-0"
+}
+
+// statGrid is a row of up to four statCards of the same height.
+templ statGrid(attrs ...templ.Attributes) {
+	{{ var a templ.Attributes }}
+	if len(attrs) > 0 {
+		{{ a = attrs[0] }}
+	}
+	<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-4" { a... }>
+		{ children... }
+	</dl>
+}
+
+// statCard is a number with its label and a small note. An empty value
+// shows as a muted dash. Children add lines below the note.
+templ statCard(label, value, note string, attrs ...templ.Attributes) {
+	{{ var a templ.Attributes }}
+	if len(attrs) > 0 {
+		{{ a = attrs[0] }}
+	}
+	@card.Card(card.Props{Class: "h-full min-w-0 gap-1 px-6", Attributes: a}) {
+		<dt class="truncate text-sm text-muted-foreground">{ label }</dt>
+		<dd class="min-w-0">
+			if value != "" {
+				<span class="block truncate text-2xl font-semibold tracking-tight tabular-nums">{ value }</span>
+			} else {
+				<span class="block text-2xl font-semibold tracking-tight text-muted-foreground">—</span>
+			}
+			if note != "" {
+				<span class="mt-1 block truncate text-xs text-muted-foreground">{ note }</span>
+			}
+			{ children... }
+		</dd>
+	}
+}
+
+// dangerPanel is the last card of a page: one destructive action (children)
+// and what it does.
+templ dangerPanel(title, body string) {
+	@card.Card(card.Props{Class: "min-w-0"}) {
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+				{ title }
+			}
+			@card.Description() {
+				{ body }
+			}
+			@card.Action() {
+				{ children... }
+			}
+		}
+	}
 }
 
 // command is a command to copy: a prompt, the command, a copy button.
 templ command(cmd string) {
-	<div class="ops-term group/cmd flex h-11 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1.5 pl-5 text-[0.8125rem]">
-		<span class="ops-term-dim select-none" aria-hidden="true">$</span>
+	<div class="group/cmd flex h-10 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1 pl-4 font-mono text-xs">
+		<span class="text-muted-foreground select-none" aria-hidden="true">$</span>
 		<code class="min-w-0 flex-1 truncate">{ cmd }</code>
 		@copyButton(cmd, "", "Copy command")
 	</div>
@@ -64,16 +198,17 @@ templ copyButton(value, target, label string) {
 	}
 }
 
-// emptyState is a box that says what is missing and the command that adds it.
+// emptyState is a card that says what is missing, what makes it appear
+// and the command that adds it.
 templ emptyState(title, body, cmd string) {
-	@card.Card(card.Props{Class: panelClasses}) {
-		@empty.Empty(empty.Props{Class: "items-start gap-5 rounded-none px-6 py-10 text-left sm:items-center sm:px-10 sm:py-16 sm:text-center"}) {
-			@empty.Header(empty.HeaderProps{Class: "max-w-none items-start gap-1.5 sm:items-center"}) {
-				@empty.Title(empty.TitleProps{Class: "font-sans text-[20px] leading-[1.2] font-bold tracking-[-0.02em]"}) {
+	@card.Card(card.Props{Class: "min-w-0"}) {
+		@empty.Empty(empty.Props{Class: "gap-4 p-6 sm:p-10"}) {
+			@empty.Header(empty.HeaderProps{Class: "max-w-md gap-1"}) {
+				@empty.Title(empty.TitleProps{Class: "text-base font-semibold"}) {
 					{ title }
 				}
 				if body != "" {
-					@empty.Description(empty.DescriptionProps{Class: "max-w-md text-sm text-pretty"}) {
+					@empty.Description(empty.DescriptionProps{Class: "text-sm text-pretty"}) {
 						{ body }
 					}
 				}
@@ -88,8 +223,22 @@ templ emptyState(title, body, cmd string) {
 	}
 }
 
+// emptyHint is the empty state inside a card that already has a title: one
+// muted sentence and the command that fills it.
+templ emptyHint(text, cmd string) {
+	<div class="flex flex-col items-start gap-3">
+		<p class="text-sm text-muted-foreground">{ text }</p>
+		if cmd != "" {
+			<div class="w-full max-w-sm">
+				@command(cmd)
+			</div>
+		}
+	</div>
+}
+
 // panelClasses turn a card into a panel of the control panel: the card's
-// look without its padding, the content brings its own.
+// look without its padding, the content brings its own. Kept for pages not
+// yet on panel; new code uses panel.
 const panelClasses = "block gap-0 py-0 text-base"
 
 // ago is how long ago t was, short: "now", "4m ago", "3h ago", "12d ago".

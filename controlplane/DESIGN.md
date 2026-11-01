@@ -126,6 +126,88 @@ How it works (`internal/ui/layouts/app.templ`, `appBoost`):
 
   Never wait for `DOMContentLoaded` or `load`: they do not fire after a swap.
 
+## Pages
+
+Calm like shadcn's dashboard-01, Linear and Vercel: a clear header, cards on
+the page ground, few lines, the same spacing everywhere. The helpers live in
+`internal/ui/pages/app_parts.templ`; use them, do not rebuild them per page.
+
+Rules every page follows:
+
+- **For dummies.** Clear over clever, uniform everywhere. Someone who opens
+  a page for the first time sees what it is, what state things are in and
+  the one thing to do next. Same thing, same look, on every page.
+- **Five sizes, no others.** No `text-[…px]`, no other `text-*` size on a
+  page:
+
+  | Name | Classes | Use |
+  | --- | --- | --- |
+  | page title | `text-3xl font-bold tracking-tight` | the `h1`, once per page (`pageHeader`) |
+  | number | `text-2xl font-semibold tracking-tight tabular-nums` | the value of a `statCard` |
+  | section title | `text-base font-semibold` | card titles (`panel`), empty state titles |
+  | body | `text-sm` | everything else: rows, forms, descriptions (muted with `text-muted-foreground`) |
+  | small | `text-xs text-muted-foreground` | meta next to a value: times, counts, hints under a field |
+
+- **Weights.** `font-normal` for text, `font-medium` for names in rows and
+  labels, `font-semibold`/`font-bold` only for titles and numbers.
+- **Families.** Geist (`font-sans`) for everything; Geist Mono (`font-mono`)
+  only for code, commands, IDs, keys, commits, paths and log lines.
+- **Same height.** Cards in one row have the same height: the row is a
+  `grid items-stretch`, each card `h-full`.
+- **One left edge.** Page title, tabs, card edges and the text in cards line
+  up: the page gutter, then the card's 24 px. Nothing is indented on its own.
+
+- **Page.** `@panelPage()` sets the width (`max-w-7xl`), the gutters and
+  stacks its children with `gap-6`. Put sections straight into it. Never
+  `mt-*`/`mb-*` between sections, and never inside a reusable panel.
+- **Header.** `@pageHeader(title, description) { actions }`: the page
+  title, one muted body line below it, the actions right
+  aligned at its bottom (below on phones). The description says what the
+  page is for in one sentence. An app page uses
+  `@appHeader(app, tab, description) { actions }`: the name, its status chip,
+  the line, the actions, and the tabs below.
+- **Tabs.** `@appTabs(app, tab)`: a segmented control of plain `<a href>`
+  links, one per page (boosted, see Navigation), the active one
+  `aria-current="page"`. Tabs switch pages, never content in place.
+- **Cards.** Every block is a `card.Card`, one per topic, built with
+  `@panel(panelProps{...}) { body }`: `card.Header` with `card.Title`
+  (section title), an optional `card.Description` (one muted sentence) and at most
+  one `card.Action` (a small button or a "How it works" link). The card's own
+  spacing (24 px) stays; never pass paddings, heights or radii to a card.
+  The body is `Body: ""` (padded text and forms), `panelBodyRows` (row lists:
+  rows bring `px-3`, so their text lines up with the title) or
+  `panelBodyFlush` (logs and tables edge to edge).
+- **Lines.** No `border-b`, `border-t`, `divide-y` or `<hr>` inside a card
+  or between header and body: space separates. Rows are separated by space,
+  a soft `hover:bg-muted/60` and a selected `bg-muted`, `rounded-xl`.
+  Tables use `table` with its own row lines only.
+- **Grid.** Cards side by side sit in `grid items-stretch gap-4`, each
+  `h-full`, so their edges line up. Two equal columns from `lg`
+  (`lg:grid-cols-2`), so the rows of a page share the same edges.
+- **Spacing scale.** 24 px between sections and inside cards, 16 px between
+  cards in a grid, 12 px between fields of a form, 8 px between a control
+  and its button, 4 px between a label and its value.
+- **Numbers.** `@statGrid() { @statCard(label, value, note) }`: up to four
+  cards in a row, the label muted body, the value in the number size, an
+  optional small note. No value is `—`, muted.
+- **Status.** The state of the thing a page or row is about is a chip:
+  `status.Status{Kind, Chip: true}` with the word ("live v4", "deploying
+  v5", "failed"). Inside lists and timelines use the plain
+  `status.Status{Kind}` (symbol and word, no pill). One chip per row.
+- **Actions.** One primary (`button.VariantDefault`) per area: the page
+  header or a card. Others are `VariantSecondary`; small tools in a card
+  (copy, show values, load) are `SizeSm` secondary or ghost icons.
+  Destructive actions (remove an app, a server) live in their own card at the
+  end of the page: `@dangerPanel(title, body) { button }` with a
+  `VariantDestructive` button behind a confirm. No red hover classes on gray
+  buttons.
+- **Empty states.** `@emptyState(title, body, cmd)`: what is missing, what
+  makes it appear, and the command to type. Inside a card that already has a
+  title, one muted sentence plus the command is enough:
+  `@emptyHint(text, cmd)`. Never a blank card.
+- **Text.** Muted for secondary facts, `tabular-nums` for numbers and
+  times. Times are relative ("3h ago") with the full stamp as `title`.
+
 ## Status
 
 Every status shows as a colored dot or symbol plus a word, everywhere:
