@@ -14,7 +14,7 @@ No. Builds run on your server. The control plane stores the source and relays me
 
 ## What happens when a deploy fails?
 
-The previous release starts again and the deploy is marked failed with the reason. Read it with `ops logs`.
+The previous release starts again and the deploy is marked failed with the reason. Its log ends with the last lines of the service that stopped: read it with `ops deploys v4`, for the number of the failed deploy.
 
 ## Where is my data?
 
