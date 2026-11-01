@@ -243,19 +243,23 @@ Decided 2026-11-01, after research:
 ## Renaming later
 
 ops launches as "ops by goilerplate" at ops.goilerplate.com with the
-command `ops`. A distinct name may come later; the command then changes with
-it. The way out stays clean when these hold from the start:
+command `ops`. When a distinct name comes, it is one clean breaking change:
+afterwards nothing carries the old name, no aliases and no mixed paths.
 
-- The product name lives only in `internal/build.Name`. Never write it
-  anywhere else in code; docs and pages use it from there or are updated in
-  one pass.
-- The new command ships next to `ops`, which stays as an alias for about
-  three months: it works and says once that the command has a new name.
-- The control plane answers on the old and the new host until every agent
-  has moved: agents dial the URL they registered with, and a WebSocket does
-  not follow redirects. The web pages and docs redirect.
-- Paths on servers stay as they are: `/etc/ops/rules`, `/var/lib/ops`, the
-  `ops-agent` service, the `ops-` container names. Nobody needs to change
-  them.
-- GitHub redirects a renamed repo, the GitHub Action included. The install
-  script and the CLI downloads keep working at the old URLs.
+- **One release moves everything.** The agent finds the old names on its
+  server and moves itself: `/etc/ops/rules`, `/var/lib/ops`, the `ops-agent`
+  service, the `ops-` containers and the nftables table, then connects to
+  the new host. Nobody logs in to a server by hand.
+- **A short window, about four weeks.** The old host keeps answering only so
+  agents can still fetch that release: a WebSocket does not follow
+  redirects, and an agent that loses its control plane cannot be updated.
+  The web pages and docs redirect.
+- **A migration guide** in the docs and the CHANGELOG: what changes, why (the
+  project grew and has its own name), what users do themselves (the command
+  in scripts and CI, the GitHub Action, `ops login` with the new URL), and
+  what to do if a server did not move.
+- **Then the old name is gone:** host, command, paths and code. The product
+  name lives only in `internal/build.Name`, so the code change is small;
+  the paths on servers move with the release above.
+- GitHub redirects a renamed repo and its Action, which covers links in old
+  posts.
