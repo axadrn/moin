@@ -195,6 +195,7 @@ templ BillingPricingCard(
 						<span class="text-4xl font-bold tracking-tighter tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
 						<span class="text-muted-foreground">/ year</span>
 					</div>
+					<p class="mt-1 text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout.</p>
 				}
 			</div>
 			@card.Description(card.DescriptionProps{Class: "mt-2"}) {
