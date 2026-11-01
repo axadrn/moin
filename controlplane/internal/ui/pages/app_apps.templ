@@ -322,6 +322,17 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 						Remove
 					}
 					@button.Button(button.Props{
+						Variant: button.VariantSecondary,
+						Attributes: templ.Attributes{
+							"hx-post":    basePath + "/apps/" + app.Name + "/apply",
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"title":      "Restart the live release with the env and routing as they are now, without a build",
+						},
+					}) {
+						Apply
+					}
+					@button.Button(button.Props{
 						Variant: button.VariantDefault,
 						Attributes: templ.Attributes{
 							"hx-post":       basePath + "/apps/" + app.Name + "/redeploy",

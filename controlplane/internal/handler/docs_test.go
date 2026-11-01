@@ -88,7 +88,7 @@ func newDocsTestHandler(t *testing.T) *DocsHandler {
 	if err := os.WriteFile(filepath.Join(docsPath, "introduction.md"), []byte(page), 0o644); err != nil {
 		t.Fatalf("write docs page: %v", err)
 	}
-	return NewDocsHandler(service.NewDocsService(contentPath))
+	return NewDocsHandler(service.NewDocsService(contentPath, ""))
 }
 
 func serveDocs(t *testing.T, handler *DocsHandler, action bool, path string) *httptest.ResponseRecorder {

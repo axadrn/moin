@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/netip"
 	"regexp"
 	"slices"
 	"strconv"
@@ -444,10 +445,64 @@ func (s *AppService) applyIfLive(actor Actor, app *model.App) (*model.Deploy, er
 type DomainCheck struct {
 	Domain    string
 	Canonical bool
-	// Address is the server's address the domain should point at.
+	// Address is the server's address the domain should point at: its
+	// IPv4 when known, else its IPv6, or the tunnel.
 	Address string
-	Found   []string
-	Points  bool
+	// IPv4 and IPv6 are the server's addresses, empty when unknown. A
+	// domain points here when it resolves to either.
+	IPv4, IPv6 string
+	// Advice is the DNS record to set, such as "A record to 203.0.113.7,
+	// AAAA record to 2a01:4f8::1".
+	Advice string
+	Found  []string
+	Points bool
+}
+
+// ServerAddresses are the IPv4 and IPv6 of a server: the address its agent
+// connects from and the ones it reports.
+func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
+	for _, text := range append([]string{server.Address}, strings.Fields(server.Addresses)...) {
+		address, err := netip.ParseAddr(text)
+		if err != nil {
+			continue
+		}
+		address = address.Unmap()
+		switch {
+		case address.Is4() && ipv4 == "":
+			ipv4 = address.String()
+		case address.Is6() && ipv6 == "":
+			ipv6 = address.String()
+		}
+	}
+	return ipv4, ipv6
+}
+
+// DNSAdvice is the record a domain needs to point at a server.
+func DNSAdvice(ipv4, ipv6 string) string {
+	switch {
+	case ipv4 != "" && ipv6 != "":
+		return "A record to " + ipv4 + ", AAAA record to " + ipv6
+	case ipv4 != "":
+		return "A record to " + ipv4
+	case ipv6 != "":
+		return "AAAA record to " + ipv6
+	}
+	return "A record to the server's IPv4"
+}
+
+// resolvesTo reports whether one of the addresses found is ipv4 or ipv6.
+func resolvesTo(found []string, ipv4, ipv6 string) bool {
+	for _, text := range found {
+		address, err := netip.ParseAddr(text)
+		if err != nil {
+			continue
+		}
+		address = address.Unmap()
+		if (ipv4 != "" && address.String() == ipv4) || (ipv6 != "" && address == netip.MustParseAddr(ipv6)) {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckDomains looks up every domain of an app and compares it with the
@@ -462,16 +517,22 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 		return nil, err
 	}
 	checks := []DomainCheck{}
+	ipv4, ipv6 := ServerAddresses(*server)
+	address := ipv4
+	if address == "" {
+		address = ipv6
+	}
 	for _, domain := range app.DomainList() {
-		check := DomainCheck{Domain: domain, Canonical: domain == app.Canonical, Address: server.Address}
+		check := DomainCheck{Domain: domain, Canonical: domain == app.Canonical, Address: address, IPv4: ipv4, IPv6: ipv6, Advice: DNSAdvice(ipv4, ipv6)}
 		lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		check.Found, _ = net.DefaultResolver.LookupHost(lookupCtx, domain)
 		cancel()
-		check.Points = server.Address != "" && slices.Contains(check.Found, server.Address)
+		check.Points = resolvesTo(check.Found, ipv4, ipv6)
 		if server.Tunnel {
 			// ops points the domain at the tunnel itself; Cloudflare proxies
 			// it, so it resolves to Cloudflare's addresses.
 			check.Address = server.TunnelID + ".cfargotunnel.com"
+			check.Advice = "CNAME record to " + check.Address
 			check.Points = len(check.Found) > 0
 		}
 		checks = append(checks, check)

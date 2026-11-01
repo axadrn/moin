@@ -98,8 +98,8 @@ func (r *serverRepository) Register(id, agentTokenHash string, hello model.Serve
 
 func (r *serverRepository) UpdateHello(id string, hello model.Server) error {
 	_, err := r.db.Exec(`
-		UPDATE servers SET hostname = $1, os = $2, arch = $3, agent_version = $4, last_seen_at = $5, address = $6, rules = $7 WHERE id = $8
-	`, hello.Hostname, hello.OS, hello.Arch, hello.AgentVersion, hello.LastSeenAt, hello.Address, hello.Rules, id)
+		UPDATE servers SET hostname = $1, os = $2, arch = $3, agent_version = $4, last_seen_at = $5, address = $6, rules = $7, addresses = $8 WHERE id = $9
+	`, hello.Hostname, hello.OS, hello.Arch, hello.AgentVersion, hello.LastSeenAt, hello.Address, hello.Rules, hello.Addresses, id)
 	return err
 }
 

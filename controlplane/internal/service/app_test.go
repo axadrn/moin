@@ -385,3 +385,21 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 		t.Fatalf("redeploy = %+v, %v", redeploy, err)
 	}
 }
+
+func TestServerAddressesAndAdvice(t *testing.T) {
+	// An agent that connects over IPv6 and reports its IPv4 too.
+	server := model.Server{Address: "2a01:4f8::1", Addresses: "203.0.113.7 2a01:4f8::1"}
+	ipv4, ipv6 := ServerAddresses(server)
+	if ipv4 != "203.0.113.7" || ipv6 != "2a01:4f8::1" {
+		t.Fatalf("addresses = %q, %q", ipv4, ipv6)
+	}
+	if advice := DNSAdvice(ipv4, ipv6); advice != "A record to 203.0.113.7, AAAA record to 2a01:4f8::1" {
+		t.Fatalf("advice = %q", advice)
+	}
+	if advice := DNSAdvice("", ipv6); advice != "AAAA record to 2a01:4f8::1" {
+		t.Fatalf("advice without IPv4 = %q", advice)
+	}
+	if !resolvesTo([]string{"203.0.113.7"}, ipv4, ipv6) || !resolvesTo([]string{"2a01:04f8:0::1"}, ipv4, ipv6) || resolvesTo([]string{"198.51.100.1"}, ipv4, ipv6) {
+		t.Fatal("resolvesTo does not accept either address")
+	}
+}

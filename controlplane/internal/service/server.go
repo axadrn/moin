@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/access"
 	"log/slog"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -430,8 +431,23 @@ func helloServer(hello protocol.Hello, seenAt *time.Time) model.Server {
 		Arch:         clip(hello.Arch),
 		AgentVersion: clip(hello.AgentVersion),
 		Rules:        rulesJSON(hello.Rules),
+		Addresses:    reportedAddresses(hello.Addresses),
 		LastSeenAt:   seenAt,
 	}
+}
+
+// reportedAddresses keeps the valid IP addresses an agent reports, at most
+// four, space separated.
+func reportedAddresses(addresses []string) string {
+	var clean []string
+	for _, text := range addresses {
+		address, err := netip.ParseAddr(strings.TrimSpace(text))
+		if err != nil || len(clean) == 4 {
+			continue
+		}
+		clean = append(clean, address.Unmap().String())
+	}
+	return strings.Join(clean, " ")
 }
 
 // rulesJSON keeps what an agent reports about its rules short.

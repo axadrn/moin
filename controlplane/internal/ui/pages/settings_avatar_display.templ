@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"strings"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/avatar"
 )
@@ -14,7 +13,7 @@ templ SettingsAvatarDisplay(user *model.User) {
 					@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: user.Email})
 				}
 				@avatar.Fallback() {
-					{ strings.ToUpper(string(user.Email[0])) }
+					{ user.Initial() }
 				}
 			}
 		</div>

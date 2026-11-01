@@ -12,7 +12,7 @@ On a Mac or Linux:
 curl -fsSL https://ops.example.com/cli.sh | sh
 ```
 
-It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writable. Use the address of your control plane instead of `ops.example.com`.
+It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writable. The commands on these pages name the control plane you read them on.
 
 ## 2. Log in
 

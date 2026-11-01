@@ -122,7 +122,7 @@ func New(cfg *config.Config) (*App, error) {
 		Cfg: cfg, DB: database, AuthService: auth, UserService: userService,
 		EmailService:        email,
 		LegalService:        service.NewLegalService(content.Root, cfg.SupportEmail),
-		DocsService:         service.NewDocsService(content.Root),
+		DocsService:         service.NewDocsService(content.Root, cfg.AppURL),
 		FileService:         fileService,
 		SubscriptionService: subscriptionService,
 		AdminService:        service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails),

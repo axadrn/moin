@@ -19,6 +19,8 @@ import (
 type RoutingView struct {
 	App    model.App
 	Checks []service.DomainCheck
+	// Server runs the app; its addresses tell a new domain where to point.
+	Server model.Server
 	// Notice says what happened to the last change; Error why it failed.
 	Notice string
 	Error  string
@@ -39,7 +41,7 @@ templ AppRouting(view RoutingView) {
 		<div class="grid gap-6 px-5 pt-2 pb-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 			<div class="min-w-0 space-y-3">
 				if len(view.Checks) == 0 {
-					<p class="text-sm text-muted-foreground">No domains yet. Add one and point its A record at { serverAddress(view) }. HTTPS is always on.</p>
+					<p class="text-sm text-muted-foreground">No domains yet. { serverAdvice(view) } HTTPS is always on.</p>
 				} else {
 					<ul class="divide-y rounded-2xl bg-muted/60" role="list">
 						for _, check := range view.Checks {
@@ -58,7 +60,7 @@ templ AppRouting(view RoutingView) {
 											}
 										} else {
 											@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
-												set A record to { orDash(check.Address) }
+												set { check.Advice }
 											}
 										}
 										if !check.Canonical {
@@ -164,18 +166,17 @@ templ AppRouting(view RoutingView) {
 	}
 }
 
-func serverAddress(view RoutingView) string {
-	for _, check := range view.Checks {
-		if check.Address != "" {
-			return check.Address
-		}
+// serverAdvice is the DNS record a new domain needs.
+func serverAdvice(view RoutingView) string {
+	if view.Server.Tunnel {
+		return "Add one; ops points its DNS at the Cloudflare Tunnel."
 	}
-	return "your server"
+	return "Add one and set its " + service.DNSAdvice(service.ServerAddresses(view.Server)) + "."
 }
 
 func orDash(value string) string {
 	if value == "" {
-		return "the server"
+		return "-"
 	}
 	return value
 }

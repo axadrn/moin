@@ -124,6 +124,10 @@ type Hello struct {
 	Hostname        string `json:"hostname"`
 	OS              string `json:"os"`
 	Arch            string `json:"arch"`
+	// Addresses are the server's own public IPv4 and IPv6 addresses, as far
+	// as it knows them. Older agents send none; the control plane then knows
+	// only the address the agent connected from.
+	Addresses []string `json:"addresses,omitempty"`
 	// Rules are the server's own rules for ops, from /etc/ops/rules. Nil
 	// means the server has none and ops may do everything.
 	Rules *Rules `json:"rules,omitempty"`

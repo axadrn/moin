@@ -602,7 +602,7 @@ type DomainChecks struct {
 func (d DomainChecks) Summary() string {
 	parts := []string{}
 	for _, check := range d.Items {
-		state := "does not point at " + check.Address + " yet"
+		state := "does not point at the server yet: set its " + check.Advice
 		if check.Points {
 			state = "points at the server"
 		}

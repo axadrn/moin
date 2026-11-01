@@ -16,7 +16,7 @@ Every server runs one proxy, Traefik, which ops starts with the first domain. It
 | Add | app page, **Domains and access** | `ops domains add blog.de www.blog.de` | `o`, then `blog.de` | `PUT /api/v1/apps/{app}/domains` | `set_domains` |
 | Check DNS | **Domains and access** | `ops domains` | `o` | `GET /api/v1/apps/{app}/domains` | `check_domains` |
 
-3. Point an A record of each domain at the server. ops shows the address and checks the record:
+3. Point each domain at the server: an A record to its IPv4 and, when it has one, an AAAA record to its IPv6. ops shows both addresses, the record to set, and checks it; a domain that resolves to either address points here:
 
 ```text
 DOMAIN        DNS            RESOLVES TO
@@ -56,4 +56,4 @@ Fields in `x-ops` win over the settings in ops.
 
 ## Apply by hand
 
-`ops apply` (or `apply_app` in MCP) restarts the running release with the env vars, domains and password as they are now, without a build.
+**Apply** on the app page, `ops apply` (or `apply_app` in MCP) restarts the running release with the env vars, domains and password as they are now, without a build.

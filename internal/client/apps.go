@@ -280,6 +280,9 @@ type DomainCheck struct {
 	Domain    string   `json:"domain"`
 	Canonical bool     `json:"canonical"`
 	Address   string   `json:"address"`
+	IPv4      string   `json:"ipv4"`
+	IPv6      string   `json:"ipv6"`
+	Advice    string   `json:"advice"`
 	Found     []string `json:"found"`
 	Points    bool     `json:"points"`
 }
