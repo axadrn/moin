@@ -353,6 +353,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case modeConfirmStop:
 		m.mode = modeList
 		if app, ok := m.currentApp(); key == "y" && ok {
+			m.notice = "stopping " + app.Name + "…"
 			return m, m.stop(app.Name)
 		}
 		return m, nil

@@ -11,9 +11,11 @@ ops                    # the live terminal UI
 
 The agent on your server only dials out. Nothing listens for ops.
 
+"ops" is a working name and may change soon. Servers, the CLI and agents will move over by themselves; see the [FAQ](https://ops.goilerplate.com/docs/faq).
+
 ## Documentation
 
-Everything else is in the docs, under `/docs` in the control plane.
+Everything else is in the docs, under `/docs` in the control plane: [ops.goilerplate.com/docs](https://ops.goilerplate.com/docs). They are the source of truth.
 
 ## Build
 
