@@ -505,6 +505,11 @@ func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
 			continue
 		}
 		address = address.Unmap()
+		// An agent on the control plane's own machine or network connects
+		// from a loopback or private address, which no domain can point at.
+		if !address.IsGlobalUnicast() || address.IsPrivate() {
+			continue
+		}
 		switch {
 		case address.Is4() && ipv4 == "":
 			ipv4 = address.String()

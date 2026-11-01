@@ -434,6 +434,14 @@ func TestServerAddressesAndAdvice(t *testing.T) {
 	if advice := DNSAdvice("", ipv6); advice != "AAAA record to 2a01:4f8::1" {
 		t.Fatalf("advice without IPv4 = %q", advice)
 	}
+	// An agent next to the control plane connects from loopback or a
+	// private network; only its reported public address counts.
+	for _, address := range []string{"::1", "172.17.0.1"} {
+		ipv4, ipv6 := ServerAddresses(model.Server{Address: address, Addresses: "203.0.113.7"})
+		if ipv4 != "203.0.113.7" || ipv6 != "" {
+			t.Fatalf("addresses from %s = %q, %q", address, ipv4, ipv6)
+		}
+	}
 	if !resolvesTo([]string{"203.0.113.7"}, ipv4, ipv6) || !resolvesTo([]string{"2a01:04f8:0::1"}, ipv4, ipv6) || resolvesTo([]string{"198.51.100.1"}, ipv4, ipv6) {
 		t.Fatal("resolvesTo does not accept either address")
 	}
