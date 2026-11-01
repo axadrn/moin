@@ -12,9 +12,9 @@ chose this look from three candidates (ops Looks artifact).
 - **Grouped and rounded.** Content sits in grouped lists and cards with big
   radii (see Geometry), soft system grays; separators only between rows
   inside a group.
-- **Large titles.** Page titles big and heavy (`font-display`: Geist 800,
-  tracking -0.03em), panel titles 20 px bold, like iOS large titles and
-  section headers.
+- **Clear titles.** Sizes and weights come only from the five-size scale in
+  "Pages": page title, number, section title, body, small. The landing page
+  may use its display size for the hero; the control panel never does.
 - **Dark:** pure black ground (#000), grouped surfaces #1c1c1e, controls
   #2c2c2e, text white, secondary #98989f. **Light:** ground #f2f2f7,
   surfaces white, controls #e5e5ea, text black, secondary #6e6e73. Both are

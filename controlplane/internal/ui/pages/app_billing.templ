@@ -22,7 +22,9 @@ templ Billing() {
 		@panelPage() {
 			@pageHeader("Billing", "The plan of "+workspace.Name+", the next invoice and the payment details.")
 			@billingCurrent(subscription, basePath)
-			if !subscription.HasProviderSubscription() {
+			// The offer shows while there is something to buy: in the trial
+			// and when the workspace is read-only, not on a plan it has.
+			if billingOffers(subscription) {
 				for _, plan := range access.Product.Plans {
 					if plan.Purchasable {
 						@billingOffer(plan, basePath)
@@ -191,6 +193,16 @@ templ planBenefits(plan access.Plan) {
 			</li>
 		}
 	</ul>
+}
+
+// billingOffers says whether to show the plan to buy: not while a paid,
+// granted or provider subscription gives the workspace its plan.
+func billingOffers(subscription *model.Subscription) bool {
+	if subscription.HasProviderSubscription() {
+		return false
+	}
+	current := subscription.Access()
+	return current.State == access.StateTrial || !current.Has(access.FeatureChanges)
 }
 
 func planName(planID string) string {
