@@ -44,6 +44,10 @@ Yes. Every action is an [MCP tool](/docs/guides/mcp).
 
 Yes, all of it, under AGPL-3.0 at [github.com/axadrn/ops](https://github.com/axadrn/ops): the `ops` binary (CLI, terminal UI, agent) and the control plane. We host the control plane for you, and you may host it yourself.
 
+## Why AGPL, and can I contribute?
+
+AGPL keeps ops open: whoever runs a changed ops as a service has to share the changes. Pull requests are welcome. On your first one a bot asks you to agree once to the [Contributor License Agreement](https://github.com/axadrn/ops/blob/main/CLA.md): your contribution comes in under Apache 2.0, which keeps the license of ops flexible, and you keep your copyright. See [CONTRIBUTING.md](https://github.com/axadrn/ops/blob/main/CONTRIBUTING.md).
+
 ## Can my team work on it too?
 
 Yes, and it costs nothing extra. Invite them from the **Team** page or with `ops team invite`; everyone works on the same servers and apps, and the [activity](/docs/guides/team) shows who deployed or changed what.

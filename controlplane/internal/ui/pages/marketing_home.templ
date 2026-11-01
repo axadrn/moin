@@ -64,8 +64,7 @@ templ HomeHero() {
 	<section class="pt-16 sm:pt-28">
 		<div class={ homeWrap, "grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
 			<div>
-				@homeGoilerplatePill()
-				<h1 class={ homeDisplay, "mt-8 text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
+				<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
 					<span class="block">Deploy.</span>
 					<span class="block">Back up.</span>
 					<span class="block">Edit live.</span>
@@ -86,18 +85,6 @@ templ HomeHero() {
 			@homeStage()
 		</div>
 	</section>
-}
-
-// homeGoilerplatePill is the small news above the headline: goilerplate
-// is free and open source now.
-templ homeGoilerplatePill() {
-	@badge.Badge(badge.Props{Href: blocks.GoilerplateURL, Variant: badge.VariantOutline, Class: "h-8 gap-2 pl-1 text-[13px]"}) {
-		@badge.Badge(badge.Props{Class: "h-6 px-2.5"}) {
-			New
-		}
-		<span>goilerplate is now free and open source</span>
-		@icon.ArrowRight(icon.Props{Class: "text-muted-foreground", Attributes: templ.Attributes{"data-icon": "inline-end"}})
-	}
 }
 
 // homeTerminal is a real session: a deploy that snapshots the database
@@ -636,6 +623,9 @@ templ HomeFAQ() {
 				}
 				@homeQuestion("Is it open source?") {
 					Yes, all of it: the agent, the CLI, the terminal UI and the control plane, under AGPL-3.0. Read exactly what runs on your server and what we run. Self-host it for free, or let us run it for you.
+				}
+				@homeQuestion("Why AGPL, and can I contribute?") {
+					AGPL keeps ops open: whoever runs a changed ops as a service has to share the changes. Pull requests are welcome. On your first one a bot asks you to agree once that it comes in under Apache 2.0, which keeps the license of ops flexible. You keep your copyright.
 				}
 				@homeQuestion("Can my AI agent use it?") {
 					Yes. ops has an MCP server: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
