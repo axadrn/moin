@@ -36,7 +36,6 @@ var Product = Catalog{
 				"Your whole team, no seat price",
 				"Continuous backups with daily restore drills",
 				"Data browser, SQL and the GitHub App",
-				"Yearly: save $99, 3+ months free",
 			},
 			Purchasable: true,
 		},

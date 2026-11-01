@@ -42,7 +42,7 @@ templ billingCurrent(subscription *model.Subscription, basePath string) {
 			<div class="min-w-0">
 				<p class="text-xs text-muted-foreground">Current plan</p>
 				<div class="mt-1.5 flex flex-wrap items-center gap-2.5">
-					<h2 class="font-display text-2xl leading-none">{ planName(subscription.PlanID) }</h2>
+					<h2 class="text-2xl font-semibold tracking-tight">{ planName(subscription.PlanID) }</h2>
 					@billingStatus(subscription)
 				</div>
 				<p class="mt-2 text-sm text-muted-foreground">
@@ -115,7 +115,7 @@ templ billingOffer(plan access.Plan, basePath string) {
 	@card.Card(card.Props{Class: "pricing-card gap-0 py-0 overflow-hidden border-brand/40"}) {
 		<div class="p-6 sm:p-8">
 			<div class="flex flex-wrap items-center justify-between gap-4">
-				<h2 class="font-display text-[1.75rem] leading-none">{ plan.Name }</h2>
+				<h2 class="text-2xl font-semibold tracking-tight">{ plan.Name }</h2>
 				@tabs.Tabs(tabs.Props{DefaultValue: "yearly"}) {
 					@tabs.List() {
 						@tabs.Trigger(tabs.TriggerProps{Value: "yearly", Attributes: templ.Attributes{"data-billing-interval": "yearly"}}) {
@@ -137,13 +137,13 @@ templ billingOffer(plan access.Plan, basePath string) {
 					}
 				</div>
 				<p class="mt-4 flex flex-wrap items-baseline gap-x-2">
-					<span class="font-display text-5xl leading-none tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
+					<span class="text-3xl font-bold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
 					<span class="text-muted-foreground">a year, per workspace</span>
 				</p>
 			</div>
 			<div class="price-monthly mt-7 hidden">
 				<p class="flex flex-wrap items-baseline gap-x-2">
-					<span class="font-display text-5xl leading-none tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+					<span class="text-3xl font-bold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
 					<span class="text-muted-foreground">a month, per workspace</span>
 				</p>
 				<p class="mt-2 text-sm text-muted-foreground">Yearly saves $99.</p>
