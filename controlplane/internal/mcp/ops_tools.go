@@ -236,13 +236,18 @@ type DatabaseInput struct {
 	Database string `json:"database,omitempty" jsonschema:"the database's path in the container; empty for the first one"`
 }
 
-// SQLInput is the input of query_database and execute_sql.
+// SQLInput is the input of execute_sql.
 type SQLInput struct {
 	App      string `json:"app" jsonschema:"the app name or ID"`
 	Database string `json:"database,omitempty" jsonschema:"the database's path in the container; empty for the first one"`
 	SQL      string `json:"sql" jsonschema:"one SQL statement; use ? for parameters"`
 	Params   []any  `json:"params,omitempty" jsonschema:"values for the ? placeholders"`
-	Limit    int    `json:"limit,omitempty" jsonschema:"query_database only: rows to return, 1 to 1000, default 100"`
+}
+
+// QueryInput is the input of query_database.
+type QueryInput struct {
+	SQLInput
+	Limit int `json:"limit,omitempty" jsonschema:"rows to return, 1 to 1000, default 100"`
 }
 
 // Tables is the output of list_tables.
@@ -783,7 +788,7 @@ func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseI
 	return Tables{tables}, err
 }
 
-func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input SQLInput) (QueryResult, error) {
+func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input QueryInput) (QueryResult, error) {
 	result, err := t.services.Apps.Query(ctx, caller.actor(), input.App, input.Database, input.SQL, input.Params, false, input.Limit)
 	return QueryResult{result}, err
 }

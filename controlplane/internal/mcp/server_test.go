@@ -347,3 +347,37 @@ func TestOpsToolsActAsMembersAndStopAfterRemoval(t *testing.T) {
 	}
 	toolError(t, call(t, member, "list_servers", nil), "not_found")
 }
+
+func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "sql")
+	token, _ := createToken(t, env, owner)
+	session := connectMemory(t, env.server, owner, token)
+
+	result, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := map[string]map[string]any{}
+	for _, tool := range result.Tools {
+		schema, _ := json.Marshal(tool.InputSchema)
+		var decoded struct {
+			Properties map[string]any `json:"properties"`
+		}
+		_ = json.Unmarshal(schema, &decoded)
+		properties[tool.Name] = decoded.Properties
+	}
+	for _, name := range []string{"query_database", "execute_sql"} {
+		for _, field := range []string{"app", "database", "sql", "params"} {
+			if _, ok := properties[name][field]; !ok {
+				t.Errorf("%s has no %s", name, field)
+			}
+		}
+	}
+	if _, ok := properties["query_database"]["limit"]; !ok {
+		t.Error("query_database has no limit")
+	}
+	if _, ok := properties["execute_sql"]["limit"]; ok {
+		t.Error("execute_sql takes a limit")
+	}
+}
