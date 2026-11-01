@@ -12,15 +12,16 @@ ops backs up every SQLite database of your apps into your own S3-compatible buck
 
 Everything runs inside the agent on your server. Your data goes from your server to your bucket and never through ops.
 
-| Action | Web | CLI | TUI | MCP |
-| --- | --- | --- | --- | --- |
-| Set the bucket | app page, **Backups** | `ops backups bucket set …` | – | `set_backup_storage` |
-| List backups | **Backups** | `ops backups` | `b` | `get_backups` |
-| Back up now | **Back up now** | `ops backup` | `b`, then `enter` | `back_up_app` |
-| Restore a snapshot | **Restore** on a snapshot | `ops restore <snapshot>` | `b`, type the ID, `enter`, `y` | `restore_app` |
-| Restore a point in time | **Back to a point in time** | `ops restore --at "2026-10-31 14:01"` | `b`, type `14:01`, `enter`, `y` | `restore_app` with `at` |
-| Snapshot before changes | **Before every change** | `ops backups auto on\|off` | – | `set_backup_settings` |
-| Stop backups | **Stop backups** | `ops backups bucket rm` | – | `remove_backup_storage` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Set the bucket | **Bucket** in the sidebar | `ops backups bucket set …` | settings tab, **Bucket**, `enter` | `PUT /api/v1/backup-storage` | `set_backup_storage` |
+| See the bucket | **Bucket** | `ops backups bucket` | settings tab | `GET /api/v1/backup-storage` | `get_backup_storage` |
+| List backups | app page, **Backups** | `ops backups` | `b` | `GET /api/v1/apps/{app}/backups` | `get_backups` |
+| Back up now | **Back up now** | `ops backup` | `b`, then `enter` | `POST /api/v1/apps/{app}/backups` | `back_up_app` |
+| Restore a snapshot | **Restore** on a snapshot | `ops restore <snapshot>` | `b`, type the ID, `enter`, `y` | `POST /api/v1/apps/{app}/restore` | `restore_app` |
+| Restore a point in time | **Back to a point in time** | `ops restore --at "2026-10-31 14:01"` | `b`, type `14:01`, `enter`, `y` | `POST /api/v1/apps/{app}/restore` with `at` | `restore_app` with `at` |
+| Snapshot before changes | **Before every change** | `ops backups auto on\|off` | `b`, then `on` or `off` | `PUT /api/v1/apps/{app}/backups/settings` | `set_backup_settings` |
+| Stop backups | **Bucket**, **Stop backups** | `ops backups bucket rm` | settings tab, **Bucket**, `x`, `y` | `DELETE /api/v1/backup-storage` | `remove_backup_storage` |
 
 ## Set up the bucket
 

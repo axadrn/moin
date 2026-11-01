@@ -8,15 +8,15 @@ ops reads your app's SQLite database live from its server. You browse tables, ed
 
 ops finds the database on its own: every SQLite file on a volume of the live release, up to three folders deep. Name one with `x-ops.database` when there are several.
 
-| Action | Web | CLI | TUI | MCP |
-| --- | --- | --- | --- | --- |
-| Tables and row counts | app page, **Data** | `ops db` | `s` | `list_tables` |
-| Browse rows | click a table | `ops db rows orders` | `s`, then `SELECT …` | `query_database` |
-| Edit a cell | click it, type, `Enter` | `ops sql --write "UPDATE …"` | `s`, then `UPDATE …`, `y` | `execute_sql` |
-| Add a row | **+ Row** | `ops sql --write "INSERT …"` | `s`, then `INSERT …`, `y` | `execute_sql` |
-| Delete a row | trash icon on the row | `ops sql --write "DELETE …"` | `s`, then `DELETE …`, `y` | `execute_sql` |
-| Schema | **Schema** | `ops db schema [table]` | `s`, then `SELECT sql FROM sqlite_schema` | `list_tables` |
-| Run SQL | **SQL** box | `ops sql "…"` | `s` | `query_database` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Tables and row counts | app page, **Data** | `ops db` | `s` | `GET /api/v1/apps/{app}/databases/tables` | `list_tables` |
+| Browse rows | click a table | `ops db rows orders` | `s`, then `SELECT …` | `GET /api/v1/apps/{app}/databases/rows` | `query_database` |
+| Edit a cell | click it, type, `Enter` | `ops sql --write "UPDATE …"` | `s`, then `UPDATE …`, `y` | `PATCH /api/v1/apps/{app}/databases/rows` | `execute_sql` |
+| Add a row | **+ Row** | `ops sql --write "INSERT …"` | `s`, then `INSERT …`, `y` | `POST /api/v1/apps/{app}/databases/rows` | `execute_sql` |
+| Delete a row | trash icon on the row | `ops sql --write "DELETE …"` | `s`, then `DELETE …`, `y` | `DELETE /api/v1/apps/{app}/databases/rows` | `execute_sql` |
+| Schema | **Schema** | `ops db schema [table]` | `s`, then `SELECT sql FROM sqlite_schema` | `GET /api/v1/apps/{app}/databases/tables` | `list_tables` |
+| Run SQL | **SQL** box | `ops sql "…"` | `s` | `POST /api/v1/apps/{app}/databases/query` | `query_database` |
 
 ## Reads cannot change anything
 

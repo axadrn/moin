@@ -6,9 +6,9 @@ order: 11
 
 The agent reads the last lines of every container of an app with `docker compose logs`.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| app page, **Load logs** | `ops logs [--tail 200] [app]` | `l` | `get_logs` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| app page, **Load logs** | `ops logs [--tail 200] [app]` | `l` | `GET /api/v1/apps/{app}/logs` | `get_logs` |
 
 Each line starts with the service and a timestamp:
 

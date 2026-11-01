@@ -39,39 +39,43 @@ A bind mount whose path the repo does not bring, like `./data`, moves to `/var/l
 
 ## Follow a deploy
 
-| | Web | CLI | TUI | MCP |
-| --- | --- | --- | --- | --- |
-| Deploy the current repo | – | `ops deploy` | `d` | – |
-| Live log | app page, **Deploy log** | printed by `ops deploy` | output panel | `get_deploy`, poll it |
-| Deploy history | app page, **Deploys** | – | `enter` on the app | `get_app` |
+| | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Create an app | **Apps**, **Add app** | `ops apps add --server web-1 blog`, or the first `ops deploy` | `a` on the apps tab | `POST /api/v1/apps` | `create_app` |
+| Deploy the current repo | – | `ops deploy` | `d` | `POST /api/v1/apps/{app}/uploads`, then `POST /api/v1/apps/{app}/deploys` | – |
+| Live log | app page, **Deploy log** | printed by `ops deploy` | output panel | `GET /api/v1/apps/{app}/deploys/{number}/events` | `get_deploy`, poll it |
+| Deploy history | app page, **Deploys** | `ops deploys [app]` | `enter` on the app | `GET /api/v1/apps/{app}` | `get_app` |
+| Log of one deploy | click its row in **Deploys** | – | pick it with `↑` `↓`, then `enter` | `GET /api/v1/apps/{app}/deploys/{number}` | `get_deploy` |
 
-The web page follows every new deploy by itself, also the ones started from the CLI.
+The web page follows every new deploy by itself, also the ones started from the CLI. Every deploy keeps its log, also a failed one, so you can read later what went wrong.
 
 ## Redeploy
 
 Builds the newest source again, from the copy the server kept, with the env vars as they are now. Nothing is uploaded. Use it after changing env vars.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| **Redeploy** | `ops redeploy [app]` | `R` | `redeploy_app` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Redeploy** | `ops redeploy [app]` | `R` | `POST /api/v1/apps/{app}/redeploy` | `redeploy_app` |
+
+An app deployed from an image runs the newest image again instead.
 
 ## Roll back
 
 Starts the images of an earlier successful deploy again, with the env vars that deploy had. It is a new deploy, for example v4 with the note *rollback to v1*.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| **Roll back** on a deploy | `ops rollback` or `ops rollback v3` | `r`, then `y` | `rollback_app` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Roll back** on a deploy | `ops rollback` or `ops rollback v3` | `r`, then `y`; in the open app pick a deploy with `↑` `↓` first | `POST /api/v1/apps/{app}/rollback` with `{"number": 3}` | `rollback_app` |
 
-Without a number it picks the successful deploy before the live one.
+Without a number, or without a pick in the terminal UI, it picks the successful deploy before the live one.
 
 ## Remove an app
 
 Stops it and removes its containers and images. Volumes and data stay on the server.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| **Remove** | `ops apps rm <app>` | `x`, then `y` | `remove_app` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Remove** | `ops apps rm <app>` | `x`, then `y` | `DELETE /api/v1/apps/{app}` | `remove_app` |
 
 ## Push to deploy with GitHub Actions
 

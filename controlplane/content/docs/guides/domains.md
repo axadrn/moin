@@ -11,9 +11,10 @@ Every server runs one proxy, Traefik, which ops starts with the first domain. It
 1. Buy the domain anywhere, for example at Cloudflare or Porkbun.
 2. Add it to the app:
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| app page, **Domains and access** | `ops domains add blog.de www.blog.de` | `o`, then `blog.de` | `set_domains` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Add | app page, **Domains and access** | `ops domains add blog.de www.blog.de` | `o`, then `blog.de` | `PUT /api/v1/apps/{app}/domains` | `set_domains` |
+| Check DNS | **Domains and access** | `ops domains` | `o` | `GET /api/v1/apps/{app}/domains` | `check_domains` |
 
 3. Point an A record of each domain at the server. ops shows the address and checks the record:
 
@@ -29,18 +30,18 @@ Changes apply right away: ops restarts the running release with the new routing,
 
 Pick one domain as canonical; the others redirect to it with a permanent redirect.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| **Make canonical** on a domain | `ops domains canonical blog.de` (or `none`) | `o`, then `=blog.de` | `set_domains` with `canonical` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Make canonical** on a domain | `ops domains canonical blog.de` (or `none`) | `o`, then `=blog.de` | `PUT /api/v1/apps/{app}/domains` with `canonical` | `set_domains` with `canonical` |
 
 ## Protect with a password
 
 Put a username and password in front of an app, for a staging app or a preview. Only a bcrypt hash is stored.
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| **Password**, then **Protect** | `ops protect --user ops`, password on stdin | `p`, then `user:password` | `set_protection` |
-| **Remove password** | `ops protect off` | `p`, then `off` | `remove_protection` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Password**, then **Protect** | `ops protect --user ops`, password on stdin | `p`, then `user:password` | `PUT /api/v1/apps/{app}/protection` | `set_protection` |
+| **Remove password** | `ops protect off` | `p`, then `off` | `DELETE /api/v1/apps/{app}/protection` | `remove_protection` |
 
 ## In the repo
 

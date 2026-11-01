@@ -21,13 +21,23 @@ You get a workspace when you sign up. Make more from the workspace switcher at t
 | Invite people, rename the workspace | | ✓ | ✓ |
 | Change roles, billing, delete the workspace | | | ✓ |
 
-## Invite someone
+## Invite someone and manage the team
 
-| Web | CLI | MCP |
-| --- | --- | --- |
-| **Team**, then **Send invite** | `ops team invite ada@example.com [--admin]` | `invite_member` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| See members and invitations | **Team** | `ops team` | – | `GET /api/v1/workspaces/{slug}` | `get_workspace` |
+| Invite | **Team**, then **Send invite** | `ops team invite ada@example.com [--admin]` | – | `POST /api/v1/workspaces/{slug}/invitations` | `invite_member` |
+| Send an invitation again | **Resend** under **Pending invitations** | – | – | `POST …/invitations/{id}/resend` | – |
+| Revoke an invitation | **Revoke** under **Pending invitations** | – | – | `DELETE …/invitations/{id}` | – |
+| Rename the workspace | **Team**, **General**, **Save** | – | – | `PATCH /api/v1/workspaces/{slug}/name` | `rename_workspace` |
+| Change a role | **Role** on a member, **Save** | web only | web only | session only | web only |
+| Remove a member | **Remove** on a member | web only | web only | session only | web only |
+| Leave a workspace | **Leave workspace** | web only | web only | session only | web only |
+| Delete a workspace | **Delete workspace** | web only | web only | session only | web only |
 
-The invitation is an email that works for seven days. `ops team` lists the members and the invitations still open. To take someone out, remove them on the **Team** page; their tokens stop reaching the workspace right away.
+The invitation is an email that works for seven days. When someone is removed, their tokens stop reaching the workspace right away.
+
+Changing roles, removing people, leaving and deleting a workspace work only in the web, signed in: an API token, and so the CLI, the terminal UI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
 
 ## Tokens and workspaces
 
@@ -41,7 +51,7 @@ ops login --token pat_…
 
 Every change goes into the activity of the workspace: who did it, when, and how it came in.
 
-| Web | CLI | Terminal UI | API | MCP |
+| Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- |
 | **Activity**, or `g` then `y` | `ops activity [--limit 30]` | the `activity` tab | `GET /api/v1/activity` | `list_activity` |
 

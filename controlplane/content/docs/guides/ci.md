@@ -18,17 +18,19 @@ An image deploy keeps the compose file of the running release and only swaps the
 
 Public images pull without one. For GitHub Container Registry, create a token with `read:packages`:
 
-| Web | CLI | MCP |
-| --- | --- | --- |
-| **Settings → Registries** | `ops registry set ghcr.io <user>`, then the token | `set_registry` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| List logins | **Settings → Registries** | `ops registry` | settings tab | `GET /api/v1/registries` | `list_registries` |
+| Save a login | **Settings → Registries** | `ops registry set ghcr.io <user>`, then the token | settings tab, `a` | `PUT /api/v1/registries/{host}` | `set_registry` |
+| Remove a login | **Remove** on the login | `ops registry rm ghcr.io` | settings tab, `x`, `y` | `DELETE /api/v1/registries/{host}` | `remove_registry` |
 
 The token is stored encrypted. The agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
 
 ## 2. A deploy hook
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| app page, **Deploy hook** | `ops hook [app]` | `h` | `create_deploy_hook` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| app page, **Deploy hook** | `ops hook [app]` | `h` | `POST /api/v1/apps/{app}/hook` | `create_deploy_hook` |
 
 It prints a secret URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. Creating a new one makes the old one stop working.
 
@@ -81,8 +83,8 @@ The step waits until the deploy is live and fails the job when the deploy fails.
 
 ## Deploy an image by hand
 
-| Web | CLI | TUI | MCP |
-| --- | --- | --- | --- |
-| app page, **Deploy image** | `ops deploy --image ghcr.io/me/blog:3f2a9c1 [app]` | `i` | `deploy_image` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| app page, **Deploy image** | `ops deploy --image ghcr.io/me/blog:3f2a9c1 [app]` | `i` | `POST /api/v1/apps/{app}/deploys` with `{"image": …}` | `deploy_image` |
 
 A redeploy of an image deploy pulls the same image again.

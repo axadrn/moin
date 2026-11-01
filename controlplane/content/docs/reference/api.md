@@ -8,10 +8,27 @@ The web UI, the CLI and the terminal UI all use this API. Its OpenAPI 3.1 docume
 
 Send a personal API token as `Authorization: Bearer pat_…`. The token belongs to one workspace, and every endpoint below works in it. Errors are `{"error":{"code","message","fields"}}` with stable codes such as `server_offline`, `deploy_running` and `no_rollback`.
 
+Endpoints marked *session* answer only a signed-in browser, never a token, so a leaked token cannot make new tokens, change roles, remove people or delete a workspace. Their sign-in and two-step flows live under `/api/v1/auth`; `GET /api/v1/csrf` gives the CSRF token a session sends with every change.
+
 | Endpoint | Does |
 | --- | --- |
+| `GET /api/v1/account` · `PATCH /account/name` | the signed-in account; its name |
+| `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
+| `POST` · `DELETE /api/v1/account/avatar` | the profile picture |
+| `GET` · `POST /api/v1/account/tokens` · `DELETE /{id}` | personal API tokens (*session*) |
+| `GET /api/v1/account/sessions` · `DELETE /{id}` · `DELETE` | signed-in browsers; signs one or all others out (*session*) |
 | `GET /api/v1/activity` | who did what in the workspace, newest first, with `next_cursor` |
-| `GET /api/v1/workspaces/{slug}` · `POST /{slug}/invitations` | the team and its invitations |
+| `GET /api/v1/workspaces` · `POST` | the workspaces you are in; a new one (*session*) |
+| `GET /api/v1/workspaces/{slug}` | the team: members, roles and open invitations |
+| `PATCH /api/v1/workspaces/{slug}/name` | renames the workspace (admin) |
+| `DELETE /api/v1/workspaces/{slug}` | deletes the workspace (owner, *session*) |
+| `POST /api/v1/workspaces/{slug}/invitations` | invites someone by email (admin) |
+| `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /{id}` | sends an invitation again; revokes it (admin) |
+| `PATCH /api/v1/workspaces/{slug}/members/{id}/role` | changes a role (owner, *session*) |
+| `DELETE /api/v1/workspaces/{slug}/members/{id}` | removes a member (*session*) |
+| `POST /api/v1/workspaces/{slug}/leave` | leaves the workspace (*session*) |
+| `GET /api/v1/workspaces/{slug}/billing` | the plan and the subscription, where billing is on |
+| `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | a checkout link; the billing portal (owner, *session*) |
 | `GET /api/v1/servers` · `POST` · `DELETE /{id}` | servers, with their `rules` from `/etc/ops/rules` |
 | `GET /api/v1/servers/events` | server list as server-sent events |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
@@ -19,11 +36,11 @@ Send a personal API token as `Authorization: Bearer pat_…`. The token belongs 
 | `POST /api/v1/apps/{app}/uploads` | a link that takes the source straight into your bucket |
 | `POST /api/v1/apps/{app}/deploys` | deploys an upload `{"upload": "…", "sha256": "…"}`, an image `{"image": "…"}` built in CI, or `{"ref": "main"}` from GitHub |
 | `POST /api/v1/apps/{app}/hook` | a new deploy hook URL, shown once |
-| `POST /webhooks/deploy/{token}` | the deploy hook CI calls with `?image=` |
+| `POST /webhooks/deploy/{token}` | the deploy hook CI calls with `?image=` or the JSON body `{"image": "…"}` |
 | `GET /api/v1/registries` · `PUT` · `DELETE /{host}` | registry logins for private images |
 | `GET /api/v1/apps/{app}/deploys/{number}` | a deploy with its log |
 | `GET /api/v1/apps/{app}/deploys/{number}/events` | a deploy as server-sent events |
-| `POST /api/v1/apps/{app}/redeploy` | builds the newest source again |
+| `POST /api/v1/apps/{app}/redeploy` | builds the newest source again, or runs the newest image again |
 | `POST /api/v1/apps/{app}/rollback` | starts an earlier release again |
 | `GET /api/v1/apps/{app}/logs` | container logs |
 | `PUT /api/v1/servers/{id}/security` | Cloudflare Tunnel, SSH on Tailscale, firewall |

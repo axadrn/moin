@@ -31,9 +31,9 @@ ops keeps the bucket's secret key encrypted and uses it for one thing: to sign l
 
 Any S3-compatible store works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in. Create a bucket and a key that may read, write and delete in it, then:
 
-| Web | CLI | MCP |
-| --- | --- | --- |
-| **Bucket** in the sidebar | `ops backups bucket set --endpoint … --bucket … --access-key …`, secret key on stdin | `set_backup_storage` |
+| Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- |
+| **Bucket** in the sidebar | `ops backups bucket set --endpoint … --bucket … --access-key …`, secret key on stdin | settings tab, **Bucket**, `enter` | `PUT /api/v1/backup-storage` | `set_backup_storage` |
 
 ops writes and deletes a test file first, so a wrong key fails right away. One bucket serves all your servers and apps:
 

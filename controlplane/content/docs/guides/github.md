@@ -6,15 +6,18 @@ order: 9
 
 Connect GitHub once, link a repo to an app, and ops deploys from GitHub: any branch, tag or commit from the web, the CLI, the terminal UI or an agent, with no checkout on your machine. With auto deploy every push to the branch deploys. ops writes how it went back to GitHub as the commit status **ops/deploy**, so the pull request shows a green check when the deploy is live.
 
-| Action | Web | CLI | TUI | MCP |
-| --- | --- | --- | --- | --- |
-| Connect GitHub | app page, **Connect GitHub** | `ops github` prints the link | – | `get_github` |
-| List repos | **Repository** | `ops github repos` | – | `list_repos` |
-| Link a repo | **Repository**, choose it, **Link** | `ops link me/blog [--branch main]` | – | `link_repo` |
-| Deploy the branch | **Deploy** | `ops deploy --ref main` | `g` | `deploy_ref` |
-| Deploy a tag or commit | type it, **Deploy** | `ops deploy --ref v1.4.0` | – | `deploy_ref` with `ref` |
-| Deploy every push | **Deploy every push** | `ops link me/blog` (on by default), `--auto=false` turns it off | – | `link_repo` with `auto_deploy` |
-| Unlink | **Unlink** | `ops unlink` | – | `unlink_repo` |
+| Action | Web | CLI | TUI | API | MCP |
+| --- | --- | --- | --- | --- | --- |
+| Connect GitHub | app page, **Connect GitHub** | `ops github` prints the link | settings tab, **GitHub**, `enter` shows the link | `GET /api/v1/github` | `get_github` |
+| See where it is installed | **Repository** | `ops github` | settings tab, **GitHub** | `GET /api/v1/github` | `get_github` |
+| List repos | **Repository** | `ops github repos` | `g` | `GET /api/v1/github/repos` | `list_repos` |
+| Link a repo | **Repository**, choose it, **Link** | `ops link me/blog [--branch main]` | `g`, then `link me/blog [main]` | `PUT /api/v1/apps/{app}/repo` | `link_repo` |
+| Deploy the linked branch | **Deploy** | `ops deploy --ref main` | `g`, then `enter` | `POST /api/v1/apps/{app}/deploys` with `{"ref": ""}` | `deploy_ref` |
+| Deploy a branch, tag or commit | type it, **Deploy** | `ops deploy --ref v1.4.0` | `g`, then type it, `enter` | `POST /api/v1/apps/{app}/deploys` with `{"ref": "v1.4.0"}` | `deploy_ref` with `ref` |
+| Deploy every push | **Deploy every push** | `ops link me/blog` (on by default), `--auto=false` turns it off | `g`, then `link me/blog` (on), `link me/blog main manual` (off) | `PUT /api/v1/apps/{app}/repo` with `auto_deploy` | `link_repo` with `auto_deploy` |
+| Unlink | **Unlink** | `ops unlink` | `g`, then `unlink` | `DELETE /api/v1/apps/{app}/repo` | `unlink_repo` |
+
+In the terminal UI, `g` on an app opens the GitHub panel: the repo the app follows and the repos ops may read. `enter` on its own deploys the linked branch; type a branch, tag or commit to deploy that instead.
 
 ## Connect
 
