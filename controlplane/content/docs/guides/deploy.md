@@ -52,7 +52,7 @@ MCP: create_app
 1. Downloads the code from your bucket, or the commit from GitHub, checks it and keeps it with the release.
 2. Reads the compose file with `docker compose config`, together with the [x-ops block](/docs/guides/config).
 3. Tags the built images per deploy, sets the env vars and `restart: unless-stopped`.
-4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 3 seconds later.
+4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 5 seconds later.
 5. Calls the health path, if x-ops sets one, until it answers below 500.
 6. Reports the SQLite databases it finds on the app's volumes.
 
@@ -63,6 +63,8 @@ The server keeps the releases of the last 5 builds (of code or of an image) with
 ## Your data survives every deploy
 
 A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/ops/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Files the repo brings, like a config file, belong to the release.
+
+Your app keeps its database in a folder other than `/data`? Mount that folder in `compose.yml`, for example `./data:/app/data`. ops keeps it and backs up the SQLite files in it.
 
 ## Follow a deploy
 
