@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"context"
+
 	"github.com/axadrn/ops/controlplane/internal/ui/components/accordion"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
@@ -35,16 +37,19 @@ templ Home(network model.Network) {
 				@HomeLive(network)
 			}
 			@HomeCommands()
-			@HomeWaysIn()
 			@HomeBackups()
 			@HomeData()
 			@HomeNoDocker()
-			@HomeStatement()
+			@HomeWaysIn()
+			@HomeCompare()
+			@HomeGoilerplate()
 			if ctxkeys.RenderConfig(ctx).Billing {
 				@HomePricing()
 			}
-			@HomeFAQ()
+			@HomeStatement()
 			@HomeMaker()
+			@HomeFAQ()
+			@HomeStart()
 		</main>
 	}
 }
@@ -52,12 +57,29 @@ templ Home(network model.Network) {
 // homeCTA is the size of the big buttons of the home page.
 const homeCTA = "gap-2"
 
-templ homePrimary(label string) {
+// homePrimary is the one main button of the page: the free trial, the
+// waitlist while signups are closed, or sign in on a self-hosted ops.
+templ homePrimary() {
 	@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA}) {
-		{ label }
+		{ homeStartLabel(ctx) }
 		@icon.ArrowRight(icon.Props{Class: "size-4"})
 	}
 }
+
+func homeStartLabel(ctx context.Context) string {
+	cfg := ctxkeys.RenderConfig(ctx)
+	switch {
+	case !cfg.Billing:
+		return "Get started"
+	case cfg.SignupsOpen:
+		return "Start free trial"
+	default:
+		return "Join the waitlist"
+	}
+}
+
+// homeGoilerplateGuide is the goilerplate guide for deploying with ops.
+const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-ops?ref=ops-landing"
 
 // ---------------------------------------------------------------- hero
 templ HomeHero() {
@@ -69,11 +91,15 @@ templ HomeHero() {
 					<span class="block">Back up.</span>
 					<span class="block">Edit live.</span>
 				</h1>
-				<p class="mt-7 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
-					{ brand.Name } puts your apps on servers you own, backs up every change of their SQLite database to your bucket and lets you edit the data live. From the browser, the CLI, a terminal UI or your AI agent.
+				<p class="mt-7 max-w-[32rem] text-lg leading-8 font-semibold sm:mt-9 sm:text-xl sm:leading-9" data-positioning>
+					<span class="block">Made for Go and SQLite.</span>
+					<span class="block">Runs any app with a Dockerfile.</span>
+				</p>
+				<p class="mt-3 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+					{ brand.Name } puts your apps on your own server, backs up every change of your database to your bucket and lets you fix the data live. From the browser, the CLI, a terminal UI or your AI agent.
 				</p>
 				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
-					@homePrimary("Get started")
+					@homePrimary()
 					@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
 						Read the docs
 					}
@@ -238,10 +264,14 @@ templ HomeCommands() {
 	<section id="how" class="scroll-mt-24 pt-32 sm:pt-44">
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "text-[clamp(2.4rem,6.4vw,5rem)]" }>Three commands.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<span class="text-foreground">Getting an app online is the easy part. Keeping its data safe is the hard part.</span>
+				{ brand.Name } does both, on a server you rent for $5 a month.
+			</p>
 			<div class="mt-12 grid gap-3 sm:mt-16">
-				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server and its agent dials out. No open port.")
-				@homeCommand("ops deploy", "Packs your repo. Your server builds it, checks its health and puts it live.")
-				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops took a snapshot of now first.")
+				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server. Its agent dials out, so no port stays open.")
+				@homeCommand("ops deploy", "Sends your repo. Your server builds it, checks that it is healthy and puts it live.")
+				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops saves the current state first.")
 			</div>
 		</div>
 	</section>
@@ -460,7 +490,7 @@ templ homeFile(name, note, kind string) {
 
 // ---------------------------------------------------------------- maker
 templ HomeMaker() {
-	<section id="maker" class="scroll-mt-24 pb-32 sm:pb-44">
+	<section id="maker" class="scroll-mt-24 pt-32 sm:pt-44">
 		<div class={ homeWrap, "grid gap-10 md:grid-cols-[auto_minmax(0,1fr)] md:gap-16" }>
 			<a href="https://x.com/axadrn" target="_blank" rel="me noopener" aria-label="Axel Adrian on X" class="shrink-0">
 				<img src="https://github.com/axadrn.png?size=320" alt="Axel Adrian" width="320" height="320" loading="lazy" class="size-32 rounded-4xl object-cover sm:size-40"/>
@@ -512,6 +542,123 @@ templ HomeStatement() {
 					@homeSecretStep("Then", "End-to-end encrypted", "We can't read your secrets or your data. Not won't, can't.")
 				</ol>
 			}
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- compare
+// HomeCompare puts ops next to what people use instead: one line on what
+// each one does, one line on what ops does there. Only facts we can stand
+// behind.
+templ HomeCompare() {
+	<section id="compare" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Why not Coolify?</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<span class="text-foreground">Good tools put your app online. { brand.Name } does that too, and then looks after your data.</span>
+				Here is the difference, one line each.
+			</p>
+			<div class="mt-12 grid items-stretch gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeVersus("Coolify and Dokploy",
+					"Deploy containers to your own server, from a web panel.",
+					"Deploys too, and runs your data: every change backed up, a restore drill every day, restore to any second, tables, SQL and your migrations in view.")
+				@homeVersus("Kamal",
+					"Deploys from your laptop over SSH.",
+					"Needs no SSH. The agent dials out and nothing listens. Plus backups and a data UI, in the browser, the CLI, a terminal UI and MCP.")
+				@homeVersus("Heroku, Render and Railway",
+					"Run your app on their machines and bill you per resource.",
+					"Runs on your own $5 server at any provider. One flat price for every app and server, or free to host yourself.")
+				@homeVersus("Fly.io with LiteFS",
+					"Replicates SQLite between Fly machines.",
+					"Backs up SQLite on any server, from any provider, to your own bucket. Restore to any second.")
+			</div>
+			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
+				@homePrimary()
+				if ctxkeys.RenderConfig(ctx).Billing {
+					@button.Button(button.Props{Href: "#pricing", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
+						See pricing
+					}
+				} else {
+					@button.Button(button.Props{Href: "/docs/getting-started", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
+						Getting started
+					}
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// homeVersus is one other tool: what it does, and what ops does there.
+templ homeVersus(name, they, ops string) {
+	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex h-full flex-col p-5 sm:p-8")), Attributes: templ.Attributes{"data-versus": name}}) {
+		<p class="px-2 pt-2 font-display text-[clamp(1.6rem,3vw,2.2rem)] sm:px-0 sm:pt-0">{ name }</p>
+		<dl class="mt-6 flex flex-1 flex-col gap-2">
+			<div class="rounded-3xl bg-background px-5 py-4">
+				<dt class="text-sm text-muted-foreground">They</dt>
+				<dd class="mt-1 text-[17px] leading-7 text-muted-foreground">{ they }</dd>
+			</div>
+			<div class="flex-1 rounded-3xl bg-foreground px-5 py-4 text-background">
+				<dt class="text-sm font-semibold text-background/65">{ brand.Name }</dt>
+				<dd class="mt-1 text-[17px] leading-7">{ ops }</dd>
+			</div>
+		</dl>
+	}
+}
+
+// ---------------------------------------------------------------- goilerplate
+// HomeGoilerplate speaks to people who built their app with goilerplate,
+// the Go SaaS starter by the same maker.
+templ HomeGoilerplate() {
+	<section id="goilerplate" class="pt-3">
+		<div class={ homeWrap }>
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16")), Attributes: templ.Attributes{"data-goilerplate-box": true}}) {
+				<div>
+					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Built with goilerplate?</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+						<span class="text-foreground"><code class="font-mono">ops deploy</code> and it's live. Backups included.</span>
+						Your app gets HTTPS on your domain, every change of its SQLite database in your bucket and a data browser.
+					</p>
+					<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+						@button.Button(button.Props{Href: homeGoilerplateGuide, Target: "_blank", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA, Attributes: templ.Attributes{"rel": "noopener"}}) {
+							Read the guide
+							@icon.ArrowRight(icon.Props{Class: "size-4"})
+						}
+						@button.Button(button.Props{Href: blocks.RefURL(blocks.GoilerplateURL, "goilerplate-box"), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA, Attributes: templ.Attributes{"rel": "noopener"}}) {
+							goilerplate.com
+						}
+					</div>
+				</div>
+				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]" aria-label="Three commands that put a goilerplate app live">
+					<p class="text-terminal-foreground/45"># in your goilerplate project</p>
+					<p><span class="text-terminal-foreground/45">$ </span>ops servers add web-1</p>
+					<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
+					<p class="text-live">✓ v1 of acme is live</p>
+				</div>
+			}
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- start
+// HomeStart is the last call to action, after the questions.
+templ HomeStart() {
+	<section id="start" class="scroll-mt-24 py-32 sm:py-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Deploy your app today.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				if ctxkeys.RenderConfig(ctx).Billing {
+					<span class="text-foreground">30 days free, no card.</span>
+				} else {
+					<span class="text-foreground">Free and open source.</span>
+				}
+				One server, one command, and your data is backed up from the first second.
+			</p>
+			<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+				@homePrimary()
+				@button.Button(button.Props{Href: "/docs/getting-started", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
+					Getting started
+				}
+			</div>
 		</div>
 	</section>
 }
@@ -589,11 +736,7 @@ templ HomePricing() {
 					</dl>
 					<div class="mt-auto pt-10">
 						@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: homeCTA + " bg-background text-foreground hover:bg-background/85"}) {
-							if ctxkeys.RenderConfig(ctx).SignupsOpen {
-								Start free trial
-							} else {
-								Join the waitlist
-							}
+							{ homeStartLabel(ctx) }
 							@icon.ArrowRight(icon.Props{Class: "size-4"})
 						}
 					</div>
@@ -613,7 +756,7 @@ templ homePlanRow(label, value string, dark bool) {
 
 // ---------------------------------------------------------------- faq
 templ HomeFAQ() {
-	<section id="faq" class="scroll-mt-24 pb-32 sm:pb-44">
+	<section id="faq" class="scroll-mt-24 pt-32 sm:pt-44">
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Questions.</h2>
 			@accordion.Accordion(accordion.Props{Multiple: true, Class: utils.CN(homeSurface, "mt-10 px-2 sm:px-4")}) {
