@@ -21,7 +21,7 @@ order: 1
 | `ops apps add --server <server> <name>` | adds an app |
 | `ops apps rm <app> [--yes]` | removes an app, keeps its data |
 | `ops deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |
-| `ops deploy --image <image> [app]` | deploys an image built in CI |
+| `ops deploy --image <image> [app]` | deploys an image built in CI, with the compose file of an earlier deploy of the repo |
 | `ops redeploy [app]` | runs the newest source or image again |
 | `ops restart [app]` | starts the live release again with the current env and domains |
 | `ops stop [app] [--yes]` | takes the app offline; its data stays |
@@ -44,7 +44,7 @@ order: 1
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |
 | `ops sql [--app <app>] [--limit 100] "<sql>"` | runs SQL read-only; the SQL may come on stdin |
-| `ops sql --write "<sql>"` | runs SQL that changes data, in one transaction |
+| `ops sql --write "<sql>" [--yes]` | runs SQL that changes data, in one transaction; DROP and DELETE ask first |
 | `ops backups [app]` | snapshots, point in time window and restore drills |
 | `ops backup [app]` | takes a snapshot now |
 | `ops restore <snapshot> [--yes]` · `ops restore --at "<time>" [--yes]` | restores a snapshot, or a point in time in UTC |
@@ -59,7 +59,7 @@ order: 1
 | `ops env [--show] [app]` | lists env vars, values hidden without `--show` |
 | `ops env set [app] KEY=value …` | sets env vars |
 | `ops env rm KEY … [--yes]` | removes env vars |
-| `ops env pull [--app <app>] [file]` | writes them to `.env` |
+| `ops env pull [--app <app>] [--yes] [file]` | writes them to `.env`; asks before it replaces a file |
 | `ops run [--app <app>] -- <command>` | runs a command with them |
 | `ops agent register --url <url> --token <install token>` | connects a server, done by the install script |
 | `ops agent` | runs the agent |
@@ -69,7 +69,7 @@ Commands that work on an app take it as an argument or as `--app`, then from `x-
 
 ## Asking first
 
-Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink` and `restore`. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
+Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
 
 ## Agent updates
 

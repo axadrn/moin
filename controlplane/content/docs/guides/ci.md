@@ -9,7 +9,7 @@ By default your server builds the app. You can also build the image in CI, push 
 | | Server builds | CI builds |
 | --- | --- | --- |
 | Who builds | your server, from the source `ops deploy` uploads | GitHub Actions or any CI |
-| Start it | `ops deploy` | the deploy hook, or `ops deploy --image` |
+| Start it | `ops deploy` | the deploy hook, or `ops deploy --image` (after one `ops deploy` of the repo, whose compose file it reuses) |
 | Good for | small apps, no registry needed | heavy builds, build caches, many servers |
 
 An image deploy keeps the compose file of the running release and only swaps the image of the main service. So deploy the repo once with `ops deploy`; after that CI can ship images. Health check, automatic rollback, `ops rollback` and env vars work the same.
