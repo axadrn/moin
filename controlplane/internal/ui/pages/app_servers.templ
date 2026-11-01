@@ -160,7 +160,7 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col gap-4"}) {
 			<dl class="grid grid-cols-3 gap-3">
 				@serverFact("System", serverSystem(server), serverSystem(server))
-				@serverFact("Agent", dashIfEmpty(server.AgentVersion), dashIfEmpty(server.AgentVersion))
+				@serverFact("Agent", server.AgentVersion, server.AgentVersion)
 				@serverFact("Last seen", serverLastSeen(server, now), serverLastSeenTitle(server))
 			</dl>
 			@serverAccess(server)
@@ -198,11 +198,16 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 	}
 }
 
-// serverFact is a label with its value on a server card.
+// serverFact is a label with its value on a server card. No value is a
+// muted dash.
 templ serverFact(label, value, title string) {
 	<div class="flex min-w-0 flex-col gap-1">
 		<dt class="text-xs text-muted-foreground">{ label }</dt>
-		<dd class="truncate text-sm font-medium tabular-nums" title={ title }>{ value }</dd>
+		if value != "" {
+			<dd class="truncate text-sm font-medium tabular-nums" title={ title }>{ value }</dd>
+		} else {
+			<dd class="text-sm text-muted-foreground">—</dd>
+		}
 	</div>
 }
 
@@ -258,7 +263,7 @@ func serversSummary(servers []model.Server) string {
 
 func serverSystem(server model.Server) string {
 	if server.OS == "" {
-		return "-"
+		return ""
 	}
 	return server.OS + "/" + server.Arch
 }
@@ -267,13 +272,6 @@ func serverSystem(server model.Server) string {
 // control plane. Development builds never count.
 func agentOutdated(server model.Server) bool {
 	return build.Version != "dev" && server.AgentVersion != "" && server.AgentVersion != build.Version
-}
-
-func dashIfEmpty(value string) string {
-	if value == "" {
-		return "-"
-	}
-	return value
 }
 
 func serverLastSeenTitle(server model.Server) string {
@@ -315,30 +313,19 @@ templ subscribeCard() {
 
 templ subscribeOffer(plan access.Plan) {
 	{{ checkout := ctxkeys.AppBasePath(ctx) + "/billing/checkout" }}
-	@card.Card(card.Props{Class: "max-w-3xl gap-0 py-0", Attributes: templ.Attributes{"data-subscribe": true}}) {
-		<div class="flex flex-col gap-6 p-6">
-			<div class="flex flex-col gap-1">
-				<div class="flex flex-wrap items-center gap-2">
-					<h2 class="text-base font-semibold">This workspace is read-only</h2>
-					@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-						read-only
-					}
-				</div>
-				<p class="text-sm text-muted-foreground">Your apps keep running. Subscribe to { plan.Name } to add servers and deploy again.</p>
-			</div>
+	@panel(panelProps{
+		Title:       "This workspace is read-only",
+		Description: "Your apps keep running. Subscribe to " + plan.Name + " to add servers and deploy again.",
+		Attrs:       templ.Attributes{"data-subscribe": true},
+	}) {
+		<div class="flex flex-col gap-6">
 			<div class="flex flex-col gap-2">
-				<div class="flex flex-wrap items-center gap-2">
-					<span class="text-sm font-medium">{ plan.Name }</span>
-					@badge.Badge(badge.Props{Class: "bg-brand text-brand-foreground"}) {
-						Best value · Save { model.FormatPlanPrice(12*plan.MonthlyPrice - plan.YearlyPrice) }
-					}
-				</div>
-				<p class="flex flex-wrap items-baseline gap-x-2">
-					<span class="text-3xl font-bold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
-					<span class="text-sm text-muted-foreground">a year, per workspace</span>
-				</p>
+				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "self-start"}) {
+					Save { model.FormatPlanPrice(12*plan.MonthlyPrice - plan.YearlyPrice) } a year
+				}
+				@planPrice(model.FormatPlanPrice(plan.YearlyPrice), "a year, per workspace")
 			</div>
-			<div class="flex flex-col gap-2">
+			<div class="flex flex-col items-start gap-2">
 				<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
 					@subscribeButton(checkout, plan.ID, "yearly", true) {
 						Subscribe for { model.FormatPlanPrice(plan.YearlyPrice) } a year
@@ -349,16 +336,7 @@ templ subscribeOffer(plan access.Plan) {
 				</div>
 				<p class="text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
 			</div>
-		</div>
-		<div class="bg-muted/50 p-6">
-			<ul class="grid gap-3 sm:grid-cols-2">
-				for _, benefit := range plan.Benefits {
-					<li class="flex items-start gap-2 text-sm">
-						@icon.Check(icon.Props{Class: "mt-0.5 size-4 shrink-0 text-live"})
-						<span>{ benefit }</span>
-					</li>
-				}
-			</ul>
+			@planBenefits(plan)
 		</div>
 	}
 }
@@ -372,7 +350,6 @@ templ subscribeButton(checkout, planID, interval string, primary bool) {
 		<input type="hidden" name="interval" value={ interval }/>
 		@button.Button(button.Props{
 			Type:       button.TypeSubmit,
-			Size:       button.SizeLg,
 			Variant:    utils.IfElse(primary, button.VariantDefault, button.VariantGhost),
 			Class:      "w-full sm:w-auto",
 			Attributes: templ.Attributes{"data-subscribe-" + interval: true},

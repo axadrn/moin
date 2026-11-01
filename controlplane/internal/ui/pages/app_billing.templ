@@ -8,6 +8,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/tabs"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
@@ -19,17 +20,15 @@ templ Billing() {
 	{{ basePath := "/app/" + workspace.Slug }}
 	@layouts.App("Billing") {
 		@panelPage() {
-			@pageTitle("Billing", "The plan of "+workspace.Name+", the next invoice and the payment details.")
-			<div class="mt-6 flex max-w-3xl flex-col gap-6">
-				@billingCurrent(subscription, basePath)
-				if !subscription.HasProviderSubscription() {
-					for _, plan := range access.Product.Plans {
-						if plan.Purchasable {
-							@billingOffer(plan, basePath)
-						}
+			@pageHeader("Billing", "The plan of "+workspace.Name+", the next invoice and the payment details.")
+			@billingCurrent(subscription, basePath)
+			if !subscription.HasProviderSubscription() {
+				for _, plan := range access.Product.Plans {
+					if plan.Purchasable {
+						@billingOffer(plan, basePath)
 					}
 				}
-			</div>
+			}
 		}
 	}
 }
@@ -37,60 +36,53 @@ templ Billing() {
 // billingCurrent is the plan the workspace has now: its status, what it
 // costs, the next date that matters and the way to the Stripe portal.
 templ billingCurrent(subscription *model.Subscription, basePath string) {
-	@card.Card(card.Props{Class: "gap-0 py-0"}) {
-		<div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-			<div class="min-w-0">
-				<p class="text-xs text-muted-foreground">Current plan</p>
-				<div class="mt-1.5 flex flex-wrap items-center gap-2.5">
-					<h2 class="text-2xl font-semibold tracking-tight">{ planName(subscription.PlanID) }</h2>
-					@billingStatus(subscription)
-				</div>
-				<p class="mt-2 text-sm text-muted-foreground">
-					{ billingLine(subscription) }
-				</p>
-			</div>
-			if subscription.ProviderCustomerID != nil {
-				@button.Button(button.Props{Href: basePath + "/billing/manage", Variant: button.VariantOutline, Class: "shrink-0"}) {
-					Manage subscription
+	@card.Card(card.Props{Class: "min-w-0"}) {
+		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
+			@card.Title(card.TitleProps{Class: "flex min-w-0 flex-wrap items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+				{ planName(subscription.PlanID) }
+				@billingStatus(subscription)
+			}
+			if line := billingLine(subscription); line != "" {
+				@card.Description() {
+					{ line }
 				}
 			}
-		</div>
+			if subscription.ProviderCustomerID != nil {
+				@card.Action(card.ActionProps{Class: panelActionStack}) {
+					@button.Button(button.Props{Href: basePath + "/billing/manage", Variant: button.VariantSecondary, Size: button.SizeSm}) {
+						Manage subscription
+					}
+				}
+			}
+		}
 	}
 }
 
+// billingStatus is the state of the subscription as a status chip.
 templ billingStatus(subscription *model.Subscription) {
-	switch subscription.Status {
-		case model.SubscriptionStatusActive:
-			if subscription.PlanID == model.SubscriptionPlanFree {
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-					read-only
-				}
-			} else {
-				@badge.Badge(badge.Props{Class: "bg-live/12 text-live"}) {
-					active
-				}
-			}
-		case model.SubscriptionStatusTrialing:
-			@badge.Badge(badge.Props{Class: "bg-running/14 text-running"}) {
-				trial
-			}
-		case model.SubscriptionStatusPastDue:
-			@badge.Badge(badge.Props{Class: "bg-running/14 text-running"}) {
-				payment due
-			}
-		case model.SubscriptionStatusIncomplete:
-			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-				payment pending
-			}
-		case model.SubscriptionStatusCancelled:
-			@badge.Badge(badge.Props{Class: "bg-failed/12 text-failed"}) {
-				cancelled
-			}
-		default:
-			@badge.Badge(badge.Props{Class: "bg-failed/12 text-failed"}) {
-				ended
-			}
+	{{ kind, word := billingState(subscription) }}
+	@status.Status(status.Props{Kind: kind, Chip: true}) {
+		{ word }
 	}
+}
+
+func billingState(subscription *model.Subscription) (status.Kind, string) {
+	switch subscription.Status {
+	case model.SubscriptionStatusActive:
+		if subscription.PlanID == model.SubscriptionPlanFree {
+			return status.KindIdle, "read-only"
+		}
+		return status.KindLive, "active"
+	case model.SubscriptionStatusTrialing:
+		return status.KindRunning, "trial"
+	case model.SubscriptionStatusPastDue:
+		return status.KindWaiting, "payment due"
+	case model.SubscriptionStatusIncomplete:
+		return status.KindIdle, "payment pending"
+	case model.SubscriptionStatusCancelled:
+		return status.KindFailed, "cancelled"
+	}
+	return status.KindFailed, "ended"
 }
 
 // billingLine says what the plan costs and the date that matters next.
@@ -112,46 +104,26 @@ func billingLine(subscription *model.Subscription) string {
 // billingOffer is the plan to buy: yearly first, the price, one button to
 // Stripe Checkout and what it includes.
 templ billingOffer(plan access.Plan, basePath string) {
-	@card.Card(card.Props{Class: "pricing-card gap-0 py-0 overflow-hidden border-brand/40"}) {
-		<div class="p-6 sm:p-8">
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<h2 class="text-2xl font-semibold tracking-tight">{ plan.Name }</h2>
-				@tabs.Tabs(tabs.Props{DefaultValue: "yearly"}) {
-					@tabs.List() {
-						@tabs.Trigger(tabs.TriggerProps{Value: "yearly", Attributes: templ.Attributes{"data-billing-interval": "yearly"}}) {
-							Yearly
-						}
-						@tabs.Trigger(tabs.TriggerProps{Value: "monthly", Attributes: templ.Attributes{"data-billing-interval": "monthly"}}) {
-							Monthly
-						}
-					}
+	@panel(panelProps{
+		Title:       plan.Name,
+		Description: "One price per workspace, for the whole team.",
+		Action:      billingInterval(),
+		Class:       "pricing-card",
+	}) {
+		<div class="flex flex-col gap-6">
+			<div class="price-yearly flex flex-col gap-2">
+				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "self-start"}) {
+					Save { model.FormatPlanPrice(12*plan.MonthlyPrice - plan.YearlyPrice) } a year
 				}
+				@planPrice(model.FormatPlanPrice(plan.YearlyPrice), "a year, per workspace")
 			</div>
-			<div class="price-yearly mt-7">
-				<div class="flex flex-wrap items-center gap-2">
-					@badge.Badge(badge.Props{Class: "bg-brand text-brand-foreground"}) {
-						Best value · Save $99
-					}
-					@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-						3+ months free
-					}
-				</div>
-				<p class="mt-4 flex flex-wrap items-baseline gap-x-2">
-					<span class="text-3xl font-bold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
-					<span class="text-muted-foreground">a year, per workspace</span>
-				</p>
-			</div>
-			<div class="price-monthly mt-7 hidden">
-				<p class="flex flex-wrap items-baseline gap-x-2">
-					<span class="text-3xl font-bold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
-					<span class="text-muted-foreground">a month, per workspace</span>
-				</p>
-				<p class="mt-2 text-sm text-muted-foreground">Yearly saves $99.</p>
+			<div class="price-monthly hidden">
+				@planPrice(model.FormatPlanPrice(plan.MonthlyPrice), "a month, per workspace")
 			</div>
 			<form
 				action={ templ.SafeURL(basePath + "/billing/checkout") }
 				method="POST"
-				class="mt-7"
+				class="flex flex-col items-start gap-2"
 				hx-post={ basePath + "/billing/checkout" }
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
@@ -159,23 +131,14 @@ templ billingOffer(plan access.Plan, basePath string) {
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value={ plan.ID }/>
 				<input type="hidden" name="interval" value="yearly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full", Attributes: templ.Attributes{"data-subscribe": true}}) {
+				@button.Button(button.Props{Type: button.TypeSubmit, Attributes: templ.Attributes{"data-subscribe": true}}) {
 					<span class="price-yearly">Subscribe for { model.FormatPlanPrice(plan.YearlyPrice) } a year</span>
 					<span class="price-monthly hidden">Subscribe for { model.FormatPlanPrice(plan.MonthlyPrice) } a month</span>
 				}
+				<p class="text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
 			</form>
-			<p class="mt-3 text-center text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
-		</div>
-		<div class="border-t bg-muted/40 p-6 sm:p-8">
-			<ul class="grid gap-3 sm:grid-cols-2">
-				for _, benefit := range plan.Benefits {
-					<li class="flex items-start gap-2.5 text-sm">
-						@icon.Check(icon.Props{Class: "mt-0.5 size-4 shrink-0 text-live"})
-						<span>{ benefit }</span>
-					</li>
-				}
-			</ul>
-			<p class="mt-6 text-sm text-muted-foreground">
+			@planBenefits(plan)
+			<p class="text-sm text-muted-foreground">
 				<span class="font-medium text-foreground">goilerplate buyers:</span> 50% off forever. Your code arrives by email in the next days.
 			</p>
 		</div>
@@ -193,6 +156,41 @@ templ billingOffer(plan access.Plan, basePath string) {
 			})();
 		</script>
 	}
+}
+
+// billingInterval switches the offer between the yearly and the monthly
+// price.
+templ billingInterval() {
+	@tabs.Tabs(tabs.Props{DefaultValue: "yearly"}) {
+		@tabs.List() {
+			@tabs.Trigger(tabs.TriggerProps{Value: "yearly", Attributes: templ.Attributes{"data-billing-interval": "yearly"}}) {
+				Yearly
+			}
+			@tabs.Trigger(tabs.TriggerProps{Value: "monthly", Attributes: templ.Attributes{"data-billing-interval": "monthly"}}) {
+				Monthly
+			}
+		}
+	}
+}
+
+// planPrice is a price in the number size with what it buys.
+templ planPrice(price, per string) {
+	<p class="flex flex-wrap items-baseline gap-x-2">
+		<span class="text-2xl font-semibold tracking-tight tabular-nums">{ price }</span>
+		<span class="text-sm text-muted-foreground">{ per }</span>
+	</p>
+}
+
+// planBenefits is what a plan includes, two columns from phones up.
+templ planBenefits(plan access.Plan) {
+	<ul class="grid gap-3 sm:grid-cols-2">
+		for _, benefit := range plan.Benefits {
+			<li class="flex items-start gap-2 text-sm">
+				@icon.Check(icon.Props{Class: "mt-0.5 size-4 shrink-0 text-live"})
+				<span>{ benefit }</span>
+			</li>
+		}
+	</ul>
 }
 
 func planName(planID string) string {
