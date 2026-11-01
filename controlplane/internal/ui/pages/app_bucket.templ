@@ -23,7 +23,7 @@ templ Bucket(view BucketView) {
 	@layouts.App("Bucket") {
 		@panelPage(templ.Attributes{"data-bucket-page": true}) {
 			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
-			<div id="bucket" class="flex max-w-3xl flex-col gap-6">
+			<div id="bucket" class="flex flex-col gap-6">
 				if view.Notice != "" {
 					@pageNotice(false, templ.Attributes{"data-bucket-notice": true}) {
 						{ view.Notice }

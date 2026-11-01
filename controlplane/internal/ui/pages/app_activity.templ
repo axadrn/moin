@@ -61,7 +61,7 @@ templ ActivityRows(view ActivityView) {
 						{ label }
 					}
 				}
-				<time class="text-xs text-muted-foreground tabular-nums" datetime={ event.CreatedAt.UTC().Format(time.RFC3339) } title={ stamp(event.CreatedAt) }>{ ago(event.CreatedAt, now) }</time>
+				<time class="w-14 text-right text-xs text-muted-foreground tabular-nums" datetime={ event.CreatedAt.UTC().Format(time.RFC3339) } title={ stamp(event.CreatedAt) }>{ ago(event.CreatedAt, now) }</time>
 			</div>
 		</li>
 	}

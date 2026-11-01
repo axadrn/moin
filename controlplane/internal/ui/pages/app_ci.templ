@@ -168,7 +168,7 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 							{ formError }
 						}
 					}
-					<div>
+					<div class="flex justify-end">
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 							Save login
 						}

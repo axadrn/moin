@@ -39,11 +39,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	{{ seatLimit := subscription.Access().Limit(access.LimitMembers) }}
 	{{ basePath := "/app/" + workspace.Slug }}
 	@panelPage(templ.Attributes{"id": "workspace-content", "hx-swap-oob": "true"}) {
-		@pageHeader("Team", "Everyone in "+workspace.Name+" works on the same servers and apps. Owners handle billing, admins invite. Teams are free.") {
-			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-				{ seatText(len(members), seatLimit) }
-			}
-		}
+		@pageHeader("Team", "Everyone in "+workspace.Name+" works on the same servers and apps. Owners handle billing, admins invite. Teams are free.")
 		if viewer.Can(model.WorkspacePermissionManageMembers) {
 			@panel(panelProps{Title: "Invite a teammate", Description: "They get an email with a link to join. Invitations expire after seven days."}) {
 				<form
@@ -87,7 +83,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				</form>
 			}
 		}
-		@panel(panelProps{Title: "Members", Description: "Roles apply only inside this workspace.", Body: panelBodyRows}) {
+		@panel(panelProps{Title: "Members", Description: seatText(len(members), seatLimit) + ". Roles apply only inside this workspace.", Body: panelBodyRows}) {
 			<ul class="flex flex-col gap-1" role="list">
 				for _, member := range members {
 					<li class="flex flex-col gap-3 rounded-xl px-3 py-2.5 hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between" data-member={ member.ID }>
