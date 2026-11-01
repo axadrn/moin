@@ -27,14 +27,14 @@ templ ErrorPage(status int, title, description string) {
 			@components.Scripts()
 		</head>
 		<body class="style-nova min-h-screen">
-			@StatusScreen(strconv.Itoa(status), title, description, strconv.Itoa(status)+" "+title)
+			@StatusScreen(title, description, strconv.Itoa(status)+" "+title)
 		</body>
 	</html>
 }
 
-// StatusScreen is the full page for 404s and errors: a big code, what
-// happened in words, and the way back.
-templ StatusScreen(code, title, description, line string) {
+// StatusScreen is the full page for 404s and errors: what happened in
+// words, the code as a log line, and the way back.
+templ StatusScreen(title, description, line string) {
 	<div class="flex min-h-svh flex-col bg-background">
 		<header class="mx-auto flex h-20 w-full max-w-6xl items-center px-5 sm:px-8">
 			<a href="/" class="text-[22px] leading-none">
@@ -42,19 +42,18 @@ templ StatusScreen(code, title, description, line string) {
 			</a>
 		</header>
 		<main class="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 pb-24 sm:px-8">
-			<p class="font-display text-[clamp(5rem,18vw,12rem)] leading-none text-foreground/[0.12]">{ code }</p>
-			<h1 class="mt-6 max-w-2xl font-display text-[clamp(2rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.03em] text-balance">{ title }</h1>
-			<p class="mt-4 max-w-lg text-lg leading-7 text-muted-foreground">{ description }</p>
-			<p class="mt-8 inline-flex max-w-full items-center gap-2 self-start overflow-hidden rounded-full bg-terminal px-4 py-2 font-mono text-[12px] text-terminal-foreground">
+			<h1 class="max-w-2xl text-3xl font-bold tracking-tight text-balance">{ title }</h1>
+			<p class="mt-2 max-w-lg text-sm text-pretty text-muted-foreground">{ description }</p>
+			<p class="mt-6 inline-flex max-w-full items-center gap-2 self-start overflow-hidden rounded-full bg-terminal px-4 py-2 font-mono text-xs text-terminal-foreground">
 				<span class="text-failed">✗</span>
 				<span class="truncate">{ line }</span>
 			</p>
-			<div class="mt-10 flex flex-wrap gap-3">
-				@button.Button(button.Props{Href: "/", Variant: button.VariantDefault, Size: button.SizeLg, Class: "gap-2"}) {
-					@icon.ArrowLeft(icon.Props{Class: "size-4"})
+			<div class="mt-6 flex flex-wrap gap-2">
+				@button.Button(button.Props{Href: "/"}) {
+					@icon.ArrowLeft(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
 					Back to home
 				}
-				@button.Button(button.Props{Href: "/docs", Variant: button.VariantGhost, Size: button.SizeLg, Class: "text-foreground"}) {
+				@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary}) {
 					Read the docs
 				}
 			</div>

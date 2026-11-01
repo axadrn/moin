@@ -16,7 +16,7 @@ import (
 templ NewWorkspace(errorMsg string) {
 	@layouts.Auth(layouts.SEOProps{Title: "New workspace", Description: "Create a workspace", Path: ctxkeys.URLPath(ctx)}) {
 		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("New workspace", "Create a separate space for your team") {
+			@blocks.AuthCard("New workspace", "A separate space for another team, with its own servers, apps and billing.") {
 				@NewWorkspaceForm(errorMsg)
 			}
 		}

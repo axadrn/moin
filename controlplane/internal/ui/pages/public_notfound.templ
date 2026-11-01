@@ -7,6 +7,6 @@ import (
 
 templ NotFound() {
 	@layouts.Base() {
-		@StatusScreen("404", "This page is not deployed.", "The address does not exist or has moved.", "404 not found: "+ctxkeys.URLPath(ctx))
+		@StatusScreen("This page is not deployed.", "The address does not exist or has moved.", "404 not found: "+ctxkeys.URLPath(ctx))
 	}
 }

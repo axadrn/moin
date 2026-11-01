@@ -18,7 +18,7 @@ templ VerifyEmailSuccess() {
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Email verified", "Your email address has been updated") {
+			@blocks.AuthCard("Email verified", "Your email address is updated.") {
 				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
 					@empty.Header() {
 						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-live/10 text-live"}) {
@@ -51,7 +51,7 @@ templ VerifyEmailError(errorMessage string) {
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Verification failed", "We couldn't verify your email") {
+			@blocks.AuthCard("Verification failed", "The link did not work. It may have expired or been used already.") {
 				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
 					@empty.Header() {
 						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-destructive/10 text-destructive"}) {
