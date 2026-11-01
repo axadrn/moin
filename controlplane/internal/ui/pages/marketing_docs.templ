@@ -207,6 +207,36 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 					}, 1600);
 				});
 
+				// Surfaces blocks (Web | CLI | TUI | API | MCP tabs) share one
+				// choice: picking a surface opens it on every block of the page,
+				// and the browser keeps it for the next pages and visits. This
+				// script lives outside the swapped docs content and runs once
+				// per document, so its listener stays.
+				const surfaceKey = 'ops-docs-surface';
+				function showSurface(value, picked) {
+					if (!/^[a-z]+$/.test(value || '')) return;
+					// The block that was clicked stays where it is on the screen
+					// while the blocks above it change height.
+					const top = picked?.getBoundingClientRect().top;
+					document.querySelectorAll('[data-surfaces]').forEach(root => {
+						if (root === picked) return;
+						if (root.querySelector(`[data-slot="tabs-trigger"][data-templ-value="${value}"]`)) {
+							window.templ?.tabs?.setActive(root, value);
+						}
+					});
+					if (picked) window.scrollBy(0, picked.getBoundingClientRect().top - top);
+				}
+				function initSurfaces() {
+					let value = null;
+					try { value = localStorage.getItem(surfaceKey); } catch {}
+					showSurface(value, null);
+				}
+				document.addEventListener('tabs-value-change', event => {
+					if (!event.target.hasAttribute?.('data-surfaces')) return;
+					try { localStorage.setItem(surfaceKey, event.detail.value); } catch {}
+					showSurface(event.detail.value, event.target);
+				});
+
 				document.addEventListener('htmx:after:settle', event => {
 					if (event.target?.id === 'docs-content-wrapper') {
 						document.dispatchEvent(new CustomEvent('goilerplate:docs:navigated'));
@@ -313,12 +343,17 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 					});
 
 					initDocsTOC();
+					initSurfaces();
 					window.scrollTo(0, 0);
 
 					window.templ?.sidebar?.setOpenMobile(false);
 				});
 
 				initDocsTOC();
+				// The component bundle loads deferred, after this script on the
+				// first load: the tabs API is there by DOMContentLoaded.
+				if (window.templ?.tabs) initSurfaces();
+				else document.addEventListener('DOMContentLoaded', initSurfaces, { once: true });
 			</script>
 		}
 		@blocks.HighlightScripts()

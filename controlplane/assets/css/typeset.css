@@ -622,3 +622,11 @@
   }
 
 }
+
+/* ops docs: commands never break across lines. Inline code in a table stays
+   on one line; a wide table scrolls sideways in its .typeset-scroll box. */
+@layer components {
+  .typeset :is(td, th) code {
+    white-space: nowrap;
+  }
+}

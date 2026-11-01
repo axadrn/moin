@@ -1,0 +1,47 @@
+package markdown
+
+import "github.com/axadrn/ops/controlplane/internal/ui/components/tabs"
+
+// surfaceItem is one tab of a surfaces block: a line of code, or lines of
+// rendered inline markdown.
+type surfaceItem struct {
+	Value string
+	Label string
+	Code  bool
+	Text  string
+	HTML  []string
+}
+
+// surfacesView is a surfaces block as shadcn tabs on a card, like the
+// package manager tabs of shadcn's docs. The first tab is open; the docs
+// page script opens the surface the reader picked last on every block.
+templ surfacesView(items []surfaceItem) {
+	@tabs.Tabs(tabs.Props{
+		DefaultValue: items[0].Value,
+		Class:        "mt-6 gap-0 overflow-hidden rounded-[18px] bg-card",
+		Attributes:   templ.Attributes{"data-surfaces": ""},
+	}) {
+		<div class="px-3 pt-3">
+			@tabs.List(tabs.ListProps{Class: "max-w-full overflow-x-auto"}) {
+				for _, item := range items {
+					@tabs.Trigger(tabs.TriggerProps{Value: item.Value, Class: "flex-none"}) {
+						{ item.Label }
+					}
+				}
+			}
+		</div>
+		for _, item := range items {
+			@tabs.Content(tabs.ContentProps{Value: item.Value, Class: "min-w-0 text-base [&_[data-slot=code-block]]:mt-0"}) {
+				if item.Code {
+					<pre class="m-0 rounded-none bg-transparent px-6 py-4 pr-14"><code>{ item.Text }</code></pre>
+				} else {
+					for _, html := range item.HTML {
+						<p class="m-0 px-6 py-4 [&+p]:pt-0">
+							@templ.Raw(html)
+						</p>
+					}
+				}
+			}
+		}
+	}
+}

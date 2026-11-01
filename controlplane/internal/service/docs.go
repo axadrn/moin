@@ -119,7 +119,8 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*model.DocPage, err
 		Slug:        slug,
 		Path:        relPath,
 		HTMLContent: string(htmlContent),
-		Content:     string(content),
+		// The markdown export shows surfaces blocks as plain lists.
+		Content:     string(markdown.PlainSurfaces(content)),
 		Headings:    s.parser.ExtractHeadings(content),
 		Children:    []*model.DocPage{},
 	}

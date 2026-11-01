@@ -27,6 +27,7 @@ func NewParser() *Parser {
 			extension.Footnote,
 			extension.Typographer,
 			&frontmatter.Extender{},
+			surfacesExtension{},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
