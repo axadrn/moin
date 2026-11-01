@@ -89,7 +89,7 @@ templ panel(p panelProps) {
 		{{ attrs["aria-labelledby"] = p.Heading }}
 	}
 	@card.Card(card.Props{ID: p.ID, Class: utils.CN("h-full min-w-0", p.Class), Attributes: attrs}) {
-		@card.Header() {
+		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
 			@card.Title(card.TitleProps{ID: p.Heading, Class: "flex min-w-0 items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
 				{ p.Title }
 			}
@@ -99,7 +99,7 @@ templ panel(p panelProps) {
 				}
 			}
 			if p.Action != nil {
-				@card.Action(card.ActionProps{Class: "flex items-center gap-1"}) {
+				@card.Action(card.ActionProps{Class: utils.CN("flex items-center gap-1", panelActionStack)}) {
 					@p.Action
 				}
 			}
@@ -154,18 +154,24 @@ templ statCard(label, value, note string, attrs ...templ.Attributes) {
 	}
 }
 
+// panelActionStack puts a card's actions under its title and description on
+// phones, so the description keeps the full width.
+const panelHeaderStack = "max-sm:has-data-[slot=card-action]:grid-cols-1"
+
+const panelActionStack = "max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-auto max-sm:justify-self-start max-sm:pt-2"
+
 // dangerPanel is the last card of a page: one destructive action (children)
 // and what it does.
 templ dangerPanel(title, body string) {
 	@card.Card(card.Props{Class: "min-w-0"}) {
-		@card.Header() {
+		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
 			@card.Title(card.TitleProps{Class: "text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
 				{ title }
 			}
 			@card.Description() {
 				{ body }
 			}
-			@card.Action() {
+			@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-2", panelActionStack)}) {
 				{ children... }
 			}
 		}
