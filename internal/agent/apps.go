@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/axadrn/ops/protocol"
@@ -212,6 +213,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		}
 	}
 	saveJSON(filepath.Join(release, "detected.json"), detected)
+	a.ownVolumes(ctx, start.App, composeFile, logf)
 
 	previous := a.current(start.App)
 	if a.backups != nil && previous > 0 && start.Snapshot {
@@ -370,6 +372,84 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 		}
 	}
 	return config, detected, nil
+}
+
+// ownVolumes hands the data directories ops made for an app to the user
+// its service runs as. They are made by root, and an app that runs as
+// another user could not write its database to them.
+func (a *apps) ownVolumes(ctx context.Context, app, composeFile string, logf func(string, ...any)) {
+	if os.Geteuid() != 0 {
+		return
+	}
+	var config struct {
+		Services map[string]struct {
+			Image   string `json:"image"`
+			User    string `json:"user"`
+			Volumes []struct {
+				Type   string `json:"type"`
+				Source string `json:"source"`
+			} `json:"volumes"`
+		} `json:"services"`
+	}
+	body, err := os.ReadFile(composeFile)
+	if err != nil || json.Unmarshal(body, &config) != nil {
+		return
+	}
+	volumesDir := filepath.Join(a.appDir(app), "volumes")
+	for name, service := range config.Services {
+		user := service.User
+		resolved := false
+		for _, mount := range service.Volumes {
+			if mount.Type != "bind" || !within(volumesDir, mount.Source) {
+				continue
+			}
+			if !resolved {
+				resolved = true
+				if user == "" {
+					image := service.Image
+					if image == "" {
+						image = project(app) + "-" + name
+					}
+					user, _ = a.output(ctx, "docker", "image", "inspect", "-f", "{{.Config.User}}", image)
+					user = strings.TrimSpace(user)
+				}
+			}
+			uid, gid, ok := numericUser(user)
+			if !ok || uid == 0 {
+				break
+			}
+			info, err := os.Stat(mount.Source)
+			if err != nil {
+				continue
+			}
+			owner, _ := info.Sys().(*syscall.Stat_t)
+			if owner == nil || owner.Uid != 0 {
+				continue
+			}
+			err = os.Chown(mount.Source, uid, gid)
+			if err != nil {
+				logf("cannot hand %s to user %s: %v", mount.Source, user, err)
+			}
+		}
+	}
+}
+
+// numericUser reads a compose or image user such as "1000", "1000:1000" or
+// "65532:65532". A user name cannot be resolved outside the image.
+func numericUser(user string) (int, int, bool) {
+	name, group, found := strings.Cut(user, ":")
+	uid, err := strconv.Atoi(name)
+	if err != nil {
+		return 0, 0, false
+	}
+	gid := uid
+	if found {
+		gid, err = strconv.Atoi(group)
+		if err != nil {
+			return 0, 0, false
+		}
+	}
+	return uid, gid, true
 }
 
 // loadBase reads the resolved compose file, the findings and the image of

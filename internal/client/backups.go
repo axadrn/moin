@@ -62,8 +62,17 @@ func (c *Client) BackupStorage(ctx context.Context) (BackupStorage, error) {
 
 // SetBackupStorage checks and stores the account's bucket.
 func (c *Client) SetBackupStorage(ctx context.Context, storage BackupStorage) (BackupStorage, error) {
+	// The API takes no created_at, so the bucket goes without it.
+	body := struct {
+		Endpoint  string `json:"endpoint"`
+		Region    string `json:"region"`
+		Bucket    string `json:"bucket"`
+		Path      string `json:"path"`
+		AccessKey string `json:"access_key"`
+		SecretKey string `json:"secret_key"`
+	}{storage.Endpoint, storage.Region, storage.Bucket, storage.Path, storage.AccessKey, storage.SecretKey}
 	var stored BackupStorage
-	err := c.do(ctx, http.MethodPut, "/api/v1/backup-storage", storage, &stored)
+	err := c.do(ctx, http.MethodPut, "/api/v1/backup-storage", body, &stored)
 	return stored, err
 }
 
