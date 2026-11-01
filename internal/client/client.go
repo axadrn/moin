@@ -366,6 +366,13 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Code == "not_found"
 }
 
+// IsReadOnlyQuery reports whether a read query was refused because it
+// changes data.
+func IsReadOnlyQuery(err error) bool {
+	var apiErr *Error
+	return errors.As(err, &apiErr) && apiErr.Code == "read_only_query"
+}
+
 // responseError turns an API error body into an error people can read.
 func (c *Client) responseError(response *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(response.Body, 64*1024))

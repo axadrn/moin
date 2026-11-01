@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
 )
 
@@ -152,7 +153,7 @@ func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	}
 	result, err := api.Query(ctx, name, *database, query, *write, *limit)
 	if err != nil {
-		if !*write && strings.Contains(err.Error(), "readonly") {
+		if !*write && client.IsReadOnlyQuery(err) {
 			return errors.New("this query changes data: run it again with --write")
 		}
 		return err

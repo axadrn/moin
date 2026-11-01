@@ -1371,7 +1371,7 @@ func (m model) showTables(name string) tea.Cmd {
 func (m model) runSQL(name, query string, write bool) tea.Cmd {
 	return func() tea.Msg {
 		result, err := m.api.Query(m.ctx, name, "", query, write, 200)
-		if err != nil && !write && strings.Contains(err.Error(), "readonly") {
+		if !write && client.IsReadOnlyQuery(err) {
 			return writeMsg(query)
 		}
 		if err != nil {
