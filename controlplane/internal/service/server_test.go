@@ -92,8 +92,12 @@ func TestServerNames(t *testing.T) {
 		t.Fatalf("long name: err = %v", err)
 	}
 	generated, _, err := servers.Create(owner, "")
-	if err != nil || !strings.HasPrefix(generated.Name, "server-") {
+	if err != nil || generated.Name != "web-1" {
 		t.Fatalf("empty name = %v, %v", generated, err)
+	}
+	generated, _, err = servers.Create(owner, " ")
+	if err != nil || generated.Name != "web-2" {
+		t.Fatalf("second empty name = %v, %v", generated, err)
 	}
 }
 
