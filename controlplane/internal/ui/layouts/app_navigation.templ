@@ -1,6 +1,7 @@
 package layouts
 
 import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/kbd"
 	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -71,8 +72,15 @@ templ AppSidebarNavigation() {
 
 // navKey is the go-to hint: g, then the key. It shows on hover.
 templ navKey(key string) {
-	<span class="hidden items-center gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden md:flex" aria-hidden="true">
-		<kbd class="ops-kbd">G</kbd>
-		<kbd class="ops-kbd">{ key }</kbd>
-	</span>
+	@kbd.Group(kbd.GroupProps{Class: "hidden gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden md:flex", Attributes: templ.Attributes{"aria-hidden": "true"}}) {
+		@kbd.Kbd(kbd.Props{Class: navKeyClasses}) {
+			G
+		}
+		@kbd.Kbd(kbd.Props{Class: navKeyClasses}) {
+			{ key }
+		}
+	}
 }
+
+// navKeyClasses keep the go-to keys small and mono next to the labels.
+const navKeyClasses = "h-[1.125rem] min-w-[1.125rem] rounded-[5px] px-1 font-mono text-[10px] leading-none"

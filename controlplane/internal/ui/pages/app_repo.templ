@@ -4,9 +4,15 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/checkbox"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/icons"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
 // RepoView is the repository panel of an app.
@@ -26,20 +32,24 @@ type RepoView struct {
 templ AppRepo(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	{{ swap := templ.Attributes{"hx-target": "#app-repo", "hx-swap": "outerHTML"} }}
-	<section id="app-repo" aria-labelledby="app-repo-heading" class="ops-panel mt-4 min-w-0 overflow-hidden">
-		<div class={ panelHeadClasses }>
-			<h2 id="app-repo-heading" class="ops-panel-title flex items-center gap-2.5">
+	@card.Card(card.Props{ID: "app-repo", Class: "block gap-0 py-0 text-base mt-4 min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-repo-heading", "role": "region"}}) {
+		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+			@card.Title(card.TitleProps{ID: "app-repo-heading", Class: "flex items-center gap-2.5", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
 				@icons.Github(icons.Props{Class: "size-5"})
 				Repository
-			</h2>
+			}
 			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/github">How it works</a>
-		</div>
+		}
 		<div class="px-5 pb-5">
 			if view.Notice != "" {
-				<p class="mb-3 rounded-2xl bg-live/12 px-4 py-3 text-sm font-medium text-live" role="status" data-repo-notice>{ view.Notice }</p>
+				@alert.Alert(alert.Props{Class: "border-0 mb-3 rounded-2xl bg-live/12 px-4 py-3 text-sm font-medium text-live", Attributes: templ.Attributes{"data-repo-notice": true}}) {
+					{ view.Notice }
+				}
 			}
 			if view.Error != "" {
-				<p class="mb-3 rounded-2xl bg-failed/12 px-4 py-3 text-sm font-medium text-failed" role="alert" data-repo-error>{ view.Error }</p>
+				@alert.Alert(alert.Props{Class: "border-0 mb-3 rounded-2xl bg-failed/12 px-4 py-3 text-sm font-medium text-failed", Attributes: templ.Attributes{"data-repo-error": true}}) {
+					{ view.Error }
+				}
 			}
 			if !view.Enabled {
 				<p class="text-sm text-muted-foreground">This control plane has no GitHub App. Deploy with <code class="font-mono text-foreground">ops deploy</code> or from CI.</p>
@@ -54,17 +64,24 @@ templ AppRepo(view RepoView) {
 			} else if view.App.Repo == "" {
 				<form class="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]" hx-post={ appPath + "/repo" } { swap... } data-link-repo>
 					@csrf.Token()
-					<label class="flex min-w-0 flex-col gap-1">
-						<span class="text-xs font-semibold">Repo</span>
-						<select name="repo" required class="h-10 min-w-0 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring">
-							for _, repo := range view.Repos {
-								<option value={ repo.FullName }>{ repo.FullName }</option>
+					<div class="flex min-w-0 flex-col gap-1">
+						<label for="link-repo" class="text-xs font-semibold">Repo</label>
+						@selectcomp.Select(selectcomp.Props{Name: "repo", Required: true, DefaultValue: firstRepo(view.Repos), Items: repoItems(view.Repos)}) {
+							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 rounded-xl font-mono text-[0.8125rem] data-[size=default]:h-10"}) {
+								@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No repo"})
 							}
-						</select>
-					</label>
+							@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+								for _, repo := range view.Repos {
+									@selectcomp.Item(selectcomp.ItemProps{Value: repo.FullName, Class: "font-mono text-[0.8125rem]"}) {
+										{ repo.FullName }
+									}
+								}
+							}
+						}
+					</div>
 					<label class="flex min-w-0 flex-col gap-1">
 						<span class="text-xs font-semibold">Branch</span>
-						<input name="branch" placeholder="default branch" spellcheck="false" autocomplete="off" class="h-10 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring"/>
+						@input.Input(input.Props{Name: "branch", Placeholder: "default branch", Class: "font-mono text-[0.8125rem] md:text-[0.8125rem]", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
 					</label>
 					<div class="flex items-end">
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Class: "w-full"}) {
@@ -72,7 +89,7 @@ templ AppRepo(view RepoView) {
 						}
 					</div>
 					<label class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
-						<input type="checkbox" name="auto_deploy" value="1" checked class="size-4 accent-[var(--foreground)]"/>
+						@checkbox.Checkbox(checkbox.Props{Name: "auto_deploy", Value: "1", DefaultChecked: true})
 						Deploy every push to the branch
 					</label>
 					if len(view.Repos) == 0 {
@@ -88,7 +105,7 @@ templ AppRepo(view RepoView) {
 							<input type="hidden" name="repo" value={ view.App.Repo }/>
 							<input type="hidden" name="branch" value={ view.App.Branch }/>
 							<label class="flex cursor-pointer items-center gap-2">
-								<input type="checkbox" name="auto_deploy" value="1" checked?={ view.App.AutoDeploy } class="size-4 accent-[var(--foreground)]" data-auto-deploy/>
+								@checkbox.Checkbox(checkbox.Props{Name: "auto_deploy", Value: "1", DefaultChecked: view.App.AutoDeploy, Attributes: templ.Attributes{"data-auto-deploy": true}})
 								Deploy every push to { view.App.Branch }
 							</label>
 						</form>
@@ -97,15 +114,38 @@ templ AppRepo(view RepoView) {
 						<form class="flex gap-2" hx-post={ appPath + "/repo/deploy" } { swap... } data-deploy-ref>
 							@csrf.Token()
 							<label for="deploy-ref" class="sr-only">Branch, tag or commit</label>
-							<input id="deploy-ref" name="ref" placeholder={ view.App.Branch } spellcheck="false" autocomplete="off" class="h-10 w-40 rounded-xl bg-muted px-3 font-mono text-[0.8125rem] outline-none focus:ring-2 focus:ring-ring"/>
+							@input.Input(input.Props{ID: "deploy-ref", Name: "ref", Placeholder: view.App.Branch, Class: "w-40 font-mono text-[0.8125rem] md:text-[0.8125rem]", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
 							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg}) {
 								Deploy
 							}
 						</form>
-						<button type="button" class="h-10 cursor-pointer rounded-full px-3 text-sm font-semibold text-muted-foreground hover:text-failed" hx-post={ appPath + "/repo/unlink" } { swap... } hx-confirm={ "Stop following " + view.App.Repo + "?" }>Unlink</button>
+						@button.Button(button.Props{
+							Variant:    button.VariantGhost,
+							Size:       button.SizeLg,
+							Class:      "px-3 text-muted-foreground hover:bg-transparent hover:text-failed",
+							Attributes: utils.MergeAttributes(swap, templ.Attributes{"hx-post": appPath + "/repo/unlink", "hx-confirm": "Stop following " + view.App.Repo + "?"}),
+						}) {
+							Unlink
+						}
 					</div>
 				</div>
 			}
 		</div>
-	</section>
+	}
+}
+
+// firstRepo is the repo the link form selects first, like a native select.
+func firstRepo(repos []service.GitHubRepoOf) string {
+	if len(repos) == 0 {
+		return ""
+	}
+	return repos[0].FullName
+}
+
+func repoItems(repos []service.GitHubRepoOf) []selectcomp.ItemData {
+	items := make([]selectcomp.ItemData, 0, len(repos))
+	for _, repo := range repos {
+		items = append(items, selectcomp.ItemData{Value: repo.FullName, Label: repo.FullName})
+	}
+	return items
 }

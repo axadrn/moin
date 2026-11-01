@@ -264,21 +264,6 @@
   }
 
   /* Keyboard hints. */
-  .ops-kbd {
-    display: inline-flex;
-    min-width: 1.125rem;
-    height: 1.125rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    padding: 0 0.25rem;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    line-height: 1;
-    color: var(--muted-foreground);
-    background: var(--muted);
-  }
-
   /* Logs and commands: mono on the surface they sit on. */
   .ops-term {
     --tf: var(--card-foreground);
@@ -480,17 +465,6 @@
     left: var(--ops-inset, 1.25rem);
     height: 1px;
     background: var(--border);
-  }
-
-  .ops-select {
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='m4.5 6.5 3.5 3.5 3.5-3.5'/></svg>");
-    background-size: 14px;
-    background-position: right 0.85rem center;
-    background-repeat: no-repeat;
-  }
-  .ops-select > option {
-    background: var(--popover);
-    color: var(--popover-foreground);
   }
 
   @media (prefers-reduced-motion: reduce) {

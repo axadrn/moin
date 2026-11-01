@@ -4,9 +4,13 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 )
@@ -25,11 +29,13 @@ type RoutingView struct {
 templ AppRouting(view RoutingView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ routingPath := basePath + "/apps/" + view.App.Name + "/routing" }}
-	<section id="app-routing" aria-labelledby="app-routing-heading" class="ops-panel mt-4 min-w-0 overflow-hidden">
-		<div class={ panelHeadClasses }>
-			<h2 id="app-routing-heading" class="ops-panel-title">Domains and access</h2>
+	@card.Card(card.Props{ID: "app-routing", Class: "block gap-0 py-0 text-base mt-4 min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-routing-heading", "role": "region"}}) {
+		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+			@card.Title(card.TitleProps{ID: "app-routing-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+				Domains and access
+			}
 			<a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/docs/guides/domains">How it works</a>
-		</div>
+		}
 		<div class="grid gap-6 px-5 pt-2 pb-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 			<div class="min-w-0 space-y-3">
 				if len(view.Checks) == 0 {
@@ -37,44 +43,51 @@ templ AppRouting(view RoutingView) {
 				} else {
 					<ul class="divide-y rounded-2xl bg-muted/60" role="list">
 						for _, check := range view.Checks {
-							<li data-domain={ check.Domain } class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-								<span class="min-w-0 truncate font-mono text-sm font-medium">{ check.Domain }</span>
-								if check.Canonical {
-									<span class="rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">canonical</span>
+							<li data-domain={ check.Domain }>
+								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3"}) {
+									<span class="min-w-0 truncate font-mono text-sm font-medium">{ check.Domain }</span>
+									if check.Canonical {
+										@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground"}) {
+											canonical
+										}
+									}
+									<span class="ml-auto flex items-center gap-1">
+										if check.Points {
+											@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+												points here
+											}
+										} else {
+											@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
+												set A record to { orDash(check.Address) }
+											}
+										}
+										if !check.Canonical {
+											@button.Button(button.Props{
+												Variant:    button.VariantGhost,
+												Size:       button.SizeXs,
+												Class:      "px-2.5 font-normal text-muted-foreground hover:bg-background hover:text-foreground",
+												Attributes: templ.Attributes{"hx-post": routingPath + "/canonical", "hx-vals": `{"domain": "` + check.Domain + `"}`, "hx-target": "#app-routing", "hx-swap": "outerHTML"},
+											}) {
+												Make canonical
+											}
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIconXs,
+											Class:   "text-muted-foreground hover:bg-failed/10 hover:text-failed",
+											Attributes: templ.Attributes{
+												"aria-label": "Remove " + check.Domain,
+												"hx-post":    routingPath + "/remove",
+												"hx-vals":    `{"domain": "` + check.Domain + `"}`,
+												"hx-target":  "#app-routing",
+												"hx-swap":    "outerHTML",
+												"hx-confirm": "Remove " + check.Domain + "? It stops answering for this app.",
+											},
+										}) {
+											@icon.X(icon.Props{Class: "size-3.5"})
+										}
+									</span>
 								}
-								<span class="ml-auto flex items-center gap-1">
-									if check.Points {
-										@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
-											points here
-										}
-									} else {
-										@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
-											set A record to { orDash(check.Address) }
-										}
-									}
-									if !check.Canonical {
-										<button
-											type="button"
-											class="rounded-full px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-											hx-post={ routingPath + "/canonical" }
-											hx-vals={ `{"domain": "` + check.Domain + `"}` }
-											hx-target="#app-routing"
-											hx-swap="outerHTML"
-										>Make canonical</button>
-									}
-									<button
-										type="button"
-										class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-failed/10 hover:text-failed"
-										aria-label={ "Remove " + check.Domain }
-										hx-post={ routingPath + "/remove" }
-										hx-vals={ `{"domain": "` + check.Domain + `"}` }
-										hx-target="#app-routing"
-										hx-swap="outerHTML"
-										hx-confirm={ "Remove " + check.Domain + "? It stops answering for this app." }
-									>
-										@icon.X(icon.Props{Class: "size-3.5"})
-									</button>
-								</span>
 							</li>
 						}
 					</ul>
@@ -140,13 +153,15 @@ templ AppRouting(view RoutingView) {
 		if view.Notice != "" || view.Error != "" {
 			<div class="border-t px-5 py-3 text-xs">
 				if view.Error != "" {
-					<p class="text-failed" role="alert" data-routing-error>{ view.Error }</p>
+					@field.Error(field.ErrorProps{Class: "font-normal text-failed", Attributes: templ.Attributes{"data-routing-error": true}}) {
+						{ view.Error }
+					}
 				} else {
 					<p class="text-muted-foreground" data-routing-notice>{ view.Notice }</p>
 				}
 			</div>
 		}
-	</section>
+	}
 }
 
 func serverAddress(view RoutingView) string {

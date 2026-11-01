@@ -5,8 +5,10 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 )
 
@@ -14,7 +16,7 @@ import (
 // elsewhere, and the deploy hook CI calls.
 templ appCI(appName string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<section aria-labelledby="app-ci-heading" class="ops-panel mt-4 min-w-0 overflow-hidden">
+	@card.Card(card.Props{Class: "block gap-0 py-0 text-base mt-4 min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-ci-heading", "role": "region"}}) {
 		<div class="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-4">
 			<div>
 				<h2 id="app-ci-heading" class="text-base font-semibold tracking-tight">Build in CI</h2>
@@ -62,7 +64,7 @@ templ appCI(appName string) {
 				@AppHook(appName, "")
 			</div>
 		</div>
-	</section>
+	}
 }
 
 // AppHook shows a new deploy hook URL once, with the curl CI runs.
@@ -98,20 +100,22 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 				if len(logins) > 0 {
 					<ul class="mb-4 divide-y rounded-md border" role="list">
 						for _, login := range logins {
-							<li data-registry={ login.Host } class="flex h-11 items-center gap-3 px-3 text-sm">
-								<span class="font-mono text-xs font-medium">{ login.Host }</span>
-								<span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{ login.Username }</span>
-								@button.Button(button.Props{
-									Variant: button.VariantGhost,
-									Size:    button.SizeXs,
-									Attributes: templ.Attributes{
-										"hx-delete":  basePath + "/settings/registries/" + login.Host,
-										"hx-target":  "#settings-registries",
-										"hx-swap":    "outerHTML",
-										"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
-									},
-								}) {
-									Remove
+							<li data-registry={ login.Host }>
+								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex h-11 items-center gap-3 px-3 text-sm"}) {
+									<span class="font-mono text-xs font-medium">{ login.Host }</span>
+									<span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{ login.Username }</span>
+									@button.Button(button.Props{
+										Variant: button.VariantGhost,
+										Size:    button.SizeXs,
+										Attributes: templ.Attributes{
+											"hx-delete":  basePath + "/settings/registries/" + login.Host,
+											"hx-target":  "#settings-registries",
+											"hx-swap":    "outerHTML",
+											"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
+										},
+									}) {
+										Remove
+									}
 								}
 							</li>
 						}
@@ -135,7 +139,9 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 					}
 				</form>
 				if formError != "" {
-					<p class="mt-2 text-xs text-failed" role="alert" data-registry-error>{ formError }</p>
+					@field.Error(field.ErrorProps{Class: "font-normal mt-2 text-xs text-failed", Attributes: templ.Attributes{"data-registry-error": true}}) {
+						{ formError }
+					}
 				}
 			}
 		}

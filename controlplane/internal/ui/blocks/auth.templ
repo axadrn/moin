@@ -1,6 +1,9 @@
 package blocks
 
 import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
 	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -70,7 +73,7 @@ templ authCmd(command string) {
 templ authAside() {
 	{{ host := authHost(ctxkeys.RenderConfig(ctx).AppURL) }}
 	<aside class="hidden p-3 lg:flex">
-		<div class="flex flex-1 items-center rounded-[32px] bg-card">
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex flex-1 items-center rounded-[32px] bg-card"}) {
 			<div class="mx-auto w-full max-w-xl px-12 py-16">
 				<h2 class="font-display text-[2.6rem] leading-[1.02] text-balance">From a fresh server to a live app in five minutes.</h2>
 				<ol class="mt-10 divide-y divide-border rounded-[22px] bg-background">
@@ -86,14 +89,14 @@ templ authAside() {
 					}
 					@authStep("4", "Deploy from your repo") {
 						@authCmd("ops deploy")
-						<p class="mt-3 inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live">
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal mt-3 inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live"}) {
 							<span class="lp-pulse size-2 rounded-full bg-live"></span>
 							v1 of blog is live
-						</p>
+						}
 					}
 				</ol>
 			</div>
-		</div>
+		}
 	</aside>
 }
 
@@ -115,9 +118,9 @@ templ AuthCard(title, description string) {
 // AuthOr separates two ways to sign in.
 templ AuthOr() {
 	<div class="flex items-center gap-3 text-[13px] text-muted-foreground">
-		<span class="h-px flex-1 bg-border"></span>
+		@separator.Separator(separator.Props{Class: "w-auto flex-1", Attributes: templ.Attributes{"aria-hidden": "true"}})
 		or
-		<span class="h-px flex-1 bg-border"></span>
+		@separator.Separator(separator.Props{Class: "w-auto flex-1", Attributes: templ.Attributes{"aria-hidden": "true"}})
 	</div>
 }
 

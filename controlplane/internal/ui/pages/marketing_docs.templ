@@ -1,17 +1,20 @@
 package pages
 
 import (
+	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/breadcrumb"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/ops/controlplane/internal/ui/icons"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
+	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
-	"fmt"
 )
 
 templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.DocPage, nextPage *model.DocPage) {
@@ -27,7 +30,9 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 				@sidebar.Header(sidebar.HeaderProps{Class: "h-14 justify-center border-b px-4"}) {
 					<a href="/" class="flex items-center gap-2.5 text-[19px] leading-none">
 						@blocks.Wordmark()
-						<span class="rounded-full bg-secondary px-2.5 py-1 text-[12px] font-semibold text-muted-foreground">Docs</span>
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-secondary px-2.5 py-1 text-[12px] font-semibold text-muted-foreground"}) {
+							Docs
+						}
 					</a>
 				}
 				@sidebar.Content(sidebar.ContentProps{Class: "pt-2"}) {
@@ -64,7 +69,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 				<header class="sticky top-0 z-10 bg-background">
 					<div class="flex h-14 items-center gap-3 px-4 sm:px-6">
 						@sidebar.Trigger()
-						<span class="h-4 w-px bg-border"></span>
+						@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-4 data-vertical:self-auto"})
 						@templ.Fragment("docs-breadcrumb") {
 							<div id="docs-breadcrumb" class="min-w-0" hx-swap-oob="true">
 								@breadcrumb.Breadcrumb() {
@@ -100,14 +105,18 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 						}
 						<div class="ml-auto flex items-center gap-1">
 							@docsSearch(docsTree)
-							<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:inline-flex" aria-label="ops on GitHub">
+							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "ops on GitHub"}}) {
 								@icons.Github(icons.Props{Class: "size-4"})
-							</a>
+							}
 							@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground hover:text-foreground"})
 							if ctxkeys.User(ctx) != nil {
-								<a href="/app" class="ml-1.5 inline-flex h-9 items-center rounded-full bg-brand px-4 text-[13.5px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">Dashboard</a>
+								@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Class: "ml-1.5 text-[13.5px]"}) {
+									Dashboard
+								}
 							} else {
-								<a href="/auth" class="ml-1.5 inline-flex h-9 items-center rounded-full bg-brand px-4 text-[13.5px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">Get started</a>
+								@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Class: "ml-1.5 text-[13.5px]"}) {
+									Get started
+								}
 							}
 						</div>
 					</div>
@@ -340,9 +349,12 @@ func docsMarkdownURL(node *model.DocPage) string {
 	return docsPageURL(node) + ".md"
 }
 
+// docsActionClasses keeps the page actions quiet next to the headline.
+const docsActionClasses = "text-[12.5px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+
 templ docsPageActions(node *model.DocPage) {
 	<div class="mt-5 flex flex-wrap items-center gap-2">
-		<button type="button" data-docs-copy={ docsMarkdownURL(node) } class="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+		@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Class: docsActionClasses, Attributes: templ.Attributes{"data-docs-copy": docsMarkdownURL(node)}}) {
 			<span data-copy-default>
 				@icon.Copy(icon.Props{Class: "size-3.5"})
 			</span>
@@ -350,11 +362,11 @@ templ docsPageActions(node *model.DocPage) {
 				@icon.Check(icon.Props{Class: "size-3.5"})
 			</span>
 			Copy page
-		</button>
-		<a href={ templ.SafeURL(docsMarkdownURL(node)) } target="_blank" rel="noopener" class="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+		}
+		@button.Button(button.Props{Href: docsMarkdownURL(node), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Class: docsActionClasses, Attributes: templ.Attributes{"rel": "noopener"}}) {
 			@icon.FileText(icon.Props{Class: "size-3.5"})
 			Markdown
-		</a>
+		}
 	</div>
 }
 

@@ -1,7 +1,12 @@
 package pages
 
 import (
-	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/accordion"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/tabs"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -41,11 +46,14 @@ templ Home(network model.Network) {
 	}
 }
 
+// homeCTA is the size of the big buttons of the home page.
+const homeCTA = "h-12 gap-2 px-7 text-[15px]"
+
 templ homePrimary(label string) {
-	<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">
+	@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: homeCTA}) {
 		{ label }
 		@icon.ArrowRight(icon.Props{Class: "size-4"})
-	</a>
+	}
 }
 
 // ---------------------------------------------------------------- hero
@@ -63,7 +71,9 @@ templ HomeHero() {
 				</p>
 				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
 					@homePrimary("Get started")
-					<a href="/docs" class="inline-flex h-12 items-center justify-center rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">Read the docs</a>
+					@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
+						Read the docs
+					}
 				</div>
 			</div>
 			@homeTerminal()
@@ -104,62 +114,43 @@ templ homeTerminal() {
 // homeStage is the control panel, big, with a switch between its three
 // pages and live states around it.
 templ homeStage() {
-	<div class="relative" data-stage>
+	@tabs.Tabs(tabs.Props{DefaultValue: "deploys", Class: "relative gap-0", Attributes: templ.Attributes{"data-stage": true}}) {
 		<div class="mb-4 flex justify-center">
-			<div class="flex gap-1 rounded-full bg-card p-1" role="tablist" aria-label="Product">
-				@homeStageTab("deploys", "Deploys", true)
-				@homeStageTab("data", "Data", false)
-				@homeStageTab("backups", "Backups", false)
-			</div>
+			@tabs.List(tabs.ListProps{Class: "gap-1 bg-card p-1 text-muted-foreground group-data-horizontal/tabs:h-auto", Attributes: templ.Attributes{"aria-label": "Product"}}) {
+				@homeStageTab("deploys", "Deploys")
+				@homeStageTab("data", "Data")
+				@homeStageTab("backups", "Backups")
+			}
 		</div>
-		<div class="rounded-[22px] bg-card p-1.5 sm:rounded-[32px] sm:p-3">
+		@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible rounded-[22px] bg-card p-1.5 sm:rounded-[32px] sm:p-3"}) {
 			<div class="overflow-hidden rounded-[17px] sm:rounded-[22px]">
 				@homeShot("deploys", "The app page: the live release, the deploy log with the snapshot before the deploy, every deploy with its commit", true)
 				@homeShot("data", "The data page: tables, rows to edit in place, and a SQL console", false)
 				@homeShot("backups", "The backups page: continuous backups, the point in time window, snapshots and the newest restore drill", false)
 			</div>
-		</div>
+		}
 		<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5" aria-label="What ops reports">
 			@homeChip("blog", "live", "live v6")
 			@homeChip("shop.db", "live", "verified by restore")
 			@homeChip("api", "failed", "v3 failed · v2 runs again")
 		</div>
-	</div>
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			const stage = document.currentScript.previousElementSibling;
-			stage.addEventListener('click', event => {
-				const tab = event.target.closest('[data-stage-tab]');
-				if (!tab) return;
-				for (const other of stage.querySelectorAll('[data-stage-tab]')) {
-					const active = other === tab;
-					other.setAttribute('aria-selected', String(active));
-					other.classList.toggle('bg-foreground', active);
-					other.classList.toggle('text-background', active);
-					other.classList.toggle('text-muted-foreground', !active);
-				}
-				for (const shot of stage.querySelectorAll('[data-stage-shot]')) {
-					shot.hidden = shot.dataset.stageShot !== tab.dataset.stageTab;
-				}
-			});
-		})();
-	</script>
+	}
 }
 
-templ homeStageTab(name, label string, active bool) {
-	<button
-		type="button"
-		role="tab"
-		data-stage-tab={ name }
-		aria-selected={ fmt.Sprint(active) }
-		class={ "cursor-pointer rounded-full px-5 py-2 text-sm font-semibold transition-colors", templ.KV("bg-foreground text-background", active), templ.KV("text-muted-foreground hover:text-foreground", !active) }
-	>{ label }</button>
+templ homeStageTab(name, label string) {
+	@tabs.Trigger(tabs.TriggerProps{
+		Value:      name,
+		Class:      "h-auto flex-none cursor-pointer px-5 py-2 font-semibold text-muted-foreground hover:text-foreground data-active:bg-foreground data-active:text-background group-data-[variant=default]/tabs-list:data-active:shadow-none dark:text-muted-foreground dark:data-active:bg-foreground dark:data-active:text-background",
+		Attributes: templ.Attributes{"data-stage-tab": name},
+	}) {
+		{ label }
+	}
 }
 
-// homeShot is one page of the panel, light and dark: the theme switch
-// picks the one that shows.
+// homeShot is the tab panel of one page of the panel, light and dark: the
+// theme switch picks the one that shows.
 templ homeShot(name, alt string, first bool) {
-	<div data-stage-shot={ name } hidden?={ !first }>
+	@tabs.Content(tabs.ContentProps{Value: name, Attributes: templ.Attributes{"data-stage-shot": name}}) {
 		<img
 			src={ "/assets/img/product-" + name + "-light.png" }
 			alt={ alt }
@@ -180,31 +171,31 @@ templ homeShot(name, alt string, first bool) {
 			decoding="async"
 			class="hidden aspect-[4/3] w-full object-cover object-left-top sm:aspect-[1440/900] dark:block"
 		/>
-	</div>
+	}
 }
 
 // homeChip is a status pill on a solid backing: the app name and its state.
 templ homeChip(app, kind, text string) {
-	<span class="inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5 shadow-[0_10px_30px_-14px_rgb(0_0_0/0.45)]">
+	@badge.Badge(badge.Props{Class: "h-auto leading-normal text-card-foreground text-base font-normal inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5 shadow-[0_10px_30px_-14px_rgb(0_0_0/0.45)]"}) {
 		<span class="font-mono text-[13px] font-medium">{ app }</span>
 		switch kind {
 			case "live":
-				<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3.5 py-1.5 text-[13px] font-medium text-live">
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3.5 py-1.5 text-[13px] font-medium text-live"}) {
 					<span class="lp-pulse size-2 rounded-full bg-live"></span>
 					{ text }
-				</span>
+				}
 			case "running":
-				<span class="inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running">
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running"}) {
 					<span class="ops-turn inline-block leading-none">◐</span>
 					{ text }
-				</span>
+				}
 			default:
-				<span class="inline-flex items-center gap-2 rounded-full bg-failed/12 px-3.5 py-1.5 text-[13px] font-medium text-failed">
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-failed/12 px-3.5 py-1.5 text-[13px] font-medium text-failed"}) {
 					<span class="leading-none">✗</span>
 					{ text }
-				</span>
+				}
 		}
-	</span>
+	}
 }
 
 // ---------------------------------------------------------------- live
@@ -230,13 +221,13 @@ templ HomeLive(network model.Network) {
 }
 
 templ homeLiveNumber(count int, label, name string) {
-	<div class={ homeSurface, "px-6 py-5" } data-live-number={ name }>
+	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "px-6 py-5")), Attributes: templ.Attributes{"data-live-number": name}}) {
 		<dt class="sr-only">{ label }</dt>
 		<dd>
 			<span class={ homeDisplay, "block text-[clamp(2rem,4vw,2.8rem)] tabular-nums" }>{ liveCount(count) }</span>
 			<span class="mt-2 block text-sm text-muted-foreground">{ label }</span>
 		</dd>
-	</div>
+	}
 }
 
 // ---------------------------------------------------------------- commands
@@ -254,12 +245,12 @@ templ HomeCommands() {
 }
 
 templ homeCommand(command, text string) {
-	<div class={ homeSurface, "grid gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12" }>
+	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12"))}) {
 		<p class="font-mono text-[clamp(1.35rem,5.4vw,2.6rem)] leading-tight font-medium tracking-[-0.04em] break-words">
 			<span class="text-muted-foreground/60">$ </span>{ command }
 		</p>
 		<p class="max-w-md text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
-	</div>
+	}
 }
 
 // ---------------------------------------------------------------- ways in
@@ -296,20 +287,20 @@ templ HomeWaysIn() {
 				}
 			</div>
 			<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-				<span class="inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5">
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal text-card-foreground text-base font-normal inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5"}) {
 					<span class="text-[14px] font-semibold">Desktop app</span>
-					<span class="inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running">
+					@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running"}) {
 						<span class="ops-turn inline-block leading-none">◐</span>
 						coming soon
-					</span>
-				</span>
+					}
+				}
 			</div>
 		</div>
 	</section>
 }
 
 templ homeWay(name, text string) {
-	<div class={ homeSurface, "flex min-w-0 flex-col gap-6 p-5 sm:p-8" }>
+	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex min-w-0 flex-col gap-6 p-5 sm:p-8"))}) {
 		<div class="px-2 pt-2 sm:px-0 sm:pt-0">
 			<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ name }</p>
 			<p class="mt-2 text-[17px] leading-7 text-muted-foreground">{ text }</p>
@@ -317,7 +308,7 @@ templ homeWay(name, text string) {
 		<div class="mt-auto min-w-0">
 			{ children... }
 		</div>
-	</div>
+	}
 }
 
 // homeWayWeb is the deploy list of the app page, the pointer on v12.
@@ -339,7 +330,9 @@ templ homeWayDeploy(number, status, when string, hover bool) {
 		<span class="w-10 font-mono font-semibold">{ number }</span>
 		<span class={ "font-semibold", templ.KV("text-live", status == "live") }>{ status }</span>
 		if hover {
-			<span class="ml-auto rounded-full bg-card px-3 py-1 text-[13px] font-semibold shadow-[0_6px_18px_-10px_rgb(0_0_0/0.5)]">Roll back</span>
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal ml-auto rounded-full bg-card px-3 py-1 text-[13px] font-semibold text-card-foreground shadow-[0_6px_18px_-10px_rgb(0_0_0/0.5)]"}) {
+				Roll back
+			}
 		} else {
 			<span class="ml-auto text-[13px] text-muted-foreground tabular-nums">{ when }</span>
 		}
@@ -381,7 +374,7 @@ templ HomeBackups() {
 }
 
 templ homeFact(title, text, kind string) {
-	<div class={ homeSurface, "p-7 sm:p-10" }>
+	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-10"))}) {
 		<p class="flex items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
 			if kind == "live" {
 				<span class="lp-pulse size-2.5 rounded-full bg-live"></span>
@@ -389,14 +382,14 @@ templ homeFact(title, text, kind string) {
 			{ title }
 		</p>
 		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
-	</div>
+	}
 }
 
 // ---------------------------------------------------------------- data
 templ HomeData() {
 	<section id="data" class="scroll-mt-24 pt-3">
 		<div class={ homeWrap }>
-			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16" }>
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
 					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Your data, live.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
@@ -417,7 +410,7 @@ templ HomeData() {
 					<p class="mt-4"><span class="text-terminal-foreground/50">$ </span>ops sql --write "UPDATE orders SET status = 'shipped' WHERE id = 412"</p>
 					<p class="text-live">✓ 1 row changed</p>
 				</div>
-			</div>
+			}
 		</div>
 	</section>
 }
@@ -426,7 +419,7 @@ templ HomeData() {
 templ HomeNoDocker() {
 	<section class="pt-3">
 		<div class={ homeWrap }>
-			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16" }>
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
 					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Never touched Docker? Fine.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
@@ -443,7 +436,7 @@ templ HomeNoDocker() {
 					@homeFile("compose.yml", "written by ops", "")
 					@homeFile("/data/app.db", "found and kept", "live")
 				</div>
-			</div>
+			}
 		</div>
 	</section>
 }
@@ -452,10 +445,10 @@ templ homeFile(name, note, kind string) {
 	<div class="flex items-center justify-between gap-4 px-5 py-4">
 		<span class="font-mono text-[14px] font-medium">{ name }</span>
 		if kind == "live" {
-			<span class="inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live">
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live"}) {
 				<span class="size-1.5 rounded-full bg-live"></span>
 				{ note }
-			</span>
+			}
 		} else {
 			<span class="text-[14px] text-muted-foreground">{ note }</span>
 		}
@@ -466,7 +459,7 @@ templ homeFile(name, note, kind string) {
 templ HomeStatement() {
 	<section class="pt-3">
 		<div class={ homeWrap }>
-			<div class="rounded-[28px] bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20">
+			@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible text-background rounded-[28px] bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20"}) {
 				<p class={ homeDisplay, "text-[clamp(2.4rem,7.2vw,6rem)]" }>
 					<span class="block">Your servers.</span>
 					<span class="block">Your data.</span>
@@ -477,17 +470,21 @@ templ HomeStatement() {
 				</p>
 				<div class="mt-10 flex max-w-xl flex-col gap-3 text-[17px] leading-7 sm:text-lg" data-coming-soon>
 					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						<span class="rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background">coming soon</span>
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
+							coming soon
+						}
 						<span class="text-background">Hosted ops stores your login. Nothing else.</span>
 						<span class="text-background/65">Env vars and keys live only on your servers.</span>
 					</p>
 					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						<span class="rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background">coming soon</span>
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
+							coming soon
+						}
 						<span class="text-background">End-to-end encrypted.</span>
 						<span class="text-background/65">We can't read your secrets or your data. Not won't, can't.</span>
 					</p>
 				</div>
-			</div>
+			}
 		</div>
 	</section>
 }
@@ -505,7 +502,7 @@ templ HomePricing() {
 				The difference is the work around it.
 			</p>
 			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
-				<div class={ homeSurface, "flex flex-col p-7 sm:p-10" } data-plan="self-hosted">
+				@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-7 sm:p-10")), Attributes: templ.Attributes{"data-plan": "self-hosted"}}) {
 					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Self-hosted</p>
 					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
 						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$0</span>
@@ -521,17 +518,19 @@ templ HomePricing() {
 						@homePlanRow("goilerplate", "Not included", false)
 					</dl>
 					<div class="mt-auto pt-10">
-						<a href="/docs/self-hosting" class="inline-flex h-12 items-center gap-2 rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">
+						@button.Button(button.Props{Href: "/docs/self-hosting", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
 							Host it yourself
 							@icon.ArrowRight(icon.Props{Class: "size-4"})
-						</a>
+						}
 					</div>
-				</div>
-				<div class="flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10" data-plan="hosted">
+				}
+				@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible text-background flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10", Attributes: templ.Attributes{"data-plan": "hosted"}}) {
 					<p class="flex flex-wrap items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
 						Hosted
 						if !ctxkeys.RenderConfig(ctx).SignupsOpen {
-							<span class="rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold" data-private-beta>Private beta</span>
+							@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold text-background", Attributes: templ.Attributes{"data-private-beta": true}}) {
+								Private beta
+							}
 						}
 					</p>
 					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
@@ -548,16 +547,16 @@ templ HomePricing() {
 						@homePlanRow("goilerplate", "Free with yearly, $99", true)
 					</dl>
 					<div class="mt-auto pt-10">
-						<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-background px-7 text-[15px] font-semibold text-foreground transition-opacity hover:opacity-85">
+						@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: homeCTA + " bg-background text-foreground hover:bg-background/85"}) {
 							if ctxkeys.RenderConfig(ctx).SignupsOpen {
 								Get started
 							} else {
 								Join the waitlist
 							}
 							@icon.ArrowRight(icon.Props{Class: "size-4"})
-						</a>
+						}
 					</div>
-				</div>
+				}
 			</div>
 			<p class="mt-5 text-center text-sm text-muted-foreground">Your apps run on your servers either way, and your data never leaves them.</p>
 		</div>
@@ -576,7 +575,7 @@ templ HomeFAQ() {
 	<section id="faq" class="scroll-mt-24 pb-32 sm:pb-44">
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Questions.</h2>
-			<div class={ homeSurface, "mt-10 divide-y divide-border px-2 sm:px-4" }>
+			@accordion.Accordion(accordion.Props{Multiple: true, Class: utils.CN(homeSurface, "mt-10 px-2 sm:px-4")}) {
 				@homeQuestion("What can I deploy?") {
 					Any repo with a compose.yml, a Dockerfile or a go.mod. ops builds it on your server, checks that it comes up healthy and starts the previous version again when it does not.
 				}
@@ -609,19 +608,21 @@ templ HomeFAQ() {
 						Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
 					}
 				}
-			</div>
+			}
 		</div>
 	</section>
 }
 
 templ homeQuestion(question string) {
-	<details class="group">
-		<summary class="flex cursor-pointer list-none items-center justify-between gap-6 px-4 py-5 text-[17px] font-semibold sm:px-5 sm:py-6 sm:text-lg [&::-webkit-details-marker]:hidden">
+	@accordion.Item() {
+		@accordion.Trigger(accordion.TriggerProps{Class: "items-center gap-6 rounded-none px-4 py-5 text-[17px] font-semibold hover:no-underline sm:px-5 sm:py-6 sm:text-lg **:data-[slot=accordion-trigger-icon]:hidden"}) {
 			{ question }
-			@icon.Plus(icon.Props{Class: "size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-45"})
-		</summary>
-		<p class="max-w-2xl px-4 pb-6 text-[16px] leading-7 text-muted-foreground sm:px-5 sm:text-[17px]">
-			{ children... }
-		</p>
-	</details>
+			@icon.Plus(icon.Props{Class: "ml-auto size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-45"})
+		}
+		@accordion.Content(accordion.ContentProps{Class: "pb-0"}) {
+			<p class="max-w-2xl px-4 pb-6 text-[16px] leading-7 text-muted-foreground sm:px-5 sm:text-[17px]">
+				{ children... }
+			</p>
+		}
+	}
 }

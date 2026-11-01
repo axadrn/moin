@@ -2,6 +2,8 @@ package blocks
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -52,18 +54,22 @@ templ Navbar() {
 					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
 				</div>
 				if user != nil {
-					<a href="/app" class="ml-1 inline-flex h-10 items-center gap-1.5 rounded-full bg-brand px-5 text-[14px] font-semibold text-brand-foreground transition-opacity hover:opacity-85 sm:h-12 sm:px-6">
+					@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Size: button.SizeLg, Class: "ml-1 gap-1.5 text-[14px] sm:h-12 sm:px-6"}) {
 						Dashboard
 						@icon.ArrowRight(icon.Props{Class: "size-3.5"})
-					</a>
+					}
 				} else {
-					<a href="/auth" class="hidden h-10 items-center rounded-full bg-secondary px-5 text-[14px] font-semibold transition-opacity hover:opacity-80 sm:inline-flex sm:h-12 sm:px-6">Sign in</a>
-					<a href="/auth" class="ml-1 inline-flex h-10 items-center rounded-full bg-brand px-5 text-[14px] font-semibold text-brand-foreground transition-opacity hover:opacity-85 sm:h-12 sm:px-6">Get started</a>
+					@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "hidden text-[14px] sm:inline-flex sm:h-12 sm:px-6"}) {
+						Sign in
+					}
+					@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: "ml-1 text-[14px] sm:h-12 sm:px-6"}) {
+						Get started
+					}
 				}
 				@sheet.Sheet(sheet.Props{ID: "mobile-nav"}) {
-					<button type="button" class="inline-flex size-10 items-center justify-center rounded-full text-foreground hover:bg-secondary md:hidden" aria-label="Open menu" { sheet.Trigger(ctx)... }>
+					@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIconLg, Class: "text-foreground hover:bg-secondary md:hidden", Attributes: utils.MergeAttributes(sheet.Trigger(ctx), templ.Attributes{"aria-label": "Open menu"})}) {
 						@icon.Menu(icon.Props{Class: "size-5"})
-					</button>
+					}
 					@sheet.Content(sheet.ContentProps{Side: sheet.SideRight, Class: "w-full gap-0 sm:max-w-sm"}) {
 						@MobileNav()
 					}
@@ -94,10 +100,16 @@ templ MobileNav() {
 		</div>
 		<div class="space-y-2.5 border-t p-6">
 			if user != nil {
-				<a href="/app" class="flex h-12 w-full items-center justify-center rounded-full bg-brand text-[15px] font-semibold text-brand-foreground">Dashboard</a>
+				@button.Button(button.Props{Href: "/app", Variant: button.VariantBrand, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px]"}) {
+					Dashboard
+				}
 			} else {
-				<a href="/auth" class="flex h-12 w-full items-center justify-center rounded-full bg-brand text-[15px] font-semibold text-brand-foreground">Get started</a>
-				<a href="/auth" class="flex h-12 w-full items-center justify-center rounded-full bg-secondary text-[15px] font-semibold text-foreground">Sign in</a>
+				@button.Button(button.Props{Href: "/auth", Variant: button.VariantBrand, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px]"}) {
+					Get started
+				}
+				@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "flex h-12 w-full text-[15px] text-foreground"}) {
+					Sign in
+				}
 			}
 			<div class="flex items-center justify-between pt-3">
 				<span class="text-sm text-muted-foreground">Theme</span>

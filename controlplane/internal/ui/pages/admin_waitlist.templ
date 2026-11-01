@@ -2,9 +2,12 @@ package pages
 
 import (
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/checkbox"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
@@ -20,7 +23,9 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 				<p class="mt-1 text-sm text-muted-foreground">Who waits for the private beta, and who is in. <a href="/admin" class="underline-offset-4 hover:underline">Back to admin</a></p>
 			</div>
 			if notice != "" {
-				<p class="rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live" role="status" data-waitlist-notice>{ notice }</p>
+				@alert.Alert(alert.Props{Class: "border-0 rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live", Attributes: templ.Attributes{"data-waitlist-notice": true}}) {
+					{ notice }
+				}
 			}
 			@card.Card() {
 				@card.Header() {
@@ -35,8 +40,8 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 					<form method="POST" action="/admin/waitlist" class="flex flex-wrap items-center gap-3" data-let-in-form>
 						@csrf.Token()
 						@input.Input(input.Props{Name: "email", Type: "email", Placeholder: "name@example.com", Class: "max-w-sm", Attributes: templ.Attributes{"required": true}})
-						<label class="flex items-center gap-2 text-sm">
-							<input type="checkbox" name="forever_free" value="true"/>
+						<label class="flex cursor-pointer items-center gap-2 text-sm">
+							@checkbox.Checkbox(checkbox.Props{Name: "forever_free", Value: "true"})
 							Free forever
 						</label>
 						@button.Button(button.Props{Type: button.TypeSubmit}) {
@@ -49,33 +54,35 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 				@card.Content() {
 					<ul class="divide-y divide-border" role="list">
 						for _, entry := range entries {
-							<li class="flex flex-wrap items-center justify-between gap-3 py-3" data-waitlist-entry={ entry.Email }>
-								<div class="min-w-0">
-									<p class="truncate font-medium">{ entry.Email }</p>
-									<p class="text-xs text-muted-foreground">
-										joined { entry.CreatedAt.Format("2006-01-02") }
-										if entry.LetInAt != nil {
-											· in since { entry.LetInAt.Format("2006-01-02") }
-										}
-										if entry.ForeverFree {
-											· free forever
-										}
-									</p>
-								</div>
-								if entry.LetInAt == nil {
-									<form method="POST" action="/admin/waitlist" class="flex items-center gap-3">
-										@csrf.Token()
-										<input type="hidden" name="email" value={ entry.Email }/>
-										<label class="flex items-center gap-2 text-xs text-muted-foreground">
-											<input type="checkbox" name="forever_free" value="true"/>
-											Free forever
-										</label>
-										@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
-											Let in
-										}
-									</form>
-								} else {
-									<span class="text-xs font-semibold text-live">in</span>
+							<li data-waitlist-entry={ entry.Email }>
+								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex flex-wrap items-center justify-between gap-3 py-3"}) {
+									<div class="min-w-0">
+										<p class="truncate font-medium">{ entry.Email }</p>
+										<p class="text-xs text-muted-foreground">
+											joined { entry.CreatedAt.Format("2006-01-02") }
+											if entry.LetInAt != nil {
+												· in since { entry.LetInAt.Format("2006-01-02") }
+											}
+											if entry.ForeverFree {
+												· free forever
+											}
+										</p>
+									</div>
+									if entry.LetInAt == nil {
+										<form method="POST" action="/admin/waitlist" class="flex items-center gap-3">
+											@csrf.Token()
+											<input type="hidden" name="email" value={ entry.Email }/>
+											<label class="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+												@checkbox.Checkbox(checkbox.Props{Name: "forever_free", Value: "true"})
+												Free forever
+											</label>
+											@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+												Let in
+											}
+										</form>
+									} else {
+										<span class="text-xs font-semibold text-live">in</span>
+									}
 								}
 							</li>
 						}

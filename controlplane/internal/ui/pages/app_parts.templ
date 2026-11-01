@@ -2,8 +2,11 @@ package pages
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
 	"time"
 
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 )
 
@@ -46,41 +49,48 @@ templ command(cmd string) {
 
 // copyButton copies value, or the text of the element target selects.
 templ copyButton(value, target, label string) {
-	<button
-		type="button"
-		data-copy={ value }
-		if target != "" {
-			data-copy-target={ target }
-		}
-		aria-label={ label }
-		title={ label }
-		class="group/copy inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-	>
+	{{ attrs := templ.Attributes{"data-copy": value, "aria-label": label, "title": label} }}
+	if target != "" {
+		{{ attrs["data-copy-target"] = target }}
+	}
+	@button.Button(button.Props{
+		Variant:    button.VariantGhost,
+		Size:       button.SizeIconSm,
+		Class:      "group/copy text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:ring-ring focus-visible:ring-offset-0",
+		Attributes: attrs,
+	}) {
 		@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
 		@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
-	</button>
+	}
 }
 
 // emptyState is a box that says what is missing and the command that adds it.
 templ emptyState(title, body, cmd string) {
-	<div class="ops-panel flex flex-col items-start gap-5 px-6 py-10 sm:items-center sm:px-10 sm:py-16 sm:text-center">
-		<div class="space-y-1.5">
-			<p class="ops-panel-title">{ title }</p>
-			if body != "" {
-				<p class="max-w-md text-sm text-pretty text-muted-foreground">{ body }</p>
+	@card.Card(card.Props{Class: panelClasses}) {
+		@empty.Empty(empty.Props{Class: "items-start gap-5 rounded-none px-6 py-10 text-left sm:items-center sm:px-10 sm:py-16 sm:text-center"}) {
+			@empty.Header(empty.HeaderProps{Class: "max-w-none items-start gap-1.5 sm:items-center"}) {
+				@empty.Title(empty.TitleProps{Class: "font-sans text-[20px] leading-[1.2] font-bold tracking-[-0.02em]"}) {
+					{ title }
+				}
+				if body != "" {
+					@empty.Description(empty.DescriptionProps{Class: "max-w-md text-sm text-pretty"}) {
+						{ body }
+					}
+				}
 			}
-		</div>
-		if cmd != "" {
-			<div class="w-full max-w-xs">
-				@command(cmd)
-			</div>
+			if cmd != "" {
+				@empty.Content(empty.ContentProps{Class: "max-w-xs items-stretch"}) {
+					@command(cmd)
+				}
+			}
+			{ children... }
 		}
-		{ children... }
-	</div>
+	}
 }
 
-// selectClasses gives a native select the look of an input.
-const selectClasses = "ops-select h-10 cursor-pointer appearance-none rounded-full border border-transparent bg-secondary pr-9 pl-4 text-sm font-medium transition-[border-color,box-shadow] outline-none hover:border-[color-mix(in_oklch,var(--input),var(--foreground)_15%)] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 dark:bg-white/[0.03]"
+// panelClasses turn a card into a panel of the control panel: the card's
+// look without its padding, the content brings its own.
+const panelClasses = "block gap-0 py-0 text-base"
 
 // ago is how long ago t was, short: "now", "4m ago", "3h ago", "12d ago".
 func ago(t time.Time, now time.Time) string {

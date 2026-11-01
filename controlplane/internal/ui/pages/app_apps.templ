@@ -2,6 +2,9 @@ package pages
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"strconv"
 	"strings"
 	"time"
@@ -12,9 +15,11 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -65,25 +70,53 @@ templ AppAddForm(servers []model.Server, name, server, nameError string) {
 				Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "app-name-error", "data-hotkey-focus": true},
 			})
 			if nameError != "" {
-				<p id="app-name-error" class="px-4 text-xs text-failed" role="alert">{ nameError }</p>
+				@field.Error(field.ErrorProps{ID: "app-name-error", Class: "font-normal px-4 text-xs text-failed"}) {
+					{ nameError }
+				}
 			}
 		</div>
 		<div class="flex gap-2">
 			<label for="app-server" class="sr-only">Server</label>
-			<select id="app-server" name="server" class={ selectClasses + " min-w-0 flex-1 sm:w-36 sm:flex-none" } disabled?={ len(servers) == 0 }>
-				if len(servers) == 0 {
-					<option value="">No server</option>
+			@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: appAddServer(servers, server), Items: appAddServerItems(servers), Disabled: len(servers) == 0}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-server", Class: "min-w-0 flex-1 rounded-full border-transparent bg-secondary pr-3 pl-4 font-medium data-[size=default]:h-10 sm:w-36 sm:flex-none dark:bg-white/[0.03]"}) {
+					@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No server"})
 				}
-				for _, option := range servers {
-					<option value={ option.Name } selected?={ option.Name == server }>{ option.Name }</option>
+				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+					for _, option := range servers {
+						@selectcomp.Item(selectcomp.ItemProps{Value: option.Name}) {
+							{ option.Name }
+						}
+					}
 				}
-			</select>
+			}
 			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantBrand, Size: button.SizeLg, Disabled: len(servers) == 0}) {
 				@icon.Plus(icon.Props{Class: "size-4"})
 				Add app
 			}
 		</div>
 	</form>
+}
+
+// appAddServer is the server the add form selects: the one asked for, else
+// the first, like a native select without a selected option.
+func appAddServer(servers []model.Server, server string) string {
+	for _, option := range servers {
+		if option.Name == server {
+			return server
+		}
+	}
+	if len(servers) > 0 {
+		return servers[0].Name
+	}
+	return ""
+}
+
+func appAddServerItems(servers []model.Server) []selectcomp.ItemData {
+	items := make([]selectcomp.ItemData, 0, len(servers))
+	for _, option := range servers {
+		items = append(items, selectcomp.ItemData{Value: option.Name, Label: option.Name})
+	}
+	return items
 }
 
 // AppList is the overview and the apps. The page reloads it on every change
@@ -108,52 +141,56 @@ templ AppList(view AppsView) {
 				@statTile("Failed", strconv.Itoa(failed), failedNote(failed))
 				@statTile("Servers online", strconv.Itoa(onlineServers(view.Servers)), "of "+strconv.Itoa(len(view.Servers)))
 			</dl>
-			<section class="ops-panel mt-4 overflow-hidden" aria-labelledby="apps-heading">
+			@card.Card(card.Props{Class: "block gap-0 py-0 text-base mt-4 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "apps-heading", "role": "region"}}) {
 				<div class="flex items-baseline justify-between px-5 pt-4 pb-1.5">
-					<h2 id="apps-heading" class="ops-panel-title">All apps</h2>
+					@card.Title(card.TitleProps{ID: "apps-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+						All apps
+					}
 					<span class="text-xs text-muted-foreground">{ plural(len(view.Apps), "app", "apps") }</span>
 				</div>
 				<ul class="ops-group px-2 pb-2 [--ops-inset:1.25rem]" role="list">
 					for _, app := range view.Apps {
 						{{ newest, hasNewest := view.Newest[app.ID] }}
-						<li data-app={ app.Name } class="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-xl px-3 py-3 transition-colors hover:bg-muted/70 has-[a:focus-visible]:bg-muted/70 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_1rem]">
-							<div class="min-w-0">
-								<a
-									href={ templ.SafeURL(basePath + "/apps/" + app.Name) }
-									class="block truncate text-[0.9375rem] font-semibold tracking-[-0.01em] outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
-								>{ app.Name }</a>
-								<p class="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">
-									if hasNewest && newest.Detected != nil {
-										<span class="font-mono text-xs">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
-										<span class="opacity-60">·</span>
-										{ newest.Detected.Kind }
-										<span class="opacity-60">·</span>
+						<li data-app={ app.Name }>
+							@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-xl px-3 py-3 transition-colors hover:bg-muted/70 has-[a:focus-visible]:bg-muted/70 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_1rem]"}) {
+								<div class="min-w-0">
+									<a
+										href={ templ.SafeURL(basePath + "/apps/" + app.Name) }
+										class="block truncate text-[0.9375rem] font-semibold tracking-[-0.01em] outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
+									>{ app.Name }</a>
+									<p class="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">
+										if hasNewest && newest.Detected != nil {
+											<span class="font-mono text-xs">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
+											<span class="opacity-60">·</span>
+											{ newest.Detected.Kind }
+											<span class="opacity-60">·</span>
+										}
+										{ app.ServerName }
+									</p>
+								</div>
+								<span class="justify-self-end md:justify-self-start">
+									@appStatus(app)
+								</span>
+								<span class="hidden text-[0.8125rem] text-muted-foreground tabular-nums md:block">
+									if hasNewest {
+										<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
+									} else {
+										never deployed
 									}
-									{ app.ServerName }
-								</p>
-							</div>
-							<span class="justify-self-end md:justify-self-start">
-								@appStatus(app)
-							</span>
-							<span class="hidden text-[0.8125rem] text-muted-foreground tabular-nums md:block">
-								if hasNewest {
-									<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
-								} else {
-									never deployed
-								}
-							</span>
-							@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground md:block"})
+								</span>
+								@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground md:block"})
+							}
 						</li>
 					}
 				</ul>
-			</section>
+			}
 		}
 	</div>
 }
 
 // statTile is a number with its label, big, and a short note next to it.
 templ statTile(label, value, note string) {
-	<div class="ops-panel min-w-0 px-5 py-[1.125rem]">
+	@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible min-w-0 px-5 py-[1.125rem]"}) {
 		<dt class="text-xs text-muted-foreground">{ label }</dt>
 		<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
 			<span class="font-display text-[1.875rem] leading-none tabular-nums">{ value }</span>
@@ -161,7 +198,7 @@ templ statTile(label, value, note string) {
 				<span class="truncate text-[0.8125rem] font-medium text-muted-foreground">{ note }</span>
 			}
 		</dd>
-	</div>
+	}
 }
 
 func failedNote(failed int) string {
@@ -215,7 +252,7 @@ func serverKind(servers []model.Server, id string) status.Kind {
 
 templ appStatus(app model.App) {
 	<span data-status class="inline-flex flex-wrap items-center gap-2">
-		switch {
+		switch  {
 			case app.LatestNumber == 0:
 				@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
 					new
@@ -299,16 +336,18 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 			@appFacts(app, deploys)
 			<div class="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
 				<div class="flex min-w-0 flex-col gap-4">
-					<section aria-labelledby="deploy-log-heading" class="ops-panel flex min-w-0 flex-col overflow-hidden">
-						<div class={ panelHeadClasses }>
-							<h2 id="deploy-log-heading" class="ops-panel-title">Deploy log <span id="deploy-log-version" class="text-muted-foreground"></span></h2>
+					@card.Card(card.Props{Class: "gap-0 py-0 text-base flex min-w-0 flex-col overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "deploy-log-heading", "role": "region"}}) {
+						@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+							@card.Title(card.TitleProps{ID: "deploy-log-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+								Deploy log <span id="deploy-log-version" class="text-muted-foreground"></span>
+							}
 							<div class="flex items-center gap-1">
 								<span id="deploy-log-state" class="flex"></span>
 								<span data-deploy-log-copy class="contents">
 									@copyButton("", "", "Copy the log")
 								</span>
 							</div>
-						</div>
+						}
 						<div
 							id="deploy-log"
 							class="ops-term ops-term-lines max-h-[34rem] min-h-[12rem] overflow-auto overscroll-contain pt-2.5 pb-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
@@ -318,35 +357,36 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 						>
 							<p class="px-5 py-1 text-muted-foreground">No deploy yet. Run <span class="text-foreground">ops deploy { app.Name }</span> in its repo.</p>
 						</div>
-					</section>
-					<section aria-labelledby="app-logs-heading" class="ops-panel flex min-w-0 flex-col overflow-hidden">
-						<div class={ panelHeadClasses }>
-							<h2 id="app-logs-heading" class="ops-panel-title">Container logs</h2>
-							<button
-								type="button"
-								class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[0.8125rem] font-semibold text-secondary-foreground transition-[background-color,transform] outline-none hover:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_8%)] focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
-								hx-get={ basePath + "/apps/" + app.Name + "/logs" }
-								hx-target="#app-logs"
-								hx-swap="outerHTML"
-								hx-disable="this"
-							>
+					}
+					@card.Card(card.Props{Class: "gap-0 py-0 text-base flex min-w-0 flex-col overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-logs-heading", "role": "region"}}) {
+						@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+							@card.Title(card.TitleProps{ID: "app-logs-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+								Container logs
+							}
+							@button.Button(button.Props{
+								Variant:    button.VariantSecondary,
+								Size:       button.SizeSm,
+								Attributes: templ.Attributes{"hx-get": basePath + "/apps/" + app.Name + "/logs", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"},
+							}) {
 								Load logs
-							</button>
-						</div>
+							}
+						}
 						<div id="app-logs" class="ops-term px-5 pt-1.5 pb-5 text-muted-foreground">
 							<p>The last 200 lines of every container on { app.ServerName }. Same as <span class="text-foreground">ops logs { app.Name }</span>.</p>
 						</div>
-					</section>
+					}
 				</div>
 				<div class="flex min-w-0 flex-col gap-4">
 					@appDeploys(app, deploys)
-					<section aria-labelledby="app-env-heading" class="ops-panel min-w-0 overflow-hidden">
-						<div class={ panelHeadClasses }>
-							<h2 id="app-env-heading" class="ops-panel-title">Environment</h2>
+					@card.Card(card.Props{Class: "block gap-0 py-0 text-base min-w-0 overflow-hidden", Attributes: templ.Attributes{"aria-labelledby": "app-env-heading", "role": "region"}}) {
+						@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+							@card.Title(card.TitleProps{ID: "app-env-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+								Environment
+							}
 							<span class="text-xs text-muted-foreground">{ plural(len(envKeys), "encrypted", "encrypted") }</span>
-						</div>
+						}
 						@AppEnv(app.Name, envKeys, nil, "")
-					</section>
+					}
 				</div>
 			</div>
 			<div hx-get={ basePath + "/apps/" + app.Name + "/repo" } hx-trigger="load" hx-swap="outerHTML">
@@ -385,7 +425,7 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 	{{ now := time.Now() }}
 	{{ live, hasLive := deployByNumber(deploys, app.LiveNumber) }}
 	<dl id="app-facts" hx-swap-oob="true" class="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex min-w-0 flex-col justify-center px-5 py-[1.125rem]"}) {
 			<dt class="text-xs text-muted-foreground">Live</dt>
 			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
 				if app.LiveNumber > 0 {
@@ -397,8 +437,8 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 					<span class="font-display text-[1.875rem] leading-none text-muted-foreground/60">none</span>
 				}
 			</dd>
-		</div>
-		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+		}
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex min-w-0 flex-col justify-center px-5 py-[1.125rem]"}) {
 			<dt class="text-xs text-muted-foreground">Last deploy took</dt>
 			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
 				if d, number := lastTook(deploys); d != "" {
@@ -408,8 +448,8 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 					<span class="font-display text-[1.875rem] leading-none text-muted-foreground/60">—</span>
 				}
 			</dd>
-		</div>
-		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]">
+		}
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex min-w-0 flex-col justify-center px-5 py-[1.125rem]"}) {
 			<dt class="text-xs text-muted-foreground">Deploys</dt>
 			<dd class="mt-2 flex min-w-0 items-baseline gap-2.5">
 				<span class="font-display text-[1.875rem] leading-none tabular-nums">{ strconv.Itoa(app.LatestNumber) }</span>
@@ -419,8 +459,8 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 					<span class="truncate text-[0.8125rem] font-medium text-muted-foreground" title={ stamp(deploys[0].CreatedAt) }>last { ago(deploys[0].CreatedAt, now) }</span>
 				}
 			</dd>
-		</div>
-		<div class="ops-panel flex min-w-0 flex-col justify-center px-5 py-[1.125rem]" data-detected?={ detected != nil }>
+		}
+		@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible flex min-w-0 flex-col justify-center px-5 py-[1.125rem]", Attributes: templ.Attributes{"data-detected": detected != nil}}) {
 			<dt class="text-xs text-muted-foreground">Service</dt>
 			if detected != nil {
 				<dd class="mt-2 min-w-0">
@@ -435,7 +475,7 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 			} else {
 				<dd class="mt-2 text-[0.8125rem] text-muted-foreground">found on the first deploy</dd>
 			}
-		</div>
+		}
 	</dl>
 }
 
@@ -472,23 +512,15 @@ func lastTook(deploys []api.Deploy) (string, int) {
 templ appDeploys(app model.App, deploys []api.Deploy) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
-	<section
-		id="app-detail"
-		hx-swap-oob="true"
-		hx-get={ basePath + "/apps/" + app.Name + "/detail" }
-		hx-trigger="apps-changed from:body"
-		hx-swap="none"
-		data-latest-number={ strconv.Itoa(app.LatestNumber) }
-		data-latest-status={ app.LatestStatus }
-		aria-labelledby="deploys-heading"
-		class="ops-panel flex min-w-0 flex-col overflow-hidden"
-	>
-		<div class={ panelHeadClasses }>
-			<h2 id="deploys-heading" class="ops-panel-title">Deploys</h2>
+	@card.Card(card.Props{ID: "app-detail", Class: "gap-0 py-0 text-base flex min-w-0 flex-col overflow-hidden", Attributes: templ.Attributes{"hx-swap-oob": "true", "hx-get": basePath + "/apps/" + app.Name + "/detail", "hx-trigger": "apps-changed from:body", "hx-swap": "none", "data-latest-number": strconv.Itoa(app.LatestNumber), "data-latest-status": app.LatestStatus, "aria-labelledby": "deploys-heading", "role": "region"}}) {
+		@card.Header(card.HeaderProps{Class: panelHeadClasses}) {
+			@card.Title(card.TitleProps{ID: "deploys-heading", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
+				Deploys
+			}
 			if len(deploys) > 0 {
 				<span class="text-xs text-muted-foreground">newest first</span>
 			}
-		</div>
+		}
 		if len(deploys) == 0 {
 			<div class="flex flex-col items-start gap-3 px-5 pt-1 pb-5">
 				<p class="text-sm text-muted-foreground">No deploys yet. Run this in the repo of { app.Name }:</p>
@@ -503,69 +535,72 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 						data-deploy={ strconv.Itoa(deploy.Number) }
 						data-extra?={ i >= deploysShown }
 						data-line-cut?={ i == deploysShown-1 && i < len(deploys)-1 }
-						class="group/deploy grid grid-cols-[1.375rem_2.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50 has-[[data-follow-deploy]:focus-visible]:bg-muted/50 data-selected:bg-muted"
+						class="group/deploy"
 					>
-						<span class="ops-node mt-[0.3125rem]" data-kind={ nodeKind(deploy, app.LiveNumber) } aria-hidden="true"></span>
-						<span class="text-[0.9375rem] font-bold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
-						<button
-							type="button"
-							data-follow-deploy={ strconv.Itoa(deploy.Number) }
-							class="min-w-0 cursor-pointer text-left text-[0.8125rem] text-muted-foreground outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
-							aria-label={ fmt.Sprintf("Show the log of v%d", deploy.Number) }
-						>
-							@deployStatus(deploy, app.LiveNumber)
-							if deploy.Commit != "" {
-								<span class="block truncate" title={ deploy.CommitMessage } data-deploy-commit>
-									<span class="font-mono text-foreground">{ shortCommit(deploy.Commit) }</span>
-									{ deploy.CommitMessage }
+						@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none grid grid-cols-[1.375rem_2.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50 has-[[data-follow-deploy]:focus-visible]:bg-muted/50 group-data-selected/deploy:bg-muted"}) {
+							<span class="ops-node mt-[0.3125rem]" data-kind={ nodeKind(deploy, app.LiveNumber) } aria-hidden="true"></span>
+							<span class="text-[0.9375rem] font-bold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								// A row of the timeline, not a pill: the whole row is the target.
+								Class:      "block h-auto min-w-0 justify-start rounded-none border-0 bg-transparent p-0 text-left text-[0.8125rem] font-normal tracking-normal whitespace-normal text-muted-foreground after:absolute after:inset-0 after:rounded-xl hover:bg-transparent hover:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring active:not-aria-[haspopup]:scale-100",
+								Attributes: templ.Attributes{"data-follow-deploy": strconv.Itoa(deploy.Number), "aria-label": fmt.Sprintf("Show the log of v%d", deploy.Number)},
+							}) {
+								@deployStatus(deploy, app.LiveNumber)
+								if deploy.Commit != "" {
+									<span class="block truncate" title={ deploy.CommitMessage } data-deploy-commit>
+										<span class="font-mono text-foreground">{ shortCommit(deploy.Commit) }</span>
+										{ deploy.CommitMessage }
+									</span>
+								}
+								if deploy.FromNumber > 0 {
+									<span class="block truncate">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
+								}
+								if deploy.Error != "" {
+									<span class="mt-0.5 block text-failed" title={ deploy.Error }>{ deploy.Error }</span>
+								}
+							}
+							<span class="relative flex items-center justify-end pt-0.5">
+								<span class={ "text-xs whitespace-nowrap text-muted-foreground tabular-nums transition-opacity", templ.KV("sm:group-hover/deploy:opacity-0 sm:group-data-selected/deploy:opacity-0 sm:group-has-[button:focus-visible]/deploy:opacity-0", canRollBack(app, deploy)) } title={ stamp(deploy.CreatedAt) }>
+									{ strings.TrimSuffix(ago(deploy.CreatedAt, now), " ago") }
+									if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
+										· { d }
+									}
 								</span>
-							}
-							if deploy.FromNumber > 0 {
-								<span class="block truncate">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
-							}
-							if deploy.Error != "" {
-								<span class="mt-0.5 block text-failed" title={ deploy.Error }>{ deploy.Error }</span>
-							}
-						</button>
-						<span class="relative flex items-center justify-end pt-0.5">
-							<span class={ "text-xs whitespace-nowrap text-muted-foreground tabular-nums transition-opacity", templ.KV("sm:group-hover/deploy:opacity-0 sm:group-data-selected/deploy:opacity-0 sm:group-has-[button:focus-visible]/deploy:opacity-0", canRollBack(app, deploy)) } title={ stamp(deploy.CreatedAt) }>
-								{ strings.TrimSuffix(ago(deploy.CreatedAt, now), " ago") }
-								if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
-									· { d }
+								if canRollBack(app, deploy) {
+									@button.Button(button.Props{
+										Variant: button.VariantSecondary,
+										Size:    button.SizeXs,
+										Class:   "relative z-10 group-data-selected/deploy:bg-card max-sm:ml-2 sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 sm:opacity-0 sm:group-hover/deploy:opacity-100 sm:group-data-selected/deploy:opacity-100 sm:focus-visible:opacity-100",
+										Attributes: templ.Attributes{
+											"hx-post":    basePath + "/apps/" + app.Name + "/rollback",
+											"hx-vals":    fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
+											"hx-swap":    "none",
+											"hx-disable": "this",
+											"hx-confirm": fmt.Sprintf("Start the release of v%d again?", deploy.Number),
+											"title":      fmt.Sprintf("Release v%d again", deploy.Number),
+										},
+									}) {
+										Roll back
+									}
 								}
 							</span>
-							if canRollBack(app, deploy) {
-								@button.Button(button.Props{
-									Variant: button.VariantSecondary,
-									Size:    button.SizeXs,
-									Class:   "relative z-10 group-data-selected/deploy:bg-card max-sm:ml-2 sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 sm:opacity-0 sm:group-hover/deploy:opacity-100 sm:group-data-selected/deploy:opacity-100 sm:focus-visible:opacity-100",
-									Attributes: templ.Attributes{
-										"hx-post":    basePath + "/apps/" + app.Name + "/rollback",
-										"hx-vals":    fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
-										"hx-swap":    "none",
-										"hx-disable": "this",
-										"hx-confirm": fmt.Sprintf("Start the release of v%d again?", deploy.Number),
-										"title":      fmt.Sprintf("Release v%d again", deploy.Number),
-									},
-								}) {
-									Roll back
-								}
-							}
-						</span>
+						}
 					</li>
 				}
 			</ol>
 			if len(deploys) > deploysShown {
-				<button
-					type="button"
-					data-show-all
-					class="mx-2 mb-2 flex h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-[0.8125rem] font-semibold text-muted-foreground transition-colors outline-none hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-				>
+				@button.Button(button.Props{
+					Variant:    button.VariantGhost,
+					Size:       button.SizeLg,
+					Class:      "mx-2 mb-2 gap-1.5 rounded-xl text-[0.8125rem] font-semibold text-muted-foreground hover:bg-muted/60",
+					Attributes: templ.Attributes{"data-show-all": true},
+				}) {
 					{ fmt.Sprintf("Show %d older", len(deploys)-deploysShown) }
-				</button>
+				}
 			}
 		}
-	</section>
+	}
 }
 
 // nodeKind is the color of a deploy's node on the timeline.
@@ -591,7 +626,7 @@ func canRollBack(app model.App, deploy api.Deploy) bool {
 const deploysShown = 8
 
 templ deployStatus(deploy api.Deploy, liveNumber int) {
-	switch {
+	switch  {
 		case deploy.Status == model.DeployRunning:
 			<strong class="block font-semibold text-running">deploying</strong>
 		case deploy.Status == model.DeployFailed:
@@ -687,27 +722,32 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 			</div>
 			<ul class="ops-group px-2 pb-2 [--ops-inset:1.25rem]" role="list">
 				for _, key := range keys {
-					<li data-env={ key } class="group/env flex h-11 items-center gap-3 rounded-xl pr-1.5 pl-3 transition-colors hover:bg-muted/60">
-						<span class="max-w-[55%] shrink-0 truncate font-mono text-[0.8125rem]" title={ key }>{ key }</span>
-						<span class="min-w-0 flex-1 truncate text-right font-mono text-[0.8125rem] text-muted-foreground">
-							if value, ok := values[key]; ok {
-								<span data-env-value class="text-foreground/80">{ value }</span>
-							} else {
-								<span class="tracking-[0.2em]">••••••</span>
+					<li data-env={ key }>
+						@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none group/env flex h-11 items-center gap-3 rounded-xl pr-1.5 pl-3 transition-colors hover:bg-muted/60"}) {
+							<span class="max-w-[55%] shrink-0 truncate font-mono text-[0.8125rem]" title={ key }>{ key }</span>
+							<span class="min-w-0 flex-1 truncate text-right font-mono text-[0.8125rem] text-muted-foreground">
+								if value, ok := values[key]; ok {
+									<span data-env-value class="text-foreground/80">{ value }</span>
+								} else {
+									<span class="tracking-[0.2em]">••••••</span>
+								}
+							</span>
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								Size:    button.SizeIconXs,
+								Class:   "text-muted-foreground hover:bg-failed/15 hover:text-failed focus-visible:opacity-100 sm:opacity-0 sm:group-hover/env:opacity-100",
+								Attributes: templ.Attributes{
+									"aria-label": "Remove " + key,
+									"title":      "Remove " + key,
+									"hx-delete":  envPath + "/" + key,
+									"hx-target":  "#app-env",
+									"hx-swap":    "outerHTML",
+									"hx-confirm": "Remove " + key + "? The next deploy drops it.",
+								},
+							}) {
+								@icon.X(icon.Props{Class: "size-3.5"})
 							}
-						</span>
-						<button
-							type="button"
-							class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,opacity] outline-none hover:bg-failed/15 hover:text-failed focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring sm:opacity-0 sm:group-hover/env:opacity-100"
-							aria-label={ "Remove " + key }
-							title={ "Remove " + key }
-							hx-delete={ envPath + "/" + key }
-							hx-target="#app-env"
-							hx-swap="outerHTML"
-							hx-confirm={ "Remove " + key + "? The next deploy drops it." }
-						>
-							@icon.X(icon.Props{Class: "size-3.5"})
-						</button>
+						}
 					</li>
 				}
 			</ul>
@@ -730,7 +770,9 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 			}
 		</form>
 		if formError != "" {
-			<p class="-mt-2 px-5 pb-4 text-xs text-failed" role="alert" data-env-error>{ formError }</p>
+			@field.Error(field.ErrorProps{Class: "font-normal -mt-2 px-5 pb-4 text-xs text-failed", Attributes: templ.Attributes{"data-env-error": true}}) {
+				{ formError }
+			}
 		}
 	</div>
 }

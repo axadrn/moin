@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"strconv"
 
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
@@ -49,11 +50,13 @@ templ StatusScreen(code, title, description, line string) {
 				<span class="truncate">{ line }</span>
 			</p>
 			<div class="mt-10 flex flex-wrap gap-3">
-				<a href="/" class="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-6 text-[15px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">
+				@button.Button(button.Props{Href: "/", Variant: button.VariantBrand, Size: button.SizeLg, Class: "h-12 gap-2 px-6 text-[15px]"}) {
 					@icon.ArrowLeft(icon.Props{Class: "size-4"})
 					Back to home
-				</a>
-				<a href="/docs" class="inline-flex h-12 items-center rounded-full border px-6 text-[15px] font-medium transition-colors hover:bg-accent">Read the docs</a>
+				}
+				@button.Button(button.Props{Href: "/docs", Variant: button.VariantGhost, Size: button.SizeLg, Class: "h-12 border-border px-6 text-[15px] text-foreground hover:bg-accent"}) {
+					Read the docs
+				}
 			</div>
 		</main>
 	</div>

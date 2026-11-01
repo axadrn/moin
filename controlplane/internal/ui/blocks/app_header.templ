@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
@@ -40,15 +41,10 @@ templ AppHeader(p AppHeaderProps) {
 			</ol>
 		</nav>
 		<div class="ml-auto flex items-center gap-1">
-			<a
-				href="/docs"
-				target="_blank"
-				rel="noopener"
-				class="hidden h-8 items-center gap-1 rounded-full px-3 text-[0.8125rem] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
-			>
+			@button.Button(button.Props{Href: "/docs", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeSm, Class: "hidden gap-1 px-3 font-normal text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener"}}) {
 				Docs
 				@icon.ArrowUpRight(icon.Props{Class: "size-3.5"})
-			</a>
+			}
 			@ThemeSwitcher(ThemeSwitcherProps{Class: "size-8 text-muted-foreground hover:text-foreground"})
 		</div>
 	</header>
