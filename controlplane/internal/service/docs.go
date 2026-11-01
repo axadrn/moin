@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,13 +18,33 @@ type DocsService struct {
 	parser      *markdown.Parser
 	contentPath string
 	docsTree    *model.DocPage
+	// appURL is this control plane, which the docs show in place of the
+	// placeholder.
+	appURL string
 }
 
-func NewDocsService(contentPath string) *DocsService {
+// docsPlaceholder is the control plane in the doc sources. Every page but
+// the self-hosting guide shows the real APP_URL instead, so commands copy
+// as they are.
+const docsPlaceholder = "https://ops.example.com"
+
+func NewDocsService(contentPath, appURL string) *DocsService {
 	return &DocsService{
 		parser:      markdown.NewParser(),
 		contentPath: contentPath,
+		appURL:      strings.TrimRight(appURL, "/"),
 	}
+}
+
+// withAppURL puts this control plane in place of the placeholder. The
+// self-hosting guide keeps it: there it stands for the reader's own.
+func (s *DocsService) withAppURL(content []byte, relPath string) []byte {
+	if s.appURL == "" || relPath == "self-hosting.md" {
+		return content
+	}
+	host := strings.TrimPrefix(strings.TrimPrefix(s.appURL, "https://"), "http://")
+	content = bytes.ReplaceAll(content, []byte(docsPlaceholder), []byte(s.appURL))
+	return bytes.ReplaceAll(content, []byte(strings.TrimPrefix(docsPlaceholder, "https://")), []byte(host))
 }
 
 func (s *DocsService) BuildDocsTree() error {
@@ -84,6 +105,7 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*model.DocPage, err
 	if err != nil {
 		return nil, err
 	}
+	content = s.withAppURL(content, relPath)
 
 	htmlContent, meta, err := s.parser.ParseWithFrontmatter(content)
 	if err != nil {
