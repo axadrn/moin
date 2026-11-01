@@ -62,14 +62,18 @@ func (m model) header(width int) []string {
 	}
 	servers := tab("servers", m.tab == tabServers, len(m.servers))
 	apps := tab("apps", m.tab == tabApps, len(m.apps))
-	activity := style.Muted.Render("activity")
-	if m.tab == tabActivity {
-		activity = style.Accent.Bold(true).Render("activity")
+	label := func(name string, active bool) string {
+		if active {
+			return style.Accent.Bold(true).Render(name)
+		}
+		return style.Muted.Render(name)
 	}
+	activity := label("activity", m.tab == tabActivity)
+	settings := label("settings", m.tab == tabSettings)
 	if m.tab == tabApps && m.detail != nil {
 		apps = style.Accent.Bold(true).Render("apps") + style.Muted.Render(" › ") + style.Bold.Render(m.detail.App.Name)
 	}
-	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps + "   " + activity
+	left := " " + style.Mark.Render(build.Name) + "   " + servers + "   " + apps + "   " + activity + "   " + settings
 
 	right := style.Muted.Render(host(m.url))
 	switch {
@@ -104,6 +108,8 @@ func (m model) body(width, room int) []string {
 		return m.serversView(width, room)
 	case m.tab == tabActivity:
 		return m.activityView(room)
+	case m.tab == tabSettings:
+		return m.settingsView(room)
 	case m.detail != nil:
 		return m.detailView(width, room)
 	}
@@ -169,7 +175,7 @@ func (m model) serversView(width, room int) []string {
 
 func (m model) appsView(room int) []string {
 	if len(m.apps) == 0 {
-		return empty("No apps yet.", fmt.Sprintf("Press d to deploy %s, or run %s deploy in a repo.", m.dir, build.Name))
+		return empty("No apps yet.", fmt.Sprintf("Press a to create one, or run %s deploy in a repo to create and deploy it.", build.Name))
 	}
 	rows := make([][]string, 0, len(m.apps))
 	for index, app := range m.apps {
@@ -201,19 +207,28 @@ func (m model) detailView(width, room int) []string {
 	lines = append(lines, "")
 
 	if len(m.detail.Deploys) == 0 {
-		lines = append(lines, pad+style.Muted.Render("No deploys yet. Press d to deploy "+m.dir+"."))
+		next := "No deploys yet. Press i to deploy an image or g to deploy from GitHub, or run " + build.Name + " deploy in its repo."
+		if app.Name == client.AppName("", m.dir) {
+			next = "No deploys yet. Press d to deploy " + m.dir + "."
+		}
+		lines = append(lines, pad+style.Muted.Render(next))
 	} else {
-		// The history gets up to 8 rows; with the output panel open it
-		// leaves the panel at least 6 lines.
-		history := min(len(m.detail.Deploys), 8)
+		// The history gets up to historyRows rows; with the output panel
+		// open it leaves the panel at least 6 lines, and keeps the pick in
+		// view.
+		history := min(len(m.detail.Deploys), historyRows)
 		if m.outputTitle != "" && room >= 0 {
 			history = max(min(history, room-len(lines)-1-4-6), 1)
 		}
-		rows := make([][]string, 0, history)
-		for _, deploy := range m.detail.Deploys[:history] {
+		rows := make([][]string, 0, historyRows)
+		selected := -1
+		for index, deploy := range m.detail.Deploys[:min(len(m.detail.Deploys), historyRows)] {
+			if deploy.Number == m.deployPick {
+				selected = index
+			}
 			rows = append(rows, m.deployRow(deploy, app.LiveNumber))
 		}
-		lines = append(lines, table([]string{"DEPLOY", "STATUS", "STARTED", "TOOK", "NOTE"}, rows, -1, -1)...)
+		lines = append(lines, table([]string{"DEPLOY", "STATUS", "STARTED", "TOOK", "NOTE"}, rows, selected, history+1)...)
 	}
 
 	if m.outputTitle != "" {
@@ -222,6 +237,9 @@ func (m model) detailView(width, room int) []string {
 	}
 	return lines
 }
+
+// historyRows is how many deploys the open app lists and lets you pick.
+const historyRows = 8
 
 func (m model) deployRow(deploy client.Deploy, liveNumber int) []string {
 	status := style.Deploy(deploy, liveNumber)
@@ -355,13 +373,41 @@ func (m model) prompt() ([]string, [][2]string) {
 	case modeAdd:
 		return bar(style.Accent, style.Bold.Render("Name: ")+m.input+cursor), [][2]string{{"enter", "add"}, {"esc", "cancel"}}
 	case modeEnv:
-		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, {"enter", "apply"}, {"esc", "close"}}
+		toggle := [2]string{"show", "values"}
+		if m.envShown {
+			toggle = [2]string{"hide", "values"}
+		}
+		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, toggle, {"enter", "apply"}, {"esc", "close"}}
 	case modeImage:
 		return bar(style.Accent, style.Bold.Render("Image: ")+m.input+cursor), [][2]string{{"enter", "deploy"}, {"esc", "cancel"}}
 	case modeSQL:
 		return bar(style.Accent, style.Bold.Render("SQL: ")+m.input+cursor), [][2]string{{"enter", "run"}, {"esc", "close"}}
 	case modeBackups:
-		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"esc", "close"}}
+		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"on/off", "snapshot before changes"}, {"esc", "close"}}
+	case modeGitHub:
+		return bar(style.Accent, style.Bold.Render("GitHub: ")+m.input+cursor), [][2]string{{"enter", "deploy the branch"}, {"branch, tag or commit", "deploy it"}, {"link owner/repo", "follow"}, {"unlink", "stop"}, {"esc", "close"}}
+	case modeForm:
+		field := m.form.fields[m.form.step]
+		shown := m.input
+		if field.secret {
+			shown = strings.Repeat("•", len([]rune(m.input)))
+		}
+		label := fmt.Sprintf("%s · %s (%d/%d): ", m.form.title, field.label, m.form.step+1, len(m.form.fields))
+		next := "next"
+		if m.form.step == len(m.form.fields)-1 {
+			next = "save"
+		}
+		keys := [][2]string{{"enter", next}, {"esc", "cancel"}}
+		if field.hint == "" {
+			return bar(style.Accent, style.Bold.Render(label)+shown+cursor), keys
+		}
+		return bar(style.Accent, style.Bold.Render(label)+shown+cursor, field.hint), keys
+	case modeConfirm:
+		color := style.Warning
+		if m.confirm.danger {
+			color = style.Danger
+		}
+		return bar(color, style.Bold.Render(m.confirm.question), m.confirm.detail), [][2]string{{"y", m.confirm.verb}, cancel}
 	case modeConfirmRestore:
 		return bar(style.Warning, style.Bold.Render("Restore "+m.pendingRestore+"?"), build.Name+" takes a snapshot of the current state first."), [][2]string{{"y", "restore"}, cancel}
 	case modeConfirmWrite:
@@ -387,22 +433,48 @@ func (m model) prompt() ([]string, [][2]string) {
 	case modeConfirmRollback:
 		app, _ := m.currentApp()
 		question := fmt.Sprintf("Roll %s back to the deploy before v%d?", app.Name, app.LiveNumber)
+		if m.pendingRollback != 0 {
+			question = fmt.Sprintf("Roll %s back to v%d?", app.Name, m.pendingRollback)
+		}
 		return bar(style.Warning, style.Bold.Render(question), "It starts the old images with the env they had."), [][2]string{{"y", "roll back"}, cancel}
 	}
 
-	here := client.AppName("", m.dir)
-	appKeys := [][2]string{{"d", "deploy " + here}, {"g", "deploy from GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"r", "rollback"}, {"x", "remove"}}
+	// Only keys that work here show: d needs the app of the directory,
+	// the app keys an app.
+	var appKeys [][2]string
+	if here := client.AppName("", m.dir); m.hasApp(here) {
+		appKeys = append(appKeys, [2]string{"d", "deploy " + here})
+	}
+	rollback := [2]string{"r", "rollback"}
+	if m.detail != nil && m.deployPick != 0 {
+		rollback = [2]string{"r", fmt.Sprintf("roll back to v%d", m.deployPick)}
+	}
+	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, rollback, {"x", "remove"}}...)
 	switch {
 	case m.tab == tabServers && m.added != nil:
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabActivity:
-		return nil, [][2]string{{"tab", "servers"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "settings"}, {"q", "quit"}}
+	case m.tab == tabSettings:
+		keys := [][2]string{{"tab", "servers"}, {"↑↓", "select"}, {"enter", "set"}, {"a", "add a registry"}}
+		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].set {
+			keys = append(keys, [2]string{"x", "remove"})
+		}
+		return nil, append(keys, [2]string{"q", "quit"})
+	case m.tab == tabServers && len(m.servers) == 0:
+		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
-		return nil, append(appKeys, [2]string{"esc", "back"}, [2]string{"q", "quit"})
+		keys := [][2]string{{"↑↓", "pick a deploy"}}
+		if m.deployPick != 0 {
+			keys = append(keys, [2]string{"enter", "its log"})
+		}
+		return nil, append(append(keys, appKeys...), [2]string{"esc", "back"}, [2]string{"q", "quit"})
+	case len(m.apps) == 0:
+		return nil, [][2]string{{"tab", "activity"}, {"a", "create an app"}, {"q", "quit"}}
 	}
-	keys := [][2]string{{"tab", "activity"}, {"↑↓", "select"}, {"enter", "open"}}
+	keys := [][2]string{{"tab", "activity"}, {"↑↓", "select"}, {"enter", "open"}, {"a", "create"}}
 	return nil, append(append(keys, appKeys...), [2]string{"q", "quit"})
 }
 

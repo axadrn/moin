@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/protocol"
@@ -123,7 +125,147 @@ func frames() map[string]model {
 		m.tab, m.detail, m.mode = tabApps, detail, modeConfirmWrite
 		m.pendingSQL = "UPDATE settings SET value = 'on' WHERE key = 'maintenance' AND value IS NOT NULL AND key != 'currency'"
 	})
+	add("detail-pick", func(m *model) { m.tab, m.detail, m.deployPick = tabApps, detail, 40 })
+	add("detail-rollback-pick", func(m *model) {
+		m.tab, m.detail, m.deployPick, m.mode, m.pendingRollback = tabApps, detail, 40, modeConfirmRollback, 40
+	})
+	add("detail-env-shown", func(m *model) {
+		m.tab, m.detail, m.outputID, m.outputTitle, m.output = tabApps, detail, 1, "env of hello", []string{"GREETING=hi", "TUI_KEY=secret"}
+		m.mode, m.envShown = modeEnv, true
+	})
+	add("detail-github", func(m *model) { m.tab, m.detail, m.mode, m.input = tabApps, detail, modeGitHub, "link acme/hello main" })
+	add("apps-add", func(m *model) {
+		*m = m.addAppForm()
+		m.tab, m.input = tabApps, "shop"
+	})
+	stored := settings{loaded: true, storage: &client.BackupStorage{Endpoint: "https://abc.r2.cloudflarestorage.com", Region: "auto", Bucket: "ops-backups", AccessKey: "AKIA123"},
+		integrations: client.Integrations{Cloudflare: true, CloudflareAccount: "Acme"},
+		registries:   []client.Registry{{Host: "ghcr.io", Username: "acme"}}}
+	stored.github.Enabled = true
+	add("settings", func(m *model) { m.tab, m.settings = tabSettings, stored })
+	add("settings-empty", func(m *model) { m.tab, m.settings = tabSettings, settings{loaded: true} })
+	add("settings-bucket", func(m *model) {
+		m.tab, m.settings, m.settingSelected = tabSettings, stored, 1
+		next, _ := m.editSetting(m.settingRows()[1])
+		*m = next.(model)
+		m.form.step, m.form.values, m.input = 5, []string{"", "", "", "", ""}, "secret"
+	})
+	add("settings-remove", func(m *model) {
+		m.tab, m.settings, m.settingSelected = tabSettings, stored, 4
+		*m = m.removeSetting(m.settingRows()[4])
+	})
 	return out
+}
+
+// press sends keys to a model, ignoring the commands they start.
+func press(m model, keys ...string) model {
+	for _, key := range keys {
+		msg := tea.KeyPressMsg{Code: []rune(key)[0], Text: key}
+		switch key {
+		case "esc":
+			msg = tea.KeyPressMsg{Code: tea.KeyEscape}
+		case "enter":
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
+		case "down":
+			msg = tea.KeyPressMsg{Code: tea.KeyDown}
+		case "up":
+			msg = tea.KeyPressMsg{Code: tea.KeyUp}
+		}
+		next, _ := m.Update(msg)
+		m = next.(model)
+	}
+	return m
+}
+
+// TestEscNeverQuits: esc closes what is open, only q quits.
+func TestEscNeverQuits(t *testing.T) {
+	for name, m := range frames() {
+		if m.mode != modeList {
+			continue
+		}
+		_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if cmd != nil {
+			if _, quit := cmd().(tea.QuitMsg); quit {
+				t.Errorf("%s: esc quits", name)
+			}
+		}
+		_, cmd = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+		if cmd == nil {
+			t.Errorf("%s: q does not quit", name)
+		} else if _, quit := cmd().(tea.QuitMsg); !quit {
+			t.Errorf("%s: q does not quit", name)
+		}
+	}
+}
+
+// TestEmptyAppsKeys: without apps the hint and the footer offer only what
+// works there.
+func TestEmptyAppsKeys(t *testing.T) {
+	m := frames()["apps-empty"]
+	m.width, m.height = 120, 30
+	content := strip(m.View().Content)
+	if strings.Contains(content, "Press d") || strings.Contains(content, "   d deploy") || strings.Contains(content, "rollback") {
+		t.Errorf("empty apps offers keys that do not work:\n%s", content)
+	}
+	if !strings.Contains(content, "a create an app") {
+		t.Errorf("empty apps does not offer a:\n%s", content)
+	}
+	other := frames()["apps"]
+	other.dir = "/home/me/elsewhere"
+	if _, keys := other.prompt(); slices.Contains(keys, [2]string{"d", "deploy elsewhere"}) {
+		t.Errorf("d shows for an app that does not exist")
+	}
+}
+
+// TestDeployPick: the arrows pick a deploy in the open app and r rolls back
+// to it; the live one cannot be picked for a rollback.
+func TestDeployPick(t *testing.T) {
+	m := frames()["detail"]
+	m = press(m, "down", "down")
+	if m.deployPick != 42 {
+		t.Fatalf("pick %d, want 42", m.deployPick)
+	}
+	m = press(m, "r")
+	if m.err == nil || m.mode != modeList {
+		t.Errorf("rolling back to the live deploy asks: %v", m.err)
+	}
+	m = press(m, "down", "r")
+	if m.mode != modeConfirmRollback || m.pendingRollback != 41 {
+		t.Errorf("mode %d, rollback %d; want a question for v41", m.mode, m.pendingRollback)
+	}
+	m = press(m, "n", "up", "up", "up")
+	if m.deployPick != 0 {
+		t.Errorf("up past the newest picks %d", m.deployPick)
+	}
+	m = press(m, "down", "esc")
+	if m.deployPick != 0 || m.detail == nil {
+		t.Errorf("esc drops the pick first")
+	}
+}
+
+// TestForm walks the new-app form: defaults fill empty answers, a needed
+// field without one stays.
+func TestForm(t *testing.T) {
+	m := frames()["apps-empty"]
+	m.dir = "/home/me/shop"
+	m.servers = m.servers[:1]
+	var got []string
+	m = press(m, "a")
+	if m.mode != modeForm {
+		t.Fatalf("a opens no form")
+	}
+	m.form.submit = func(values []string) tea.Cmd { got = values; return nil }
+	m = press(m, "enter", "enter")
+	if m.mode != modeList || !slices.Equal(got, []string{"shop", "dock-1"}) {
+		t.Errorf("form gave %v, mode %d", got, m.mode)
+	}
+	m.dir = "/home/me/hello"
+	m.apps = frames()["apps"].apps
+	m.servers = frames()["apps"].servers
+	m = press(m, "a", "enter")
+	if m.err == nil || m.form.step != 0 {
+		t.Errorf("an empty name with no default goes on")
+	}
 }
 
 // TestViewFits renders every frame at small and large sizes: it never has
