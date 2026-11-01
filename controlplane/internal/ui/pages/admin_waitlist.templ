@@ -2,12 +2,10 @@ package pages
 
 import (
 	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/checkbox"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
@@ -17,26 +15,18 @@ import (
 // everything without a payment.
 templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 	@layouts.Admin("Waitlist") {
-		<div class="space-y-8" data-waitlist-page>
-			<div>
-				<h1 class="text-2xl font-bold tracking-tight sm:text-[1.75rem] sm:leading-9">Waitlist</h1>
-				<p class="mt-1 text-sm text-muted-foreground">Who waits for the private beta, and who is in. <a href="/admin" class="underline-offset-4 hover:underline">Back to admin</a></p>
-			</div>
+		<div class="flex flex-col gap-6" data-waitlist-page>
+			@pageHeader("Waitlist", "Who waits for the private beta, and who is in.") {
+				@button.Button(button.Props{Href: "/admin", Variant: button.VariantSecondary}) {
+					Admin
+				}
+			}
 			if notice != "" {
-				@alert.Alert(alert.Props{Class: "border-0 rounded-2xl bg-live/12 px-5 py-3.5 text-sm font-medium text-live", Attributes: templ.Attributes{"data-waitlist-notice": true}}) {
+				@pageNotice(false, templ.Attributes{"data-waitlist-notice": true}) {
 					{ notice }
 				}
 			}
-			@card.Card() {
-				@card.Header() {
-					@card.Title() {
-						Let someone in
-					}
-					@card.Description() {
-						Anyone, on the list or not. They get an email with the sign-in link.
-					}
-				}
-				@card.Content() {
+			@panel(panelProps{Title: "Let someone in", Description: "Anyone, on the list or not. They get an email with the sign-in link."}) {
 					<form method="POST" action="/admin/waitlist" class="flex flex-wrap items-center gap-3" data-let-in-form>
 						@csrf.Token()
 						@input.Input(input.Props{Name: "email", Type: "email", Placeholder: "name@example.com", Class: "max-w-sm", Attributes: templ.Attributes{"required": true}})
@@ -48,16 +38,13 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 							Let in
 						}
 					</form>
-				}
 			}
-			@card.Card() {
-				@card.Content() {
-					<ul class="divide-y divide-border" role="list">
+			@panel(panelProps{Title: "People", Description: plural(len(entries), "person", "people") + ". Waiting first, then who is in.", Body: panelBodyRows}) {
+					<ul class="flex flex-col gap-1" role="list">
 						for _, entry := range entries {
-							<li data-waitlist-entry={ entry.Email }>
-								@item.Item(item.Props{Class: "flex-nowrap gap-0 p-0 text-base border-0 rounded-none flex flex-wrap items-center justify-between gap-3 py-3"}) {
+							<li data-waitlist-entry={ entry.Email } class="flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5 hover:bg-muted/60">
 									<div class="min-w-0">
-										<p class="truncate font-medium">{ entry.Email }</p>
+										<p class="truncate text-sm font-medium">{ entry.Email }</p>
 										<p class="text-xs text-muted-foreground">
 											joined { entry.CreatedAt.Format("2006-01-02") }
 											if entry.LetInAt != nil {
@@ -81,16 +68,16 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 											}
 										</form>
 									} else {
-										<span class="text-xs font-semibold text-live">in</span>
+										@status.Status(status.Props{Kind: status.KindLive}) {
+											in
+										}
 									}
-								}
 							</li>
 						}
 						if len(entries) == 0 {
-							<li class="py-3 text-sm text-muted-foreground">Nobody waits yet.</li>
+							<li class="px-3 py-2.5 text-sm text-muted-foreground">Nobody waits yet.</li>
 						}
 					</ul>
-				}
 			}
 		</div>
 	}

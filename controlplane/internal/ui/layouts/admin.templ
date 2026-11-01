@@ -14,12 +14,12 @@ templ Admin(title string) {
 				<div class="mx-auto flex h-12 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
 					<a href="/admin" class="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
 						@blocks.Wordmark("text-[1.125rem] leading-none")
-						<span class="text-[0.9375rem] font-semibold text-muted-foreground">Admin</span>
+						<span class="text-sm font-medium text-muted-foreground">Admin</span>
 					</a>
 					<div class="ml-auto flex items-center gap-2">
 						@blocks.ThemeSwitcher()
-						@button.Button(button.Props{Href: "/app", Variant: button.VariantOutline, Size: button.SizeSm}) {
-							@icon.ArrowLeft(icon.Props{Class: "size-4"})
+						@button.Button(button.Props{Href: "/app", Variant: button.VariantSecondary, Size: button.SizeSm}) {
+							@icon.ArrowLeft(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
 							Back to the panel
 						}
 					</div>
