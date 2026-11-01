@@ -71,12 +71,12 @@ func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database
 
 // Query runs SQL on one of the app's databases. A read returns at most
 // limit rows and cannot change anything; a write runs in one transaction
-// and goes into the activity with how many rows it changed, never its SQL:
-// that may hold your users' data.
+// and goes into the activity with what it did and how many rows it changed,
+// such as "UPDATE on orders", never its SQL: that may hold your users' data.
 func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database, sql string, params []any, write bool, limit int) (protocol.DBResult, error) {
 	result, err := s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, write, limit)
 	if err == nil && write {
-		s.servers.record(actor, "data.sql", "app", idOrName, map[string]string{"database": database, "changes": strconv.FormatInt(result.Changes, 10)})
+		s.servers.record(actor, "data.sql", "app", idOrName, map[string]string{"database": database, "statements": sqlSummary(sql), "changes": strconv.FormatInt(result.Changes, 10)})
 	}
 	return result, err
 }

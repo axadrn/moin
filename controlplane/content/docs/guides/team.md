@@ -47,4 +47,4 @@ Every change goes into the activity of the workspace: who did it, when, and how 
 
 It records deploys, redeploys, rollbacks, restores, snapshots, SQL writes, row edits, env vars, domains, passwords, registry logins, the bucket, GitHub, servers, their security and every member change. **Via** says how it came in: the web, the CLI (any API token), an agent over MCP, a deploy hook or a GitHub push.
 
-The activity never holds your data: env vars show their names, never their values, a SQL write shows how many rows it changed, never its SQL, and a row edit names the table, row and column, never the value.
+The activity never holds your data: env vars show their names, never their values, a SQL write shows what it did and how many rows it changed, such as `ran UPDATE on orders in shop, 3 rows changed`, never its SQL or a value, and a row edit names the table, row and column, never the value.

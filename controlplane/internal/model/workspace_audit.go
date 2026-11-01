@@ -140,13 +140,17 @@ func (e WorkspaceAuditEvent) Summary() string {
 	case "backup.snapshot_before_changes":
 		return on("turned the snapshot before changes %s for " + target)
 	case "data.sql":
+		what := "SQL"
+		if d["statements"] != "" {
+			what = d["statements"]
+		}
 		switch d["changes"] {
 		case "", "0":
-			return "ran SQL on " + target
+			return "ran " + what + " in " + target
 		case "1":
-			return "ran SQL on " + target + " that changed 1 row"
+			return "ran " + what + " in " + target + ", 1 row changed"
 		}
-		return "ran SQL on " + target + " that changed " + d["changes"] + " rows"
+		return "ran " + what + " in " + target + ", " + d["changes"] + " rows changed"
 	case "data.cell_updated":
 		return "edited " + d["column"] + " of row " + d["row"] + " in " + d["table"] + " of " + target
 	case "data.row_deleted":

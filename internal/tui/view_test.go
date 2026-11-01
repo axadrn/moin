@@ -70,7 +70,7 @@ func frames() map[string]model {
 		m.events = []client.Event{
 			{Actor: "ada@example.com", Via: "api", Summary: "deployed hello v43 from main at 3f2a9c1", CreatedAt: now},
 			{Actor: "GitHub", Via: "github", Summary: "deployed hello v42 from main at 9e1b7d0", CreatedAt: now.Add(-time.Hour)},
-			{Actor: "grace@example.com", Via: "web", Summary: "ran SQL on hello", CreatedAt: now.Add(-26 * time.Hour)},
+			{Actor: "grace@example.com", Via: "web", Summary: "ran UPDATE on orders in hello, 3 rows changed", CreatedAt: now.Add(-26 * time.Hour)},
 		}
 	})
 	add("activity-empty", func(m *model) { m.tab = tabActivity })
