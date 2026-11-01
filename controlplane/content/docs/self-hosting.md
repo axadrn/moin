@@ -1,10 +1,20 @@
 ---
 title: "Self-hosting"
-description: "Run your own control plane: the same ops, without billing"
-order: 15
+description: "Free forever: run all of ops yourself, the same product we host"
+order: 3
 ---
 
-**The short version:** ops is open source under AGPL-3.0, the control plane too. Run it on your own server with `BILLING=false` and you get the same product we host, with every feature and no limits, for free.
+**Free forever.** All of ops is open source under AGPL-3.0, the control plane too. Run it on your own server and you get exactly the product we host: every feature, unlimited servers, apps and members, no license key and no account with us.
+
+| | Self-hosted | Hosted |
+| --- | --- | --- |
+| Price | free forever | $29 a month or $290 a year, yearly with goilerplate included |
+| Features | all | all |
+| Servers, apps, members | unlimited | unlimited |
+| Who runs the control plane | you | us: updates, backups, uptime |
+| Where your apps run | your servers | your servers |
+
+You need nothing from us: no license key, and it never calls us. Prefer not to run it? Our hosted control plane is the same code.
 
 ## What is different
 

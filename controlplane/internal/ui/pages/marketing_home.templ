@@ -445,19 +445,64 @@ templ HomeStatement() {
 }
 
 // ---------------------------------------------------------------- pricing
+// HomePricing puts the free self-hosted ops next to the hosted one: the same
+// product, the only difference is who runs the control plane.
 templ HomePricing() {
 	<section id="pricing" class="scroll-mt-24 py-32 sm:py-44">
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "text-[clamp(2.4rem,6.4vw,5rem)]" }>One subscription.</h2>
-			<div class="mt-10 max-w-2xl space-y-5 text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<p>The price is announced at launch. Pay monthly or yearly, and yearly saves two months.</p>
-				<p><span class="text-foreground">Founding members lock the lowest price.</span> goilerplate customers get 50% off the first year.</p>
-			</div>
-			<div class="mt-10">
-				@homePrimary("Get started")
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Free to run. Or we run it.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				The same ops either way, every feature and no limits. The only difference is who runs the control plane.
+			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+				<div class={ homeSurface, "flex flex-col p-7 sm:p-10" } data-plan="self-hosted">
+					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Self-hosted</p>
+					<p class="mt-6 flex items-baseline gap-2">
+						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$0</span>
+						<span class="text-lg text-muted-foreground">free forever</span>
+					</p>
+					<ul class="mt-8 flex flex-col gap-3 text-[17px] leading-7 text-muted-foreground">
+						@homePlanLine("Open source under AGPL-3.0, all of it")
+						@homePlanLine("Every feature, unlimited servers, apps and members")
+						@homePlanLine("Your control plane on your own server")
+						@homePlanLine("Updates with a git pull")
+					</ul>
+					<div class="mt-auto pt-10">
+						<a href="/docs/self-hosting" class="inline-flex h-12 items-center gap-2 rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">
+							Host it yourself
+							@icon.ArrowRight(icon.Props{Class: "size-4"})
+						</a>
+					</div>
+				</div>
+				<div class="flex flex-col rounded-[24px] bg-foreground p-7 text-background sm:p-10" data-plan="hosted">
+					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Hosted</p>
+					<p class="mt-6 flex flex-wrap items-baseline gap-x-2">
+						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
+						<span class="text-lg text-background/65">a month, or $290 a year</span>
+					</p>
+					<ul class="mt-8 flex flex-col gap-3 text-[17px] leading-7 text-background/75">
+						@homePlanLine("Everything of self-hosted, run by us")
+						@homePlanLine("Updates, backups and uptime of the control plane")
+						@homePlanLine("Your apps still run on your servers")
+						@homePlanLine("Yearly: goilerplate included, worth $99")
+					</ul>
+					<div class="mt-auto pt-10">
+						<a href="/auth" class="inline-flex h-12 items-center gap-2 rounded-full bg-background px-7 text-[15px] font-semibold text-foreground transition-opacity hover:opacity-85">
+							Get started
+							@icon.ArrowRight(icon.Props{Class: "size-4"})
+						</a>
+					</div>
+				</div>
 			</div>
 		</div>
 	</section>
+}
+
+templ homePlanLine(text string) {
+	<li class="flex gap-3">
+		<span class="mt-[0.7em] size-1.5 shrink-0 rounded-full bg-current opacity-60"></span>
+		<span>{ text }</span>
+	</li>
 }
 
 // ---------------------------------------------------------------- faq

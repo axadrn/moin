@@ -6,6 +6,8 @@ order: 1
 
 ops deploys your apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. You use it from the browser, the `ops` CLI, the `ops` terminal UI and any AI agent through MCP. All four do the same things.
 
+All of ops is open source. Use the hosted control plane, or [host it yourself for free](/docs/self-hosting): the same product, every feature, no limits.
+
 ## What it does
 
 - **Deploys**: `ops deploy` from a repo, a branch or commit from [GitHub](/docs/guides/github), or an image from [CI](/docs/guides/ci). Health checks, and the last good release starts again when a deploy fails.

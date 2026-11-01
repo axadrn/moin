@@ -1,7 +1,7 @@
 ---
 title: "FAQ"
 description: "Common questions"
-order: 5
+order: 6
 ---
 
 ## Does my server need open ports?

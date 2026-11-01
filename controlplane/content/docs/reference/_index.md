@@ -1,7 +1,7 @@
 ---
 title: "Reference"
 description: "Every command, key, endpoint and tool"
-order: 4
+order: 5
 ---
 
 - [CLI](/docs/reference/cli)

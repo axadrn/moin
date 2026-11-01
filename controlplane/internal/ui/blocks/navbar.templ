@@ -1,15 +1,18 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/githubstars"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sheet"
 	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 )
 
-// GitHubURL is the open source repository of the CLI, TUI and agent.
-const GitHubURL = "https://github.com/axadrn/ops"
+// GitHubURL is the open source repository of ops.
+const GitHubURL = "https://github.com/" + githubstars.Repo
 
 // Wordmark is the brand name in the display face with a terminal cursor.
 templ Wordmark(class ...string) {
@@ -38,8 +41,12 @@ templ Navbar() {
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
-				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class="hidden size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:inline-flex" aria-label={ brand.Name + " on GitHub" }>
+				{{ stars := githubstars.Count() }}
+				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-10 items-center justify-center gap-1.5 rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:inline-flex", templ.KV("w-10", stars == 0), templ.KV("px-3.5", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
 					@icons.Github(icons.Props{Class: "size-[18px]"})
+					if stars > 0 {
+						<span class="text-[13px] font-semibold tabular-nums">{ githubstars.Short(stars) }</span>
+					}
 				</a>
 				<div class="hidden md:block">
 					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
