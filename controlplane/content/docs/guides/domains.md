@@ -15,7 +15,7 @@ Every server runs one proxy, Traefik, which ops starts with the first domain. It
 | --- | --- | --- | --- |
 | app page, **Domains and access** | `ops domains add blog.de www.blog.de` | `o`, then `blog.de` | `set_domains` |
 
-3. Point an A record of each domain at the server. ops shows the address and checks the record:
+3. Point each domain at the server: an A record to its IPv4 and, when it has one, an AAAA record to its IPv6. ops shows both addresses, the record to set, and checks it; a domain that resolves to either address points here:
 
 ```text
 DOMAIN        DNS            RESOLVES TO

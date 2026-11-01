@@ -576,11 +576,16 @@ type protectionRequest struct {
 
 // DomainCheck says whether a domain points at the app's server.
 type DomainCheck struct {
-	Domain    string   `json:"domain"`
-	Canonical bool     `json:"canonical"`
-	Address   string   `json:"address"`
-	Found     []string `json:"found"`
-	Points    bool     `json:"points"`
+	Domain    string `json:"domain"`
+	Canonical bool   `json:"canonical"`
+	Address   string `json:"address"`
+	// IPv4 and IPv6 are the server's addresses, empty when unknown.
+	IPv4 string `json:"ipv4"`
+	IPv6 string `json:"ipv6"`
+	// Advice is the DNS record to set, such as "A record to 203.0.113.7".
+	Advice string   `json:"advice"`
+	Found  []string `json:"found"`
+	Points bool     `json:"points"`
 }
 
 // DomainChecks is the answer of GET /api/v1/apps/{app}/domains.
@@ -595,7 +600,7 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 		if found == nil {
 			found = []string{}
 		}
-		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, Found: found, Points: check.Points})
+		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points})
 	}
 	return out
 }

@@ -98,6 +98,7 @@ func Hello() protocol.Hello {
 		Hostname:        hostname,
 		OS:              runtime.GOOS,
 		Arch:            runtime.GOARCH,
+		Addresses:       publicAddresses(),
 	}
 }
 

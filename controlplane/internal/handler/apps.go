@@ -419,6 +419,9 @@ func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request, noti
 		return
 	}
 	view := pages.RoutingView{App: *app, Checks: checks, Notice: notice}
+	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
+		view.Server = *server
+	}
 	if changeErr != nil {
 		view.Notice, view.Error = "", errorMessage(changeErr)
 	}

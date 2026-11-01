@@ -3841,7 +3841,7 @@ components:
           type: array
           items:
             type: object
-            required: [domain, canonical, address, found, points]
+            required: [domain, canonical, address, ipv4, ipv6, advice, found, points]
             properties:
               domain:
                 type: string
@@ -3849,7 +3849,16 @@ components:
                 type: boolean
               address:
                 type: string
-                description: The address the domain should point at. Empty before the agent connected.
+                description: The address the domain should point at, the IPv4 when known, else the IPv6, or the tunnel. Empty before the agent connected.
+              ipv4:
+                type: string
+                description: The server's public IPv4, empty when unknown. The domain points here when it resolves to the IPv4 or the IPv6.
+              ipv6:
+                type: string
+                description: The server's public IPv6, empty when unknown.
+              advice:
+                type: string
+                description: The DNS record to set, such as "A record to 203.0.113.7, AAAA record to 2a01:4f8::1".
               found:
                 type: array
                 items:

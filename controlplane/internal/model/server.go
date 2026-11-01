@@ -16,7 +16,10 @@ type Server struct {
 	Arch             string     `db:"arch"`
 	AgentVersion     string     `db:"agent_version"`
 	Address          string     `db:"address"`
-	LastSeenAt       *time.Time `db:"last_seen_at"`
+	// Addresses are the public addresses the agent reported, space
+	// separated: its IPv4 and IPv6 next to the one it connected from.
+	Addresses  string     `db:"addresses"`
+	LastSeenAt *time.Time `db:"last_seen_at"`
 	// Tunnel carries app traffic through a Cloudflare Tunnel; TunnelToken
 	// is sealed. SSHTailscale answers SSH only on the tailnet, Firewall
 	// drops every other inbound connection. Security is the agent's last
