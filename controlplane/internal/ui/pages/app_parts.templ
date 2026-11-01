@@ -178,7 +178,7 @@ templ statCard(label, value, note string, attrs ...templ.Attributes) {
 				<span class="block text-2xl font-semibold tracking-tight text-muted-foreground">—</span>
 			}
 			if note != "" {
-				<span class="mt-1 block truncate text-xs text-muted-foreground">{ note }</span>
+				<span class="mt-1 block text-xs text-muted-foreground">{ note }</span>
 			}
 			{ children... }
 		</dd>
