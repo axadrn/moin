@@ -29,7 +29,7 @@ func expectPurchasablePlansShape(t *testing.T, plans []api.Plan) {
 		t.Fatalf("plans = %#v", plans)
 	}
 	pro := plans[0]
-	if len(pro.Prices) != 2 || pro.Prices[0].Interval != "monthly" || pro.Prices[0].Amount != 2900 || pro.Prices[0].DisplayPrice != "$29" || pro.Prices[1].Interval != "yearly" || pro.Prices[1].DisplayPrice != "$290" {
+	if len(pro.Prices) != 2 || pro.Prices[0].Interval != "monthly" || pro.Prices[0].Amount != 2900 || pro.Prices[0].DisplayPrice != "$29" || pro.Prices[1].Interval != "yearly" || pro.Prices[1].DisplayPrice != "$249" || pro.Name != "ops Hosted" {
 		t.Fatalf("pro prices = %#v", pro.Prices)
 	}
 	if len(pro.Benefits) == 0 {

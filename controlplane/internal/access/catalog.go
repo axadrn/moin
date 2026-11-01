@@ -25,10 +25,10 @@ var Product = Catalog{
 		},
 		{
 			ID:           PlanPro,
-			Name:         "ops",
+			Name:         "ops Hosted",
 			Description:  "Deploys, backups and data for your servers",
 			MonthlyPrice: 2900,
-			YearlyPrice:  29000,
+			YearlyPrice:  24900,
 			Features:     []Feature{FeatureChanges},
 			Limits:       map[Limit]int{LimitServers: Unlimited, LimitMembers: Unlimited},
 			Benefits: []string{
@@ -36,7 +36,7 @@ var Product = Catalog{
 				"Your whole team, no seat price",
 				"Continuous backups with daily restore drills",
 				"Data browser, SQL and the GitHub App",
-				"Monthly, or yearly with two months free",
+				"Yearly: save $99, 3+ months free",
 			},
 			Purchasable: true,
 		},

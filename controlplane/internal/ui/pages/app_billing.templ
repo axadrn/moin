@@ -36,7 +36,7 @@ templ Billing() {
 						<div class="flex items-center justify-between">
 							<div>
 								<div class="flex items-center gap-3 mb-2">
-									<h3 class="text-2xl font-bold capitalize">{ subscription.PlanID }</h3>
+									<h3 class="text-2xl font-bold">{ planName(subscription.PlanID) }</h3>
 									if subscription.PlanID != model.SubscriptionPlanFree && subscription.FormatPrice() != "" {
 										<span class="text-lg text-muted-foreground">{ subscription.FormatPrice() }</span>
 									}
@@ -103,7 +103,7 @@ templ Billing() {
 				<div>
 					<div class="flex items-center justify-between mb-4">
 						<h2 class="ops-panel-title">Plans</h2>
-						@tabs.Tabs(tabs.Props{DefaultValue: "monthly"}) {
+						@tabs.Tabs(tabs.Props{DefaultValue: "yearly"}) {
 							@tabs.List() {
 								@tabs.Trigger(tabs.TriggerProps{
 									Value: "monthly",
@@ -120,7 +120,7 @@ templ Billing() {
 									},
 								}) {
 									Yearly
-									<span class="ml-1 text-xs font-semibold text-live">2 months free</span>
+									<span class="ml-1 text-xs font-semibold text-live">Save $99</span>
 								}
 							}
 						}
@@ -148,8 +148,8 @@ templ Billing() {
 						if (trigger) togglePrices(trigger.getAttribute('data-billing-interval'));
 					});
 
-					// Init with monthly
-					togglePrices('monthly');
+					// Init with yearly, the better deal
+					togglePrices('yearly');
 				</script>
 			</div>
 		}
@@ -187,13 +187,14 @@ templ BillingPricingCard(
 						<span class="text-muted-foreground">/ Free forever</span>
 					</div>
 				} else {
-					<div class="price-monthly flex items-baseline gap-1">
+					<div class="price-monthly hidden flex items-baseline gap-1">
 						<span class="text-4xl font-bold tracking-tighter tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
 						<span class="text-muted-foreground">/ month</span>
 					</div>
-					<div class="price-yearly hidden flex items-baseline gap-1">
+					<div class="price-yearly flex flex-wrap items-baseline gap-x-1">
 						<span class="text-4xl font-bold tracking-tighter tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
 						<span class="text-muted-foreground">/ year</span>
+						<span class="ml-2 text-xs font-semibold text-live">Best value · 3+ months free</span>
 					</div>
 					<p class="mt-1 text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout.</p>
 				}
@@ -233,7 +234,7 @@ templ BillingPricingCard(
 					>
 						@csrf.Token()
 						<input type="hidden" name="plan_id" value={ plan.ID }/>
-						<input type="hidden" name="interval" value="monthly"/>
+						<input type="hidden" name="interval" value="yearly"/>
 						if plan.ID == model.SubscriptionPlanPro {
 							@button.Button(button.Props{
 								Type:  "submit",
@@ -255,4 +256,12 @@ templ BillingPricingCard(
 			}
 		}
 	}
+}
+
+// planName is the name buyers see for a plan ID, "ops Hosted" for pro.
+func planName(planID string) string {
+	if plan, ok := access.PlanByID(planID); ok {
+		return plan.Name
+	}
+	return planID
 }

@@ -560,11 +560,24 @@ templ HomePricing() {
 							}
 						}
 					</p>
-					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
-						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
-						<span class="text-lg text-background/65">a month, or $290 a year</span>
+					<div class="mt-6 flex flex-wrap items-center gap-2" data-yearly-deal>
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background px-3 py-1 font-sans text-[13px] font-semibold text-foreground"}) {
+							Best value · Save $99
+						}
+						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold text-background"}) {
+							3+ months free
+						}
+					</div>
+					<p class="mt-4 flex flex-wrap items-baseline gap-x-3">
+						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$249</span>
+						<span class="text-lg text-background/65">a year</span>
 					</p>
+					<p class="mt-2 text-base text-background/65">or $29 a month</p>
 					<p class="mt-2 text-sm text-background/55">Plus sales tax or VAT where it applies, shown at checkout.</p>
+					<div class="mt-6 rounded-lg border border-background/15 bg-background/8 px-4 py-3 text-[15px] leading-6" data-goilerplate-offer>
+						<p class="font-semibold">goilerplate buyers: 50% off forever.</p>
+						<p class="text-background/65">Your code arrives by email in the next days.</p>
+					</div>
 					<dl class="mt-8 divide-y divide-background/15 border-y border-background/15">
 						@homePlanRow("Free trial", "30 days, no card", true)
 						@homePlanRow("Setup", "Two minutes", true)

@@ -297,25 +297,33 @@ func serverLastSeen(server model.Server, now time.Time) string {
 templ subscribeCard() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@card.Card(card.Props{Class: "block gap-0 py-0 text-base text-background mt-6 overflow-hidden bg-foreground px-7 py-10 text-background sm:px-12 sm:py-14", Attributes: templ.Attributes{"data-subscribe": true}}) {
-		<h2 class="font-display text-[clamp(2rem,4vw,3rem)] leading-none">Start ops.</h2>
+		<h2 class="font-display text-[clamp(2rem,4vw,3rem)] leading-none">Start ops Hosted.</h2>
 		<p class="mt-5 max-w-xl text-lg leading-8 text-background/70">
 			Unlimited servers and apps, continuous backups with daily restore drills, the data browser, the GitHub App. Cancel any time; your apps keep running on your servers.
 		</p>
-		<div class="mt-8 flex flex-col gap-3 sm:flex-row">
+		<div class="mt-8 flex flex-wrap items-center gap-2">
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background px-3 py-1 text-[13px] font-semibold text-foreground"}) {
+				Best value · Save $99
+			}
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 text-[13px] font-semibold text-background"}) {
+				3+ months free
+			}
+		</div>
+		<div class="mt-4 flex flex-col gap-3 sm:flex-row">
 			<form method="post" action={ templ.SafeURL(basePath + "/billing/checkout") }>
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
-				<input type="hidden" name="interval" value="monthly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full bg-background text-foreground hover:bg-background/85 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
-					$29 a month
+				<input type="hidden" name="interval" value="yearly"/>
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full bg-background text-foreground hover:bg-background/85 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-yearly": true}}) {
+					$249 a year
 				}
 			</form>
 			<form method="post" action={ templ.SafeURL(basePath + "/billing/checkout") }>
 				@csrf.Token()
 				<input type="hidden" name="plan_id" value="pro"/>
-				<input type="hidden" name="interval" value="yearly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full bg-background/12 text-background hover:bg-background/20 sm:w-auto"}) {
-					$290 a year, two months free
+				<input type="hidden" name="interval" value="monthly"/>
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg, Class: "w-full bg-background/12 text-background hover:bg-background/20 sm:w-auto", Attributes: templ.Attributes{"data-subscribe-monthly": true}}) {
+					or $29 a month
 				}
 			</form>
 		</div>

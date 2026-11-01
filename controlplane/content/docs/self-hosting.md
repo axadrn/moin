@@ -8,7 +8,7 @@ order: 3
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
-| Price | free forever | $29 a month or $290 a year |
+| Price | free forever | $249 a year (save $99) or $29 a month |
 | Features | all | all |
 | Servers, apps, members | unlimited | unlimited |
 | Setup | about an hour | two minutes |

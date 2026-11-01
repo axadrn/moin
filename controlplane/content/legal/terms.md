@@ -26,7 +26,7 @@ Do not use ops to run malware, phishing, spam, illegal content or attacks on oth
 
 ## Plans and payment
 
-ops is a subscription, monthly or yearly; paying yearly saves two months. A new account gets a free trial of 30 days with everything, without a payment method. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
+ops is a subscription, monthly or yearly; paying yearly costs less than twelve monthly payments. A new account gets a free trial of 30 days with everything, without a payment method. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing settings; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it.
 
