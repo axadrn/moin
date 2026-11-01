@@ -217,7 +217,10 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 		CurrentPeriodEnd int64  `json:"current_period_end"`
 		Items            struct {
 			Data []struct {
-				Price struct {
+				// Since API version 2025-03-31.basil the period lives on
+				// the item, not on the subscription.
+				CurrentPeriodEnd int64 `json:"current_period_end"`
+				Price            struct {
 					ID         string `json:"id"`
 					UnitAmount int64  `json:"unit_amount"`
 					Currency   string `json:"currency"`
@@ -268,7 +271,7 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 	interval := s.mapStripeInterval(subscription.Items.Data[0].Price.Recurring.Interval)
 	sub.Interval = &interval
 
-	periodEnd := time.Unix(subscription.CurrentPeriodEnd, 0)
+	periodEnd := time.Unix(stripePeriodEnd(subscription.CurrentPeriodEnd, subscription.Items.Data[0].CurrentPeriodEnd), 0)
 	sub.CurrentPeriodEnd = &periodEnd
 
 	err = s.subscriptionService.UpdateSubscription(sub, providerEventID...)
@@ -288,7 +291,10 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 		CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
 		Items             struct {
 			Data []struct {
-				Price struct {
+				// Since API version 2025-03-31.basil the period lives on
+				// the item, not on the subscription.
+				CurrentPeriodEnd int64 `json:"current_period_end"`
+				Price            struct {
 					ID         string `json:"id"`
 					UnitAmount int64  `json:"unit_amount"`
 					Currency   string `json:"currency"`
@@ -333,7 +339,11 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 		sub.Status = model.SubscriptionStatusCancelled
 	}
 
-	periodEnd := time.Unix(subscription.CurrentPeriodEnd, 0)
+	var itemEnd int64
+	if len(subscription.Items.Data) > 0 {
+		itemEnd = subscription.Items.Data[0].CurrentPeriodEnd
+	}
+	periodEnd := time.Unix(stripePeriodEnd(subscription.CurrentPeriodEnd, itemEnd), 0)
 	sub.CurrentPeriodEnd = &periodEnd
 
 	err = s.subscriptionService.UpdateSubscription(sub, providerEventID...)
@@ -478,4 +488,13 @@ func (s *StripeProvider) mapStripeInterval(interval string) string {
 	default:
 		return interval
 	}
+}
+
+// stripePeriodEnd is the end of the current period: on the subscription in
+// older API versions, on its first item since 2025-03-31.basil.
+func stripePeriodEnd(subscription, item int64) int64 {
+	if subscription != 0 {
+		return subscription
+	}
+	return item
 }

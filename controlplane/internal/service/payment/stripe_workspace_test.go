@@ -57,3 +57,12 @@ func TestStripeWebhookBindsCustomerToWorkspace(t *testing.T) {
 		t.Fatalf("workspace subscription = %#v", subscription)
 	}
 }
+
+func TestStripePeriodEndComesFromTheItemSinceBasil(t *testing.T) {
+	if end := stripePeriodEnd(0, 1800000000); end != 1800000000 {
+		t.Fatalf("basil payload: end = %d, want the item's", end)
+	}
+	if end := stripePeriodEnd(1700000000, 1800000000); end != 1700000000 {
+		t.Fatalf("older payload: end = %d, want the subscription's", end)
+	}
+}
