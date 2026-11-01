@@ -3,6 +3,7 @@ package blocks
 import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
@@ -22,6 +23,10 @@ type AppHeaderProps struct {
 templ AppHeader(p AppHeaderProps) {
 	<header class="flex h-(--header-height) shrink-0 items-center gap-2 px-3 sm:px-5 lg:px-7">
 		@sidebar.Trigger(sidebar.TriggerProps{Class: "-ml-1 text-muted-foreground hover:text-foreground"})
+		@separator.Separator(separator.Props{
+			Orientation: separator.OrientationVertical,
+			Class:       "mr-1 data-vertical:h-4 data-vertical:self-auto",
+		})
 		<nav aria-label="Breadcrumb" class="min-w-0 flex-1">
 			<ol class="flex min-w-0 items-center gap-0.5 text-sm">
 				for i, crumb := range p.Crumbs {

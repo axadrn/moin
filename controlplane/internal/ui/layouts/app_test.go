@@ -49,6 +49,31 @@ func TestAppLayoutShowsAdminLinkOnlyToOperators(t *testing.T) {
 	}
 }
 
+func TestAppLayoutRendersTheSidebarAsItWasLeft(t *testing.T) {
+	expanded := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
+	if !strings.Contains(expanded, `data-state="expanded"`) || !strings.Contains(expanded, `data-templ-collapsible="icon"`) {
+		t.Fatal("the sidebar does not start expanded and collapsible to icons")
+	}
+	for _, hook := range []string{`id="sidebar-workspace"`, `id="sidebar-apps"`, `id="sidebar-avatar"`, `id="sidebar-user-name"`, `id="dropdown-user-label"`, "data-app-base=", `data-sidebar="rail"`, `hx-post="/auth/logout"`} {
+		if !strings.Contains(expanded, hook) {
+			t.Fatalf("the sidebar lost %s", hook)
+		}
+	}
+
+	collapsed := renderApp(t, ctxkeys.WithSidebarCollapsed(appContext(model.WorkspaceRoleOwner, 1), true))
+	if !strings.Contains(collapsed, `data-state="collapsed"`) || !strings.Contains(collapsed, `data-collapsible="icon"`) {
+		t.Fatal("a collapsed sidebar renders expanded")
+	}
+}
+
+func TestUserInitials(t *testing.T) {
+	for name, want := range map[string]string{"Ada Lovelace": "AL", "ada b. lovelace": "AL", "Ada": "A", "": "U", "Émile Zola": "ÉZ"} {
+		if got := userInitials(&model.User{Name: name, Email: "user@example.com"}); got != want {
+			t.Errorf("userInitials(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
 func TestBaseLayoutShowsReadOnlyImpersonationBanner(t *testing.T) {
 	operatorID := "operator"
 	ctx := context.Background()
@@ -88,6 +113,10 @@ func renderAppLayoutWithAdmin(t *testing.T) string {
 
 func renderAppLayout(t *testing.T, role string, workspaceCount int) string {
 	t.Helper()
+	return renderApp(t, appContext(role, workspaceCount))
+}
+
+func appContext(role string, workspaceCount int) context.Context {
 	workspace := &model.Workspace{ID: "workspace-1", Name: "First Workspace", Slug: "first-workspace"}
 	member := &model.WorkspaceMember{ID: "member-1", WorkspaceID: workspace.ID, UserID: "user-1", Role: role}
 	workspaces := []model.WorkspaceMembership{{Workspace: *workspace, Role: member.Role}}
@@ -104,8 +133,11 @@ func renderAppLayout(t *testing.T, role string, workspaceCount int) string {
 	ctx = ctxkeys.WithUser(ctx, &model.User{ID: "user-1", Email: "user@example.com", Name: "Test User"})
 	ctx = ctxkeys.WithWorkspace(ctx, workspace)
 	ctx = ctxkeys.WithWorkspaceMember(ctx, member)
-	ctx = ctxkeys.WithWorkspaces(ctx, workspaces)
+	return ctxkeys.WithWorkspaces(ctx, workspaces)
+}
 
+func renderApp(t *testing.T, ctx context.Context) string {
+	t.Helper()
 	var output bytes.Buffer
 	if err := App("Dashboard").Render(ctx, &output); err != nil {
 		t.Fatalf("render App(): %v", err)

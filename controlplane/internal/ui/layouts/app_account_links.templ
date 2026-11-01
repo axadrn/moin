@@ -11,25 +11,19 @@ templ AppSidebarAccountLinks() {
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@dropdown.Item(dropdown.ItemProps{Href: basePath + "/settings"}) {
-		<span class="flex items-center">
-			@icon.Settings(icon.Props{Class: "mr-2 size-4"})
-			Settings
-		</span>
+		@icon.Settings()
+		Settings
 	}
 	if ctxkeys.IsAdmin(ctx) {
 		@dropdown.Item(dropdown.ItemProps{Href: "/admin"}) {
-			<span class="flex items-center">
-				@icon.Shield(icon.Props{Class: "mr-2 size-4"})
-				Admin
-			</span>
+			@icon.Shield()
+			Admin
 		}
 	}
 	if member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(ctx).Billing {
 		@dropdown.Item(dropdown.ItemProps{Href: basePath + "/billing"}) {
-			<span class="flex items-center">
-				@icon.CreditCard(icon.Props{Class: "mr-2 size-4"})
-				Billing
-			</span>
+			@icon.CreditCard()
+			Billing
 		}
 	}
 }

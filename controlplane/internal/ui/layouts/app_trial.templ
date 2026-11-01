@@ -28,7 +28,7 @@ templ AppTrialCard() {
 	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
 		{{ current := subscription.Access() }}
 		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
-			@card.Card(card.Props{Class: "gap-2 px-4 py-3.5 text-sm shadow-none", Attributes: templ.Attributes{"data-trial": string(current.State)}}) {
+			@card.Card(card.Props{Class: "gap-2 px-4 py-3.5 text-sm shadow-none group-data-[collapsible=icon]:hidden", Attributes: templ.Attributes{"data-trial": string(current.State)}}) {
 				if current.State == access.StateTrial {
 					{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
 					<p class="font-medium">

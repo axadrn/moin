@@ -1,6 +1,9 @@
 package layouts
 
 import (
+	"strings"
+	"unicode/utf8"
+
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/avatar"
 )
@@ -11,7 +14,19 @@ templ AppSidebarAvatarContent(user *model.User) {
 			@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: user.Name})
 		}
 		@avatar.Fallback() {
-			{ user.Initial() }
+			{ userInitials(user) }
 		}
 	}
+}
+
+// userInitials is the first letters of the first and last word of the
+// name, or the one initial of the email when there is no name.
+func userInitials(user *model.User) string {
+	words := strings.Fields(user.Name)
+	if len(words) < 2 {
+		return user.Initial()
+	}
+	first, _ := utf8.DecodeRuneInString(words[0])
+	last, _ := utf8.DecodeRuneInString(words[len(words)-1])
+	return strings.ToUpper(string(first) + string(last))
 }

@@ -1,34 +1,21 @@
 package layouts
 
 import (
-	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	dropdown "github.com/axadrn/ops/controlplane/internal/ui/components/dropdownmenu"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 )
 
+// AppSidebarLogout signs out. htmx posts it with the CSRF header the body
+// sets for every request.
 templ AppSidebarLogout() {
-	<form
-		class="contents"
-		action="/auth/logout"
-		method="POST"
-		hx-post="/auth/logout"
-		hx-swap="none"
-		hx-disable="find button[type='submit']"
-	>
-		@csrf.Token()
-		@button.Button(button.Props{
-			Type:    button.TypeSubmit,
-			Variant: button.VariantGhost,
-			Size:    button.SizeSm,
-			Class:   "h-auto w-full justify-start px-3 py-2",
-			Attributes: templ.Attributes{
-				"role": "menuitem",
-			},
-		}) {
-			<span class="flex items-center">
-				@icon.LogOut(icon.Props{Class: "mr-2 size-4"})
-				Log out
-			</span>
-		}
-	</form>
+	@dropdown.Item(dropdown.ItemProps{
+		Attributes: templ.Attributes{
+			"hx-post":     "/auth/logout",
+			"hx-swap":     "none",
+			"data-logout": "true",
+		},
+	}) {
+		@icon.LogOut()
+		Log out
+	}
 }

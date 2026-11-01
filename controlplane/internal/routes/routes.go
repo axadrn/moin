@@ -283,5 +283,6 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
 		middleware.WithURLPath,
+		middleware.WithSidebarState,
 	)
 }

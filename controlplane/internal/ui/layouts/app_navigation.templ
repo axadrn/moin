@@ -1,70 +1,63 @@
 package layouts
 
 import (
-	"github.com/axadrn/ops/controlplane/internal/ui/components/kbd"
 	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/kbd"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
-// navButtonClasses is a place in the sidebar: a pill, inverted when active.
-const navButtonClasses = "h-10 gap-3 rounded-xl px-3 text-[0.875rem] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-active:bg-brand data-active:font-semibold data-active:text-brand-foreground data-active:hover:bg-brand data-active:hover:text-brand-foreground [&>span:last-child]:overflow-visible"
+// navItem is one place of the panel: its icon, its label, and the go-to
+// key (g, then the key) when it has one.
+type navItem struct {
+	Title  string
+	URL    string
+	Icon   func(...icon.Props) templ.Component
+	Active bool
+	Key    string
+}
 
-// AppSidebarNavigation is the places of the panel, each with its go-to key.
+// AppSidebarNavigation is the places of the panel, grouped as in nav-main of
+// shadcn's sidebar-07. Collapsed to icons, each names itself in a tooltip.
 templ AppSidebarNavigation() {
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ path := ctxkeys.URLPath(ctx) }}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/apps", IsActive: path == basePath+"/apps", Class: navButtonClasses}) {
-			@icon.Boxes(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Apps</span>
-			@navKey("A")
-		}
-	}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/servers", IsActive: strings.HasPrefix(path, basePath+"/servers"), Class: navButtonClasses}) {
-			@icon.Server(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Servers</span>
-			@navKey("S")
-		}
-	}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/bucket", IsActive: strings.HasPrefix(path, basePath+"/bucket"), Class: navButtonClasses}) {
-			@icon.Archive(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Bucket</span>
-			@navKey("B")
-		}
-	}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/activity", IsActive: strings.HasPrefix(path, basePath+"/activity"), Class: navButtonClasses}) {
-			@icon.Activity(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Activity</span>
-			@navKey("Y")
-		}
-	}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/workspace", IsActive: path == basePath+"/workspace", Class: navButtonClasses}) {
-			@icon.Users(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Team</span>
-			@navKey("T")
-		}
-	}
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/settings", IsActive: strings.HasPrefix(path, basePath+"/settings"), Class: navButtonClasses}) {
-			@icon.Settings(icon.Props{Class: "size-[1.0625rem]"})
-			<span class="flex-1">Settings</span>
-			@navKey(",")
-		}
-	}
+	@navGroup("Platform", []navItem{
+		{Title: "Apps", URL: basePath + "/apps", Icon: icon.Boxes, Active: path == basePath+"/apps", Key: "A"},
+		{Title: "Servers", URL: basePath + "/servers", Icon: icon.Server, Active: strings.HasPrefix(path, basePath+"/servers"), Key: "S"},
+		{Title: "Bucket", URL: basePath + "/bucket", Icon: icon.Archive, Active: strings.HasPrefix(path, basePath+"/bucket"), Key: "B"},
+		{Title: "Activity", URL: basePath + "/activity", Icon: icon.Activity, Active: strings.HasPrefix(path, basePath+"/activity"), Key: "Y"},
+	})
+	{{ manage := []navItem{
+		{Title: "Team", URL: basePath + "/workspace", Icon: icon.Users, Active: path == basePath+"/workspace", Key: "T"},
+		{Title: "Settings", URL: basePath + "/settings", Icon: icon.Settings, Active: strings.HasPrefix(path, basePath+"/settings"), Key: ","},
+	} }}
 	if member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(ctx).Billing {
-		@sidebar.MenuItem() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/billing", IsActive: strings.HasPrefix(path, basePath+"/billing"), Class: navButtonClasses}) {
-				@icon.CreditCard(icon.Props{Class: "size-[1.0625rem]"})
-				<span class="flex-1">Billing</span>
+		{{ manage = append(manage, navItem{Title: "Billing", URL: basePath + "/billing", Icon: icon.CreditCard, Active: strings.HasPrefix(path, basePath+"/billing")}) }}
+	}
+	@navGroup("Workspace", manage)
+}
+
+templ navGroup(label string, items []navItem) {
+	@sidebar.Group() {
+		@sidebar.GroupLabel() {
+			{ label }
+		}
+		@sidebar.Menu() {
+			for _, item := range items {
+				@sidebar.MenuItem() {
+					@sidebar.MenuButton(sidebar.MenuButtonProps{Href: item.URL, IsActive: item.Active, Tooltip: item.Title}) {
+						@item.Icon()
+						<span class="truncate">{ item.Title }</span>
+						if item.Key != "" {
+							@navKey(item.Key)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -72,7 +65,7 @@ templ AppSidebarNavigation() {
 
 // navKey is the go-to hint: g, then the key. It shows on hover.
 templ navKey(key string) {
-	@kbd.Group(kbd.GroupProps{Class: "hidden gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden md:flex", Attributes: templ.Attributes{"aria-hidden": "true"}}) {
+	@kbd.Group(kbd.GroupProps{Class: "ml-auto hidden gap-0.5 opacity-0 transition-opacity group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100 group-data-active/menu-button:hidden group-data-[collapsible=icon]:hidden md:flex", Attributes: templ.Attributes{"aria-hidden": "true"}}) {
 		@kbd.Kbd(kbd.Props{Class: navKeyClasses}) {
 			G
 		}

@@ -4,10 +4,7 @@ import (
 	"net/url"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
-	dropdown "github.com/axadrn/ops/controlplane/internal/ui/components/dropdownmenu"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
@@ -33,7 +30,6 @@ templ App(title string) {
 // AppShell is the control panel: the sidebar with the places, the top bar
 // with the path, and the page.
 templ AppShell(p AppProps) {
-	{{ cfg := ctxkeys.RenderConfig(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{
 		Title:       p.Title,
@@ -41,61 +37,33 @@ templ AppShell(p AppProps) {
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		@sidebar.Provider(sidebar.ProviderProps{
-			Class:      "bg-background",
-			Attributes: templ.Attributes{"style": "--sidebar-width: 15.5rem; --sidebar-width-icon: 3rem; --header-height: 3.5rem;"},
+			Class:              "bg-background",
+			DisableDefaultOpen: ctxkeys.SidebarCollapsed(ctx),
+			Attributes:         templ.Attributes{"style": "--sidebar-width: 16rem; --sidebar-width-icon: 3rem; --header-height: 3.5rem;"},
 		}) {
-			@sidebar.Sidebar(sidebar.Props{Collapsible: sidebar.CollapsibleOffcanvas, Variant: sidebar.VariantSidebar, Class: "border-r-0"}) {
-				@sidebar.Header(sidebar.HeaderProps{Class: "shrink-0 flex-row items-center px-3.5 pt-5 pb-0"}) {
+			@sidebar.Sidebar(sidebar.Props{Collapsible: sidebar.CollapsibleIcon}) {
+				@sidebar.Header() {
 					@AppSidebarIdentity()
 				}
-				@sidebar.Content(sidebar.ContentProps{Class: "gap-0 pt-5"}) {
-					@sidebar.Group(sidebar.GroupProps{Class: "px-3.5 py-0"}) {
-						@sidebar.Menu(sidebar.MenuProps{Class: "gap-1"}) {
-							@AppSidebarNavigation()
-						}
-					}
+				@sidebar.Content() {
+					@AppSidebarNavigation()
 					<div
 						id="sidebar-apps"
-						class="mt-6 px-3.5"
+						class="contents"
 						hx-get={ basePath + "/apps/nav?at=" + url.QueryEscape(ctxkeys.URLPath(ctx)) }
 						hx-trigger="load, apps-changed from:body"
 						hx-swap="innerHTML"
 					></div>
 				}
-				@sidebar.Footer(sidebar.FooterProps{Class: "gap-2 px-3.5 pb-4"}) {
+				@sidebar.Footer() {
+					@AppSidebarHelp()
 					@AppTrialCard()
-					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
-						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{
-								Href:       "/docs",
-								Size:       sidebar.MenuButtonSizeSm,
-								Class:      navQuietClasses,
-								Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"},
-							}) {
-								@icon.BookOpen(icon.Props{Class: "size-4"})
-								<span>Documentation</span>
-							}
-						}
-						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{
-								Href:  "mailto:" + cfg.SupportEmail,
-								Size:  sidebar.MenuButtonSizeSm,
-								Class: navQuietClasses,
-							}) {
-								@icon.LifeBuoy(icon.Props{Class: "size-4"})
-								<span>Support</span>
-							}
-						}
-					}
-					@sidebar.Menu() {
-						@sidebar.MenuItem() {
-							{{ user := ctxkeys.User(ctx) }}
-							if user != nil {
-								@AppSidebarDropdown(user)
-							}
-						}
+					{{ user := ctxkeys.User(ctx) }}
+					if user != nil {
+						@AppSidebarUser(user)
 					}
 				}
+				@sidebar.Rail()
 			}
 			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background"}) {
 				@blocks.AppHeader(blocks.AppHeaderProps{Title: p.Title, Crumbs: appCrumbs(p)})
@@ -105,11 +73,25 @@ templ AppShell(p AppProps) {
 			}
 		}
 		@appShellScript()
+		@sidebarMenuSides()
 	}
 }
 
-// navQuietClasses is a secondary place in the sidebar: docs, support.
-const navQuietClasses = "h-9 gap-3 rounded-xl px-3 text-[0.8125rem] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+// sidebarMenuSides is the pendant of useSidebar().isMobile in shadcn's
+// sidebar-07: the workspace and user menus open to the right of the
+// sidebar, and below their button on phones. A menu reads its side when it
+// opens; the menus are looked up each time, as the workspace one is swapped
+// in place after a rename.
+templ sidebarMenuSides() {
+	<script type="module" nonce={ templ.GetNonce(ctx) }>
+		window.templ.sidebar.onMobileChange((isMobile) => {
+			for (const id of ["sidebar-workspace-menu", "sidebar-user-menu"]) {
+				// The id names the menu popup, its positioner holds the side.
+				document.getElementById(id)?.parentElement?.setAttribute("data-templ-side", isMobile ? "bottom" : "right");
+			}
+		});
+	</script>
+}
 
 func appCrumbs(p AppProps) []blocks.Crumb {
 	crumbs := make([]blocks.Crumb, 0, len(p.Crumbs)+1)
@@ -120,35 +102,6 @@ func appCrumbs(p AppProps) []blocks.Crumb {
 		crumbs = append(crumbs, blocks.Crumb{Label: p.Title})
 	}
 	return crumbs
-}
-
-templ AppSidebarDropdown(user *model.User) {
-	@dropdown.DropdownMenu() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{
-			Size:       sidebar.MenuButtonSizeLg,
-			Class:      "h-13 gap-3 rounded-2xl px-2.5 hover:bg-sidebar-accent data-popup-open:bg-sidebar-accent",
-			Attributes: dropdown.Trigger(ctx),
-		}) {
-			@AppSidebarAvatar(user)
-			@AppSidebarUserSummary(user)
-			@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-3.5 text-muted-foreground"})
-		}
-		@dropdown.Content(dropdown.ContentProps{
-			Class: "w-60",
-			Side:  dropdown.SideTop,
-			Align: dropdown.AlignStart,
-		}) {
-			@AppSidebarUserLabel(user)
-			@dropdown.Separator()
-			@dropdown.Group() {
-				@AppSidebarAccountLinks()
-			}
-			@dropdown.Separator()
-			@dropdown.Group() {
-				@AppSidebarLogout()
-			}
-		}
-	}
 }
 
 // appShellScript adds what every page of the panel shares: copy buttons

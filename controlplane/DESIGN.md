@@ -23,8 +23,9 @@ chose this look from three candidates (ops Looks artifact).
   running, red failed, as filled soft chips with a dot and the word.
   Primary action is an inverted pill (white on black in dark, black on white
   in light); secondary actions are gray pills. One primary per view.
-- **Selection** is a filled pill (white/black) in the sidebar, a soft gray
-  row in lists. Generous padding inside every rounded shape: text never sits
+- **Selection** is a soft gray row, in the sidebar and in lists. The sidebar
+  is shadcn's sidebar-07: workspace switcher on top, the places and the apps
+  in groups, the user at the bottom, collapsible to icons. Generous padding inside every rounded shape: text never sits
   close to a rounded edge.
 - **Alive.** Live dots pulse softly, running states blink, changes swap in
   place without layout jumps. Reduced motion turns it off.

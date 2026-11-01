@@ -1,22 +1,36 @@
 package layouts
 
 import (
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
-templ AppSidebarDocumentation() {
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{
-			Href: "/docs",
-			Size: sidebar.MenuButtonSizeSm,
-			Attributes: templ.Attributes{
-				"target": "_blank",
-				"rel":    "noopener",
-			},
-		}) {
-			@icon.BookOpen(icon.Props{Class: "size-4"})
-			<span>Documentation</span>
+// AppSidebarHelp is the quiet links above the user: the docs and support.
+templ AppSidebarHelp() {
+	@sidebar.Menu() {
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Href:       "/docs",
+				Size:       sidebar.MenuButtonSizeSm,
+				Tooltip:    "Documentation",
+				Class:      "text-sidebar-foreground/70",
+				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"},
+			}) {
+				@icon.BookOpen()
+				<span>Documentation</span>
+			}
+		}
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Href:    "mailto:" + ctxkeys.RenderConfig(ctx).SupportEmail,
+				Size:    sidebar.MenuButtonSizeSm,
+				Tooltip: "Support",
+				Class:   "text-sidebar-foreground/70",
+			}) {
+				@icon.LifeBuoy()
+				<span>Support</span>
+			}
 		}
 	}
 }
