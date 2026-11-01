@@ -168,8 +168,10 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 										<a href="/#pricing" class="transition-colors hover:text-foreground">Pricing</a>
 									}
 									<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="transition-colors hover:text-foreground">GitHub</a>
-									<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
-									<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
+									if cfg.Billing {
+										<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
+										<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
+									}
 								</div>
 							</div>
 						</footer>

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/access"
 	"github.com/axadrn/ops/internal/build"
+	"log/slog"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/config"
@@ -97,8 +98,11 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
 		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
 	)
-	beta := service.NewBetaService(cfg.SignupsOpen, cfg.AdminEmails, repository.NewWaitlistRepository(database), subscriptions, email)
+	beta := service.NewBetaService(cfg.SignupsOpen, cfg.Billing, cfg.AdminEmails, repository.NewWaitlistRepository(database), subscriptions, email)
 	auth.SetBeta(beta)
+	if !cfg.SignupsOpen && len(cfg.AdminEmails) == 0 {
+		slog.Warn("sign-up is closed and ADMIN_EMAILS is empty: only invited people can create an account. Set ADMIN_EMAILS to your email and sign up with it to become the first admin")
+	}
 	userService := service.NewUserService(users,
 		fileService,
 		email, workspaceService,

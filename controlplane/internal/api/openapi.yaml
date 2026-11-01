@@ -173,6 +173,8 @@ paths:
         that link calls `POST /api/v1/auth/magic-link/verify` with the token. While sign-up is
         closed (`SIGNUPS_OPEN=false`, a private beta), a new address goes on the waitlist and the
         answer is 403 `waitlisted`; admins, invited addresses and people let in still get a link.
+        A self-hosted control plane (`BILLING=false`) is closed by default and has no waitlist:
+        the answer is 403 `private`.
       security: []
       requestBody:
         required: true
@@ -187,7 +189,7 @@ paths:
           $ref: '#/components/responses/InvalidBody'
         '403':
           $ref: '#/components/responses/Forbidden'
-          description: '`waitlisted`: sign-up is closed and the address is on the waitlist now.'
+          description: '`waitlisted`: sign-up is closed and the address is on the waitlist now. `private`: a self-hosted control plane with sign-up closed; ask its admin for an invitation.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':

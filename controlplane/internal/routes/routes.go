@@ -35,7 +35,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	securityHeaders := func(next http.Handler) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
 	}
-	home := handler.NewHomeHandler(app.TelemetryService)
+	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing)
 	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
@@ -85,7 +85,11 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
-	mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+	// The legal pages describe the hosted service; a self-hosted control
+	// plane answers them with not found.
+	if app.Cfg.Billing {
+		mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+	}
 
 	rateLimiter := middleware.RateLimitAuth(clientIPs)
 	authEmailRateLimiter := middleware.RateLimitAuthEmail(clientIPs)

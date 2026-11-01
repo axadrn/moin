@@ -74,8 +74,9 @@ type Config struct {
 	// Billing off runs a self-hosted control plane: no Stripe, no prices,
 	// every workspace gets everything.
 	Billing bool
-	// SignupsOpen false runs a private beta: new accounts only for admins,
-	// invited people and people let in from the waitlist.
+	// SignupsOpen false closes sign-up: new accounts only for admins,
+	// invited people and, on the hosted control plane, people let in from
+	// the waitlist. A self-hosted control plane is closed by default.
 	SignupsOpen bool
 	// BackupDatabase sends every change of the control plane's own SQLite
 	// database to its bucket and restores it on start when it is missing.
@@ -136,13 +137,12 @@ func Load() (*Config, error) {
 	s3PresignExpiryPrivate = r.duration("S3_PRESIGN_EXPIRY_PRIVATE", s3PresignExpiryPrivate)
 
 	cfg := &Config{
-		AppEnv:        appEnv,
-		AppURL:        r.string("APP_URL", ""),
-		Port:          r.string("PORT", "8090"),
-		SupportEmail:  r.string("SUPPORT_EMAIL", "hello@example.com"),
-		AdminEmails:   r.emails("ADMIN_EMAILS"),
-		RobotsNoIndex: r.boolean("ROBOTS_NOINDEX", false),
-		DBConnection:  r.string("DB_CONNECTION", "./data/acme.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"),
+		AppEnv:       appEnv,
+		AppURL:       r.string("APP_URL", ""),
+		Port:         r.string("PORT", "8090"),
+		SupportEmail: r.string("SUPPORT_EMAIL", "hello@example.com"),
+		AdminEmails:  r.emails("ADMIN_EMAILS"),
+		DBConnection: r.string("DB_CONNECTION", "./data/acme.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"),
 
 		SessionExpiry:            r.duration("SESSION_EXPIRY", 168*time.Hour),
 		TokenEmailVerifyExpiry:   r.duration("TOKEN_EMAIL_VERIFY_EXPIRY", 24*time.Hour),
@@ -158,7 +158,6 @@ func Load() (*Config, error) {
 		CloudflareAccountID:     r.string("CLOUDFLARE_ACCOUNT_ID", ""),
 		CloudflareAPIToken:      r.string("CLOUDFLARE_API_TOKEN", ""),
 		Billing:                 r.boolean("BILLING", true),
-		SignupsOpen:             r.boolean("SIGNUPS_OPEN", true),
 		Telemetry:               r.boolean("TELEMETRY", true),
 		TelemetryURL:            r.string("TELEMETRY_URL", client.DefaultURL+"/webhooks/telemetry"),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
@@ -182,6 +181,10 @@ func Load() (*Config, error) {
 		S3PresignExpiryPublic:  s3PresignExpiryPublic,
 		S3PresignExpiryPrivate: s3PresignExpiryPrivate,
 	}
+	// A self-hosted control plane is private: closed sign-up and no search
+	// engines, unless its env says otherwise.
+	cfg.SignupsOpen = r.boolean("SIGNUPS_OPEN", cfg.Billing)
+	cfg.RobotsNoIndex = r.boolean("ROBOTS_NOINDEX", !cfg.Billing)
 	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction())
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")

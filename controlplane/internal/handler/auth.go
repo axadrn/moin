@@ -160,6 +160,10 @@ func (h *authHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
 		return
 	}
+	if errors.Is(err, service.ErrPrivate) {
+		render(w, r, pages.AuthPrivate())
+		return
+	}
 	if err != nil {
 		// Don't reveal specific errors to prevent email enumeration
 		slog.Warn("magic link send failed", "error", err)

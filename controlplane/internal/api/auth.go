@@ -167,6 +167,10 @@ func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusForbidden, "waitlisted", err.Error())
 		return
 	}
+	if errors.Is(err, service.ErrPrivate) {
+		Error(w, http.StatusForbidden, "private", err.Error())
+		return
+	}
 	if err != nil {
 		slog.Warn("magic link send failed", "error", err)
 	}

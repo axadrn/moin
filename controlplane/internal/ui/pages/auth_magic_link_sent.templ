@@ -85,3 +85,25 @@ templ AuthWaitlisted(email string) {
 		}
 	}
 }
+
+// AuthPrivate is what a new address sees on a self-hosted control plane with
+// sign-up closed: only its admins and invited people get in.
+templ AuthPrivate() {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "This " + brand.Name + " is private",
+		Description: "Ask its admin for an invitation",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("This "+brand.Name+" is private", "Ask its admin for an invitation.") {
+				@field.Group() {
+					@field.Field(field.Props{Attributes: templ.Attributes{"data-private": true}}) {
+						@field.Description(field.DescriptionProps{Class: "text-center"}) {
+							<a href="/auth">Use another email</a>
+						}
+					}
+				}
+			}
+		}
+	}
+}

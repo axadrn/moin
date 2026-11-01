@@ -37,10 +37,12 @@ templ AuthShell(appName string) {
 			</main>
 			<footer class="flex h-16 items-center justify-between gap-4 text-xs text-muted-foreground">
 				<a href="/docs" class="transition-colors hover:text-foreground">Docs</a>
-				<span class="flex gap-5">
-					<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
-					<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
-				</span>
+				if ctxkeys.RenderConfig(ctx).Billing {
+					<span class="flex gap-5">
+						<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
+						<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
+					</span>
+				}
 			</footer>
 		</div>
 		@authAside()
@@ -107,10 +109,12 @@ templ AuthCard(title, description string) {
 		<div class="mt-8">
 			{ children... }
 		</div>
-		<p class="mt-8 text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-foreground">
-			By continuing, you agree to the <a href="/legal/terms">Terms of Service</a>
-			and the <a href="/legal/privacy">Privacy Policy</a>.
-		</p>
+		if ctxkeys.RenderConfig(ctx).Billing {
+			<p class="mt-8 text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-foreground">
+				By continuing, you agree to the <a href="/legal/terms">Terms of Service</a>
+				and the <a href="/legal/privacy">Privacy Policy</a>.
+			</p>
+		}
 	</div>
 }
 

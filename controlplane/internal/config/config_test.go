@@ -311,3 +311,28 @@ func TestGitHubAppKeyFromFile(t *testing.T) {
 		t.Fatalf("key = %q", cfg.GitHubAppPrivateKey)
 	}
 }
+
+func TestSelfHostedIsPrivateByDefault(t *testing.T) {
+	for _, test := range []struct {
+		billing, signupsOpen, noIndex string
+		wantOpen, wantNoIndex         bool
+	}{
+		{billing: "true", wantOpen: true, wantNoIndex: false},
+		{billing: "false", wantOpen: false, wantNoIndex: true},
+		{billing: "false", signupsOpen: "true", noIndex: "false", wantOpen: true, wantNoIndex: false},
+		{billing: "true", signupsOpen: "false", wantOpen: false, wantNoIndex: false},
+	} {
+		setCoreEnvironment(t)
+		t.Setenv("BILLING", test.billing)
+		t.Setenv("SIGNUPS_OPEN", test.signupsOpen)
+		t.Setenv("ROBOTS_NOINDEX", test.noIndex)
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.SignupsOpen != test.wantOpen || cfg.RobotsNoIndex != test.wantNoIndex {
+			t.Fatalf("BILLING=%s SIGNUPS_OPEN=%q ROBOTS_NOINDEX=%q: open = %v, noindex = %v", test.billing, test.signupsOpen, test.noIndex, cfg.SignupsOpen, cfg.RobotsNoIndex)
+		}
+	}
+}

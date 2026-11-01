@@ -21,9 +21,17 @@ order: 3
 
 You need nothing from us, not even a license key. Prefer not to run it? Our hosted control plane is the same code.
 
+**It is private.** A self-hosted control plane has no landing page and no sign-up for strangers: only admins (`ADMIN_EMAILS`) and teammates they invite sign in.
+
 ## What is different
 
-Only billing. With `BILLING=false` there are no prices, no checkout and no billing page, and every workspace gets unlimited servers, apps and members. Everything else is the code we run: the web UI, the API, MCP, deploys, backups, data, GitHub, teams and the activity.
+Billing, and who gets in. With `BILLING=false` there are no prices, no checkout and no billing page, and every workspace gets unlimited servers, apps and members. Everything else is the code we run: the web UI, the API, MCP, deploys, backups, data, GitHub, teams and the activity.
+
+And it is private:
+
+- No landing page. Your `APP_URL` opens the sign-in page, or your workspace when you are signed in.
+- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This ops is private. Ask its admin for an invitation." There is no waitlist.
+- The docs stay at `/docs`. The terms and privacy pages of our hosted service are not there, and search engines are asked to stay away (`ROBOTS_NOINDEX` is on).
 
 ## Where to run it
 
@@ -61,6 +69,8 @@ sh setup.sh
 APP_ENV=production
 APP_URL=https://ops.example.com
 BILLING=false
+# You: the first admin. Sign up with this address.
+ADMIN_EMAILS=you@example.com
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
 # openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
 SECRETS_KEY=
@@ -93,6 +103,19 @@ The control plane listens on `127.0.0.1:8090`. Put it on your domain in one of t
 
 - **A proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
 
+### Keep it private: run it on your tailnet
+
+The safest control plane is one the internet cannot reach. Run it only on your Tailscale network, your private network of your own devices:
+
+1. Prepare the server with `sh setup.sh --tailscale`. It joins your tailnet.
+2. Serve the control plane on the tailnet, with HTTPS: `tailscale serve --bg 8090`. It is now at `https://<server>.<tailnet>.ts.net`. Use that as `APP_URL`, with no tunnel and no open port.
+3. Put each server on the tailnet too, with `tailscale up`, before you install the agent. The agent then reaches the control plane.
+4. Put your computer on the tailnet, for the web UI, the CLI and the TUI.
+
+Your apps stay public: they get their visitors through a Cloudflare Tunnel or ports 80 and 443 on each server, never through the control plane.
+
+GitHub and CI outside your tailnet cannot reach the control plane, so **Deploy every push** and deploy hooks do not work there. Deploy from the web, the CLI or a CI runner on your tailnet.
+
 ### Keep the settings in 1Password
 
 Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Password:
@@ -102,9 +125,15 @@ Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Pas
 
 `update.sh` fills them in from 1Password on every start. A changed password counts after the next `update.sh`.
 
-### Private beta
+### Who signs in
 
-`SIGNUPS_OPEN=false` closes sign-up. New addresses go on a waitlist, and admins (`ADMIN_EMAILS`) let people in under **Admin**, **Waitlist**: they get a sign-in email and their workspace has everything unlocked. Invited teammates can always join.
+- **You, first.** Put your address in `ADMIN_EMAILS` and sign up with it, with a sign-in link. Add a password later under **Settings** if you like. `ADMIN_EMAILS` takes several addresses, separated by commas.
+- **Your team.** Invite teammates to your workspace. They sign up with the invited address.
+- **Nobody else.** Other addresses get no account.
+
+If `ADMIN_EMAILS` is empty, nobody can create the first account, and the control plane says so in its log when it starts. Set it and run `update.sh` again.
+
+If you do want anyone to sign up, set `SIGNUPS_OPEN=true`. Keep it off on a control plane the internet can reach.
 
 ### Analytics
 
@@ -112,7 +141,7 @@ Off by default. To count visitors with your own Umami, set `UMAMI_WEBSITE_ID` an
 
 ## Use it
 
-Sign up at your `APP_URL`, then point the CLI at it:
+Sign up at your `APP_URL` with your address from `ADMIN_EMAILS`, then point the CLI at it:
 
 ```bash
 ops login --url https://ops.example.com

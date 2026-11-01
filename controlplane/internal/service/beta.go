@@ -16,10 +16,16 @@ import (
 // is on the waitlist now.
 var ErrWaitlisted = errors.New("sign-up is closed for now: you are on the waitlist and hear from us when you are in")
 
-// BetaService runs a private beta: with sign-up closed, only admins,
-// invited people and people let in from the waitlist create accounts.
+// ErrPrivate is the answer to a new address on a control plane with sign-up
+// closed and no waitlist, the way a self-hosted one runs.
+var ErrPrivate = errors.New("this control plane is private: ask its admin for an invitation")
+
+// BetaService closes sign-up: only admins, invited people and people let in
+// from the waitlist create accounts. The hosted control plane puts everyone
+// else on the waitlist; a self-hosted one has none and stays private.
 type BetaService struct {
 	open          bool
+	waitlisting   bool
 	admins        map[string]struct{}
 	waitlist      repository.WaitlistRepository
 	subscriptions repository.SubscriptionRepository
@@ -27,12 +33,12 @@ type BetaService struct {
 	now           func() time.Time
 }
 
-func NewBetaService(open bool, adminEmails []string, waitlist repository.WaitlistRepository, subscriptions repository.SubscriptionRepository, email *EmailService) *BetaService {
+func NewBetaService(open, waitlisting bool, adminEmails []string, waitlist repository.WaitlistRepository, subscriptions repository.SubscriptionRepository, email *EmailService) *BetaService {
 	admins := make(map[string]struct{}, len(adminEmails))
 	for _, address := range adminEmails {
 		admins[strings.ToLower(strings.TrimSpace(address))] = struct{}{}
 	}
-	return &BetaService{open: open, admins: admins, waitlist: waitlist, subscriptions: subscriptions, email: email, now: time.Now}
+	return &BetaService{open: open, waitlisting: waitlisting, admins: admins, waitlist: waitlist, subscriptions: subscriptions, email: email, now: time.Now}
 }
 
 // MayCreate reports whether a new account may be made for the address.
@@ -52,6 +58,22 @@ func (s *BetaService) MayCreate(email string) (bool, error) {
 		return true, nil
 	}
 	return s.waitlist.HasPendingInvitation(email, s.now().UTC())
+}
+
+// Admit lets a new address create an account, or says why it may not: it
+// joins the waitlist, or without one the control plane is private.
+func (s *BetaService) Admit(email string) error {
+	allowed, err := s.MayCreate(email)
+	if err != nil || allowed {
+		return err
+	}
+	if !s.waitlisting {
+		return ErrPrivate
+	}
+	if err := s.Join(email); err != nil {
+		return err
+	}
+	return ErrWaitlisted
 }
 
 // Join puts an address on the waitlist.

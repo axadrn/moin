@@ -805,20 +805,10 @@ func (s *AuthService) SetBeta(beta *BetaService) {
 	s.beta = beta
 }
 
-// mayCreate puts a new address on the waitlist when sign-up is closed.
+// mayCreate refuses a new address the beta does not let in.
 func (s *AuthService) mayCreate(email string) error {
 	if s.beta == nil {
 		return nil
 	}
-	allowed, err := s.beta.MayCreate(email)
-	if err != nil {
-		return err
-	}
-	if allowed {
-		return nil
-	}
-	if err := s.beta.Join(email); err != nil {
-		return err
-	}
-	return ErrWaitlisted
+	return s.beta.Admit(email)
 }

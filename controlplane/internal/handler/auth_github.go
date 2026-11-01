@@ -103,6 +103,10 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
 		return
 	}
+	if errors.Is(err, service.ErrPrivate) {
+		render(w, r, pages.AuthPrivate())
+		return
+	}
 	if err != nil {
 		slog.Error("oauth authentication failed", "error", err)
 		render(w, r, pages.Auth("Authentication failed. Please try again."))
