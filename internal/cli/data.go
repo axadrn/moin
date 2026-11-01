@@ -94,18 +94,26 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	case "schema":
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
 		tables, err := api.Tables(ctx, name, *database)
 		if err != nil {
 			return err
 		}
+		found := false
 		for _, table := range tables.Tables {
 			if flags.NArg() > 0 && table.Name != flags.Arg(0) {
 				continue
 			}
+			found = true
 			fmt.Fprintln(stdout, table.SQL+";")
 			for _, index := range table.Indexes {
 				fmt.Fprintln(stdout, index+";")
 			}
+		}
+		if !found && flags.NArg() > 0 {
+			return fmt.Errorf("%s has no table %s. See them with `%s db`", tables.Database, flags.Arg(0), build.Name)
 		}
 		return nil
 	}
@@ -164,7 +172,7 @@ func sql(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	}
 	printResult(stdout, result.Columns, result.Rows)
 	if result.Truncated {
-		fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("first %d rows, more with --limit", len(result.Rows))))
+		fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("first %d %s, more with --limit", len(result.Rows), pluralWord(int64(len(result.Rows)), "row", "rows"))))
 	}
 	return nil
 }
