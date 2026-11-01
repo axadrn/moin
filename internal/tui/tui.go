@@ -141,10 +141,12 @@ type form struct {
 }
 
 // formField is one question of a form. An empty answer takes value; a
-// field that is not optional needs one of the two.
+// field that is not optional needs one of the two. check, if set, refuses a
+// wrong answer and the field asks again.
 type formField struct {
 	label, hint, value string
 	secret, optional   bool
+	check              func(value string) error
 }
 
 // confirmation is a question that runs its command after a yes, and goes
@@ -584,6 +586,12 @@ func (m model) formKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if value == "" && !field.optional {
 			m.err = fmt.Errorf("%s is needed", strings.ToLower(field.label))
 			return m, nil
+		}
+		if field.check != nil {
+			if err := field.check(value); err != nil {
+				m.err = err
+				return m, nil
+			}
 		}
 		m.input = ""
 		m.form.values = append(slices.Clone(m.form.values), value)

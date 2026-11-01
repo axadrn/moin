@@ -64,7 +64,7 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 	case "a":
 		return m.ask("Invite", func(values []string) tea.Cmd { return m.invite(values[0], values[1]) },
 			formField{label: "Email"},
-			formField{label: "Role", value: "member", hint: "member or admin, enter takes member"},
+			formField{label: "Role", value: "member", hint: "member or admin, enter takes member", check: checkRole},
 		), nil
 	case "n":
 		name := m.team.Workspace.Name
@@ -85,10 +85,15 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) invite(email, role string) tea.Cmd {
+// checkRole lets the invite form ask the role again when it is wrong.
+func checkRole(role string) error {
 	if role != "member" && role != "admin" {
-		return func() tea.Msg { return errMsg{fmt.Errorf("the role is member or admin, not %s", role)} }
+		return fmt.Errorf("the role is member or admin, not %s", role)
 	}
+	return nil
+}
+
+func (m model) invite(email, role string) tea.Cmd {
 	return m.teamChange(func() error { return m.api.Invite(m.ctx, email, role) }, "Invited "+email+" as "+role)
 }
 

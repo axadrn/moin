@@ -428,3 +428,15 @@ func TestStopThenStart(t *testing.T) {
 		t.Errorf("S on a stopped app asks to stop it again")
 	}
 }
+
+// TestInviteWrongRole: a wrong role keeps the form and the email typed.
+func TestInviteWrongRole(t *testing.T) {
+	m := press(frames()["team"], "a")
+	m.input = "ada@example.com"
+	m = press(m, "enter")
+	m.input = "boss"
+	m = press(m, "enter")
+	if m.mode != modeForm || m.form.step != 1 || m.err == nil || !slices.Equal(m.form.values, []string{"ada@example.com"}) {
+		t.Errorf("mode %d, step %d, values %v, err %v; want the role asked again", m.mode, m.form.step, m.form.values, m.err)
+	}
+}
