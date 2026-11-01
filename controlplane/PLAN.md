@@ -223,3 +223,19 @@ one starts.
 4. **Data**: done 2026-10-31. Browse, edit, SQL; the schema stays with the app's migrations.
 5. **Security**: done 2026-10-31. Cloudflare Tunnel, SSH on Tailscale, firewall.
 6. **Beta**: Stripe plans, name and domain, preview URLs on their own domain, the first real servers.
+
+## License
+
+Decided 2026-11-01, after research:
+
+- AGPL-3.0 for all of ops: real open source, so it lists where self-hosters
+  look, next to Apache-licensed Coolify and Dokploy. A hosted clone is
+  legal but must publish all of its code.
+- Contributions come in under Apache 2.0, signed off on every commit
+  (`CONTRIBUTING.md`, the pull request template). That keeps one move open:
+  if a paid hosted clone of ops gains traction, future versions can switch
+  to FSL-1.1-ALv2, which forbids a competing hosted service and turns into
+  Apache 2.0 after two years.
+- The name and logo are outside the license (`TRADEMARKS.md`). No
+  registration for now; register the name at the paid launch or at its
+  first misuse.
