@@ -20,6 +20,10 @@ The previous release starts again and the deploy is marked failed with the reaso
 
 On your server: bind mounts under `/var/lib/ops/apps/<app>/volumes`, named volumes in Docker. Removing an app keeps both.
 
+## Can ops see my data?
+
+Only what you ask for. A table you open, a query you run or the logs you read pass through to you and are never stored, and the activity keeps no SQL and no values. To close even that, write `data: off` and `logs: off` into `/etc/ops/rules` on your server: the agent then refuses every read, and nobody can change it through ops, not even us. See [Rules](/docs/guides/security#rules).
+
 ## Can I see and change everything from an AI agent?
 
 Yes. Every action is an [MCP tool](/docs/guides/mcp).

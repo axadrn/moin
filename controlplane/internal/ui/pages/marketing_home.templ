@@ -437,7 +437,7 @@ templ HomeStatement() {
 					<span class="block">Nothing listens for&nbsp;us.</span>
 				</p>
 				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
-					The agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. Your code builds on your server, your backups go to your bucket.
+					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
 				</p>
 			</div>
 		</div>
@@ -478,6 +478,9 @@ templ HomeFAQ() {
 				@homeQuestion("Where does my code go?") {
 					Into your own bucket, never to us. ops deploy puts it there through a link ops signs, your server picks it up and deletes it. Deploys from GitHub go from GitHub straight to your server. Your backups live in the same bucket.
 				}
+				@homeQuestion("Can you see my data?") {
+					Only what you ask for: a table you open passes through to your browser and is never stored, and the activity never keeps your SQL or your values. Want even that gone? Write data: off and logs: off into /etc/ops/rules on your server. The agent then refuses every read, and nobody can change that through ops, not even us.
+				}
 				@homeQuestion("What happens if ops is down?") {
 					Your apps keep running. They live on your servers, not on ours. You only cannot deploy or change them through ops until it is back.
 				}
@@ -490,8 +493,10 @@ templ HomeFAQ() {
 				@homeQuestion("Can my team use it?") {
 					Yes, for free. Invite them and everyone deploys to the same servers. The activity shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
-				@homeQuestion("Can I cancel?") {
-					Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
+				if ctxkeys.RenderConfig(ctx).Billing {
+					@homeQuestion("Can I cancel?") {
+						Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
+					}
 				}
 			</div>
 		</div>

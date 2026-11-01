@@ -10,9 +10,13 @@ order: 15
 
 Only billing. With `BILLING=false` there are no prices, no checkout and no billing page, and every workspace gets unlimited servers, apps and members. Everything else is the code we run: the web UI, the API, MCP, deploys, backups, data, GitHub, teams and the activity.
 
+## Where to run it
+
+On its own small server, not on a server with your apps. The agent on an app server takes ports 80 and 443 for your apps, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers, since their agents dial out to it.
+
 ## What you need
 
-- A Linux server with Docker, reachable over HTTPS at your own domain.
+- A small Linux server with Docker for the control plane, reachable over HTTPS at your own domain.
 - An S3-compatible bucket for the files of the control plane, such as avatars.
 - Cloudflare Email Sending for sign-in links and invitations.
 - Optional: your own GitHub App for GitHub deploys, see [GitHub](/docs/guides/github).
