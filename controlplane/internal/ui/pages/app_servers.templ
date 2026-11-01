@@ -158,7 +158,7 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 			}
 		}
 		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col gap-4"}) {
-			<dl class="grid grid-cols-3 gap-3">
+			<dl class="flex flex-wrap gap-x-8 gap-y-3">
 				@serverFact("System", serverSystem(server), serverSystem(server))
 				@serverFact("Agent", server.AgentVersion, server.AgentVersion)
 				@serverFact("Last seen", serverLastSeen(server, now), serverLastSeenTitle(server))
