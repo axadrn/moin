@@ -62,7 +62,7 @@ func (h *AppsHandler) BackupSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	toastFailed(w, r, "Setting not saved", errorMessage(err))
 	if app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app")); err == nil {
-		render(w, r, pages.BackupSettingsForm(*app))
+		renderOOB(w, r, pages.BackupSettingsForm(*app), "outerHTML:#backup-settings-form")
 	}
 }
 

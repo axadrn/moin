@@ -277,10 +277,12 @@ templ backupSettings(view BackupsView) {
 }
 
 // BackupSettingsForm is the switch that saves itself. A change that failed
-// answers it as stored, so it flips back.
+// answers it as stored, so it flips back. It is no out-of-band part: the
+// backups panel swaps in whole after Back up now and a restore, and an
+// out-of-band form in it would leave the page without the switch.
 templ BackupSettingsForm(app model.App) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	<form id="backup-settings-form" hx-swap-oob="true" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
+	<form id="backup-settings-form" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
 			@csrf.Token()
 			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 				@field.Content() {
