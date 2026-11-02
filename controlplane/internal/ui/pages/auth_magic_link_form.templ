@@ -40,9 +40,7 @@ templ AuthMagicLinkForm(errorMsg string) {
 						"required":     "",
 					},
 				})
-				@fieldHint("email", errorMsg) {
-					We email you a link to sign in.
-				}
+				@fieldHint("email", errorMsg)
 			}
 			@button.Button(button.Props{Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
 				Continue with email
