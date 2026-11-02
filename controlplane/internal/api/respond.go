@@ -247,6 +247,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRestoreTarget, field: "snapshot", message: "Choose a snapshot or a point in time."},
 	{err: service.ErrGitHubOff, status: http.StatusConflict, code: "github_off", message: "The GitHub App is not set up on this control plane."},
 	{err: service.ErrGitHubState, status: http.StatusBadRequest, code: "github_state", message: "The GitHub install link expired or belongs to another account. Connect again."},
+	{err: repository.ErrGitHubInstallationTaken, status: http.StatusConflict, code: "github_taken", message: "This GitHub account is connected to another workspace. Disconnect it there first."},
 	{err: service.ErrRepo, field: "repo", message: "ops cannot read this repo. Install the ops GitHub App on its account and give it the repo."},
 	{err: service.ErrRepoName, field: "repo", message: "Name the repo as owner/name."},
 	{err: service.ErrNoRepo, status: http.StatusConflict, code: "no_repo", message: "The app follows no repo. Link one first."},

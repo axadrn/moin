@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -127,6 +128,22 @@ func TestGitHubDeploys(t *testing.T) {
 	account, err := apps.ConnectGitHub(ctx, owner, 7, state)
 	if err != nil || account != "axadrn" {
 		t.Fatalf("connect = %q, %v", account, err)
+	}
+	// Installation IDs are public counters: another workspace's own valid
+	// state must not move this installation, and its private repos, there.
+	otherLink, _ := apps.GitHubInstallURL(other)
+	otherParsed, _ := url.Parse(otherLink)
+	if _, err := apps.ConnectGitHub(ctx, other, 7, otherParsed.Query().Get("state")); !errors.Is(err, repository.ErrGitHubInstallationTaken) {
+		t.Fatalf("another workspace took the installation: err = %v", err)
+	}
+	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
+		t.Fatalf("other workspace installations = %+v", installations)
+	}
+	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 {
+		t.Fatalf("owner lost the installation: %+v", installations)
+	}
+	if _, err := apps.ConnectGitHub(ctx, owner, 7, state); err != nil {
+		t.Fatalf("connect again in the same workspace: %v", err)
 	}
 
 	_, err = apps.Create(owner, "blog", server.ID)
