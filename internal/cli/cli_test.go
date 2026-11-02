@@ -19,7 +19,9 @@ type fakeAPI struct {
 	mu       sync.Mutex
 	requests []string
 	answers  map[string]string
-	status   int
+	// conflicts answers 409 with these error codes.
+	conflicts map[string]string
+	status    int
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +36,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	f.requests = append(f.requests, strings.Join(parts, " "))
 	answer, ok := f.answers[key]
+	conflict := f.conflicts[key]
 	status := f.status
 	f.mu.Unlock()
+	if conflict != "" {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":{"code":"` + conflict + `","message":"Conflict."}}`))
+		return
+	}
 	if status != 0 {
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(`{"error":{"code":"unauthenticated","message":"Sign in to continue."}}`))
@@ -506,5 +514,14 @@ func TestIntegrationsRmWithoutAKeyChangesNothing(t *testing.T) {
 	code, stdout, stderr := runCLI(t, api, "integrations", "rm", "tailscale", "--yes")
 	if code != 0 || !strings.Contains(stdout, "Nothing changed: no tailscale key is stored.") || api.seen("PUT") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}
+
+// start on a running app says so and changes nothing.
+func TestStartRunningApp(t *testing.T) {
+	api := &fakeAPI{conflicts: map[string]string{"POST /api/v1/apps/shop/start": "already_running"}}
+	code, stdout, stderr := runCLI(t, api, "start", "shop")
+	if code != 0 || !strings.Contains(stdout, "shop is already running. Nothing changed.") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

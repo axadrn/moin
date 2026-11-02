@@ -120,7 +120,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Stops the containers of an app. It stays offline, also after a reboot of the server, until start_app, restart_app or a deploy. Its data and settings stay. Needs a token with read and write access.",
 		change(true, true)), Write(member(services, tools.stop)))
 	mcpsdk.AddTool(server, add("start_app", "Start an app",
-		"Runs a stopped app again, with its env vars, domains and protection as they are now. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
+		"Runs a stopped app again, with its env vars, domains and protection as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(member(services, tools.start)))
 	mcpsdk.AddTool(server, add("check_domains", "Check domains",
 		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-ops.domains in compose.yml sets; they change there. Needs the read scope.",

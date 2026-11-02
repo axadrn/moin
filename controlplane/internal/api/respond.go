@@ -225,6 +225,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrComposeDomains, status: http.StatusConflict, code: "domains_from_compose", message: "The domains of this app come from x-ops.domains in compose.yml. Change them there and deploy."},
 	{err: service.ErrProtectUser, field: "username", message: "Use a username without spaces or colons."},
 	{err: service.ErrProtect, field: "password", message: "Use a password of 8 to 72 characters."},
+	{err: service.ErrRunning, status: http.StatusConflict, code: "already_running", message: "The app is already running. Nothing changed."},
 	{err: service.ErrNotLive, status: http.StatusConflict, code: "not_live", message: "The app has no live release yet. Run ops deploy in the repo first."},
 	{err: service.ErrNoSource, status: http.StatusConflict, code: "no_source", message: "No deploy has a source or an image yet. Run ops deploy in the repo first."},
 	{err: service.ErrReleaseGone, status: http.StatusConflict, code: "release_gone", message: "The release of that deploy is no longer on the server: it keeps the releases of the last 5 builds. Deploy again or roll back to a newer deploy."},

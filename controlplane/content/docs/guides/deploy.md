@@ -165,7 +165,7 @@ MCP: stop_app
 
 ## Start
 
-Runs a stopped app again, like a restart. A deploy starts it too.
+Runs a stopped app again, like a restart. A deploy starts it too. An app that runs already stays as it is: ops says it is already running.
 
 ```surfaces
 Web: the app page, **Start**

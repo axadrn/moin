@@ -6,6 +6,7 @@ package tui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -1421,6 +1422,10 @@ func (m model) restart(name string, start bool) tea.Cmd {
 			run, verb = m.api.Start, "start"
 		}
 		started, err := run(m.ctx, name)
+		var apiErr *client.Error
+		if errors.As(err, &apiErr) && apiErr.Code == "already_running" {
+			return noticeMsg(name + " is already running. Nothing changed")
+		}
 		if err != nil {
 			return errMsg{err}
 		}

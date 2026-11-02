@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -234,6 +235,11 @@ func restart(ctx context.Context, command string, args []string, stdout io.Write
 		run, title = api.Start, "Start"
 	}
 	started, err := run(ctx, name)
+	var apiErr *client.Error
+	if errors.As(err, &apiErr) && apiErr.Code == "already_running" {
+		done(stdout, "%s is already running. Nothing changed.", name)
+		return nil
+	}
 	if err != nil {
 		return err
 	}

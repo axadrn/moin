@@ -199,6 +199,12 @@ func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 // Start runs a stopped app again. The page follows the new deploy.
 func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
 	deploy, err := h.apps.Start(actor(r), r.PathValue("app"))
+	if errors.Is(err, service.ErrRunning) {
+		// Started elsewhere: the page shows it running.
+		h.Detail(w, r)
+		toastDone(w, r, r.PathValue("app")+" is already running", "Nothing changed.")
+		return
+	}
 	if err != nil {
 		failed(w, r, "App not started", err, nil)
 		return

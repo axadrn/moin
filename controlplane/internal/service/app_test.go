@@ -522,6 +522,20 @@ func TestStopStartAndRestart(t *testing.T) {
 	}
 	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 
+	// A running app does not start again.
+	agent.mu.Lock()
+	agent.sent = nil
+	agent.mu.Unlock()
+	if _, err := apps.Start(owner, "blog"); !errors.Is(err, ErrRunning) {
+		t.Fatalf("start a running app: err = %v", err)
+	}
+	agent.mu.Lock()
+	sent := len(agent.sent)
+	agent.mu.Unlock()
+	if _, deploys, _ := apps.Deploys(owner.WorkspaceID, "blog", 10); len(deploys) != 1 || sent != 0 {
+		t.Fatalf("start of a running app made %d deploys, sent %d messages", len(deploys), sent)
+	}
+
 	// A failed stop leaves the app as it was.
 	go agentAnswers(servers, server.ID, agent, protocol.TypeAppStop, protocol.TypeError, protocol.Error{Message: "docker is not running"})
 	var agentErr *AgentError

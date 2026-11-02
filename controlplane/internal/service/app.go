@@ -39,6 +39,7 @@ var (
 	ErrReleaseGone    = errors.New("the release of that deploy is no longer on the server")
 	ErrNoSource       = errors.New("no deploy has a source yet")
 	ErrNotLive        = errors.New("the app has no live release yet")
+	ErrRunning        = errors.New("the app is already running")
 	ErrImage          = errors.New("image must be a reference like ghcr.io/me/app:tag")
 	ErrDeployHook     = errors.New("deploy hook is invalid")
 	ErrRegistryHost   = errors.New("registry host must be a host name like ghcr.io")
@@ -384,8 +385,15 @@ func (s *AppService) Restart(actor Actor, idOrName string) (*model.Deploy, error
 }
 
 // Start runs a stopped app again. Like a restart, it takes the env and
-// routing as they are now.
+// routing as they are now. An app that runs already stays as it is.
 func (s *AppService) Start(actor Actor, idOrName string) (*model.Deploy, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if app.LiveNumber > 0 && !app.Stopped {
+		return nil, ErrRunning
+	}
 	return s.apply(actor, "app.started", idOrName)
 }
 
