@@ -429,3 +429,12 @@ func TestDomainsFromComposeAreMarked(t *testing.T) {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
+
+func TestEnvPullCountsOneVar(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
+	file := filepath.Join(t.TempDir(), "shop.env")
+	code, stdout, stderr := runCLI(t, api, "env", "pull", "--app", "shop", file)
+	if code != 0 || !strings.Contains(stdout, "Wrote 1 env var of shop") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}

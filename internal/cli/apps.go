@@ -867,7 +867,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if err != nil {
 			return err
 		}
-		done(stdout, "Wrote %d env vars of %s to %s", len(values), style.Bold.Render(name), path)
+		done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
