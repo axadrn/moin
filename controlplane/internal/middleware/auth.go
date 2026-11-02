@@ -175,13 +175,17 @@ func withWorkspaceOf(slugOf func(*http.Request) string, workspaceService *servic
 // readOnlyAllows says whether a request may run in a workspace whose plan
 // allows no changes: reading, SQL (writes are checked again), the workspace
 // with its team and billing, the account, sessions and tokens, stopping or
-// starting an app and turning its deploy hook off.
+// starting an app and turning its deploy hook off. It reads the route
+// pattern, not the path, so no app or workspace name can match a part.
 func readOnlyAllows(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 		return true
 	}
-	path := r.URL.Path
+	path := r.Pattern
+	if _, route, ok := strings.Cut(path, " "); ok {
+		path = route
+	}
 	for _, part := range []string{"/api/v1/workspaces/", "/workspace/", "/billing/", "/account", "/profile/", "/settings/sessions", "/settings/api-tokens", "/data/query", "/databases/query"} {
 		if strings.Contains(path, part) {
 			return true
