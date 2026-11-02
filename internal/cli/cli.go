@@ -103,7 +103,7 @@ Backups
   restore            Restore a snapshot: restore <snapshot>, or a time: restore --at "2026-10-31 14:02" [--yes]
   backups auto       Snapshot before every change: backups auto on|off
   backups bucket     Show the bucket backups go to
-  backups bucket set Set it: --endpoint https://… --bucket … --access-key …, secret key on stdin
+  backups bucket set  Set it: --endpoint https://… --bucket … --access-key …, secret key on stdin
   backups bucket rm  Stop backups; the bucket keeps what is in it: backups bucket rm [--yes]
 
 Env
@@ -131,21 +131,38 @@ Docs: https://ops.goilerplate.com/docs, or /docs on your own control plane.
 `
 
 // printUsage writes the help: section names bold, descriptions muted on a
-// terminal.
+// terminal, all in one column after the longest command.
 func printUsage(w io.Writer) {
-	for index, line := range strings.Split(strings.TrimRight(strings.ReplaceAll(usage, "ops", build.Name), "\n"), "\n") {
-		name, description, ok := strings.Cut(strings.TrimPrefix(line, "  "), "  ")
+	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(usage, "ops", build.Name), "\n"), "\n")
+	width := 0
+	for _, line := range lines {
+		if name, _, ok := usageEntry(line); ok {
+			width = max(width, len(name))
+		}
+	}
+	for index, line := range lines {
+		name, description, ok := usageEntry(line)
 		switch {
 		case index == 0:
 			fmt.Fprintln(w, style.Accent.Bold(true).Render(build.Name)+strings.TrimPrefix(line, build.Name))
-		case strings.HasPrefix(line, "  ") && ok:
-			fmt.Fprintln(w, "  "+name+"  "+style.Muted.Render(description))
+		case ok:
+			fmt.Fprintln(w, "  "+name+strings.Repeat(" ", width-len(name)+2)+style.Muted.Render(description))
 		case line != "" && !strings.Contains(line, " "):
 			fmt.Fprintln(w, style.Bold.Render(line))
 		default:
 			fmt.Fprintln(w, line)
 		}
 	}
+}
+
+// usageEntry splits an indented line of the usage into the command and what
+// it does, at the first two spaces.
+func usageEntry(line string) (name, description string, ok bool) {
+	if !strings.HasPrefix(line, "  ") {
+		return "", "", false
+	}
+	name, description, ok = strings.Cut(strings.TrimPrefix(line, "  "), "  ")
+	return name, strings.TrimSpace(description), ok
 }
 
 // Run runs one command and returns the exit code.
