@@ -95,3 +95,50 @@ func TestImpersonationCannotConnectGitHub(t *testing.T) {
 		}
 	}
 }
+
+// TestImpersonationHidesPrivateData: env values, database rows and app logs
+// stay hidden from an operator, on the web and in the API.
+func TestImpersonationHidesPrivateData(t *testing.T) {
+	operatorID := "operator"
+	for path, private := range map[string]bool{
+		"/app/acme/apps/blog/env?show=1":              true,
+		"/app/acme/apps/blog/env":                     false,
+		"/app/acme/apps/blog/logs":                    true,
+		"/app/acme/apps/blog/data?db=app.db":          true,
+		"/app/acme/apps/blog/backups":                 false,
+		"/app/acme/apps/logs":                         false,
+		"/app/acme/apps/data/detail":                  false,
+		"/api/v1/apps/blog/env":                       true,
+		"/api/v1/apps/blog/logs":                      true,
+		"/api/v1/apps/blog/databases/rows?table=user": true,
+		"/api/v1/apps/blog/databases/tables":          false,
+		"/api/v1/apps/blog/backups":                   false,
+		"/api/v1/apps/env":                            false,
+	} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request = request.WithContext(ctxkeys.WithSession(request.Context(), &model.Session{ImpersonatorUserID: &operatorID}))
+		recorder := httptest.NewRecorder()
+		called := false
+		BlockImpersonatedWrites(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+		})).ServeHTTP(recorder, request)
+		if called == private {
+			t.Errorf("%s: called = %t, want %t", path, called, !private)
+		}
+		if private && recorder.Code != http.StatusForbidden {
+			t.Errorf("%s: status = %d, want 403", path, recorder.Code)
+		}
+	}
+
+	// The user's own session still sees everything.
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/apps/blog/env", nil)
+	request = request.WithContext(ctxkeys.WithSession(request.Context(), &model.Session{ID: "session-1"}))
+	if !privateDuringImpersonation(request) {
+		t.Fatal("the env API is not marked private")
+	}
+	called := false
+	BlockImpersonatedWrites(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })).ServeHTTP(httptest.NewRecorder(), request)
+	if !called {
+		t.Fatal("an ordinary session cannot read its env")
+	}
+}
