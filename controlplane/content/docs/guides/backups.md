@@ -95,7 +95,7 @@ A snapshot ID is the time it was taken, then why, like `20261031T143638Z-manual`
 
 ```surfaces
 Web: the app page, **Backups** tab, **Restore** on a snapshot
-CLI: ops restore 20261031T143638Z-manual
+CLI: ops restore <snapshot-id>
 TUI: on the app, `b`, type the snapshot ID, `enter`, then the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
@@ -138,7 +138,7 @@ API: PUT /api/v1/apps/{app}/backups/settings
 MCP: set_backup_settings
 ```
 
-ops then takes a snapshot before a deploy (`before-v4`), before a cell edit, a deleted row or SQL with **Allow changes** (`before-sql`), and before a restore. More changes in the same second each get their own snapshot: `before-sql-2`, `before-sql-3`.
+ops then takes a snapshot before a [deploy](/docs/guides/deploy) (`before-v4`), before a cell edit, a deleted row or SQL with **Allow changes** (`before-sql`), and before a restore. More changes in the same second each get their own snapshot: `before-sql-2`, `before-sql-3`.
 
 ## Stop backups
 
