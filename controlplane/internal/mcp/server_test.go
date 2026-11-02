@@ -351,7 +351,8 @@ func TestOpsToolsActAsMembersAndStopAfterRemoval(t *testing.T) {
 func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "sql")
-	token, _ := createToken(t, env, owner)
+	upgrade(t, env, owner)
+	token, _ := createToken(t, env, owner, "read", "write")
 	session := connectMemory(t, env.server, owner, token)
 
 	result, err := session.ListTools(context.Background(), nil)
@@ -379,5 +380,11 @@ func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
 	}
 	if _, ok := properties["execute_sql"]["limit"]; ok {
 		t.Error("execute_sql takes a limit")
+	}
+	// Out of range is refused the same way as the tail of get_logs.
+	limit := toolError(t, call(t, session, "query_database", map[string]any{"app": "blog", "sql": "SELECT 1", "limit": 5000}), "validation_failed").Fields
+	tail := toolError(t, call(t, session, "get_logs", map[string]any{"app": "blog", "tail": 5000}), "validation_failed").Fields
+	if limit["limit"] != "Choose between 1 and 1000 rows." || tail["tail"] != "Choose between 1 and 1000 lines." {
+		t.Errorf("limit %v, tail %v", limit, tail)
 	}
 }

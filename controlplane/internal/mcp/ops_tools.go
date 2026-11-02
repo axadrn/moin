@@ -836,7 +836,14 @@ func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseI
 }
 
 func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input QueryInput) (QueryResult, error) {
-	result, err := t.services.Apps.Query(ctx, caller.actor(), input.App, input.Database, input.SQL, input.Params, false, input.Limit)
+	limit := input.Limit
+	if limit == 0 {
+		limit = 100
+	}
+	if limit < 1 || limit > 1000 {
+		return QueryResult{}, InvalidField("limit", "Choose between 1 and 1000 rows.")
+	}
+	result, err := t.services.Apps.Query(ctx, caller.actor(), input.App, input.Database, input.SQL, input.Params, false, limit)
 	return QueryResult{result}, err
 }
 
