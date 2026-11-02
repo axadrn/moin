@@ -123,6 +123,8 @@ from x-ops.app in compose.yml, then from the name of the current directory.
 Flags may come before or after the arguments. Commands that remove or
 replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
+
+Docs: https://ops.goilerplate.com/docs, or /docs on your own control plane.
 `
 
 // printUsage writes the help: section names bold, descriptions muted on a
