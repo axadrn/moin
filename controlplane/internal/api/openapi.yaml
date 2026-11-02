@@ -851,14 +851,19 @@ paths:
       tags: [Servers]
       operationId: deleteServer
       summary: Remove a server
-      description: Disconnects its agent. The agent token stops working.
+      description: Disconnects its agent. The agent token stops working. The agent stays installed on the machine until you run `uninstall_command` there.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
-        '204':
+        '200':
           description: The server is removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemovedServer'
+
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -3745,6 +3750,13 @@ components:
         expires_at:
           type: string
           format: date-time
+    RemovedServer:
+      type: object
+      required: [uninstall_command]
+      properties:
+        uninstall_command:
+          type: string
+          description: Run it on the server to remove the agent, its binary and state. The apps keep running with their data; add `--apps` to remove them too.
     App:
       type: object
       required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, stopped, created_at]

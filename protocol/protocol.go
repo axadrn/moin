@@ -498,3 +498,10 @@ func UpdateCommand(baseURL, name, arch string) string {
 	return fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && systemctl restart %s-agent",
 		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary, name)
 }
+
+// UninstallCommand removes the agent from a server, run on it: its
+// service, binary and state. The apps keep running with their data; add
+// --apps to remove them too.
+func UninstallCommand(name string) string {
+	return "sudo " + name + " agent uninstall"
+}

@@ -31,7 +31,7 @@ removing members, leaving and deleting the workspace are web only.
 | `s`, then `y` | servers | turns SSH only on Tailscale on or off |
 | `u` | servers | updates the server's agent to the control plane's version |
 | `f`, then `y` | servers | turns the firewall on or off |
-| `x`, then `y` | servers, apps | removes the selected one |
+| `x`, then `y` | servers, apps | removes the selected one; for a server, shows the command that removes its agent there |
 | `a` | apps | creates an app: its name, then its server |
 | `enter` | apps | opens the app with its deploys and databases |
 | `↑` `↓` | app | picks a deploy; `enter` shows its log |

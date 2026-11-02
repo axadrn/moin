@@ -19,6 +19,7 @@ import (
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
 	"github.com/axadrn/ops/internal/tui"
+	"github.com/axadrn/ops/protocol"
 	"golang.org/x/term"
 )
 
@@ -107,6 +108,7 @@ Env
 
 Agent
   agent register     Connect this server with an install token
+  agent uninstall    Remove the agent from this server; the apps keep running: agent uninstall [--apps] [--yes]
   agent              Run the agent on this server
 
   version            Show the version
@@ -242,7 +244,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "run":
 		return runWithEnv(ctx, rest, stdin, stdout)
 	case "agent":
-		return agentCommand(ctx, rest, stdout)
+		return agentCommand(ctx, rest, stdin, stdout)
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help` for all of them", command, build.Name)
 }
@@ -428,11 +430,12 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		err = api.RemoveServer(ctx, name)
+		uninstall, err := api.RemoveServer(ctx, name)
 		if err != nil {
 			return err
 		}
 		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
+		hint(stdout, "The agent is still installed there. Remove it on the server with", uninstall)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+command, build.Name)
@@ -529,7 +532,7 @@ func dash(value string) string {
 	return value
 }
 
-func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
+func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	dir := agent.StateDir()
 	if len(args) > 0 && args[0] == "register" {
 		flags := newFlags("agent register", "agent register --url <control plane> --token <install token>")
@@ -549,7 +552,10 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 		done(stdout, "Registered as server %s. State is in %s", state.ServerID, dir)
 		return nil
 	}
-	flags := newFlags("agent", "agent, or agent register --url <control plane> --token <install token>")
+	if len(args) > 0 && args[0] == "uninstall" {
+		return uninstallAgent(ctx, dir, args[1:], stdin, stdout)
+	}
+	flags := newFlags("agent", "agent, agent register --url <control plane> --token <install token>, or agent uninstall [--apps]")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -561,6 +567,37 @@ func agentCommand(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return agent.Run(ctx, dir, state)
+}
+
+// uninstallAgent removes the agent from this server and says what stays.
+func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("agent uninstall", "agent uninstall [--apps] [--yes]").withYes()
+	withApps := flags.Bool("apps", false, "remove the apps with their data, the proxy, the tunnel and the firewall too")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	question := "Remove the agent from this server? The apps keep running."
+	if *withApps {
+		question = "Remove the agent and every app on this server with its data? This cannot be undone."
+	}
+	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		return err
+	}
+	kept, err := agent.Uninstall(ctx, dir, *withApps, func(format string, args ...any) { step(stdout, format, args...) })
+	if err != nil {
+		return err
+	}
+	done(stdout, "The agent is removed from this server")
+	if len(kept) > 0 {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Still here: "+strings.Join(kept, "; ")+"."))
+	}
+	if !*withApps {
+		hint(stdout, "Remove the apps and their data too with", protocol.UninstallCommand(build.Name)+" --apps")
+	}
+	return nil
 }
 
 // printRules shows /etc/ops/rules of a server as its agent reported it.

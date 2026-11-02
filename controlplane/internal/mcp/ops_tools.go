@@ -62,7 +62,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Adds a server and returns its one-time install command. The user runs it as root on the machine within an hour; the agent then connects. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.addServer)))
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
-		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. Needs a token with read and write access.",
+		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it; the apps there keep running with their data unless it gets --apps. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
@@ -408,12 +408,24 @@ type Done struct {
 
 func (d Done) Summary() string { return d.Message }
 
-func (t opsTools) removeServer(_ context.Context, caller Caller, input NameInput) (Done, error) {
+// RemovedServer is the output of remove_server.
+type RemovedServer struct {
+	Message          string `json:"message"`
+	UninstallCommand string `json:"uninstall_command"`
+}
+
+func (r RemovedServer) Summary() string { return r.Message }
+
+func (t opsTools) removeServer(_ context.Context, caller Caller, input NameInput) (RemovedServer, error) {
 	err := t.services.Servers.Delete(caller.actor(), input.Name)
 	if err != nil {
-		return Done{}, err
+		return RemovedServer{}, err
 	}
-	return Done{Message: "Removed server " + input.Name + "."}, nil
+	command := t.services.Servers.UninstallCommand()
+	return RemovedServer{
+		Message:          "Removed server " + input.Name + ". Its agent is still installed: run " + command + " on the server to remove it.",
+		UninstallCommand: command,
+	}, nil
 }
 
 func (t opsTools) updateAgent(ctx context.Context, caller Caller, input NameInput) (ServerOutput, error) {

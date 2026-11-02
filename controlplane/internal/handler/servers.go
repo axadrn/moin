@@ -4,8 +4,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"slices"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
@@ -28,7 +31,17 @@ func (h *ServersHandler) ServersPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list servers failed", err)
 		return
 	}
-	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID)))
+	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers)))
+}
+
+// removed is the server Delete just removed, named in ?removed=, so the
+// list can show the command that removes its agent on the machine.
+func (h *ServersHandler) removed(r *http.Request, servers []model.Server) *pages.RemovedServer {
+	name := r.URL.Query().Get("removed")
+	if name == "" || slices.ContainsFunc(servers, func(server model.Server) bool { return server.Name == name }) {
+		return nil
+	}
+	return &pages.RemovedServer{Name: name, Command: h.servers.UninstallCommand()}
 }
 
 // List answers the table, for the reload after a change.
@@ -70,6 +83,11 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 // Delete removes a server from its page and goes back to the list.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
+	// The list names the server, to show how to remove its agent there.
+	location := ctxkeys.AppBasePath(r.Context()) + "/servers"
+	if server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id")); err == nil {
+		location += "?removed=" + url.QueryEscape(server.Name)
+	}
 	err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if errors.Is(err, repository.ErrServerHasApps) {
 		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server not removed", Description: "Remove the apps on this server first.", Type: toast.TypeError}), "beforeend:#toast-container")
@@ -80,7 +98,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server could not be removed", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
 		return
 	}
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/servers", http.StatusSeeOther)
+	redirect(w, r, location, http.StatusSeeOther)
 }
 
 // UpdateAgent has the server's agent update itself and says how it went. The

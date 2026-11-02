@@ -14,7 +14,7 @@ order: 1
 | `ops team invite <email> [--admin]` | invites someone by email |
 | `ops servers` | lists servers |
 | `ops servers add [name]` | adds a server, prints its install command; without a name it is the next free `web-1`, `web-2`, … |
-| `ops servers rm <name> [--yes]` | removes a server |
+| `ops servers rm <name> [--yes]` | removes a server and prints the command that removes its agent there |
 | `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |
 | `ops servers rules <name>` | the server's own rules for ops, from `/etc/ops/rules` on it |
 | `ops apps` | lists apps |
@@ -63,13 +63,14 @@ order: 1
 | `ops run [--app <app>] -- <command>` | runs a command with them |
 | `ops agent register --url <url> --token <install token>` | connects a server, done by the install script |
 | `ops agent` | runs the agent |
+| `ops agent uninstall [--apps] [--yes]` | removes the agent from this server; the apps keep running unless `--apps` |
 | `ops version` | prints the version |
 
 Commands that work on an app take it as an argument or as `--app`, then from `x-ops.app` in `compose.yml`, then from the directory name. Flags may come before or after the arguments: `ops rollback v3 --app shop` is `ops rollback --app shop v3`. When there is no such app, the error names it and where the name came from. Every command shows its usage and flags with `--help`.
 
 ## Asking first
 
-Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `hook` (the old deploy hook stops working), `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
+Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `agent uninstall`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `hook` (the old deploy hook stops working), `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
 
 ## Agent updates
 

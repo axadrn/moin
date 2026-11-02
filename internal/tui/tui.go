@@ -64,6 +64,7 @@ type (
 	// streamErrMsg means a live stream broke; it reconnects by itself.
 	streamErrMsg struct{ err error }
 	addedMsg     client.NewServer
+	removedMsg   removedServer
 	detailMsg    client.AppDetail
 	// outputMsg replaces the output panel. follow means a deploy streams
 	// into it.
@@ -193,6 +194,7 @@ type model struct {
 	selected int
 	input    string
 	added    *client.NewServer
+	removed  *removedServer
 	// pendingSQL is a query that changes data, waiting for a yes.
 	pendingSQL string
 	// pendingRestore is a snapshot ID or a time, waiting for a yes.
@@ -329,7 +331,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode, m.pendingSQL = modeConfirmWrite, string(msg)
 	case addedMsg:
 		added := client.NewServer(msg)
-		m.added, m.mode, m.input = &added, modeList, ""
+		m.added, m.removed, m.mode, m.input = &added, nil, modeList, ""
+	case removedMsg:
+		removed := removedServer(msg)
+		m.removed, m.added = &removed, nil
 	case tea.KeyPressMsg:
 		return m.key(msg)
 	case tea.PasteMsg:
@@ -371,7 +376,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.tab == tabServers && m.selected < len(m.servers) {
-			return m, m.removeServer(m.servers[m.selected].ID)
+			return m, m.removeServer(m.servers[m.selected].ID, m.servers[m.selected].Name)
 		}
 		if app, ok := m.currentApp(); m.tab == tabApps && ok {
 			m.detail = nil
@@ -534,8 +539,8 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		// Esc closes what is open and never quits.
 		switch {
-		case m.added != nil:
-			m.added = nil
+		case m.added != nil || m.removed != nil:
+			m.added, m.removed = nil, nil
 		case m.detail != nil && m.deployPick != 0:
 			m.deployPick = 0
 		case m.detail != nil:
@@ -547,7 +552,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "tab":
 		m.tab = (m.tab + 1) % tabs
-		m.added = nil
+		m.added, m.removed = nil, nil
 		switch m.tab {
 		case tabActivity:
 			return m, m.loadActivity()
@@ -653,7 +658,7 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		m.selected = min(m.selected+1, max(len(m.servers)-1, 0))
 	case "a":
-		m.mode, m.added = modeAdd, nil
+		m.mode, m.added, m.removed = modeAdd, nil, nil
 	case "x":
 		if len(m.servers) > 0 {
 			m.mode = modeConfirmRemove
@@ -962,13 +967,20 @@ func (m model) addServer(name string) tea.Cmd {
 	}
 }
 
-func (m model) removeServer(id string) tea.Cmd {
+// removedServer is a server just removed and the command that removes its
+// agent on the machine.
+type removedServer struct {
+	name      string
+	uninstall string
+}
+
+func (m model) removeServer(id, name string) tea.Cmd {
 	return func() tea.Msg {
-		err := m.api.RemoveServer(m.ctx, id)
+		uninstall, err := m.api.RemoveServer(m.ctx, id)
 		if err != nil {
 			return errMsg{err}
 		}
-		return nil
+		return removedMsg{name: name, uninstall: uninstall}
 	}
 }
 

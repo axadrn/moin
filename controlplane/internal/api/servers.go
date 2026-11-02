@@ -64,6 +64,12 @@ type CreatedServer struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 }
 
+// RemovedServer is the answer of DELETE /api/v1/servers/{id}: the command
+// that removes the agent from the server too.
+type RemovedServer struct {
+	UninstallCommand string `json:"uninstall_command"`
+}
+
 type createServerRequest struct {
 	Name string `json:"name"`
 }
@@ -137,7 +143,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	NoContent(w)
+	JSON(w, http.StatusOK, RemovedServer{UninstallCommand: h.servers.UninstallCommand()})
 }
 
 // Update has the server's agent swap its binary for the control plane's and

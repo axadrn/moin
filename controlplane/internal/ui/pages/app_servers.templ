@@ -26,7 +26,14 @@ type AddedServer struct {
 	Command string
 }
 
-templ Servers(servers []model.Server, canAdd bool) {
+// RemovedServer is a server just removed and the command that removes its
+// agent on the machine.
+type RemovedServer struct {
+	Name    string
+	Command string
+}
+
+templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer) {
 	@layouts.App("Servers") {
 		@panelPage() {
 			@pageHeader("Servers", "Every server runs the ops agent. It dials out to ops, so nothing on your server listens for us.") {
@@ -37,7 +44,11 @@ templ Servers(servers []model.Server, canAdd bool) {
 			if !canAdd {
 				@subscribeCard()
 			}
-			<div id="server-added" class="empty:hidden"></div>
+			<div id="server-added" class="empty:hidden">
+				if removed != nil {
+					@serverRemoved(*removed)
+				}
+			</div>
 			<div data-server-list-wrap>
 				@ServerList(servers)
 			</div>
@@ -111,6 +122,19 @@ templ ServerAdded(added AddedServer) {
 			</div>
 		}
 	</div>
+}
+
+// serverRemoved tells that the agent of a server just removed is still
+// installed, with the command that removes it there.
+templ serverRemoved(removed RemovedServer) {
+	@panel(panelProps{
+		Heading:     "server-removed-heading",
+		Title:       removed.Name + " is removed",
+		Description: "Its agent is disconnected but still installed. Run this on the server to remove it. The apps there keep running with their data; add --apps to remove them too.",
+		Attrs:       templ.Attributes{"data-server-removed": removed.Name},
+	}) {
+		@command(removed.Command)
+	}
 }
 
 // ServerList is the list of servers. The page reloads it on every change the

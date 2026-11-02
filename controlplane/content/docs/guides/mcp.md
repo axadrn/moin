@@ -22,7 +22,7 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 | `whoami` | the account and token | read |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
-| `remove_server` | removes a server | write, destructive |
+| `remove_server` | removes a server; returns the `uninstall_command` for the server | write, destructive |
 | `update_agent` | puts the control plane's agent version on a server | write |
 | `list_apps` | apps with live and newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |

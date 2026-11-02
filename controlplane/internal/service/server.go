@@ -17,6 +17,7 @@ import (
 
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/protocol"
 	"github.com/google/uuid"
 )
@@ -134,6 +135,12 @@ func (s *ServerService) freeName(workspaceID string) string {
 // InstallCommand is what people run on the server.
 func (s *ServerService) InstallCommand(installToken string) string {
 	return fmt.Sprintf("curl -fsSL %s/install.sh | sudo sh -s -- %s", s.appURL, installToken)
+}
+
+// UninstallCommand removes the agent from a server, run on it after the
+// server is removed here.
+func (s *ServerService) UninstallCommand() string {
+	return protocol.UninstallCommand(build.Name)
 }
 
 // List returns the servers of a user with their live status.

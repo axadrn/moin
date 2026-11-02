@@ -29,8 +29,9 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `POST /api/v1/workspaces/{slug}/leave` | leaves the workspace (*session*) |
 | `GET /api/v1/workspaces/{slug}/billing` | the plan and the subscription, where billing is on |
 | `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | a checkout link; the billing portal (owner, *session*) |
-| `GET /api/v1/servers` · `POST` · `DELETE /{id}` | servers, with their `rules` from `/etc/ops/rules` |
+| `GET /api/v1/servers` · `POST` | servers, with their `rules` from `/etc/ops/rules` |
 | `GET /api/v1/servers/events` | server list as server-sent events |
+| `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
 | `GET /api/v1/apps/events` | app list as server-sent events |

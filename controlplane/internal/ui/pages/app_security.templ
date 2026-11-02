@@ -81,7 +81,7 @@ templ ServerSecurity(view SecurityView) {
 				@securityKeys(view)
 				@serverRules(view.Server)
 			</div>
-			@dangerPanel("Remove this server", "Its agent is disconnected and stops. The apps on the server keep running, but ops no longer reaches them.") {
+			@dangerPanel("Remove this server", "Its agent is disconnected. The apps on the server keep running, but ops no longer reaches them. The next page shows the command that removes the agent there.") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{

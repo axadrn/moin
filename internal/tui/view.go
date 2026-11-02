@@ -158,6 +158,15 @@ func (m model) serversView(width, room int) []string {
 		}
 		added = append(added, "", pad+style.Muted.Render("It turns online here when its agent connects."))
 	}
+	if m.removed != nil {
+		added = append(added, "",
+			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.removed.name)+" removed. Its agent is still installed; remove it on the server with:",
+			"")
+		for _, line := range wrapCommand(m.removed.uninstall, width-len(pad)-1) {
+			added = append(added, pad+style.Accent.Render(line))
+		}
+		added = append(added, "", pad+style.Muted.Render("The apps keep running with their data. Add --apps to remove them too."))
+	}
 	switch {
 	case m.loading && m.offline == nil:
 		return append([]string{pad + style.Muted.Render("Connecting to "+host(m.url)+"…")}, added...)
@@ -476,7 +485,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	}
 	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, rollback, {"x", "remove"}}...)
 	switch {
-	case m.tab == tabServers && m.added != nil:
+	case m.tab == tabServers && (m.added != nil || m.removed != nil):
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabActivity:
 		return nil, [][2]string{{"tab", "team"}, {"q", "quit"}}

@@ -58,6 +58,20 @@ API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```
 
+The agent stays installed on the machine. Every surface answers the command that removes it; run it on the server:
+
+```bash
+sudo ops agent uninstall
+```
+
+It stops and removes the `ops-agent` service, the `ops` binary and the agent's state in `/var/lib/ops`. What stays: the apps keep running with their data in `/var/lib/ops/apps`, and so do the proxy, the tunnel and the firewall that serve them, your `/etc/ops/rules` and Docker.
+
+If you want the apps gone too, add `--apps`. It takes every app down with its containers, images and volumes, removes the proxy, the tunnel and the firewall, and deletes `/var/lib/ops`. Their data is gone for good.
+
+```bash
+sudo ops agent uninstall --apps
+```
+
 ## On the server
 
 See whether the agent runs, and follow its log:
