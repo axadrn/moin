@@ -949,49 +949,53 @@ func (s *AppService) Env(workspaceID, idOrName string) (map[string]string, error
 }
 
 // SetEnv sets and removes env vars. They take effect with the next deploy.
-func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string, unset []string) error {
+// removed are the keys of unset the app had; the others were not set.
+func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	current, err := s.apps.Env(app.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sealed := make(map[string]string, len(set))
 	for key, value := range set {
 		if !envKeyPattern.MatchString(key) {
-			return ErrEnvKey
+			return nil, ErrEnvKey
 		}
 		if len(value) > maxEnvValueSize {
-			return ErrEnvValue
+			return nil, ErrEnvValue
 		}
 		sealed[key] = s.box.Seal(value, app.ID+"/"+key)
 		current[key] = ""
 	}
 	for _, key := range unset {
 		if !envKeyPattern.MatchString(key) {
-			return ErrEnvKey
+			return nil, ErrEnvKey
+		}
+		if _, ok := current[key]; ok {
+			removed = append(removed, key)
 		}
 		delete(current, key)
 	}
 	if len(current) > maxEnvVars {
-		return ErrEnvLimit
+		return nil, ErrEnvLimit
 	}
 	err = s.apps.SetEnv(app.ID, sealed, unset, s.now().UTC())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// The activity names the keys, never the values.
 	keys := slices.Sorted(maps.Keys(set))
 	if len(keys) > 0 {
 		s.servers.record(actor, "env.set", "app", app.Name, map[string]string{"keys": strings.Join(keys, ", ")})
 	}
-	if len(unset) > 0 {
-		s.servers.record(actor, "env.removed", "app", app.Name, map[string]string{"keys": strings.Join(unset, ", ")})
+	if len(removed) > 0 {
+		s.servers.record(actor, "env.removed", "app", app.Name, map[string]string{"keys": strings.Join(removed, ", ")})
 	}
 	s.notify(actor.WorkspaceID)
-	return nil
+	return removed, nil
 }
 
 // Subscribe returns a channel that receives a value whenever an app of the

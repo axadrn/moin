@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -130,12 +131,16 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("app on another user's server: err = %v", err)
 	}
 
-	err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "a$b"}, nil)
+	_, err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "a$b", "OLD": "x"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.SetEnv(owner, "blog", map[string]string{"1BAD": "x"}, nil); !errors.Is(err, ErrEnvKey) {
+	if _, err := apps.SetEnv(owner, "blog", map[string]string{"1BAD": "x"}, nil); !errors.Is(err, ErrEnvKey) {
 		t.Fatalf("bad key: err = %v", err)
+	}
+	// Only keys the app had count as removed.
+	if removed, err := apps.SetEnv(owner, "blog", nil, []string{"OLD", "NOT_THERE"}); err != nil || !slices.Equal(removed, []string{"OLD"}) {
+		t.Fatalf("removed = %v, %v; want OLD", removed, err)
 	}
 
 	// v1: the agent gets the source URL, its sum and the env.
@@ -217,7 +222,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
 
 	// A redeploy builds the newest source again, with the env as it is now.
-	err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "new"}, nil)
+	_, err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "new"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

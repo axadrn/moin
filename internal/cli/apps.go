@@ -699,12 +699,31 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if apiErr != nil {
 			return apiErr
 		}
-		keys := strings.Join(flags.Args(), ", ")
+		// Only keys the app has are removed; the others say so.
+		current, err := api.Env(ctx, name)
+		if err != nil {
+			return err
+		}
+		var remove, missing []string
+		for _, key := range flags.Args() {
+			if _, ok := current[key]; ok {
+				remove = append(remove, key)
+			} else {
+				missing = append(missing, key)
+			}
+		}
+		if len(missing) > 0 {
+			fmt.Fprintf(stdout, "%s has no %s.\n", name, strings.Join(missing, ", "))
+		}
+		if len(remove) == 0 {
+			return nil
+		}
+		keys := strings.Join(remove, ", ")
 		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s?", keys, name))
 		if err != nil {
 			return err
 		}
-		_, err = api.SetEnv(ctx, name, nil, flags.Args())
+		_, err = api.SetEnv(ctx, name, nil, remove)
 		if err != nil {
 			return err
 		}

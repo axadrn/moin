@@ -292,7 +292,7 @@ func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	key := strings.TrimSpace(r.FormValue("key"))
-	err := h.apps.SetEnv(actor(r), r.PathValue("app"), map[string]string{key: r.FormValue("value")}, nil)
+	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), map[string]string{key: r.FormValue("value")}, nil)
 	if err != nil {
 		h.renderEnv(w, r, workspace.ID, false, errorMessage(err))
 		return
@@ -303,7 +303,7 @@ func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 // UnsetEnv removes one env var.
 func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	err := h.apps.SetEnv(actor(r), r.PathValue("app"), nil, []string{r.PathValue("key")})
+	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), nil, []string{r.PathValue("key")})
 	if err != nil {
 		h.renderEnv(w, r, workspace.ID, false, errorMessage(err))
 		return

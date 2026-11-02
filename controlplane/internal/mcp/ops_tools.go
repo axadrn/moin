@@ -6,6 +6,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/protocol"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -778,7 +779,9 @@ func (t opsTools) getEnv(_ context.Context, caller Caller, input NameInput) (Env
 // EnvSet is the output of set_env: the env vars after the change.
 type EnvSet struct {
 	Env
-	set, unset int
+	set, removed int
+	// missing are keys to remove the app did not have.
+	missing []string
 }
 
 // Summary says what changed and that the app needs a restart to see it.
@@ -787,18 +790,22 @@ func (e EnvSet) Summary() string {
 	if e.set > 0 {
 		parts = append(parts, "set "+envVars(e.set))
 	}
-	if e.unset > 0 {
-		parts = append(parts, "removed "+envVars(e.unset))
+	if e.removed > 0 {
+		parts = append(parts, "removed "+envVars(e.removed))
+	}
+	missing := ""
+	if len(e.missing) > 0 {
+		missing = " Not set, so not removed: " + strings.Join(e.missing, ", ") + "."
 	}
 	if len(parts) == 0 {
-		return "Nothing changed."
+		return "Nothing changed." + missing
 	}
 	changed := strings.Join(parts, " and ")
 	it := "them"
-	if e.set+e.unset == 1 {
+	if e.set+e.removed == 1 {
 		it = "it"
 	}
-	return strings.ToUpper(changed[:1]) + changed[1:] + ". Restart the app to apply " + it + ": restart_app."
+	return strings.ToUpper(changed[:1]) + changed[1:] + "." + missing + " Restart the app to apply " + it + ": restart_app."
 }
 
 func envVars(n int) string {
@@ -809,12 +816,18 @@ func envVars(n int) string {
 }
 
 func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
-	err := t.services.Apps.SetEnv(caller.actor(), input.App, input.Set, input.Unset)
+	removed, err := t.services.Apps.SetEnv(caller.actor(), input.App, input.Set, input.Unset)
 	if err != nil {
 		return EnvSet{}, err
 	}
+	var missing []string
+	for _, key := range input.Unset {
+		if !slices.Contains(removed, key) && !slices.Contains(missing, key) {
+			missing = append(missing, key)
+		}
+	}
 	env, err := t.getEnv(context.Background(), caller, NameInput{Name: input.App})
-	return EnvSet{Env: env, set: len(input.Set), unset: len(input.Unset)}, err
+	return EnvSet{Env: env, set: len(input.Set), removed: len(removed), missing: missing}, err
 }
 
 func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {

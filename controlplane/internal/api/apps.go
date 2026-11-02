@@ -408,7 +408,7 @@ func (h *AppsHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.SetEnv(actor(r), r.PathValue("app"), request.Set, request.Unset)
+	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), request.Set, request.Unset)
 	if err != nil {
 		ServiceError(w, err)
 		return

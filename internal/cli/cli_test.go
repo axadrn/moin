@@ -152,7 +152,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -329,5 +329,18 @@ func TestNothingChanged(t *testing.T) {
 	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
 	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// TestEnvRmMissing: a key the app does not have is not removed and says so.
+func TestEnvRmMissing(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "PATCH /api/v1/apps/shop/env": `{"items":{}}`}}
+	code, stdout, stderr := runCLI(t, api, "env", "rm", "--app", "shop", "NOT_THERE", "--yes")
+	if code != 0 || !strings.Contains(stdout, "shop has no NOT_THERE") || strings.Contains(stdout, "Removed") || api.seen("PATCH") {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	code, stdout, _ = runCLI(t, api, "env", "rm", "--app", "shop", "NOT_THERE", "KEY", "--yes")
+	if code != 0 || !strings.Contains(stdout, "Removed KEY from") || !api.seen(`PATCH /api/v1/apps/shop/env {"set":null,"unset":["KEY"]}`) {
+		t.Errorf("code %d, stdout %q, requests %v", code, stdout, api.requests)
 	}
 }
