@@ -40,7 +40,9 @@ func (e *CloudflareError) Error() string {
 	return fmt.Sprintf("cloudflare: %d %s", e.Status, e.Message)
 }
 
-// Account returns the account the token may use.
+// Account returns the account the token may use. A token with only
+// Cloudflare Tunnel Edit and DNS Edit lists no account, so then it is the
+// account of the token's zones.
 func (c *Cloudflare) Account(ctx context.Context, token string) (string, error) {
 	var accounts []struct {
 		ID string `json:"id"`
@@ -49,10 +51,22 @@ func (c *Cloudflare) Account(ctx context.Context, token string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	if len(accounts) == 0 {
+	if len(accounts) > 0 {
+		return accounts[0].ID, nil
+	}
+	var zones []struct {
+		Account struct {
+			ID string `json:"id"`
+		} `json:"account"`
+	}
+	err = c.call(ctx, token, http.MethodGet, "/zones?per_page=1", nil, &zones)
+	if err != nil {
+		return "", err
+	}
+	if len(zones) == 0 || zones[0].Account.ID == "" {
 		return "", errors.New("the token sees no account")
 	}
-	return accounts[0].ID, nil
+	return zones[0].Account.ID, nil
 }
 
 // CreateTunnel creates a tunnel whose routes Cloudflare keeps, and returns

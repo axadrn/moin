@@ -73,6 +73,23 @@ func (f *fakeCloudflare) called(call string) bool {
 	return false
 }
 
+// A token with only Cloudflare Tunnel Edit and DNS Edit lists no account;
+// its zones name the account.
+func TestCloudflareAccountFromZones(t *testing.T) {
+	cloudflare := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var result any = []any{}
+		if r.URL.Path == "/zones" {
+			result = []map[string]any{{"id": "zone1", "account": map[string]string{"id": "acc2"}}}
+		}
+		json.NewEncoder(w).Encode(map[string]any{"success": true, "result": result})
+	}))
+	defer cloudflare.Close()
+	account, err := NewCloudflare(cloudflare.URL).Account(context.Background(), "cf-tunnel-only")
+	if err != nil || account != "acc2" {
+		t.Fatalf("account = %q, %v", account, err)
+	}
+}
+
 func TestServerSecurity(t *testing.T) {
 	apps, _, server, agent := newAppService(t)
 	fake := &fakeCloudflare{body: map[string]string{}}
