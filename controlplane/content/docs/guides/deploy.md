@@ -172,7 +172,7 @@ A rollback is a new deploy, for example v4 with the note *rollback to v3*. Witho
 
 ## Remove an app
 
-Stops the app and removes its containers and images. Its volumes and data stay on the server.
+Stops the app and removes its containers and images. Its volumes and data stay on the server, and its backups stay in your bucket until you delete them: see [How long things stay](/docs/guides/bucket#how-long-things-stay).
 
 ```surfaces
 Web: the app page, **Remove app**

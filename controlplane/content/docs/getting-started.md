@@ -54,7 +54,7 @@ A bucket is a folder in an online storage service. Your code and your backups go
 Web: **Bucket** in the sidebar, then **Save bucket**
 CLI: ops backups bucket set \
   --endpoint https://<account>.r2.cloudflarestorage.com \
-  --bucket my-ops \
+  --bucket <your-bucket> \
   --access-key <key>
 TUI: settings tab, **Bucket**, then `enter`
 API: PUT /api/v1/backup-storage

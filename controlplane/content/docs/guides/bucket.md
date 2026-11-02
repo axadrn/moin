@@ -35,7 +35,7 @@ Tells ops which bucket to use. Do it once per workspace: one bucket serves all y
 Web: **Bucket** in the sidebar, then **Save bucket**
 CLI: ops backups bucket set \
   --endpoint https://<account>.r2.cloudflarestorage.com \
-  --bucket my-ops \
+  --bucket <your-bucket> \
   --access-key <key id>
 TUI: settings tab, **Bucket**, then `enter`
 API: PUT /api/v1/backup-storage
@@ -44,9 +44,62 @@ MCP: set_backup_storage
 
 Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in. Create a bucket and a key that may read, write and delete in it first. The CLI asks for the secret key on stdin.
 
-ops writes and deletes a test file first, so a wrong key fails right away. In the bucket each app gets a folder:
+ops writes and deletes a test file first, so a wrong key fails right away.
+
+## What goes in the bucket
+
+Everything of one workspace goes into one folder, named after the workspace's ID. Inside it each app gets its own folder. So two workspaces can share one bucket, even with apps of the same name, and never touch each other's files.
+
+With only a bucket name:
 
 ```
-<folder>/<app>/uploads/      code on its way to the server, gone after the deploy starts
-<folder>/<app>/data-app.db/  backups of /data/app.db
+<your-bucket>/
+└── <workspace>/                  ← your workspace's ID, it never changes
+    └── <app-name>/               ← the name of your app
+        └── <app-id>/             ← this app's ID, a new app with the same name gets a new one
+            ├── uploads/          ← your code on its way to the server
+            └── <database-file>/  ← one per database (e.g. data-app.db for /data/app.db)
+                ├── litestream/   ← every change, any second of the last 7 days
+                └── snapshots/    ← full copies, the newest 50
 ```
+
+With a bucket name and a folder, everything moves one level down, into the folder:
+
+```
+<your-bucket>/
+└── <folder>/                         ← the folder you typed into the Folder field
+    └── <workspace>/                  ← your workspace's ID, it never changes
+        └── <app-name>/               ← the name of your app
+            └── <app-id>/             ← this app's ID, a new app with the same name gets a new one
+                ├── uploads/          ← your code on its way to the server
+                └── <database-file>/  ← one per database (e.g. data-app.db for /data/app.db)
+                    ├── litestream/   ← every change, any second of the last 7 days
+                    └── snapshots/    ← full copies, the newest 50
+```
+
+What each folder holds:
+
+- **uploads:** your code on its way to the server. Temporary: deleted as soon as the server has it, and anything left over is deleted after 24 hours.
+- **litestream:** every change as it happens, so you can go back to any second of the last 7 days.
+- **snapshots:** full copies before every deploy and change, the last 50. Each one is a plain gzipped SQLite file.
+
+The **Bucket** page shows your workspace's folder. The **Backups** tab of an app shows the app's folder.
+
+## How long things stay
+
+| What | How long it stays | Who deletes it |
+| --- | --- | --- |
+| `uploads/` | until the server has it, 24 hours at most | the ops agent on your server: right after the download, and once an hour anything older than 24 hours |
+| `litestream/` | every change of the last 7 days | the ops agent on your server, with Litestream's own cleanup: older changes go as new ones come in |
+| `snapshots/` | the newest 50 per database | the ops agent on your server: after each new snapshot it deletes the oldest beyond 50 |
+| an app you removed | until you delete it | you: delete its `<app-id>/` folder in your storage provider's dashboard or with any S3 tool |
+| a bucket or folder you changed | until you delete it | you: ops starts in the new place with a full copy and leaves the old place as it is |
+| a bucket you removed from ops | until you delete it | you: backups stop and ops deletes nothing |
+
+Remove an app and create a new one with the same name, and the new app starts with an empty folder: old backups never mix with new ones. The old app's backups stay in its own `<app-id>/` folder. To get its data back, download a snapshot from there, `gunzip` it and open it with `sqlite3`.
+
+## The folder field
+
+The **Folder** field on the Bucket page is `--path` in the CLI and `path` in the API and MCP. Most people leave it empty. Fill it in when the bucket holds other files too, such as a bucket you already use for something else. Everything of ops then stays inside that one folder, like `ops/`, and the rest of the bucket is left alone.
+
+You do not need it to share one bucket between workspaces: each workspace gets its own folder anyway.

@@ -21,7 +21,7 @@ Web: **Bucket** in the sidebar, then **Save bucket**
 CLI: ops backups bucket set \
   --endpoint https://<account>.r2.cloudflarestorage.com \
   --region auto \
-  --bucket ops-backups \
+  --bucket <your-bucket> \
   --access-key <key id>
 TUI: settings tab, **Bucket**, then `enter`
 API: PUT /api/v1/backup-storage
@@ -32,12 +32,22 @@ Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Ob
 
 ops writes and deletes a test file first, so a wrong key fails right away. The secret key is stored encrypted. Every online server starts backing up at once, the others when they connect.
 
-In the bucket each database gets a folder:
+In the bucket each database of an app gets a folder with two folders inside:
 
 ```
-<folder>/<app>/data-app.db/litestream/   every change
-<folder>/<app>/data-app.db/snapshots/    20261031T143638Z-manual.db.gz
+<your-bucket>/
+└── <workspace>/                  ← your workspace's ID, it never changes
+    └── <app-name>/               ← the name of your app
+        └── <app-id>/             ← this app's ID
+            └── <database-file>/  ← one per database (e.g. data-app.db for /data/app.db)
+                ├── litestream/   ← every change, any second of the last 7 days
+                └── snapshots/    ← full copies, the newest 50
 ```
+
+- **litestream:** every change as it happens, so you can go back to any second of the last 7 days. The ops agent on your server cleans up changes older than that.
+- **snapshots:** full copies before every deploy and change, the last 50. After each new one the agent deletes the oldest.
+
+[What goes in the bucket](/docs/guides/bucket#what-goes-in-the-bucket) shows the whole tree, with a folder and with uploads, and what happens to backups when you remove an app or change the bucket.
 
 A snapshot is a plain gzipped SQLite file: `gunzip` it and open it with `sqlite3`, no ops needed.
 
