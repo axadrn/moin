@@ -22,6 +22,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 - **Uptime checks, built in**: every domain is watched from the outside from the first deploy on, nothing to set up. [#18](https://github.com/axadrn/ops/issues/18)
 - **Alerts where your team is**: email, Slack, Discord, Telegram or a webhook, when an app goes down, a deploy fails or a server goes offline. [#19](https://github.com/axadrn/ops/issues/19)
+- **Live metrics, built in**: CPU, RAM, disk and network for every server; requests, errors, response time and crashes for every app, with every deploy marked on the graphs. [#20](https://github.com/axadrn/ops/issues/20)
 - **Env vars as one text**: switch between fields and a whole `.env` file you can paste. [#9](https://github.com/axadrn/ops/issues/9)
 - **Vim keys in the terminal UI**: `gg`, `G`, `/` to search, `:` commands. [#11](https://github.com/axadrn/ops/issues/11)
 - **List or grid, and your own order**: drag and drop apps and servers. [#14](https://github.com/axadrn/ops/issues/14)
