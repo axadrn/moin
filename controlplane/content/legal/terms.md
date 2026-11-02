@@ -46,7 +46,7 @@ Your apps run on your servers, not on ours. If the control plane is unavailable,
 
 ## Ending
 
-You can delete your account at any time in the settings. This removes your servers, apps and deploys from ops; the agent stops and your containers keep running until you remove them. If we ever end the service, we tell you by email and refund the unused part of a prepaid period.
+You can delete your account at any time in the settings. Your servers, apps and deploys belong to a workspace, not to your account: deleting the workspace on its Team page removes them from ops. If you are the only owner of a workspace, delete it or hand it to someone else before you delete your account. Once a server is gone from ops, its agent can no longer connect, and your containers keep running until you remove them. If we ever end the service, we tell you by email and refund the unused part of a prepaid period.
 
 ## Liability
 

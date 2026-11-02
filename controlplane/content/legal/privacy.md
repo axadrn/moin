@@ -4,7 +4,7 @@ description: What ops stores, why, where it lives and how to get rid of it
 lastUpdated: November 2, 2026
 ---
 
-Short version: ops stores what it needs to run your servers and apps, encrypts every secret, uses no tracking cookies and no advertising, and deletes your data when you delete your account. Your apps and their data stay on your own servers.
+Short version: ops stores what it needs to run your servers and apps, encrypts every secret, uses no tracking cookies and no advertising, and deletes your data when you delete your account or your workspace. Your apps and their data stay on your own servers.
 
 ## Who we are
 
@@ -49,7 +49,7 @@ Payments run through Stripe Managed Payments. Stripe is the seller of record: it
 
 ## Retention
 
-We keep your data while your account exists. Deleting your account deletes your servers, apps, deploys, env vars and tokens. Your email stays on your entries in the activity log, as described above. Payment records stay with Stripe for as long as tax law requires.
+We keep your data while your account exists. Deleting your account deletes your profile, your picture, your sessions, your API tokens and the invitations you sent, and takes you out of every workspace. Servers, apps, deploys and env vars belong to a workspace, not to you, so they stay for the rest of your team. Deleting a workspace deletes them, together with its activity log. If you are the only owner of a workspace, hand it to someone else or delete it before you delete your account. Your email stays on your entries in the activity log of the workspaces that remain, as described above. Payment records stay with Stripe for as long as tax law requires.
 
 ## Your rights
 
