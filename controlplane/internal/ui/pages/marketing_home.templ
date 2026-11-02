@@ -414,6 +414,19 @@ templ HomeBackups() {
 	</section>
 }
 
+templ homeTrust(title, text, href, link string) {
+	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-7 sm:p-10"))}) {
+		<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</p>
+		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+		<div class="mt-auto pt-8">
+			@button.Button(button.Props{Href: href, Variant: button.VariantSecondary}) {
+				{ link }
+				@icon.ArrowRight(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-end"}})
+			}
+		</div>
+	}
+}
+
 templ homeFact(title, text, kind string) {
 	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-10"))}) {
 		<p class="flex items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
@@ -589,13 +602,10 @@ templ HomeCompare() {
 				</table>
 			</div>
 			<p class="mt-4 text-sm text-muted-foreground">From each tool's own docs and pricing pages, November 2026. A question mark means they do not say. Your server costs extra everywhere except on Heroku, Render, Railway and Fly.io, which run it for you.</p>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">We never store your code or your app's data.</span>
-				They live in your bucket and on your server. <a href="/docs/guides/security" class="text-foreground underline underline-offset-4 hover:text-foreground/80">How ops keeps your servers closed.</a>
-			</p>
-			<p class="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				Want even more control today? <a href="/docs/self-hosting" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Self-host { brand.Name }.</a> Every feature, free, under AGPL.
-			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeTrust("Your data stays yours", "We never store your code or your app's data. They live in your bucket and on your server, with no open port.", "/docs/guides/security", "How "+brand.Name+" keeps your servers closed")
+				@homeTrust("Even more control", "Run "+brand.Name+" yourself. Every feature, free, under AGPL. Nothing of yours ever touches us.", "/docs/self-hosting", "Self-host "+brand.Name)
+			</div>
 			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
 				@homePrimary()
 				if ctxkeys.RenderConfig(ctx).Billing {
@@ -696,7 +706,6 @@ templ HomePricing() {
 						@homePlanRow("GitHub App, email", "You set them up", false)
 						@homePlanRow("Control plane backups", "Yours to run", false)
 						@homePlanRow("Support", "GitHub issues", false)
-						@homePlanRow("goilerplate", "Not included", false)
 					</dl>
 					<div class="mt-auto pt-10">
 						@button.Button(button.Props{Href: "/docs/self-hosting", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
@@ -714,28 +723,12 @@ templ HomePricing() {
 							}
 						}
 					</p>
-					<div class="mt-6 flex flex-wrap items-center gap-2" data-yearly-deal>
-						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background px-3 py-1 font-sans text-[13px] font-semibold text-foreground"}) {
-							Best value · Save $99
-						}
-						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold text-background"}) {
-							3+ months free
-						}
-					</div>
-					<p class="mt-4 flex flex-wrap items-baseline gap-x-3">
-						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$249</span>
-						<span class="text-lg text-background/65">a year, per workspace</span>
+					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
+						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
+						<span class="text-lg text-background/65">a month, per workspace</span>
 					</p>
-					<p class="mt-2 text-base text-background/65">or $29 a month</p>
-					<p class="mt-2 text-sm text-background/55">Plus sales tax or VAT where it applies, shown at checkout.</p>
-					<p class="mt-6 text-[17px] leading-7 font-semibold" data-one-price>One price. Unlimited servers, apps and teammates. No tiers, no per-server fees.</p>
-					<p class="mt-2 text-sm leading-6 text-background/65" data-beta-price>{ brand.Name } is in beta and moves fast. Prices, plans and features may change as we grow. Join early: the price you start with is the price you keep.</p>
-					<div class="mt-6 rounded-lg border border-background/15 bg-background/8 px-4 py-3 text-[15px] leading-6" data-goilerplate-offer>
-						<p class="font-semibold">goilerplate buyers: 50% off forever.</p>
-						<p class="text-background/65">Your code arrives by email in the next days.</p>
-					</div>
+					<p class="mt-2 text-base text-background/65" data-yearly-deal>or $249 a year, save $99. 30 days free, no card.</p>
 					<dl class="mt-8 divide-y divide-background/15 border-y border-background/15">
-						@homePlanRow("Free trial", "30 days, no card", true)
 						@homePlanRow("Setup", "Two minutes", true)
 						@homePlanRow("Control plane", "Ours, nothing to run", true)
 						@homePlanRow("Updates", "The day they ship", true)
@@ -751,7 +744,11 @@ templ HomePricing() {
 					</div>
 				}
 			</div>
-			<p class="mt-5 text-center text-sm text-muted-foreground">Your apps run on your servers either way, and their data is stored only there and in your bucket.</p>
+			<div class="mt-10 flex flex-col items-center gap-2 text-center">
+				<p class="text-lg font-semibold" data-one-price>One price. Unlimited servers, apps and teammates. No tiers.</p>
+				<p class="max-w-2xl text-sm leading-6 text-muted-foreground" data-beta-price>{ brand.Name } is in beta and moves fast, so prices and plans may change. Join early: the price you start with is the price you keep. Plus sales tax or VAT where it applies.</p>
+				<p class="text-sm text-muted-foreground" data-goilerplate-offer>goilerplate buyers get 50% off, forever.</p>
+			</div>
 		</div>
 	</section>
 }
