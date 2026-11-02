@@ -26,7 +26,7 @@ func CheckURL(raw string) error {
 		if privateHost(parsed.Hostname()) {
 			return nil
 		}
-		return fmt.Errorf("%s sends your token unencrypted. Use https://%s, or plain http only on localhost or your tailnet", raw, parsed.Host)
+		return fmt.Errorf("plain http sends your token unencrypted to %s. Use https://%s, or http only on localhost or your tailnet", parsed.Host, parsed.Host)
 	default:
 		return fmt.Errorf("%q is not an http or https URL. Use one like https://ops.example.com", raw)
 	}

@@ -25,3 +25,11 @@ func TestCheckURL(t *testing.T) {
 		}
 	}
 }
+
+// The CLI capitalizes errors, so the refusal starts with a word, not the URL.
+func TestCheckURLRefusalReadsWell(t *testing.T) {
+	err := CheckURL("http://example.com")
+	if err == nil || err.Error() != "plain http sends your token unencrypted to example.com. Use https://example.com, or http only on localhost or your tailnet" {
+		t.Errorf("err = %v", err)
+	}
+}
