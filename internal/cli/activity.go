@@ -38,6 +38,11 @@ func activity(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if len(page.Items) == 0 && (*app != "" || *server != "" || *user != "") {
+		// A filter that names nothing, like a typo, finds nothing too.
+		fmt.Fprintln(stdout, style.Muted.Render("No events match. Check the names, or run "+build.Name+" activity without filters."))
+		return nil
+	}
 	if len(page.Items) == 0 {
 		fmt.Fprintln(stdout, style.Muted.Render("Nothing happened yet."))
 		return nil

@@ -486,3 +486,11 @@ func TestRowsPastTheEndSaySo(t *testing.T) {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
+
+func TestActivityFilterThatMatchesNothing(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/activity": `{"items":[]}`}}
+	code, stdout, stderr := runCLI(t, api, "activity", "--server", "ghost")
+	if code != 0 || !strings.Contains(stdout, "No events match.") {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}
