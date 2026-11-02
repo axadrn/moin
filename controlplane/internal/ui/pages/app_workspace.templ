@@ -40,7 +40,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	@panelPage(templ.Attributes{"id": "workspace-content", "hx-swap-oob": "true"}) {
 		@pageHeader("Team", "Everyone in "+workspace.Name+" works on the same servers and apps. Owners handle billing, admins invite. Teams are free.")
 		if viewer.Can(model.WorkspacePermissionManageMembers) {
-			@panel(panelProps{Title: "Invite a teammate", Description: "They get an email with a link to join. Invitations expire after seven days."}) {
+			@panel(panelProps{Title: "Invite a teammate", Docs: "/docs/guides/team#invite-someone", Description: "They get an email with a link to join. Invitations expire after seven days."}) {
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/invitations") }
 					method="POST"
@@ -149,7 +149,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 			</ul>
 		}
 		if viewer.Can(model.WorkspacePermissionManageMembers) && len(invitations) > 0 {
-			@panel(panelProps{Title: "Pending invitations", Description: "Sent, not accepted yet.", Body: panelBodyRows}) {
+			@panel(panelProps{Title: "Pending invitations", Docs: "/docs/guides/team#send-an-invitation-again", Description: "Sent, not accepted yet.", Body: panelBodyRows}) {
 				<ul class="flex flex-col gap-1" role="list">
 					for _, invitation := range invitations {
 						<li class="flex flex-col gap-3 rounded-xl px-3 py-2.5 hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between" data-invitation={ invitation.Email }>
@@ -190,7 +190,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 			}
 		}
 		if viewer.Can(model.WorkspacePermissionManageWorkspace) {
-			@panel(panelProps{Title: "Workspace name", Description: "Shown in the sidebar and in emails. The address /app/" + workspace.Slug + " stays the same."}) {
+			@panel(panelProps{Title: "Workspace name", Docs: "/docs/guides/team#rename-the-workspace", Description: "Shown in the sidebar and in emails. The address /app/" + workspace.Slug + " stays the same."}) {
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/name") }
 					method="POST"

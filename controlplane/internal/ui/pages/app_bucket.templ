@@ -22,7 +22,7 @@ templ Bucket(view BucketView) {
 			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
 			<div id="bucket" class="flex flex-col gap-6">
 				@bucketForm(view)
-				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it"}) {
+				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it", Docs: "/docs/guides/bucket#what-goes-in-the-bucket"}) {
 					<dl class="grid gap-4 text-sm md:grid-cols-3">
 						@bucketUse("Your code", "ops deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
 						@bucketUse("Your backups", "Every change of every SQLite database. Restore any second of the last week.")
@@ -94,7 +94,7 @@ templ bucketForm(view BucketView) {
 					<form class="flex flex-col gap-6" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-storage-form>
 						@csrf.Token()
 						<div class="grid gap-3 sm:grid-cols-2">
-							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3.", "text", true)
+							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Starts with https://. Empty for AWS S3.", "text", true)
 							@bucketField("bucket", "Bucket", "your bucket's name", "", "text", false)
 							@bucketField("path", "Folder", "optional", "Only if the bucket holds other files too.", "text", false)
 							@bucketField("access_key", "Access key", "", "", "text", false)

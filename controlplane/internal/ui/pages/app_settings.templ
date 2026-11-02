@@ -65,6 +65,7 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 	@panel(panelProps{
 		ID:          "settings-sessions",
 		Title:       "Sessions",
+		Docs:        "/docs/guides/account#see-and-end-sessions",
 		Description: "Browsers and devices signed in to your account.",
 		Action:      signOutEverywhere(),
 		Body:        panelBodyRows,
@@ -155,7 +156,7 @@ templ settingsSubmit(label string) {
 
 templ SettingsNameSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Name", Description: "How your team sees you in ops and in the activity."}) {
+	@panel(panelProps{Title: "Name", Docs: "/docs/guides/account#change-your-name", Description: "How your team sees you in ops and in the activity."}) {
 		<form
 			class="flex flex-col gap-2 sm:flex-row"
 			hx-patch={ basePath + "/profile/name" }
@@ -174,7 +175,7 @@ templ SettingsNameSection(user *model.User) {
 
 templ SettingsEmailSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Email", Description: "Where sign-in links and notices go. A new address gets a link to confirm it."}) {
+	@panel(panelProps{Title: "Email", Docs: "/docs/guides/account#change-your-email", Description: "Where sign-in links and notices go. A new address gets a link to confirm it."}) {
 		<form
 			class="flex flex-col gap-2 sm:flex-row"
 			hx-patch={ basePath + "/account/email" }
@@ -194,7 +195,7 @@ templ SettingsEmailSection(user *model.User) {
 templ SettingsPasswordSection() {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Password", Description: utils.IfElse(user.HasPassword(), "You sign in with your password or an email link.", "You sign in with email links only. Set a password to sign in with it too.")}) {
+	@panel(panelProps{Title: "Password", Docs: "/docs/guides/account#set-change-or-remove-your-password", Description: utils.IfElse(user.HasPassword(), "You sign in with your password or an email link.", "You sign in with email links only. Set a password to sign in with it too.")}) {
 		@templ.Fragment("settings-password-form") {
 			<div id="password-form" hx-swap-oob="true">
 				if user.HasPassword() {

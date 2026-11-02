@@ -121,7 +121,9 @@ templ AppList(view AppsView) {
 		class="flex flex-col gap-6"
 	>
 		if len(view.Apps) == 0 {
-			@emptyState("No apps yet", "Run ops deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "ops deploy")
+			@emptyState("No apps yet", "Run ops deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "ops deploy") {
+				@docsLink("/docs/guides/deploy", "How it works")
+			}
 		} else {
 			{{ live, deploying, failed := appCounts(view.Apps) }}
 			@statGrid() {
@@ -306,7 +308,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 			@appFacts(app, deploys)
 			<div class="grid items-stretch gap-4 lg:grid-cols-2">
 				@appDeploys(app, deploys)
-				@panel(panelProps{Heading: "deploy-log-heading", Title: "Deploy log", Description: "The steps of the deploy picked under Deploys.", Action: deployLogActions(), Body: panelBodyFlush}) {
+				@panel(panelProps{Heading: "deploy-log-heading", Title: "Deploy log", Docs: "/docs/guides/deploy#follow-a-deploy", Description: "The steps of the deploy picked under Deploys.", Action: deployLogActions(), Body: panelBodyFlush}) {
 					<div
 						id="deploy-log"
 						class="ops-term ops-term-lines max-h-[32rem] flex-1 lg:min-h-72 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"

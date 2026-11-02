@@ -123,6 +123,7 @@ templ serverRemoved(removed RemovedServer) {
 	@panel(panelProps{
 		Heading:     "server-removed-heading",
 		Title:       removed.Name + " is removed",
+		Docs:        "/docs/guides/servers#remove-a-server",
 		Description: "Its agent is disconnected but still installed. Run this on the server as root, or put sudo in front, to remove it. The apps there keep running with their data; add --apps to remove them too.",
 		Attrs:       templ.Attributes{"data-server-removed": removed.Name},
 	}) {
@@ -144,7 +145,9 @@ templ ServerList(servers []model.Server) {
 		class="flex flex-col gap-4"
 	>
 		if len(servers) == 0 {
-			@emptyState("No servers yet", "Add a server, then run the install command ops gives you on it. Or add one from your terminal:", "ops servers add web-1")
+			@emptyState("No servers yet", "Add a server, then run the install command ops gives you on it. Or add one from your terminal:", "ops servers add web-1") {
+				@docsLink("/docs/getting-started", "Getting started")
+			}
 		} else {
 			<div class="flex items-baseline justify-between gap-3">
 				@sectionTitle("Your servers")

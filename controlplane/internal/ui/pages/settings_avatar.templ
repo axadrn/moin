@@ -3,7 +3,7 @@ package pages
 import "github.com/axadrn/ops/controlplane/internal/model"
 
 templ SettingsAvatarSection(user *model.User) {
-	@panel(panelProps{Title: "Picture", Description: "Shown next to your name in the sidebar and in the team."}) {
+	@panel(panelProps{Title: "Picture", Docs: "/docs/guides/account#change-your-picture", Description: "Shown next to your name in the sidebar and in the team."}) {
 		<div class="flex flex-col gap-6 sm:flex-row sm:items-start">
 			@SettingsAvatarDisplay(user)
 			<div class="min-w-0 flex-1">

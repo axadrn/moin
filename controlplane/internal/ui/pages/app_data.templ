@@ -62,7 +62,7 @@ templ AppData(view DataView) {
 					if view.Table != nil {
 						@dataTable(view)
 					} else {
-						@panel(panelProps{Title: "No tables yet", Description: "Tables come from the migrations in your repo and show up here after the next deploy."}) {
+						@panel(panelProps{Title: "No tables yet", Docs: "/docs/guides/data#the-schema-belongs-to-your-code", Description: "Tables come from the migrations in your repo and show up here after the next deploy."}) {
 							@emptyHint("Or create one with SQL below.", "")
 						}
 					}
