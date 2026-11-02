@@ -100,6 +100,24 @@ func (a *apps) appID(app string) string {
 	return id
 }
 
+// keepIDs stores the IDs the control plane sends for apps that have none
+// yet, the ones deployed before deploys brought it. A stored ID stays. It
+// reports whether it stored one.
+func (a *apps) keepIDs(ids map[string]string) (kept bool) {
+	for app, id := range ids {
+		if !appNamePattern.MatchString(app) || !appIDPattern.MatchString(id) || a.appID(app) != "" {
+			continue
+		}
+		if _, err := os.Stat(a.appDir(app)); err != nil {
+			continue
+		}
+		if os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte(id), 0o600) == nil {
+			kept = true
+		}
+	}
+	return kept
+}
+
 func (a *apps) current(app string) int {
 	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "current"))
 	number, _ := strconv.Atoi(strings.TrimSpace(string(body)))

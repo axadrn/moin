@@ -226,6 +226,40 @@ func TestBackups(t *testing.T) {
 	if status := b.status(ctx, app, a.runningDatabases(app)[0], true); !strings.Contains(status.Error, "deploy "+app+" once more") {
 		t.Fatalf("status without an app ID = %+v", status)
 	}
+
+	// The control plane sends the ID on connect: backups go on, no deploy.
+	if !a.keepIDs(map[string]string{app: "app-two"}) {
+		t.Fatal("the sent app ID was not kept")
+	}
+	b.reconcile()
+	if len(b.watched) != 1 {
+		t.Fatalf("watched with the sent app ID = %v", b.watched)
+	}
+}
+
+// TestKeepIDs: an app without an ID takes the one the control plane sends;
+// a stored ID, an unknown app or a bad ID are left alone.
+func TestKeepIDs(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	for _, app := range []string{"old", "new"} {
+		os.MkdirAll(a.appDir(app), 0o700)
+	}
+	os.WriteFile(filepath.Join(a.appDir("new"), "app-id"), []byte("id-new"), 0o600)
+	if !a.keepIDs(map[string]string{"old": "id-old", "new": "id-other", "gone": "id-gone", "../x": "id-x"}) {
+		t.Fatal("nothing kept")
+	}
+	if a.keepIDs(map[string]string{"old": "id-again"}) {
+		t.Fatal("kept over a stored ID")
+	}
+	if a.appID("old") != "id-old" || a.appID("new") != "id-new" || a.appID("gone") != "" {
+		t.Fatalf("ids = %q %q %q", a.appID("old"), a.appID("new"), a.appID("gone"))
+	}
+	if _, err := os.Stat(a.appDir("gone")); err == nil {
+		t.Fatal("an unknown app got a folder")
+	}
+	if a.keepIDs(map[string]string{"old": "../bad"}) {
+		t.Fatal("kept a bad ID")
+	}
 }
 
 // TestBucketLayout: two workspaces share one bucket and folder, each with

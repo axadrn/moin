@@ -423,9 +423,13 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
+		kept := r.apps.keepIDs(config.Apps)
 		if err := r.backups.configure(ctx, config.Storage); err != nil {
 			fail(err)
 			return
+		}
+		if kept {
+			r.backups.reconcile()
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
 	case protocol.TypeBackupSnapshot, protocol.TypeBackupList:

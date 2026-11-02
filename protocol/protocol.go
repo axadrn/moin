@@ -413,9 +413,12 @@ type BackupStorage struct {
 }
 
 // BackupConfig is where backups go. Without Storage the agent stops
-// replicating.
+// replicating. Apps are the IDs of the server's apps by name: an app
+// deployed before deploys brought its ID gets it here, so its backups
+// start without another deploy.
 type BackupConfig struct {
-	Storage *BackupStorage `json:"storage,omitempty"`
+	Storage *BackupStorage    `json:"storage,omitempty"`
+	Apps    map[string]string `json:"apps,omitempty"`
 }
 
 // BackupRequest names an app; Database narrows it to one database. Reason
