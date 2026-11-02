@@ -261,11 +261,15 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	return s.apps.ByID(app.ID)
 }
 
-// UnlinkRepo stops an app from following its repo.
+// UnlinkRepo stops an app from following its repo. An app that follows
+// none stays as it is, and the activity shows no change.
 func (s *AppService) UnlinkRepo(actor Actor, idOrName string) error {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return err
+	}
+	if app.Repo == "" {
+		return nil
 	}
 	err = s.apps.SetRepo(app.ID, "", "", false, 0)
 	if err != nil {

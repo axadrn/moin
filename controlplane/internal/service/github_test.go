@@ -17,11 +17,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/protocol"
 )
@@ -194,6 +196,13 @@ func TestGitHubDeploys(t *testing.T) {
 	}
 	if _, err := apps.DeployRef(ctx, owner, "blog", "main"); !errors.Is(err, ErrNoRepo) {
 		t.Fatalf("deploy without repo: err = %v", err)
+	}
+	// Unlinking an app that follows no repo changes nothing, the activity included.
+	if err := apps.UnlinkRepo(owner, "blog"); err != nil {
+		t.Fatalf("unlink without a repo: %v", err)
+	}
+	if events, _ := servers.audit.ListPage(owner.WorkspaceID, model.ActivityFilter{}, "", 50); slices.ContainsFunc(events, func(e model.WorkspaceAuditEvent) bool { return e.Action == "repo.unlinked" }) {
+		t.Fatal("unlink without a repo shows in the activity")
 	}
 	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", true); !errors.Is(err, ErrRepo) {
 		t.Fatalf("link a repo ops cannot read: err = %v", err)
