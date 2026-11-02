@@ -223,7 +223,7 @@ templ securityState(view SecurityView, securityPath string) {
 					<dl class="grid gap-4 sm:grid-cols-3">
 						@backupFact("Traffic", proxyText(report.Proxy), "")
 						@backupFact("Open to everyone", portsText(*report, view.Server.SSHTailscale), portsNote(report.Firewall))
-						@backupFact("Tailnet", tailnetText(report.TailscaleIP, view.Integrations.Tailscale), tailnetNote(report.TailscaleIP, view.Integrations.Tailscale))
+						@backupFact("Tailnet", tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
 					</dl>
 					for _, problem := range report.Problems {
 						@alert.Alert(alert.Props{Class: "border-0 bg-running/12 text-running"}) {
@@ -312,22 +312,28 @@ func portsNote(firewall bool) string {
 	return "Firewall off: every other listening port too."
 }
 
-func tailnetText(ip string, key bool) string {
+// tailnetText and tailnetNote say where the server stands on the tailnet.
+// The agent joins it only for SSH on Tailscale.
+func tailnetText(ip string, key, sshOnTailscale bool) string {
 	switch {
 	case ip != "":
 		return ip
-	case key:
+	case key && sshOnTailscale:
 		return "not up"
+	case key:
+		return "not used"
 	}
 	return "not joined"
 }
 
-func tailnetNote(ip string, key bool) string {
+func tailnetNote(ip string, key, sshOnTailscale bool) string {
 	switch {
 	case ip != "":
 		return "The server's address on your tailnet."
-	case key:
+	case key && sshOnTailscale:
 		return "The server could not join your tailnet yet."
+	case key:
+		return "Turn on SSH only on Tailscale: the server then joins your tailnet."
 	}
 	return "Add a Tailscale auth key below: the server joins your tailnet, then SSH can answer only there."
 }
