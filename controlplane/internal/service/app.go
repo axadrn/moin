@@ -401,11 +401,12 @@ func (s *AppService) apply(actor Actor, action, idOrName string) (*model.Deploy,
 // SetDomains replaces the app's domains and the canonical one ("" for none),
 // then applies them to the running release. The deploy is nil when there is
 // nothing to apply yet, or the server is offline or busy: the next deploy
-// takes them.
-func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, canonical string) (*model.Deploy, error) {
+// takes them. changed is false when the app had these domains already;
+// then nothing restarts.
+func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, canonical string) (deploy *model.Deploy, changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	clean := []string{}
 	for _, domain := range domains {
@@ -414,54 +415,66 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 			continue
 		}
 		if !domainPattern.MatchString(domain) || len(domain) > 253 {
-			return nil, ErrDomain
+			return nil, false, ErrDomain
 		}
 		clean = append(clean, domain)
 	}
 	canonical = strings.ToLower(strings.TrimSpace(canonical))
 	if canonical != "" && !slices.Contains(clean, canonical) {
-		return nil, ErrCanonical
+		return nil, false, ErrCanonical
+	}
+	if slices.Equal(clean, app.DomainList()) && canonical == app.Canonical {
+		return nil, false, nil
 	}
 	body, _ := json.Marshal(clean)
 	err = s.apps.SetRouting(app.ID, string(body), canonical)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	app.Domains = string(body)
 	s.syncTunnelOf(app)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"domains": strings.Join(clean, ", "), "canonical": canonical})
-	return s.applyIfLive(actor, app)
+	deploy, err = s.applyIfLive(actor, app)
+	return deploy, true, err
 }
 
 // SetProtection puts a password in front of the app, or takes it away when
-// password is empty, then applies it to the running release.
-func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (*model.Deploy, error) {
+// password is empty, then applies it to the running release. changed is
+// false when the app had this password, or none, already; then nothing
+// restarts.
+func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (deploy *model.Deploy, changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	protect := ""
 	if password != "" {
 		username = strings.TrimSpace(username)
 		if username == "" || strings.ContainsAny(username, ": ") || len(password) < 8 || len(password) > 72 {
-			return nil, ErrProtect
+			return nil, false, ErrProtect
+		}
+		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
+			return nil, false, nil
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		protect = username + ":" + string(hash)
+	} else if app.Protect == "" {
+		return nil, false, nil
 	}
 	err = s.apps.SetProtect(app.ID, protect)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	action := "app.protected"
 	if protect == "" {
 		action = "app.unprotected"
 	}
 	s.servers.record(actor, action, "app", app.Name, nil)
-	return s.applyIfLive(actor, app)
+	deploy, err = s.applyIfLive(actor, app)
+	return deploy, true, err
 }
 
 // applyIfLive applies a change to the running release. The change itself is

@@ -682,18 +682,21 @@ type Change struct {
 }
 
 func (c Change) Summary() string {
+	if c.Unchanged {
+		return "Nothing changed."
+	}
 	if c.Deploy == nil {
 		return "Saved. The app takes it with its next deploy or start."
 	}
 	return fmt.Sprintf("Saved. Deploy v%d applies it now.", c.Deploy.Number)
 }
 
-func (t opsTools) change(caller Caller, app string, deploy *model.Deploy) (Change, error) {
+func (t opsTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
 	current, err := t.services.Apps.Get(caller.Token.WorkspaceID, app)
 	if err != nil {
 		return Change{}, err
 	}
-	answer := Change{api.Change{App: api.NewApp(*current)}}
+	answer := Change{api.Change{App: api.NewApp(*current), Unchanged: !changed}}
 	if deploy != nil {
 		applied := api.NewDeploy(*deploy)
 		answer.Deploy = &applied
@@ -702,11 +705,11 @@ func (t opsTools) change(caller Caller, app string, deploy *model.Deploy) (Chang
 }
 
 func (t opsTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
-	deploy, err := t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
+	deploy, changed, err := t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, deploy)
+	return t.change(caller, input.App, deploy, changed)
 }
 
 // ProtectionInput is the input of set_protection.
@@ -720,19 +723,19 @@ func (t opsTools) setProtection(_ context.Context, caller Caller, input Protecti
 	if input.Password == "" {
 		return Change{}, InvalidField("password", "Enter a password of at least 8 characters.")
 	}
-	deploy, err := t.services.Apps.SetProtection(caller.actor(), input.App, input.Username, input.Password)
+	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.App, input.Username, input.Password)
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, deploy)
+	return t.change(caller, input.App, deploy, changed)
 }
 
 func (t opsTools) removeProtection(_ context.Context, caller Caller, input NameInput) (Change, error) {
-	deploy, err := t.services.Apps.SetProtection(caller.actor(), input.Name, "", "")
+	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.Name, "", "")
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.Name, deploy)
+	return t.change(caller, input.Name, deploy, changed)
 }
 
 // Logs is the output of get_logs.

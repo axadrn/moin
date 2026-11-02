@@ -375,14 +375,17 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Before the first deploy there is nothing to apply.
-	deploy, err := apps.SetDomains(owner, "blog", []string{"Blog.de", "www.blog.de", "blog.de"}, "blog.de")
-	if err != nil || deploy != nil {
-		t.Fatalf("set domains before a deploy = %v, %v", deploy, err)
+	deploy, changed, err := apps.SetDomains(owner, "blog", []string{"Blog.de", "www.blog.de", "blog.de"}, "blog.de")
+	if err != nil || deploy != nil || !changed {
+		t.Fatalf("set domains before a deploy = %v, %v, %v", deploy, changed, err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
+	if _, changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed {
+		t.Fatalf("no password, taken away = %v, %v", changed, err)
+	}
+	if _, _, err := apps.SetDomains(owner, "blog", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
 		t.Fatalf("bad domain: err = %v", err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "other.de"); !errors.Is(err, ErrCanonical) {
+	if _, _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "other.de"); !errors.Is(err, ErrCanonical) {
 		t.Fatalf("bad canonical: err = %v", err)
 	}
 	first, err := deployUpload(apps)
@@ -397,10 +400,10 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 
 	// With a live release, protection applies at once, without a build.
-	if _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
+	if _, _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
 		t.Fatalf("short password: err = %v", err)
 	}
-	applied, err := apps.SetProtection(owner, "blog", "me", "a long password")
+	applied, _, err := apps.SetProtection(owner, "blog", "me", "a long password")
 	if err != nil || applied == nil {
 		t.Fatalf("set protection = %v, %v", applied, err)
 	}
@@ -410,6 +413,14 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 		t.Fatalf("apply deploy.start = %+v", start)
 	}
 	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: applied.ID, OK: true})
+	// The same password or the same domains change nothing and restart
+	// nothing.
+	if deploy, changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed || deploy != nil {
+		t.Fatalf("the same password = %v, %v, %v", deploy, changed, err)
+	}
+	if deploy, changed, err := apps.SetDomains(owner, "blog", []string{"blog.de", "www.blog.de"}, "blog.de"); err != nil || changed || deploy != nil {
+		t.Fatalf("the same domains = %v, %v, %v", deploy, changed, err)
+	}
 	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
 	if err != nil || len(checks) != 2 || checks[0].Address != "203.0.113.5" || checks[0].Points {
 		t.Fatalf("checks = %+v, %v", checks, err)
@@ -493,7 +504,7 @@ func TestStopStartAndRestart(t *testing.T) {
 	}
 
 	// A stopped app keeps a domain change for its start.
-	deploy, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "")
+	deploy, _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "")
 	if err != nil || deploy != nil {
 		t.Fatalf("set domains of a stopped app = %v, %v", deploy, err)
 	}

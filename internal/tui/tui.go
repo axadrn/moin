@@ -1201,6 +1201,9 @@ func (m model) changeDomains(app client.App, input string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
+		if change.Unchanged {
+			return noticeMsg("Nothing changed.")
+		}
 		if change.Deploy != nil {
 			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, app.Name))
 		}
@@ -1224,6 +1227,9 @@ func (m model) changeProtect(name, input string) tea.Cmd {
 		}
 		if err != nil {
 			return errMsg{err}
+		}
+		if change.Unchanged {
+			return noticeMsg("Nothing changed.")
 		}
 		if change.Deploy != nil {
 			return m.follow(name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, name))

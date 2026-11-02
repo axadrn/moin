@@ -303,6 +303,8 @@ type DomainCheck struct {
 type Change struct {
 	App    App     `json:"app"`
 	Deploy *Deploy `json:"deploy"`
+	// Unchanged is set when the app had it so already; nothing restarts.
+	Unchanged bool `json:"unchanged"`
 }
 
 // CheckDomains looks up every domain of an app.

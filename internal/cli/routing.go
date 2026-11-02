@@ -160,6 +160,10 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
+		if change.Unchanged {
+			done(stdout, "Nothing changed: %s has no password.", name)
+			return nil
+		}
 		done(stdout, "%s is public again.", name)
 		reportChange(ctx, api, name, change, stdout)
 		return nil
@@ -177,6 +181,10 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	change, err := api.SetProtection(ctx, name, *user, password)
 	if err != nil {
 		return err
+	}
+	if change.Unchanged {
+		done(stdout, "Nothing changed: %s asks for user %s and this password already.", name, *user)
+		return nil
 	}
 	done(stdout, "%s asks for user %s and the password now.", name, *user)
 	reportChange(ctx, api, name, change, stdout)
@@ -244,6 +252,10 @@ func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 
 // reportChange follows the deploy that applies a change, or says when it applies.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
+	if change.Unchanged {
+		done(stdout, "Nothing changed.")
+		return
+	}
 	if change.Deploy == nil && change.App.Stopped {
 		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
 		return

@@ -3918,6 +3918,9 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Deploy'
             - type: 'null'
+        unchanged:
+          type: boolean
+          description: true when the app had it so already; nothing restarts
     DomainsRequest:
       type: object
       required: [domains]

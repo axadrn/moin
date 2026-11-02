@@ -576,9 +576,11 @@ func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
 
 // Change is the answer to a routing change: the app, and the deploy that
 // applies it to the running release, or null when the next deploy will.
+// Unchanged is set when the app had it so already; nothing restarts.
 type Change struct {
-	App    App     `json:"app"`
-	Deploy *Deploy `json:"deploy"`
+	App       App     `json:"app"`
+	Deploy    *Deploy `json:"deploy"`
+	Unchanged bool    `json:"unchanged,omitempty"`
 }
 
 type domainsRequest struct {
@@ -622,13 +624,13 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 	return out
 }
 
-func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy) {
+func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy, changed bool) {
 	current, err := h.apps.Get(workspaceID, app)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	answer := Change{App: NewApp(*current)}
+	answer := Change{App: NewApp(*current), Unchanged: !changed}
 	if deploy != nil {
 		applied := NewDeploy(*deploy)
 		answer.Deploy = &applied
@@ -654,12 +656,12 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	deploy, err := h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
+	deploy, changed, err := h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy)
+	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
 }
 
 // SetProtection puts a password in front of the app.
@@ -673,23 +675,23 @@ func (h *AppsHandler) SetProtection(w http.ResponseWriter, r *http.Request) {
 		ValidationError(w, map[string]string{"password": "Enter a password of at least 8 characters."})
 		return
 	}
-	deploy, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
+	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy)
+	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
 }
 
 // DeleteProtection takes the password away.
 func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	deploy, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy)
+	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
 }
 
 // Restart starts the live release again with the env and routing as they

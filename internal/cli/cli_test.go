@@ -321,3 +321,13 @@ func TestLinkUnreadableRepo(t *testing.T) {
 		t.Errorf("code %d, stderr %q", code, stderr.String())
 	}
 }
+
+// TestNothingChanged: a change the app had already says so and follows no
+// restart.
+func TestNothingChanged(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/apps/shop/protection": `{"app":{"name":"shop"},"deploy":null,"unchanged":true}`}}
+	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
+	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}

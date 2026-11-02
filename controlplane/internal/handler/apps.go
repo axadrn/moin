@@ -398,8 +398,8 @@ func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, chan
 		return
 	}
 	domains, canonical := change(app.DomainList(), app.Canonical)
-	deploy, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
-	h.renderRouting(w, r, appliedNotice(deploy), err)
+	deploy, changed, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
+	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
 }
 
 // Protect puts a password in front of the app.
@@ -408,17 +408,20 @@ func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
 		h.renderRouting(w, r, "", service.ErrProtect)
 		return
 	}
-	deploy, err := h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
-	h.renderRouting(w, r, appliedNotice(deploy), err)
+	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
+	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
 }
 
 // Unprotect makes the app public again.
 func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
-	deploy, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
-	h.renderRouting(w, r, appliedNotice(deploy), err)
+	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
 }
 
-func appliedNotice(deploy *model.Deploy) string {
+func appliedNotice(deploy *model.Deploy, changed bool) string {
+	if !changed {
+		return "Nothing changed."
+	}
 	if deploy == nil {
 		return "Saved. The app takes it with its next deploy or start."
 	}
