@@ -218,7 +218,7 @@ func (i ServerInput) server() string { return cmp.Or(i.Server, i.Name) }
 
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
-	Server string `json:"server,omitempty" jsonschema:"the server name; empty gets a generated one"`
+	Server string `json:"server,omitempty" jsonschema:"the server name; empty gets one like brave-otter"`
 	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 

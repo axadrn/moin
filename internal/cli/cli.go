@@ -38,7 +38,7 @@ Account
 
 Servers
   servers            List servers
-  servers add        Add a server and print its install command: servers add [web-1]
+  servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
   servers update     Update the agent to the control plane's version: servers update [web-1]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]
@@ -382,7 +382,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if apiErr != nil {
 			return apiErr
 		}
-		// Without a name the control plane picks the next free web-<n>.
+		// Without a name the control plane picks one like brave-otter.
 		created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
 		var apiErr *client.Error
 		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {

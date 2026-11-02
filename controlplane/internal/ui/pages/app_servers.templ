@@ -74,8 +74,8 @@ templ ServerAddForm() {
 			ID:          "server-name",
 			Name:        "name",
 			Type:        "text",
-			Placeholder: "Server name, e.g. web-1",
-			Class:       "min-w-0 sm:w-60",
+			Placeholder: "Leave empty for a name like brave-otter",
+			Class:       "min-w-0 sm:w-72",
 			Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
 		})
 		@button.Button(button.Props{Type: button.TypeSubmit}) {

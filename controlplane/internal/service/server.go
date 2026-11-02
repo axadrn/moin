@@ -115,23 +115,6 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 	return server, raw, nil
 }
 
-// freeName is the first web-<n> no server of the workspace has.
-func (s *ServerService) freeName(workspaceID string) string {
-	taken := map[string]bool{}
-	servers, err := s.servers.ListByWorkspaceID(workspaceID)
-	if err == nil {
-		for _, server := range servers {
-			taken[server.Name] = true
-		}
-	}
-	for number := 1; ; number++ {
-		name := fmt.Sprintf("web-%d", number)
-		if !taken[name] {
-			return name
-		}
-	}
-}
-
 // InstallCommand is what people run on the server.
 func (s *ServerService) InstallCommand(installToken string) string {
 	return fmt.Sprintf("curl -fsSL %s/install.sh | sudo sh -s -- %s", s.appURL, installToken)

@@ -398,7 +398,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	cancel := [2]string{"any other key", "cancels"}
 	switch m.mode {
 	case modeAdd:
-		return bar(style.Accent, style.Bold.Render("Name: ")+m.input+cursor), [][2]string{{"enter", "add"}, {"esc", "cancel"}}
+		return bar(style.Accent, style.Bold.Render("Name: ")+m.input+cursor), [][2]string{{"enter", "add, empty for a name like brave-otter"}, {"esc", "cancel"}}
 	case modeEnv:
 		toggle := [2]string{"show", "values"}
 		if m.envShown {

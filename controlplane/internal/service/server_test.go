@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"github.com/axadrn/ops/controlplane/internal/access"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -91,13 +92,14 @@ func TestServerNames(t *testing.T) {
 	if !errors.Is(err, ErrServerName) {
 		t.Fatalf("long name: err = %v", err)
 	}
-	generated, _, err := servers.Create(owner, "")
-	if err != nil || generated.Name != "web-1" {
-		t.Fatalf("empty name = %v, %v", generated, err)
+	generatedName := regexp.MustCompile(`^[a-z]+-[a-z]+$`)
+	first, _, err := servers.Create(owner, "")
+	if err != nil || !generatedName.MatchString(first.Name) {
+		t.Fatalf("empty name = %v, %v", first, err)
 	}
-	generated, _, err = servers.Create(owner, " ")
-	if err != nil || generated.Name != "web-2" {
-		t.Fatalf("second empty name = %v, %v", generated, err)
+	second, _, err := servers.Create(owner, " ")
+	if err != nil || !generatedName.MatchString(second.Name) || second.Name == first.Name {
+		t.Fatalf("second empty name = %v, %v", second, err)
 	}
 }
 

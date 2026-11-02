@@ -13,7 +13,7 @@ order: 1
 | `ops team` | members and open invitations of your workspace |
 | `ops team invite <email> [--admin]` | invites someone by email |
 | `ops servers` | lists servers |
-| `ops servers add [name]` | adds a server, prints its install command; without a name it is the next free `web-1`, `web-2`, … |
+| `ops servers add [name]` | adds a server, prints its install command; without a name it gets one like `brave-otter` |
 | `ops servers rm <name> [--yes]` | removes a server and prints the command that removes its agent there |
 | `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |
 | `ops servers rules <name>` | the server's own rules for ops, from `/etc/ops/rules` on it |

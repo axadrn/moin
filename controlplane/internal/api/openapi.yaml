@@ -3735,6 +3735,7 @@ components:
         name:
           type: string
           maxLength: 64
+          description: Empty or left out gets a name like `brave-otter`.
     CreatedServer:
       type: object
       required: [server, install_token, install_command, expires_at]

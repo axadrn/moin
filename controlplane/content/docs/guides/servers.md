@@ -22,7 +22,7 @@ A server shows **waiting** until its agent connects, **online** while it is conn
 
 ## Add a server
 
-Gives you one install command for a new server. Run it as root on the machine within one hour; it works once.
+Gives you one install command for a new server. Run it as root on the machine within one hour; it works once. Leave the name empty and ops picks one like `brave-otter`.
 
 ```surfaces
 Web: **Servers**, **Add server**
