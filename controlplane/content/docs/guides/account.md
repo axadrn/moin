@@ -99,4 +99,6 @@ An API token, and so the CLI, the TUI and agents, cannot change your email, pass
 
 ## Billing
 
-On ops cloud the plan belongs to the workspace. Only its owner sees it and pays, on the web: **Billing** in the sidebar. `GET /api/v1/workspaces/{slug}/billing` and the `get_billing` tool show the plan; buying and cancelling happen only on the web. A self-hosted control plane has no billing: every feature is free.
+On hosted ops you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. When the trial ends and nobody has subscribed, the workspace is read-only: your apps and their backups keep running, and you can still see everything and stop and start apps, but not deploy or add servers until you subscribe.
+
+Only the owner of the workspace sees the plan and pays, on the web: **Billing** in the sidebar. `GET /api/v1/workspaces/{slug}/billing` and the `get_billing` tool show the plan; buying and cancelling happen only on the web. A self-hosted control plane has no billing: every feature is free.

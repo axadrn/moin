@@ -10,7 +10,7 @@ Not for ops: the agent dials out. Visitors reach your apps through the proxy on 
 
 ## Does ops build on its own servers?
 
-No. Builds run on your server. The control plane stores the source and relays messages.
+No. Builds run on your server. `ops deploy` puts your code into your own bucket and a GitHub deploy goes from GitHub straight to your server. The control plane only relays messages.
 
 ## What happens when a deploy fails?
 
