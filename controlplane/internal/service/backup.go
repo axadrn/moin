@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -73,6 +74,7 @@ func (s *AppService) SetBackupStorage(ctx context.Context, actor Actor, input Ba
 		Region:    strings.TrimSpace(input.Region),
 		Bucket:    strings.TrimSpace(input.Bucket),
 		Path:      strings.Trim(strings.TrimSpace(input.Path), "/"),
+		Workspace: actor.WorkspaceID,
 		AccessKey: strings.TrimSpace(input.AccessKey),
 		SecretKey: strings.TrimSpace(input.SecretKey),
 	}
@@ -129,13 +131,13 @@ func (s *AppService) RemoveBackupStorage(actor Actor) error {
 	return nil
 }
 
-// checkBucket writes and deletes a small object, which needs the same
-// rights as backups.
+// checkBucket writes and deletes a small object in the workspace's folder,
+// which needs the same rights as backups.
 func checkBucket(ctx context.Context, storage protocol.BackupStorage) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	client := bucketClient(storage)
-	key := strings.TrimLeft(storage.Path+"/.ops-check", "/")
+	key := strings.TrimLeft(path.Join(storage.Path, storage.Workspace, ".ops-check"), "/")
 	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("ops"))})
 	if err != nil {
 		return err
@@ -178,6 +180,7 @@ func (s *AppService) backupConfig(workspaceID string) protocol.BackupConfig {
 		Region:    storage.Region,
 		Bucket:    storage.Bucket,
 		Path:      storage.Path,
+		Workspace: workspaceID,
 		AccessKey: storage.AccessKey,
 		SecretKey: secretKey,
 	}}

@@ -729,7 +729,7 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	if err != nil {
 		return nil, err
 	}
-	start.DeployID, start.App, start.Number = deploy.ID, app.Name, deploy.Number
+	start.DeployID, start.App, start.AppID, start.Number = deploy.ID, app.Name, app.ID, deploy.Number
 	start.Routing = &protocol.Routing{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect}
 	start.Snapshot = s.snapshotBeforeWrite(app)
 	if start.FromNumber == 0 {
