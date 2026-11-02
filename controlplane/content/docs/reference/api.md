@@ -10,6 +10,8 @@ Send a personal API token as `Authorization: Bearer pat_…`. The token belongs 
 
 Endpoints marked *session* answer only a signed-in browser, never a token, so a leaked token cannot make new tokens, change roles, remove people or delete a workspace. Their sign-in and two-step flows live under `/api/v1/auth`; `GET /api/v1/csrf` gives the CSRF token a session sends with every change.
 
+A user can hold 20 server-sent event streams open at once, across all `…/events` endpoints. One more answers `429` with `rate_limited`; closing a stream frees its place.
+
 | Endpoint | Does |
 | --- | --- |
 | `GET /api/v1/meta` | the name, version and support address of this control plane; needs no token |
