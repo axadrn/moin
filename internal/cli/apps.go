@@ -544,9 +544,16 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if off {
 		return hookOff(ctx, api, name, stdin, stdout, flags.yes())
 	}
-	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
+	detail, err := api.App(ctx, name)
 	if err != nil {
 		return err
+	}
+	// Only a hook that exists stops working; the first one asks nothing.
+	if detail.App.Hook {
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
+		if err != nil {
+			return err
+		}
 	}
 	url, err := api.RotateDeployHook(ctx, name)
 	if err != nil {

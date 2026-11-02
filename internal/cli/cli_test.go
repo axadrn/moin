@@ -152,7 +152,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -436,5 +436,17 @@ func TestEnvPullCountsOneVar(t *testing.T) {
 	code, stdout, stderr := runCLI(t, api, "env", "pull", "--app", "shop", file)
 	if code != 0 || !strings.Contains(stdout, "Wrote 1 env var of shop") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// The first deploy hook replaces nothing, so it asks nothing.
+func TestFirstHookAsksNothing(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps/shop":       `{"app":{"name":"shop"},"deploys":[]}`,
+		"POST /api/v1/apps/shop/hook": `{"url":"http://localhost/webhooks/deploy/dph_x"}`,
+	}}
+	code, stdout, stderr := runCLI(t, api, "hook", "shop")
+	if code != 0 || !strings.Contains(stdout, "dph_x") {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
 }
