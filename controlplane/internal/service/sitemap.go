@@ -77,7 +77,8 @@ func (s *SitemapService) docsURLs() []model.SitemapURL {
 	today := time.Now().Format("2006-01-02")
 	var urls []model.SitemapURL
 	for _, page := range s.docsService.FlatDocsList() {
-		if page.HTMLContent == "" && len(page.Children) > 0 {
+		// The introduction is /docs itself; its own path only redirects.
+		if (page.HTMLContent == "" && len(page.Children) > 0) || page.Slug == "introduction" {
 			continue
 		}
 		priority := "0.6"
