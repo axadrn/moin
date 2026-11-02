@@ -117,7 +117,7 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 
 // InstallCommand is what people run on the server.
 func (s *ServerService) InstallCommand(installToken string) string {
-	return fmt.Sprintf("curl -fsSL %s/install.sh | sudo sh -s -- %s", s.appURL, installToken)
+	return fmt.Sprintf("curl -fsSL %s/install.sh | sh -s -- %s", s.appURL, installToken)
 }
 
 func validServerName(name string) bool {

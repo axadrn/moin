@@ -400,7 +400,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		done(stdout, "Added %s. Run this on the server as root within the next hour:", style.Bold.Render(created.Server.Name))
+		done(stdout, "Added %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
 		// The command stays on one line, so it copies in one piece.
 		fmt.Fprintln(stdout)
 		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
@@ -438,7 +438,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		done(stdout, "New install command for %s. Run this on the server as root within the next hour:", style.Bold.Render(created.Server.Name))
+		done(stdout, "New install command for %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
 		fmt.Fprintln(stdout)
 		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
 		fmt.Fprintln(stdout)
@@ -482,7 +482,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			return err
 		}
 		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
-		hint(stdout, "The agent is still installed there. Remove it on the server with", uninstall)
+		hint(stdout, "The agent is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+command, build.Name)
@@ -642,7 +642,7 @@ func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Rea
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Still here: "+strings.Join(kept, "; ")+"."))
 	}
 	if !*withApps {
-		hint(stdout, "Remove the apps and their data too with", protocol.UninstallCommand(build.Name)+" --apps")
+		hint(stdout, "Remove the apps and their data too, as root, with", protocol.UninstallCommand(build.Name)+" --apps")
 	}
 	return nil
 }

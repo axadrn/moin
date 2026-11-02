@@ -122,9 +122,9 @@ func (m model) body(width, room int) []string {
 func (m model) serversView(width, room int) []string {
 	var added []string
 	if m.added != nil {
-		lead := " added. Run this on the server as root within the next hour:"
+		lead := " added. Run this on the server as root (or put sudo before sh) within the next hour:"
 		if m.again {
-			lead = ": a new install command. Run it on the server as root within the next hour; the old one stops working:"
+			lead = ": a new install command. Run it on the server as root (or put sudo before sh) within the next hour; the old one stops working:"
 		}
 		added = append(added, "",
 			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.added.Server.Name)+lead,
@@ -139,7 +139,7 @@ func (m model) serversView(width, room int) []string {
 	}
 	if m.removed != nil {
 		added = append(added, "",
-			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.removed.name)+" removed. Its agent is still installed; remove it on the server with:",
+			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.removed.name)+" removed. Its agent is still installed; remove it on the server as root (or put sudo in front) with:",
 			"")
 		for _, line := range wrapCommand(m.removed.uninstall, width-len(pad)-1) {
 			added = append(added, pad+style.Accent.Render(line))

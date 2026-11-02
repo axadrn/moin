@@ -62,7 +62,7 @@ func frames() map[string]model {
 	add("servers-empty", func(m *model) { m.servers = nil })
 	add("servers-add", func(m *model) { m.mode, m.input = modeAdd, "tui-1" })
 	add("servers-added", func(m *model) {
-		m.added = &client.NewServer{Server: client.Server{Name: "tui-1"}, InstallCommand: "curl -fsSL https://ops.goilerplate.com/install.sh | sudo sh -s -- ins_4k2j9x0c8v7b6n5m4l3k2j1h0g9f8d7s"}
+		m.added = &client.NewServer{Server: client.Server{Name: "tui-1"}, InstallCommand: "curl -fsSL https://ops.goilerplate.com/install.sh | sh -s -- ins_4k2j9x0c8v7b6n5m4l3k2j1h0g9f8d7s"}
 	})
 	add("servers-remove", func(m *model) {
 		m.selected = 2

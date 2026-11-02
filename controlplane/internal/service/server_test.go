@@ -32,7 +32,7 @@ func TestInstallTokenWorksOnce(t *testing.T) {
 	if !strings.HasPrefix(installToken, "ins_") {
 		t.Fatalf("install token %q has no marker", installToken)
 	}
-	if got := servers.InstallCommand(installToken); got != "curl -fsSL https://ops.example.com/install.sh | sudo sh -s -- "+installToken {
+	if got := servers.InstallCommand(installToken); got != "curl -fsSL https://ops.example.com/install.sh | sh -s -- "+installToken {
 		t.Fatalf("install command = %q", got)
 	}
 

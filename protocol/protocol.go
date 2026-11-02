@@ -511,9 +511,9 @@ func UpdateCommand(baseURL, name, arch string) string {
 		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary, name)
 }
 
-// UninstallCommand removes the agent from a server, run on it: its
+// UninstallCommand removes the agent from a server, run on it as root: its
 // service, binary and state. The apps keep running with their data; add
 // --apps to remove them too.
 func UninstallCommand(name string) string {
-	return "sudo " + name + " agent uninstall"
+	return name + " agent uninstall"
 }

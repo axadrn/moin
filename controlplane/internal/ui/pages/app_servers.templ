@@ -92,7 +92,7 @@ templ ServerAdded(added AddedServer) {
 		@panel(panelProps{
 			Heading:     "server-added-heading",
 			Title:       "Install the agent on " + added.Name,
-			Description: "Run this command on the server as root. It works once, within the next hour. It shows only now: ops stores just a fingerprint of it.",
+			Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: ops stores just a fingerprint of it.",
 			Docs:        "/docs/guides/servers#add-a-server",
 		}) {
 			<div class="flex flex-col gap-4">
@@ -123,7 +123,7 @@ templ serverRemoved(removed RemovedServer) {
 	@panel(panelProps{
 		Heading:     "server-removed-heading",
 		Title:       removed.Name + " is removed",
-		Description: "Its agent is disconnected but still installed. Run this on the server to remove it. The apps there keep running with their data; add --apps to remove them too.",
+		Description: "Its agent is disconnected but still installed. Run this on the server as root, or put sudo in front, to remove it. The apps there keep running with their data; add --apps to remove them too.",
 		Attrs:       templ.Attributes{"data-server-removed": removed.Name},
 	}) {
 		@command(removed.Command)

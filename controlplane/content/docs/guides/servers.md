@@ -22,7 +22,7 @@ A server shows **waiting** until its agent connects, **online** while it is conn
 
 ## Add a server
 
-Gives you one install command for a new server. Run it as root on the machine within one hour; it works once. Leave the name empty and ops picks one like `brave-otter`. The server needs Linux with systemd, such as Ubuntu or Debian. If the install stops halfway, remove the server and add it again for a new command.
+Gives you one install command for a new server. Run it as root on the machine within one hour, or put `sudo` before `sh`; it works once. Leave the name empty and ops picks one like `brave-otter`. The server needs Linux with systemd, such as Ubuntu or Debian. If the install stops halfway, remove the server and add it again for a new command.
 
 ```surfaces
 Web: **Servers**, **Add server**
@@ -84,10 +84,10 @@ API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```
 
-The agent stays installed on the machine. Every surface answers the command that removes it; run it on the server:
+The agent stays installed on the machine. Every surface answers the command that removes it; run it on the server as root, or put `sudo` in front:
 
 ```bash
-sudo ops agent uninstall
+ops agent uninstall
 ```
 
 It stops and removes the `ops-agent` service, the `ops` binary and the agent's state in `/var/lib/ops`. What stays: the apps keep running with their data in `/var/lib/ops/apps`, and so do the proxy, the tunnel and the firewall that serve them, your `/etc/ops/rules` and Docker.
@@ -95,7 +95,7 @@ It stops and removes the `ops-agent` service, the `ops` binary and the agent's s
 If you want the apps gone too, add `--apps`. It takes every app down with its containers, images and volumes, removes the proxy, the tunnel and the firewall, and deletes `/var/lib/ops`. Their data is gone for good.
 
 ```bash
-sudo ops agent uninstall --apps
+ops agent uninstall --apps
 ```
 
 ## On the server

@@ -85,7 +85,7 @@ templ authAside() {
 					}
 					@authStep("3", "Add a server, run what it prints") {
 						@authCmd("ops servers add web-1")
-						@authCmd("curl -fsSL " + host + "/install.sh | sudo sh -s -- ins_…")
+						@authCmd("curl -fsSL " + host + "/install.sh | sh -s -- ins_…")
 					}
 					@authStep("4", "Deploy from your repo") {
 						@authCmd("ops deploy")

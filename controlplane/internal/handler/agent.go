@@ -39,11 +39,11 @@ func NewAgentHandler(servers *service.ServerService, appURL string, clientIPs mi
 // control plane URL. The binary comes from /download, which serves the
 // downloads directory.
 const installScript = `#!/bin/sh
-# Installs the ops agent. Usage: curl -fsSL %[1]s/install.sh | sudo sh -s -- <install token>
+# Installs the ops agent. Usage, as root (or with sudo before sh): curl -fsSL %[1]s/install.sh | sh -s -- <install token>
 set -eu
 token="${1:?usage: install.sh <install token>}"
 url="%[1]s"
-[ "$(id -u)" = 0 ] || { echo "Run as root." >&2; exit 1; }
+[ "$(id -u)" = 0 ] || { echo "Run as root, or put sudo before sh." >&2; exit 1; }
 [ "$(uname -s)" = Linux ] || { echo "The agent runs on Linux." >&2; exit 1; }
 case "$(uname -m)" in
 	x86_64 | amd64) arch=amd64 ;;

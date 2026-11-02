@@ -131,13 +131,13 @@ func TestOwnUsageNotGoFlags(t *testing.T) {
 }
 
 func TestDestructiveCommandsAsk(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"sudo ops agent uninstall"}`}}
+	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"ops agent uninstall"}`}}
 	code, _, stderr := runCLI(t, api, "servers", "rm", "web-1")
 	if code != 1 || !strings.Contains(stderr, "--yes") || api.seen("DELETE") {
 		t.Errorf("without --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--yes")
-	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "sudo ops agent uninstall") {
+	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "ops agent uninstall") {
 		t.Errorf("with --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	for _, args := range [][]string{

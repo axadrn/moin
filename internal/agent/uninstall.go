@@ -26,7 +26,7 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 	_, err := os.Stat(unitFile)
 	installed := err == nil
 	if installed && os.Geteuid() != 0 {
-		return nil, errors.New("run it as root: sudo " + build.Name + " agent uninstall")
+		return nil, errors.New("run it as root, or put sudo in front: sudo " + build.Name + " agent uninstall")
 	}
 	if installed {
 		logf("stopping the %s-agent service", build.Name)

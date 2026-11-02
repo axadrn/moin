@@ -468,7 +468,7 @@ type CreatedServer struct {
 }
 
 func (c CreatedServer) Summary() string {
-	return fmt.Sprintf("Added %s. Run this on the server as root within the hour: %s", c.Server.Name, c.InstallCommand)
+	return fmt.Sprintf("Added %s. Run this on the server as root (or put sudo before sh) within the hour: %s", c.Server.Name, c.InstallCommand)
 }
 
 // NewInstall is the output of new_install_command.
@@ -477,7 +477,7 @@ type NewInstall struct {
 }
 
 func (n NewInstall) Summary() string {
-	return fmt.Sprintf("New install command for %s. Run this on the server as root within the hour: %s", n.Server.Name, n.InstallCommand)
+	return fmt.Sprintf("New install command for %s. Run this on the server as root (or put sudo before sh) within the hour: %s", n.Server.Name, n.InstallCommand)
 }
 
 func (t opsTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
@@ -535,7 +535,7 @@ func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveSer
 	}
 	command := t.services.Servers.UninstallCommand()
 	return RemovedServer{
-		Message:          "Removed server " + server.Name + ". Its agent is still installed: run " + command + " on the server to remove it.",
+		Message:          "Removed server " + server.Name + ". Its agent is still installed: run " + command + " on the server as root (or with sudo in front) to remove it.",
 		UninstallCommand: command,
 	}, nil
 }

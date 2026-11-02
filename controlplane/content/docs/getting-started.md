@@ -38,10 +38,10 @@ Any Linux server with root access works, on amd64 or arm64.
 ops servers add web-1
 ```
 
-It prints one command. Run it on the server within the next hour. Logged in as root and `sudo` is missing? Leave out `sudo`.
+It prints one command. Run it on the server as root within the next hour. Not root? Put `sudo` before `sh`.
 
 ```bash
-curl -fsSL https://ops.example.com/install.sh | sudo sh -s -- ins_…
+curl -fsSL https://ops.example.com/install.sh | sh -s -- ins_…
 ```
 
 It installs Docker when it is missing, which takes a few minutes, installs the agent as the `ops-agent` systemd service and connects it. `ops servers` now shows `web-1 online`. The web UI shows the same under **Servers**, live.

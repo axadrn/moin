@@ -3919,7 +3919,7 @@ components:
           description: Shown this one time.
         install_command:
           type: string
-          description: Run it as root on the server.
+          description: Run it as root on the server, or put sudo before sh.
         expires_at:
           type: string
           format: date-time
@@ -3929,7 +3929,7 @@ components:
       properties:
         uninstall_command:
           type: string
-          description: Run it on the server to remove the agent, its binary and state. The apps keep running with their data; add `--apps` to remove them too.
+          description: Run it on the server as root, or with sudo in front, to remove the agent, its binary and state. The apps keep running with their data; add `--apps` to remove them too.
     App:
       type: object
       required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, stopped, created_at]
