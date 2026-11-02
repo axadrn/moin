@@ -131,10 +131,12 @@ func (s *security) ensureTunnel(ctx context.Context, token string) error {
 	if token == "" {
 		return nil
 	}
-	_, err = s.apps.output(ctx, "docker", "run", "-d", "--name", tunnelName, "--restart", "unless-stopped",
+	// "-e TUNNEL_TOKEN" without a value makes docker take it from its own
+	// environment, so the token never shows on a command line in ps.
+	_, err = s.apps.outputEnv(ctx, []string{"TUNNEL_TOKEN=" + token}, "docker", "run", "-d", "--name", tunnelName, "--restart", "unless-stopped",
 		"--network", proxyNetwork,
 		"--label", "ops.token="+tokenLabel(token),
-		"-e", "TUNNEL_TOKEN="+token,
+		"-e", "TUNNEL_TOKEN",
 		tunnelImage, "tunnel", "--no-autoupdate", "run")
 	return err
 }
@@ -165,7 +167,21 @@ func joinTailnet(ctx context.Context, authKey string) (string, error) {
 	hostname, _ := os.Hostname()
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, "tailscale", "up", "--authkey="+authKey, "--hostname="+hostname).CombinedOutput()
+	// tailscale reads the key from a file with "file:", so the key never
+	// shows on a command line in ps. Only root can read the file.
+	keyFile, err := os.CreateTemp("", "ops-tailscale-key-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(keyFile.Name())
+	_, err = keyFile.WriteString(authKey)
+	if closeErr := keyFile.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return "", err
+	}
+	output, err := exec.CommandContext(ctx, "tailscale", "up", "--auth-key=file:"+keyFile.Name(), "--hostname="+hostname).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("up: %s", lastLine(string(output)))
 	}

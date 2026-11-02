@@ -1086,8 +1086,17 @@ func (a *apps) run(ctx context.Context, logf func(string, ...any), environment [
 
 // output runs a command and returns its stdout. A failure carries stderr.
 func (a *apps) output(ctx context.Context, name string, args ...string) (string, error) {
+	return a.outputEnv(ctx, nil, name, args...)
+}
+
+// outputEnv is output with extra environment variables. A secret goes
+// there, not in args: args show in ps to every user of the server.
+func (a *apps) outputEnv(ctx context.Context, env []string, name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	command := exec.CommandContext(ctx, name, args...)
+	if env != nil {
+		command.Env = append(os.Environ(), env...)
+	}
 	command.Stdout, command.Stderr = &stdout, &stderr
 	err := command.Run()
 	if err != nil {

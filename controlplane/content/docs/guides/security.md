@@ -18,6 +18,8 @@ You can turn on each switch alone. If you only do one thing, turn on the firewal
 
 The switches need two keys: a Cloudflare API token for the tunnel and a Tailscale auth key for SSH. They belong to the workspace, work for all its servers and are stored encrypted. On the web they are under **Integrations** on the security page of any server.
 
+On the server, the agent hands the Cloudflare token to cloudflared through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows up in `ps`.
+
 ### Store a key
 
 Adds the Cloudflare token or the Tailscale key. A new key replaces the old one; an empty field keeps it.
