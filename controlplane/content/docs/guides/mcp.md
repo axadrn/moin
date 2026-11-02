@@ -62,7 +62,8 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `get_env` | env vars in plain text | write |
 | `set_env` | sets and removes env vars | write |
 | `get_github` | GitHub installations and the install link | read |
-| `list_repos` | repos ops may read | read |
+| `list_branches` | the branches of a repo, the default first | read |
+| `list_repos` | repos ops may read, and where on GitHub to give it more | read |
 | `link_repo` | follows a repo and branch | write |
 | `unlink_repo` | stops following it | write, destructive |
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |

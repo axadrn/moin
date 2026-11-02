@@ -49,7 +49,8 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `GET /api/v1/apps/{app}/logs` | container logs |
 | `PUT /api/v1/servers/{id}/security` | Cloudflare Tunnel, SSH on Tailscale, firewall |
 | `GET` · `PUT /api/v1/integrations` | the Cloudflare API token and the Tailscale auth key |
-| `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations and install link; repos ops reads |
+| `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; repos ops reads |
+| `GET /api/v1/github/repos/{owner}/{repo}/branches` | the branches of a repo, the default first |
 | `PUT` · `DELETE /api/v1/apps/{app}/repo` | links or unlinks a GitHub repo and branch |
 | `GET /api/v1/apps/{app}/databases` | SQLite databases of the live release |
 | `GET /api/v1/apps/{app}/databases/tables` | tables, columns, row counts, schema and migration |

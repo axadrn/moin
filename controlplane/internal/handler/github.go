@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -109,6 +109,23 @@ func (h *AppsHandler) Repo(w http.ResponseWriter, r *http.Request) {
 	h.renderRepo(w, r)
 }
 
+// RepoBranches answers the branch select of the link form for the repo it
+// has chosen.
+func (h *AppsHandler) RepoBranches(w http.ResponseWriter, r *http.Request) {
+	render(w, r, pages.RepoBranchField(h.branches(r, r.FormValue("repo"))))
+}
+
+// branches lists the branches of a repo, the default first. When GitHub
+// does not answer the select stays empty and the link takes the default.
+func (h *AppsHandler) branches(r *http.Request, repo string) []string {
+	branches, err := h.apps.GitHubBranches(r.Context(), ctxkeys.Workspace(r.Context()).ID, repo)
+	if err != nil {
+		slog.Warn("list github branches failed", "repo", repo, "error", err)
+		return nil
+	}
+	return branches
+}
+
 // LinkRepo makes the app follow the chosen repo and branch. The switch of
 // a linked repo sends the same, with only deploy on push changed.
 func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +147,15 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 	case before.Repo != "":
 		// The switch saved itself; its position says so.
 		h.renderRepo(w, r)
+	case r.FormValue("deploy") != "":
+		// The link form deploys the branch right away.
+		deploy, err := h.apps.DeployRef(r.Context(), actor(r), app.Name, "")
+		h.renderRepo(w, r)
+		if err != nil {
+			toastWarning(w, r, app.Repo+" linked, deploy not started", errorMessage(err))
+			return
+		}
+		toastDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 	default:
 		h.renderRepo(w, r)
 		toastDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
@@ -183,11 +209,14 @@ func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load github installations failed", err)
 		return
 	}
-	view.Connected = len(installations) > 0
+	view.Connected, view.Installations = len(installations) > 0, installations
 	if view.Enabled && view.Connected && app.Repo == "" {
 		view.Repos, err = h.apps.GitHubRepos(r.Context(), workspace.ID)
 		if err != nil {
 			view.Error = errorMessage(err)
+		}
+		if len(view.Repos) > 0 {
+			view.Branches = h.branches(r, view.Repos[0].FullName)
 		}
 	}
 	render(w, r, pages.AppRepo(view))

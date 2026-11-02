@@ -1174,7 +1174,16 @@ func (m model) showGitHub(app client.App) tea.Cmd {
 			}
 			lines = append(lines, resultLines([]string{"repo", "branch", "visibility"}, rows)...)
 		}
-		note := "type link owner/repo [branch] [manual] to follow one"
+		if github, err := m.api.GitHub(m.ctx); err == nil && github.Enabled {
+			lines = append(lines, "", style.Muted.Render("Don't see your repo? Give "+build.Name+" access to it on GitHub:"))
+			for _, installation := range github.Installations {
+				lines = append(lines, "  "+installation.Account+"  "+style.Accent.Render(installation.SettingsURL))
+			}
+			if github.InstallURL != "" {
+				lines = append(lines, "  "+style.Muted.Render("another account")+"  "+style.Accent.Render(github.InstallURL))
+			}
+		}
+		note := "type link owner/repo [branch] [manual] to follow one · branches owner/repo lists its branches"
 		if app.Repo != "" {
 			note = "enter deploys " + app.Branch + " · a branch, tag or commit deploys that"
 		}
@@ -1195,6 +1204,29 @@ func (m model) github(app client.App, input string) tea.Cmd {
 				return errMsg{err}
 			}
 			return noticeMsg(app.Name + " follows no repo any more")
+		}
+	case len(fields) > 0 && fields[0] == "branches":
+		repo := app.Repo
+		if len(fields) > 1 {
+			repo = fields[1]
+		}
+		if repo == "" {
+			return func() tea.Msg { return errMsg{fmt.Errorf("type branches owner/repo")} }
+		}
+		return func() tea.Msg {
+			branches, err := m.api.GitHubBranches(m.ctx, repo)
+			if err != nil {
+				return errMsg{err}
+			}
+			lines := []string{}
+			for index, branch := range branches {
+				if index == 0 {
+					branch += style.Muted.Render("  default")
+				}
+				lines = append(lines, branch)
+			}
+			note := "type link " + repo + " <branch> [manual] to follow one"
+			return outputMsg{id: m.shared.outputs.Add(1), title: "Branches of " + repo, note: style.Muted.Render(note), lines: lines}
 		}
 	case len(fields) > 0 && fields[0] == "link":
 		if len(fields) < 2 {

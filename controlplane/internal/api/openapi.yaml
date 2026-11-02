@@ -2268,12 +2268,15 @@ paths:
                     type: array
                     items:
                       type: object
-                      required: [id, account]
+                      required: [id, account, settings_url]
                       properties:
                         id:
                           type: integer
                         account:
                           type: string
+                        settings_url:
+                          type: string
+                          description: The page on github.com where the account chooses the repos ops may read. For an installation connected before ops kept it, the install link, which leads there too.
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2321,6 +2324,53 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`github_off` when the control plane has no GitHub App.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/github/repos/{owner}/{repo}/branches:
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [GitHub]
+      operationId: getGitHubBranches
+      summary: List branches
+      description: The branches of a repo ops may read, the default branch first.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The branch names.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`github_off` when the control plane has no GitHub App.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.repo` when ops cannot read the repo.'
         '500':
           $ref: '#/components/responses/Internal'
 

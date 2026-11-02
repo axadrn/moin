@@ -175,6 +175,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/github/setup", middleware.RequireAuth(apps.GitHubSetup))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.Repo))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.LinkRepo))
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo/branches", workspace(apps.RepoBranches))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo/unlink", workspace(apps.UnlinkRepo))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo/deploy", workspace(apps.DeployRef))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/backups", workspace(apps.Backups))

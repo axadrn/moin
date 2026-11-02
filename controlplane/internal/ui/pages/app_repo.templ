@@ -23,6 +23,10 @@ type RepoView struct {
 	Enabled   bool
 	Connected bool
 	Repos     []service.GitHubRepoOf
+	// Branches are the branches of the first repo, its default first.
+	Branches []string
+	// Installations say where on GitHub the user gives ops more repos.
+	Installations []model.GitHubInstallation
 	// Error says why the repos could not be listed.
 	Error string
 }
@@ -67,59 +71,117 @@ templ repoConnect(view RepoView) {
 	</div>
 }
 
-// repoLink links the app to a repo and a branch.
+// repoLink links the app to a repo and a branch and deploys it: choose the
+// repo, then one of its branches, keep or drop deploy on push, Deploy.
 templ repoLink(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
-	<form class="flex flex-col gap-3" hx-post={ appPath + "/repo" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-link-repo>
-		@csrf.Token()
-		<div class="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-			@field.Field(field.Props{Class: "gap-1 min-w-0"}) {
-				@field.Label(field.LabelProps{For: "link-repo"}) {
-					Repo
-				}
-				@selectcomp.Select(selectcomp.Props{Name: "repo", Required: true, DefaultValue: firstRepo(view.Repos), Items: repoItems(view.Repos)}) {
-					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 font-mono", Attributes: templ.Attributes{"aria-describedby": "link-repo-hint"}}) {
-						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No repo"})
+	if len(view.Repos) == 0 {
+		<div class="flex flex-col items-start gap-3" data-no-repos>
+			<p class="text-sm text-muted-foreground">The ops GitHub App sees no repo yet. Give it access to the repo you want to deploy, then come back here.</p>
+			@repoAccess(view, true)
+		</div>
+	} else {
+		<form class="flex flex-col gap-4" hx-post={ appPath + "/repo" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-link-repo>
+			@csrf.Token()
+			<input type="hidden" name="deploy" value="1"/>
+			<div class="grid gap-3 sm:grid-cols-2">
+				@field.Field(field.Props{Class: "gap-1 min-w-0", Attributes: templ.Attributes{"hx-get": appPath + "/repo/branches", "hx-trigger": "change", "hx-include": "closest form", "hx-target": "#link-branch-field", "hx-swap": "outerHTML"}}) {
+					@field.Label(field.LabelProps{For: "link-repo"}) {
+						Repo
 					}
-					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-						@selectcomp.Group() {
-							for _, repo := range view.Repos {
-								@selectcomp.Item(selectcomp.ItemProps{Value: repo.FullName, Class: "font-mono"}) {
-									{ repo.FullName }
+					@selectcomp.Select(selectcomp.Props{Name: "repo", Required: true, DefaultValue: firstRepo(view.Repos), Items: repoItems(view.Repos)}) {
+						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 font-mono", Attributes: templ.Attributes{"aria-describedby": "link-repo-hint"}}) {
+							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No repo"})
+						}
+						@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+							@selectcomp.Group() {
+								for _, repo := range view.Repos {
+									@selectcomp.Item(selectcomp.ItemProps{Value: repo.FullName, Class: "font-mono"}) {
+										{ repo.FullName }
+									}
 								}
 							}
 						}
 					}
+					@fieldHint("link-repo", "") {
+						The repos the ops GitHub App may read.
+					}
 				}
-				@fieldHint("link-repo", "") {
-					The repos the ops GitHub App may read.
-				}
-			}
-			@field.Field(field.Props{Class: "gap-1 min-w-0"}) {
-				@field.Label(field.LabelProps{For: "link-branch"}) {
-					Branch
-				}
-				@input.Input(input.Props{ID: "link-branch", Name: "branch", Placeholder: "default branch", Class: "font-mono", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off", "aria-describedby": "link-branch-hint"}})
-				@fieldHint("link-branch", "") {
-					Empty follows the default branch.
+				@RepoBranchField(view.Branches)
+			</div>
+			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+				@checkbox.Checkbox(checkbox.Props{ID: "link-auto-deploy", Name: "auto_deploy", Value: "1", DefaultChecked: true})
+				@field.Label(field.LabelProps{For: "link-auto-deploy", Class: "font-normal"}) {
+					Deploy every push to the branch
 				}
 			}
-		</div>
-		if len(view.Repos) == 0 {
-			<p class="text-sm text-muted-foreground">The ops GitHub App sees no repo yet. <a class="font-medium text-foreground underline underline-offset-4" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath) } hx-boost="false">Choose repos on GitHub</a>.</p>
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				@button.Button(button.Props{Type: button.TypeSubmit, Class: "self-start"}) {
+					Deploy
+				}
+				@repoAccess(view, false)
+			</div>
+		</form>
+	}
+}
+
+// RepoBranchField is the branch select of the link form, for the chosen
+// repo; the form asks for it again when the repo changes.
+templ RepoBranchField(branches []string) {
+	@field.Field(field.Props{ID: "link-branch-field", Class: "gap-1 min-w-0"}) {
+		@field.Label(field.LabelProps{For: "link-branch"}) {
+			Branch
 		}
-		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-			@checkbox.Checkbox(checkbox.Props{ID: "link-auto-deploy", Name: "auto_deploy", Value: "1", DefaultChecked: true})
-			@field.Label(field.LabelProps{For: "link-auto-deploy", Class: "font-normal"}) {
-				Deploy every push to the branch
+		@selectcomp.Select(selectcomp.Props{Name: "branch", DefaultValue: firstOf(branches), Items: branchItems(branches)}) {
+			@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-branch", Class: "w-full min-w-0 font-mono", Attributes: templ.Attributes{"aria-describedby": "link-branch-hint"}}) {
+				@selectcomp.Value(selectcomp.ValueProps{Placeholder: "default branch"})
+			}
+			@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+				@selectcomp.Group() {
+					for _, branch := range branches {
+						@selectcomp.Item(selectcomp.ItemProps{Value: branch, Class: "font-mono"}) {
+							{ branch }
+						}
+					}
+				}
 			}
 		}
-		<div>
-			@button.Button(button.Props{Type: button.TypeSubmit}) {
-				Link repo
+		@fieldHint("link-branch", "") {
+			The first one is the default branch.
+		}
+	}
+}
+
+// repoAccess links to where on GitHub the user gives ops another repo, and
+// reloads the panel to see it. primary makes the link the main action, for
+// a panel with no repo yet.
+templ repoAccess(view RepoView, primary bool) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ install := ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath }}
+	<div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" data-repo-access>
+		if !primary {
+			<span class="text-muted-foreground">Don't see your repo?</span>
+		}
+		for _, installation := range view.Installations {
+			@button.Button(button.Props{
+				Href:       utils.IfElse(installation.SettingsURL != "", installation.SettingsURL, install),
+				Variant:    utils.IfElse(primary, button.VariantDefault, button.VariantLink),
+				Size:       utils.IfElse(primary, button.SizeDefault, button.SizeSm),
+				Class:      utils.IfElse(primary, "", "h-auto px-0"),
+				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "hx-boost": "false", "data-github-settings": installation.Account},
+			}) {
+				@icons.Github(icons.Props{Class: "size-4"})
+				Give ops access on { installation.Account }
 			}
-		</div>
-	</form>
+		}
+		@button.Button(button.Props{
+			Variant:    button.VariantSecondary,
+			Size:       utils.IfElse(primary, button.SizeDefault, button.SizeSm),
+			Attributes: templ.Attributes{"hx-get": appPath + "/repo", "hx-target": "#app-repo", "hx-swap": "outerHTML", "hx-disable": "this", "data-refresh-repos": true},
+		}) {
+			Refresh
+		}
+	</div>
 }
 
 // repoLinked is a linked repo: deploy a ref, deploy on push, unlink.
@@ -175,6 +237,21 @@ func firstRepo(repos []service.GitHubRepoOf) string {
 		return ""
 	}
 	return repos[0].FullName
+}
+
+func firstOf(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func branchItems(branches []string) []selectcomp.ItemData {
+	items := make([]selectcomp.ItemData, 0, len(branches))
+	for _, branch := range branches {
+		items = append(items, selectcomp.ItemData{Value: branch, Label: branch})
+	}
+	return items
 }
 
 func repoItems(repos []service.GitHubRepoOf) []selectcomp.ItemData {

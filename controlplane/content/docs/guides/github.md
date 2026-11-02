@@ -24,7 +24,7 @@ The app asks for the least it needs: read the contents of the repos you choose, 
 
 ## See the repos
 
-Lists the repos ops may read.
+Lists the repos ops may read, and where on GitHub you give it another one.
 
 ```surfaces
 Web: the app page, **GitHub**
@@ -36,17 +36,31 @@ MCP: list_repos
 
 In the TUI, `g` on an app opens the GitHub panel: the repo the app follows and the repos ops may read.
 
-## Link a repo
+If you don't see your repo, ops may not read it yet. Under the list, every surface links to the settings page of each account on github.com where you choose the repos ops may read, and gives the link that installs the app on another account or organization. Add the repo there and come back: the web refreshes the list with **Refresh**, the others when you list again. With no repo yet, that link is the first step.
 
-Makes an app follow a repo and a branch. Deploy every push is on by default.
+The branches of a repo, the default branch first:
 
 ```surfaces
-Web: the app page, **GitHub**, choose the repo, **Link repo**
+Web: the app page, **GitHub**, the **Branch** select after you choose the repo
+CLI: ops github branches me/blog
+TUI: on the app, `g`, then type `branches me/blog`
+API: GET /api/v1/github/repos/{owner}/{repo}/branches
+MCP: list_branches
+```
+
+## Link a repo
+
+Makes an app follow a repo and a branch. Deploy every push is on by default. The app needs no deploy before: add it, link the repo and deploy it from GitHub.
+
+```surfaces
+Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**
 CLI: ops link me/blog --branch main
 TUI: on the app, `g`, then type `link me/blog main`
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
+
+In the web, **Deploy** links the repo and deploys the branch in one step. The CLI, the TUI, the API and MCP link first and then deploy, as below.
 
 ## Deploy from GitHub
 

@@ -336,10 +336,10 @@ func (r *appRepository) GitHubInstallations(workspaceID string) ([]model.GitHubI
 // connected to another workspace stays there: ErrGitHubInstallationTaken.
 func (r *appRepository) AddGitHubInstallation(installation model.GitHubInstallation) error {
 	result, err := r.db.Exec(`
-		INSERT INTO github_installations (installation_id, workspace_id, account, created_at) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (installation_id) DO UPDATE SET account = excluded.account
+		INSERT INTO github_installations (installation_id, workspace_id, account, created_at, settings_url) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (installation_id) DO UPDATE SET account = excluded.account, settings_url = excluded.settings_url
 		WHERE github_installations.workspace_id = excluded.workspace_id
-	`, installation.InstallationID, installation.WorkspaceID, installation.Account, installation.CreatedAt)
+	`, installation.InstallationID, installation.WorkspaceID, installation.Account, installation.CreatedAt, installation.SettingsURL)
 	if err != nil {
 		return err
 	}

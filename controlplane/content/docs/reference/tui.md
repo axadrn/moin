@@ -40,7 +40,7 @@ removing members, leaving and deleting the workspace are web only.
 | `enter` | apps | opens the app with its deploys and databases |
 | `↑` `↓` | app | picks a deploy; `enter` shows its log |
 | `d` | apps | deploys the directory `ops` started in, when its app exists |
-| `g` | apps | GitHub: shows the repo and the repos ops may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `unlink` stops |
+| `g` | apps | GitHub: shows the repo and the repos ops may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `branches owner/repo` lists its branches, `unlink` stops |
 | `R` | apps | redeploys the newest source or image |
 | `t` | apps | restarts the app with the current env and domains |
 | `S` | apps | stops the app, after `y`; starts a stopped one |

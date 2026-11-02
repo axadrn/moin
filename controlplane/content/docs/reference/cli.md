@@ -57,7 +57,8 @@ order: 1
 | `ops backups auto on\|off [app]` | snapshot before every change |
 | `ops backups bucket` · `bucket set` · `bucket rm [--yes]` | the bucket backups go to, the same for every app; the secret key comes on stdin |
 | `ops deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
-| `ops github` · `ops github repos` | where the GitHub App is installed, with the install link; the repos it reads |
+| `ops github` · `ops github repos` | where the GitHub App is installed, with the install link; the repos it reads and where to give it more |
+| `ops github branches <owner/name>` | the branches of a repo, the default first |
 | `ops link owner/name [--branch main] [--auto=false] [app]` | follows a repo; every push deploys unless `--auto=false` |
 | `ops unlink [app] [--yes]` | stops following it |
 | `ops servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off] [--yes]` | how the server is reached; prints what the agent set up |

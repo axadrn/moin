@@ -314,7 +314,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 						tabindex="0"
 						aria-label="Deploy log"
 					>
-						<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet. Run <span class="font-mono text-foreground">ops deploy { app.Name }</span> in its repo.</p>
+						<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet. Deploy from GitHub below, or run <span class="font-mono text-foreground">ops deploy { app.Name }</span> in its repo.</p>
 					</div>
 				}
 			</div>
@@ -511,7 +511,7 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 	}) {
 		if len(deploys) == 0 {
 			<div class="px-3">
-				@emptyHint("No deploys yet. Run this in the repo of "+app.Name+":", "ops deploy "+app.Name)
+				@emptyHint("No deploys yet. Deploy from GitHub below, or run this in the repo of "+app.Name+":", "ops deploy "+app.Name)
 			</div>
 		} else {
 			<ol class="flex flex-col gap-1" role="list">

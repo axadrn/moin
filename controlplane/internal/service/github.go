@@ -144,19 +144,46 @@ func (g *GitHub) token(ctx context.Context, installationID int64) (string, error
 	return answer.Token, nil
 }
 
-// Installation returns the account an installation belongs to.
-func (g *GitHub) Installation(ctx context.Context, installationID int64) (string, error) {
+// Installation returns the account an installation belongs to and the page
+// on github.com where its owner chooses the repos.
+func (g *GitHub) Installation(ctx context.Context, installationID int64) (account, settingsURL string, err error) {
 	jwt, err := g.jwt()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	var answer struct {
 		Account struct {
 			Login string `json:"login"`
 		} `json:"account"`
+		HTMLURL string `json:"html_url"`
 	}
 	err = g.call(ctx, http.MethodGet, "/app/installations/"+strconv.FormatInt(installationID, 10), "Bearer "+jwt, nil, &answer)
-	return answer.Account.Login, err
+	return answer.Account.Login, answer.HTMLURL, err
+}
+
+// Branches lists the branch names of a repo.
+func (g *GitHub) Branches(ctx context.Context, installationID int64, repo string) ([]string, error) {
+	token, err := g.token(ctx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	branches := []string{}
+	for page := 1; page <= 10; page++ {
+		var answer []struct {
+			Name string `json:"name"`
+		}
+		err = g.call(ctx, http.MethodGet, "/repos/"+repo+"/branches?per_page=100&page="+strconv.Itoa(page), "token "+token, nil, &answer)
+		if err != nil {
+			return nil, err
+		}
+		for _, branch := range answer {
+			branches = append(branches, branch.Name)
+		}
+		if len(answer) < 100 {
+			break
+		}
+	}
+	return branches, nil
 }
 
 // Repos lists the repos an installation may read.

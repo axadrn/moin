@@ -78,7 +78,8 @@ Domains
 
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
-  github repos       Repos ops may read
+  github repos       Repos ops may read, and where to give it more
+  github branches    Branches of a repo: github branches owner/name
   link               Follow a repo: link owner/name [--branch main] [--auto=false]
   unlink             Stop following it: unlink [app] [--yes]
 

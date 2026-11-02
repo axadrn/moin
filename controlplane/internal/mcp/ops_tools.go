@@ -177,8 +177,11 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Returns where the ops GitHub App is installed and the link that installs it on another account; installing happens on github.com. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getGitHub)))
 	mcpsdk.AddTool(server, add("list_repos", "List GitHub repos",
-		"Lists the repos the ops GitHub App may read. Needs the read scope.",
+		"Lists the repos the ops GitHub App may read, and where on github.com the user gives it access to another repo. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRepos)))
+	mcpsdk.AddTool(server, add("list_branches", "List branches",
+		"Lists the branches of a repo the ops GitHub App may read, the default branch first. Needs the read scope.",
+		readOnly("")), Read(member(services, tools.listBranches)))
 	mcpsdk.AddTool(server, add("link_repo", "Link a repo",
 		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.linkRepo)))
@@ -337,9 +340,32 @@ type GitHub struct {
 	api.GitHub
 }
 
-// Repos is the output of list_repos.
+// Repos is the output of list_repos. Access says where on GitHub the user
+// gives ops a repo it does not see yet.
 type Repos struct {
 	api.GitHubRepos
+	Access string `json:"access"`
+}
+
+func (r Repos) Summary() string {
+	names := make([]string, 0, len(r.Items))
+	for _, repo := range r.Items {
+		names = append(names, repo.FullName)
+	}
+	if len(names) == 0 {
+		return "ops may read no repo yet. " + r.Access
+	}
+	return "ops may read " + strings.Join(names, ", ") + ". " + r.Access
+}
+
+// BranchesInput is the input of list_branches.
+type BranchesInput struct {
+	Repo string `json:"repo" jsonschema:"owner/name on GitHub"`
+}
+
+// Branches is the output of list_branches.
+type Branches struct {
+	api.GitHubBranches
 }
 
 // IntegrationsInput is the input of set_integrations.
@@ -1069,7 +1095,7 @@ func (t opsTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHu
 		return GitHub{}, err
 	}
 	for _, installation := range installations {
-		answer.Installations = append(answer.Installations, api.GitHubInstallation{ID: installation.InstallationID, Account: installation.Account})
+		answer.Installations = append(answer.Installations, api.GitHubInstallation{ID: installation.InstallationID, Account: installation.Account, SettingsURL: cmp.Or(installation.SettingsURL, link)})
 	}
 	return GitHub{answer}, nil
 }
@@ -1083,7 +1109,30 @@ func (t opsTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Rep
 	for _, repo := range repos {
 		answer.Items = append(answer.Items, api.GitHubRepo{FullName: repo.FullName, DefaultBranch: repo.DefaultBranch, Private: repo.Private, Account: repo.Account})
 	}
-	return Repos{answer}, nil
+	github, err := t.getGitHub(ctx, caller, struct{}{})
+	if err != nil {
+		return Repos{}, err
+	}
+	links := []string{}
+	for _, installation := range github.Installations {
+		links = append(links, installation.Account+": "+installation.SettingsURL)
+	}
+	access := "Don't see a repo? The user gives ops access to it on GitHub"
+	if len(links) > 0 {
+		access += ", " + strings.Join(links, "; ")
+	}
+	if github.InstallURL != "" {
+		access += ". Another account or organization: " + github.InstallURL
+	}
+	return Repos{answer, access + "."}, nil
+}
+
+func (t opsTools) listBranches(ctx context.Context, caller Caller, input BranchesInput) (Branches, error) {
+	branches, err := t.services.Apps.GitHubBranches(ctx, caller.Token.WorkspaceID, input.Repo)
+	if err != nil {
+		return Branches{}, err
+	}
+	return Branches{api.GitHubBranches{Items: branches}}, nil
 }
 
 func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) (App, error) {

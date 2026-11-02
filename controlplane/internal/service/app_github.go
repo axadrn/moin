@@ -63,11 +63,11 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", ErrGitHubState
 	}
 	actor.WorkspaceID = parts[0]
-	account, err := s.github.Installation(ctx, installationID)
+	account, settingsURL, err := s.github.Installation(ctx, installationID)
 	if err != nil {
 		return "", err
 	}
-	err = s.apps.AddGitHubInstallation(model.GitHubInstallation{InstallationID: installationID, WorkspaceID: actor.WorkspaceID, Account: account, CreatedAt: s.now().UTC()})
+	err = s.apps.AddGitHubInstallation(model.GitHubInstallation{InstallationID: installationID, WorkspaceID: actor.WorkspaceID, Account: account, CreatedAt: s.now().UTC(), SettingsURL: settingsURL})
 	if err != nil {
 		return "", err
 	}
@@ -104,6 +104,45 @@ func (s *AppService) GitHubRepos(ctx context.Context, workspaceID string) ([]Git
 	return repos, nil
 }
 
+// GitHubBranches lists the branches of a repo the workspace's installations
+// may read, with its default branch first.
+func (s *AppService) GitHubBranches(ctx context.Context, workspaceID, repo string) ([]string, error) {
+	found, err := s.gitHubRepo(ctx, workspaceID, repo)
+	if err != nil {
+		return nil, err
+	}
+	branches, err := s.github.Branches(ctx, found.InstallationID, found.FullName)
+	if err != nil {
+		return nil, err
+	}
+	sorted := []string{found.DefaultBranch}
+	for _, branch := range branches {
+		if branch != found.DefaultBranch {
+			sorted = append(sorted, branch)
+		}
+	}
+	return sorted, nil
+}
+
+// gitHubRepo finds a repo the workspace's installations may read.
+func (s *AppService) gitHubRepo(ctx context.Context, workspaceID, repo string) (GitHubRepoOf, error) {
+	repo = strings.Trim(strings.TrimPrefix(strings.TrimSpace(repo), "https://github.com/"), "/")
+	repo = strings.TrimSuffix(repo, ".git")
+	if !repoPattern.MatchString(repo) {
+		return GitHubRepoOf{}, ErrRepoName
+	}
+	repos, err := s.GitHubRepos(ctx, workspaceID)
+	if err != nil {
+		return GitHubRepoOf{}, err
+	}
+	for _, found := range repos {
+		if strings.EqualFold(found.FullName, repo) {
+			return found, nil
+		}
+	}
+	return GitHubRepoOf{}, ErrRepo
+}
+
 // LinkRepo makes an app follow a repo and branch. An empty branch is the
 // repo's default branch.
 func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy bool) (*model.App, error) {
@@ -111,32 +150,21 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	if err != nil {
 		return nil, err
 	}
-	repo = strings.Trim(strings.TrimPrefix(strings.TrimSpace(repo), "https://github.com/"), "/")
-	repo = strings.TrimSuffix(repo, ".git")
-	if !repoPattern.MatchString(repo) {
-		return nil, ErrRepoName
-	}
-	repos, err := s.GitHubRepos(ctx, actor.WorkspaceID)
+	found, err := s.gitHubRepo(ctx, actor.WorkspaceID, repo)
 	if err != nil {
 		return nil, err
 	}
-	for _, found := range repos {
-		if !strings.EqualFold(found.FullName, repo) {
-			continue
-		}
-		branch = strings.TrimSpace(branch)
-		if branch == "" {
-			branch = found.DefaultBranch
-		}
-		err = s.apps.SetRepo(app.ID, found.FullName, branch, autoDeploy, found.InstallationID)
-		if err != nil {
-			return nil, err
-		}
-		s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
-		s.notify(actor.WorkspaceID)
-		return s.apps.ByID(app.ID)
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		branch = found.DefaultBranch
 	}
-	return nil, ErrRepo
+	err = s.apps.SetRepo(app.ID, found.FullName, branch, autoDeploy, found.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
+	s.notify(actor.WorkspaceID)
+	return s.apps.ByID(app.ID)
 }
 
 // UnlinkRepo stops an app from following its repo.

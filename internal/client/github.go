@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // GitHub is where the ops GitHub App is installed.
@@ -10,8 +12,9 @@ type GitHub struct {
 	Enabled       bool   `json:"enabled"`
 	InstallURL    string `json:"install_url"`
 	Installations []struct {
-		ID      int64  `json:"id"`
-		Account string `json:"account"`
+		ID          int64  `json:"id"`
+		Account     string `json:"account"`
+		SettingsURL string `json:"settings_url"`
 	} `json:"installations"`
 }
 
@@ -36,6 +39,17 @@ func (c *Client) GitHubRepos(ctx context.Context) ([]GitHubRepo, error) {
 		Items []GitHubRepo `json:"items"`
 	}
 	err := c.do(ctx, http.MethodGet, "/api/v1/github/repos", nil, &answer)
+	return answer.Items, err
+}
+
+// GitHubBranches lists the branches of a repo, owner/name, the default
+// branch first.
+func (c *Client) GitHubBranches(ctx context.Context, repo string) ([]string, error) {
+	owner, name, _ := strings.Cut(repo, "/")
+	var answer struct {
+		Items []string `json:"items"`
+	}
+	err := c.do(ctx, http.MethodGet, "/api/v1/github/repos/"+url.PathEscape(owner)+"/"+url.PathEscape(name)+"/branches", nil, &answer)
 	return answer.Items, err
 }
 

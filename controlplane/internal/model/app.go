@@ -112,4 +112,7 @@ type GitHubInstallation struct {
 	WorkspaceID    string    `db:"workspace_id"`
 	Account        string    `db:"account"`
 	CreatedAt      time.Time `db:"created_at"`
+	// SettingsURL is the page on github.com where its owner chooses the
+	// repos ops may read; empty for installations stored before ops kept it.
+	SettingsURL string `db:"settings_url"`
 }

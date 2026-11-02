@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"errors"
 	"net/http"
 
@@ -20,6 +21,13 @@ type GitHub struct {
 type GitHubInstallation struct {
 	ID      int64  `json:"id"`
 	Account string `json:"account"`
+	// SettingsURL is where the account chooses the repos ops may read.
+	SettingsURL string `json:"settings_url"`
+}
+
+// GitHubBranches is the answer of GET /api/v1/github/repos/{owner}/{repo}/branches.
+type GitHubBranches struct {
+	Items []string `json:"items"`
 }
 
 // GitHubRepos is the answer of GET /api/v1/github/repos.
@@ -58,7 +66,7 @@ func (h *AppsHandler) GetGitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, installation := range installations {
-		answer.Installations = append(answer.Installations, GitHubInstallation{ID: installation.InstallationID, Account: installation.Account})
+		answer.Installations = append(answer.Installations, GitHubInstallation{ID: installation.InstallationID, Account: installation.Account, SettingsURL: cmp.Or(installation.SettingsURL, link)})
 	}
 	JSON(w, http.StatusOK, answer)
 }
@@ -76,6 +84,17 @@ func (h *AppsHandler) GetGitHubRepos(w http.ResponseWriter, r *http.Request) {
 		answer.Items = append(answer.Items, GitHubRepo{FullName: repo.FullName, DefaultBranch: repo.DefaultBranch, Private: repo.Private, Account: repo.Account})
 	}
 	JSON(w, http.StatusOK, answer)
+}
+
+// GetGitHubBranches lists the branches of a repo, the default branch first.
+func (h *AppsHandler) GetGitHubBranches(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	branches, err := h.apps.GitHubBranches(r.Context(), workspace.ID, r.PathValue("owner")+"/"+r.PathValue("repo"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, GitHubBranches{Items: branches})
 }
 
 // SetRepo makes the app follow a repo and branch.

@@ -14,14 +14,34 @@ import (
 
 // github shows where the ops GitHub App is installed and its repos.
 func github(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("github", "github, or github repos")
+	flags := newFlags("github", "github, github repos, or github branches owner/name")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "repos") {
+	wrong := flags.NArg() > 2 || (flags.NArg() >= 1 && flags.Arg(0) != "repos" && flags.Arg(0) != "branches") ||
+		(flags.Arg(0) == "repos" && flags.NArg() != 1) || (flags.Arg(0) == "branches" && flags.NArg() != 2)
+	if wrong {
 		return flags.wrong()
 	}
 	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	if flags.Arg(0) == "branches" {
+		branches, err := api.GitHubBranches(ctx, flags.Arg(1))
+		if err != nil {
+			return err
+		}
+		for index, branch := range branches {
+			if index == 0 {
+				branch += style.Muted.Render("  default")
+			}
+			fmt.Fprintln(stdout, branch)
+		}
+		hint(stdout, "Deploy one with", build.Name+" link "+flags.Arg(1)+" --branch <branch>, then "+build.Name+" deploy --ref <branch>")
+		return nil
+	}
+	answer, err := api.GitHub(ctx)
 	if err != nil {
 		return err
 	}
@@ -38,12 +58,20 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 			}
 			rows = append(rows, []string{repo.FullName, repo.DefaultBranch, visibility})
 		}
-		table(stdout, []string{"REPO", "DEFAULT BRANCH", "VISIBILITY"}, rows)
+		if len(rows) == 0 {
+			fmt.Fprintln(stdout, build.Name+" may read no repo yet.")
+		} else {
+			table(stdout, []string{"REPO", "DEFAULT BRANCH", "VISIBILITY"}, rows)
+		}
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, style.Muted.Render("Don't see your repo? Give "+build.Name+" access to it on GitHub:"))
+		for _, installation := range answer.Installations {
+			fmt.Fprintln(stdout, "  "+installation.Account+"  "+style.Bold.Render(installation.SettingsURL))
+		}
+		if answer.InstallURL != "" {
+			fmt.Fprintln(stdout, "  "+style.Muted.Render("another account or organization")+"  "+style.Bold.Render(answer.InstallURL))
+		}
 		return nil
-	}
-	answer, err := api.GitHub(ctx)
-	if err != nil {
-		return err
 	}
 	if !answer.Enabled {
 		return errors.New("this control plane has no GitHub App")
@@ -88,9 +116,11 @@ func link(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	done(stdout, "%s follows %s@%s", app.Name, app.Repo, app.Branch)
+	lead := "Deploy it now with"
 	if app.AutoDeploy {
-		fmt.Fprintln(stdout, style.Muted.Render("  every push to "+app.Branch+" deploys; deploy now with ")+style.Bold.Render(build.Name+" deploy --ref "+app.Branch))
+		lead = "Every push to " + app.Branch + " deploys. Deploy it now with"
 	}
+	hint(stdout, lead, build.Name+" deploy --ref "+app.Branch+" --app "+app.Name)
 	return nil
 }
 
