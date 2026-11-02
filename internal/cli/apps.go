@@ -82,7 +82,7 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		if err != nil {
 			return err
 		}
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name))
+		err = confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name), name)
 		if err != nil {
 			return err
 		}
@@ -294,8 +294,8 @@ func appAndNumber(flags *flagSet) (string, int, error) {
 	return name, number, err
 }
 
-func rollback(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("rollback", "rollback [--app <app>] [app] [v<number>]").withApp()
+func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("rollback", "rollback [--app <app>] [app] [v<number>] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -307,6 +307,14 @@ func rollback(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	target := "the deploy before the live one"
+	if number != 0 {
+		target = fmt.Sprintf("v%d", number)
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Roll %s back to %s? It replaces the live release.", name, target))
 	if err != nil {
 		return err
 	}
@@ -447,20 +455,28 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 // hook gives the app a new deploy hook URL for CI. It asks first: the old
 // URL stops working.
 func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("hook", "hook [app] [--yes]").withApp().withYes()
+	flags := newFlags("hook", "hook [app] [--yes], or hook off [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() > 1 {
+	off := flags.Arg(0) == "off"
+	argument := flags.Arg(0)
+	if off {
+		argument = flags.Arg(1)
+	}
+	if flags.NArg() > 2 || (!off && flags.NArg() > 1) {
 		return flags.wrong()
 	}
-	name, err := flags.app(flags.Arg(0))
+	name, err := flags.app(argument)
 	if err != nil {
 		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
+	}
+	if off {
+		return hookOff(ctx, api, name, stdin, stdout, flags.yes())
 	}
 	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
 	if err != nil {
@@ -473,6 +489,28 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	done(stdout, "New deploy hook for %s. It is shown once; the old one stops working:", name)
 	fmt.Fprintf(stdout, "\n  %s\n\n", url)
 	hint(stdout, "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/`+name+`:$GITHUB_SHA"`)
+	return nil
+}
+
+// hookOff turns the deploy hook of an app off after asking.
+func hookOff(ctx context.Context, api *client.Client, name string, stdin io.Reader, stdout io.Writer, yes bool) error {
+	detail, err := api.App(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !detail.App.Hook {
+		done(stdout, "Nothing changed: %s has no deploy hook.", name)
+		return nil
+	}
+	err = confirm(stdin, stdout, yes, fmt.Sprintf("Turn off the deploy hook of %s? CI can no longer deploy it.", name))
+	if err != nil {
+		return err
+	}
+	err = api.RemoveDeployHook(ctx, name)
+	if err != nil {
+		return err
+	}
+	done(stdout, "Turned off the deploy hook of %s. Its URL no longer works.", name)
 	return nil
 }
 

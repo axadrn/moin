@@ -64,7 +64,11 @@ func frames() map[string]model {
 	add("servers-added", func(m *model) {
 		m.added = &client.NewServer{Server: client.Server{Name: "tui-1"}, InstallCommand: "curl -fsSL https://ops.goilerplate.com/install.sh | sudo sh -s -- ins_4k2j9x0c8v7b6n5m4l3k2j1h0g9f8d7s"}
 	})
-	add("servers-remove", func(m *model) { m.mode, m.selected = modeConfirmRemove, 2 })
+	add("servers-remove", func(m *model) {
+		m.selected = 2
+		m.confirm = confirmation{question: "Remove " + servers[2].Name + "?", detail: "Its agent is disconnected.", name: servers[2].Name, danger: true}
+		m.mode, m.input = modeConfirmName, "web"
+	})
 	add("servers-offline", func(m *model) { m.offline = errors.New("eof") })
 	add("apps", func(m *model) { m.tab = tabApps; m.notice = "v42 of hello is live" })
 	add("activity", func(m *model) {
@@ -129,7 +133,8 @@ func frames() map[string]model {
 		m.mode, m.input = modeBackups, "14:0"
 	})
 	add("detail-restore", func(m *model) {
-		m.tab, m.detail, m.mode, m.pendingRestore = tabApps, detail, modeConfirmRestore, "20261031T143638Z-manual"
+		m.tab, m.detail, m.mode = tabApps, detail, modeConfirmName
+		m.confirm = confirmation{question: "Restore hello to 20261031T143638Z-manual?", detail: "It replaces the data there now.", name: "hello", danger: true}
 	})
 	add("detail-sql-write", func(m *model) {
 		m.tab, m.detail, m.mode = tabApps, detail, modeConfirmWrite

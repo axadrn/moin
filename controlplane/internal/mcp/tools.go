@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/api"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -66,6 +67,18 @@ func registerTools(server *mcpsdk.Server, services Services) {
 		Description: "Changes the display name of a workspace (2 to 80 characters). The slug and every link stay the same. Only owners and admins may rename. Needs a token with read and write access.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Rename a workspace", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, Write(tools.renameWorkspace))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "resend_invitation",
+		Title:       "Send an invitation again",
+		Description: "Sends the email of a pending invitation again, with a new link that works for seven days; the old link stops working. Name the invitation by its email or its ID from get_workspace. Only owners and admins may resend. Needs a token with read and write access.",
+		Annotations: &mcpsdk.ToolAnnotations{Title: "Send an invitation again", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
+	}, Write(tools.resendInvitation))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "revoke_invitation",
+		Title:       "Revoke an invitation",
+		Description: "Takes back a pending invitation; the link in the email stops working. Name it by its email or its ID from get_workspace. Only owners and admins may revoke. Needs a token with read and write access.",
+		Annotations: &mcpsdk.ToolAnnotations{Title: "Revoke an invitation", DestructiveHint: boolPointer(true), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
+	}, Write(tools.revokeInvitation))
 	registerOpsTools(server, services)
 }
 
@@ -327,6 +340,76 @@ func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input Re
 		return RenamedWorkspace{}, err
 	}
 	return RenamedWorkspace{Workspace: api.NewWorkspace(updated)}, nil
+}
+
+// InvitationInput names a pending invitation.
+type InvitationInput struct {
+	Workspace  string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Invitation string `json:"invitation" jsonschema:"the email the invitation went to, or its ID from get_workspace"`
+}
+
+// InvitationChange is the output of resend_invitation and revoke_invitation.
+type InvitationChange struct {
+	Email   string `json:"email"`
+	Revoked bool   `json:"revoked"`
+}
+
+func (c InvitationChange) Summary() string {
+	if c.Revoked {
+		return fmt.Sprintf("Revoked the invitation of %s. The link in the email no longer works.", c.Email)
+	}
+	return fmt.Sprintf("Sent the invitation to %s again. Only the new link works.", c.Email)
+}
+
+func (t builtinTools) resendInvitation(_ context.Context, caller Caller, input InvitationInput) (InvitationChange, error) {
+	workspace, member, invitation, err := t.invitation(caller, input)
+	if err != nil {
+		return InvitationChange{}, err
+	}
+	// A resend sends email, so it draws from the budget of invite_member.
+	if !t.services.Invitations.Allow(member.WorkspaceID + ":" + member.UserID) {
+		return InvitationChange{}, &ToolError{Code: "rate_limited", Message: "Too many invitations. Try again in an hour."}
+	}
+	err = t.services.Workspaces.ResendInvitation(member, workspace, invitation.ID, "mcp")
+	if err != nil {
+		return InvitationChange{}, err
+	}
+	return InvitationChange{Email: invitation.Email}, nil
+}
+
+func (t builtinTools) revokeInvitation(_ context.Context, caller Caller, input InvitationInput) (InvitationChange, error) {
+	workspace, member, invitation, err := t.invitation(caller, input)
+	if err != nil {
+		return InvitationChange{}, err
+	}
+	err = t.services.Workspaces.RevokeInvitation(member, workspace.ID, invitation.ID, "mcp")
+	if err != nil {
+		return InvitationChange{}, err
+	}
+	return InvitationChange{Email: invitation.Email, Revoked: true}, nil
+}
+
+// invitation finds a pending invitation by email or ID. Only members who
+// may manage members get that far, so nobody else learns who is invited.
+func (t builtinTools) invitation(caller Caller, input InvitationInput) (*model.Workspace, *model.WorkspaceMember, model.WorkspaceInvitation, error) {
+	workspace, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return nil, nil, model.WorkspaceInvitation{}, err
+	}
+	if !member.Can(model.WorkspacePermissionManageMembers) {
+		return nil, nil, model.WorkspaceInvitation{}, service.ErrWorkspacePermission
+	}
+	invitations, err := t.services.Workspaces.PendingInvitations(workspace.ID)
+	if err != nil {
+		return nil, nil, model.WorkspaceInvitation{}, err
+	}
+	wanted := strings.TrimSpace(input.Invitation)
+	for _, invitation := range invitations {
+		if invitation.ID == wanted || strings.EqualFold(invitation.Email, wanted) {
+			return workspace, member, invitation, nil
+		}
+	}
+	return nil, nil, model.WorkspaceInvitation{}, repository.ErrWorkspaceInvitationNotFound
 }
 
 // boundMembership returns the workspace the token is bound to with the

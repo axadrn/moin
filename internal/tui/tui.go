@@ -113,7 +113,6 @@ type mode int
 const (
 	modeList mode = iota
 	modeAdd
-	modeConfirmRemove
 	modeConfirmStop
 	modeConfirmRollback
 	modeEnv
@@ -123,12 +122,14 @@ const (
 	modeSQL
 	modeConfirmWrite
 	modeBackups
-	modeConfirmRestore
 	modeConfirmSecurity
 	// modeForm asks the fields of m.form one after the other.
 	modeForm
 	// modeConfirm waits for a yes to m.confirm.
 	modeConfirm
+	// modeConfirmName waits for the name m.confirm asks for, typed out,
+	// before something big that cannot be undone.
+	modeConfirmName
 	modeGitHub
 )
 
@@ -154,7 +155,9 @@ type formField struct {
 // back to the mode it came from either way.
 type confirmation struct {
 	question, detail, verb string
-	danger                 bool
+	// name is what modeConfirmName wants typed.
+	name   string
+	danger bool
 	back                   mode
 	run                    tea.Cmd
 }
@@ -197,8 +200,6 @@ type model struct {
 	removed  *removedServer
 	// pendingSQL is a query that changes data, waiting for a yes.
 	pendingSQL string
-	// pendingRestore is a snapshot ID or a time, waiting for a yes.
-	pendingRestore string
 	// pendingSecurity is a change of a server's access, waiting for a yes.
 	pendingSecurity securityChange
 	// pendingRollback is the deploy a rollback goes to, 0 for the one
@@ -370,19 +371,6 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.input += msg.Text
 		}
 		return m, nil
-	case modeConfirmRemove:
-		m.mode = modeList
-		if key != "y" {
-			return m, nil
-		}
-		if m.tab == tabServers && m.selected < len(m.servers) {
-			return m, m.removeServer(m.servers[m.selected].ID, m.servers[m.selected].Name)
-		}
-		if app, ok := m.currentApp(); m.tab == tabApps && ok {
-			m.detail = nil
-			return m, m.removeApp(app.Name)
-		}
-		return m, nil
 	case modeConfirmStop:
 		m.mode = modeList
 		if app, ok := m.currentApp(); key == "y" && ok {
@@ -408,6 +396,9 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.envShown = input == "show"
 				return m, m.showEnv(app.Name, m.envShown)
 			}
+			if key, ok := strings.CutPrefix(input, "-"); ok {
+				return m.confirmFirst("Remove "+key+" from "+app.Name+"?", "The next deploy or restart drops it.", "remove", true, m.changeEnv(app.Name, input, m.envShown)), nil
+			}
 			return m, m.changeEnv(app.Name, input, m.envShown)
 		case "backspace":
 			m.input = dropLast(m.input)
@@ -424,8 +415,14 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			input := strings.TrimSpace(m.input)
 			mode := m.mode
 			m.mode, m.input = modeList, ""
+			if domain, ok := strings.CutPrefix(input, "-"); ok && mode == modeDomains {
+				return m.confirmFirst("Remove "+domain+" from "+app.Name+"?", "Visitors there stop reaching it.", "remove", true, m.changeDomains(app, input)), nil
+			}
 			if mode == modeDomains {
 				return m, m.changeDomains(app, input)
+			}
+			if input == "off" && app.Protected {
+				return m.confirmFirst("Take the password away from "+app.Name+"?", "Anyone with the link can open it again.", "remove", true, m.changeProtect(app.Name, input)), nil
 			}
 			return m, m.changeProtect(app.Name, input)
 		case "backspace":
@@ -465,17 +462,11 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if target == "on" || target == "off" {
 				return m, m.setSnapshots(app.Name, target == "on")
 			}
-			m.mode, m.pendingRestore = modeConfirmRestore, target
+			return m.confirmName("Restore "+app.Name+" to "+target+"?", "It replaces the data there now; "+build.Name+" takes a snapshot of it first.", app.Name, m.restore(app.Name, target)), nil
 		case "backspace":
 			m.input = dropLast(m.input)
 		default:
 			m.input += msg.Text
-		}
-		return m, nil
-	case modeConfirmRestore:
-		m.mode = modeBackups
-		if app, ok := m.currentApp(); key == "y" && ok {
-			return m, m.restore(app.Name, m.pendingRestore)
 		}
 		return m, nil
 	case modeConfirmSecurity:
@@ -488,6 +479,24 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode = m.confirm.back
 		if key == "y" {
 			return m, m.confirm.run
+		}
+		return m, nil
+	case modeConfirmName:
+		switch key {
+		case "esc":
+			m.mode, m.input = m.confirm.back, ""
+		case "enter":
+			typed := strings.TrimSpace(m.input)
+			m.mode, m.input = m.confirm.back, ""
+			if typed != m.confirm.name {
+				m.err = fmt.Errorf("that is not %s; nothing changed", m.confirm.name)
+				return m, nil
+			}
+			return m, m.confirm.run
+		case "backspace":
+			m.input = dropLast(m.input)
+		default:
+			m.input += msg.Text
 		}
 		return m, nil
 	case modeForm:
@@ -628,10 +637,18 @@ func (m model) confirmFirst(question, detail, verb string, danger bool, run tea.
 	return m
 }
 
+// confirmName asks for name, typed out, before run: for removing a server,
+// an app or the bucket and for a restore.
+func (m model) confirmName(question, detail, name string, run tea.Cmd) model {
+	m.confirm = confirmation{question: question, detail: detail, name: name, danger: true, back: m.mode, run: run}
+	m.mode, m.input = modeConfirmName, ""
+	return m
+}
+
 // typing reports whether the footer holds a text input.
 func (m model) typing() bool {
 	switch m.mode {
-	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub:
+	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub, modeConfirmName:
 		return true
 	}
 	return false
@@ -660,8 +677,9 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 	case "a":
 		m.mode, m.added, m.removed = modeAdd, nil, nil
 	case "x":
-		if len(m.servers) > 0 {
-			m.mode = modeConfirmRemove
+		if m.selected < len(m.servers) {
+			server := m.servers[m.selected]
+			return m.confirmName("Remove "+server.Name+"?", "Its agent is disconnected; the agent stays on the machine until you uninstall it.", server.Name, m.removeServer(server.ID, server.Name)), nil
 		}
 	case "u":
 		if m.selected < len(m.servers) {
@@ -817,6 +835,16 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.mode, m.input = modeImage, ""
 		}
+	case "H":
+		if ok && app.Hook {
+			name := app.Name
+			return m.confirmFirst("Turn off the deploy hook of "+name+"?", "Its URL stops working; CI can no longer deploy it.", "turn off", true, func() tea.Msg {
+				if err := m.api.RemoveDeployHook(m.ctx, name); err != nil {
+					return errMsg{err}
+				}
+				return noticeMsg("Turned off the deploy hook of " + name)
+			}), nil
+		}
 	case "h":
 		if ok {
 			return m.confirmFirst("Make a new deploy hook for "+app.Name+"?", "The old one stops working.", "replace", true, m.newHook(app.Name)), nil
@@ -847,7 +875,8 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		if ok {
-			m.mode = modeConfirmRemove
+			m.detail = nil
+			return m.confirmName("Remove "+app.Name+"?", "Its containers stop and go; its data stays on the server.", app.Name, m.removeApp(app.Name)), nil
 		}
 	}
 	return m, nil

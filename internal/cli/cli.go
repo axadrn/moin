@@ -35,13 +35,16 @@ Account
   activity           Who deployed, restored or changed what: activity [--limit 30]
   team               Members and open invitations of your workspace
   team invite        Invite someone: team invite ada@example.com [--admin]
+  team resend        Send an invitation again: team resend ada@example.com
+  team revoke        Take an invitation back: team revoke ada@example.com [--yes]
+  team rename        Rename the workspace: team rename "Acme Inc"
 
 Servers
   servers            List servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
   servers update     Update the agent to the control plane's version: servers update [web-1]
-  servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]
+  servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for ops, from /etc/ops/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
   integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
@@ -60,7 +63,7 @@ Deploys
   stop               Take the app offline; its data stays: stop [app] [--yes]
   start              Run a stopped app again: start [app]
   deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
-  rollback           Start an earlier release again: rollback [app] [v<number>]
+  rollback           Start an earlier release again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
 
 Domains
@@ -69,7 +72,7 @@ Domains
   domains rm         Remove domains: domains rm www.blog.de [--yes]
   domains canonical  Redirect the others to one: domains canonical blog.de|none
   protect            Ask for a password: protect [--user ops], password on stdin
-  protect off        Make the app public again: protect off [app]
+  protect off        Make the app public again: protect off [app] [--yes]
 
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
@@ -79,6 +82,7 @@ GitHub
 
 CI
   hook               New deploy hook URL for CI: hook [app] [--yes]
+  hook off           Turn the deploy hook off; CI can no longer deploy: hook off [app] [--yes]
   registry           List registry logins for private images
   registry set       Save a login: registry set <host> <username>
   registry rm        Remove a login: registry rm <host> [--yes]
@@ -194,7 +198,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "activity":
 		return activity(ctx, rest, stdout)
 	case "team":
-		return team(ctx, rest, stdout)
+		return team(ctx, rest, stdin, stdout)
 	case "servers":
 		return servers(ctx, rest, stdin, stdout)
 	case "apps":
@@ -204,7 +208,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "deploys":
 		return deploys(ctx, rest, stdout)
 	case "rollback":
-		return rollback(ctx, rest, stdout)
+		return rollback(ctx, rest, stdin, stdout)
 	case "redeploy":
 		return redeploy(ctx, rest, stdout)
 	case "logs":
@@ -399,7 +403,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		hint(stdout, "It shows online in", build.Name+" servers")
 		return nil
 	case "secure":
-		return secure(ctx, args, stdout)
+		return secure(ctx, args, stdin, stdout)
 	case "rules":
 		flags := newFlags("servers rules", "servers rules <server>")
 		if err := flags.parse(args); err != nil {
@@ -426,7 +430,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			return flags.wrong()
 		}
 		name := flags.Arg(0)
-		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name))
+		err := confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
 		if err != nil {
 			return err
 		}

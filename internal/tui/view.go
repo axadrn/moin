@@ -435,8 +435,8 @@ func (m model) prompt() ([]string, [][2]string) {
 			color = style.Danger
 		}
 		return bar(color, style.Bold.Render(m.confirm.question), m.confirm.detail), [][2]string{{"y", m.confirm.verb}, cancel}
-	case modeConfirmRestore:
-		return bar(style.Warning, style.Bold.Render("Restore "+m.pendingRestore+"?"), build.Name+" takes a snapshot of the current state first."), [][2]string{{"y", "restore"}, cancel}
+	case modeConfirmName:
+		return bar(style.Danger, style.Bold.Render(m.confirm.question)+" "+m.confirm.detail, "Type "+m.confirm.name+" to confirm: "+m.input+cursor), [][2]string{{"enter", "confirm"}, {"esc", "cancel"}}
 	case modeConfirmWrite:
 		return bar(style.Warning, style.Bold.Render("This query changes data. Run it?"), m.pendingSQL), [][2]string{{"y", "run"}, cancel}
 	case modeDomains:
@@ -447,14 +447,6 @@ func (m model) prompt() ([]string, [][2]string) {
 			masked = user + ":" + strings.Repeat("•", len([]rune(password)))
 		}
 		return bar(style.Accent, style.Bold.Render("Protect: ")+masked+cursor), [][2]string{{"user:password", "protect"}, {"off", "public"}, {"esc", "cancel"}}
-	case modeConfirmRemove:
-		question, detail := "", ""
-		if m.tab == tabServers && m.selected < len(m.servers) {
-			question, detail = "Remove "+m.servers[m.selected].Name+"?", "Its agent is disconnected."
-		} else if app, ok := m.currentApp(); ok {
-			question, detail = "Remove "+app.Name+"?", "Its containers stop, its data stays on the server."
-		}
-		return bar(style.Danger, style.Bold.Render(question), detail), [][2]string{{"y", "remove"}, cancel}
 	case modeConfirmSecurity:
 		return bar(style.Warning, style.Bold.Render(m.pendingSecurity.question), m.pendingSecurity.detail), [][2]string{{"y", "apply"}, cancel}
 	case modeConfirmStop:
@@ -483,7 +475,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	if app, ok := m.currentApp(); ok && app.Stopped {
 		power = [2]string{"S", "start"}
 	}
-	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, rollback, {"x", "remove"}}...)
+	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"H", "hook off"}, rollback, {"x", "remove"}}...)
 	switch {
 	case m.tab == tabServers && (m.added != nil || m.removed != nil):
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}

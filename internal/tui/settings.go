@@ -194,7 +194,7 @@ func (m model) removeSetting(row settingRow) model {
 	blank := ""
 	switch row.kind {
 	case "bucket":
-		return m.confirmFirst("Stop backups?", "The bucket keeps what is in it.", "stop", true, m.done(func() error { return m.api.RemoveBackupStorage(m.ctx) }, "Backups stopped; the bucket keeps what is in it"))
+		return m.confirmName("Stop backups?", "The bucket keeps what is in it.", m.settings.storage.Bucket, m.done(func() error { return m.api.RemoveBackupStorage(m.ctx) }, "Backups stopped; the bucket keeps what is in it"))
 	case "cloudflare":
 		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it ops cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
 	case "tailscale":

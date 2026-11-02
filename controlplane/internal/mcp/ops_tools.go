@@ -63,7 +63,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Adds a server and returns its one-time install command. The user runs it as root on the machine within an hour; the agent then connects. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.addServer)))
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
-		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it; the apps there keep running with their data unless it gets --apps. Needs a token with read and write access.",
+		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
@@ -78,14 +78,14 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Creates an app on a server. Deploys come from `ops deploy` in the repo, which can also create the app. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, add("remove_app", "Remove an app",
-		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Needs a token with read and write access.",
+		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeApp)))
 	mcpsdk.AddTool(server, add("get_deploy", "Get a deploy",
 		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getDeploy)))
 	mcpsdk.AddTool(server, add("rollback_app", "Roll back an app",
-		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.rollback)))
+		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. It replaces the live release, so ask the user first. Needs a token with read and write access.",
+		change(true, false)), Write(changes(services, tools.rollback)))
 	mcpsdk.AddTool(server, add("redeploy_app", "Redeploy an app",
 		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.redeploy)))
@@ -95,6 +95,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("create_deploy_hook", "Create a deploy hook",
 		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. CI calls POST <url> with {\"image\": \"...\"}. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.createDeployHook)))
+	mcpsdk.AddTool(server, add("remove_deploy_hook", "Turn the deploy hook off",
+		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes. Needs a token with read and write access.",
+		change(true, true)), Write(member(services, tools.removeDeployHook)))
 	mcpsdk.AddTool(server, add("list_registries", "List registry logins",
 		"Lists the registry logins agents use to pull private images, without passwords. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRegistries)))
@@ -150,7 +153,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Takes a snapshot of every database of an app now. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.backUpApp)))
 	mcpsdk.AddTool(server, add("restore_app", "Restore a database",
-		"Puts a database of an app back from a snapshot or as it was at a point in time. ops takes a snapshot of the current state first; the app stops for the swap and starts again. Needs a token with read and write access.",
+		"Puts a database of an app back from a snapshot or as it was at a point in time. ops takes a snapshot of the current state first; the app stops for the swap and starts again. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.restoreApp)))
 	mcpsdk.AddTool(server, add("set_backup_settings", "Snapshot before changes",
 		"Turns the snapshot before every deploy, restore and data change made through ops on or off for an app. Needs a token with read and write access.",
@@ -162,7 +165,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Checks and stores the S3-compatible bucket backups go to; every online server starts backing up there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setBackupStorage)))
 	mcpsdk.AddTool(server, add("remove_backup_storage", "Remove the backup bucket",
-		"Stops backups. What is in the bucket stays. Needs a token with read and write access.",
+		"Stops backups. What is in the bucket stays. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeBackupStorage)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
 		"Returns where the ops GitHub App is installed and the link that installs it on another account; installing happens on github.com. Needs the read scope.",
@@ -206,6 +209,32 @@ type AppInput struct {
 }
 
 func (i AppInput) app() string { return cmp.Or(i.App, i.Name) }
+
+// confirmed checks the confirm argument of a tool that removes or replaces
+// something big that cannot be undone: it must be the name, typed out.
+func confirmed(confirm, name string) error {
+	if confirm != name {
+		return InvalidField("confirm", "Ask the user first, then repeat the name "+name+" here to confirm.")
+	}
+	return nil
+}
+
+// RemoveAppInput is the input of remove_app.
+type RemoveAppInput struct {
+	App     string `json:"app" jsonschema:"the app name or ID"`
+	Confirm string `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
+}
+
+// RemoveServerInput is the input of remove_server.
+type RemoveServerInput struct {
+	Server  string `json:"server" jsonschema:"the server name or ID"`
+	Confirm string `json:"confirm" jsonschema:"the server's name, typed out, after the user agreed"`
+}
+
+// ConfirmInput is the input of remove_backup_storage.
+type ConfirmInput struct {
+	Confirm string `json:"confirm" jsonschema:"the bucket's name, typed out, after the user agreed"`
+}
 
 // ServerInput names one server. name is the old spelling of server, still
 // accepted.
@@ -331,6 +360,7 @@ type RestoreInput struct {
 	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
 	Snapshot string  `json:"snapshot,omitempty" jsonschema:"a snapshot ID from get_backups"`
 	At       *string `json:"at,omitempty" jsonschema:"a point in time inside the database's window, RFC 3339"`
+	Confirm  string  `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
 }
 
 // BackupSettingsInput is the input of set_backup_settings.
@@ -431,14 +461,21 @@ type RemovedServer struct {
 
 func (r RemovedServer) Summary() string { return r.Message }
 
-func (t opsTools) removeServer(_ context.Context, caller Caller, input ServerInput) (RemovedServer, error) {
-	err := t.services.Servers.Delete(caller.actor(), input.server())
+func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveServerInput) (RemovedServer, error) {
+	server, err := t.services.Servers.Get(caller.Token.WorkspaceID, input.Server)
+	if err != nil {
+		return RemovedServer{}, err
+	}
+	if err := confirmed(input.Confirm, server.Name); err != nil {
+		return RemovedServer{}, err
+	}
+	err = t.services.Servers.Delete(caller.actor(), server.ID)
 	if err != nil {
 		return RemovedServer{}, err
 	}
 	command := t.services.Servers.UninstallCommand()
 	return RemovedServer{
-		Message:          "Removed server " + input.server() + ". Its agent is still installed: run " + command + " on the server to remove it.",
+		Message:          "Removed server " + server.Name + ". Its agent is still installed: run " + command + " on the server to remove it.",
 		UninstallCommand: command,
 	}, nil
 }
@@ -513,12 +550,19 @@ func (t opsTools) createApp(_ context.Context, caller Caller, input CreateAppInp
 	return App{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) removeApp(ctx context.Context, caller Caller, input AppInput) (Done, error) {
-	err := t.services.Apps.Delete(ctx, caller.actor(), input.app())
+func (t opsTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {
+	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.App)
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Removed app " + input.app() + ". Its data stays on the server."}, nil
+	if err := confirmed(input.Confirm, app.Name); err != nil {
+		return Done{}, err
+	}
+	err = t.services.Apps.Delete(ctx, caller.actor(), app.ID)
+	if err != nil {
+		return Done{}, err
+	}
+	return Done{Message: "Removed app " + app.Name + ". Its data stays on the server."}, nil
 }
 
 // Deploy is the output of get_deploy and rollback_app.
@@ -601,6 +645,17 @@ func (t opsTools) createDeployHook(_ context.Context, caller Caller, input AppIn
 		return DeployHook{}, err
 	}
 	return DeployHook{api.DeployHook{URL: url}}, nil
+}
+
+func (t opsTools) removeDeployHook(_ context.Context, caller Caller, input AppInput) (Done, error) {
+	removed, err := t.services.Apps.RemoveDeployHook(caller.actor(), input.app())
+	if err != nil {
+		return Done{}, err
+	}
+	if !removed {
+		return Done{Message: input.app() + " has no deploy hook. Nothing changed."}, nil
+	}
+	return Done{Message: "Turned off the deploy hook of " + input.app() + ". Its URL no longer works."}, nil
 }
 
 // RegistryList is the output of list_registries.
@@ -910,7 +965,14 @@ func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreIn
 		}
 		at = &parsed
 	}
-	err := t.services.Apps.Restore(ctx, caller.actor(), input.App, input.Database, input.Snapshot, at)
+	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.App)
+	if err != nil {
+		return Done{}, err
+	}
+	if err := confirmed(input.Confirm, app.Name); err != nil {
+		return Done{}, err
+	}
+	err = t.services.Apps.Restore(ctx, caller.actor(), app.ID, input.Database, input.Snapshot, at)
 	if err != nil {
 		return Done{}, err
 	}
@@ -941,8 +1003,15 @@ func (t opsTools) setBackupStorage(ctx context.Context, caller Caller, input Bac
 	return t.getBackupStorage(ctx, caller, struct{}{})
 }
 
-func (t opsTools) removeBackupStorage(_ context.Context, caller Caller, _ struct{}) (Done, error) {
-	err := t.services.Apps.RemoveBackupStorage(caller.actor())
+func (t opsTools) removeBackupStorage(_ context.Context, caller Caller, input ConfirmInput) (Done, error) {
+	storage, err := t.services.Apps.BackupStorage(caller.Token.WorkspaceID)
+	if err != nil {
+		return Done{}, err
+	}
+	if err := confirmed(input.Confirm, storage.Bucket); err != nil {
+		return Done{}, err
+	}
+	err = t.services.Apps.RemoveBackupStorage(caller.actor())
 	if err != nil {
 		return Done{}, err
 	}

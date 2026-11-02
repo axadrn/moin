@@ -49,12 +49,15 @@ type Team struct {
 		Email string `json:"email"`
 		Role  string `json:"role"`
 	} `json:"members"`
-	Invitations []struct {
-		ID        string    `json:"id"`
-		Email     string    `json:"email"`
-		Role      string    `json:"role"`
-		ExpiresAt time.Time `json:"expires_at"`
-	} `json:"invitations"`
+	Invitations []Invitation `json:"invitations"`
+}
+
+// Invitation is an open invitation to the workspace.
+type Invitation struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 // Team returns the workspace the token belongs to.

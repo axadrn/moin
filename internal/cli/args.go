@@ -183,6 +183,28 @@ func isTerminal(r io.Reader) bool {
 // confirm asks before a destructive step. --yes skips the question; without
 // a terminal and without --yes it refuses, so a script never removes
 // something by accident.
+// confirmName asks before something big that cannot be undone: the answer
+// must be name, typed out. --yes skips it for scripts.
+func confirmName(stdin io.Reader, stdout io.Writer, yes bool, question, name string) error {
+	if yes {
+		return nil
+	}
+	if !isTerminal(stdin) {
+		return fmt.Errorf("%s Answer it on a terminal, or add --yes", question)
+	}
+	fmt.Fprintln(stdout, style.Warning.Render("?")+" "+question)
+	fmt.Fprint(stdout, "  Type "+style.Bold.Render(name)+" to confirm: ")
+	answer, err := readLine(stdin)
+	if err != nil {
+		return err
+	}
+	if answer == name {
+		return nil
+	}
+	fmt.Fprintln(stdout, style.Muted.Render("That is not "+name+". Nothing changed."))
+	return errReported
+}
+
 func confirm(stdin io.Reader, stdout io.Writer, yes bool, question string) error {
 	if yes {
 		return nil

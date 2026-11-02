@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
 )
 
@@ -55,9 +58,10 @@ func viaName(via string) string {
 	return ""
 }
 
-// team lists the members of the token's workspace, or invites one.
-func team(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("team", "team, or team invite <email> [--admin]")
+// team lists the members of the token's workspace, invites one, sends
+// or revokes an invitation, or renames the workspace.
+func team(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("team", "team, team invite <email> [--admin], team resend <email>, team revoke <email> [--yes], or team rename <name>").withYes()
 	admin := flags.Bool("admin", false, "invite as admin, who may invite others")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -66,24 +70,79 @@ func team(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if flags.Arg(0) == "invite" {
-		email := flags.Arg(1)
-		if email == "" {
+	command, rest := flags.Arg(0), flags.Args()
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	switch command {
+	case "":
+	case "invite":
+		if len(rest) != 1 {
 			return fmt.Errorf("name the email: %s team invite ada@example.com", build.Name)
 		}
 		role := "member"
 		if *admin {
 			role = "admin"
 		}
-		err = api.Invite(ctx, email, role)
+		err = api.Invite(ctx, rest[0], role)
 		if err != nil {
 			return err
 		}
-		done(stdout, "Invited %s as %s. The invitation is in their inbox for seven days.", email, role)
+		done(stdout, "Invited %s as %s. The invitation is in their inbox for seven days.", rest[0], role)
 		return nil
+	case "rename":
+		if len(rest) == 0 {
+			return fmt.Errorf("name the new name: %s team rename \"Acme Inc\"", build.Name)
+		}
+		team, err := api.Team(ctx)
+		if err != nil {
+			return err
+		}
+		name := strings.Join(rest, " ")
+		err = api.RenameWorkspace(ctx, team.Workspace.Slug, name)
+		if err != nil {
+			return err
+		}
+		done(stdout, "Renamed the workspace to %s. Its links stay the same.", name)
+		return nil
+	case "resend", "revoke":
+		if len(rest) != 1 {
+			return fmt.Errorf("name the email: %s team %s ada@example.com", build.Name, command)
+		}
+		team, err := api.Team(ctx)
+		if err != nil {
+			return err
+		}
+		index := slices.IndexFunc(team.Invitations, func(invitation client.Invitation) bool {
+			return strings.EqualFold(invitation.Email, rest[0]) || invitation.ID == rest[0]
+		})
+		if index < 0 {
+			return fmt.Errorf("no open invitation for %s. %s team shows them", rest[0], build.Name)
+		}
+		invitation := team.Invitations[index]
+		if command == "resend" {
+			err = api.ResendInvitation(ctx, team.Workspace.Slug, invitation.ID)
+			if err != nil {
+				return err
+			}
+			done(stdout, "Sent the invitation to %s again. Only the new link works.", invitation.Email)
+			return nil
+		}
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Revoke the invitation of %s? The link in the email stops working.", invitation.Email))
+		if err != nil {
+			return err
+		}
+		err = api.RevokeInvitation(ctx, team.Workspace.Slug, invitation.ID)
+		if err != nil {
+			return err
+		}
+		done(stdout, "Revoked the invitation of %s.", invitation.Email)
+		return nil
+	default:
+		return fmt.Errorf("unknown team command %q: use %s team, team invite, team resend, team revoke or team rename", command, build.Name)
 	}
-	if flags.Arg(0) != "" {
-		return fmt.Errorf("unknown team command %q: use %s team or %s team invite <email>", flags.Arg(0), build.Name, build.Name)
+	if len(rest) > 0 {
+		return flags.wrong()
 	}
 	team, err := api.Team(ctx)
 	if err != nil {

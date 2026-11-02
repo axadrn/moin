@@ -134,7 +134,7 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 
 // protect puts a password in front of an app, or takes it away with off.
 func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("protect", "protect [--user ops] [app], password on stdin; protect off [app]").withApp()
+	flags := newFlags("protect", "protect [--user ops] [app], password on stdin; protect off [app] [--yes]").withApp().withYes()
 	user := flags.String("user", "ops", "username for the password prompt in the browser")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -156,6 +156,18 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return err
 	}
 	if off {
+		detail, err := api.App(ctx, name)
+		if err != nil {
+			return err
+		}
+		if !detail.App.Protected {
+			done(stdout, "Nothing changed: %s has no password.", name)
+			return nil
+		}
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take the password away from %s? Anyone with the link can open it again.", name))
+		if err != nil {
+			return err
+		}
 		change, err := api.RemoveProtection(ctx, name)
 		if err != nil {
 			return err

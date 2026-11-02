@@ -121,7 +121,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if when != nil {
 		target = when.Format("2006-01-02 15:04:05") + " UTC"
 	}
-	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s takes a snapshot of it first.", name, target, build.Name))
+	err = confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s takes a snapshot of it first.", name, target, build.Name), name)
 	if err != nil {
 		return err
 	}
@@ -222,7 +222,11 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		done(stdout, "Backups go to %s now, for every app.", *name)
 		return nil
 	case "rm":
-		err := confirm(stdin, stdout, flags.yes(), "Stop backups of every app? What is in the bucket stays.")
+		storage, err := api.BackupStorage(ctx)
+		if err != nil {
+			return err
+		}
+		err = confirmName(stdin, stdout, flags.yes(), "Stop backups of every app? What is in the bucket stays.", storage.Bucket)
 		if err != nil {
 			return err
 		}

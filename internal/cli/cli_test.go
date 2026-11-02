@@ -101,7 +101,7 @@ func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
 		"POST /api/v1/apps/shop/rollback":        `{"number":4,"status":"running","from_number":3}`,
 		"GET /api/v1/apps/shop/deploys/4/events": "event: done\ndata: {\"number\":4,\"status\":\"succeeded\"}\n\n",
 	}
-	for _, args := range [][]string{{"rollback", "v3", "--app", "shop"}, {"rollback", "shop", "v3"}, {"rollback", "3", "shop"}} {
+	for _, args := range [][]string{{"rollback", "v3", "--app", "shop", "--yes"}, {"rollback", "shop", "v3", "--yes"}, {"rollback", "3", "shop", "--yes"}} {
 		api := &fakeAPI{answers: rollback}
 		code, stdout, stderr := runCLI(t, api, args...)
 		if code != 0 || !api.seen(`POST /api/v1/apps/shop/rollback {"number":3}`) {
@@ -152,7 +152,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"]}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -325,10 +325,43 @@ func TestLinkUnreadableRepo(t *testing.T) {
 // TestNothingChanged: a change the app had already says so and follows no
 // restart.
 func TestNothingChanged(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/apps/shop/protection": `{"app":{"name":"shop"},"deploy":null,"unchanged":true}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","protected":false},"deploys":[]}`}}
 	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
-	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") {
+	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") || api.seen("DELETE") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// TestAsksFirst: commands that remove or replace something need a terminal
+// or --yes, and change nothing without them.
+func TestAsksFirst(t *testing.T) {
+	answers := map[string]string{
+		"GET /api/v1/apps/shop":                         `{"app":{"name":"shop","protected":true,"hook":true},"deploys":[]}`,
+		"GET /api/v1/servers":                           `{"items":[{"id":"s1","name":"web-1"}]}`,
+		"GET /api/v1/workspaces":                        `{"items":[{"workspace":{"slug":"acme"}}]}`,
+		"GET /api/v1/workspaces/acme":                   `{"workspace":{"name":"Acme","slug":"acme"},"invitations":[{"id":"i1","email":"ada@example.com","role":"member"}]}`,
+		"DELETE /api/v1/apps/shop/protection":           `{"app":{"name":"shop"},"deploy":null,"unchanged":true}`,
+		"DELETE /api/v1/apps/shop/hook":                 ``,
+		"DELETE /api/v1/workspaces/acme/invitations/i1": ``,
+		"PUT /api/v1/servers/s1/security":               `{"id":"s1","name":"web-1","firewall":true}`,
+	}
+	for _, args := range [][]string{
+		{"protect", "off", "shop"},
+		{"hook", "off", "shop"},
+		{"rollback", "shop"},
+		{"team", "revoke", "ada@example.com"},
+		{"servers", "secure", "web-1", "--firewall", "on"},
+	} {
+		api := &fakeAPI{answers: answers}
+		code, _, stderr := runCLI(t, api, args...)
+		if code != 1 || !strings.Contains(stderr, "--yes") || api.seen("DELETE") || api.seen("PUT") || api.seen("POST") {
+			t.Errorf("%v without --yes: code %d, stderr %q, requests %v", args, code, stderr, api.requests)
+		}
+		api = &fakeAPI{answers: answers}
+		code, _, stderr = runCLI(t, api, append(args[:len(args):len(args)], "--yes")...)
+		if args[0] != "rollback" && (code != 0 || !(api.seen("DELETE") || api.seen("PUT"))) {
+			t.Errorf("%v --yes: code %d, stderr %q, requests %v", args, code, stderr, api.requests)
+		}
 	}
 }
 

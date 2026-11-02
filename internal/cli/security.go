@@ -14,8 +14,8 @@ import (
 
 // secure sets how a server is reached; flags it does not get keep their
 // value.
-func secure(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off]")
+func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]").withYes()
 	tunnel := flags.String("tunnel", "", "on: app traffic through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
 	ssh := flags.String("ssh", "", "tailscale: SSH only on the tailnet; open: everywhere")
 	firewall := flags.String("firewall", "", "on: drop every other inbound connection")
@@ -57,6 +57,18 @@ func secure(ctx context.Context, args []string, stdout io.Writer) error {
 			*setting.target = false
 		default:
 			return fmt.Errorf("%s is %s or %s", setting.flagLabel, setting.on, setting.off)
+		}
+	}
+	if security != (client.Security{Tunnel: server.Tunnel, SSHTailscale: server.SSHTailscale, Firewall: server.Firewall}) {
+		next := server
+		next.Tunnel, next.SSHTailscale, next.Firewall = security.Tunnel, security.SSHTailscale, security.Firewall
+		question := fmt.Sprintf("Change how %s is reached from %s to %s?", server.Name, server.Access(), next.Access())
+		if security.SSHTailscale && !server.SSHTailscale {
+			question += " Port 22 closes once Tailscale is up; keep another way in."
+		}
+		err = confirm(stdin, stdout, flags.yes(), question)
+		if err != nil {
+			return err
 		}
 	}
 	step(stdout, "applying to %s", server.Name)
