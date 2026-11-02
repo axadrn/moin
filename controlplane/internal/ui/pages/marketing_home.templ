@@ -272,7 +272,10 @@ templ HomeCommands() {
 			<p class="mt-4 max-w-2xl text-lg leading-8 sm:text-xl sm:leading-9">
 				<a href="/docs#how-ops-works-in-2-minutes" class="underline underline-offset-4 hover:text-foreground/80">New to servers? How { brand.Name } works in 2 minutes.</a>
 			</p>
-			<div class="mt-12 grid gap-3 sm:mt-16">
+			<p class="mt-12 max-w-2xl text-lg leading-8 text-muted-foreground sm:mt-16 sm:text-xl sm:leading-9">
+				Sign up, add your bucket, then run these three. <a href="/docs/getting-started" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Getting Started</a> shows every step.
+			</p>
+			<div class="mt-6 grid gap-3">
 				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server. Its agent dials out, so no port stays open.")
 				@homeCommand("ops deploy", "Sends your repo. Your server builds it, checks that it is healthy and puts it live.")
 				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops saves the current state first.")
