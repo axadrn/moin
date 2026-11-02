@@ -18,6 +18,7 @@ import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/ops/protocol"
 )
 
 // Run opens the TUI until the user quits or ctx ends. dir is where `d`
@@ -481,6 +482,12 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			if target == "on" || target == "off" {
 				return m, m.setSnapshots(app.Name, target == "on")
+			}
+			// Ask for the name only for something that can be restored.
+			if _, _, ok := restoreTarget(target); !ok {
+				m.input = target
+				m.err = fmt.Errorf("%q is neither a snapshot ID nor a time like 14:02", target)
+				return m, nil
 			}
 			return m.confirmName("Restore "+app.Name+" to "+target+"?", "It replaces the data there now; "+build.Name+" takes a snapshot of it first.", app.Name, m.restore(app.Name, target)), nil
 		case "backspace":
@@ -1669,22 +1676,26 @@ func (m model) backUp(name string) tea.Cmd {
 }
 
 // restore restores a snapshot ID, or a time in UTC.
+// restoreTarget reads a snapshot ID or a time in UTC; a time without a
+// date is today.
+func restoreTarget(target string) (snapshot string, at *time.Time, ok bool) {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "15:04:05", "15:04"} {
+		parsed, err := time.Parse(layout, target)
+		if err != nil {
+			continue
+		}
+		if parsed.Year() == 0 {
+			now := time.Now().UTC()
+			parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
+		}
+		return "", &parsed, true
+	}
+	return target, nil, protocol.ValidSnapshotID(target)
+}
+
 func (m model) restore(name, target string) tea.Cmd {
 	return func() tea.Msg {
-		snapshot := target
-		var at *time.Time
-		for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "15:04:05", "15:04"} {
-			parsed, err := time.Parse(layout, target)
-			if err != nil {
-				continue
-			}
-			if parsed.Year() == 0 {
-				now := time.Now().UTC()
-				parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
-			}
-			at, snapshot = &parsed, ""
-			break
-		}
+		snapshot, at, _ := restoreTarget(target)
 		err := m.api.Restore(m.ctx, name, "", snapshot, at)
 		if err != nil {
 			return errMsg{err}

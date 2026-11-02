@@ -479,3 +479,21 @@ func TestTypedNameConfirms(t *testing.T) {
 		t.Fatal("the right name ran something else")
 	}
 }
+
+// A restore target that is neither a snapshot ID nor a time is refused
+// before the app's name is asked.
+func TestRestoreTargetCheckedFirst(t *testing.T) {
+	m := frames()["detail-backups"]
+	m.input = "bogus"
+	m = press(m, "enter")
+	if m.mode != modeBackups || m.err == nil || m.input != "bogus" {
+		t.Errorf("bogus: mode %v, err %v, input %q", m.mode, m.err, m.input)
+	}
+	for _, target := range []string{"20261031T143638Z-manual", "14:02"} {
+		m := frames()["detail-backups"]
+		m.input = target
+		if m = press(m, "enter"); m.mode != modeConfirmName {
+			t.Errorf("%s: mode %v, err %v", target, m.mode, m.err)
+		}
+	}
+}
