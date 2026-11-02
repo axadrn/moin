@@ -18,6 +18,12 @@ import (
 // knows plus untracked ones that are not ignored, so uncommitted changes
 // deploy too. Elsewhere it takes everything but .git.
 func Pack(dir string, out io.Writer) (files int, err error) {
+	// A link to the project packs the project: the walk below does not
+	// enter a linked directory.
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		return 0, err
+	}
 	paths, err := sourceFiles(dir)
 	if err != nil {
 		return 0, err

@@ -1,6 +1,9 @@
 package client
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,5 +19,24 @@ func TestReadLocalConfig(t *testing.T) {
 	}
 	if got := ReadLocalConfig(t.TempDir()); got != (LocalConfig{}) {
 		t.Fatalf("no compose.yml: %+v", got)
+	}
+}
+
+func TestPackFollowsALinkedDirectory(t *testing.T) {
+	project := t.TempDir()
+	os.WriteFile(filepath.Join(project, "Dockerfile"), []byte("FROM scratch\n"), 0o644)
+	link := filepath.Join(t.TempDir(), "current")
+	if err := os.Symlink(project, link); err != nil {
+		t.Skip(err)
+	}
+	var out bytes.Buffer
+	files, err := Pack(link, &out)
+	if err != nil || files != 1 {
+		t.Fatalf("Pack = %d, %v", files, err)
+	}
+	compressed, _ := gzip.NewReader(&out)
+	header, err := tar.NewReader(compressed).Next()
+	if err != nil || header.Name != "Dockerfile" {
+		t.Fatalf("first file = %v, %v", header, err)
 	}
 }
