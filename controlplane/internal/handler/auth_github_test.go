@@ -13,8 +13,22 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 )
 
+// TestGitHubAuthNeedsClient: without a client ID and secret, GitHub would
+// show an error page, so the sign-in stays on ops.
+func TestGitHubAuthNeedsClient(t *testing.T) {
+	handler := &authHandler{cfg: &config.Config{APIURL: "https://api.example.com"}}
+	response := httptest.NewRecorder()
+	handler.GitHubAuth(response, httptest.NewRequest(http.MethodGet, "/auth/github", nil))
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/auth" {
+		t.Fatalf("GitHubAuth() without a client = %d %q, want 303 to /auth", response.Code, response.Header().Get("Location"))
+	}
+	if !(&config.Config{GitHubClientID: "client", GitHubClientSecret: "secret"}).Render().GitHubLogin || (&config.Config{GitHubClientID: "client"}).Render().GitHubLogin {
+		t.Fatal("GitHubLogin must need both the client ID and the secret")
+	}
+}
+
 func TestGitHubAuthUsesOneTimeStateCookie(t *testing.T) {
-	handler := &authHandler{cfg: &config.Config{AppURL: "https://app.example.com", APIURL: "https://api.example.com", GitHubClientID: "client"}}
+	handler := &authHandler{cfg: &config.Config{AppURL: "https://app.example.com", APIURL: "https://api.example.com", GitHubClientID: "client", GitHubClientSecret: "secret"}}
 	request := httptest.NewRequest(http.MethodGet, "/auth/github", nil)
 	request = request.WithContext(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{AppEnv: "production"}))
 	response := httptest.NewRecorder()

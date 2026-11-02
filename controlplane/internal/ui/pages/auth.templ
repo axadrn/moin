@@ -20,9 +20,9 @@ templ Auth(errorMsg string) {
 			@blocks.AuthCard("Sign in or sign up", "Enter your email. We send you a link, no password needed.") {
 				@field.Group() {
 					@AuthMagicLinkForm(errorMsg)
-					if config.GoogleOAuthEnabled || config.GitHubOAuthEnabled {
+					if config.GoogleOAuthEnabled || ctxkeys.RenderConfig(ctx).GitHubLogin {
 						@blocks.AuthOr()
-						@blocks.OAuthButtons(config.GoogleOAuthEnabled, config.GitHubOAuthEnabled)
+						@blocks.OAuthButtons(config.GoogleOAuthEnabled, ctxkeys.RenderConfig(ctx).GitHubLogin)
 					}
 					@blocks.AuthOr()
 					@button.Button(button.Props{Href: "/auth/password", Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {

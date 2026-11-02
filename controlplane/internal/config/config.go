@@ -21,7 +21,6 @@ const (
 	EnvironmentDevelopment Environment = "development"
 	EnvironmentProduction  Environment = "production"
 	GoogleOAuthEnabled                 = false
-	GitHubOAuthEnabled                 = true
 )
 
 type Config struct {
@@ -129,6 +128,9 @@ type RenderConfig struct {
 	GoogleAnalyticsID string
 	Billing           bool
 	SignupsOpen       bool
+	// GitHubLogin shows "Continue with GitHub": only with a client ID and
+	// secret, so the button never leads to a broken GitHub page.
+	GitHubLogin bool
 }
 
 func Load() (*Config, error) {
@@ -476,6 +478,7 @@ func (c *Config) Render() RenderConfig {
 		GoogleAnalyticsID: c.GoogleAnalyticsID,
 		Billing:           c.Billing,
 		SignupsOpen:       c.SignupsOpen,
+		GitHubLogin:       c.GitHubClientID != "" && c.GitHubClientSecret != "",
 	}
 }
 

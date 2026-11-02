@@ -28,6 +28,10 @@ func (h *authHandler) githubOAuthConfig() *oauth2.Config {
 
 // GitHubAuth redirects user to GitHub OAuth consent screen
 func (h *authHandler) GitHubAuth(w http.ResponseWriter, r *http.Request) {
+	if h.cfg.GitHubClientID == "" || h.cfg.GitHubClientSecret == "" {
+		redirect(w, r, "/auth", http.StatusSeeOther)
+		return
+	}
 	// Generate secure state token for CSRF protection
 	state := generateOAuthState()
 
