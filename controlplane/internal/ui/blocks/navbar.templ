@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 
@@ -27,6 +28,13 @@ templ Wordmark(class ...string) {
 	</span>
 }
 
+// BetaBadge says ops is in beta, next to the wordmark.
+templ BetaBadge(class string) {
+	@badge.Badge(badge.Props{Class: utils.CN("h-auto leading-normal rounded-full bg-secondary px-2 py-0.5 font-sans text-[11px] font-semibold text-muted-foreground", class)}) {
+		Beta
+	}
+}
+
 templ navLink(href, label string) {
 	<a href={ templ.SafeURL(href) } class="rounded-full px-3.5 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">{ label }</a>
 }
@@ -36,8 +44,9 @@ templ Navbar() {
 	<header class="sticky top-0 z-50 px-3 pt-3 sm:px-6">
 		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-6 sm:h-16 sm:pl-7" aria-label="Main">
 			<div class="flex items-center gap-6">
-				<a href="/" class="text-[21px] leading-none" aria-label={ brand.Name + " home" }>
+				<a href="/" class="flex items-center gap-2 text-[21px] leading-none" aria-label={ brand.Name + " home, beta" }>
 					@Wordmark()
+					@BetaBadge("")
 				</a>
 				<div class="hidden items-center gap-0.5 md:flex">
 					@NavbarPricingDesktop()
@@ -93,8 +102,9 @@ templ MobileLink(href, label string) {
 templ MobileNav() {
 	{{ user := ctxkeys.User(ctx) }}
 	<div class="flex h-full flex-col">
-		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[22px] leading-none">
+		<div class="flex h-16 shrink-0 items-center gap-2 border-b px-6 text-[22px] leading-none">
 			@Wordmark()
+			@BetaBadge("")
 		</div>
 		<div class="flex-1 overflow-y-auto px-6 pt-1">
 			@NavbarPricingMobile()
