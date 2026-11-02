@@ -48,6 +48,7 @@ templ Home(network model.Network) {
 			}
 			@HomeStatement()
 			@HomeMaker()
+			@HomeRoadmap()
 			@HomeFAQ()
 			@HomeStart()
 		</main>
@@ -267,6 +268,9 @@ templ HomeCommands() {
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
 				<span class="text-foreground">Getting an app online is the easy part. Keeping its data safe is the hard part.</span>
 				{ brand.Name } does both, on a server you rent for $5 a month.
+			</p>
+			<p class="mt-4 max-w-2xl text-lg leading-8 sm:text-xl sm:leading-9">
+				<a href="/docs#how-ops-works-in-2-minutes" class="underline underline-offset-4 hover:text-foreground/80">New to servers? How { brand.Name } works in 2 minutes.</a>
 			</p>
 			<div class="mt-12 grid gap-3 sm:mt-16">
 				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server. Its agent dials out, so no port stays open.")
@@ -541,7 +545,7 @@ templ HomeStatement() {
 					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
 				</p>
 				<ol class="mt-12 grid gap-px overflow-hidden rounded-3xl bg-background/15 sm:grid-cols-3" data-secrets-roadmap>
-					@homeSecretStep("Now", "Encrypted with us", "Env vars and registry logins are sealed with AES-256-GCM in the control plane. Your code and data never pass through it.")
+					@homeSecretStep("Now", "Encrypted with us", "Env vars and registry logins are sealed with AES-256-GCM in the control plane. Your code and your backups never pass through it.")
 					@homeSecretStep("Next", "Only on your servers", "Secrets move to the agent. Hosted ops keeps your login and nothing else.")
 					@homeSecretStep("Then", "End-to-end encrypted", "We can't read your secrets or your data. Not won't, can't.")
 				</ol>
@@ -551,31 +555,47 @@ templ HomeStatement() {
 }
 
 // ---------------------------------------------------------------- compare
-// HomeCompare puts ops next to what people use instead: one line on what
-// each one does, one line on what ops does there. Only facts we can stand
-// behind.
+// HomeCompare puts ops next to what people use instead, fact by fact, from
+// their own docs and pricing pages (compareRows). On a phone the table
+// scrolls inside its box.
 templ HomeCompare() {
 	<section id="compare" class="scroll-mt-24 pt-32 sm:pt-44">
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Why not Coolify?</h2>
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Why { brand.Name }</h2>
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">Good tools put your app online. { brand.Name } does that too, and then looks after your data.</span>
-				Here is the difference, one line each.
+				<span class="text-foreground">Good tools put your app online. { brand.Name } does that too, holds no key to your servers and looks after your data.</span>
+				One price. Unlimited servers, apps and teammates. No tiers, no per-server fees.
 			</p>
-			<div class="mt-12 grid items-stretch gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeVersus("Coolify and Dokploy",
-					"Deploy containers to your own server, from a web panel.",
-					"Deploys too, and runs your data: every change backed up, a restore drill every day, restore to any second, tables, SQL and your migrations in view.")
-				@homeVersus("Kamal",
-					"Deploys from your laptop over SSH.",
-					"Needs no SSH. The agent dials out and nothing listens. Plus backups and a data UI, in the browser, the CLI, a terminal UI and MCP.")
-				@homeVersus("Heroku, Render and Railway",
-					"Run your app on their machines and bill you per resource.",
-					"Runs on your own $5 server at any provider. One flat price for every app and server, or free to host yourself.")
-				@homeVersus("Fly.io with LiteFS",
-					"Replicates SQLite between Fly machines.",
-					"Backs up SQLite on any server, from any provider, to your own bucket. Restore to any second.")
+			<div class={ utils.CN(homeSurface, "mt-12 overflow-x-auto sm:mt-16") } data-compare>
+				<table class="w-full min-w-[64rem] border-collapse text-left text-[15px] leading-6">
+					<thead>
+						<tr>
+							<th scope="col" class="sticky left-0 bg-card px-5 py-4 font-normal text-muted-foreground"><span class="sr-only">Fact</span></th>
+							for i, tool := range compareTools {
+								<th scope="col" class={ "px-4 py-4 font-semibold", templ.KV("text-live", i == 0) }>{ tool }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range compareRows {
+							<tr class="border-t border-border align-top">
+								<th scope="row" class="sticky left-0 bg-card px-5 py-3.5 font-medium">{ row.Label }</th>
+								for i, cell := range row.Cells {
+									<td class={ "px-4 py-3.5", templ.KV("font-semibold", i == 0), templ.KV("text-muted-foreground", i > 0) }>{ cell }</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
 			</div>
+			<p class="mt-4 text-sm text-muted-foreground">From each tool's own docs and pricing pages, November 2026. A question mark means they do not say. Your server costs extra everywhere except on Heroku, Render, Railway and Fly.io, which run it for you.</p>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<span class="text-foreground">We never store your code or your app's data.</span>
+				They live in your bucket and on your server. <a href="/docs/guides/security" class="text-foreground underline underline-offset-4 hover:text-foreground/80">How ops keeps your servers closed.</a>
+			</p>
+			<p class="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				Want even more control today? <a href="/docs/self-hosting" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Self-host { brand.Name }.</a> Every feature, free, under AGPL.
+			</p>
 			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
 				@homePrimary()
 				if ctxkeys.RenderConfig(ctx).Billing {
@@ -590,23 +610,6 @@ templ HomeCompare() {
 			</div>
 		</div>
 	</section>
-}
-
-// homeVersus is one other tool: what it does, and what ops does there.
-templ homeVersus(name, they, ops string) {
-	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex h-full flex-col p-5 sm:p-8")), Attributes: templ.Attributes{"data-versus": name}}) {
-		<p class="px-2 pt-2 font-display text-[clamp(1.6rem,3vw,2.2rem)] sm:px-0 sm:pt-0">{ name }</p>
-		<dl class="mt-6 flex flex-1 flex-col gap-2">
-			<div class="rounded-3xl bg-background px-5 py-4">
-				<dt class="text-sm text-muted-foreground">They</dt>
-				<dd class="mt-1 text-[17px] leading-7 text-muted-foreground">{ they }</dd>
-			</div>
-			<div class="flex-1 rounded-3xl bg-foreground px-5 py-4 text-background">
-				<dt class="text-sm font-semibold text-background/65">{ brand.Name }</dt>
-				<dd class="mt-1 text-[17px] leading-7">{ ops }</dd>
-			</div>
-		</dl>
-	}
 }
 
 // ---------------------------------------------------------------- goilerplate
@@ -725,6 +728,8 @@ templ HomePricing() {
 					</p>
 					<p class="mt-2 text-base text-background/65">or $29 a month</p>
 					<p class="mt-2 text-sm text-background/55">Plus sales tax or VAT where it applies, shown at checkout.</p>
+					<p class="mt-6 text-[17px] leading-7 font-semibold" data-one-price>One price. Unlimited servers, apps and teammates. No tiers, no per-server fees.</p>
+					<p class="mt-2 text-sm leading-6 text-background/65" data-beta-price>{ brand.Name } is in beta and moves fast. Prices, plans and features may change as we grow. Join early: the price you start with is the price you keep.</p>
 					<div class="mt-6 rounded-lg border border-background/15 bg-background/8 px-4 py-3 text-[15px] leading-6" data-goilerplate-offer>
 						<p class="font-semibold">goilerplate buyers: 50% off forever.</p>
 						<p class="text-background/65">Your code arrives by email in the next days.</p>
@@ -746,7 +751,7 @@ templ HomePricing() {
 					</div>
 				}
 			</div>
-			<p class="mt-5 text-center text-sm text-muted-foreground">Your apps run on your servers either way, and your data never leaves them.</p>
+			<p class="mt-5 text-center text-sm text-muted-foreground">Your apps run on your servers either way, and their data is stored only there and in your bucket.</p>
 		</div>
 	</section>
 }
@@ -756,6 +761,32 @@ templ homePlanRow(label, value string, dark bool) {
 		<dt class={ "shrink-0 text-[15px]", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/60", dark) }>{ label }</dt>
 		<dd class="truncate text-right text-[15px] font-semibold">{ value }</dd>
 	</div>
+}
+
+// ---------------------------------------------------------------- roadmap
+// HomeRoadmap is the short roadmap: what ships, what comes next, what comes
+// later. No dates. The docs page has the links to the issues.
+templ HomeRoadmap() {
+	<section id="roadmap" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Where { brand.Name } is going.</h2>
+			<div class="mt-10 grid gap-3 lg:grid-cols-3">
+				@homeRoadmapStep("Now", "Deploys, backups, data, domains, security, teams and the activity log. On the web, the CLI, the terminal UI, the API and MCP.")
+				@homeRoadmapStep("Next", "Env vars as one .env text, vim keys in the terminal UI, your own order of apps and servers, more than one bucket.")
+				@homeRoadmapStep("Later", "Zero trust: bucket keys only on your servers, secrets encrypted end to end, and servers that only obey commands you signed.")
+			</div>
+			<p class="mt-6">
+				<a href="/docs/roadmap" class="text-[17px] text-muted-foreground underline underline-offset-4 hover:text-foreground">The whole roadmap</a>
+			</p>
+		</div>
+	</section>
+}
+
+templ homeRoadmapStep(when, text string) {
+	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8")), Attributes: templ.Attributes{"data-roadmap": when}}) {
+		<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ when }</p>
+		<p class="mt-3 text-[17px] leading-7 text-muted-foreground">{ text }</p>
+	}
 }
 
 // ---------------------------------------------------------------- faq
