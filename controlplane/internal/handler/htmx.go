@@ -51,3 +51,15 @@ func renderError(w http.ResponseWriter, message string, err error) {
 	slog.Error(message, "error", err)
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }
+
+// renderAuthPage answers the sign-in form with another auth page: its <main>
+// takes the place of the sign-in page's, instead of the whole page landing
+// inside the form.
+func renderAuthPage(w http.ResponseWriter, r *http.Request, component templ.Component) {
+	if isAction(r) {
+		w.Header().Set("HX-Retarget", "main")
+		w.Header().Set("HX-Reselect", "main")
+		w.Header().Set("HX-Reswap", "outerHTML")
+	}
+	render(w, r, component)
+}
