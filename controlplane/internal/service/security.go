@@ -147,6 +147,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	if !input.Tunnel && server.TunnelID != "" {
 		token, account, err := s.cloudflareToken(actor.WorkspaceID)
 		if err == nil {
+			s.unpointTunnel(ctx, server, token)
 			err = s.cloudflare.DeleteTunnel(ctx, token, account, server.TunnelID)
 		}
 		if err != nil {
@@ -286,13 +287,39 @@ func (s *AppService) syncTunnel(ctx context.Context, server *model.Server) ([]st
 		return nil, fmt.Errorf("route the tunnel: %w", err)
 	}
 	problems := []string{}
+	zones := []string{}
 	for _, host := range hosts {
-		err = s.cloudflare.PointAtTunnel(ctx, token, host, server.TunnelID)
+		zone, err := s.cloudflare.PointAtTunnel(ctx, token, host, server.TunnelID)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("DNS of %s: %s; point it at %s.cfargotunnel.com yourself", host, err, server.TunnelID))
+			continue
+		}
+		if slices.Contains(zones, zone) {
+			continue
+		}
+		zones = append(zones, zone)
+		err = s.cloudflare.AlwaysUseHTTPS(ctx, token, zone)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("Always Use HTTPS for %s: %s; give the token Zone Settings Edit or turn it on in Cloudflare yourself", host, err))
 		}
 	}
 	return problems, nil
+}
+
+// unpointTunnel deletes the DNS records that point the domains of the
+// server's apps at its tunnel, before the tunnel goes.
+func (s *AppService) unpointTunnel(ctx context.Context, server *model.Server, token string) {
+	hosts, err := s.tunnelHosts(server)
+	if err != nil {
+		slog.Warn("list tunnel domains failed", "server_id", server.ID, "error", err)
+		return
+	}
+	for _, host := range hosts {
+		err = s.cloudflare.UnpointFromTunnel(ctx, token, host, server.TunnelID)
+		if err != nil {
+			slog.Warn("delete tunnel DNS record failed", "server_id", server.ID, "host", host, "error", err)
+		}
+	}
 }
 
 // syncTunnelOf syncs the tunnel of an app's server in the background,

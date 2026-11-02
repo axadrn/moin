@@ -90,9 +90,9 @@ ops does the setup with your Cloudflare token:
 3. It points the DNS of each domain at the tunnel, in the Cloudflare zone that holds the domain.
 4. It turns on **Always Use HTTPS** for those zones. Cloudflare serves HTTPS, so the server needs no certificate.
 
-A domain you add later gets the same setup. If the token cannot reach the zone of a domain, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself.
+A domain you add later gets the same setup. If the token cannot reach the zone of a domain, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says so too: turn on **Always Use HTTPS** in Cloudflare yourself.
 
-Turning the tunnel off deletes it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server with an A record, as in [Add a domain](/docs/guides/domains#add-a-domain).
+Turning the tunnel off deletes it and the DNS records ops pointed at it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server with an A record, as in [Add a domain](/docs/guides/domains#add-a-domain).
 
 ## SSH only on Tailscale
 

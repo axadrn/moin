@@ -21,6 +21,9 @@ type fakeCloudflare struct {
 	mu    sync.Mutex
 	calls []string
 	body  map[string]string
+	// noSettings refuses zone settings, as a token without Zone Settings
+	// Edit gets.
+	noSettings bool
 }
 
 func (f *fakeCloudflare) serve() *httptest.Server {
@@ -52,9 +55,14 @@ func (f *fakeCloudflare) serve() *httptest.Server {
 			answer([]map[string]string{{"id": "zone1"}})
 		case call == "GET /zones":
 			answer([]map[string]string{})
+		case call == "GET /zones/zone1/dns_records" && f.called("POST /zones/zone1/dns_records"):
+			answer([]map[string]string{{"id": "rec1", "content": "tun1.cfargotunnel.com"}, {"id": "rec2", "content": "203.0.113.5"}})
 		case call == "GET /zones/zone1/dns_records":
 			answer([]map[string]string{})
-		case call == "POST /zones/zone1/dns_records", call == "PATCH /zones/zone1/settings/always_use_https":
+		case call == "PATCH /zones/zone1/settings/always_use_https" && f.noSettings:
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(map[string]any{"success": false, "errors": []map[string]string{{"message": "Authentication error"}}})
+		case call == "POST /zones/zone1/dns_records", call == "PUT /zones/zone1/dns_records/rec1", call == "DELETE /zones/zone1/dns_records/rec1", call == "PATCH /zones/zone1/settings/always_use_https":
 			answer(map[string]string{"id": "rec1"})
 		default:
 			http.NotFound(w, r)
@@ -199,11 +207,24 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatalf("domain check in tunnel mode = %+v, %v", checks, err)
 	}
 
+	// Without Zone Settings Edit the DNS still points at the tunnel; only
+	// Always Use HTTPS is left to do by hand.
+	fake.mu.Lock()
+	fake.noSettings = true
+	fake.mu.Unlock()
+	problems, err := apps.syncTunnel(ctx, secured)
+	if err != nil || len(problems) != 1 || !strings.HasPrefix(problems[0], "Always Use HTTPS for blog.de") {
+		t.Fatalf("problems without Zone Settings Edit = %q, %v", problems, err)
+	}
+
 	open, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if open.Tunnel || open.TunnelID != "" || !fake.called("DELETE /accounts/acc1/cfd_tunnel/tun1") {
 		t.Fatalf("turning the tunnel off: %+v, calls %v", open, fake.calls)
+	}
+	if !fake.called("DELETE /zones/zone1/dns_records/rec1") || fake.called("DELETE /zones/zone1/dns_records/rec2") {
+		t.Fatalf("turning the tunnel off deletes only the record at the tunnel: %v", fake.calls)
 	}
 }

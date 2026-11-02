@@ -102,18 +102,11 @@ func (c *Cloudflare) RouteTunnel(ctx context.Context, token, account, tunnelID s
 }
 
 // PointAtTunnel makes host a proxied CNAME to the tunnel, in the zone of
-// the account that holds it, and turns on Always Use HTTPS there.
-func (c *Cloudflare) PointAtTunnel(ctx context.Context, token, host, tunnelID string) error {
-	zone, err := c.zone(ctx, token, host)
+// the account that holds it, and returns that zone.
+func (c *Cloudflare) PointAtTunnel(ctx context.Context, token, host, tunnelID string) (string, error) {
+	zone, records, err := c.records(ctx, token, host)
 	if err != nil {
-		return err
-	}
-	var records []struct {
-		ID string `json:"id"`
-	}
-	err = c.call(ctx, token, http.MethodGet, "/zones/"+zone+"/dns_records?name="+url.QueryEscape(host), nil, &records)
-	if err != nil {
-		return err
+		return "", err
 	}
 	record := map[string]any{"type": "CNAME", "name": host, "content": tunnelID + ".cfargotunnel.com", "proxied": true, "comment": "ops tunnel"}
 	if len(records) > 0 {
@@ -121,10 +114,47 @@ func (c *Cloudflare) PointAtTunnel(ctx context.Context, token, host, tunnelID st
 	} else {
 		err = c.call(ctx, token, http.MethodPost, "/zones/"+zone+"/dns_records", record, nil)
 	}
+	return zone, err
+}
+
+// UnpointFromTunnel deletes the DNS records of host that point at the
+// tunnel. Records that point elsewhere stay.
+func (c *Cloudflare) UnpointFromTunnel(ctx context.Context, token, host, tunnelID string) error {
+	zone, records, err := c.records(ctx, token, host)
 	if err != nil {
 		return err
 	}
+	for _, record := range records {
+		if record.Content != tunnelID+".cfargotunnel.com" {
+			continue
+		}
+		err = c.call(ctx, token, http.MethodDelete, "/zones/"+zone+"/dns_records/"+record.ID, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AlwaysUseHTTPS turns on Always Use HTTPS in a zone.
+func (c *Cloudflare) AlwaysUseHTTPS(ctx context.Context, token, zone string) error {
 	return c.call(ctx, token, http.MethodPatch, "/zones/"+zone+"/settings/always_use_https", map[string]string{"value": "on"}, nil)
+}
+
+type dnsRecord struct {
+	ID      string `json:"id"`
+	Content string `json:"content"`
+}
+
+// records returns the zone of host and the DNS records of host in it.
+func (c *Cloudflare) records(ctx context.Context, token, host string) (string, []dnsRecord, error) {
+	zone, err := c.zone(ctx, token, host)
+	if err != nil {
+		return "", nil, err
+	}
+	var records []dnsRecord
+	err = c.call(ctx, token, http.MethodGet, "/zones/"+zone+"/dns_records?name="+url.QueryEscape(host), nil, &records)
+	return zone, records, err
 }
 
 // zone finds the zone of a host: blog.example.com is in example.com.
