@@ -482,7 +482,12 @@ func deployNote(deploy client.Deploy) string {
 	case deploy.FromNumber > 0:
 		note = fmt.Sprintf("rollback to v%d", deploy.FromNumber)
 	case deploy.Commit != "":
-		note = deploy.Ref + " " + deploy.Commit[:min(7, len(deploy.Commit))] + " " + deploy.CommitMessage
+		ref := deploy.Ref
+		// A deploy of a commit by its SHA names it once.
+		if strings.HasPrefix(deploy.Commit, ref) {
+			ref = ""
+		}
+		note = ref + " " + deploy.Commit[:min(7, len(deploy.Commit))] + " " + deploy.CommitMessage
 	case deploy.Image != "":
 		note = deploy.Image
 	}

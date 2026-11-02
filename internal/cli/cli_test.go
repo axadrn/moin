@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/axadrn/ops/internal/client"
 )
 
 // fakeAPI answers the paths a test gives and records every request.
@@ -448,5 +450,23 @@ func TestFirstHookAsksNothing(t *testing.T) {
 	code, stdout, stderr := runCLI(t, api, "hook", "shop")
 	if code != 0 || !strings.Contains(stdout, "dph_x") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}
+
+// The hint after the branches is one command to copy.
+func TestGitHubBranchesHintIsOneCommand(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/github/repos/me/shop/branches": `{"items":["main","dev"]}`}}
+	code, stdout, stderr := runCLI(t, api, "github", "branches", "me/shop")
+	if code != 0 || !strings.Contains(stdout, "`ops link me/shop --branch <branch>`") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestDeployNoteNamesACommitOnce(t *testing.T) {
+	sha := "5ee5ee5ee5ee5ee5ee5ee5ee5ee5ee5ee5ee5ee5"
+	for ref, want := range map[string]string{sha: "5ee5ee5 Add the shop", "5ee5ee5": "5ee5ee5 Add the shop", "main": "main 5ee5ee5 Add the shop"} {
+		if got := deployNote(client.Deploy{Ref: ref, Commit: sha, CommitMessage: "Add the shop"}); got != want {
+			t.Errorf("ref %q: %q, want %q", ref, got, want)
+		}
 	}
 }

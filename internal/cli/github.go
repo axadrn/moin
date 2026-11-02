@@ -40,7 +40,7 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 			}
 			fmt.Fprintln(stdout, branch)
 		}
-		hint(stdout, "Deploy one with", build.Name+" link "+flags.Arg(1)+" --branch <branch>, then "+build.Name+" deploy --ref <branch>")
+		hint(stdout, "Follow one with", build.Name+" link "+flags.Arg(1)+" --branch <branch>")
 		return nil
 	}
 	answer, err := api.GitHub(ctx)
