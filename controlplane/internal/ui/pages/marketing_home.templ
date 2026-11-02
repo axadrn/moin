@@ -817,7 +817,7 @@ templ HomeFAQ() {
 					AGPL keeps ops open: whoever runs a changed ops as a service has to share the changes. Pull requests are welcome. On your first one a bot asks you to agree once that it comes in under Apache 2.0, which keeps the license of ops flexible. You keep your copyright.
 				}
 				@homeQuestion("Can my AI agent use it?") {
-					Yes. ops has an MCP server: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
+					Yes. ops has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground/80">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
 				}
 				@homeQuestion("Where are my env vars?") {
 					Today in the control plane, sealed with AES-256-GCM, and handed to your server with each deploy. Next they move to your servers only, so hosted ops keeps your login and nothing else. After that, end-to-end encryption: we can't read them at all.
@@ -826,7 +826,7 @@ templ HomeFAQ() {
 					Maybe. If it does, your servers, the CLI and the agents move over by themselves, and the old address keeps working for a while. Nothing breaks.
 				}
 				@homeQuestion("Can my team use it?") {
-					Yes, for free. Invite them and everyone deploys to the same servers. The activity shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
+					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground/80">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@homeQuestion("How does the trial work?") {
