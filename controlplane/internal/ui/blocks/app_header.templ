@@ -38,8 +38,8 @@ templ AppHeader(p AppHeaderProps) {
 						</li>
 					}
 					if crumb.Href != "" && i < len(p.Crumbs)-1 {
-						<li class="shrink-0">
-							<a href={ templ.SafeURL(crumb.Href) } class="rounded-full px-2 py-1 text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{ crumb.Label }</a>
+						<li class="min-w-0">
+							<a href={ templ.SafeURL(crumb.Href) } class="block truncate rounded-full px-2 py-1 text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{ crumb.Label }</a>
 						</li>
 					} else {
 						<li class="min-w-0 truncate px-2 font-medium" aria-current="page">{ crumb.Label }</li>
