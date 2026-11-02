@@ -94,7 +94,7 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("restore", `restore [--app <app>] [--db <path>] <snapshot> [--yes], or restore --at "2026-10-31 14:02" [--yes]`).withApp().withYes()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	at := flags.String("at", "", `point in time in UTC, like "2026-10-31 14:02:00"`)
+	at := flags.String("at", "", `point in time in UTC, like "2026-10-31 14:02:00", or "14:02" for today`)
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -140,13 +140,19 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 
 // parseTime reads a time in UTC: RFC 3339, or a date and time.
 func parseTime(text string) (time.Time, error) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02T15:04"} {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02T15:04", "15:04:05", "15:04"} {
 		parsed, err := time.Parse(layout, strings.TrimSpace(text))
-		if err == nil {
-			return parsed.UTC(), nil
+		if err != nil {
+			continue
 		}
+		// A time without a day is today in UTC, as in the TUI.
+		if parsed.Year() == 0 {
+			now := time.Now().UTC()
+			parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
+		}
+		return parsed.UTC(), nil
 	}
-	return time.Time{}, fmt.Errorf("cannot read %q as a time: use \"2026-10-31 14:02:00\" in UTC", text)
+	return time.Time{}, fmt.Errorf("cannot read %q as a time: use \"2026-10-31 14:02:00\" or \"14:02\" for today, in UTC", text)
 }
 
 // bucket shows, sets or removes the bucket backups go to. It is the same
