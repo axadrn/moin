@@ -143,6 +143,11 @@ func TestBackups(t *testing.T) {
 	if n := count(pointFile); n != 3 {
 		t.Fatalf("point in time before the delete has %d notes, want 3", n)
 	}
+	// A time before the window says so, not litestream's words.
+	err = b.restorePoint(ctx, app, "/data/app.db", time.Date(2020, 1, 1, 10, 0, 0, 0, time.UTC), filepath.Join(dir, "early.db"))
+	if err == nil || !strings.Contains(err.Error(), "2020-01-01 10:00:00 UTC is outside the point in time window of /data/app.db") {
+		t.Fatalf("restore before the window: %v", err)
+	}
 	snapshotFile := filepath.Join(dir, "snapshot.db")
 	err = b.download(ctx, app, "/data/app.db", snapshot.ID, snapshotFile)
 	if err != nil {

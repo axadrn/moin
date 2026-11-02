@@ -675,6 +675,9 @@ func (b *backups) restorePoint(ctx context.Context, app, database string, at tim
 	options.OutputPath = target
 	options.Timestamp = at
 	err = litestream.NewReplicaWithClient(nil, client).Restore(ctx, options)
+	if errors.Is(err, litestream.ErrTxNotAvailable) {
+		return fmt.Errorf("%s UTC is outside the point in time window of %s: pick a time in the window the backups show, or a snapshot", at.UTC().Format(time.DateTime), database)
+	}
 	if err != nil {
 		return fmt.Errorf("restore to %s: %w", at.Format(time.RFC3339), err)
 	}
