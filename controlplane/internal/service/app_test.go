@@ -307,6 +307,23 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	}
 }
 
+func TestDeleteOnAServerThatNeverConnected(t *testing.T) {
+	apps, servers, _, _ := newAppService(t)
+	server, _, err := servers.Create(owner, "web-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := apps.Delete(context.Background(), owner, "blog"); err != nil {
+		t.Fatalf("delete on a server that never connected: %v", err)
+	}
+	if err := servers.Delete(owner, server.ID); err != nil {
+		t.Fatalf("delete the empty server: %v", err)
+	}
+}
+
 func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	apps, servers, server, agent := newAppService(t)
 	_, err := apps.Create(owner, "blog", "web-1")

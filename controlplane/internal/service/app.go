@@ -137,17 +137,23 @@ func (s *AppService) Get(workspaceID, idOrName string) (*model.App, error) {
 
 // Delete stops the app on its server, then forgets it. Its data stays on
 // the server. An offline server keeps the app, because its containers would
-// keep running unseen.
+// keep running unseen. A server that never connected holds nothing of it.
 func (s *AppService) Delete(ctx context.Context, actor Actor, idOrName string) error {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppRemove, protocol.AppRemove{App: app.Name}, nil)
+	server, err := s.servers.Get(actor.WorkspaceID, app.ServerID)
 	if err != nil {
 		return err
+	}
+	if server.AgentTokenHash != nil {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+		err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppRemove, protocol.AppRemove{App: app.Name}, nil)
+		if err != nil {
+			return err
+		}
 	}
 	err = s.apps.DeleteForWorkspace(app.ID, actor.WorkspaceID)
 	if err != nil {
