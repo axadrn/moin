@@ -85,7 +85,7 @@ const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-o
 // ---------------------------------------------------------------- hero
 templ HomeHero() {
 	<section class="pt-16 sm:pt-28">
-		<div class={ homeWrap, "grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
+		<div class={ homeWrap, "grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
 			<div>
 				<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
 					<span class="block">Deploy.</span>
@@ -275,7 +275,7 @@ templ HomeCommands() {
 			<p class="mt-12 max-w-2xl text-lg leading-8 text-muted-foreground sm:mt-16 sm:text-xl sm:leading-9">
 				Sign up, add your bucket, then run these three. <a href="/docs/getting-started" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Getting Started</a> shows every step.
 			</p>
-			<div class="mt-6 grid gap-3">
+			<div class="mt-6 grid grid-cols-1 gap-3">
 				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server. Its agent dials out, so no port stays open.")
 				@homeCommand("ops deploy", "Sends your repo. Your server builds it, checks that it is healthy and puts it live.")
 				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops saves the current state first.")
@@ -285,7 +285,7 @@ templ HomeCommands() {
 }
 
 templ homeCommand(command, text string) {
-	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12"))}) {
+	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12"))}) {
 		<p class="font-mono text-[clamp(1.35rem,5.4vw,2.6rem)] leading-tight font-medium tracking-[-0.04em] break-words">
 			<span class="text-muted-foreground/60">$ </span>{ command }
 		</p>
@@ -308,7 +308,7 @@ templ HomeWaysIn() {
 				<a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Know who changed what, to the second.</a>
 				Your secrets and your data never.
 			</p>
-			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
 				@homeWay("Browser", "For a look around, and for your team.") {
 					@homeWayWeb()
 				}
@@ -407,7 +407,7 @@ templ HomeBackups() {
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
 				Most apps lose data the boring way: a migration that goes wrong, an <code class="font-mono text-foreground">UPDATE</code> without <code class="font-mono text-foreground">WHERE</code>, a disk that dies. { brand.Name } makes all three a click to undo.
 			</p>
-			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
 				@homeFact("Every second", "Each change of every SQLite database streams to your own bucket with Litestream. Restore to any second of the last week.", "")
 				@homeFact("Before every change", "A full snapshot before every deploy, every restore and every edit made through "+brand.Name+". On by default.", "")
 				@homeFact("Proven every day", "The agent restores the newest state into a temp file and runs the integrity check. You see “verified by restore”, not “backup job ran”.", "live")
@@ -446,7 +446,7 @@ templ homeFact(title, text, kind string) {
 templ HomeData() {
 	<section id="data" class="scroll-mt-24 pt-3">
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16"))}) {
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
 					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Your data, live.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
@@ -476,7 +476,7 @@ templ HomeData() {
 templ HomeNoDocker() {
 	<section class="pt-3">
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16"))}) {
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
 					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Never touched Docker? Fine.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
@@ -499,7 +499,7 @@ templ HomeNoDocker() {
 }
 
 templ homeFile(name, note, kind string) {
-	<div class="flex items-center justify-between gap-4 px-5 py-4">
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-4">
 		<span class="font-mono text-[14px] font-medium">{ name }</span>
 		if kind == "live" {
 			@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live"}) {
@@ -560,7 +560,7 @@ templ HomeStatement() {
 				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
 					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
 				</p>
-				<ol class="mt-12 grid gap-px overflow-hidden rounded-3xl bg-background/15 sm:grid-cols-3" data-secrets-roadmap>
+				<ol class="mt-12 grid grid-cols-1 gap-px overflow-hidden rounded-3xl bg-background/15 sm:grid-cols-3" data-secrets-roadmap>
 					@homeSecretStep("Now", "Encrypted with us", "Env vars and registry logins are sealed with AES-256-GCM in the control plane. Your code and your backups never pass through it.")
 					@homeSecretStep("Next", "Only on your servers", "Secrets move to the agent. Hosted ops keeps your login and nothing else.")
 					@homeSecretStep("Then", "End-to-end encrypted", "We can't read your secrets or your data. Not won't, can't.")
@@ -605,8 +605,8 @@ templ HomeCompare() {
 				</table>
 			</div>
 			<p class="mt-4 text-sm text-muted-foreground">From each tool's own docs and pricing pages, November 2026. A question mark means they do not say. Your server costs extra everywhere except on Heroku, Render, Railway and Fly.io, which run it for you.</p>
-			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeTrust("Your data stays yours", "We never store your code or your app's data. They live in your bucket and on your server, with no open port.", "/docs/guides/security", "How "+brand.Name+" keeps your servers closed")
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeTrust("Your data stays yours", "We never store your code or your app's data. They live in your bucket and on your server, with no open port.", "/docs/guides/security", "Read the security guide")
 				@homeTrust("Even more control", "Run "+brand.Name+" yourself. Every feature, free, under AGPL. Nothing of yours ever touches us.", "/docs/self-hosting", "Self-host "+brand.Name)
 			</div>
 			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -631,7 +631,7 @@ templ HomeCompare() {
 templ HomeGoilerplate() {
 	<section id="goilerplate" class="pt-3">
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16")), Attributes: templ.Attributes{"data-goilerplate-box": true}}) {
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16")), Attributes: templ.Attributes{"data-goilerplate-box": true}}) {
 				<div>
 					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Built with goilerplate?</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
@@ -695,7 +695,7 @@ templ HomePricing() {
 				<span class="text-foreground">Both get every feature, with unlimited servers, apps and members, all open source.</span>
 				The difference is the work around it.
 			</p>
-			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
 				@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-7 sm:p-10")), Attributes: templ.Attributes{"data-plan": "self-hosted"}}) {
 					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Self-hosted</p>
 					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
@@ -760,7 +760,7 @@ templ HomePricing() {
 templ homePlanRow(label, value string, dark bool) {
 	<div class="flex items-baseline justify-between gap-4 py-3.5">
 		<dt class={ "shrink-0 text-[15px]", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/60", dark) }>{ label }</dt>
-		<dd class="truncate text-right text-[15px] font-semibold">{ value }</dd>
+		<dd class="min-w-0 text-right text-[15px] font-semibold">{ value }</dd>
 	</div>
 }
 
@@ -771,7 +771,7 @@ templ HomeRoadmap() {
 	<section id="roadmap" class="scroll-mt-24 pt-32 sm:pt-44">
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Where { brand.Name } is going.</h2>
-			<div class="mt-10 grid gap-3 lg:grid-cols-3">
+			<div class="mt-10 grid grid-cols-1 gap-3 lg:grid-cols-3">
 				@homeRoadmapStep("Now", "Deploys, backups, data, domains, security, teams and the activity log. On the web, the CLI, the terminal UI, the API and MCP.")
 				@homeRoadmapStep("Next", "Live metrics for every server and app, uptime checks for every domain, alerts to email, Slack, Discord and Telegram. Env vars as one .env text, vim keys in the terminal UI, more than one bucket.")
 				@homeRoadmapStep("Later", "Zero trust: bucket keys only on your servers, secrets encrypted end to end, and servers that only obey commands you signed.")
