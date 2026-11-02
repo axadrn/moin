@@ -105,6 +105,8 @@ func (h *AppsHandler) DataDelete(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Row not deleted", err, nil)
 		return
 	}
+	// The row goes; the answer only carries the toast.
+	w.Header().Set("HX-Reswap", "delete")
 	toastDone(w, r, "Row "+strconv.FormatInt(rowID, 10)+" deleted", "")
 }
 
