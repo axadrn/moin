@@ -64,7 +64,21 @@ API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so the CLI and the TUI ask first. In a script, add `--yes`.
+ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so ops asks first. In a script, add `--yes`.
+
+### Turn the deploy hook off
+
+Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop using CI or think the URL leaked. A new hook can be made again any time.
+
+```surfaces
+Web: the app page, **Deploy hook**, **Turn off**
+CLI: ops hook off blog
+TUI: on the app, `H`, then `y`
+API: DELETE /api/v1/apps/{app}/hook
+MCP: remove_deploy_hook
+```
+
+It works also when the plan allows no changes. `get_app` and `GET /api/v1/apps/{app}` say in `hook` whether the app has one.
 
 ## 3. The workflow
 

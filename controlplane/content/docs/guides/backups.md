@@ -84,7 +84,7 @@ Puts the database back to the state of one snapshot.
 ```surfaces
 Web: the app page, **Backups** tab, **Restore** on a snapshot
 CLI: ops restore 20261031T143638Z-manual
-TUI: on the app, `b`, type the snapshot ID, `enter`, then `y`
+TUI: on the app, `b`, type the snapshot ID, `enter`, then the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
@@ -96,7 +96,7 @@ Puts the database back to any second of the last 7 days. Deleted the wrong rows 
 ```surfaces
 Web: the app page, **Backups** tab, **Restore to a point in time**: pick the day and the time, then **Restore to this time**
 CLI: ops restore --at "2026-10-31 14:01:00"
-TUI: on the app, `b`, type `14:01`, `enter`, then `y`
+TUI: on the app, `b`, type `14:01`, `enter`, then the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
@@ -108,6 +108,8 @@ Times are in UTC. In the API and MCP, send the time as `at`.
 A restore never loses the present. ops first takes a snapshot of the current database (`before-restore`), then downloads the backup, checks it, stops the app for the swap and starts it again. To undo a restore, restore that snapshot.
 
 After a restore, the point in time history starts again from the restored database.
+
+A restore replaces the live data, so ops asks you to type the app's name first, on the web, in the CLI and in the TUI. `--yes` skips it in scripts. An agent passes the name as `confirm`.
 
 ## A snapshot before every change
 
@@ -131,10 +133,12 @@ Removes the bucket from ops, so no server backs up any more. What is in the buck
 ```surfaces
 Web: **Bucket** in the sidebar, **Remove bucket**
 CLI: ops backups bucket rm
-TUI: settings tab, **Bucket**, `x`, then `y`
+TUI: settings tab, **Bucket**, `x`, then type the bucket name
 API: DELETE /api/v1/backup-storage
 MCP: remove_backup_storage
 ```
+
+ops asks you to type the bucket's name first; `--yes` skips it in scripts.
 
 ## Requirements
 

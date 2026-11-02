@@ -53,9 +53,13 @@ Sends the email again, for example when it landed in spam.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Resend**
+CLI: ops team resend ada@example.com
 TUI: on the team tab, pick the invitation, then `enter`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
+MCP: resend_invitation
 ```
+
+Only the new link works.
 
 ## Revoke an invitation
 
@@ -63,8 +67,10 @@ Takes an invitation back before someone accepts it.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Revoke**
+CLI: ops team revoke ada@example.com
 TUI: on the team tab, pick the invitation, `x`, then `y`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
+MCP: revoke_invitation
 ```
 
 ## Rename the workspace
@@ -73,6 +79,7 @@ Changes the name everyone in the workspace sees.
 
 ```surfaces
 Web: **Team**, **Workspace name**, **Save**
+CLI: ops team rename "Acme Inc"
 TUI: on the team tab, `n`
 API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
@@ -85,7 +92,7 @@ These four work only on the web, signed in:
 - **Change a role:** **Team**, **Role** on a member, then **Save**.
 - **Remove a member:** **Team**, **Remove** on a member. Their tokens stop reaching the workspace right away.
 - **Leave a workspace:** **Team**, **Leave workspace**.
-- **Delete a workspace:** **Team**, **Delete workspace**.
+- **Delete a workspace:** **Team**, **Delete workspace**, then type its name. It cannot be undone.
 
 An API token, and so the CLI, the TUI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
 

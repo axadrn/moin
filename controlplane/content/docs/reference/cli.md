@@ -12,14 +12,17 @@ order: 1
 | `ops activity [--limit 30]` | who deployed, restored or changed what, newest first |
 | `ops team` | members and open invitations of your workspace |
 | `ops team invite <email> [--admin]` | invites someone by email |
+| `ops team resend <email>` | sends an invitation again; only the new link works |
+| `ops team revoke <email> [--yes]` | takes an invitation back |
+| `ops team rename <name>` | renames the workspace; its links stay the same |
 | `ops servers` | lists servers |
 | `ops servers add [name]` | adds a server, prints its install command; without a name it gets one like `brave-otter` |
-| `ops servers rm <name> [--yes]` | removes a server and prints the command that removes its agent there |
+| `ops servers rm <name> [--yes]` | asks you to type its name, removes the server and prints the command that removes its agent there |
 | `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |
 | `ops servers rules <name>` | the server's own rules for ops, from `/etc/ops/rules` on it |
 | `ops apps` | lists apps |
 | `ops apps add --server <server> <name>` | adds an app |
-| `ops apps rm <app> [--yes]` | removes an app, keeps its data |
+| `ops apps rm <app> [--yes]` | asks you to type its name, removes the app, keeps its data |
 | `ops deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |
 | `ops deploy --image <image> [app]` | deploys an image built in CI, with the compose file of an earlier deploy of the repo |
 | `ops redeploy [app]` | runs the newest source or image again |
@@ -29,17 +32,18 @@ order: 1
 | `ops deploys [app]` | the newest deploys: number, status, started, took, note |
 | `ops deploys [app] v<number>` | one deploy with its whole log |
 | `ops hook [app] [--yes]` | asks, then prints a new deploy hook URL for CI; the old one stops working |
+| `ops hook off [app] [--yes]` | turns the deploy hook off; CI can no longer deploy |
 | `ops registry` | lists registry logins |
 | `ops registry set <host> <username>` | saves a login; the password or token comes from stdin |
 | `ops registry rm <host> [--yes]` | removes a login |
-| `ops rollback [app] [v<number>]` | starts an earlier release again; without a number the one before the live one |
+| `ops rollback [app] [v<number>] [--yes]` | starts an earlier release again; without a number the one before the live one |
 | `ops logs [--tail 200] [app]` | prints container logs |
 | `ops domains [app]` | lists domains and their DNS |
 | `ops domains add <domain> ...` | adds domains |
 | `ops domains rm <domain> ... [--yes]` | removes domains |
 | `ops domains canonical <domain\|none>` | the domain the others redirect to |
 | `ops protect [--user ops] [app]` | asks for a password; the password comes from stdin |
-| `ops protect off [app]` | makes the app public again |
+| `ops protect off [app] [--yes]` | makes the app public again |
 | `ops db [--db <path>] [app]` | tables, row counts and migration of the database |
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |
@@ -54,7 +58,7 @@ order: 1
 | `ops github` · `ops github repos` | where the GitHub App is installed, with the install link; the repos it reads |
 | `ops link owner/name [--branch main] [--auto=false] [app]` | follows a repo; every push deploys unless `--auto=false` |
 | `ops unlink [app] [--yes]` | stops following it |
-| `ops servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off]` | how the server is reached; prints what the agent set up |
+| `ops servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off] [--yes]` | how the server is reached; prints what the agent set up |
 | `ops integrations` · `integrations cloudflare` · `integrations tailscale` · `integrations rm <name> [--yes]` | the Cloudflare API token and the Tailscale auth key; keys come on stdin |
 | `ops env [--show] [app]` | lists env vars, values hidden without `--show` |
 | `ops env set [app] KEY=value …` | sets env vars |
@@ -70,7 +74,15 @@ Commands that work on an app take it as an argument or as `--app`, then from `x-
 
 ## Asking first
 
-Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `agent uninstall`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `hook` (the old deploy hook stops working), `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
+ops asks before it removes or replaces something. How it asks depends on how big the change is:
+
+| | Commands | Asks |
+| --- | --- | --- |
+| Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type blog to confirm:` |
+| Small or reversible | `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `sql --write` with DROP or DELETE | `[y/N]` |
+| Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup`, adding and setting things | nothing |
+
+`--yes` skips the question, the typed name too. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident. The web, the TUI and agents ask the same way; the API never asks.
 
 ## Agent updates
 

@@ -50,10 +50,12 @@ MCP: update_agent
 
 Disconnects the agent and makes its token stop working. A server with apps cannot be removed: remove the apps first.
 
+You cannot undo it, so ops asks you to type the server's name first: in the web dialog (the copy button next to the name helps), in the CLI and in the TUI. `--yes` skips it in scripts. An agent passes the name as `confirm`.
+
 ```surfaces
 Web: **Servers**, open the server, **Remove server**
 CLI: ops servers rm web-1
-TUI: on the server, `x`, then `y`
+TUI: on the server, `x`, then type its name
 API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```

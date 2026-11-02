@@ -168,7 +168,7 @@ API: POST /api/v1/apps/{app}/rollback
 MCP: rollback_app
 ```
 
-A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`ops rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` before `r` to choose one. In the API, send the deploy as `{"number": 3}`.
+A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`ops rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` before `r` to choose one. In the API, send the deploy as `{"number": 3}`. The web, the CLI and the TUI ask first; in a script, add `--yes`.
 
 ## Remove an app
 
@@ -177,10 +177,12 @@ Stops the app and removes its containers and images. Its volumes and data stay o
 ```surfaces
 Web: the app page, **Remove app**
 CLI: ops apps rm blog
-TUI: on the app, `x`, then `y`
+TUI: on the app, `x`, then type its name
 API: DELETE /api/v1/apps/{app}
 MCP: remove_app
 ```
+
+You cannot undo it, so ops asks you to type the app's name first. `ops apps rm blog --yes` skips that in scripts. An agent passes the name as `confirm`.
 
 ## Push to deploy with GitHub Actions
 

@@ -6,7 +6,7 @@ order: 12
 
 The control plane serves an MCP server at `/mcp`. Every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back blog and show me its logs"*.
 
-Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them.
+Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_backup_storage` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
 
 ## Connect Claude Code
 
@@ -24,31 +24,32 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `whoami` | the account and token | read |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
-| `remove_server` | removes a server; returns the `uninstall_command` for the server | write, destructive |
+| `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server | write, destructive |
 | `update_agent` | puts the control plane's agent version on a server | write |
 | `list_apps` | apps with live and newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |
-| `remove_app` | stops and removes an app, keeps its data | write, destructive |
+| `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |
 | `deploy_image` | deploys an image built in CI | write |
 | `create_deploy_hook` | a new deploy hook URL for CI, shown once; the old one stops working | write, destructive |
+| `remove_deploy_hook` | turns the deploy hook off; CI can no longer deploy | write, destructive |
 | `list_registries` | registry logins, without passwords | read |
 | `set_registry` | stores a registry login | write |
 | `remove_registry` | removes a registry login | write, destructive |
-| `rollback_app` | starts an earlier release again | write |
+| `rollback_app` | starts an earlier release again | write, destructive |
 | `get_logs` | the last container lines | read |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
 | `get_backups` | snapshots, point in time window, restore drills | read |
 | `back_up_app` | takes a snapshot now | write |
-| `restore_app` | restores a snapshot or a point in time | write, destructive |
+| `restore_app` | restores a snapshot or a point in time; `confirm` is the app's name | write, destructive |
 | `set_backup_settings` | snapshot before every change | write |
 | `get_backup_storage` | the bucket, without its secret | read |
 | `set_backup_storage` | sets the bucket | write |
-| `remove_backup_storage` | stops backups | write, destructive |
+| `remove_backup_storage` | stops backups; `confirm` is the bucket's name | write, destructive |
 | `check_domains` | whether each domain points at the server | read |
 | `set_domains` | domains and the canonical one | write |
 | `set_protection` | a password in front of the app | write |
@@ -70,4 +71,6 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `list_workspaces` · `get_workspace` | the token's workspace with its members | read |
 | `list_activity` | who did what, newest first | read |
 | `invite_member` | invites someone by email | write |
+| `resend_invitation` | sends an invitation again | write |
+| `revoke_invitation` | takes an invitation back | write, destructive |
 | `rename_workspace` | renames the workspace | write |
