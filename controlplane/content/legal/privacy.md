@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What ops stores, why, where it lives and how to get rid of it
-lastUpdated: November 1, 2026
+lastUpdated: November 2, 2026
 ---
 
 Short version: ops stores what it needs to run your servers and apps, encrypts every secret, uses no tracking cookies and no advertising, and deletes your data when you delete your account. Your apps and their data stay on your own servers.
@@ -39,13 +39,17 @@ Your apps, their files and their databases live on your servers, not with us. Wh
 
 If your apps hold personal data of other people, you are the controller for that data and ops processes it only on your instructions. Ask at [{{support_email}}](mailto:{{support_email}}) for a data processing agreement.
 
+## Activity log
+
+Each workspace keeps a log of who changed what, so a team can see who deployed, restored or changed a setting. Each entry holds the time, the member's email or the API token's name, how the change came in (web, CLI, terminal UI, API, MCP, GitHub or a deploy hook), the IP address and browser or program of the request, and what changed. It never holds env var values, secrets, your SQL or the values in your database. Every member of the workspace sees the log; only admins and owners see IP addresses and browsers. The log stays as long as the workspace exists. When you delete your account, your email stays on your earlier entries, so the team still knows who made them. Legal basis is our and your team's legitimate interest in a secure, accountable service (Art. 6(1)(f) GDPR).
+
 ## Payments
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: it takes your payment details, handles tax, invoices and receipts, and has its own [privacy policy](https://stripe.com/privacy). We never see your card number. We store the Stripe customer and subscription reference, your plan and its status, so we know which features your account has.
 
 ## Retention
 
-We keep your data while your account exists. Deleting your account deletes your servers, apps, deploys, sources, env vars and tokens. Payment records stay with Stripe for as long as tax law requires.
+We keep your data while your account exists. Deleting your account deletes your servers, apps, deploys, env vars and tokens. Your email stays on your entries in the activity log, as described above. Payment records stay with Stripe for as long as tax law requires.
 
 ## Your rights
 
