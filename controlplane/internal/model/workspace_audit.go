@@ -259,6 +259,8 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "updated the agent of " + target + " from " + d["from"] + " to " + d["to"]
 	case "server.security_set":
 		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
+	case "server.reinstalled":
+		return "installed the agent of " + target + " again, and the old agent's token stopped working: " + strings.Join(nonEmpty(d["hostname"], d["os"]+"/"+d["arch"], d["version"]), ", ")
 	case "server.installed":
 		return "connected " + target + " for the first time: " + strings.Join(nonEmpty(d["hostname"], d["os"]+"/"+d["arch"], d["version"]), ", ")
 	case "deploy.succeeded":

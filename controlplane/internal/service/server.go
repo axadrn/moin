@@ -142,7 +142,7 @@ func (s *ServerService) Rename(actor Actor, idOrName, name string) (*model.Serve
 	if err != nil {
 		return nil, err
 	}
-	s.record(actor, "server.renamed", "server", name, map[string]string{"from": server.Name})
+	s.record(actor, "server.renamed", "server", name, map[string]string{"from": server.Name, "to": name})
 	s.notify(actor.WorkspaceID)
 	server.Name = name
 	server.Online = s.Online(server.ID)
@@ -242,7 +242,11 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 		session.kick()
 	}
 	slog.Info("agent registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
-	s.record(System(server.WorkspaceID), "server.installed", "server", server.Name, map[string]string{"hostname": hello.Hostname, "os": hello.OS, "arch": hello.Arch, "version": hello.AgentVersion})
+	action := "server.installed"
+	if server.AgentTokenHash != nil {
+		action = "server.reinstalled"
+	}
+	s.record(System(server.WorkspaceID), action, "server", server.Name, map[string]string{"hostname": hello.Hostname, "os": hello.OS, "arch": hello.Arch, "version": hello.AgentVersion})
 	s.notify(server.WorkspaceID)
 	return server, raw, nil
 }
