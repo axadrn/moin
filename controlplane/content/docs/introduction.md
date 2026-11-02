@@ -24,13 +24,32 @@ All of ops is open source. Use the hosted control plane, or [host it yourself fo
 | **agent** | `ops agent` on each server. It dials out to the control plane over one WebSocket. Nothing on your server listens for ops. |
 | **`ops`** | One binary. `ops` opens the terminal UI, `ops <command>` is the CLI, `ops agent` is the agent. Open source under AGPL-3.0. |
 
-## Words
+## How ops works in 2 minutes
 
-- **server**: a machine with an agent.
-- **app**: a Docker Compose project on one server.
-- **deploy**: one release of an app, numbered per app: v1, v2, v3.
-- **env vars**: settings and secrets of an app, stored encrypted.
-- **backup**: a copy of an app's database in your bucket: continuous, or a snapshot.
+- **workspace**: your team's space in ops. It holds your servers, apps, bucket and people. You pay per workspace.
+- **server**: a computer you rent, for example at Hetzner, with the ops agent on it.
+- **agent**: a small program on your server. It calls ops and does the work there, like a caretaker who phones in for the day's jobs. Nothing on your server waits for calls from ops.
+- **app**: one website or service, such as your shop. It is a Docker Compose project and lives on one server.
+- **deploy**: one release of an app, numbered v1, v2, v3. When a new one fails, the last good one starts again.
+- **env vars**: the settings and secrets of an app, such as an API key. ops keeps them encrypted and hands them to your server with each deploy.
+- **domain**: the address people type to reach your app, such as shop.example.com. ops gives it HTTPS.
+- **bucket**: your own storage box, for example at Cloudflare R2. One per workspace. It holds your code on its way to the server and your backups. ops never stores either.
+- **backup**: every change of your app's SQLite database, copied to your bucket about once a second.
+- **snapshot**: a full copy of the database at one moment, like a photo. ops takes one before every deploy, restore and data change.
+- **restore**: puts the database back to a snapshot, or to any second of the last 7 days.
+- **team members and roles**: the people in your workspace. Members deploy and fix things, admins also invite people, the owner also handles billing and roles.
+- **API token**: a key for the CLI, scripts and AI agents to act for you. It belongs to one workspace and can read, or read and write.
+- **activity log**: the list of who changed what in your workspace, and when.
+
+```
+workspace "acme"     your team, your bucket and your servers
+├── server web-1     app shop, app blog
+└── server web-2     app api
+
+ops deploy   laptop ──▶ your bucket ──▶ web-1     (your code, gone after the deploy)
+GitHub       GitHub ──────────────────▶ web-2     (no bucket needed)
+backups      web-1, web-2 ──▶ your bucket          (every change, plus snapshots)
+```
 
 ## Where builds run
 
