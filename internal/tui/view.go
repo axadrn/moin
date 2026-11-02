@@ -119,31 +119,6 @@ func (m model) body(width, room int) []string {
 	return m.appsView(width, room)
 }
 
-// activityView is who did what, newest first, as many as fit.
-func (m model) activityView(room int) []string {
-	if len(m.events) == 0 {
-		return []string{pad + style.Muted.Render("Nothing happened yet. Deploys, restores, SQL writes and every other change show up here.")}
-	}
-	rows := make([][]string, 0, len(m.events))
-	for _, event := range m.events {
-		rows = append(rows, []string{style.Muted.Render(event.CreatedAt.Local().Format("Jan 2 15:04")), event.Actor, style.Muted.Render(viaName(event.Via)), event.Summary})
-	}
-	return table([]string{"WHEN", "WHO", "VIA", "WHAT"}, rows, -1, room)
-}
-
-// viaName names how a change came in.
-func viaName(via string) string {
-	switch via {
-	case "api":
-		return "cli"
-	case "mcp":
-		return "agent"
-	case "hook":
-		return "deploy hook"
-	}
-	return via
-}
-
 func (m model) serversView(width, room int) []string {
 	var added []string
 	if m.added != nil {
@@ -480,7 +455,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && (m.added != nil || m.removed != nil):
 		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabActivity:
-		return nil, [][2]string{{"tab", "team"}, {"q", "quit"}}
+		return nil, m.activityKeys()
 	case m.tab == tabTeam:
 		return nil, m.teamKeys()
 	case m.tab == tabSettings:

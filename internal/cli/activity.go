@@ -13,49 +13,73 @@ import (
 	"github.com/axadrn/ops/internal/style"
 )
 
-// activity prints what the team did, newest first.
+// activity prints what the team did, newest first, to the second in the
+// local time zone. --app, --server and --user narrow it; --cursor continues
+// with older events.
 func activity(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("activity", "activity [--limit 30]")
+	flags := newFlags("activity", "activity [--app <app>] [--server <server>] [--user <email>] [--limit 30] [--cursor <cursor>]")
 	limit := flags.Int("limit", 30, "how many events, at most 200")
+	app := flags.String("app", "", "only this app")
+	server := flags.String("server", "", "only this server and its apps")
+	user := flags.String("user", "", "only this member, by email")
+	cursor := flags.String("cursor", "", "continue with older events, from the hint at the end")
 	if err := flags.parse(args); err != nil {
 		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	events, err := api.Activity(ctx, min(max(*limit, 1), 200))
+	query := client.ActivityQuery{App: *app, Server: *server, User: *user, Cursor: *cursor, Limit: min(max(*limit, 1), 200)}
+	page, err := api.Activity(ctx, query)
 	if err != nil {
 		return err
 	}
-	if len(events) == 0 {
+	if len(page.Items) == 0 {
 		fmt.Fprintln(stdout, style.Muted.Render("Nothing happened yet."))
 		return nil
 	}
-	now := time.Now()
 	rows := [][]string{}
-	for _, event := range events {
-		rows = append(rows, []string{since(event.CreatedAt, now), event.Actor, viaName(event.Via), event.Summary})
+	for _, event := range page.Items {
+		rows = append(rows, []string{when(event.CreatedAt), event.Actor, viaName(event.Via, event.Token), event.Summary})
 	}
 	table(stdout, []string{"WHEN", "WHO", "VIA", "WHAT"}, rows)
+	if page.Next != "" {
+		next := build.Name + " activity"
+		for _, flag := range [][2]string{{"app", *app}, {"server", *server}, {"user", *user}} {
+			if flag[1] != "" {
+				next += " --" + flag[0] + " " + flag[1]
+			}
+		}
+		if *limit != 30 {
+			next += fmt.Sprintf(" --limit %d", query.Limit)
+		}
+		hint(stdout, "Older events:", next+" --cursor "+page.Next)
+	}
 	return nil
 }
 
-// viaName names how a change came in, as the web page does.
-func viaName(via string) string {
+// when is the time of an event to the second, in the local time zone.
+func when(t time.Time) string {
+	return t.Local().Format("2006-01-02 15:04:05 MST")
+}
+
+// viaName names how a change came in, with the API token it came with.
+func viaName(via, token string) string {
+	name := via
 	switch via {
-	case "web":
-		return "web"
-	case "api":
-		return "cli"
-	case "mcp":
-		return "agent"
 	case "hook":
-		return "deploy hook"
-	case "github":
-		return "github"
+		name = "deploy hook"
+	case "system":
+		name = "ops"
 	}
-	return ""
+	if token != "" {
+		return name + ", token " + token
+	}
+	return name
 }
 
 // team lists the members of the token's workspace, invites one, sends

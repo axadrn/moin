@@ -25,6 +25,7 @@ import (
 func Run(ctx context.Context, api *client.Client, url, dir string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	api.UseSurface("tui")
 	shared := &shared{}
 	program := tea.NewProgram(model{api: api, url: url, dir: dir, ctx: ctx, shared: shared, loading: true}, tea.WithContext(ctx))
 	shared.program = program
@@ -59,7 +60,7 @@ func watch(ctx context.Context, program *tea.Program, stream func(context.Contex
 type (
 	serversMsg []client.Server
 	appsMsg    []client.App
-	eventsMsg  []client.Event
+	eventsMsg  client.ActivityPage
 	errMsg     struct{ err error }
 	// streamErrMsg means a live stream broke; it reconnects by itself.
 	streamErrMsg struct{ err error }
@@ -181,8 +182,12 @@ type model struct {
 
 	tab  tab
 	mode mode
-	// events is the activity of the workspace, newest first.
-	events  []client.Event
+	// events is the activity of the workspace, newest first, as far as it
+	// is loaded; activityNext loads older ones. activityFilter narrows it to
+	// one app, server or member.
+	events         []client.Event
+	activityNext   string
+	activityFilter client.ActivityQuery
 	width   int
 	height  int
 	err     error
@@ -273,7 +278,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadDetail(m.detail.App.Name)
 		}
 	case eventsMsg:
-		m.events = msg
+		m.events, m.activityNext = msg.Items, msg.Next
+	case olderEventsMsg:
+		m.events, m.activityNext = append(slices.Clone(m.events), msg.Items...), msg.Next
+	case activityFilterMsg:
+		m.activityFilter = client.ActivityQuery(msg)
+		return m, m.loadActivity()
 	case teamMsg:
 		m.team, m.teamErr = msg.team, msg.err
 		m.teamSelected = min(m.teamSelected, max(len(m.teamRows())-1, 0))
@@ -576,7 +586,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case tabServers:
 		return m.serverKey(key)
 	case tabActivity:
-		return m, nil
+		return m.activityKey(key)
 	case tabTeam:
 		return m.teamKey(key)
 	case tabSettings:
@@ -1030,18 +1040,6 @@ func (m model) loadDetail(name string) tea.Cmd {
 			return errMsg{err}
 		}
 		return detailMsg(detail)
-	}
-}
-
-// loadActivity fetches what the team did; every change of the servers or
-// apps loads it again while the tab is open.
-func (m model) loadActivity() tea.Cmd {
-	return func() tea.Msg {
-		events, err := m.api.Activity(m.ctx, 100)
-		if err != nil {
-			return errMsg{err}
-		}
-		return eventsMsg(events)
 	}
 }
 

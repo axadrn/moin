@@ -10,25 +10,59 @@ import (
 )
 
 // Event is one thing that happened in the workspace. Actor and Summary read
-// as a sentence: "ada@example.com deployed blog v12".
+// as a sentence: "ada@example.com deployed blog v12". Via is web, cli, tui,
+// api, mcp, hook, github or system, Token the API token by name. IP and
+// UserAgent are there for admins only.
 type Event struct {
 	ID        string    `json:"id"`
 	Action    string    `json:"action"`
 	Actor     string    `json:"actor"`
 	Summary   string    `json:"summary"`
 	Via       string    `json:"via"`
+	Token     string    `json:"token"`
+	App       string    `json:"app"`
+	Server    string    `json:"server"`
+	IP        string    `json:"ip"`
+	UserAgent string    `json:"user_agent"`
 	Metadata  string    `json:"metadata"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Activity returns up to limit events of the token's workspace, newest
-// first.
-func (c *Client) Activity(ctx context.Context, limit int) ([]Event, error) {
-	var answer struct {
-		Items []Event `json:"items"`
+// ActivityQuery picks a page of the activity: up to Limit events, after the
+// cursor of the page before, of one app, server or member (an email).
+type ActivityQuery struct {
+	App, Server, User, Cursor string
+	Limit                     int
+}
+
+// ActivityPage is a page of the activity, newest first. Next continues with
+// older events and is empty on the last page.
+type ActivityPage struct {
+	Items []Event
+	Next  string
+}
+
+// Activity returns a page of the token's workspace activity, newest first.
+func (c *Client) Activity(ctx context.Context, query ActivityQuery) (ActivityPage, error) {
+	values := url.Values{}
+	for key, value := range map[string]string{"app": query.App, "server": query.Server, "user": query.User, "cursor": query.Cursor} {
+		if value != "" {
+			values.Set(key, value)
+		}
 	}
-	err := c.do(ctx, http.MethodGet, "/api/v1/activity?limit="+strconv.Itoa(limit), nil, &answer)
-	return answer.Items, err
+	if query.Limit > 0 {
+		values.Set("limit", strconv.Itoa(query.Limit))
+	}
+	var answer struct {
+		Items      []Event `json:"items"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	err := c.do(ctx, http.MethodGet, "/api/v1/activity?"+values.Encode(), nil, &answer)
+	page := ActivityPage{Items: answer.Items}
+	if answer.NextCursor != nil {
+		page.Next = *answer.NextCursor
+	}
+	return page, err
 }
 
 // Team is the workspace of the token with its members and the invitations

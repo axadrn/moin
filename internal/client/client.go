@@ -179,14 +179,20 @@ type Client struct {
 	token        string
 	tokenFromEnv bool
 	http         *http.Client
+	// surface is "cli" or "tui". It goes in the user agent, so the activity
+	// says where a change came from.
+	surface string
 }
+
+// UseSurface names the program that sends the requests: "cli" or "tui".
+func (c *Client) UseSurface(surface string) { c.surface = surface }
 
 // New returns a client for the config, or ErrNotLoggedIn.
 func New(config Config) (*Client, error) {
 	if config.Token == "" {
 		return nil, ErrNotLoggedIn
 	}
-	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, http: &http.Client{}}, nil
+	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, http: &http.Client{}, surface: "cli"}, nil
 }
 
 // Account returns the user the token belongs to.
@@ -336,6 +342,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 		return nil, err
 	}
 	request.Header.Set("Authorization", "Bearer "+c.token)
+	request.Header.Set("User-Agent", "ops-"+c.surface+"/"+build.Version)
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
