@@ -65,6 +65,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
 		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
+	mcpsdk.AddTool(server, add("rename_server", "Rename a server",
+		"Gives a server a new name, 1 to 64 characters, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.renameServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.updateAgent)))
@@ -244,6 +247,12 @@ type ServerInput struct {
 }
 
 func (i ServerInput) server() string { return cmp.Or(i.Server, i.Name) }
+
+// RenameServerInput is the input of rename_server.
+type RenameServerInput struct {
+	Server string `json:"server" jsonschema:"the server name or ID"`
+	Name   string `json:"name" jsonschema:"the new name"`
+}
 
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
@@ -478,6 +487,14 @@ func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveSer
 		Message:          "Removed server " + server.Name + ". Its agent is still installed: run " + command + " on the server to remove it.",
 		UninstallCommand: command,
 	}, nil
+}
+
+func (t opsTools) renameServer(_ context.Context, caller Caller, input RenameServerInput) (ServerOutput, error) {
+	server, err := t.services.Servers.Rename(caller.actor(), input.Server, input.Name)
+	if err != nil {
+		return ServerOutput{}, err
+	}
+	return ServerOutput{api.NewServer(*server)}, nil
 }
 
 func (t opsTools) updateAgent(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {

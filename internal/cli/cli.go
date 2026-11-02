@@ -43,6 +43,7 @@ Servers
   servers            List servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
+  servers rename     Rename a server: servers rename web-1 shop-1
   servers update     Update the agent to the control plane's version: servers update [web-1]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for ops, from /etc/ops/rules on it
@@ -420,6 +421,23 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return printRules(ctx, api, flags.Arg(0), stdout)
 	case "update":
 		return updateAgents(ctx, args, stdout)
+	case "rename":
+		flags := newFlags("servers rename", "servers rename <server> <new name>")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 2 {
+			return flags.wrong()
+		}
+		renamed, err := api.RenameServer(ctx, flags.Arg(0), flags.Arg(1))
+		if err != nil {
+			return err
+		}
+		done(stdout, "Renamed %s to %s", flags.Arg(0), style.Bold.Render(renamed.Name))
+		return nil
 	case "rm", "remove":
 		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
 		if err := flags.parse(args); err != nil {

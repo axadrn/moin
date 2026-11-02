@@ -847,6 +847,40 @@ paths:
   /api/v1/servers/{id}:
     parameters:
       - $ref: '#/components/parameters/ServerID'
+    patch:
+      tags: [Servers]
+      operationId: renameServer
+      summary: Rename a server
+      description: The same rules as adding one. Its apps stay on it; they point at the server, not its name.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameServerRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The renamed server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No server with this ID or name belongs to the account.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`: empty, longer than 64 characters, or taken in the workspace.'
+        '500':
+          $ref: '#/components/responses/Internal'
     delete:
       tags: [Servers]
       operationId: deleteServer
@@ -3787,6 +3821,14 @@ components:
           type: string
           maxLength: 64
           description: Empty or left out gets a name like `brave-otter`.
+    RenameServerRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
     CreatedServer:
       type: object
       required: [server, install_token, install_command, expires_at]

@@ -42,7 +42,7 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"add_server", "back_up_app", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "execute_sql", "get_app", "get_backup_storage", "get_backups", "get_billing", "get_deploy", "get_env", "get_github", "get_integrations", "get_logs", "get_workspace", "invite_member", "link_repo", "list_activity", "list_apps", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "query_database", "redeploy_app", "remove_app", "remove_backup_storage", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_workspace", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_backup_settings", "set_backup_storage", "set_domains", "set_env", "set_integrations", "set_protection", "set_registry", "set_server_security", "start_app", "stop_app", "unlink_repo", "update_agent", "whoami"}
+	want := []string{"add_server", "back_up_app", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "execute_sql", "get_app", "get_backup_storage", "get_backups", "get_billing", "get_deploy", "get_env", "get_github", "get_integrations", "get_logs", "get_workspace", "invite_member", "link_repo", "list_activity", "list_apps", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "query_database", "redeploy_app", "remove_app", "remove_backup_storage", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_server", "rename_workspace", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_backup_settings", "set_backup_storage", "set_domains", "set_env", "set_integrations", "set_protection", "set_registry", "set_server_security", "start_app", "stop_app", "unlink_repo", "update_agent", "whoami"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
@@ -416,8 +416,12 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	for _, input := range []map[string]any{{"app": "shop"}, {"name": "blog"}} {
 		output[mcp.AppDetail](t, call(t, session, "get_app", input))
 	}
-	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-2", "confirm": "box"}), "validation_failed")
-	output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-2", "confirm": "box-2"}))
+	renamed := output[mcp.ServerOutput](t, call(t, session, "rename_server", map[string]any{"server": "box-2", "name": "box-3"}))
+	if renamed.Server.Name != "box-3" {
+		t.Fatalf("rename_server = %#v", renamed)
+	}
+	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box"}), "validation_failed")
+	output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box-3"}))
 	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"}), "server_has_apps")
 	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "validation_failed")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))

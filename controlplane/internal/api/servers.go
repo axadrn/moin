@@ -136,6 +136,24 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type renameServerRequest struct {
+	Name string `json:"name"`
+}
+
+// Rename gives a server a new name and answers it.
+func (h *ServersHandler) Rename(w http.ResponseWriter, r *http.Request) {
+	var request renameServerRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	server, err := h.servers.Rename(actor(r), r.PathValue("id"), request.Name)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewServer(*server))
+}
+
 // Delete removes a server by ID or name and disconnects its agent.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	err := h.servers.Delete(actor(r), r.PathValue("id"))

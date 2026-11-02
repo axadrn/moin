@@ -691,6 +691,13 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			server := m.servers[m.selected]
 			return m.confirmName("Remove "+server.Name+"?", "Its agent is disconnected; the agent stays on the machine until you uninstall it.", server.Name, m.removeServer(server.ID, server.Name)), nil
 		}
+	case "n":
+		if m.selected < len(m.servers) {
+			server := m.servers[m.selected]
+			return m.ask("Rename "+server.Name, func(values []string) tea.Cmd {
+				return m.renameServer(server.ID, server.Name, values[0])
+			}, formField{label: "Name", value: server.Name, hint: placeholder(server.Name, "")}), nil
+		}
 	case "u":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
@@ -1020,6 +1027,16 @@ func (m model) removeServer(id, name string) tea.Cmd {
 			return errMsg{err}
 		}
 		return removedMsg{name: name, uninstall: uninstall}
+	}
+}
+
+func (m model) renameServer(id, from, name string) tea.Cmd {
+	return func() tea.Msg {
+		renamed, err := m.api.RenameServer(m.ctx, id, name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return noticeMsg("Renamed " + from + " to " + renamed.Name)
 	}
 }
 

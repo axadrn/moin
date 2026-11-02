@@ -267,6 +267,23 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, done, "")
 }
 
+// RenameServer gives the server a new name and answers its page with it.
+func (h *AppsHandler) RenameServer(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))
+	if err != nil {
+		failed(w, r, "Server not renamed", err, nil)
+		return
+	}
+	renamed, err := h.servers.Rename(actor(r), server.ID, r.FormValue("name"))
+	if err != nil {
+		failed(w, r, "Server not renamed", err, map[string]string{"name": "server-rename"})
+		return
+	}
+	h.renderSecurity(w, r)
+	toastDone(w, r, server.Name+" renamed", "It is "+renamed.Name+" now. Its apps stay on it.")
+}
+
 func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))

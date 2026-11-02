@@ -187,3 +187,26 @@ func TestAddingServersNeedsThePlan(t *testing.T) {
 		t.Fatalf("ops plan: err = %v", err)
 	}
 }
+
+func TestRenameServer(t *testing.T) {
+	servers := newServerService(t)
+	if _, _, err := servers.Create(owner, "prod"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := servers.Create(owner, "staging"); err != nil {
+		t.Fatal(err)
+	}
+	renamed, err := servers.Rename(owner, "prod", " live ")
+	if err != nil || renamed.Name != "live" {
+		t.Fatalf("rename = %v, %v", renamed, err)
+	}
+	if _, err := servers.Rename(owner, "live", "staging"); !errors.Is(err, repository.ErrDuplicateServer) {
+		t.Fatalf("taken name: err = %v", err)
+	}
+	if _, err := servers.Rename(owner, "live", " "); !errors.Is(err, ErrServerName) {
+		t.Fatalf("empty name: err = %v", err)
+	}
+	if _, err := servers.Rename(other, "live", "mine"); !errors.Is(err, repository.ErrServerNotFound) {
+		t.Fatalf("another workspace: err = %v", err)
+	}
+}

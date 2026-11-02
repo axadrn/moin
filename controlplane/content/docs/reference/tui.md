@@ -31,6 +31,7 @@ removing members, leaving and deleting the workspace are web only.
 | `a` | servers | adds a server and shows its install command |
 | `t`, then `y` | servers | turns the Cloudflare Tunnel on or off |
 | `s`, then `y` | servers | turns SSH only on Tailscale on or off |
+| `n` | servers | renames the selected server |
 | `u` | servers | updates the server's agent to the control plane's version |
 | `f`, then `y` | servers | turns the firewall on or off |
 | `x`, then the name | servers, apps | removes the selected one; for a server, shows the command that removes its agent there |

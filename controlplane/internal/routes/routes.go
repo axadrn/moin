@@ -168,6 +168,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/data/insert", workspace(apps.DataInsert))
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/{id}/security", workspace(apps.ServerSecurity))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/security", workspace(apps.SetServerSecurity))
+	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/name", workspace(apps.RenameServer))
 	mux.HandleFunc("POST /app/{workspaceSlug}/integrations", workspace(apps.SetIntegrations))
 	mux.HandleFunc("GET /app/{workspaceSlug}/github/install", workspace(apps.GitHubInstall))
 	mux.HandleFunc("GET /app/github/setup", middleware.RequireAuth(apps.GitHubSetup))

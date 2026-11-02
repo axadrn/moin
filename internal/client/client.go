@@ -220,6 +220,13 @@ func (c *Client) AddServer(ctx context.Context, name string) (NewServer, error) 
 	return response, err
 }
 
+// RenameServer gives a server a new name and returns it.
+func (c *Client) RenameServer(ctx context.Context, idOrName, name string) (Server, error) {
+	var response Server
+	err := c.do(ctx, http.MethodPatch, "/api/v1/servers/"+url.PathEscape(idOrName), map[string]string{"name": name}, &response)
+	return response, err
+}
+
 // UpdateAgent has the agent of a server download the control plane's ops
 // binary, swap it in and restart. It returns the server once the new agent
 // is back.

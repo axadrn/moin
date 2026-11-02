@@ -32,6 +32,18 @@ API: POST /api/v1/servers
 MCP: add_server
 ```
 
+## Rename a server
+
+Gives a server a new name. The rules are those of adding one: up to 64 characters, unique in the workspace. Its apps stay on it.
+
+```surfaces
+Web: **Servers**, open the server, **Name**, **Save**
+CLI: ops servers rename web-1 shop-1
+TUI: on the server, `n`
+API: PATCH /api/v1/servers/{id}
+MCP: rename_server
+```
+
 ## Update the agent
 
 Puts the agent version of your control plane on a server. Use it when ops says a newer agent is there.

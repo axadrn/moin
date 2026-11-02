@@ -87,7 +87,7 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 	if name == "" {
 		name = s.freeName(actor.WorkspaceID)
 	}
-	if utf8.RuneCountInString(name) > maxServerNameLength || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+	if !validServerName(name) {
 		return nil, "", ErrServerName
 	}
 	err := s.allowed(actor.WorkspaceID)
@@ -118,6 +118,35 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 // InstallCommand is what people run on the server.
 func (s *ServerService) InstallCommand(installToken string) string {
 	return fmt.Sprintf("curl -fsSL %s/install.sh | sudo sh -s -- %s", s.appURL, installToken)
+}
+
+func validServerName(name string) bool {
+	return name != "" && utf8.RuneCountInString(name) <= maxServerNameLength && strings.IndexFunc(name, unicode.IsControl) < 0
+}
+
+// Rename gives a server a new name under the rules of Create. Apps follow,
+// since they point at the server, not its name.
+func (s *ServerService) Rename(actor Actor, idOrName, name string) (*model.Server, error) {
+	name = strings.TrimSpace(name)
+	if !validServerName(name) {
+		return nil, ErrServerName
+	}
+	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if server.Name == name {
+		return server, nil
+	}
+	err = s.servers.Rename(server.ID, actor.WorkspaceID, name)
+	if err != nil {
+		return nil, err
+	}
+	s.record(actor, "server.renamed", "server", name, map[string]string{"from": server.Name})
+	s.notify(actor.WorkspaceID)
+	server.Name = name
+	server.Online = s.Online(server.ID)
+	return server, nil
 }
 
 // UninstallCommand removes the agent from a server, run on it after the

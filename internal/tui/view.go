@@ -467,7 +467,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && len(m.servers) == 0:
 		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"n", "rename"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		var keys [][2]string
 		if len(m.detail.Deploys) > 0 {

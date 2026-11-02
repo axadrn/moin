@@ -26,6 +26,7 @@ type ServerRepository interface {
 	UpdateHello(id string, hello model.Server) error
 	TouchLastSeen(id string, at time.Time) error
 	DeleteForWorkspace(id, workspaceID string) error
+	Rename(id, workspaceID, name string) error
 	SetSecurity(server model.Server) error
 	SetSecurityReport(id, report string) error
 	Integrations(workspaceID string) (model.Integrations, error)
@@ -113,6 +114,25 @@ func (r *serverRepository) DeleteForWorkspace(id, workspaceID string) error {
 	result, err := r.db.Exec(`DELETE FROM servers WHERE id = $1 AND workspace_id = $2`, id, workspaceID)
 	if err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
 		return ErrServerHasApps
+	}
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrServerNotFound
+	}
+	return nil
+}
+
+// Rename gives a server a new name, unique in its workspace.
+func (r *serverRepository) Rename(id, workspaceID, name string) error {
+	result, err := r.db.Exec(`UPDATE servers SET name = $1 WHERE id = $2 AND workspace_id = $3`, name, id, workspaceID)
+	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: servers.workspace_id, servers.name") || strings.Contains(err.Error(), "duplicate key value")) {
+		return ErrDuplicateServer
 	}
 	if err != nil {
 		return err
