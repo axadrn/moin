@@ -1,7 +1,7 @@
 ---
 title: Terms of Service
 description: The plain-language rules for using ops
-lastUpdated: November 1, 2026
+lastUpdated: November 2, 2026
 ---
 
 These terms govern ops: the website, the control plane, its API and MCP server, and the `ops` command line tool and agent. By creating an account you agree to them.
@@ -31,6 +31,14 @@ ops is a subscription per workspace, monthly or yearly; paying yearly costs less
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing settings; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it.
 
 If a payment fails or is reversed, paid features stop until the subscription is paid again. Your apps keep running on your servers.
+
+## Beta and changes
+
+ops is in beta and moves fast. That means:
+
+- **Prices, plans, limits and features can change at any time.** A new price applies to new subscriptions. While your subscription stays active, it keeps the price you started with.
+- **The beta comes as it is.** We work hard to keep ops up, but there is no uptime guarantee and no promised response time.
+- **Your data stays your responsibility.** ops backs up your databases and checks the backups every day, but you decide what runs and what is kept. Check that your backups are there and that you can restore them, and keep your own copy of anything you cannot afford to lose.
 
 ## When the control plane is down
 
