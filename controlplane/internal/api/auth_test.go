@@ -257,6 +257,38 @@ func TestOnboardingGate(t *testing.T) {
 	expectStatus(t, open, http.StatusOK)
 }
 
+func TestOnboardingNamesTheWorkspace(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	for _, test := range []struct {
+		id, body, want string
+	}{
+		{id: "named", body: `{"name":"Grace Hopper","workspace_name":" Acme Labs "}`, want: "Acme Labs"},
+		{id: "default", body: `{"name":"Grace Hopper"}`, want: "Grace Hopper's Workspace"},
+	} {
+		seeded := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: test.id, Email: test.id + "@example.com", Verified: true})
+		// A new account has no workspace before onboarding.
+		if _, err := environment.database.Exec(`DELETE FROM workspaces WHERE id = $1`, seeded.Workspace.ID); err != nil {
+			t.Fatalf("remove fixture workspace: %v", err)
+		}
+		token := environment.signIn(t, seeded.User.ID)
+		if test.id == "named" {
+			invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: `{"name":"Grace Hopper","workspace_name":"x"}`})
+			detail := expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
+			if detail.Fields["workspace_name"] == "" {
+				t.Fatalf("fields = %#v", detail.Fields)
+			}
+		}
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: test.body})
+		expectStatus(t, recorder, http.StatusOK)
+		response := decodeBody[struct {
+			Workspace *api.Workspace `json:"workspace"`
+		}](t, recorder)
+		if response.Workspace == nil || response.Workspace.Name != test.want {
+			t.Fatalf("%s: workspace = %#v, want %q", test.id, response.Workspace, test.want)
+		}
+	}
+}
+
 func TestOnboardingRequiresSession(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Nobody"}`})

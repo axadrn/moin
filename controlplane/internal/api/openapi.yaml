@@ -343,7 +343,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name`.'
+          description: '`validation_failed` with `fields.name` or `fields.workspace_name`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3644,6 +3644,9 @@ components:
       properties:
         name:
           type: string
+        workspace_name:
+          type: string
+          description: The name of the first workspace, 2 to 80 characters. Without it the workspace is called "<name>'s Workspace". Ignored when no workspace is created.
         invitation_token:
           type: string
           description: The token of the workspace invitation the person arrived with. An unknown, used, revoked, expired or foreign invitation is ignored and the default workspace is created.

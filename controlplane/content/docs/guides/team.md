@@ -10,7 +10,7 @@ order: 14
 
 Everything you add to ops lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App. Everyone in the workspace sees and works on all of it. The plan belongs to the workspace too, so one subscription covers the whole team.
 
-You get a workspace when you sign up.
+You name your first workspace when you sign up. Rename it later under [Rename the workspace](#rename-the-workspace).
 
 ## Create a workspace
 

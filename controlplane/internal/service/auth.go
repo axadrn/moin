@@ -703,14 +703,22 @@ func (s *AuthService) NeedsOnboarding(userID string) (bool, error) {
 	return user.Name == "", nil
 }
 
-// CompleteOnboarding sets the user's name during onboarding
-func (s *AuthService) CompleteOnboarding(userID, name string, createWorkspace bool) (*model.Workspace, error) {
-	// Validate name
+// CompleteOnboarding sets the user's name during onboarding and, when
+// createWorkspace is set, makes the first workspace: named workspaceName,
+// or "<name>'s Workspace" when it is empty.
+func (s *AuthService) CompleteOnboarding(userID, name, workspaceName string, createWorkspace bool) (*model.Workspace, error) {
 	err := validation.ValidateName(name)
 	if err != nil {
 		return nil, err
 	}
 	name = strings.TrimSpace(name)
+	workspaceName = strings.TrimSpace(workspaceName)
+	if createWorkspace && workspaceName != "" {
+		err = validation.ValidateWorkspaceName(workspaceName)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidWorkspace, err)
+		}
+	}
 
 	err = s.userRepository.UpdateName(userID, name, time.Now())
 	if err != nil {
@@ -719,7 +727,7 @@ func (s *AuthService) CompleteOnboarding(userID, name string, createWorkspace bo
 
 	var workspace *model.Workspace
 	if createWorkspace {
-		workspace, err = s.workspaceService.EnsureDefault(userID, name)
+		workspace, err = s.workspaceService.EnsureFirst(userID, name, workspaceName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create workspace: %w", err)
 		}

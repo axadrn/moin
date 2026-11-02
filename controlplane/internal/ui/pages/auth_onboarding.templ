@@ -13,12 +13,38 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
-templ AuthOnboarding(errorMsg string) {
+// OnboardingForm is the first sign-in page: the person's name and, unless
+// they joined through an invitation, the name of their first workspace.
+// Field names the field Error is about.
+type OnboardingForm struct {
+	Name         string
+	Workspace    string
+	AskWorkspace bool
+	Field        string
+	Error        string
+}
+
+func (f OnboardingForm) errorFor(field string) string {
+	if f.Field == field {
+		return f.Error
+	}
+	return ""
+}
+
+func onboardingTitle(form OnboardingForm) (string, string) {
+	if form.AskWorkspace {
+		return "Welcome to " + brand.Name, "Your name and a name for your workspace. You can change both later in the settings."
+	}
+	return "One last thing", "What should we call you?"
+}
+
+templ AuthOnboarding(form OnboardingForm) {
+	{{ title, description := onboardingTitle(form) }}
 	@layouts.Auth(layouts.SEOProps{Title: "Complete Your Profile", Description: "Tell us your name", Path: ctxkeys.URLPath(ctx)}) {
 		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("One last thing", "What should we call you?") {
+			@blocks.AuthCard(title, description) {
 				@field.Group() {
-					@AuthOnboardingForm(errorMsg)
+					@AuthOnboardingForm(form)
 					@field.Separator() {
 						Not you? 
 					}
@@ -40,8 +66,10 @@ templ AuthOnboarding(errorMsg string) {
 	}
 }
 
-templ AuthOnboardingForm(errorMsg string) {
+templ AuthOnboardingForm(form OnboardingForm) {
 	{{ user := ctxkeys.User(ctx) }}
+	{{ nameError := form.errorFor("name") }}
+	{{ workspaceError := form.errorFor("workspace") }}
 	<form
 		id="onboarding-form"
 		action="/auth/onboarding"
@@ -57,10 +85,21 @@ templ AuthOnboardingForm(errorMsg string) {
 				@field.Label(field.LabelProps{For: "name"}) {
 					Your name 
 				}
-				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": ""}})
-				@fieldHint("name", errorMsg) {
+				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Value: form.Name, Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(nameError != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": "", "required": "", "maxlength": "100"}})
+				@fieldHint("name", nameError) {
 					if user != nil {
 						Continue as <strong>{ user.Email }</strong>.
+					}
+				}
+			}
+			if form.AskWorkspace {
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "workspace"}) {
+						Workspace name 
+					}
+					@input.Input(input.Props{ID: "workspace", Name: "workspace", Type: "text", Value: form.Workspace, Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(workspaceError != ""), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": "", "minlength": "2", "maxlength": "80"}})
+					@fieldHint("workspace", workspaceError) {
+						Your servers and apps live here. Invite your team later.
 					}
 				}
 			}

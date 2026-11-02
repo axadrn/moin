@@ -69,7 +69,7 @@ func TestOnboardingCreatesWorkspaceExceptForInvitedSignup(t *testing.T) {
 			t.Fatalf("SendMagicLink() error = %v", err)
 		}
 		user, _ := environment.userRepository.ByEmail("normal@example.com")
-		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Normal User", true)
+		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Normal User", "", true)
 		if err != nil {
 			t.Fatalf("CompleteOnboarding() error = %v", err)
 		}
@@ -95,7 +95,7 @@ func TestOnboardingCreatesWorkspaceExceptForInvitedSignup(t *testing.T) {
 			t.Fatalf("SendMagicLink() error = %v", err)
 		}
 		user, _ := environment.userRepository.ByEmail("invited@example.com")
-		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Invited User", false)
+		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Invited User", "", false)
 		if err != nil {
 			t.Fatalf("CompleteOnboarding() error = %v", err)
 		}
@@ -115,7 +115,7 @@ func TestOnboardingCreatesWorkspaceExceptForInvitedSignup(t *testing.T) {
 		}
 		user, _ := environment.userRepository.ByEmail("long-name@example.com")
 		name := strings.Repeat("A", 100)
-		workspace, err := environment.auth.CompleteOnboarding(user.ID, name, true)
+		workspace, err := environment.auth.CompleteOnboarding(user.ID, name, "", true)
 		if err != nil {
 			t.Fatalf("CompleteOnboarding() error = %v", err)
 		}
@@ -128,6 +128,51 @@ func TestOnboardingCreatesWorkspaceExceptForInvitedSignup(t *testing.T) {
 		}
 	})
 
+	t.Run("chosen workspace name", func(t *testing.T) {
+		environment := newAuthFlowEnvironment(t)
+		if err := environment.auth.SendMagicLink("chosen@example.com"); err != nil {
+			t.Fatalf("SendMagicLink() error = %v", err)
+		}
+		user, _ := environment.userRepository.ByEmail("chosen@example.com")
+		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Grace Hopper", "  Acme Labs ", true)
+		if err != nil {
+			t.Fatalf("CompleteOnboarding() error = %v", err)
+		}
+		if workspace.Name != "Acme Labs" || workspace.Slug != "acme-labs" {
+			t.Fatalf("workspace = %q %q, want Acme Labs acme-labs", workspace.Name, workspace.Slug)
+		}
+	})
+
+	t.Run("default workspace name keeps the short slug", func(t *testing.T) {
+		environment := newAuthFlowEnvironment(t)
+		if err := environment.auth.SendMagicLink("default@example.com"); err != nil {
+			t.Fatalf("SendMagicLink() error = %v", err)
+		}
+		user, _ := environment.userRepository.ByEmail("default@example.com")
+		workspace, err := environment.auth.CompleteOnboarding(user.ID, "Ada Lovelace", "Ada Lovelace's Workspace", true)
+		if err != nil {
+			t.Fatalf("CompleteOnboarding() error = %v", err)
+		}
+		if workspace.Name != "Ada Lovelace's Workspace" || workspace.Slug != "ada-lovelace" {
+			t.Fatalf("workspace = %q %q", workspace.Name, workspace.Slug)
+		}
+	})
+
+	t.Run("invalid workspace name saves nothing", func(t *testing.T) {
+		environment := newAuthFlowEnvironment(t)
+		if err := environment.auth.SendMagicLink("short@example.com"); err != nil {
+			t.Fatalf("SendMagicLink() error = %v", err)
+		}
+		user, _ := environment.userRepository.ByEmail("short@example.com")
+		if _, err := environment.auth.CompleteOnboarding(user.ID, "Grace", "x", true); !errors.Is(err, ErrInvalidWorkspace) {
+			t.Fatalf("CompleteOnboarding() error = %v, want ErrInvalidWorkspace", err)
+		}
+		updated, err := environment.userRepository.ByID(user.ID)
+		if err != nil || updated.Name != "" {
+			t.Fatalf("user name = %q, error = %v", updated.Name, err)
+		}
+	})
+
 	t.Run("control characters are rejected before trimming", func(t *testing.T) {
 		environment := newAuthFlowEnvironment(t)
 		if err := environment.auth.SendMagicLink("control-name@example.com"); err != nil {
@@ -135,7 +180,7 @@ func TestOnboardingCreatesWorkspaceExceptForInvitedSignup(t *testing.T) {
 		}
 		user, _ := environment.userRepository.ByEmail("control-name@example.com")
 		for _, name := range []string{"Jane\n", "\tJane", "Jane\r"} {
-			if _, err := environment.auth.CompleteOnboarding(user.ID, name, true); err == nil {
+			if _, err := environment.auth.CompleteOnboarding(user.ID, name, "", true); err == nil {
 				t.Fatalf("CompleteOnboarding(%q) error = nil", name)
 			}
 		}

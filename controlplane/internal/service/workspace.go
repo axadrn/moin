@@ -148,16 +148,25 @@ func (s *WorkspaceService) createdWorkspace(userID string) bool {
 }
 
 func (s *WorkspaceService) CreateDefault(userID, userName string) (*model.Workspace, error) {
-	name := strings.TrimSpace(userName) + "'s Workspace"
-	if len(name) > 80 {
-		name = "My Workspace"
-	}
 	// The slug is the person's name: ada-lovelace, not
 	// ada-lovelace-s-workspace.
-	return s.create(userID, name, userName)
+	return s.create(userID, DefaultWorkspaceName(userName), userName)
 }
 
-func (s *WorkspaceService) EnsureDefault(userID, userName string) (*model.Workspace, error) {
+// DefaultWorkspaceName is the name the first workspace of a person gets
+// unless they choose another: "Ada Lovelace's Workspace".
+func DefaultWorkspaceName(userName string) string {
+	name := strings.TrimSpace(userName) + "'s Workspace"
+	if len(name) > 80 {
+		return "My Workspace"
+	}
+	return name
+}
+
+// EnsureFirst returns the first workspace of the user or creates it, named
+// workspaceName. Without a name, or with the default one, it is the default
+// workspace of CreateDefault.
+func (s *WorkspaceService) EnsureFirst(userID, userName, workspaceName string) (*model.Workspace, error) {
 	members, err := s.workspaces.ListForUser(userID)
 	if err != nil {
 		return nil, err
@@ -165,7 +174,11 @@ func (s *WorkspaceService) EnsureDefault(userID, userName string) (*model.Worksp
 	if len(members) > 0 {
 		return s.workspaces.ByID(members[0].ID)
 	}
-	return s.CreateDefault(userID, userName)
+	workspaceName = strings.TrimSpace(workspaceName)
+	if workspaceName == "" || workspaceName == DefaultWorkspaceName(userName) {
+		return s.CreateDefault(userID, userName)
+	}
+	return s.Create(userID, workspaceName)
 }
 
 func (s *WorkspaceService) BySlugForUser(slug, userID string) (*model.Workspace, *model.WorkspaceMember, error) {

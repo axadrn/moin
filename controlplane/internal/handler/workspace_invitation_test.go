@@ -208,7 +208,7 @@ func TestOnboardingValidatesPendingInvitationBeforeSkippingWorkspace(t *testing.
 			email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 			auth := service.NewAuthService(repository.NewUserRepository(database), nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 			handler := NewAuthHandler(auth, nil, workspaces, &config.Config{})
-			form := url.Values{"name": {"Invited User"}}
+			form := url.Values{"name": {"Invited User"}, "workspace": {"Invited Team"}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/onboarding", strings.NewReader(form.Encode()))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			request.AddCookie(&http.Cookie{Name: "pending_invitation", Value: token})

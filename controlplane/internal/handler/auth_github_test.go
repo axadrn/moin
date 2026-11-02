@@ -89,10 +89,10 @@ func TestGitHubEmailRequiresAVerifiedAddress(t *testing.T) {
 				"https://api.github.com/user/emails": test.emails,
 			}}
 
-			email, err := githubEmail(client)
+			email, _, err := githubAccount(client, "https://api.github.com")
 
 			if !errors.Is(err, test.wantErr) || email != test.want {
-				t.Fatalf("githubEmail() = %q, %v, want %q, %v", email, err, test.want, test.wantErr)
+				t.Fatalf("githubAccount() = %q, %v, want %q, %v", email, err, test.want, test.wantErr)
 			}
 		})
 	}
@@ -101,9 +101,9 @@ func TestGitHubEmailRequiresAVerifiedAddress(t *testing.T) {
 func TestGitHubEmailFailsWhenTheEmailListIsUnavailable(t *testing.T) {
 	client := &http.Client{Transport: fakeGitHubAPI{"https://api.github.com/user": `{"email":"public@example.com"}`}}
 
-	email, err := githubEmail(client)
+	email, _, err := githubAccount(client, "https://api.github.com")
 
 	if err == nil || email != "" {
-		t.Fatalf("githubEmail() = %q, %v, want an error", email, err)
+		t.Fatalf("githubAccount() = %q, %v, want an error", email, err)
 	}
 }

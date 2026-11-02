@@ -21,10 +21,12 @@ func NewAuthHandler(authService *service.AuthService, userService *service.UserS
 	return &AuthHandler{authService: authService, userService: userService, workspaceService: workspaceService}
 }
 
-// onboardingRequest carries the name and, for people who arrive through a
-// workspace invitation, the invitation token.
+// onboardingRequest carries the name, the optional name of the first
+// workspace and, for people who arrive through a workspace invitation, the
+// invitation token.
 type onboardingRequest struct {
 	Name            string `json:"name"`
+	WorkspaceName   string `json:"workspace_name"`
 	InvitationToken string `json:"invitation_token"`
 }
 
@@ -33,8 +35,9 @@ type onboardingResponse struct {
 	Workspace *Workspace `json:"workspace"`
 }
 
-// CompleteOnboarding sets the name of a new account and creates its default
-// workspace when the user has none yet. An available invitation for the
+// CompleteOnboarding sets the name of a new account and creates its first
+// workspace when the user has none yet, named workspace_name or
+// "<name>'s Workspace" without one. An available invitation for the
 // account's email address skips the default workspace, like the pending
 // invitation of the web sign-in, because the account joins that workspace
 // next.
@@ -50,8 +53,16 @@ func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if strings.TrimSpace(request.WorkspaceName) != "" {
+		err = validation.ValidateWorkspaceName(request.WorkspaceName)
+		if err != nil {
+			ValidationError(w, map[string]string{"workspace_name": FieldMessage(err)})
+			return
+		}
+	}
+
 	createDefault := !h.invitedTo(request.InvitationToken, user.Email)
-	workspace, err := h.authService.CompleteOnboarding(user.ID, request.Name, createDefault)
+	workspace, err := h.authService.CompleteOnboarding(user.ID, request.Name, request.WorkspaceName, createDefault)
 	if err != nil {
 		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
 		ServiceError(w, err)

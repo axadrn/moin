@@ -16,7 +16,14 @@ Not sure what a word means? [How ops works in 2 minutes](/docs#how-ops-works-in-
 
 ## 1. Sign up
 
-Open the control plane in your browser and sign up with your email. You get a sign-in link by email. ops makes your first workspace for you: your team's space for servers, apps and the bucket.
+Open the control plane in your browser and press **Continue with GitHub**. No GitHub account, or a self-hosted control plane without GitHub sign-in? Enter your email instead, and ops sends you a sign-in link.
+
+The first time, ops asks for two things:
+
+- **Your name**, the one your team sees.
+- **Workspace name**, your team's space for servers, apps and the bucket.
+
+With GitHub both come filled in from your GitHub profile, such as "Ada Lovelace" and "Ada Lovelace's Workspace", so you press **Continue** and are done. With email you type them. You can change both later in the settings. When a teammate invited you, ops asks only for your name, and you join their workspace.
 
 If the page says **Join the waitlist**, sign-up is closed for now. Leave your email, and the sign-in link comes once you are let in. On a self-hosted control plane, only the admins and invited teammates sign up: see [Who signs in](/docs/self-hosting#who-signs-in).
 

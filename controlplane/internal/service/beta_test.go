@@ -36,7 +36,7 @@ func TestClosedSignupPutsNewAddressesOnTheWaitlist(t *testing.T) {
 		t.Fatalf("an admin: err = %v", err)
 	}
 	admin, _ := environment.userRepository.ByEmail("admin@example.com")
-	adminWorkspace, err := environment.auth.CompleteOnboarding(admin.ID, "Ada Admin", true)
+	adminWorkspace, err := environment.auth.CompleteOnboarding(admin.ID, "Ada Admin", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestClosedSignupPutsNewAddressesOnTheWaitlist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := environment.auth.CompleteOnboarding(user.ID, "Grace Hopper", true)
+	workspace, err := environment.auth.CompleteOnboarding(user.ID, "Grace Hopper", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestSelfHostedClosedSignupIsPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := environment.auth.CompleteOnboarding(admin.ID, "Ada Admin", true)
+	workspace, err := environment.auth.CompleteOnboarding(admin.ID, "Ada Admin", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

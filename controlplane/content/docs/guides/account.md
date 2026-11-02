@@ -6,6 +6,17 @@ order: 16
 
 **The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token. A token with write access can change your name and picture, never your email, password, sessions or tokens.
 
+## Sign up and sign in
+
+Sign in with GitHub, with a link ops emails you, or with a password once you set one. The first sign-in asks for your name and the name of your first workspace. After GitHub sign-in both are filled in from your GitHub profile; with an email link you type them. Someone invited to a workspace gives only their name and joins that workspace.
+
+```surfaces
+Web: the sign-in page, **Continue with GitHub** or **Continue with email**
+API: POST /api/v1/auth/onboarding
+```
+
+The API takes `name` and an optional `workspace_name`; without it the workspace is called "<name>'s Workspace".
+
 ## Change your name
 
 The name your team sees in ops and in the activity.

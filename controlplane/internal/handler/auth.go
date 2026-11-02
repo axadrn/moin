@@ -219,11 +219,19 @@ func (h *authHandler) PasswordPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) OnboardingPage(w http.ResponseWriter, r *http.Request) {
-	if user := ctxkeys.User(r.Context()); user != nil && user.Name != "" {
+	user := ctxkeys.User(r.Context())
+	if user != nil && user.Name != "" {
 		h.redirectAfterAuth(w, r, user)
 		return
 	}
-	render(w, r, pages.AuthOnboarding(""))
+	_, invited := h.pendingInvitationForUser(w, r, user)
+	form := pages.OnboardingForm{AskWorkspace: !invited}
+	// After GitHub sign-in both fields come filled in, so it is one click.
+	if name := githubName(r, user); name != "" {
+		form.Name = name
+		form.Workspace = service.DefaultWorkspaceName(name)
+	}
+	render(w, r, pages.AuthOnboarding(form))
 }
 
 func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
@@ -233,15 +241,32 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	name := r.FormValue("name")
-
 	pendingInvitation, hasPendingInvitation := h.pendingInvitationForUser(w, r, user)
-	workspace, err := h.authService.CompleteOnboarding(user.ID, name, !hasPendingInvitation)
-	if err != nil {
-		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
-		authFieldError(w, r, pages.AuthOnboardingForm("Enter your name."), "Not saved", "name", "Enter your name.")
+	form := pages.OnboardingForm{
+		Name:         r.FormValue("name"),
+		Workspace:    r.FormValue("workspace"),
+		AskWorkspace: !hasPendingInvitation,
+	}
+	if validation.ValidateName(form.Name) != nil {
+		onboardingFieldError(w, r, form, "name", "Enter your name, up to 100 characters.")
 		return
 	}
+	workspaceName := ""
+	if form.AskWorkspace {
+		workspaceName = form.Workspace
+		if validation.ValidateWorkspaceName(workspaceName) != nil {
+			onboardingFieldError(w, r, form, "workspace", "Enter a name of 2 to 80 characters.")
+			return
+		}
+	}
+
+	workspace, err := h.authService.CompleteOnboarding(user.ID, form.Name, workspaceName, !hasPendingInvitation)
+	if err != nil {
+		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
+		toastFailed(w, r, "Not saved", "Something went wrong. Please try again.")
+		return
+	}
+	clearGitHubNameCookie(w, r)
 
 	slog.Info("onboarding completed", "user_id", user.ID)
 	if hasPendingInvitation {
@@ -249,6 +274,11 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	redirect(w, r, fmt.Sprintf("/app/%s/dashboard", workspace.Slug), http.StatusSeeOther)
+}
+
+func onboardingFieldError(w http.ResponseWriter, r *http.Request, form pages.OnboardingForm, field, message string) {
+	form.Field, form.Error = field, message
+	authFieldError(w, r, pages.AuthOnboardingForm(form), "Not saved", field, message)
 }
 
 func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
