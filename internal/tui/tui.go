@@ -268,6 +268,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tab == tabActivity {
 			return m, m.loadActivity()
 		}
+		// A key stored or removed elsewhere comes with the servers.
+		if m.tab == tabSettings {
+			return m, m.loadSettings()
+		}
 	case appsMsg:
 		m.apps, m.offline = msg, nil
 		m.appSelected = min(m.appSelected, max(len(m.apps)-1, 0))

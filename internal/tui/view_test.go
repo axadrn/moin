@@ -232,6 +232,15 @@ func TestEscNeverQuits(t *testing.T) {
 
 // TestEmptyAppsKeys: without apps the hint and the footer offer only what
 // works there.
+// TestSettingsFollowServers: a key stored on another surface comes with
+// the servers stream, so the settings tab loads again.
+func TestSettingsFollowServers(t *testing.T) {
+	m := frames()["settings"]
+	if _, cmd := m.Update(serversMsg(m.servers)); cmd == nil {
+		t.Error("the settings tab does not reload when the servers change")
+	}
+}
+
 func TestEmptyAppsKeys(t *testing.T) {
 	m := frames()["apps-empty"]
 	m.width, m.height = 120, 30
