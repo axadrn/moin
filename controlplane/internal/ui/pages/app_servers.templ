@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -38,7 +37,7 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer) {
 		@panelPage() {
 			@pageHeader("Servers", "Every server runs the ops agent. It dials out to ops, so nothing on your server listens for us.") {
 				if canAdd {
-					@ServerAddForm("", "")
+					@ServerAddForm()
 				}
 			}
 			if !canAdd {
@@ -57,35 +56,28 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer) {
 	}
 }
 
-// ServerAddForm is the add form. A request replaces it to show an error or
-// to reset it.
-templ ServerAddForm(name, nameError string) {
+// ServerAddForm is the add form. A request replaces it to reset it after the
+// server was added; a wrong name keeps it as it is (DESIGN.md, Feedback).
+templ ServerAddForm() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<form
 		id="server-add-form"
 		hx-swap-oob="true"
-		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start"
+		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
 		hx-post={ basePath + "/servers" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		<div class="flex min-w-0 flex-1 flex-col gap-1 sm:w-60 sm:flex-none">
-			<label for="server-name" class="sr-only">Server name</label>
-			@input.Input(input.Props{
-				ID:          "server-name",
-				Name:        "name",
-				Type:        "text",
-				Value:       name,
-				Placeholder: "Server name, e.g. web-1",
-				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "server-name-error", "data-hotkey-focus": true},
-			})
-			if nameError != "" {
-				@field.Error(field.ErrorProps{ID: "server-name-error", Class: "px-3 text-xs"}) {
-					{ nameError }
-				}
-			}
-		</div>
+		<label for="server-name" class="sr-only">Server name</label>
+		@input.Input(input.Props{
+			ID:          "server-name",
+			Name:        "name",
+			Type:        "text",
+			Placeholder: "Server name, e.g. web-1",
+			Class:       "min-w-0 sm:w-60",
+			Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
+		})
 		@button.Button(button.Props{Type: button.TypeSubmit}) {
 			@icon.Plus()
 			Add server
@@ -113,7 +105,7 @@ templ ServerAdded(added AddedServer) {
 					}) {
 						@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
 						@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
-						<span data-copy-label>Copy</span>
+						Copy
 					}
 				</div>
 				@status.Status(status.Props{Kind: status.KindWaiting}) {

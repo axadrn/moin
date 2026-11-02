@@ -15,8 +15,6 @@ import (
 // BucketView is the bucket page: the account's own S3-compatible bucket.
 type BucketView struct {
 	Storage *service.BackupStorage
-	Notice  string
-	Error   string
 }
 
 templ Bucket(view BucketView) {
@@ -24,11 +22,6 @@ templ Bucket(view BucketView) {
 		@panelPage(templ.Attributes{"data-bucket-page": true}) {
 			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
 			<div id="bucket" class="flex flex-col gap-6">
-				if view.Notice != "" {
-					@pageNotice(false, templ.Attributes{"data-bucket-notice": true}) {
-						{ view.Notice }
-					}
-				}
 				@bucketForm(view)
 				<div class="grid items-stretch gap-4 md:grid-cols-3" role="region" aria-label="What goes in the bucket">
 					@bucketUse("Your code", "ops deploy puts it there, your server picks it up and deletes it. Code from GitHub goes straight to your server.")
@@ -44,6 +37,7 @@ templ Bucket(view BucketView) {
 								"hx-target":  "#bucket",
 								"hx-select":  "#bucket",
 								"hx-swap":    "outerHTML",
+								"hx-disable": "this",
 								"hx-confirm": "Remove the bucket? Backups stop and ops deploy needs a bucket again. What is in it stays.",
 							},
 						}) {
@@ -90,7 +84,7 @@ templ bucketForm(view BucketView) {
 					<dd class="truncate font-mono">{ view.Storage.AccessKey }</dd>
 				</dl>
 			}
-			@collapsible.Collapsible(collapsible.Props{DefaultOpen: view.Storage == nil || view.Error != "", Class: "flex flex-col gap-6"}) {
+			@collapsible.Collapsible(collapsible.Props{DefaultOpen: view.Storage == nil, Class: "flex flex-col gap-6"}) {
 				if view.Storage != nil {
 					<div>
 						@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
@@ -99,7 +93,7 @@ templ bucketForm(view BucketView) {
 					</div>
 				}
 				@collapsible.Content() {
-					<form class="flex flex-col gap-6" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" data-storage-form>
+					<form class="flex flex-col gap-6" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-storage-form>
 						@csrf.Token()
 						<div class="grid gap-3 sm:grid-cols-2">
 							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3.", "text", true)
@@ -109,11 +103,6 @@ templ bucketForm(view BucketView) {
 							@bucketField("secret_key", "Secret key", "", "Stored encrypted.", "password", false)
 							@bucketField("region", "Region", "auto", "auto for R2.", "text", false)
 						</div>
-						if view.Error != "" {
-							@field.Error(field.ErrorProps{Attributes: templ.Attributes{"data-storage-error": true}}) {
-								{ view.Error }
-							}
-						}
 						<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<p class="text-xs text-muted-foreground">ops writes and deletes a test file first.</p>
 							@button.Button(button.Props{Type: button.TypeSubmit}) {
@@ -133,9 +122,9 @@ templ bucketField(name, label, placeholder, hint, kind string, wide bool) {
 		@field.Label(field.LabelProps{For: "bucket-" + name}) {
 			{ label }
 		}
-		@input.Input(input.Props{ID: "bucket-" + name, Name: name, Type: kind, Placeholder: placeholder, Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
-		if hint != "" {
-			<p class="text-xs text-muted-foreground">{ hint }</p>
+		@input.Input(input.Props{ID: "bucket-" + name, Name: name, Type: kind, Placeholder: placeholder, Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": "bucket-" + name + "-hint"}})
+		@fieldHint("bucket-"+name, "") {
+			{ hint }
 		}
 	}
 }

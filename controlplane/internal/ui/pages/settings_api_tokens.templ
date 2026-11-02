@@ -82,12 +82,10 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 				Value:       form.Name,
 				Placeholder: "Claude Desktop",
 				Required:    true,
-				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "aria-invalid": apiTokenInvalid(form.Errors["name"])},
+				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "aria-invalid": apiTokenInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"},
 			})
-			if form.Errors["name"] != "" {
-				@field.Error(field.ErrorProps{Class: "text-xs"}) {
-					{ form.Errors["name"] }
-				}
+			@fieldHint("api-token-name", form.Errors["name"]) {
+				Where the token is used.
 			}
 		}
 		@field.Field(field.Props{Class: "gap-1"}) {
@@ -95,7 +93,7 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 				Access
 			}
 			@selectcomp.Select(selectcomp.Props{Name: "access", DefaultValue: form.Access, Items: apiTokenAccessItems}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-access", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["access"])}}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-access", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["access"]), "aria-describedby": "api-token-access-hint"}}) {
 					@selectcomp.Value()
 				}
 				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
@@ -108,11 +106,8 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 					}
 				}
 			}
-			<p class="text-xs text-muted-foreground">Read only tokens can look but not change anything.</p>
-			if form.Errors["access"] != "" {
-				@field.Error(field.ErrorProps{Class: "text-xs"}) {
-					{ form.Errors["access"] }
-				}
+			@fieldHint("api-token-access", form.Errors["access"]) {
+				Read only tokens can look but not change anything.
 			}
 		}
 		@field.Field(field.Props{Class: "gap-1"}) {
@@ -120,7 +115,7 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 				Expiration
 			}
 			@selectcomp.Select(selectcomp.Props{Name: "expiry", DefaultValue: form.Expiry, Items: apiTokenExpiryItems}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-expiry", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["expiry"])}}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-expiry", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["expiry"]), "aria-describedby": "api-token-expiry-hint"}}) {
 					@selectcomp.Value()
 				}
 				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
@@ -133,10 +128,8 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 					}
 				}
 			}
-			if form.Errors["expiry"] != "" {
-				@field.Error(field.ErrorProps{Class: "text-xs"}) {
-					{ form.Errors["expiry"] }
-				}
+			@fieldHint("api-token-expiry", form.Errors["expiry"]) {
+				After that, requests with it fail.
 			}
 		}
 		if len(view.Workspaces) > 0 {
@@ -145,7 +138,7 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 					Workspace
 				}
 				@selectcomp.Select(selectcomp.Props{Name: "workspace_id", DefaultValue: form.WorkspaceID, Items: view.workspaceItems()}) {
-					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-workspace", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["workspace_id"])}}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-workspace", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["workspace_id"]), "aria-describedby": "api-token-workspace-hint"}}) {
 						@selectcomp.Value()
 					}
 					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
@@ -158,17 +151,9 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 						}
 					}
 				}
-				<p class="text-xs text-muted-foreground">The token can only reach this workspace.</p>
-				if form.Errors["workspace_id"] != "" {
-					@field.Error(field.ErrorProps{Class: "text-xs"}) {
-						{ form.Errors["workspace_id"] }
-					}
+				@fieldHint("api-token-workspace", form.Errors["workspace_id"]) {
+					The token can only reach this workspace.
 				}
-			}
-		}
-		if form.Errors["form"] != "" {
-			@field.Error(field.ErrorProps{Class: "text-xs"}) {
-				{ form.Errors["form"] }
 			}
 		}
 		@dialog.Footer() {
@@ -255,12 +240,12 @@ templ APITokenReveal(raw string) {
 					}
 					<div class="flex gap-2">
 						@input.Input(input.Props{ID: "api-token-value", Type: "text", Value: raw, ReadOnly: true, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
-						@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: templ.Attributes{"data-api-token-copy": "api-token-value"}}) {
-							@icon.Copy()
-							<span data-api-token-copy-label>Copy</span>
+						@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Class: "group/copy", Attributes: templ.Attributes{"data-copy": "", "data-copy-target": "#api-token-value"}}) {
+							@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
+							@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
+							Copy
 						}
 					</div>
-					<p class="sr-only" role="status" aria-live="polite" data-api-token-copy-status></p>
 				}
 				@dialog.Footer() {
 					@button.Button(button.Props{Attributes: dialog.Close(ctx)}) {
@@ -272,30 +257,14 @@ templ APITokenReveal(raw string) {
 	</div>
 }
 
-// apiTokenScript copies a revealed token and removes it from the page when
-// its dialog closes. It is rendered once with the page, so swapped parts
-// carry no script; it stops listening when the page goes.
+// apiTokenScript removes a revealed token from the page when its dialog
+// closes. It is rendered once with the page, so swapped parts carry no
+// script; it stops listening when the page goes.
 templ apiTokenScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(function () {
 			const gone = new AbortController();
 			document.addEventListener("htmx:before:history:update", () => gone.abort(), { once: true });
-			document.addEventListener("click", async function (event) {
-				const button = event.target instanceof Element ? event.target.closest("[data-api-token-copy]") : null;
-				if (!button) return;
-				const input = document.getElementById(button.getAttribute("data-api-token-copy"));
-				const label = button.querySelector("[data-api-token-copy-label]");
-				const status = button.closest("[data-slot=field]")?.querySelector("[data-api-token-copy-status]");
-				if (!input) return;
-				try {
-					await navigator.clipboard.writeText(input.value);
-					if (label) label.textContent = "Copied";
-					if (status) status.textContent = "Token copied to the clipboard";
-				} catch (error) {
-					input.select();
-					if (status) status.textContent = "Copy failed. Select the token and copy it manually";
-				}
-			}, { signal: gone.signal });
 			document.addEventListener("dialog-close", function (event) {
 				if (!(event.target instanceof Element) || event.target.id !== "api-token-reveal-dialog") return;
 				document.getElementById("api-token-reveal")?.replaceChildren();

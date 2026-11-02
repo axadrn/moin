@@ -57,15 +57,10 @@ templ AuthOnboardingForm(errorMsg string) {
 				@field.Label(field.LabelProps{For: "name"}) {
 					Your name 
 				}
-				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "autofocus": ""}})
-				if user != nil {
-					@field.Description() {
-						Continue as <strong>{ user.Email }</strong>. 
-					}
-				}
-				if errorMsg != "" {
-					@field.Error() {
-						{ errorMsg }
+				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": ""}})
+				@fieldHint("name", errorMsg) {
+					if user != nil {
+						Continue as <strong>{ user.Email }</strong>.
 					}
 				}
 			}

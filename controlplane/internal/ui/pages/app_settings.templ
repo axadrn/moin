@@ -130,15 +130,16 @@ templ signOutEverywhere() {
 	}
 }
 
-// settingsField is a label, its input and an optional hint below.
+// settingsField is a label, its input and the hint line below, which
+// shows the message when the field is wrong (DESIGN.md, Feedback).
 templ settingsField(id, label, hint string) {
 	@field.Field(field.Props{Class: "gap-1"}) {
 		@field.Label(field.LabelProps{For: id}) {
 			{ label }
 		}
 		{ children... }
-		if hint != "" {
-			<p class="text-xs text-muted-foreground">{ hint }</p>
+		@fieldHint(id, "") {
+			{ hint }
 		}
 	}
 }
@@ -206,13 +207,13 @@ templ SettingsPasswordSection() {
 						@csrf.Token()
 						<div class="grid items-start gap-3 lg:grid-cols-3">
 							@settingsField("current_password", "Current password", "") {
-								@input.Input(input.Props{Type: "password", ID: "current_password", Name: "current_password", Attributes: templ.Attributes{"autocomplete": "current-password"}})
+								@input.Input(input.Props{Type: "password", ID: "current_password", Name: "current_password", Attributes: templ.Attributes{"autocomplete": "current-password", "aria-describedby": "current_password-hint"}})
 							}
 							@settingsField("new_password", "New password", "At least 12 characters.") {
-								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
 							}
 							@settingsField("confirm_password", "Repeat the new password", "") {
-								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password", "aria-describedby": "confirm_password-hint"}})
 							}
 						</div>
 						<div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -263,10 +264,10 @@ templ SettingsPasswordSection() {
 						@csrf.Token()
 						<div class="grid items-start gap-3 lg:grid-cols-2">
 							@settingsField("new_password", "New password", "At least 12 characters.") {
-								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+								@input.Input(input.Props{Type: "password", ID: "new_password", Name: "new_password", Attributes: templ.Attributes{"autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
 							}
 							@settingsField("confirm_password", "Repeat the password", "") {
-								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password"}})
+								@input.Input(input.Props{Type: "password", ID: "confirm_password", Name: "confirm_password", Attributes: templ.Attributes{"autocomplete": "new-password", "aria-describedby": "confirm_password-hint"}})
 							}
 						</div>
 						@settingsSubmit("Set password")

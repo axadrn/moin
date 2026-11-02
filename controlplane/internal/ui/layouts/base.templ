@@ -48,6 +48,7 @@ templ Base(props ...SEOProps) {
 			@components.Scripts()
 			// Site-wide enhancements
 			@themeScript()
+			@feedbackScript()
 			// Analytics
 			@Analytics()
 		</head>
@@ -128,6 +129,40 @@ templ seo(props SEOProps) {
 	<meta name="twitter:image:alt" content={ appName + " - " + appTagline }/>
 	// Theme Color
 	<meta name="theme-color" content="#000000"/>
+}
+
+// feedbackScript marks the field a request failed on (DESIGN.md, Feedback):
+// the handler sends the ops:invalid event with the field's ID, and the field
+// turns red and takes the focus. The message replaces the hint of its hint
+// line (@fieldHint), or shows as a toast when the field has none. The line
+// keeps its height, so nothing moves. Changing the field clears it again.
+templ feedbackScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		document.addEventListener("ops:invalid", (event) => {
+			const { field: id, title, message } = event.detail;
+			const field = document.getElementById(id);
+			if (!field) return;
+			const hint = document.querySelector(`[data-field-hint="${CSS.escape(id)}"]`);
+			const error = hint && hint.querySelector("[data-hint-error]");
+			field.setAttribute("aria-invalid", "true");
+			if (message && error) {
+				hint.style.minHeight = `${hint.offsetHeight}px`;
+				error.textContent = message;
+				hint.dataset.invalid = "";
+			} else if (message) {
+				window.templ.toast.add({ title, description: message, type: "error" });
+			}
+			field.focus();
+			// A select's trigger changes through its hidden input next to it.
+			const select = field.matches("[role=combobox]");
+			(select ? field.parentElement : field).addEventListener(select ? "change" : "input", () => {
+				field.removeAttribute("aria-invalid");
+				if (!hint) return;
+				delete hint.dataset.invalid;
+				hint.style.minHeight = "";
+			}, { once: true });
+		});
+	</script>
 }
 
 templ themeScript() {

@@ -10,7 +10,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
@@ -59,7 +58,7 @@ func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request
 		h.handleError(w, r, err)
 		return
 	}
-	renderOOB(w, r, toast.Toast(toast.Props{Title: "Sessions revoked", Description: "The user has been signed out everywhere.", Type: toast.TypeSuccess}), "beforeend:#toast-container")
+	toastDone(w, r, "Sessions revoked", "The user has been signed out everywhere.")
 	render(w, r, pages.AdminDashboardContent(dashboard))
 }
 
@@ -102,7 +101,7 @@ func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err e
 		slog.Error("admin action failed", "error", err)
 	}
 	if isAction(r) {
-		renderOOB(w, r, toast.Toast(toast.Props{Title: title, Description: description, Type: toast.TypeError}), "beforeend:#toast-container")
+		toastFailed(w, r, title, description)
 		return
 	}
 	w.WriteHeader(status)

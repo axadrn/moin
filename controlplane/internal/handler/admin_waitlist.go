@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
+	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
@@ -20,26 +21,34 @@ func NewWaitlistHandler(beta *service.BetaService) *WaitlistHandler {
 }
 
 func (h *WaitlistHandler) Page(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, r.URL.Query().Get("notice"))
+	h.render(w, r)
 }
 
 func (h *WaitlistHandler) LetIn(w http.ResponseWriter, r *http.Request) {
-	email := r.FormValue("email")
+	email := strings.TrimSpace(r.FormValue("email"))
 	err := h.beta.LetIn(email, r.FormValue("forever_free") == "true")
-	if err != nil {
-		slog.Error("let in failed", "error", err)
-		h.render(w, r, "Could not let "+email+" in: "+err.Error())
+	if errors.Is(err, service.ErrInvalidEmail) {
+		fieldError(w, "Not let in", "let-in-email", "Enter a valid email address.")
 		return
 	}
-	redirect(w, r, "/admin/waitlist?notice="+url.QueryEscape(email+" is in and got the sign-in email."), http.StatusSeeOther)
+	if err != nil {
+		toastFailed(w, r, email+" not let in", errorMessage(err))
+		return
+	}
+	if !isAction(r) {
+		redirect(w, r, "/admin/waitlist", http.StatusSeeOther)
+		return
+	}
+	h.render(w, r)
+	toastDone(w, r, email+" is in", "They got the sign-in email.")
 }
 
-func (h *WaitlistHandler) render(w http.ResponseWriter, r *http.Request, notice string) {
+func (h *WaitlistHandler) render(w http.ResponseWriter, r *http.Request) {
 	entries, err := h.beta.Waitlist()
 	if err != nil {
 		slog.Error("waitlist failed", "error", err)
 		http.Error(w, "waitlist failed", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, pages.AdminWaitlist(entries, notice))
+	render(w, r, pages.AdminWaitlist(entries))
 }

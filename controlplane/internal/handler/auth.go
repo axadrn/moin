@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"github.com/a-h/templ"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 	"github.com/axadrn/ops/controlplane/internal/validation"
 )
@@ -36,7 +36,7 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.authService.EndSession(r); err != nil {
 		slog.Error("failed to revoke session during logout", "error", err)
 		if isAction(r) {
-			renderOOB(w, r, toast.Toast(toast.Props{Title: "Sign out failed", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+			toastFailed(w, r, "Not signed out", "Something went wrong. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Sign out failed", "Please try again."))
@@ -55,13 +55,13 @@ func (h *authHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(r.FormValue("email"))
 
 	if email == "" {
-		render(w, r, pages.AuthForgotPasswordForm("Email is required"))
+		authFieldError(w, r, pages.AuthForgotPasswordForm("Enter your email."), "Link not sent", "email", "Enter your email.")
 		return
 	}
 
 	err := validation.ValidateEmail(email)
 	if err != nil {
-		render(w, r, pages.AuthForgotPasswordForm("Please provide a valid email address"))
+		authFieldError(w, r, pages.AuthForgotPasswordForm("Enter a valid email address."), "Link not sent", "email", "Enter a valid email address.")
 		return
 	}
 
@@ -145,13 +145,13 @@ func (h *authHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(r.FormValue("email"))
 
 	if email == "" {
-		render(w, r, pages.AuthMagicLinkForm("Email is required"))
+		authFieldError(w, r, pages.AuthMagicLinkForm("Enter your email."), "Link not sent", "email", "Enter your email.")
 		return
 	}
 
 	err := validation.ValidateEmail(email)
 	if err != nil {
-		render(w, r, pages.AuthMagicLinkForm("Please provide a valid email address"))
+		authFieldError(w, r, pages.AuthMagicLinkForm("Enter a valid email address."), "Link not sent", "email", "Enter a valid email address.")
 		return
 	}
 
@@ -239,7 +239,7 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 	workspace, err := h.authService.CompleteOnboarding(user.ID, name, !hasPendingInvitation)
 	if err != nil {
 		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
-		render(w, r, pages.AuthOnboardingForm("Please enter your name"))
+		authFieldError(w, r, pages.AuthOnboardingForm("Enter your name."), "Not saved", "name", "Enter your name.")
 		return
 	}
 
@@ -255,28 +255,32 @@ func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(r.FormValue("email"))
 	password := r.FormValue("password")
 
-	if email == "" || password == "" {
-		render(w, r, pages.AuthPasswordForm(email, "Email and password are required"))
+	if email == "" {
+		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter your email."), "Not signed in", "email", "Enter your email.")
+		return
+	}
+	if password == "" {
+		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter your password."), "Not signed in", "password", "Enter your password.")
 		return
 	}
 
 	err := validation.ValidateEmail(email)
 	if err != nil {
-		render(w, r, pages.AuthPasswordForm(email, "Please provide a valid email address"))
+		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter a valid email address."), "Not signed in", "email", "Enter a valid email address.")
 		return
 	}
 
 	user, err := h.authService.Login(email, password)
 	if err != nil {
 		slog.Warn("password login failed", "error", err)
-		render(w, r, pages.AuthPasswordForm(email, "Invalid email or password"))
+		authFieldError(w, r, pages.AuthPasswordForm(email, "Wrong email or password."), "Not signed in", "password", "Wrong email or password.")
 		return
 	}
 
 	_, err = h.authService.StartSession(w, r, user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.AuthPasswordForm(email, "An error occurred. Please try again."))
+		toastFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
 		return
 	}
 
@@ -308,4 +312,15 @@ func (h *authHandler) pendingInvitationForUser(w http.ResponseWriter, r *http.Re
 		return "", false
 	}
 	return cookie.Value, true
+}
+
+// authFieldError answers a sign-in form with a wrong field: the field is
+// marked and the message shows in its hint line, and what was typed stays
+// (DESIGN.md, Feedback). Without htmx the form renders again with it.
+func authFieldError(w http.ResponseWriter, r *http.Request, form templ.Component, title, field, message string) {
+	if isAction(r) {
+		fieldError(w, title, field, message)
+		return
+	}
+	render(w, r, form)
 }

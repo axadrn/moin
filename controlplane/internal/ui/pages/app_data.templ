@@ -224,6 +224,7 @@ templ dataTable(view DataView) {
 												"hx-vals":    deleteRowVals(view.Database, table.Name, rowID),
 												"hx-target":  "closest tr",
 												"hx-swap":    "outerHTML",
+												"hx-disable": "this",
 												"hx-confirm": "Delete row " + rowID + " of " + table.Name + "? This cannot be undone.",
 											},
 										}) {
@@ -366,7 +367,7 @@ templ dataSchema(table protocol.DBTable) {
 }
 
 templ newRowForm(dataPath, database string, table protocol.DBTable) {
-	<form id="new-row" hidden class="px-6 pb-6" hx-post={ dataPath + "/insert" } hx-swap="none" data-new-row>
+	<form id="new-row" hidden class="px-6 pb-6" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
 		@csrf.Token()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
@@ -449,7 +450,7 @@ templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn
 templ dataConsole(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
 	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Description: "Reads only, until you allow changes. The same as ops sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
-		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML">
+		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']">
 			@csrf.Token()
 			<input type="hidden" name="db" value={ view.Database }/>
 			<label for="sql" class="sr-only">SQL</label>

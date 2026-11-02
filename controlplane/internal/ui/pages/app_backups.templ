@@ -28,10 +28,8 @@ type BackupsView struct {
 	App     model.App
 	Storage *service.BackupStorage
 	Backups protocol.Backups
-	// Notice says what just happened; Error why the server could not answer
-	// or a change failed.
-	Notice string
-	Error  string
+	// Error says why the server could not report its backups.
+	Error string
 	Now    time.Time
 }
 
@@ -53,13 +51,8 @@ templ AppBackups(view BackupsView) {
 				}
 			}
 			<div id="app-backups" class="flex flex-col gap-6">
-				if view.Notice != "" {
-					@pageNotice(false, templ.Attributes{"data-backup-notice": true}) {
-						{ view.Notice }
-					}
-				}
 				if view.Error != "" {
-					@pageNotice(true, templ.Attributes{"data-backup-error": true}) {
+					@stateAlert(templ.Attributes{"data-backup-error": true}) {
 						{ view.Error }
 					}
 				}
@@ -274,9 +267,16 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 }
 
 templ backupSettings(view BackupsView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	@panel(panelProps{Title: "Automatic snapshots", Description: "A snapshot before ops changes your data, so one click undoes it."}) {
-		<form hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
+		@BackupSettingsForm(view.App)
+	}
+}
+
+// BackupSettingsForm is the switch that saves itself. A change that failed
+// answers it as stored, so it flips back.
+templ BackupSettingsForm(app model.App) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	<form id="backup-settings-form" hx-swap-oob="true" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
 			@csrf.Token()
 			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 				@field.Content() {
@@ -287,10 +287,9 @@ templ backupSettings(view BackupsView) {
 						Before every deploy, restore, cell edit and SQL change made through ops. Undoes a bad migration or a wrong UPDATE.
 					}
 				}
-				@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: view.App.SnapshotBeforeChanges})
+				@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: app.SnapshotBeforeChanges})
 			}
 		</form>
-	}
 }
 
 templ bucketSummary(view BackupsView) {

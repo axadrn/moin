@@ -2,7 +2,7 @@ package handler
 
 import (
 	"errors"
-	"log/slog"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -14,7 +14,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
@@ -113,23 +112,17 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list servers failed", err)
 		return
 	}
-	name, server := r.FormValue("name"), r.FormValue("server")
-	_, err = h.apps.Create(actor(r), name, server)
-	switch {
-	case errors.Is(err, service.ErrAppName):
-		render(w, r, pages.AppAddForm(servers, name, server, "Use lowercase letters, digits and dashes."))
-		return
-	case errors.Is(err, repository.ErrDuplicateApp):
-		render(w, r, pages.AppAddForm(servers, name, server, "An app with this name already exists."))
-		return
-	case errors.Is(err, repository.ErrServerNotFound):
-		render(w, r, pages.AppAddForm(servers, name, server, "Choose a server."))
-		return
-	case err != nil:
-		h.toast(w, r, "App could not be added", err)
+	app, err := h.apps.Create(actor(r), r.FormValue("name"), r.FormValue("server"))
+	if errors.Is(err, repository.ErrServerNotFound) {
+		fieldError(w, "App not added", "app-server", "Choose a server.")
 		return
 	}
-	render(w, r, pages.AppAddForm(servers, "", "", ""))
+	if err != nil {
+		failed(w, r, "App not added", err, map[string]string{"name": "app-name"})
+		return
+	}
+	render(w, r, pages.AppAddForm(servers))
+	toastDone(w, r, app.Name+" added", "Run ops deploy "+app.Name+" in its repo to ship it.")
 }
 
 func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {
@@ -171,107 +164,119 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 // the new running deploy on its own.
 func (h *AppsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
 	number, _ := strconv.Atoi(r.FormValue("number"))
-	_, err := h.apps.Rollback(actor(r), r.PathValue("app"), number)
+	deploy, err := h.apps.Rollback(actor(r), r.PathValue("app"), number)
 	if err != nil {
-		h.toast(w, r, "Rollback could not start", err)
+		failed(w, r, "Rollback not started", err, nil)
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, "Rollback started", fmt.Sprintf("v%d releases v%d again.", deploy.Number, number))
 }
 
 // Redeploy builds the newest source again. The page follows the new deploy.
 func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.Redeploy(actor(r), r.PathValue("app"))
+	deploy, err := h.apps.Redeploy(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Redeploy could not start", err)
+		failed(w, r, "Redeploy not started", err, nil)
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, "Redeploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
 }
 
 // Restart starts the live release again with the env and routing as they
 // are now, without a build. The page follows the new deploy.
 func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.Restart(actor(r), r.PathValue("app"))
+	deploy, err := h.apps.Restart(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Restart could not start", err)
+		failed(w, r, "Restart not started", err, nil)
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, "Restart started", fmt.Sprintf("v%d starts the live release again.", deploy.Number))
 }
 
 // Start runs a stopped app again. The page follows the new deploy.
 func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.Start(actor(r), r.PathValue("app"))
+	deploy, err := h.apps.Start(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Start failed", err)
+		failed(w, r, "App not started", err, nil)
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, r.PathValue("app")+" starting", fmt.Sprintf("v%d runs it again.", deploy.Number))
 }
 
 // Stop stops the app's containers. Its data stays.
 func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 	err := h.apps.Stop(r.Context(), actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Stop failed", err)
+		failed(w, r, "App not stopped", err, nil)
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, r.PathValue("app")+" stopped", "Its data and settings stay. Start runs it again.")
 }
 
 // DeployImage deploys an image built elsewhere. The page follows the new deploy.
 func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.Deploy(actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")))
+	deploy, err := h.apps.Deploy(actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")))
 	if err != nil {
-		h.toast(w, r, "Image deploy could not start", err)
+		failed(w, r, "Image not deployed", err, map[string]string{"image": "image-ref"})
 		return
 	}
 	h.Detail(w, r)
+	toastDone(w, r, "Image deploy started", fmt.Sprintf("v%d pulls %s.", deploy.Number, deploy.Image))
 }
 
 // RotateHook shows a new deploy hook URL once.
 func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 	url, err := h.apps.RotateDeployHook(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "Deploy hook could not be created", err)
+		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
 	render(w, r, pages.AppHook(r.PathValue("app"), url))
+	toastDone(w, r, "Deploy hook created", "The old URL stopped working.")
 }
+
+// registryFields are the fields of the registry form, by API field name.
+var registryFields = map[string]string{"host": "registry-host", "password": "registry-password"}
 
 // SetRegistry saves a registry login from the settings form.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	err := h.apps.SetRegistry(actor(r), r.FormValue("host"), r.FormValue("username"), r.FormValue("password"))
-	message := ""
+	host := strings.TrimSpace(r.FormValue("host"))
+	err := h.apps.SetRegistry(actor(r), host, r.FormValue("username"), r.FormValue("password"))
 	if err != nil {
-		message = errorMessage(err)
+		failed(w, r, "Login not saved", err, registryFields)
+		return
 	}
-	h.renderRegistries(w, r, workspace.ID, message)
+	h.renderRegistries(w, r)
+	toastDone(w, r, "Login for "+host+" saved", "Your servers pull private images from it now.")
 }
 
 // DeleteRegistry removes a registry login.
 func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
 	err := h.apps.RemoveRegistry(actor(r), r.PathValue("host"))
-	message := ""
 	if err != nil {
-		message = errorMessage(err)
+		failed(w, r, "Login not removed", err, nil)
+		return
 	}
-	h.renderRegistries(w, r, workspace.ID, message)
+	h.renderRegistries(w, r)
+	toastDone(w, r, "Login for "+r.PathValue("host")+" removed", "")
 }
 
-func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request, workspaceID, formError string) {
-	logins, err := h.apps.Registries(workspaceID)
+func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
+	logins, err := h.apps.Registries(ctxkeys.Workspace(r.Context()).ID)
 	if err != nil {
 		renderError(w, "list registries failed", err)
 		return
 	}
-	render(w, r, pages.SettingsRegistriesSection(logins, formError))
+	render(w, r, pages.SettingsRegistriesSection(logins))
 }
 
-// Logs answers the last lines of the app's containers.
+// Logs answers the last lines of the app's containers, or why they could
+// not be read: the panel is their output, an error included.
 func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	lines, err := h.apps.Logs(r.Context(), workspace.ID, r.PathValue("app"), 200)
@@ -284,36 +289,40 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 
 // Env answers the env table; with show=1 the values are visible.
 func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	h.renderEnv(w, r, workspace.ID, r.URL.Query().Get("show") == "1", "")
+	h.renderEnv(w, r, r.URL.Query().Get("show") == "1")
 }
 
 // SetEnv sets one env var from the add form.
 func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
 	key := strings.TrimSpace(r.FormValue("key"))
 	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), map[string]string{key: r.FormValue("value")}, nil)
-	if err != nil {
-		h.renderEnv(w, r, workspace.ID, false, errorMessage(err))
+	if errors.Is(err, service.ErrEnvValue) {
+		fieldError(w, key+" not saved", "env-value", errorMessage(err))
 		return
 	}
-	h.renderEnv(w, r, workspace.ID, false, "")
+	if err != nil {
+		failed(w, r, "Variable not saved", err, map[string]string{"set": "env-key"})
+		return
+	}
+	h.renderEnv(w, r, false)
+	toastDone(w, r, key+" saved", "The next deploy or restart hands it to the app.")
 }
 
 // UnsetEnv removes one env var.
 func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), nil, []string{r.PathValue("key")})
+	key := r.PathValue("key")
+	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), nil, []string{key})
 	if err != nil {
-		h.renderEnv(w, r, workspace.ID, false, errorMessage(err))
+		failed(w, r, key+" not removed", err, nil)
 		return
 	}
-	h.renderEnv(w, r, workspace.ID, false, "")
+	h.renderEnv(w, r, false)
+	toastDone(w, r, key+" removed", "The next deploy or restart drops it.")
 }
 
-func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, workspaceID string, show bool, formError string) {
+func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show bool) {
 	name := r.PathValue("app")
-	env, err := h.apps.Env(workspaceID, name)
+	env, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
@@ -322,33 +331,17 @@ func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, workspac
 	if show {
 		values = env
 	}
-	render(w, r, pages.AppEnv(name, sortedKeys(env), values, formError))
+	render(w, r, pages.AppEnv(name, sortedKeys(env), values))
 }
 
 // Delete stops the app on its server and removes it, then goes to the list.
 func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	err := h.apps.Delete(r.Context(), actor(r), r.PathValue("app"))
 	if err != nil {
-		h.toast(w, r, "App could not be removed", err)
+		failed(w, r, "App not removed", err, nil)
 		return
 	}
 	w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/apps")
-}
-
-func (h *AppsHandler) toast(w http.ResponseWriter, r *http.Request, title string, err error) {
-	renderOOB(w, r, toast.Toast(toast.Props{Title: title, Description: errorMessage(err), Type: toast.TypeError}), "beforeend:#toast-container")
-}
-
-// errorMessage is the message the API would answer for err.
-func errorMessage(err error) string {
-	_, detail, known := api.ErrorFor(err)
-	if !known {
-		slog.Error("apps request failed", "error", err)
-	}
-	for _, message := range detail.Fields {
-		return message
-	}
-	return detail.Message
 }
 
 func sortedKeys(values map[string]string) []string {
@@ -362,20 +355,21 @@ func sortedKeys(values map[string]string) []string {
 
 // Routing answers the domains and access panel with fresh DNS checks.
 func (h *AppsHandler) Routing(w http.ResponseWriter, r *http.Request) {
-	h.renderRouting(w, r, "", nil)
+	h.renderRouting(w, r)
 }
 
 // AddDomain adds one domain and applies it.
 func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
-	h.changeDomains(w, r, func(domains []string, canonical string) ([]string, string) {
-		return append(domains, strings.TrimSpace(r.FormValue("domain"))), canonical
+	domain := strings.TrimSpace(r.FormValue("domain"))
+	h.changeDomains(w, r, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
+		return append(domains, domain), canonical
 	})
 }
 
 // RemoveDomain removes one domain and applies it.
 func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
-	h.changeDomains(w, r, func(domains []string, canonical string) ([]string, string) {
+	h.changeDomains(w, r, domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
 		if canonical == domain {
 			canonical = ""
 		}
@@ -385,12 +379,13 @@ func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 
 // MakeCanonical lets the other domains redirect to one.
 func (h *AppsHandler) MakeCanonical(w http.ResponseWriter, r *http.Request) {
-	h.changeDomains(w, r, func(domains []string, _ string) ([]string, string) {
-		return domains, r.FormValue("domain")
+	domain := r.FormValue("domain")
+	h.changeDomains(w, r, domain+" is canonical", "Canonical domain not changed", func(domains []string, _ string) ([]string, string) {
+		return domains, domain
 	})
 }
 
-func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, change func([]string, string) ([]string, string)) {
+func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, done, notDone string, change func([]string, string) ([]string, string)) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
@@ -399,36 +394,60 @@ func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, chan
 	}
 	domains, canonical := change(app.DomainList(), app.Canonical)
 	deploy, changed, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
-	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
-}
-
-// Protect puts a password in front of the app.
-func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
-	if r.FormValue("password") == "" {
-		h.renderRouting(w, r, "", service.ErrProtect)
+	if err != nil {
+		failed(w, r, notDone, err, map[string]string{"domains": "domain-name"})
 		return
 	}
-	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
-	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
+	h.routingChanged(w, r, done, deploy, changed)
+}
+
+// Protect puts a password in front of the app. A wrong field says the
+// rule of its hint line again, in red.
+func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
+	var deploy *model.Deploy
+	changed, err := false, service.ErrProtect
+	if r.FormValue("password") != "" {
+		deploy, changed, err = h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
+	}
+	switch {
+	case errors.Is(err, service.ErrProtectUser):
+		fieldError(w, "Password not set", "protect-user", "No spaces or colons.")
+		return
+	case errors.Is(err, service.ErrProtect):
+		fieldError(w, "Password not set", "protect-password", "Use 8 to 72 characters.")
+		return
+	case err != nil:
+		failed(w, r, "Password not set", err, nil)
+		return
+	}
+	h.routingChanged(w, r, "Password set", deploy, changed)
 }
 
 // Unprotect makes the app public again.
 func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
 	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
-	h.renderRouting(w, r, appliedNotice(deploy, changed), err)
+	if err != nil {
+		failed(w, r, "Password not removed", err, nil)
+		return
+	}
+	h.routingChanged(w, r, "Password removed", deploy, changed)
 }
 
-func appliedNotice(deploy *model.Deploy, changed bool) string {
-	if !changed {
-		return "Nothing changed."
+// routingChanged answers a saved change of the domains or the password: the
+// panel as it is now and a toast with what applies it.
+func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, deploy *model.Deploy, changed bool) {
+	h.renderRouting(w, r)
+	switch {
+	case !changed:
+		toastDone(w, r, "Nothing changed", "It was like this already.")
+	case deploy == nil:
+		toastDone(w, r, done, "The app takes it with its next deploy or start.")
+	default:
+		toastDone(w, r, done, "Deploy v"+strconv.Itoa(deploy.Number)+" applies it now.")
 	}
-	if deploy == nil {
-		return "Saved. The app takes it with its next deploy or start."
-	}
-	return "Saved. Deploy v" + strconv.Itoa(deploy.Number) + " applies it now."
 }
 
-func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request, notice string, changeErr error) {
+func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
@@ -440,12 +459,9 @@ func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request, noti
 		renderError(w, "check domains failed", err)
 		return
 	}
-	view := pages.RoutingView{App: *app, Checks: checks, Notice: notice}
+	view := pages.RoutingView{App: *app, Checks: checks}
 	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
 		view.Server = *server
-	}
-	if changeErr != nil {
-		view.Notice, view.Error = "", errorMessage(changeErr)
 	}
 	render(w, r, pages.AppRouting(view))
 }

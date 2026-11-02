@@ -23,8 +23,6 @@ import (
 type SecurityView struct {
 	Server       model.Server
 	Integrations service.Integrations
-	Notice       string
-	Error        string
 }
 
 // serverAccess is the row on a server card that says how it is reached and
@@ -67,16 +65,6 @@ templ ServerSecurity(view SecurityView) {
 		@panelPage(templ.Attributes{"data-server-security": view.Server.Name}) {
 			@statusHeader(view.Server.Name, serverStatus(view.Server), "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.")
 			<div id="server-security" class="flex flex-col gap-6">
-				if view.Notice != "" {
-					@pageNotice(false, templ.Attributes{"data-security-notice": true}) {
-						{ view.Notice }
-					}
-				}
-				if view.Error != "" {
-					@pageNotice(true, templ.Attributes{"data-security-error": true}) {
-						{ view.Error }
-					}
-				}
 				@securityState(view, securityPath)
 				@securityKeys(view)
 				@serverRules(view.Server)
@@ -105,7 +93,7 @@ templ ServerSecurity(view SecurityView) {
 templ securityKeys(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@panel(panelProps{Title: "Integrations", Description: "The keys the switches need. One set for all servers of this workspace, stored encrypted."}) {
-		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
+		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
 			@csrf.Token()
 			<div class="grid items-start gap-3 lg:grid-cols-2">
 				@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit, Zone Settings Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount+".", "For the tunnel: Tunnel Edit, DNS Edit and Zone Settings Edit.")
@@ -131,14 +119,16 @@ templ keyField(id, name, label, placeholder string, stored bool, storedText, hel
 		@field.Label(field.LabelProps{For: id}) {
 			{ label }
 		}
-		@input.Input(input.Props{ID: id, Name: name, Type: "password", Placeholder: utils.IfElse(stored, "Paste a new one to replace it", placeholder), Attributes: templ.Attributes{"autocomplete": "off"}})
-		if stored {
-			<p class="flex items-center gap-1 text-xs text-live">
-				@icon.Check(icon.Props{Class: "size-3.5"})
-				{ storedText }
-			</p>
-		} else {
-			<p class="text-xs text-muted-foreground">{ help }</p>
+		@input.Input(input.Props{ID: id, Name: name, Type: "password", Placeholder: utils.IfElse(stored, "Paste a new one to replace it", placeholder), Attributes: templ.Attributes{"autocomplete": "off", "aria-describedby": id + "-hint"}})
+		@fieldHint(id, "") {
+			if stored {
+				<span class="inline-flex items-center gap-1 text-live">
+					@icon.Check(icon.Props{Class: "size-3.5"})
+					{ storedText }
+				</span>
+			} else {
+				{ help }
+			}
 		}
 	}
 }
@@ -173,7 +163,7 @@ templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
 	<div id="security-state" class="flex flex-col gap-6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
 		@panel(panelProps{Title: "Access", Description: "How the internet reaches this server. Nothing changes until you press Apply.", Action: docsLink("/docs/guides/security", "How it works")}) {
-			<form class="flex flex-col gap-6" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" data-security-form>
+			<form class="flex flex-col gap-6" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
 				@csrf.Token()
 				// What the page showed: Apply changes only the switches flipped here
 				// and keeps what changed elsewhere meanwhile.
@@ -225,6 +215,7 @@ templ removeKeyButton(server, key, label, question string) {
 			"hx-target":       "#server-security",
 			"hx-select":       "#server-security",
 			"hx-swap":         "outerHTML",
+			"hx-disable":      "this",
 			"hx-confirm":      question,
 			"data-remove-key": key,
 		},

@@ -7,7 +7,6 @@ import (
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
@@ -23,15 +22,15 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	name := r.FormValue("name")
 	if strings.TrimSpace(name) == "" {
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Error", Description: "Name is required", Type: toast.TypeError}), "beforeend:#toast-container")
+		fieldError(w, "Name not saved", "name", "Enter your name.")
 		return
 	}
 	updatedUser, err := h.users.UpdateName(user.ID, name)
 	if err != nil {
 		slog.Error("failed to update name", "error", err, "user_id", user.ID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Error", Description: "Failed to update name", Type: toast.TypeError}), "beforeend:#toast-container")
+		toastFailed(w, r, "Name not saved", "Something went wrong. Please try again.")
 		return
 	}
-	renderOOB(w, r, toast.Toast(toast.Props{Title: "Success", Description: "Name updated successfully", Type: toast.TypeSuccess}), "beforeend:#toast-container")
 	render(w, r, layouts.SidebarIdentityUpdates(updatedUser))
+	toastDone(w, r, "Name saved", "Your team sees it in ops and in the activity.")
 }

@@ -115,8 +115,9 @@ func appCrumbs(p AppProps) []blocks.Crumb {
 const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML","selectOOB":"#sidebar-nav,#app-header"}`
 
 // appShellScript adds what every page of the panel shares: copy buttons
-// ([data-copy] copies its value, or the text of the element its
-// data-copy-target selects), the go-to keys (g then a, s, b, y, t or ,) and / or n to
+// ([data-copy] copies its value, or the value or text of the element its
+// data-copy-target selects, and is marked data-copied for a moment, so its
+// icon turns into a check without changing its size), the go-to keys (g then a, s, b, y, t or ,) and / or n to
 // focus the page's main field ([data-hotkey-focus]).
 templ appShellScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
@@ -144,17 +145,11 @@ templ appShellScript() {
 				if (!button) return;
 				event.preventDefault();
 				const target = button.dataset.copyTarget && document.querySelector(button.dataset.copyTarget);
-				const text = target ? target.textContent.trim() : button.dataset.copy;
+				const text = target ? ("value" in target ? target.value : target.textContent).trim() : button.dataset.copy;
 				if (!text || !(await copy(text))) return;
 				button.dataset.copied = "";
-				const label = button.querySelector("[data-copy-label]");
-				if (label && !label.dataset.before) label.dataset.before = label.textContent;
-				if (label) label.textContent = "Copied";
 				clearTimeout(button.copyTimer);
-				button.copyTimer = setTimeout(() => {
-					delete button.dataset.copied;
-					if (label) label.textContent = label.dataset.before;
-				}, 1400);
+				button.copyTimer = setTimeout(() => delete button.dataset.copied, 1400);
 			});
 			// A boosted answer is a whole page: its parts marked hx-swap-oob
 			// for their own fragment answers stay in place in #main instead of

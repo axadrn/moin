@@ -5,6 +5,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/empty"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"time"
 
@@ -235,15 +236,31 @@ templ copyButton(value, target, label string) {
 	}
 }
 
-// pageNotice is the answer to the last change on a page: a green line when
-// it worked, a red one when it did not.
-templ pageNotice(failed bool, attrs templ.Attributes) {
-	@alert.Alert(alert.Props{Class: utils.IfElse(failed, "border-0 bg-failed/12 text-failed", "border-0 bg-live/12 text-live"), Attributes: attrs}) {
-		if failed {
-			@icon.CircleAlert()
-		} else {
-			@icon.CircleCheck()
-		}
+// fieldHint is the line under a field of a form with labels above its
+// fields: the hint (children, may be empty), or the message when the field
+// is wrong (DESIGN.md, Feedback). The line is there from the start, so a
+// message only swaps text; err shows one the page renders with, the
+// ops:invalid event of a handler one it answers with. The field points at
+// it with aria-describedby id-hint.
+templ fieldHint(id, err string) {
+	@field.Description(field.DescriptionProps{
+		ID:         id + "-hint",
+		Class:      "group/hint min-h-4 text-xs leading-4",
+		Attributes: templ.Attributes{"data-field-hint": id, "data-invalid": err != "", "aria-live": "polite"},
+	}) {
+		<span class="group-data-invalid/hint:hidden">
+			{ children... }
+		</span>
+		<span data-hint-error class="hidden text-failed group-data-invalid/hint:inline">{ err }</span>
+	}
+}
+
+// stateAlert is a state that lasts while the page is open, like data that
+// could not be read (DESIGN.md, Feedback). It renders with the page or the
+// panel it is about, never as the answer to a click.
+templ stateAlert(attrs templ.Attributes) {
+	@alert.Alert(alert.Props{Class: "border-0 bg-failed/12 text-failed", Attributes: attrs}) {
+		@icon.CircleAlert()
 		@alert.Title(alert.TitleProps{Class: "font-medium"}) {
 			{ children... }
 		}

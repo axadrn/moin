@@ -8,274 +8,143 @@ import (
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 	"github.com/axadrn/ops/controlplane/internal/validation"
 )
 
 func (h *AccountHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
-
-	email := r.FormValue("email")
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "Valid email is required",
-			Type:        toast.TypeError,
-		}))
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	if validation.ValidateEmail(email) != nil {
+		fieldError(w, "Email not changed", "email", "Enter a valid email address.")
 		return
 	}
-
 	if email == user.Email {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Info",
-			Description: "Email address is already set to this value",
-			Type:        toast.TypeInfo,
-		}))
+		toastDone(w, r, "Nothing changed", "This is your email already.")
 		return
 	}
-
-	err = h.authService.RequestEmailChange(user.ID, email)
+	err := h.authService.RequestEmailChange(user.ID, email)
+	if errors.Is(err, service.ErrEmailAlreadyExists) {
+		fieldError(w, "Email not changed", "email", "Another account uses this email.")
+		return
+	}
+	if errors.Is(err, service.ErrInvalidEmail) {
+		fieldError(w, "Email not changed", "email", "Enter a valid email address.")
+		return
+	}
 	if err != nil {
 		slog.Warn("email change request failed", "error", err, "user_id", user.ID)
-
-		errMsg := "Failed to change email"
-		if errors.Is(err, service.ErrEmailAlreadyExists) {
-			errMsg = "Email already in use"
-		} else if errors.Is(err, service.ErrInvalidEmail) {
-			errMsg = "Invalid email address"
-		}
-
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: errMsg,
-			Type:        toast.TypeError,
-		}))
+		toastFailed(w, r, "Email not changed", "Something went wrong. Please try again.")
 		return
 	}
-
 	slog.Info("email change requested", "user_id", user.ID)
-	accountToast(w, r, toast.Toast(toast.Props{
-		Title:       "Verification Required",
-		Description: "Please check your new email address to verify the change",
-		Type:        toast.TypeInfo,
-	}))
+	toastDone(w, r, "Confirm your new email", "We sent a link to "+email+". The change applies once you open it.")
+}
+
+// passwordFields checks the fields of the password forms in their order and
+// marks the first that is wrong. current is false for the form that sets a
+// first password.
+func passwordFields(w http.ResponseWriter, r *http.Request, title string, current bool) bool {
+	if current && r.FormValue("current_password") == "" {
+		fieldError(w, title, "current_password", "Enter your current password.")
+		return false
+	}
+	if r.FormValue("new_password") == "" {
+		fieldError(w, title, "new_password", "Enter a new password.")
+		return false
+	}
+	if validation.ValidatePassword(r.FormValue("new_password")) != nil {
+		fieldError(w, title, "new_password", passwordProblem(r.FormValue("new_password")))
+		return false
+	}
+	if r.FormValue("confirm_password") != r.FormValue("new_password") {
+		fieldError(w, title, "confirm_password", "The passwords do not match.")
+		return false
+	}
+	return true
+}
+
+// passwordProblem says in a few words why ValidatePassword refused
+// password, short enough for the hint line under the field.
+func passwordProblem(password string) string {
+	switch {
+	case len(password) < 12:
+		return "Use at least 12 characters."
+	case len(password) > 72:
+		return "Use at most 72 characters."
+	}
+	return "Too common. Choose another one."
 }
 
 func (h *AccountHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
-
-	currentPassword := r.FormValue("current_password")
-	newPassword := r.FormValue("new_password")
-	confirmPassword := r.FormValue("confirm_password")
-
-	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "All password fields are required",
-			Type:        toast.TypeError,
-		}))
+	if !passwordFields(w, r, "Password not changed", true) {
 		return
 	}
-
-	if newPassword != confirmPassword {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "New passwords do not match",
-			Type:        toast.TypeError,
-		}))
+	err := h.userService.UpdatePassword(user.ID, r.FormValue("current_password"), r.FormValue("new_password"))
+	if errors.Is(err, service.ErrInvalidCurrentPassword) {
+		fieldError(w, "Password not changed", "current_password", "This is not your current password.")
 		return
 	}
-
-	err := validation.ValidatePassword(newPassword)
-	if err != nil {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: err.Error(),
-			Type:        toast.TypeError,
-		}))
-		return
-	}
-
-	err = h.userService.UpdatePassword(user.ID, currentPassword, newPassword)
 	if err != nil {
 		slog.Warn("password update failed", "error", err, "user_id", user.ID)
-
-		errMsg := "Failed to update password"
-		if errors.Is(err, service.ErrInvalidCurrentPassword) {
-			errMsg = "Current password is incorrect"
-		}
-
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: errMsg,
-			Type:        toast.TypeError,
-		}))
+		toastFailed(w, r, "Password not changed", "Something went wrong. Please try again.")
 		return
 	}
-
-	revocationErr := h.revokeOtherAccess(r, user.ID)
-	if revocationErr != nil {
-		slog.Error("failed to revoke other sessions after password update", "error", revocationErr, "user_id", user.ID)
-	}
-
 	slog.Info("password updated", "user_id", user.ID)
-	toastProps := toast.Props{
-		Title:       "Success",
-		Description: "Password updated successfully",
-		Type:        toast.TypeSuccess,
-	}
-	if revocationErr != nil {
-		toastProps = toast.Props{
-			Title:       "Password Updated",
-			Description: "Your password changed, but other sessions could not be signed out. Use Sign Out Everywhere and try again.",
-			Type:        toast.TypeWarning,
-			Timeout:     8000,
-		}
-	}
-	accountToast(w, r, toast.Toast(toastProps))
 	renderFragment(w, r, pages.SettingsPasswordSection(), "settings-password-form")
+	h.passwordDone(w, r, user.ID, "Password changed")
 }
 
 func (h *AccountHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
-
-	newPassword := r.FormValue("new_password")
-	confirmPassword := r.FormValue("confirm_password")
-
-	if newPassword == "" || confirmPassword == "" {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "All fields are required",
-			Type:        toast.TypeError,
-		}))
+	if !passwordFields(w, r, "Password not set", false) {
 		return
 	}
-
-	if newPassword != confirmPassword {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "Passwords do not match",
-			Type:        toast.TypeError,
-		}))
-		return
-	}
-
-	err := validation.ValidatePassword(newPassword)
-	if err != nil {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: err.Error(),
-			Type:        toast.TypeError,
-		}))
-		return
-	}
-
-	err = h.authService.SetPassword(user.ID, newPassword)
+	err := h.authService.SetPassword(user.ID, r.FormValue("new_password"))
 	if err != nil {
 		slog.Warn("set password failed", "error", err, "user_id", user.ID)
-
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Failed to Set Password",
-			Description: err.Error(),
-			Type:        toast.TypeError,
-			Timeout:     8000, // 8 seconds for errors
-		}))
+		toastFailed(w, r, "Password not set", "Something went wrong. Please try again.")
 		return
 	}
-
-	// Reload user from DB to get updated password_hash
-	updatedUser, err := h.userService.ByID(user.ID)
-	if err != nil {
-		slog.Error("failed to reload user after password set", "error", err, "user_id", user.ID)
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "Password set but failed to refresh. Please reload the page.",
-			Type:        toast.TypeError,
-		}))
-		return
-	}
-
-	// Update context with fresh user
-	ctx := ctxkeys.WithUser(r.Context(), updatedUser)
-	revocationErr := h.revokeOtherAccess(r, user.ID)
-	if revocationErr != nil {
-		slog.Error("failed to revoke other sessions after password set", "error", revocationErr, "user_id", user.ID)
-	}
-
 	slog.Info("password set", "user_id", user.ID)
-	toastProps := toast.Props{
-		Title:       "Success",
-		Description: "Password set successfully. You can now sign in with your password.",
-		Type:        toast.TypeSuccess,
-	}
-	if revocationErr != nil {
-		toastProps = toast.Props{
-			Title:       "Password Set",
-			Description: "Your password was set, but other sessions could not be signed out. Use Sign Out Everywhere and try again.",
-			Type:        toast.TypeWarning,
-			Timeout:     8000,
-		}
-	}
-	accountToast(w, r, toast.Toast(toastProps))
-	renderFragment(w, r.WithContext(ctx), pages.SettingsPasswordSection(), "settings-password-form")
+	h.renderPasswordForm(w, r, user.ID)
+	h.passwordDone(w, r, user.ID, "Password set")
 }
 
 func (h *AccountHandler) RemovePassword(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
-
 	err := h.authService.RemovePassword(user.ID)
 	if err != nil {
 		slog.Warn("remove password failed", "error", err, "user_id", user.ID)
-
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Failed to Remove Password",
-			Description: err.Error(),
-			Type:        toast.TypeError,
-			Timeout:     8000, // 8 seconds for errors
-		}))
+		toastFailed(w, r, "Password not removed", "Something went wrong. Please try again.")
 		return
 	}
-
-	// Reload user from DB to get updated password_hash (now NULL)
-	updatedUser, err := h.userService.ByID(user.ID)
-	if err != nil {
-		slog.Error("failed to reload user after password removal", "error", err, "user_id", user.ID)
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "Password removed but failed to refresh. Please reload the page.",
-			Type:        toast.TypeError,
-		}))
-		return
-	}
-
-	// Update context with fresh user
-	ctx := ctxkeys.WithUser(r.Context(), updatedUser)
-	revocationErr := h.revokeOtherAccess(r, user.ID)
-	if revocationErr != nil {
-		slog.Error("failed to revoke other sessions after password removal", "error", revocationErr, "user_id", user.ID)
-	}
-
 	slog.Info("password removed", "user_id", user.ID)
+	h.renderPasswordForm(w, r, user.ID)
+	h.passwordDone(w, r, user.ID, "Password removed")
+}
 
-	toastProps := toast.Props{
-		Title:       "Success",
-		Description: "Password removed. You can now only sign in with magic links.",
-		Type:        toast.TypeSuccess,
+// renderPasswordForm answers the password form for the password as it is
+// now: set one, or change and remove it.
+func (h *AccountHandler) renderPasswordForm(w http.ResponseWriter, r *http.Request, userID string) {
+	updated, err := h.userService.ByID(userID)
+	if err != nil {
+		slog.Error("failed to reload user after password change", "error", err, "user_id", userID)
+		return
 	}
-	if revocationErr != nil {
-		toastProps = toast.Props{
-			Title:       "Password Removed",
-			Description: "Your password was removed, but other sessions could not be signed out. Use Sign Out Everywhere and try again.",
-			Type:        toast.TypeWarning,
-			Timeout:     8000,
-		}
+	renderFragment(w, r.WithContext(ctxkeys.WithUser(r.Context(), updated)), pages.SettingsPasswordSection(), "settings-password-form")
+}
+
+// passwordDone signs out the other sessions after a change of the password
+// and says so, or that they could not be signed out.
+func (h *AccountHandler) passwordDone(w http.ResponseWriter, r *http.Request, userID, title string) {
+	if err := h.revokeOtherAccess(r, userID); err != nil {
+		slog.Error("failed to revoke other sessions after password change", "error", err, "user_id", userID)
+		toastWarning(w, r, title, "Other sessions could not be signed out. Use Sign out everywhere under Sessions.")
+		return
 	}
-	accountToast(w, r, toast.Toast(toastProps))
-	renderFragment(w, r.WithContext(ctx), pages.SettingsPasswordSection(), "settings-password-form")
+	toastDone(w, r, title, "Your other sessions are signed out.")
 }
 
 func (h *AccountHandler) revokeOtherAccess(r *http.Request, userID string) error {
@@ -292,11 +161,7 @@ func (h *AccountHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	confirmation := strings.TrimSpace(r.FormValue("delete_confirmation"))
 
 	if confirmation != "DELETE" {
-		accountToast(w, r, toast.Toast(toast.Props{
-			Title:       "Error",
-			Description: "Please type DELETE to confirm account deletion",
-			Type:        toast.TypeError,
-		}))
+		toastFailed(w, r, "Account not deleted", "Type DELETE to confirm.")
 		return
 	}
 

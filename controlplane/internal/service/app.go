@@ -45,7 +45,8 @@ var (
 	ErrRegistryLogin = errors.New("registry username and password are required")
 	ErrDomain        = errors.New("domains must be host names like blog.de")
 	ErrCanonical     = errors.New("the canonical domain must be one of the domains")
-	ErrProtect       = errors.New("protection needs a username and a password of at least 8 characters")
+	ErrProtect       = errors.New("protection needs a password of 8 to 72 characters")
+	ErrProtectUser   = errors.New("protection needs a username without spaces or colons")
 	ErrEnvKey        = errors.New("env keys are letters, digits and underscores and do not start with a digit")
 	ErrEnvValue      = errors.New("env values are at most 32 KB")
 	ErrEnvLimit      = errors.New("an app has at most 200 env vars")
@@ -456,7 +457,10 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 	protect := ""
 	if password != "" {
 		username = strings.TrimSpace(username)
-		if username == "" || strings.ContainsAny(username, ": ") || len(password) < 8 || len(password) > 72 {
+		if username == "" || strings.ContainsAny(username, ": ") {
+			return nil, false, ErrProtectUser
+		}
+		if len(password) < 8 || len(password) > 72 {
 			return nil, false, ErrProtect
 		}
 		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {

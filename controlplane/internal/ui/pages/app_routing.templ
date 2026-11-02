@@ -20,9 +20,6 @@ type RoutingView struct {
 	Checks []service.DomainCheck
 	// Server runs the app; its addresses tell a new domain where to point.
 	Server model.Server
-	// Notice says what happened to the last change; Error why it failed.
-	Notice string
-	Error  string
 }
 
 // AppRouting is the domains and access panel of an app: the domains with
@@ -32,19 +29,6 @@ type RoutingView struct {
 templ AppRouting(view RoutingView) {
 	{{ routingPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/routing" }}
 	<div id="app-routing" class="grid items-stretch gap-4 lg:grid-cols-2">
-		if view.Error != "" {
-			<div class="lg:col-span-2">
-				@pageNotice(true, templ.Attributes{"data-routing-error": true}) {
-					{ view.Error }
-				}
-			</div>
-		} else if view.Notice != "" {
-			<div class="lg:col-span-2">
-				@pageNotice(false, templ.Attributes{"data-routing-notice": true}) {
-					{ view.Notice }
-				}
-			</div>
-		}
 		@panel(panelProps{
 			Heading:     "app-domains-heading",
 			Title:       "Domains",
@@ -102,13 +86,19 @@ templ AppRouting(view RoutingView) {
 							@field.Label(field.LabelProps{For: "protect-user"}) {
 								Username
 							}
-							@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "ops", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+							@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "ops", Attributes: templ.Attributes{"autocomplete": "off", "required": true, "aria-describedby": "protect-user-hint"}})
+							@fieldHint("protect-user", "") {
+								No spaces or colons.
+							}
 						}
 						@field.Field(field.Props{Class: "gap-1"}) {
 							@field.Label(field.LabelProps{For: "protect-password"}) {
 								Password
 							}
-							@input.Input(input.Props{ID: "protect-password", Name: "password", Type: "password", Placeholder: "8 characters or more", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "minlength": "8"}})
+							@input.Input(input.Props{ID: "protect-password", Name: "password", Type: "password", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "minlength": "8", "aria-describedby": "protect-password-hint"}})
+							@fieldHint("protect-password", "") {
+								8 to 72 characters.
+							}
 						}
 					</div>
 					<div class="flex justify-end">

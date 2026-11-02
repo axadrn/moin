@@ -91,7 +91,7 @@ func (h *AppsHandler) DataCell(w http.ResponseWriter, r *http.Request) {
 	state := "saved"
 	err := h.apps.UpdateCell(r.Context(), actor(r), r.PathValue("app"), database, table, rowID, columnName, value)
 	if err != nil {
-		h.toast(w, r, "Cell not saved", err)
+		toastError(w, r, "Cell not saved", errorMessage(err))
 		state = "failed"
 	}
 	render(w, r, pages.DataCell(dataPath, database, table, strconv.FormatInt(rowID, 10), column, shown, state))
@@ -102,11 +102,10 @@ func (h *AppsHandler) DataDelete(w http.ResponseWriter, r *http.Request) {
 	rowID, _ := strconv.ParseInt(r.FormValue("rowid"), 10, 64)
 	err := h.apps.DeleteRow(r.Context(), actor(r), r.PathValue("app"), r.FormValue("db"), r.FormValue("table"), rowID)
 	if err != nil {
-		w.Header().Set("HX-Reswap", "none")
-		h.toast(w, r, "Row not deleted", err)
+		failed(w, r, "Row not deleted", err, nil)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	toastDone(w, r, "Row "+strconv.FormatInt(rowID, 10)+" deleted", "")
 }
 
 // DataQuery runs the SQL console. Changes need the box ticked.
@@ -125,7 +124,7 @@ func (h *AppsHandler) DataQuery(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) DataInsert(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		h.toast(w, r, "Row not added", err)
+		failed(w, r, "Row not added", err, nil)
 		return
 	}
 	values := map[string]string{}
@@ -138,8 +137,7 @@ func (h *AppsHandler) DataInsert(w http.ResponseWriter, r *http.Request) {
 	database, table := r.FormValue("db"), r.FormValue("table")
 	err = h.apps.InsertRow(r.Context(), actor(r), r.PathValue("app"), database, table, values)
 	if err != nil {
-		w.Header().Set("HX-Reswap", "none")
-		h.toast(w, r, "Row not added", err)
+		failed(w, r, "Row not added", err, nil)
 		return
 	}
 	query := url.Values{}

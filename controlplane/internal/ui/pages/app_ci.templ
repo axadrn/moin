@@ -34,12 +34,12 @@ templ appCI(appName string) {
 						Image
 					}
 					<div class="flex flex-col gap-2 sm:flex-row">
-						@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+						@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-describedby": "image-ref-hint"}})
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
 							Deploy image
 						}
 					</div>
-					@field.Description(field.DescriptionProps{Class: "text-xs"}) {
+					@fieldHint("image-ref", "") {
 						Same as <code class="font-mono">ops deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
 					}
 				}
@@ -91,7 +91,7 @@ templ AppHook(appName, url string) {
 }
 
 // SettingsRegistriesSection lists the registry logins agents pull private images with.
-templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string) {
+templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="settings-registries">
 		@card.Card() {
@@ -148,26 +148,28 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin, formError string
 							@field.Label(field.LabelProps{For: "registry-host"}) {
 								Registry
 							}
-							@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+							@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-describedby": "registry-host-hint"}})
+							@fieldHint("registry-host", "") {
+								The host name, like ghcr.io.
+							}
 						}
 						@field.Field(field.Props{Class: "gap-1"}) {
 							@field.Label(field.LabelProps{For: "registry-username"}) {
 								Username
 							}
-							@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Attributes: templ.Attributes{"autocomplete": "off", "required": true}})
+							@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Attributes: templ.Attributes{"autocomplete": "off", "required": true, "aria-describedby": "registry-username-hint"}})
+							@fieldHint("registry-username", "")
 						}
 						@field.Field(field.Props{Class: "gap-1"}) {
 							@field.Label(field.LabelProps{For: "registry-password"}) {
 								Password or token
 							}
-							@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true}})
+							@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "aria-describedby": "registry-password-hint"}})
+							@fieldHint("registry-password", "") {
+								Stored encrypted.
+							}
 						}
 					</div>
-					if formError != "" {
-						@field.Error(field.ErrorProps{Attributes: templ.Attributes{"data-registry-error": true}}) {
-							{ formError }
-						}
-					}
 					<div class="flex justify-end">
 						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 							Save login

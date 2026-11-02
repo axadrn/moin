@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -11,7 +10,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
@@ -58,31 +56,22 @@ func (h *ServersHandler) List(w http.ResponseWriter, r *http.Request) {
 // Create adds a server and answers the reset form and its install command.
 // The event stream reloads the table.
 func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	name := r.FormValue("name")
-	server, installToken, err := h.servers.Create(actor(r), name)
-	switch {
-	case errors.Is(err, service.ErrServerName):
-		render(w, r, pages.ServerAddForm(name, "Name must contain between 1 and 64 characters."))
-		return
-	case errors.Is(err, service.ErrSubscriptionRequired):
+	server, installToken, err := h.servers.Create(actor(r), r.FormValue("name"))
+	if errors.Is(err, service.ErrSubscriptionRequired) {
 		w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/servers")
 		return
-	case errors.Is(err, repository.ErrDuplicateServer):
-		render(w, r, pages.ServerAddForm(name, "A server with this name already exists."))
-		return
-	case err != nil:
-		slog.Error("failed to add server", "error", err, "workspace_id", workspace.ID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server could not be added", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+	}
+	if err != nil {
+		failed(w, r, "Server not added", err, map[string]string{"name": "server-name"})
 		return
 	}
-	render(w, r, pages.ServerAddForm("", ""))
+	render(w, r, pages.ServerAddForm())
 	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
+	toastDone(w, r, server.Name+" added", "Run the install command on the server.")
 }
 
 // Delete removes a server from its page and goes back to the list.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
 	// The list names the server, to show how to remove its agent there.
 	location := ctxkeys.AppBasePath(r.Context()) + "/servers"
 	if server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id")); err == nil {
@@ -90,12 +79,11 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if errors.Is(err, repository.ErrServerHasApps) {
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server not removed", Description: "Remove the apps on this server first.", Type: toast.TypeError}), "beforeend:#toast-container")
+		toastFailed(w, r, "Server not removed", "Remove the apps on this server first.")
 		return
 	}
 	if err != nil && !errors.Is(err, repository.ErrServerNotFound) {
-		slog.Error("failed to remove server", "error", err, "workspace_id", workspace.ID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Server could not be removed", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+		failed(w, r, "Server not removed", err, nil)
 		return
 	}
 	redirect(w, r, location, http.StatusSeeOther)
@@ -106,8 +94,8 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	server, err := h.servers.UpdateAgent(r.Context(), actor(r), r.PathValue("id"))
 	if err != nil {
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "The agent was not updated", Description: errorMessage(err), Type: toast.TypeError}), "beforeend:#toast-container")
+		failed(w, r, "Agent not updated", err, nil)
 		return
 	}
-	renderOOB(w, r, toast.Toast(toast.Props{Title: "Agent updated", Description: server.Name + " runs agent " + server.AgentVersion + " now.", Type: toast.TypeSuccess}), "beforeend:#toast-container")
+	toastDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
 }

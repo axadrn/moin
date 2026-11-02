@@ -23,8 +23,8 @@ type RepoView struct {
 	Enabled   bool
 	Connected bool
 	Repos     []service.GitHubRepoOf
-	Notice    string
-	Error     string
+	// Error says why the repos could not be listed.
+	Error string
 }
 
 // AppRepo is the repository panel: connect GitHub, link a repo and branch,
@@ -38,13 +38,8 @@ templ AppRepo(view RepoView) {
 		Action:      docsLink("/docs/guides/github", "How it works"),
 	}) {
 		<div class="flex flex-col gap-6">
-			if view.Notice != "" {
-				@pageNotice(false, templ.Attributes{"data-repo-notice": true}) {
-					{ view.Notice }
-				}
-			}
 			if view.Error != "" {
-				@pageNotice(true, templ.Attributes{"data-repo-error": true}) {
+				@stateAlert(templ.Attributes{"data-repo-error": true}) {
 					{ view.Error }
 				}
 			}
@@ -83,7 +78,7 @@ templ repoLink(view RepoView) {
 					Repo
 				}
 				@selectcomp.Select(selectcomp.Props{Name: "repo", Required: true, DefaultValue: firstRepo(view.Repos), Items: repoItems(view.Repos)}) {
-					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 font-mono"}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "link-repo", Class: "w-full min-w-0 font-mono", Attributes: templ.Attributes{"aria-describedby": "link-repo-hint"}}) {
 						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No repo"})
 					}
 					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
@@ -96,12 +91,18 @@ templ repoLink(view RepoView) {
 						}
 					}
 				}
+				@fieldHint("link-repo", "") {
+					The repos the ops GitHub App may read.
+				}
 			}
 			@field.Field(field.Props{Class: "gap-1 min-w-0"}) {
 				@field.Label(field.LabelProps{For: "link-branch"}) {
 					Branch
 				}
-				@input.Input(input.Props{ID: "link-branch", Name: "branch", Placeholder: "default branch", Class: "font-mono", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
+				@input.Input(input.Props{ID: "link-branch", Name: "branch", Placeholder: "default branch", Class: "font-mono", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off", "aria-describedby": "link-branch-hint"}})
+				@fieldHint("link-branch", "") {
+					Empty follows the default branch.
+				}
 			}
 		</div>
 		if len(view.Repos) == 0 {
@@ -141,12 +142,14 @@ templ repoLinked(view RepoView) {
 		@csrf.Token()
 		<label for="deploy-ref" class="text-sm font-medium">Deploy a branch, tag or commit</label>
 		<div class="flex flex-col gap-2 sm:flex-row">
-			@input.Input(input.Props{ID: "deploy-ref", Name: "ref", Placeholder: view.App.Branch, Class: "min-w-0 font-mono sm:max-w-xs", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off"}})
+			@input.Input(input.Props{ID: "deploy-ref", Name: "ref", Placeholder: view.App.Branch, Class: "min-w-0 font-mono sm:max-w-xs", Attributes: templ.Attributes{"spellcheck": "false", "autocomplete": "off", "aria-describedby": "deploy-ref-hint"}})
 			@button.Button(button.Props{Type: button.TypeSubmit, Class: "shrink-0"}) {
 				Deploy
 			}
 		</div>
-		<p class="text-xs text-muted-foreground">Empty deploys the newest commit on { view.App.Branch }.</p>
+		@fieldHint("deploy-ref", "") {
+			Empty deploys the newest commit on { view.App.Branch }.
+		}
 	</form>
 	<form hx-post={ appPath + "/repo" } hx-trigger="change" hx-target="#app-repo" hx-swap="outerHTML">
 		@csrf.Token()

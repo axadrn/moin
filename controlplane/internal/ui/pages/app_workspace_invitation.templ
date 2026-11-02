@@ -37,7 +37,7 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 				}
 				@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {
 					if errorMessage != "" {
-						@pageNotice(true, nil) {
+						@stateAlert(nil) {
 							{ errorMessage }
 						}
 					}

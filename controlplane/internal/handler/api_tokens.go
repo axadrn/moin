@@ -8,7 +8,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
@@ -34,7 +33,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 			view, err := apiTokensView(r, h.tokens, newAPITokenForm(r))
 			if err != nil {
 				slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
-				renderOOB(w, r, toast.Toast(toast.Props{Title: "Token created", Description: "Reload the page to see it in the list.", Type: toast.TypeInfo}), "beforeend:#toast-container")
+				toastDone(w, r, "Token created", "Reload the page to see it in the list.")
 				render(w, r, pages.APITokenReveal(raw))
 				return
 			}
@@ -46,7 +45,11 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 		field, message, ok := apiTokenFormError(err)
 		if !ok {
 			slog.Error("failed to create api token", "error", err, "user_id", user.ID)
-			renderOOB(w, r, toast.Toast(toast.Props{Title: "Token could not be created", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+			toastFailed(w, r, "Token not created", "Something went wrong. Please try again.")
+			return
+		}
+		if field == "form" {
+			toastFailed(w, r, "Token not created", message)
 			return
 		}
 		form.Errors[field] = message
@@ -54,7 +57,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	view, err := apiTokensView(r, h.tokens, form)
 	if err != nil {
 		slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Token could not be created", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+		toastFailed(w, r, "Token not created", "Something went wrong. Please try again.")
 		return
 	}
 	render(w, r, pages.APITokenCreateForm(view, true))
@@ -67,14 +70,14 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	err := h.tokens.Revoke(user.ID, tokenID)
 	switch {
 	case errors.Is(err, repository.ErrAPITokenNotFound):
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Token not found", Description: "That token was already revoked.", Type: toast.TypeError}), "beforeend:#toast-container")
+		toastError(w, r, "Token not found", "That token was already revoked.")
 	case err != nil:
 		slog.Error("failed to revoke api token", "error", err, "user_id", user.ID, "token_id", tokenID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Token could not be revoked", Description: "Please try again.", Type: toast.TypeError}), "beforeend:#toast-container")
+		toastFailed(w, r, "Token not revoked", "Something went wrong. Please try again.")
 		return
 	default:
 		slog.Info("api token revoked", "token_id", tokenID, "user_id", user.ID)
-		renderOOB(w, r, toast.Toast(toast.Props{Title: "Token revoked", Description: "Requests with it no longer work.", Type: toast.TypeSuccess}), "beforeend:#toast-container")
+		toastDone(w, r, "Token revoked", "Requests with it no longer work.")
 	}
 	view, err := apiTokensView(r, h.tokens, newAPITokenForm(r))
 	if err != nil {

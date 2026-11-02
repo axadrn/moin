@@ -39,11 +39,9 @@ templ NewWorkspaceForm(errorMsg string) {
 				@field.Label(field.LabelProps{For: "workspace-name"}) {
 					Workspace name
 				}
-				@input.Input(input.Props{ID: "workspace-name", Name: "name", Type: "text", Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "autofocus": ""}})
-				if errorMsg != "" {
-					@field.Error() {
-						{ errorMsg }
-					}
+				@input.Input(input.Props{ID: "workspace-name", Name: "name", Type: "text", Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "aria-describedby": "workspace-name-hint", "autofocus": ""}})
+				@fieldHint("workspace-name", errorMsg) {
+					Your team, your company or a project. You can rename it later.
 				}
 			}
 			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {

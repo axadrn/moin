@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"io"
@@ -105,27 +106,45 @@ func (h *HooksHandler) GitHubWebhook(w http.ResponseWriter, r *http.Request) {
 
 // Repo is the repository panel of an app.
 func (h *AppsHandler) Repo(w http.ResponseWriter, r *http.Request) {
-	h.renderRepo(w, r, "", "")
+	h.renderRepo(w, r)
 }
 
-// LinkRepo makes the app follow the chosen repo and branch.
+// LinkRepo makes the app follow the chosen repo and branch. The switch of
+// a linked repo sends the same, with only deploy on push changed.
 func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.LinkRepo(r.Context(), actor(r), r.PathValue("app"), r.FormValue("repo"), r.FormValue("branch"), r.FormValue("auto_deploy") == "1")
+	before, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
-		h.renderRepo(w, r, "", errorMessage(err))
+		failed(w, r, "Repo not linked", err, nil)
 		return
 	}
-	h.renderRepo(w, r, "Linked.", "")
+	app, err := h.apps.LinkRepo(r.Context(), actor(r), r.PathValue("app"), r.FormValue("repo"), r.FormValue("branch"), r.FormValue("auto_deploy") == "1")
+	switch {
+	case err != nil && before.Repo != "":
+		// The switch flips back to what is stored.
+		h.renderRepo(w, r)
+		toastError(w, r, "Deploy on push not changed", errorMessage(err))
+	case errors.Is(err, service.ErrRepo):
+		fieldRefused(w, r, "Repo not linked", "link-repo", errorMessage(err))
+	case err != nil:
+		failed(w, r, "Repo not linked", err, map[string]string{"repo": "link-repo", "ref": "link-branch"})
+	case before.Repo != "":
+		// The switch saved itself; its position says so.
+		h.renderRepo(w, r)
+	default:
+		h.renderRepo(w, r)
+		toastDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
+	}
 }
 
 // UnlinkRepo stops the app from following its repo.
 func (h *AppsHandler) UnlinkRepo(w http.ResponseWriter, r *http.Request) {
 	err := h.apps.UnlinkRepo(actor(r), r.PathValue("app"))
 	if err != nil {
-		h.renderRepo(w, r, "", errorMessage(err))
+		failed(w, r, "Repo not unlinked", err, nil)
 		return
 	}
-	h.renderRepo(w, r, "", "")
+	h.renderRepo(w, r)
+	toastDone(w, r, "Repo unlinked", "ops no longer deploys its pushes. The app keeps running.")
 }
 
 // DeployRef deploys a branch, tag or commit from GitHub; the page follows
@@ -133,10 +152,11 @@ func (h *AppsHandler) UnlinkRepo(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) DeployRef(w http.ResponseWriter, r *http.Request) {
 	deploy, err := h.apps.DeployRef(r.Context(), actor(r), r.PathValue("app"), r.FormValue("ref"))
 	if err != nil {
-		h.renderRepo(w, r, "", errorMessage(err))
+		failed(w, r, "Deploy not started", err, map[string]string{"ref": "deploy-ref"})
 		return
 	}
-	h.renderRepo(w, r, "Deploying "+shortSHA(deploy.CommitSHA)+" as v"+strconv.Itoa(deploy.Number)+".", "")
+	h.renderRepo(w, r)
+	toastDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 }
 
 func shortSHA(sha string) string {
@@ -146,14 +166,16 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request, notice, failure string) {
+// renderRepo renders the repository panel. Error says why the repos could
+// not be listed: a state of the panel, not of a click.
+func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		renderError(w, "load app failed", err)
 		return
 	}
-	view := pages.RepoView{App: *app, Notice: notice, Error: failure}
+	view := pages.RepoView{App: *app}
 	_, err = h.apps.GitHubInstallURL(actor(r))
 	view.Enabled = err == nil
 	installations, err := h.apps.GitHubInstallations(workspace.ID)
@@ -164,7 +186,7 @@ func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request, notice,
 	view.Connected = len(installations) > 0
 	if view.Enabled && view.Connected && app.Repo == "" {
 		view.Repos, err = h.apps.GitHubRepos(r.Context(), workspace.ID)
-		if err != nil && view.Error == "" {
+		if err != nil {
 			view.Error = errorMessage(err)
 		}
 	}
@@ -173,7 +195,7 @@ func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request, notice,
 
 // ServerSecurity is the security page of a server.
 func (h *AppsHandler) ServerSecurity(w http.ResponseWriter, r *http.Request) {
-	h.renderSecurity(w, r, "", "")
+	h.renderSecurity(w, r)
 }
 
 // SetServerSecurity applies the switches. The form also sends what the page
@@ -192,10 +214,11 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 		Firewall:     flipped(r, "firewall", server.Firewall),
 	})
 	if err != nil {
-		h.renderSecurity(w, r, "", errorMessage(err))
+		failed(w, r, "Security not applied", err, nil)
 		return
 	}
-	h.renderSecurity(w, r, "Applied.", "")
+	h.renderSecurity(w, r)
+	toastDone(w, r, "Security applied", "The agent changes "+server.Name+" now.")
 }
 
 // flipped is the switch's new value when the form flipped it, else now.
@@ -213,13 +236,15 @@ func flipped(r *http.Request, name string, now bool) bool {
 func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	var cloudflare, tailscale *string
 	cloudflareToken, tailscaleKey := r.FormValue("cloudflare_token"), r.FormValue("tailscale_key")
-	notice := "Keys saved."
+	done, notDone := "Keys saved", "Keys not saved"
 	switch r.FormValue("remove") {
 	case "cloudflare":
-		cloudflareToken, tailscaleKey, notice = "", "", "Cloudflare API token removed."
+		cloudflareToken, tailscaleKey = "", ""
+		done, notDone = "Cloudflare API token removed", "Cloudflare API token not removed"
 		cloudflare = &cloudflareToken
 	case "tailscale":
-		cloudflareToken, tailscaleKey, notice = "", "", "Tailscale auth key removed."
+		cloudflareToken, tailscaleKey = "", ""
+		done, notDone = "Tailscale auth key removed", "Tailscale auth key not removed"
 		tailscale = &tailscaleKey
 	}
 	if cloudflareToken != "" {
@@ -230,14 +255,19 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.apps.SetIntegrations(r.Context(), actor(r), cloudflare, tailscale)
 	r.SetPathValue("id", r.FormValue("server"))
-	if err != nil {
-		h.renderSecurity(w, r, "", errorMessage(err))
+	if errors.Is(err, service.ErrCloudflareToken) {
+		fieldRefused(w, r, notDone, "cloudflare-token", errorMessage(err))
 		return
 	}
-	h.renderSecurity(w, r, notice, "")
+	if err != nil {
+		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key"})
+		return
+	}
+	h.renderSecurity(w, r)
+	toastDone(w, r, done, "")
 }
 
-func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request, notice, failure string) {
+func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))
 	if err != nil && isAction(r) {
@@ -254,5 +284,5 @@ func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request, not
 		renderError(w, "load integrations failed", err)
 		return
 	}
-	render(w, r, pages.ServerSecurity(pages.SecurityView{Server: *server, Integrations: integrations, Notice: notice, Error: failure}))
+	render(w, r, pages.ServerSecurity(pages.SecurityView{Server: *server, Integrations: integrations}))
 }

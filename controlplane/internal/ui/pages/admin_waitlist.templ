@@ -13,7 +13,7 @@ import (
 // AdminWaitlist lists who waits for hosted ops and who is in. Letting
 // someone in sends them a sign-in email; their first workspace gets
 // everything without a payment.
-templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
+templ AdminWaitlist(entries []model.WaitlistEntry) {
 	@layouts.Admin("Waitlist") {
 		<div class="flex flex-col gap-6" data-waitlist-page>
 			@pageHeader("Waitlist", "Who waits for the private beta, and who is in.") {
@@ -21,15 +21,11 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 					Admin
 				}
 			}
-			if notice != "" {
-				@pageNotice(false, templ.Attributes{"data-waitlist-notice": true}) {
-					{ notice }
-				}
-			}
 			@panel(panelProps{Title: "Let someone in", Description: "Anyone, on the list or not. They get an email with the sign-in link."}) {
-					<form method="POST" action="/admin/waitlist" class="flex flex-wrap items-center gap-3" data-let-in-form>
+					<form method="POST" action="/admin/waitlist" class="flex flex-wrap items-center gap-3" hx-post="/admin/waitlist" hx-target="[data-waitlist-page]" hx-select="[data-waitlist-page]" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-let-in-form>
 						@csrf.Token()
-						@input.Input(input.Props{Name: "email", Type: "email", Placeholder: "name@example.com", Class: "max-w-sm", Attributes: templ.Attributes{"required": true}})
+						<label for="let-in-email" class="sr-only">Email</label>
+						@input.Input(input.Props{ID: "let-in-email", Name: "email", Type: "email", Placeholder: "name@example.com", Class: "max-w-sm", Attributes: templ.Attributes{"required": true}})
 						<label class="flex cursor-pointer items-center gap-2 text-sm">
 							@checkbox.Checkbox(checkbox.Props{Name: "forever_free", Value: "true"})
 							Free forever
@@ -56,7 +52,7 @@ templ AdminWaitlist(entries []model.WaitlistEntry, notice string) {
 										</p>
 									</div>
 									if entry.LetInAt == nil {
-										<form method="POST" action="/admin/waitlist" class="flex items-center gap-3">
+										<form method="POST" action="/admin/waitlist" class="flex items-center gap-3" hx-post="/admin/waitlist" hx-target="[data-waitlist-page]" hx-select="[data-waitlist-page]" hx-swap="outerHTML" hx-disable="find button[type='submit']">
 											@csrf.Token()
 											<input type="hidden" name="email" value={ entry.Email }/>
 											<label class="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">

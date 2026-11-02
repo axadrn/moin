@@ -2,7 +2,6 @@ package pages
 
 import (
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"strconv"
 	"strings"
@@ -34,7 +33,7 @@ templ Apps(view AppsView) {
 	@layouts.App("Apps") {
 		@panelPage() {
 			@pageHeader("Apps", "Docker Compose projects on your servers. The first ops deploy in a repo creates its app.") {
-				@AppAddForm(view.Servers, "", "", "")
+				@AppAddForm(view.Servers)
 			}
 			@AppList(view)
 		}
@@ -42,38 +41,31 @@ templ Apps(view AppsView) {
 	}
 }
 
-// AppAddForm is the add form. A request replaces it to show an error or to reset it.
-templ AppAddForm(servers []model.Server, name, server, nameError string) {
+// AppAddForm is the add form. A request replaces it to reset it after the
+// app was added; a wrong name keeps it as it is (DESIGN.md, Feedback).
+templ AppAddForm(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<form
 		id="app-add-form"
 		hx-swap-oob="true"
-		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start"
+		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
 		hx-post={ basePath + "/apps" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		<div class="flex min-w-0 flex-1 flex-col gap-1 sm:w-56 sm:flex-none">
-			<label for="app-name" class="sr-only">App name</label>
-			@input.Input(input.Props{
-				ID:          "app-name",
-				Name:        "name",
-				Type:        "text",
-				Value:       name,
-				Placeholder: "New app, e.g. blog",
-				Class:       "font-mono placeholder:font-sans",
-				Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-invalid": apiTokenInvalid(nameError), "aria-describedby": "app-name-error", "data-hotkey-focus": true},
-			})
-			if nameError != "" {
-				@field.Error(field.ErrorProps{ID: "app-name-error", Class: "px-3 text-xs font-normal text-failed"}) {
-					{ nameError }
-				}
-			}
-		</div>
+		<label for="app-name" class="sr-only">App name</label>
+		@input.Input(input.Props{
+			ID:          "app-name",
+			Name:        "name",
+			Type:        "text",
+			Placeholder: "New app, e.g. blog",
+			Class:       "min-w-0 font-mono placeholder:font-sans sm:w-56",
+			Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
+		})
 		<div class="flex gap-2">
 			<label for="app-server" class="sr-only">Server</label>
-			@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: appAddServer(servers, server), Items: appAddServerItems(servers), Disabled: len(servers) == 0}) {
+			@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: appAddServer(servers), Items: appAddServerItems(servers), Disabled: len(servers) == 0}) {
 				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-server", Class: "min-w-0 flex-1 sm:w-36 sm:flex-none"}) {
 					@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No server"})
 				}
@@ -98,14 +90,9 @@ templ AppAddForm(servers []model.Server, name, server, nameError string) {
 	</form>
 }
 
-// appAddServer is the server the add form selects: the one asked for, else
-// the first, like a native select without a selected option.
-func appAddServer(servers []model.Server, server string) string {
-	for _, option := range servers {
-		if option.Name == server {
-			return server
-		}
-	}
+// appAddServer is the server the add form selects: the first, like a
+// native select without a selected option.
+func appAddServer(servers []model.Server) string {
 	if len(servers) > 0 {
 		return servers[0].Name
 	}
@@ -333,7 +320,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 			</div>
 			<div class="grid items-stretch gap-4 lg:grid-cols-2">
 				@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Description: "Stored encrypted. The next deploy or restart hands them to the app.", Body: panelBodyRows}) {
-					@AppEnv(app.Name, envKeys, nil, "")
+					@AppEnv(app.Name, envKeys, nil)
 				}
 				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as ops logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
 					<div id="app-logs" class="px-6 text-sm text-muted-foreground">Not loaded yet.</div>
@@ -690,7 +677,7 @@ func parseLogLine(line string) logLine {
 
 // AppEnv is the env list with its add form. values holds the shown values;
 // keys without one show as dots.
-templ AppEnv(appName string, keys []string, values map[string]string, formError string) {
+templ AppEnv(appName string, keys []string, values map[string]string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ envPath := basePath + "/apps/" + appName + "/env" }}
 	<div id="app-env" class="flex flex-col gap-3">
@@ -739,6 +726,7 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 									"hx-delete":  envPath + "/" + key,
 									"hx-target":  "#app-env",
 									"hx-swap":    "outerHTML",
+									"hx-disable": "this",
 									"hx-confirm": "Remove " + key + "? The next deploy drops it.",
 								},
 							}) {
@@ -756,21 +744,17 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 			hx-post={ envPath }
 			hx-target="#app-env"
 			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
 		>
 			@csrf.Token()
 			<label for="env-key" class="sr-only">Key</label>
-			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono sm:w-36 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-invalid": apiTokenInvalid(formError)}})
+			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono sm:w-36 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
 			<label for="env-value" class="sr-only">Value</label>
 			@input.Input(input.Props{ID: "env-value", Name: "value", Type: "password", Placeholder: "value", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off"}})
 			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0"}) {
 				Set
 			}
 		</form>
-		if formError != "" {
-			@field.Error(field.ErrorProps{Class: "px-6 text-xs font-normal text-failed", Attributes: templ.Attributes{"data-env-error": true}}) {
-				{ formError }
-			}
-		}
 	</div>
 }
 
