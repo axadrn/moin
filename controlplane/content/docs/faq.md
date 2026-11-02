@@ -39,7 +39,7 @@ Today in the control plane, sealed with AES-256-GCM, and handed to your server w
 
 ## What is a workspace?
 
-Your team in ops: its servers, apps, bucket, settings and people. Invite teammates from the **Team** page and everyone works on the same servers. The plan, the trial and the [activity](/docs/guides/team) belong to the workspace. You can be in several workspaces and switch between them at the top of the sidebar.
+Your team in ops: its servers, apps, bucket, settings and people. Invite teammates from the **Team** page and everyone works on the same servers. The plan, the trial and the [activity](/docs/guides/activity) belong to the workspace. You can be in several workspaces and switch between them at the top of the sidebar.
 
 ## Do I pay per workspace?
 
@@ -67,4 +67,4 @@ AGPL keeps ops open: whoever runs a changed ops as a service has to share the ch
 
 ## Can my team work on it too?
 
-Yes, and it costs nothing extra. Invite them from the **Team** page or with `ops team invite`; everyone works on the same servers and apps, and the [activity](/docs/guides/team) shows who deployed or changed what.
+Yes, and it costs nothing extra. [Invite them](/docs/guides/team#invite-someone) from the **Team** page or with `ops team invite`; everyone works on the same servers and apps, and the [activity](/docs/guides/activity) shows who deployed or changed what.

@@ -39,13 +39,13 @@ Sends an email that lets someone join the workspace. The invitation works for se
 
 ```surfaces
 Web: **Team**, **Invite a teammate**, **Send invite**
-CLI: ops team invite ada@example.com
+CLI: ops team invite <email>
 TUI: on the team tab, `a`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
 ```
 
-`--admin` in the CLI invites them as an admin.
+`--admin` in the CLI invites them as an admin. They sign up with the address you invited, then land in your workspace. What each role may do is in [Roles](#roles).
 
 ## Send an invitation again
 
@@ -53,7 +53,7 @@ Sends the email again, for example when it landed in spam.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Resend**
-CLI: ops team resend ada@example.com
+CLI: ops team resend <email>
 TUI: on the team tab, pick the invitation, then `enter`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
 MCP: resend_invitation
@@ -67,7 +67,7 @@ Takes an invitation back before someone accepts it.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Revoke**
-CLI: ops team revoke ada@example.com
+CLI: ops team revoke <email>
 TUI: on the team tab, pick the invitation, `x`, then `y`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
 MCP: revoke_invitation
@@ -79,7 +79,7 @@ Changes the name everyone in the workspace sees.
 
 ```surfaces
 Web: **Team**, **Workspace name**, **Save**
-CLI: ops team rename "Acme Inc"
+CLI: ops team rename "<workspace-name>"
 TUI: on the team tab, `n`
 API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace

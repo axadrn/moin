@@ -1,7 +1,7 @@
 ---
 title: "Activity log"
 description: "Who changed what, to the second, and what ops never writes down"
-order: 14
+order: 15
 ---
 
 **Know who changed what, to the second.** Every deploy, every env change, every click in the data browser. Your secrets and your data never.
@@ -61,9 +61,9 @@ Narrow it to one app, one server or one member. A server shows its own changes a
 
 ```surfaces
 Web: **Activity**, pick an app, a server or a member, then **Filter**
-CLI: ops activity --app shop --server web-1 --user ada@example.com
+CLI: ops activity --app <app-name> --server <server-name> --user <email>
 TUI: on the activity tab, `f`; `c` clears it
-API: GET /api/v1/activity?app=shop&server=web-1&user=ada@example.com
+API: GET /api/v1/activity?app=<app-name>&server=<server-name>&user=<email>
 MCP: list_activity with app, server or user
 ```
 
@@ -86,3 +86,4 @@ MCP: list_activity with cursor set to next_cursor
 - Every member can see the activity. Only admins and owners see IP addresses and browsers.
 - When someone deletes their account, their email stays on their old changes.
 - Deleting a workspace deletes its activity too.
+- Who may do what is in [Roles](/docs/guides/team#roles).

@@ -1,7 +1,7 @@
 ---
 title: "Account and tokens"
 description: "Your name, email, password, sessions and API tokens"
-order: 15
+order: 16
 ---
 
 **The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token, which can never change your account.
@@ -59,6 +59,8 @@ API: GET /api/v1/account/sessions
 
 The CLI, the TUI, the GitHub Action and agents sign in with a personal API token. Each token belongs to one workspace and can read, or read and write.
 
+For the CLI, pick **Read and write**: the dialog starts at **Read only**, and a read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
+
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Create token**
 API: POST /api/v1/account/tokens
@@ -86,7 +88,9 @@ A token cannot be renamed or get more rights. Make a new one and revoke the old 
 
 ## Delete your account
 
-Removes your account, your profile and your API tokens. It cannot be undone, so you type `DELETE` first. If you are the last owner of a workspace, hand it to someone else or delete it first.
+Removes your account, your profile, your picture, your sessions and your API tokens, and takes you out of every workspace. It cannot be undone, so you type `DELETE` first.
+
+Your servers, apps and env vars belong to a workspace, not to you, so they stay for your team. If you are the last owner of a workspace, hand it to someone else or [delete the workspace](/docs/guides/team#change-roles-remove-people-leave-or-delete) first. Deleting a workspace removes its servers and apps from ops; the apps keep running on your servers.
 
 ```surfaces
 Web: **Settings**, **Security** tab, **Delete account**
@@ -101,4 +105,10 @@ An API token, and so the CLI, the TUI and agents, cannot change your email, pass
 
 On hosted ops you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. When the trial ends and nobody has subscribed, the workspace is read-only: your apps and their backups keep running, and you can still see everything and stop and start apps, but not deploy or add servers until you subscribe.
 
-Only the owner of the workspace sees the plan and pays, on the web: **Billing** in the sidebar. `GET /api/v1/workspaces/{slug}/billing` and the `get_billing` tool show the plan; buying and cancelling happen only on the web. A self-hosted control plane has no billing: every feature is free.
+Only the owner of the workspace sees the plan and pays, on the web: **Billing** in the sidebar. Buying and cancelling happen only on the web.
+
+```surfaces
+Web: **Billing** in the sidebar
+API: GET /api/v1/workspaces/{slug}/billing
+MCP: get_billing
+``` A self-hosted control plane has no billing: every feature is free.
