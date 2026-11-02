@@ -143,11 +143,19 @@ func unlink(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Stop %s from following its repo? Pushes no longer deploy it.", name))
+	api, err := apiClient()
 	if err != nil {
 		return err
 	}
-	api, err := apiClient()
+	detail, err := api.App(ctx, name)
+	if err != nil {
+		return err
+	}
+	if detail.App.Repo == "" {
+		done(stdout, "Nothing changed: %s follows no repo.", name)
+		return nil
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Stop %s from following %s? Pushes no longer deploy it.", name, detail.App.Repo))
 	if err != nil {
 		return err
 	}

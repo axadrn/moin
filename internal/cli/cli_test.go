@@ -154,7 +154,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -468,5 +468,13 @@ func TestDeployNoteNamesACommitOnce(t *testing.T) {
 		if got := deployNote(client.Deploy{Ref: ref, Commit: sha, CommitMessage: "Add the shop"}); got != want {
 			t.Errorf("ref %q: %q, want %q", ref, got, want)
 		}
+	}
+}
+
+func TestUnlinkWithoutARepoChangesNothing(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop"},"deploys":[]}`}}
+	code, stdout, stderr := runCLI(t, api, "unlink", "shop", "--yes")
+	if code != 0 || !strings.Contains(stdout, "Nothing changed: shop follows no repo.") || api.seen("DELETE") {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
 }
