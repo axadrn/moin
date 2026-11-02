@@ -191,3 +191,32 @@ func TestBackups(t *testing.T) {
 		t.Fatalf("bucket has %d objects for the app", len(list.Contents))
 	}
 }
+
+// TestDrillBeforeReplication: a drill with nothing in the bucket yet is
+// neither passed nor failed, and asks to try again soon.
+func TestDrillBeforeReplication(t *testing.T) {
+	endpoint := os.Getenv("OPS_TEST_S3")
+	if endpoint == "" {
+		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+	}
+	bucket := os.Getenv("OPS_TEST_S3_BUCKET")
+	if bucket == "" {
+		bucket = "ops-dev"
+	}
+	reports := make(chan protocol.Backups, 1)
+	b := newBackups(newApps(t.TempDir(), func(protocol.MessageType, string, any) {}), func(_ protocol.MessageType, _ string, data any) {
+		if backups, ok := data.(protocol.Backups); ok {
+			reports <- backups
+		}
+	})
+	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: fmt.Sprintf("empty-%d", time.Now().UnixNano()), AccessKey: "x", SecretKey: "y"}
+	database := protocol.Database{Path: "/data/app.db", HostPath: filepath.Join(t.TempDir(), "app.db")}
+	b.watched[database.HostPath] = watched{app: "fresh", database: database}
+	if !b.drillAll(context.Background()) {
+		t.Error("a drill before the first replication does not try again soon")
+	}
+	report := <-reports
+	if report.Databases[0].VerifiedAt != nil || report.Databases[0].Error != "" {
+		t.Errorf("report = %+v, want no drill yet", report.Databases[0])
+	}
+}

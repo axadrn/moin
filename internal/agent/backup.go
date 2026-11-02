@@ -658,6 +658,7 @@ func integrityCheck(ctx context.Context, file string) error {
 
 // drills restores the newest state of every replicated database into a
 // temp file once a day and checks it, then reports to the control plane.
+// While a database has nothing in the bucket yet, it tries again soon.
 func (b *backups) drills(ctx context.Context) {
 	timer := time.NewTimer(firstDrill)
 	defer timer.Stop()
@@ -667,12 +668,17 @@ func (b *backups) drills(ctx context.Context) {
 			return
 		case <-timer.C:
 		}
-		b.drillAll(ctx)
-		timer.Reset(drillEvery)
+		if b.drillAll(ctx) {
+			timer.Reset(firstDrill)
+		} else {
+			timer.Reset(drillEvery)
+		}
 	}
 }
 
-func (b *backups) drillAll(ctx context.Context) {
+// drillAll drills every database. waiting reports a database with nothing
+// replicated yet: it has no drill, neither passed nor failed.
+func (b *backups) drillAll(ctx context.Context) (waiting bool) {
 	b.mu.Lock()
 	items := make([]watched, 0, len(b.watched))
 	for _, item := range b.watched {
@@ -683,12 +689,17 @@ func (b *backups) drillAll(ctx context.Context) {
 	for _, item := range items {
 		err := b.drillOne(ctx, item)
 		b.mu.Lock()
-		result := drill{at: time.Now().UTC()}
-		if err != nil {
-			result.err = "restore drill failed: " + err.Error()
-			slog.Error("backup: restore drill failed", "app", item.app, "database", item.database.Path, "error", err)
+		if errors.Is(err, litestream.ErrTxNotAvailable) {
+			waiting = true
+			delete(b.verified, item.database.HostPath)
+		} else {
+			result := drill{at: time.Now().UTC()}
+			if err != nil {
+				result.err = "restore drill failed: " + err.Error()
+				slog.Error("backup: restore drill failed", "app", item.app, "database", item.database.Path, "error", err)
+			}
+			b.verified[item.database.HostPath] = result
 		}
-		b.verified[item.database.HostPath] = result
 		b.mu.Unlock()
 		matchOwner(item.database.HostPath)
 		reports[item.app] = append(reports[item.app], b.status(ctx, item.app, item.database, false))
@@ -696,6 +707,7 @@ func (b *backups) drillAll(ctx context.Context) {
 	for app, databases := range reports {
 		b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: databases})
 	}
+	return waiting
 }
 
 func (b *backups) drillOne(ctx context.Context, item watched) error {
