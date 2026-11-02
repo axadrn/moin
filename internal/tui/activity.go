@@ -48,7 +48,9 @@ func (m model) activityKey(key string) (tea.Model, tea.Cmd) {
 	case "f":
 		filter := m.activityFilter
 		return m.ask("Filter the activity", func(values []string) tea.Cmd {
-			return func() tea.Msg { return activityFilterMsg(client.ActivityQuery{App: values[0], Server: values[1], User: values[2]}) }
+			return func() tea.Msg {
+				return activityFilterMsg(client.ActivityQuery{App: values[0], Server: values[1], User: values[2]})
+			}
 		},
 			formField{label: "App", hint: "empty for every app", value: filter.App, optional: true},
 			formField{label: "Server", hint: "empty for every server", value: filter.Server, optional: true},

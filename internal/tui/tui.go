@@ -161,8 +161,8 @@ type confirmation struct {
 	// name is what modeConfirmName wants typed.
 	name   string
 	danger bool
-	back                   mode
-	run                    tea.Cmd
+	back   mode
+	run    tea.Cmd
 }
 
 // shared is what every copy of the model points to.
@@ -190,11 +190,11 @@ type model struct {
 	events         []client.Event
 	activityNext   string
 	activityFilter client.ActivityQuery
-	width   int
-	height  int
-	err     error
-	notice  string
-	loading bool
+	width          int
+	height         int
+	err            error
+	notice         string
+	loading        bool
 	// offline is the error of a broken live stream until it reconnects.
 	offline error
 	// frame turns the spinner while a deploy runs.
