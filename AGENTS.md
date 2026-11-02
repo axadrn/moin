@@ -29,5 +29,10 @@ addresses, personal details.
 go build ./... && go vet ./... && go test ./...
 ```
 
-Test changes end to end against a local control plane: the CLI, the TUI in a
-real terminal and the web UI.
+Then check what you changed, and only that:
+
+- A small change: the Go tests, plus a quick look at the changed page in a
+  browser, or the changed command in the CLI or TUI, against a local control
+  plane.
+- A release with many changes, or a change to the layout every page uses: the
+  full end-to-end run in Chromium and WebKit, at phone and desktop width.
