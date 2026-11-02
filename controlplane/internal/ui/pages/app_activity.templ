@@ -145,7 +145,7 @@ templ activitySelect(name, all, current string, values []string) {
 		@selectcomp.Trigger(selectcomp.TriggerProps{Size: selectcomp.SizeSm, Class: "min-w-32", Attributes: templ.Attributes{"aria-label": all}}) {
 			@selectcomp.Value(selectcomp.ValueProps{Placeholder: all})
 		}
-		@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+		@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart, Class: "w-auto min-w-(--anchor-width) max-w-[min(24rem,var(--available-width))]"}) {
 			@selectcomp.Group() {
 				@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
 					{ all }
