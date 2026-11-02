@@ -8,6 +8,8 @@ ops deploys your apps to servers you own, backs up every change of their SQLite 
 
 All of ops is open source. Use the hosted control plane, or [host it yourself for free](/docs/self-hosting): the same product, every feature, no limits.
 
+ops is in beta: it works and runs real sites, and things may still change. When something you use has to change, we tell you before it breaks.
+
 ## What it does
 
 - **Deploys**: `ops deploy` from a repo, a branch or commit from [GitHub](/docs/guides/github), or an image from [CI](/docs/guides/ci). Health checks, and the last good release starts again when a deploy fails.
