@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -81,7 +82,7 @@ func addRouting(config, service map[string]any, app string, detected protocol.De
 		"traefik.docker.network":                                      proxyNetwork,
 		"traefik.http.routers." + name + ".rule":                      strings.Join(hosts, " || "),
 		"traefik.http.routers." + name + ".entrypoints":               "websecure",
-		"traefik.http.routers." + name + ".tls.certresolver":          "le",
+		"traefik.http.routers." + name + ".tls":                       "true",
 		"traefik.http.services." + name + ".loadbalancer.server.port": fmt.Sprint(detected.Port),
 	}
 	middlewares := []string{}
@@ -151,9 +152,12 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 			return err
 		}
 	}
-	// A proxy on an older image is replaced, so proxy updates reach every server.
-	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \"ops.mode\"}}", proxyName)
-	if err == nil && strings.TrimSpace(running) == "true "+proxyImage+" "+mode {
+	// A proxy on an older image or with other flags is replaced, so proxy
+	// updates reach every server. A label holds a hash of the flags.
+	flags := proxyFlags(mode)
+	setup := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(flags, "\n"))))[:12]
+	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \"ops.mode\"}} {{index .Config.Labels \"ops.setup\"}}", proxyName)
+	if err == nil && strings.TrimSpace(running) == "true "+proxyImage+" "+mode+" "+setup {
 		return nil
 	}
 	if err == nil {
@@ -165,7 +169,7 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		return err
 	}
 	args := []string{"run", "-d", "--name", proxyName, "--restart", "unless-stopped",
-		"--network", proxyNetwork, "--label", "ops.mode=" + mode}
+		"--network", proxyNetwork, "--label", "ops.mode=" + mode, "--label", "ops.setup=" + setup}
 	if mode == "direct" {
 		httpPort, httpsPort := envOr("OPS_HTTP_PORT", "80"), envOr("OPS_HTTPS_PORT", "443")
 		logf("starting the proxy on ports %s and %s", httpPort, httpsPort)
@@ -177,20 +181,36 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
 		"-v", data+":/data",
 		proxyImage,
+	)
+	args = append(args, flags...)
+	_, err = a.output(ctx, "docker", args...)
+	return err
+}
+
+// proxyFlags configures Traefik for the mode. In direct mode the HTTPS
+// entrypoint gets its certificates from Let's Encrypt. In tunnel mode
+// Cloudflare serves HTTPS and no port is open, so Let's Encrypt could never
+// reach the server: nothing asks it.
+func proxyFlags(mode string) []string {
+	flags := []string{
 		"--providers.docker=true",
 		"--providers.docker.exposedbydefault=false",
-		"--providers.docker.network="+proxyNetwork,
+		"--providers.docker.network=" + proxyNetwork,
+		"--entrypoints." + tunnelEntrypoint + ".address=:" + tunnelPort,
 		"--entrypoints.web.address=:80",
 		"--entrypoints.web.http.redirections.entrypoint.to=websecure",
 		"--entrypoints.web.http.redirections.entrypoint.scheme=https",
 		"--entrypoints.websecure.address=:443",
-		"--entrypoints."+tunnelEntrypoint+".address=:"+tunnelPort,
+	}
+	if mode == "tunnel" {
+		return flags
+	}
+	return append(flags,
+		"--entrypoints.websecure.http.tls.certresolver=le",
 		"--certificatesresolvers.le.acme.httpchallenge=true",
 		"--certificatesresolvers.le.acme.httpchallenge.entrypoint=web",
 		"--certificatesresolvers.le.acme.storage=/data/acme.json",
 	)
-	_, err = a.output(ctx, "docker", args...)
-	return err
 }
 
 func envOr(key, fallback string) string {
