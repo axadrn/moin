@@ -92,7 +92,7 @@ func schemaURL(view DataView, table string) string {
 // dataSidebar lists the databases and tables, and says how the schema
 // changes.
 templ dataSidebar(view DataView) {
-	@panel(panelProps{Title: "Tables", Description: tablesLine(view), Body: panelBodyRows}) {
+	@panel(panelProps{Title: "Tables", Description: tablesLine(view), Docs: "/docs/guides/data#browse-rows", Body: panelBodyRows}) {
 		if len(view.Databases) > 1 {
 			<nav aria-label="Databases" class="mb-6">
 				<p class="px-3 pb-1 text-xs text-muted-foreground">Database</p>
@@ -449,7 +449,7 @@ templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn
 
 templ dataConsole(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
-	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Description: "Reads only, until you allow changes. The same as ops sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
+	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Docs: "/docs/guides/data#run-sql", Description: "Reads only, until you allow changes. The same as ops sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
 		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']">
 			@csrf.Token()
 			<input type="hidden" name="db" value={ view.Database }/>

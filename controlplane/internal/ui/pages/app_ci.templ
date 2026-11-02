@@ -48,6 +48,7 @@ templ appCI(appName string, hook bool) {
 		@panel(panelProps{
 			Heading:     "app-hook-heading",
 			Title:       "Deploy hook",
+			Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
 			Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
 			Action:      newHookButton(appName),
 		}) {
@@ -122,6 +123,9 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 				}
 				@card.Description() {
 					Logins your servers use to pull private images built in CI. Passwords and tokens are stored encrypted and only handed to the agent for the pull.
+				}
+				@card.Action() {
+					@docsLink("/docs/guides/ci#1-save-a-registry-login", "How it works")
 				}
 			}
 			@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {

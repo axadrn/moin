@@ -82,7 +82,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				</form>
 			}
 		}
-		@panel(panelProps{Title: "Members", Description: seatText(len(members), seatLimit) + ". Roles apply only inside this workspace.", Body: panelBodyRows}) {
+		@panel(panelProps{Title: "Members", Docs: "/docs/guides/team#roles", Description: seatText(len(members), seatLimit) + ". Roles apply only inside this workspace.", Body: panelBodyRows}) {
 			<ul class="flex flex-col gap-1" role="list">
 				for _, member := range members {
 					<li class="flex flex-col gap-3 rounded-xl px-3 py-2.5 hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between" data-member={ member.ID }>

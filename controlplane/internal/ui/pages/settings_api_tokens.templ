@@ -21,6 +21,7 @@ templ SettingsAPITokensSection(view APITokensView) {
 	@panel(panelProps{
 		ID:          "settings-api-tokens",
 		Title:       "API tokens",
+		Docs:        "/docs/guides/account#create-an-api-token",
 		Description: "Let the CLI, scripts and AI agents use ops as you. Treat a token like a password.",
 		Action:      APITokenCreateDialog(view),
 		Body:        panelBodyRows,

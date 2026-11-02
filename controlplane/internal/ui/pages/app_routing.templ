@@ -58,6 +58,7 @@ templ AppRouting(view RoutingView) {
 		@panel(panelProps{
 			Heading:     "app-password-heading",
 			Title:       "Password",
+			Docs:        "/docs/guides/domains#protect-with-a-password",
 			Description: "Ask visitors for a username and password before they see the app. Good for staging and previews.",
 			Action:      protectStatus(view.App),
 		}) {

@@ -109,6 +109,7 @@ templ billingOffer(plan access.Plan, basePath string) {
 	@panel(panelProps{
 		Title:       plan.Name,
 		Description: "One price per workspace, for the whole team.",
+		Docs:        "/docs/guides/account#billing",
 		Action:      billingInterval(),
 		Class:       "pricing-card",
 	}) {

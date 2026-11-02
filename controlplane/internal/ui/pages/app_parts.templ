@@ -106,6 +106,9 @@ type panelProps struct {
 	Description string
 	// Action is the one small control right of the title.
 	Action templ.Component
+	// Docs is the docs page, with its anchor, that explains the panel: a
+	// "How it works" link right of the title, before the Action.
+	Docs  string
 	Body   panelBody
 	Class  string
 	Attrs  templ.Attributes
@@ -130,9 +133,14 @@ templ panel(p panelProps) {
 					{ p.Description }
 				}
 			}
-			if p.Action != nil {
+			if p.Action != nil || p.Docs != "" {
 				@card.Action(card.ActionProps{Class: utils.CN("flex items-center gap-1", panelActionStack)}) {
-					@p.Action
+					if p.Docs != "" {
+						@docsLink(p.Docs, "How it works")
+					}
+					if p.Action != nil {
+						@p.Action
+					}
 				}
 			}
 		}

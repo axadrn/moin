@@ -88,6 +88,7 @@ templ AppBackups(view BackupsView) {
 templ continuousBackup(view BackupsView, database protocol.DatabaseBackup, index int) {
 	@panel(panelProps{
 		Title:       "Continuous backup",
+		Docs:        "/docs/guides/backups#restore-to-a-point-in-time",
 		Description: "Every change to " + database.Database + " is copied to your bucket within a second. Every day ops restores a copy and checks it.",
 	}) {
 		<div class="flex flex-col gap-6">
@@ -226,6 +227,7 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	@panel(panelProps{
 		Title:       "Snapshots",
+		Docs:        "/docs/guides/backups#restore-a-snapshot",
 		Description: "Full copies of " + database.Database + ". ops takes one before every deploy and every change it makes; Back up now takes one by hand.",
 		Body:        snapshotBody(database),
 	}) {
@@ -269,7 +271,7 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 }
 
 templ backupSettings(view BackupsView) {
-	@panel(panelProps{Title: "Automatic snapshots", Description: "A snapshot before ops changes your data, so one click undoes it."}) {
+	@panel(panelProps{Title: "Automatic snapshots", Docs: "/docs/guides/backups#a-snapshot-before-every-change", Description: "A snapshot before ops changes your data, so one click undoes it."}) {
 		@BackupSettingsForm(view.App)
 	}
 }
@@ -295,7 +297,7 @@ templ BackupSettingsForm(app model.App) {
 }
 
 templ bucketSummary(view BackupsView) {
-	@panel(panelProps{Title: "Bucket", Description: "Where the backups of all your apps go.", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": true}}) {
+	@panel(panelProps{Title: "Bucket", Description: "Where the backups of all your apps go.", Docs: "/docs/guides/bucket", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": true}}) {
 		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
 			<dt class="text-muted-foreground">Bucket</dt>
 			<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>

@@ -319,10 +319,10 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				}
 			</div>
 			<div class="grid items-stretch gap-4 lg:grid-cols-2">
-				@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Description: "Stored encrypted. The next deploy or restart hands them to the app.", Body: panelBodyRows}) {
+				@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Docs: "/docs/guides/env", Description: "Stored encrypted. The next deploy or restart hands them to the app.", Body: panelBodyRows}) {
 					@AppEnv(app.Name, envKeys, nil)
 				}
-				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as ops logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
+				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Docs: "/docs/guides/logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as ops logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
 					<div id="app-logs" class="px-6 text-sm text-muted-foreground">Not loaded yet.</div>
 				}
 			</div>
@@ -498,6 +498,7 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 		Heading:     "deploys-heading",
 		Title:       "Deploys",
 		Description: "Newest first. The live one serves the app.",
+		Docs:        "/docs/guides/deploy#what-a-deploy-does",
 		Body:        panelBodyRows,
 		Attrs: templ.Attributes{
 			"hx-swap-oob":        "true",

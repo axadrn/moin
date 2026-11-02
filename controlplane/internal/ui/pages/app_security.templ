@@ -93,7 +93,7 @@ templ ServerSecurity(view SecurityView) {
 // only add or replace a key; a stored key has its own remove button.
 templ securityKeys(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Integrations", Description: "The keys the switches need. One set for all servers of this workspace, stored encrypted."}) {
+	@panel(panelProps{Title: "Integrations", Docs: "/docs/guides/security#keys", Description: "The keys the switches need. One set for all servers of this workspace, stored encrypted."}) {
 		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
 			@csrf.Token()
 			<div class="grid items-start gap-3 lg:grid-cols-2">
