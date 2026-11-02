@@ -204,13 +204,24 @@ func (g *GitHub) Commit(ctx context.Context, installationID int64, repo, ref str
 
 // Tarball is where the agent downloads a commit itself, with the
 // authorization to send: the code goes from GitHub to the server and never
-// through ops. The token expires within the hour.
+// through ops. The token only reads this one repo and expires within the
+// hour, so a server never holds access to the other repos of the
+// installation.
 func (g *GitHub) Tarball(ctx context.Context, installationID int64, repo, sha string) (url, authorization string, err error) {
-	token, err := g.token(ctx, installationID)
+	jwt, err := g.jwt()
 	if err != nil {
 		return "", "", err
 	}
-	return g.apiURL + "/repos/" + repo + "/tarball/" + sha, "token " + token, nil
+	_, name, _ := strings.Cut(repo, "/")
+	scope := map[string]any{"repositories": []string{name}, "permissions": map[string]string{"contents": "read"}}
+	var answer struct {
+		Token string `json:"token"`
+	}
+	err = g.call(ctx, http.MethodPost, "/app/installations/"+strconv.FormatInt(installationID, 10)+"/access_tokens", "Bearer "+jwt, scope, &answer)
+	if err != nil {
+		return "", "", err
+	}
+	return g.apiURL + "/repos/" + repo + "/tarball/" + sha, "token " + answer.Token, nil
 }
 
 // SetStatus writes the ops commit status of a deploy.

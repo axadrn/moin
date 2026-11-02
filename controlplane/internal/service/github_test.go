@@ -42,7 +42,21 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 				http.Error(w, "jwt", http.StatusUnauthorized)
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]any{"token": "ghs_test", "expires_at": time.Now().Add(time.Hour)})
+			var scope struct {
+				Repositories []string          `json:"repositories"`
+				Permissions  map[string]string `json:"permissions"`
+			}
+			json.NewDecoder(r.Body).Decode(&scope)
+			token := "ghs_test"
+			if len(scope.Repositories) > 0 {
+				// A token for one repo that can only read it.
+				if len(scope.Repositories) != 1 || scope.Repositories[0] != "blog" || len(scope.Permissions) != 1 || scope.Permissions["contents"] != "read" {
+					http.Error(w, "scope", http.StatusUnprocessableEntity)
+					return
+				}
+				token = "ghs_blog_read"
+			}
+			json.NewEncoder(w).Encode(map[string]any{"token": token, "expires_at": time.Now().Add(time.Hour)})
 		case r.URL.Path == "/app/installations/7":
 			json.NewEncoder(w).Encode(map[string]any{"account": map[string]string{"login": "axadrn"}})
 		case auth != "token ghs_test":
@@ -176,7 +190,7 @@ func TestGitHubDeploys(t *testing.T) {
 	if start.SourceURL == "" {
 		t.Fatal("the agent got no source")
 	}
-	if !strings.HasSuffix(start.SourceURL, "/repos/axadrn/blog/tarball/abc123") || start.SourceAuthorization != "token ghs_test" || !start.SourceStripTop {
+	if !strings.HasSuffix(start.SourceURL, "/repos/axadrn/blog/tarball/abc123") || start.SourceAuthorization != "token ghs_blog_read" || !start.SourceStripTop {
 		t.Fatalf("the agent does not download from GitHub itself: %+v", start)
 	}
 	fake.waitStatus(t, "pending")
