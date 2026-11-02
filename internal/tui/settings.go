@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"errors"
 	"strings"
 
@@ -154,7 +155,7 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 			m.err = errors.New("the GitHub App is not set up on this control plane")
 			return m, nil
 		}
-		m.notice = "Install the " + build.Name + " GitHub App on your account or organization: " + m.settings.github.InstallURL
+		m.notice = "Connect GitHub, also when the " + build.Name + " GitHub App is already installed: " + cmp.Or(m.settings.github.ConnectURL, m.settings.github.InstallURL)
 		return m, nil
 	case "bucket":
 		var current client.BackupStorage

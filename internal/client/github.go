@@ -10,6 +10,7 @@ import (
 // GitHub is where the ops GitHub App is installed.
 type GitHub struct {
 	Enabled       bool   `json:"enabled"`
+	ConnectURL    string `json:"connect_url"`
 	InstallURL    string `json:"install_url"`
 	Installations []struct {
 		ID          int64  `json:"id"`

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -81,11 +82,12 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 		done(stdout, "Installed on %s", installation.Account)
 	}
 	if len(answer.Installations) == 0 {
-		fmt.Fprintln(stdout, "GitHub is not connected yet.")
+		fmt.Fprintln(stdout, "GitHub is not connected yet. Connect it, also when the app is already installed:")
+		fmt.Fprintln(stdout, "  "+style.Bold.Render(cmp.Or(answer.ConnectURL, answer.InstallURL)))
 	}
-	fmt.Fprintln(stdout, "Install the ops GitHub App on an account or organization:")
+	fmt.Fprintln(stdout, "Install the "+build.Name+" GitHub App on another account or organization:")
 	fmt.Fprintln(stdout, "  "+style.Bold.Render(answer.InstallURL))
-	fmt.Fprintln(stdout, style.Muted.Render("The link is yours and works for an hour."))
+	fmt.Fprintln(stdout, style.Muted.Render("Each link is yours and works for an hour."))
 	return nil
 }
 
