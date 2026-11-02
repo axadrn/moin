@@ -50,6 +50,8 @@ case "$(uname -m)" in
 	aarch64 | arm64) arch=arm64 ;;
 	*) echo "Unsupported CPU: $(uname -m)" >&2; exit 1 ;;
 esac
+# The agent runs as a systemd service. Check before the token is used up.
+[ -d /run/systemd/system ] || { echo "The agent needs systemd, and this machine does not run it." >&2; exit 1; }
 # Apps run as Docker Compose projects.
 if ! docker compose version >/dev/null 2>&1; then
 	echo "Installing Docker…"
@@ -136,7 +138,7 @@ func (h *AgentHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	server, agentToken, err := h.servers.Register(agentBearer(r), request.Hello)
 	if errors.Is(err, service.ErrInstallTokenValid) {
-		http.Error(w, "The install token is invalid, used or expired. Add the server again for a new one.", http.StatusUnauthorized)
+		http.Error(w, "The install token is invalid, used or expired. Remove the server and add it again for a new install line.", http.StatusUnauthorized)
 		return
 	}
 	if err != nil {
