@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/ops/protocol"
 )
 
 // backups lists an app's backups, or manages the bucket and the snapshot
@@ -104,6 +105,9 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	snapshot := flags.Arg(0)
 	if (snapshot == "") == (*at == "") {
 		return fmt.Errorf("name a snapshot or a time: %s restore <snapshot> or %s restore --at \"2026-10-31 14:02:00\"", build.Name, build.Name)
+	}
+	if snapshot != "" && !protocol.ValidSnapshotID(snapshot) {
+		return fmt.Errorf("%q is not a snapshot ID. Copy one from `%s backups`, like 20261031T140200Z-daily", snapshot, build.Name)
 	}
 	var when *time.Time
 	if *at != "" {

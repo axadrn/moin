@@ -91,6 +91,8 @@ MCP: back_up_app
 
 Puts the database back to the state of one snapshot.
 
+A snapshot ID is the time it was taken, then why, like `20261031T143638Z-manual`. Copy it from the snapshot list: ops refuses anything else.
+
 ```surfaces
 Web: the app page, **Backups** tab, **Restore** on a snapshot
 CLI: ops restore 20261031T143638Z-manual

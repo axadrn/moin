@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/ops/protocol"
 )
 
 // github shows where the ops GitHub App is installed and its repos.
@@ -98,6 +99,9 @@ func link(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	if flags.NArg() < 1 || flags.NArg() > 2 {
 		return flags.wrong()
+	}
+	if *branch != "" && !protocol.ValidRefName(*branch) {
+		return fmt.Errorf("%q is not a valid branch name", *branch)
 	}
 	name, err := flags.app(flags.Arg(1))
 	if err != nil {

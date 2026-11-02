@@ -44,7 +44,7 @@ const (
 	drillEvery       = 24 * time.Hour
 	firstDrill       = 2 * time.Minute
 	snapshotTimeout  = 10 * time.Minute
-	snapshotIDLayout = "20060102T150405Z"
+	snapshotIDLayout = protocol.SnapshotIDLayout
 	keepUploads      = 24 * time.Hour
 	sweepEvery       = time.Hour
 )

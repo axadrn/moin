@@ -16,6 +16,7 @@ import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/ops/protocol"
 )
 
 func apiClient() (*client.Client, error) {
@@ -133,6 +134,9 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	api, err := apiClient()
 	if err != nil {
 		return err
+	}
+	if *ref != "" && !protocol.ValidRefName(*ref) {
+		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
 	if *ref != "" {
 		// The control plane downloads the commit from GitHub; nothing is

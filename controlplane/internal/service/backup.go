@@ -39,6 +39,7 @@ var (
 	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: ops only reaches buckets on the public internet")
 	ErrNoBackups      = errors.New("backups are not set up: add a bucket first")
 	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
+	ErrSnapshotID     = errors.New("this is not a snapshot ID: copy one from the backups list")
 )
 
 // BackupStorage is an account's bucket without its secret key. Folder is
@@ -345,6 +346,10 @@ func (s *AppService) backupRequest(ctx context.Context, workspaceID, idOrName st
 func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, database, snapshot string, at *time.Time) error {
 	if snapshot == "" && at == nil {
 		return ErrRestoreTarget
+	}
+	// Only IDs the agent makes go on, as part of a bucket key.
+	if snapshot != "" && !protocol.ValidSnapshotID(snapshot) {
+		return ErrSnapshotID
 	}
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {

@@ -21,6 +21,7 @@ var (
 	ErrRepoName       = errors.New("name the repo as owner/name")
 	ErrNoRepo         = errors.New("the app follows no repo: link one first")
 	ErrRef            = errors.New("GitHub knows no branch, tag or commit by this name")
+	ErrRefName        = errors.New("this is not a valid branch, tag or commit name")
 	repoPattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
 	githubStateExpiry = time.Hour
 )
@@ -156,6 +157,12 @@ func (s *AppService) gitHubRepo(ctx context.Context, workspaceID, repo string) (
 // LinkRepo makes an app follow a repo and branch. An empty branch is the
 // repo's default branch.
 func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy bool) (*model.App, error) {
+	// The branch goes into GitHub URLs and the push matching; git's rules
+	// keep it a plain name. GitHub's default branch needs no check.
+	branch = strings.TrimSpace(branch)
+	if branch != "" && !protocol.ValidRefName(branch) {
+		return nil, ErrRefName
+	}
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -195,6 +202,11 @@ func (s *AppService) UnlinkRepo(actor Actor, idOrName string) error {
 // DeployRef deploys a branch, tag or commit of the app's repo, downloaded
 // from GitHub. An empty ref is the linked branch.
 func (s *AppService) DeployRef(ctx context.Context, actor Actor, idOrName, ref string) (*model.Deploy, error) {
+	// The ref goes into a GitHub URL; the linked branch was checked before.
+	ref = strings.TrimSpace(ref)
+	if ref != "" && !protocol.ValidRefName(ref) {
+		return nil, ErrRefName
+	}
 	if s.github == nil {
 		return nil, ErrGitHubOff
 	}

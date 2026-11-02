@@ -143,7 +143,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
 		{"env", "rm", "--app", "shop", "KEY"},
-		{"restore", "--app", "shop", "snap-1"},
+		{"restore", "--app", "shop", "20261031T140200Z-manual"},
 		{"domains", "rm", "--app", "shop", "blog.de"},
 		{"unlink", "shop"},
 		{"hook", "shop"},
@@ -385,5 +385,21 @@ func TestLoginRefusesPlainHTTP(t *testing.T) {
 	code, _, stderr := runCLI(t, api, "login", "--url", "http://ops.example.com", "--token", "ops_test")
 	if code == 0 || !strings.Contains(stderr, "https://ops.example.com") || len(api.requests) > 0 {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// TestBadNamesStayLocal: a made-up snapshot ID or branch name is refused
+// before the CLI calls the control plane.
+func TestBadNamesStayLocal(t *testing.T) {
+	for _, args := range [][]string{
+		{"restore", "--app", "shop", "--yes", "../20261031T140200Z"},
+		{"deploy", "--ref", "main..x", "shop"},
+		{"link", "acme/shop", "--branch", "-x", "shop"},
+	} {
+		api := &fakeAPI{}
+		code, _, stderr := runCLI(t, api, args...)
+		if code == 0 || !strings.Contains(stderr, "not a") || len(api.requests) > 0 {
+			t.Errorf("%v: code %d, stderr %q, requests %v", args, code, stderr, api.requests)
+		}
 	}
 }
