@@ -343,6 +343,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			detail.App.Stopped = true
 			m.detail = &detail
 		}
+	case closedMsg:
+		if m.mode == msg.mode {
+			m.mode, m.input = modeList, ""
+		}
+		return m.Update(msg.msg)
 	case errMsg:
 		m.err = msg.err
 	case streamErrMsg:
@@ -433,20 +438,19 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.mode, m.input = modeList, ""
 		case "enter":
+			// The input stays open with the text until the change worked.
 			app, _ := m.currentApp()
 			input := strings.TrimSpace(m.input)
-			mode := m.mode
-			m.mode, m.input = modeList, ""
-			if domain, ok := strings.CutPrefix(input, "-"); ok && mode == modeDomains {
-				return m.confirmFirst("Remove "+domain+" from "+app.Name+"?", "Visitors there stop reaching it.", "remove", true, m.changeDomains(app, input)), nil
+			if domain, ok := strings.CutPrefix(input, "-"); ok && m.mode == modeDomains {
+				return m.confirmFirst("Remove "+domain+" from "+app.Name+"?", "Visitors there stop reaching it.", "remove", true, m.closing(m.changeDomains(app, input))), nil
 			}
-			if mode == modeDomains {
-				return m, m.changeDomains(app, input)
+			if m.mode == modeDomains {
+				return m, m.closing(m.changeDomains(app, input))
 			}
 			if input == "off" && app.Protected {
-				return m.confirmFirst("Take the password away from "+app.Name+"?", "Anyone with the link can open it again.", "remove", true, m.changeProtect(app.Name, input)), nil
+				return m.confirmFirst("Take the password away from "+app.Name+"?", "Anyone with the link can open it again.", "remove", true, m.closing(m.changeProtect(app.Name, input))), nil
 			}
-			return m, m.changeProtect(app.Name, input)
+			return m, m.closing(m.changeProtect(app.Name, input))
 		case "backspace":
 			m.input = dropLast(m.input)
 		default:
@@ -535,9 +539,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.mode, m.input = modeList, ""
 		case "enter":
 			app, _ := m.currentApp()
-			input := strings.TrimSpace(m.input)
-			m.mode, m.input = modeList, ""
-			return m, m.github(app, input)
+			return m, m.closing(m.github(app, strings.TrimSpace(m.input)))
 		case "backspace":
 			m.input = dropLast(m.input)
 		default:
@@ -649,6 +651,26 @@ func (m model) formKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.input += msg.Text
 	}
 	return m, nil
+}
+
+// closedMsg is the answer of a command run from the input of mode: it
+// worked, so the input closes.
+type closedMsg struct {
+	mode mode
+	msg  tea.Msg
+}
+
+// closing runs cmd from the open input and closes the input once cmd
+// worked. After an error the typed text stays, to fix and send again.
+func (m model) closing(cmd tea.Cmd) tea.Cmd {
+	mode := m.mode
+	return func() tea.Msg {
+		msg := cmd()
+		if _, failed := msg.(errMsg); failed {
+			return msg
+		}
+		return closedMsg{mode: mode, msg: msg}
+	}
 }
 
 // ask opens a form.

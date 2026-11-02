@@ -65,5 +65,6 @@ removing members, leaving and deleting the workspace are web only.
 | `a` | settings | adds a registry login |
 | `x`, then `y` | settings | removes a key or a registry login; the bucket asks for its name |
 | `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
+| `enter` | protect, GitHub, domains | sends what you typed; if ops refuses it, the input stays open with your text and the reason, to fix and send again |
 | `esc` | app | drops the pick, then back to the list |
 | `q` | everywhere | quits |

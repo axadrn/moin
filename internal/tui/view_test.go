@@ -559,3 +559,25 @@ func TestRenameServerChecksName(t *testing.T) {
 		t.Fatalf("same old name: mode %d, err %v", m.mode, m.err)
 	}
 }
+
+// A one-shot input keeps the typed text and shows the error when the change
+// fails, and closes once it worked.
+func TestOneShotInputKeepsTextOnError(t *testing.T) {
+	m := press(frames()["detail"], "p")
+	if m.mode != modeProtect {
+		t.Fatalf("p opens no protect input")
+	}
+	m.input = "nocolon"
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	next, _ = m.Update(cmd())
+	m = next.(model)
+	if m.mode != modeProtect || m.input != "nocolon" || m.err == nil {
+		t.Fatalf("after an error: mode %d, input %q, err %v", m.mode, m.input, m.err)
+	}
+	next, _ = m.Update(closedMsg{mode: modeProtect, msg: noticeMsg("Saved")})
+	m = next.(model)
+	if m.mode != modeList || m.input != "" || m.notice != "Saved" {
+		t.Fatalf("after it worked: mode %d, input %q, notice %q", m.mode, m.input, m.notice)
+	}
+}
