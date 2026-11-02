@@ -2,6 +2,12 @@
 
 Thanks for helping. Read `AGENTS.md` for how the code is built and tested.
 
+## Issue first
+
+Open an issue before you write code. We agree there on what to build and how.
+Pull requests without an agreed issue get closed. Small fixes, like a typo or a
+broken link, are welcome anytime.
+
 ## License of your contribution
 
 ops is licensed under AGPL-3.0. Your contribution comes in under the
