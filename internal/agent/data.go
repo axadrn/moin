@@ -30,7 +30,7 @@ const (
 // database returns the database of the running release that request names,
 // or its first one.
 func (a *apps) database(request protocol.DBRequest) (protocol.Database, error) {
-	if !appNamePattern.MatchString(request.App) {
+	if !protocol.ValidAppName(request.App) {
 		return protocol.Database{}, errors.New("invalid app name")
 	}
 	current := a.current(request.App)

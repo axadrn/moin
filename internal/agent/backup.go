@@ -303,7 +303,7 @@ func (b *backups) ready() (*protocol.BackupStorage, error) {
 
 // databases returns the app's running databases, or the one named.
 func (b *backups) databases(app, database string) ([]protocol.Database, error) {
-	if !appNamePattern.MatchString(app) {
+	if !protocol.ValidAppName(app) {
 		return nil, errors.New("invalid app name")
 	}
 	all := b.apps.runningDatabases(app)

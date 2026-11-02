@@ -514,3 +514,21 @@ func TestHookKeysWithoutAHook(t *testing.T) {
 		t.Errorf("h with a hook does not ask: mode %v", m.mode)
 	}
 }
+
+// The new app form asks the name or the server again when it is wrong,
+// instead of failing after both.
+func TestNewAppFormChecksEachField(t *testing.T) {
+	m := press(frames()["apps"], "a")
+	m.input = "Bad"
+	if m = press(m, "enter"); m.mode != modeForm || m.form.step != 0 || m.err == nil {
+		t.Fatalf("bad name: mode %d, step %d, err %v", m.mode, m.form.step, m.err)
+	}
+	m.input = "fresh"
+	if m = press(m, "enter"); m.form.step != 1 {
+		t.Fatalf("good name: step %d, err %v", m.form.step, m.err)
+	}
+	m.input = "ghost"
+	if m = press(m, "enter"); m.mode != modeForm || m.form.step != 1 || m.err == nil {
+		t.Fatalf("unknown server: mode %d, step %d, err %v", m.mode, m.form.step, m.err)
+	}
+}

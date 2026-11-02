@@ -46,10 +46,7 @@ const (
 	healthTimeout = 30 * time.Second
 )
 
-var (
-	appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
-	appIDPattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
-)
+var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
 // apps runs the deploys, logs and removals the control plane asks for.
 type apps struct {
@@ -105,7 +102,7 @@ func (a *apps) appID(app string) string {
 // reports whether it stored one.
 func (a *apps) keepIDs(ids map[string]string) (kept bool) {
 	for app, id := range ids {
-		if !appNamePattern.MatchString(app) || !appIDPattern.MatchString(id) || a.appID(app) != "" {
+		if !protocol.ValidAppName(app) || !appIDPattern.MatchString(id) || a.appID(app) != "" {
 			continue
 		}
 		if _, err := os.Stat(a.appDir(app)); err != nil {
@@ -145,7 +142,7 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 
 func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
 	var detected protocol.Detected
-	if !appNamePattern.MatchString(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
+	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
 		return detected, errors.New("invalid app name, app ID or deploy number")
 	}
 	defer a.lock(start.App)()
@@ -1018,7 +1015,7 @@ const (
 
 // markFailed marks the release of a failed deploy, unless it is running.
 func (a *apps) markFailed(app string, number int) {
-	if !appNamePattern.MatchString(app) || number < 1 {
+	if !protocol.ValidAppName(app) || number < 1 {
 		return
 	}
 	release := a.releaseDir(app, number)
@@ -1030,7 +1027,7 @@ func (a *apps) markFailed(app string, number int) {
 
 // logs returns the last lines of every container of the app.
 func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol.LogsResult, error) {
-	if !appNamePattern.MatchString(request.App) {
+	if !protocol.ValidAppName(request.App) {
 		return protocol.LogsResult{}, errors.New("invalid app name")
 	}
 	tail := min(max(request.Tail, 1), 1000)
@@ -1049,7 +1046,7 @@ func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol
 // volumes stay, so the data survives. Its backups stop; what is in the
 // bucket stays there.
 func (a *apps) remove(ctx context.Context, app string) error {
-	if !appNamePattern.MatchString(app) {
+	if !protocol.ValidAppName(app) {
 		return errors.New("invalid app name")
 	}
 	defer a.lock(app)()
@@ -1073,7 +1070,7 @@ func (a *apps) remove(ctx context.Context, app string) error {
 // stop stops the containers of the app's current release. Their restart
 // policy is unless-stopped, so they stay stopped after a reboot.
 func (a *apps) stop(ctx context.Context, app string) error {
-	if !appNamePattern.MatchString(app) {
+	if !protocol.ValidAppName(app) {
 		return errors.New("invalid app name")
 	}
 	defer a.lock(app)()

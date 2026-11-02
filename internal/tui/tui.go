@@ -969,9 +969,27 @@ func (m model) addAppForm() model {
 		hint = "add a server first, on the servers tab"
 	}
 	return m.ask("New app", func(values []string) tea.Cmd { return m.addApp(values[0], values[1]) },
-		formField{label: "Name", value: here, hint: placeholder(here, "lowercase letters, digits and dashes")},
-		formField{label: "Server", value: server, hint: placeholder(server, hint)},
+		formField{label: "Name", value: here, hint: placeholder(here, "lowercase letters, digits and dashes"), check: checkAppName},
+		formField{label: "Server", value: server, hint: placeholder(server, hint), check: m.checkServer},
 	)
+}
+
+// checkAppName asks again for a name the control plane would refuse.
+func checkAppName(name string) error {
+	if !protocol.ValidAppName(name) {
+		return fmt.Errorf("use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
+	}
+	return nil
+}
+
+// checkServer asks again for a server that is not in the list.
+func (m model) checkServer(name string) error {
+	for _, server := range m.servers {
+		if server.Name == name || server.ID == name {
+			return nil
+		}
+	}
+	return fmt.Errorf("no server %s: pick one of the servers tab", name)
 }
 
 // placeholder is what an empty answer takes, or a hint when there is none.

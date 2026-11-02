@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/ops/protocol"
 )
 
 // Where install.sh puts the agent.
@@ -106,7 +107,7 @@ func (a *apps) names() []string {
 	entries, _ := os.ReadDir(a.dir)
 	var names []string
 	for _, entry := range entries {
-		if entry.IsDir() && appNamePattern.MatchString(entry.Name()) {
+		if entry.IsDir() && protocol.ValidAppName(entry.Name()) {
 			names = append(names, entry.Name())
 		}
 	}
