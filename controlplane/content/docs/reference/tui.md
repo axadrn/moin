@@ -41,7 +41,7 @@ removing members, leaving and deleting the workspace are web only.
 | `t` | apps | restarts the app with the current env and domains |
 | `S` | apps | stops the app, after `y`; starts a stopped one |
 | `i` | apps | deploys an image built in CI; type the image, then `enter` |
-| `h` | apps | shows a new deploy hook URL for CI, once |
+| `h` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
 | `o` | apps | shows domains and DNS; type `blog.de`, `-blog.de` or `=blog.de` |
 | `p` | apps | password: type `user:password`, or `off` |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |

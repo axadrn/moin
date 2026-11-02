@@ -31,7 +31,7 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |
 | `deploy_image` | deploys an image built in CI | write |
-| `create_deploy_hook` | a new deploy hook URL for CI, shown once | write |
+| `create_deploy_hook` | a new deploy hook URL for CI, shown once; the old one stops working | write, destructive |
 | `list_registries` | registry logins, without passwords | read |
 | `set_registry` | stores a registry login | write |
 | `remove_registry` | removes a registry login | write, destructive |

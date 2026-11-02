@@ -28,7 +28,7 @@ order: 1
 | `ops start [app]` | runs a stopped app again |
 | `ops deploys [app]` | the newest deploys: number, status, started, took, note |
 | `ops deploys [app] v<number>` | one deploy with its whole log |
-| `ops hook [app]` | prints a new deploy hook URL for CI |
+| `ops hook [app] [--yes]` | asks, then prints a new deploy hook URL for CI; the old one stops working |
 | `ops registry` | lists registry logins |
 | `ops registry set <host> <username>` | saves a login; the password or token comes from stdin |
 | `ops registry rm <host> [--yes]` | removes a login |
@@ -69,7 +69,7 @@ Commands that work on an app take it as an argument or as `--app`, then from `x-
 
 ## Asking first
 
-Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
+Commands that remove or replace something ask `[y/N]` on a terminal: `servers rm`, `apps rm`, `stop`, `env rm`, `domains rm`, `registry rm`, `integrations rm`, `backups bucket rm`, `unlink`, `hook` (the old deploy hook stops working), `restore`, `env pull` over an existing file and `sql --write` with DROP or DELETE. `--yes` skips the question. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident.
 
 ## Agent updates
 

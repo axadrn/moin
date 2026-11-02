@@ -64,7 +64,7 @@ API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working.
+ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so the CLI and the TUI ask first. In a script, add `--yes`.
 
 ## 3. The workflow
 
