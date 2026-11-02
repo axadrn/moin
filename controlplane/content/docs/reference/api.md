@@ -12,14 +12,18 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 
 | Endpoint | Does |
 | --- | --- |
+| `GET /api/v1/meta` | the name, version and support address of this control plane; needs no token |
 | `GET /api/v1/account` · `PATCH /account/name` | the signed-in account; its name |
 | `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
+| `POST /api/v1/account/password/set` · `DELETE /account/password` | sets the first password; removes it (*session*) |
 | `POST` · `DELETE /api/v1/account/avatar` | the profile picture |
 | `GET` · `POST /api/v1/account/tokens` · `DELETE /{id}` | personal API tokens (*session*) |
 | `GET /api/v1/account/sessions` · `DELETE /{id}` · `DELETE` | signed-in browsers; signs one or all others out (*session*) |
 | `GET /api/v1/activity` | who did what in the workspace, newest first, with `next_cursor`; `app`, `server` and `user` filter it |
 | `GET /api/v1/workspaces` · `POST` | the workspaces you are in; a new one (*session*) |
 | `GET /api/v1/workspaces/{slug}` | the team: members, roles and open invitations |
+| `GET /api/v1/workspaces/{slug}/activity` | the same as `GET /api/v1/activity`, for the workspace in the path |
+| `GET /api/v1/invitations/{token}` · `POST /{token}/accept` | an invitation from its email link; accepting it (*session*) |
 | `PATCH /api/v1/workspaces/{slug}/name` | renames the workspace (admin) |
 | `DELETE /api/v1/workspaces/{slug}` | deletes the workspace (owner, *session*) |
 | `POST /api/v1/workspaces/{slug}/invitations` | invites someone by email (admin) |

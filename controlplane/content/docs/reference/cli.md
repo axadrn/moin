@@ -53,7 +53,7 @@ order: 1
 | `ops sql --write "<sql>" [--yes]` | runs SQL that changes data, in one transaction; DROP and DELETE ask first |
 | `ops backups [app]` | snapshots, point in time window and restore drills |
 | `ops backup [app]` | takes a snapshot now |
-| `ops restore <snapshot> [--yes]` · `ops restore --at "<time>" [--yes]` | restores a snapshot, or a point in time in UTC |
+| `ops restore <snapshot> [--yes]` · `ops restore --at "<time>" [--yes]` | restores a snapshot, or a point in time in UTC: `"2026-10-31 14:01"`, or `14:01` for today; `--db <path>` picks one of several databases |
 | `ops backups auto on\|off [app]` | snapshot before every change |
 | `ops backups bucket` · `bucket set` · `bucket rm [--yes]` | the bucket backups go to, the same for every app; the secret key comes on stdin |
 | `ops deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
