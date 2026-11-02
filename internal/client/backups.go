@@ -20,6 +20,7 @@ type BackupStorage struct {
 	Region    string    `json:"region"`
 	Bucket    string    `json:"bucket"`
 	Path      string    `json:"path"`
+	Folder    string    `json:"folder,omitempty"`
 	AccessKey string    `json:"access_key"`
 	SecretKey string    `json:"secret_key,omitempty"`
 	CreatedAt time.Time `json:"created_at"`

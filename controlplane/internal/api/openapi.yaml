@@ -4293,7 +4293,7 @@ components:
           type: integer
     BackupStorage:
       type: object
-      required: [endpoint, region, bucket, path, access_key, created_at]
+      required: [endpoint, region, bucket, path, folder, access_key, created_at]
       properties:
         endpoint:
           type: string
@@ -4303,6 +4303,9 @@ components:
           type: string
         path:
           type: string
+        folder:
+          type: string
+          description: Where this workspace's files are in the bucket, path then the workspace ID, like ops/0b6c1f8e-…/.
         access_key:
           type: string
         created_at:
@@ -4321,7 +4324,7 @@ components:
           type: string
         path:
           type: string
-          description: A folder in the bucket.
+          description: An optional folder inside the bucket, only for a bucket that holds other files too.
         access_key:
           type: string
         secret_key:

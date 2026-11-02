@@ -9,12 +9,14 @@ import (
 	"github.com/axadrn/ops/protocol"
 )
 
-// BackupStorage is the account's bucket, without its secret key.
+// BackupStorage is the account's bucket, without its secret key. Folder
+// is where this workspace's files go in it: path, then the workspace ID.
 type BackupStorage struct {
 	Endpoint  string    `json:"endpoint"`
 	Region    string    `json:"region"`
 	Bucket    string    `json:"bucket"`
 	Path      string    `json:"path"`
+	Folder    string    `json:"folder"`
 	AccessKey string    `json:"access_key"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -49,7 +51,7 @@ type RestoreRequest struct {
 }
 
 func newBackupStorage(storage *service.BackupStorage) BackupStorage {
-	return BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}
+	return BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: storage.Folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}
 }
 
 // GetBackupStorage returns the account's bucket.

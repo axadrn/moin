@@ -73,7 +73,9 @@ templ bucketForm(view BucketView) {
 			if view.Storage != nil {
 				<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
 					<dt class="text-muted-foreground">Bucket</dt>
-					<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+					<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }</dd>
+					<dt class="text-muted-foreground">Folder</dt>
+					<dd class="truncate font-mono" data-bucket-folder>{ view.Storage.Folder }</dd>
 					<dt class="text-muted-foreground">Endpoint</dt>
 					<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
 					<dt class="text-muted-foreground">Access key</dt>
@@ -93,8 +95,8 @@ templ bucketForm(view BucketView) {
 						@csrf.Token()
 						<div class="grid gap-3 sm:grid-cols-2">
 							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3.", "text", true)
-							@bucketField("bucket", "Bucket", "my-ops", "", "text", false)
-							@bucketField("path", "Folder", "optional", "A folder inside the bucket.", "text", false)
+							@bucketField("bucket", "Bucket", "your bucket's name", "", "text", false)
+							@bucketField("path", "Folder", "optional", "Only if the bucket holds other files too.", "text", false)
 							@bucketField("access_key", "Access key", "", "", "text", false)
 							@bucketField("secret_key", "Secret key", "", "Stored encrypted.", "password", false)
 							@bucketField("region", "Region", "auto", "auto for R2.", "text", false)

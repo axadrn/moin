@@ -300,7 +300,9 @@ templ bucketSummary(view BackupsView) {
 	@panel(panelProps{Title: "Bucket", Description: "Where the backups of all your apps go.", Docs: "/docs/guides/bucket", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": true}}) {
 		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
 			<dt class="text-muted-foreground">Bucket</dt>
-			<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }{ storagePathText(view.Storage.Path) }</dd>
+			<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }</dd>
+			<dt class="text-muted-foreground">Folder</dt>
+			<dd class="truncate font-mono" data-bucket-folder>{ view.Storage.AppFolder(&view.App) }</dd>
 			<dt class="text-muted-foreground">Endpoint</dt>
 			<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
 		</dl>
@@ -348,13 +350,6 @@ templ storageField(name, label, placeholder, note, kind string, wide bool) {
 		</span>
 		@input.Input(input.Props{Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
 	</label>
-}
-
-func storagePathText(path string) string {
-	if path == "" {
-		return ""
-	}
-	return "/" + path
 }
 
 func orAWS(endpoint string) string {

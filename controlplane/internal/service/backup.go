@@ -34,14 +34,22 @@ var (
 	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
 )
 
-// BackupStorage is an account's bucket without its secret key.
+// BackupStorage is an account's bucket without its secret key. Folder is
+// where the workspace's files go in it: <path>/<workspace ID>/.
 type BackupStorage struct {
 	Endpoint  string
 	Region    string
 	Bucket    string
 	Path      string
+	Folder    string
 	AccessKey string
 	CreatedAt time.Time
+}
+
+// AppFolder is where an app's uploads and backups go in the bucket:
+// <path>/<workspace ID>/<app>/<app ID>/.
+func (s BackupStorage) AppFolder(app *model.App) string {
+	return s.Folder + app.Name + "/" + app.ID + "/"
 }
 
 // BackupStorageInput is a bucket as people enter it.
@@ -63,7 +71,8 @@ func (s *AppService) BackupStorage(workspaceID string) (*BackupStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}, nil
+	folder := strings.TrimLeft(path.Join(storage.Path, workspaceID), "/") + "/"
+	return &BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}, nil
 }
 
 // SetBackupStorage checks that ops can write to the bucket, stores it and

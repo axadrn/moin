@@ -84,7 +84,7 @@ func (m model) settingRows() []settingRow {
 		if endpoint == "" {
 			endpoint = "AWS S3"
 		}
-		bucket = strings.TrimSuffix(s.storage.Bucket+"/"+s.storage.Path, "/") + off(" at "+host(endpoint)+" · key "+s.storage.AccessKey)
+		bucket = s.storage.Bucket + "/" + s.storage.Folder + off(" at "+host(endpoint)+" · key "+s.storage.AccessKey)
 	}
 
 	cloudflare, tailscale := off("not set · enter sets it"), off("not set · enter sets it")
@@ -166,8 +166,8 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 		},
 			formField{label: "Endpoint", value: current.Endpoint, optional: true, hint: placeholder(current.Endpoint, "https://… of an S3-compatible store, empty for AWS S3")},
 			formField{label: "Region", value: current.Region, optional: true, hint: placeholder(current.Region, "auto for Cloudflare R2")},
-			formField{label: "Bucket", value: current.Bucket, hint: placeholder(current.Bucket, "like ops-backups")},
-			formField{label: "Path", value: current.Path, optional: true, hint: placeholder(current.Path, "a folder inside the bucket, may stay empty")},
+			formField{label: "Bucket", value: current.Bucket, hint: placeholder(current.Bucket, "your bucket's name")},
+			formField{label: "Folder", value: current.Path, optional: true, hint: placeholder(current.Path, "only if the bucket holds other files too")},
 			formField{label: "Access key", value: current.AccessKey, hint: placeholder(current.AccessKey, "the access key ID")},
 			formField{label: "Secret key", secret: true, hint: build.Name + " checks that it can write before it stores the bucket"},
 		), nil

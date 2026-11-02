@@ -162,10 +162,10 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Turns the snapshot before every deploy, restore and data change made through ops on or off for an app. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setBackupSettings)))
 	mcpsdk.AddTool(server, add("get_backup_storage", "Get the backup bucket",
-		"Returns the S3-compatible bucket backups go to, without its secret key. Needs the read scope.",
+		"Returns the S3-compatible bucket uploads and backups go to, without its secret key. folder is where this workspace's files are in it: path, then the workspace ID. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getBackupStorage)))
 	mcpsdk.AddTool(server, add("set_backup_storage", "Set the backup bucket",
-		"Checks and stores the S3-compatible bucket backups go to; every online server starts backing up there. Needs a token with read and write access.",
+		"Checks and stores the S3-compatible bucket uploads and backups go to; every online server starts backing up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Each workspace gets its own folder in it either way. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setBackupStorage)))
 	mcpsdk.AddTool(server, add("remove_backup_storage", "Remove the backup bucket",
 		"Stops backups. What is in the bucket stays. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
@@ -1009,7 +1009,7 @@ func (t opsTools) getBackupStorage(_ context.Context, caller Caller, _ struct{})
 	if err != nil {
 		return BackupStorage{}, err
 	}
-	return BackupStorage{api.BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}}, nil
+	return BackupStorage{api.BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: storage.Folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}}, nil
 }
 
 func (t opsTools) setBackupStorage(ctx context.Context, caller Caller, input BackupStorageInput) (BackupStorage, error) {

@@ -58,6 +58,10 @@ func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
 	if storage := apps.backupConfig(owner.WorkspaceID).Storage; storage == nil || storage.Workspace != owner.WorkspaceID {
 		t.Errorf("the agent's bucket = %+v, want the workspace folder", storage)
 	}
+	shown, err := apps.BackupStorage(owner.WorkspaceID)
+	if err != nil || shown.Folder != owner.WorkspaceID+"/" || shown.AppFolder(app) != owner.WorkspaceID+"/blog/"+app.ID+"/" {
+		t.Errorf("the bucket people see = %+v, %v", shown, err)
+	}
 	_, err = deployUpload(apps)
 	if err != nil {
 		t.Fatal(err)

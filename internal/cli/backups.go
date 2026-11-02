@@ -171,7 +171,7 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		endpoint = flags.String("endpoint", "", "https:// URL of an S3-compatible store; empty for AWS S3")
 		region = flags.String("region", "", "region; auto for Cloudflare R2")
 		name = flags.String("bucket", "", "bucket name")
-		folder = flags.String("path", "", "folder inside the bucket")
+		folder = flags.String("path", "", "a folder inside the bucket, only if it holds other files too")
 		accessKey = flags.String("access-key", "", "access key ID")
 	case "rm":
 		flags.withYes()
@@ -196,11 +196,11 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		if endpoint == "" {
 			endpoint = "AWS S3"
 		}
-		table(stdout, []string{"BUCKET", "ENDPOINT", "REGION", "ACCESS KEY"}, [][]string{{strings.TrimSuffix(storage.Bucket+"/"+storage.Path, "/"), endpoint, storage.Region, storage.AccessKey}})
+		table(stdout, []string{"BUCKET", "FOLDER", "ENDPOINT", "REGION", "ACCESS KEY"}, [][]string{{storage.Bucket, storage.Folder, endpoint, storage.Region, storage.AccessKey}})
 		return nil
 	case "set":
 		if *name == "" || *accessKey == "" {
-			return fmt.Errorf("give --bucket and --access-key; the secret key comes on stdin: %s backups bucket set --endpoint https://… --bucket ops-backups --access-key …", build.Name)
+			return fmt.Errorf("give --bucket and --access-key; the secret key comes on stdin: %s backups bucket set --endpoint https://… --bucket <your-bucket> --access-key …", build.Name)
 		}
 		if isTerminal(stdin) {
 			fmt.Fprint(stdout, "Secret key: ")
