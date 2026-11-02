@@ -29,10 +29,10 @@ type App struct {
 	Protected    bool     `json:"protected"`
 	Stopped      bool     `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
-	Repo                  string    `json:"repo"`
-	Branch                string    `json:"branch"`
-	AutoDeploy            bool      `json:"auto_deploy"`
-	SnapshotBeforeChanges bool      `json:"snapshot_before_changes"`
+	Repo                  string `json:"repo"`
+	Branch                string `json:"branch"`
+	AutoDeploy            bool   `json:"auto_deploy"`
+	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
 	// Hook says the app has a deploy hook URL.
 	Hook      bool      `json:"hook"`
 	CreatedAt time.Time `json:"created_at"`
@@ -303,6 +303,8 @@ type DomainCheck struct {
 	Advice    string   `json:"advice"`
 	Found     []string `json:"found"`
 	Points    bool     `json:"points"`
+	// FromCompose says x-ops.domains in compose.yml sets the domain.
+	FromCompose bool `json:"from_compose"`
 }
 
 // Change is the app after a routing change, and the deploy that applies it,

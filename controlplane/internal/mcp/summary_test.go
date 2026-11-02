@@ -33,9 +33,10 @@ func TestSummariesReadWell(t *testing.T) {
 	one := ServerList{api.ServerList{Items: []api.Server{{Name: "web-1", Online: true}}}}
 	for got, want := range map[string]string{
 		one.Summary(): "1 server, 1 online.",
-		(Deploy{api.Deploy{Number: 1, Status: "succeeded"}}).Summary(): "Deploy v1 succeeded.",
-		(Deploy{api.Deploy{Number: 2, Status: "running"}}).Summary():   "Deploy v2 is running.",
-		(Logs{api.Logs{Lines: []string{"listening"}}}).Summary():       "1 log line.",
+		(Deploy{api.Deploy{Number: 1, Status: "succeeded"}}).Summary():                                                             "Deploy v1 succeeded.",
+		(Deploy{api.Deploy{Number: 2, Status: "running"}}).Summary():                                                               "Deploy v2 is running.",
+		(Logs{api.Logs{Lines: []string{"listening"}}}).Summary():                                                                   "1 log line.",
+		(DomainChecks{api.DomainChecks{Items: []api.DomainCheck{{Domain: "shop.de", Points: true, FromCompose: true}}}}).Summary(): "shop.de points at the server. x-ops.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot.",
 	} {
 		if got != want {
 			t.Errorf("%q, want %q", got, want)

@@ -403,3 +403,12 @@ func TestBadNamesStayLocal(t *testing.T) {
 		}
 	}
 }
+
+// Domains that x-ops sets are marked, with where to change them.
+func TestDomainsFromComposeAreMarked(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.de","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
+	code, stdout, stderr := runCLI(t, api, "domains", "shop")
+	if code != 0 || strings.Contains(stdout, "no domains yet") || !strings.Contains(stdout, "canonical, from compose.yml") || !strings.Contains(stdout, "change them there and deploy") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}

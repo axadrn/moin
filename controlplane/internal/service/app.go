@@ -33,23 +33,24 @@ const (
 )
 
 var (
-	ErrAppName       = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
-	ErrDeployRunning = errors.New("a deploy of this app is still running")
-	ErrNoRollback    = errors.New("there is no earlier successful deploy to roll back to")
-	ErrReleaseGone   = errors.New("the release of that deploy is no longer on the server")
-	ErrNoSource      = errors.New("no deploy has a source yet")
-	ErrNotLive       = errors.New("the app has no live release yet")
-	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
-	ErrDeployHook    = errors.New("deploy hook is invalid")
-	ErrRegistryHost  = errors.New("registry host must be a host name like ghcr.io")
-	ErrRegistryLogin = errors.New("registry username and password are required")
-	ErrDomain        = errors.New("domains must be host names like blog.de")
-	ErrCanonical     = errors.New("the canonical domain must be one of the domains")
-	ErrProtect       = errors.New("protection needs a password of 8 to 72 characters")
-	ErrProtectUser   = errors.New("protection needs a username without spaces or colons")
-	ErrEnvKey        = errors.New("env keys are letters, digits and underscores and do not start with a digit")
-	ErrEnvValue      = errors.New("env values are at most 32 KB")
-	ErrEnvLimit      = errors.New("an app has at most 200 env vars")
+	ErrAppName        = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
+	ErrDeployRunning  = errors.New("a deploy of this app is still running")
+	ErrNoRollback     = errors.New("there is no earlier successful deploy to roll back to")
+	ErrReleaseGone    = errors.New("the release of that deploy is no longer on the server")
+	ErrNoSource       = errors.New("no deploy has a source yet")
+	ErrNotLive        = errors.New("the app has no live release yet")
+	ErrImage          = errors.New("image must be a reference like ghcr.io/me/app:tag")
+	ErrDeployHook     = errors.New("deploy hook is invalid")
+	ErrRegistryHost   = errors.New("registry host must be a host name like ghcr.io")
+	ErrRegistryLogin  = errors.New("registry username and password are required")
+	ErrDomain         = errors.New("domains must be host names like blog.de")
+	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
+	ErrComposeDomains = errors.New("compose.yml sets the domains of this app with x-ops.domains")
+	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
+	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
+	ErrEnvKey         = errors.New("env keys are letters, digits and underscores and do not start with a digit")
+	ErrEnvValue       = errors.New("env values are at most 32 KB")
+	ErrEnvLimit       = errors.New("an app has at most 200 env vars")
 )
 
 const deployHookMarker = "dph_"
@@ -435,6 +436,10 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 	if err != nil {
 		return nil, false, err
 	}
+	// x-ops wins, so a change here would never reach the app.
+	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
+		return nil, false, ErrComposeDomains
+	}
 	clean := []string{}
 	for _, domain := range domains {
 		domain = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
@@ -538,6 +543,26 @@ type DomainCheck struct {
 	Advice string
 	Found  []string
 	Points bool
+	// FromCompose says x-ops.domains in compose.yml sets the domain, so
+	// it changes there, not in ops.
+	FromCompose bool
+}
+
+// composeDomains are the domains x-ops.domains sets in the live release,
+// and its canonical one; none when compose.yml sets no domains.
+func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
+	if app.LiveNumber == 0 {
+		return nil, ""
+	}
+	deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
+	if err != nil {
+		return nil, ""
+	}
+	detected := Detected(*deploy)
+	if detected == nil || detected.Config == nil || len(detected.Config.Domains) == 0 {
+		return nil, ""
+	}
+	return detected.Domains, detected.Canonical
 }
 
 // ServerAddresses are the IPv4 and IPv6 of a server: the address its agent
@@ -609,8 +634,13 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 	if address == "" {
 		address = ipv6
 	}
-	for _, domain := range app.DomainList() {
-		check := DomainCheck{Domain: domain, Canonical: domain == app.Canonical, Address: address, IPv4: ipv4, IPv6: ipv6, Advice: DNSAdvice(ipv4, ipv6)}
+	domains, canonical := app.DomainList(), app.Canonical
+	fromCompose, composeCanonical := s.composeDomains(app)
+	if len(fromCompose) > 0 {
+		domains, canonical = fromCompose, composeCanonical
+	}
+	for _, domain := range domains {
+		check := DomainCheck{Domain: domain, Canonical: domain == canonical, Address: address, IPv4: ipv4, IPv6: ipv6, Advice: DNSAdvice(ipv4, ipv6), FromCompose: len(fromCompose) > 0}
 		lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		check.Found, _ = net.DefaultResolver.LookupHost(lookupCtx, domain)
 		cancel()

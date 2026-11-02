@@ -1636,6 +1636,9 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`domains_from_compose`. x-ops.domains in compose.yml sets the domains of the live release; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.domains` or `fields.canonical`.'
@@ -4143,7 +4146,7 @@ components:
           type: array
           items:
             type: object
-            required: [domain, canonical, address, ipv4, ipv6, advice, found, points]
+            required: [domain, canonical, address, ipv4, ipv6, advice, found, points, from_compose]
             properties:
               domain:
                 type: string
@@ -4167,6 +4170,9 @@ components:
                   type: string
               points:
                 type: boolean
+              from_compose:
+                type: boolean
+                description: x-ops.domains in compose.yml of the live release sets the domain. It wins over the domains set in ops, so it changes in compose.yml, then a deploy.
     DeployHook:
       type: object
       required: [url]

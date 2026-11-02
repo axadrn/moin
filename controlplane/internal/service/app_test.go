@@ -454,6 +454,28 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 	}
 }
 
+// x-ops.domains wins over the domains set in ops, so ops lists those and
+// refuses to change domains it cannot apply.
+func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detected := protocol.Detected{Kind: "compose", Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de", Config: &protocol.Config{Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de"}}
+	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
+	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
+	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.de" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
+		t.Fatalf("checks = %+v, %v", checks, err)
+	}
+	if _, _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); !errors.Is(err, ErrComposeDomains) {
+		t.Fatalf("set domains under x-ops: err = %v", err)
+	}
+}
+
 func TestServerAddressesAndAdvice(t *testing.T) {
 	// An agent that connects over IPv6 and reports its IPv4 too.
 	server := model.Server{Address: "2a01:4f8::1", Addresses: "203.0.113.7 2a01:4f8::1"}

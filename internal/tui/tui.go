@@ -1267,9 +1267,10 @@ func (m model) showDomains(name string) tea.Cmd {
 			return errMsg{err}
 		}
 		lines := []string{}
-		advice := ""
+		advice, fromCompose := "", false
 		for _, check := range checks {
 			advice = check.Advice
+			fromCompose = fromCompose || check.FromCompose
 			state := "set DNS"
 			if check.Points {
 				state = "points here"
@@ -1278,13 +1279,19 @@ func (m model) showDomains(name string) tea.Cmd {
 			if check.Canonical {
 				line += "   canonical"
 			}
+			if check.FromCompose {
+				line += "   from compose.yml"
+			}
 			lines = append(lines, line)
 		}
 		if len(lines) == 0 {
 			lines = append(lines, "no domains yet")
 		}
 		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical"
-		if advice != "" {
+		switch {
+		case fromCompose:
+			note = "x-ops.domains in compose.yml sets these: change them there and deploy"
+		case advice != "":
 			note = "set DNS: " + advice
 		}
 		return outputMsg{id: m.shared.outputs.Add(1), title: "domains of " + name, note: style.Muted.Render(note), lines: lines}

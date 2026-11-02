@@ -41,10 +41,10 @@ type App struct {
 	// runs it again.
 	Stopped bool `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
-	Repo                  string    `json:"repo"`
-	Branch                string    `json:"branch"`
-	AutoDeploy            bool      `json:"auto_deploy"`
-	SnapshotBeforeChanges bool      `json:"snapshot_before_changes"`
+	Repo                  string `json:"repo"`
+	Branch                string `json:"branch"`
+	AutoDeploy            bool   `json:"auto_deploy"`
+	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook      bool      `json:"hook"`
@@ -619,6 +619,8 @@ type DomainCheck struct {
 	Advice string   `json:"advice"`
 	Found  []string `json:"found"`
 	Points bool     `json:"points"`
+	// FromCompose says x-ops.domains in compose.yml sets the domain.
+	FromCompose bool `json:"from_compose"`
 }
 
 // DomainChecks is the answer of GET /api/v1/apps/{app}/domains.
@@ -633,7 +635,7 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 		if found == nil {
 			found = []string{}
 		}
-		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points})
+		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, FromCompose: check.FromCompose})
 	}
 	return out
 }

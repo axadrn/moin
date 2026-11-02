@@ -116,6 +116,8 @@ x-ops:
 
 Fields in `x-ops` win over the settings in ops. [Config in the repo](/docs/guides/config) lists all of them.
 
+Once a deploy with `x-ops.domains` is live, every surface lists those domains, marked **from compose.yml**. ops cannot add or remove them then: change them in `compose.yml` and deploy. Trying it anyway in ops says so, with the API code `domains_from_compose`.
+
 ## Restart by hand
 
 Domain and password changes restart the app by themselves. [Restart](/docs/guides/deploy#restart) starts the live release again by hand, with the env vars, domains and password as they are now, without a build.

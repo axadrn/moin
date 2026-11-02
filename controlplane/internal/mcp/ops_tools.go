@@ -123,10 +123,10 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Runs a stopped app again, with its env vars, domains and protection as they are now. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(member(services, tools.start)))
 	mcpsdk.AddTool(server, add("check_domains", "Check domains",
-		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. Needs the read scope.",
+		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-ops.domains in compose.yml sets; they change there. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, add("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. HTTPS is always on. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. HTTPS is always on. Fails when x-ops.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
@@ -804,17 +804,23 @@ type DomainChecks struct {
 
 func (d DomainChecks) Summary() string {
 	parts := []string{}
+	fromCompose := false
 	for _, check := range d.Items {
 		state := "does not point at the server yet: set its " + check.Advice
 		if check.Points {
 			state = "points at the server"
 		}
 		parts = append(parts, check.Domain+" "+state)
+		fromCompose = fromCompose || check.FromCompose
 	}
 	if len(parts) == 0 {
 		return "The app has no domains."
 	}
-	return strings.Join(parts, "; ") + "."
+	summary := strings.Join(parts, "; ") + "."
+	if fromCompose {
+		summary += " x-ops.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot."
+	}
+	return summary
 }
 
 func (t opsTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
