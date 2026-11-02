@@ -79,7 +79,7 @@ templ ActivityRows(view ActivityView) {
 				@activityIcon(event.Action)
 			</span>
 			<div class="flex min-w-0 flex-1 flex-col gap-1 pt-1.5">
-				<p class="text-sm text-pretty">
+				<p class="text-sm text-pretty break-words">
 					<span class="font-medium">{ event.Actor() }</span>
 					{ " " + event.Summary() }
 				</p>

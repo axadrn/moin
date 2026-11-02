@@ -101,7 +101,7 @@ templ continuousBackup(view BackupsView, database protocol.DatabaseBackup, index
 					@alert.Title() {
 						The backup needs attention
 					}
-					@alert.Description() {
+					@alert.Description(alert.DescriptionProps{Class: "min-w-0 break-words"}) {
 						{ database.Error }
 					}
 				}
