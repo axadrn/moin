@@ -6,6 +6,8 @@ order: 3
 
 A deploy puts a new version of your app live on its server. ops numbers them per app: v1, v2, v3.
 
+Commands that work on an app take its name as the last word, like `ops redeploy <app-name>`. Leave it out and ops uses the app of the folder you are in: the `app` in [x-ops](/docs/guides/config), or else the folder's name.
+
 ## Deploy from a repo
 
 Sends the code in your current folder to the server, which builds and starts it.
@@ -20,9 +22,9 @@ API: POST /api/v1/apps/{app}/deploys
 The web and MCP cannot reach the files on your computer. They deploy from [GitHub](/docs/guides/github) or an [image](/docs/guides/ci) instead. In the API, upload first, then start the deploy.
 
 ```bash
-ops deploy               # the app from x-ops.app or the folder name
-ops deploy blog          # a named app
-ops deploy --server web-1 --dir ./site blog
+ops deploy                                                  # the app of this folder
+ops deploy <app-name>                                       # a named app
+ops deploy --server <server-name> --dir ./site <app-name>   # a new app on one of several servers, from another folder
 ```
 
 ops packs the files git knows, including changes you have not committed and new files that are not ignored. Outside a git repo it packs everything but `.git`. The archive goes straight into [your bucket](/docs/guides/bucket). The agent downloads it from there, deletes it, and builds and starts it with Docker Compose on the app's server. ops never stores your code.
@@ -34,6 +36,21 @@ What the repo brings decides how ops builds it:
 | `compose.yml` | uses it |
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
 | a Go module | also writes the Dockerfile: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
+| none of these | fails the deploy with `found no compose.yml, Dockerfile or go.mod` |
+
+Your app must listen on the port ops gives it in `PORT`, or on the port in your compose file or Dockerfile. [Config in the repo](/docs/guides/config) changes the port, the health check and more.
+
+## See your apps
+
+Lists every app with its server and its live deploy.
+
+```surfaces
+Web: **Apps**
+CLI: ops apps
+TUI: `ops`, then the **apps** tab
+API: GET /api/v1/apps
+MCP: list_apps
+```
 
 ## Create an app
 
@@ -41,7 +58,7 @@ Makes an empty app on a server, ready for its first deploy. The first `ops deplo
 
 ```surfaces
 Web: **Apps**, **Add app**
-CLI: ops apps add --server web-1 blog
+CLI: ops apps add --server <server-name> <app-name>
 TUI: on the apps tab, `a`
 API: POST /api/v1/apps
 MCP: create_app
@@ -62,7 +79,7 @@ The server keeps the releases of the last 5 builds (of code or of an image) with
 
 ## Your data survives every deploy
 
-A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/ops/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Files the repo brings, like a config file, belong to the release.
+A volume is a folder on the server that your app's container can see, such as `./data` on the server shown as `/data` in the container. A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/ops/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Files the repo brings, like a config file, belong to the release.
 
 Your app keeps its database in a folder other than `/data`? Mount that folder in `compose.yml`, for example `./data:/app/data`. ops keeps it and backs up the SQLite files in it.
 
@@ -86,7 +103,7 @@ Lists the deploys of an app, newest first, with their status.
 
 ```surfaces
 Web: the app page, **Deploys**
-CLI: ops deploys blog
+CLI: ops deploys <app-name>
 TUI: on the app, `enter`
 API: GET /api/v1/apps/{app}
 MCP: get_app
@@ -94,7 +111,7 @@ MCP: get_app
 
 ## Read the log of one deploy
 
-Shows the full log of an earlier deploy. Every deploy keeps its log, a failed one too, so you can read later what went wrong.
+Shows the full log of an earlier deploy. Every deploy keeps its log, a failed one too, so you can read later what went wrong. A failed deploy's log ends with the last lines of the service that stopped: start there.
 
 ```surfaces
 Web: the app page, click the deploy under **Deploys**
@@ -110,7 +127,7 @@ Builds the newest code again from the copy the server kept, with the env vars as
 
 ```surfaces
 Web: the app page, **Redeploy**
-CLI: ops redeploy blog
+CLI: ops redeploy <app-name>
 TUI: on the app, `R`
 API: POST /api/v1/apps/{app}/redeploy
 MCP: redeploy_app
@@ -124,7 +141,7 @@ Starts the live release again with the env vars, domains and password as they ar
 
 ```surfaces
 Web: the app page, **Restart**
-CLI: ops restart blog
+CLI: ops restart <app-name>
 TUI: on the app, `t`
 API: POST /api/v1/apps/{app}/restart
 MCP: restart_app
@@ -136,7 +153,7 @@ Takes the app offline. It stays off, also after the server reboots. Its data and
 
 ```surfaces
 Web: the app page, **Stop**
-CLI: ops stop blog
+CLI: ops stop <app-name>
 TUI: on the app, `S`, then `y`
 API: POST /api/v1/apps/{app}/stop
 MCP: stop_app
@@ -150,7 +167,7 @@ Runs a stopped app again, like a restart. A deploy starts it too.
 
 ```surfaces
 Web: the app page, **Start**
-CLI: ops start blog
+CLI: ops start <app-name>
 TUI: on the app, `S`
 API: POST /api/v1/apps/{app}/start
 MCP: start_app
@@ -176,17 +193,19 @@ Stops the app and removes its containers and images. Its volumes and data stay o
 
 ```surfaces
 Web: the app page, **Remove app**
-CLI: ops apps rm blog
+CLI: ops apps rm <app-name>
 TUI: on the app, `x`, then type its name
 API: DELETE /api/v1/apps/{app}
 MCP: remove_app
 ```
 
-You cannot undo it, so ops asks you to type the app's name first. `ops apps rm blog --yes` skips that in scripts. An agent passes the name as `confirm`.
+You cannot undo it, so ops asks you to type the app's name first. `ops apps rm <app-name> --yes` skips that in scripts. An agent passes the name as `confirm`.
 
 ## Push to deploy with GitHub Actions
 
 This workflow deploys every push to `main`. The [GitHub](/docs/guides/github) guide shows a way without CI, and [Build in CI](/docs/guides/ci) builds the image in CI.
+
+It needs a [bucket](/docs/guides/bucket) and an API token with **Read and write** access. [Create the token](/docs/guides/account#create-an-api-token) and save it in your GitHub repo under **Settings**, **Secrets and variables**, **Actions**, as `OPS_TOKEN`.
 
 ```yaml
 name: deploy

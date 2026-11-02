@@ -7,10 +7,12 @@ order: 8
 A server ops runs can have no open port at all. ops sets up three switches per server, and each one closes a door:
 
 - **Cloudflare Tunnel.** Visitors reach your apps through Cloudflare instead of ports 80 and 443. A tunnel is a connection your server opens to Cloudflare, so nothing has to come in.
-- **SSH only on Tailscale.** SSH answers only on your tailnet. A tailnet is your private Tailscale network: only your own devices are in it.
+- **SSH only on Tailscale.** SSH, the way you log in to the server, answers only on your tailnet. [Tailscale](https://tailscale.com) is a free service that links your own devices in a private network, your tailnet.
 - **Firewall.** The server drops every connection the other switches do not need.
 
 The agent only dials out to ops, so ops itself needs no open port either.
+
+You can turn on each switch alone. If you only do one thing, turn on the firewall. The tunnel needs your domains in a Cloudflare account; SSH on Tailscale needs a Tailscale account.
 
 ## Keys
 
@@ -62,7 +64,7 @@ Removing a key changes no server right away. Without the Tailscale key, the next
 
 ### Create the keys
 
-- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**. Give it Account **Cloudflare Tunnel: Edit**, Zone **DNS: Edit** and Zone **Zone Settings: Edit**, for the zones of your apps. ops checks the token before it stores it.
+- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Give it Account **Cloudflare Tunnel: Edit**, Zone **DNS: Edit** and Zone **Zone Settings: Edit**, for the zones of your apps. A zone is a domain you added to Cloudflare, such as `example.com`. ops checks the token before it stores it.
 - **Tailscale key:** in the Tailscale admin console under **Settings**, **Keys**. Make it reusable.
 
 ## Cloudflare Tunnel
@@ -88,7 +90,7 @@ ops does the setup with your Cloudflare token:
 
 A domain you add later gets the same setup. If the token cannot reach the zone of a domain, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself.
 
-Turning the tunnel off deletes it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server.
+Turning the tunnel off deletes it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server with an A record, as in [Add a domain](/docs/guides/domains#add-a-domain).
 
 ## SSH only on Tailscale
 
@@ -120,7 +122,7 @@ MCP: set_server_security
 
 The firewall lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and port 41641 for Tailscale. It drops everything else.
 
-The agent keeps its rules in one nftables table, `ops`, and changes them in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table. With the tunnel on, no container port is published.
+The agent keeps its rules in one nftables table, `ops`, and changes them in one step, so there is never a moment without rules. nftables is the firewall built into Linux. Docker publishes container ports on its own, past this table. With the tunnel on, no container port is published.
 
 ## Apply on the web
 
@@ -154,8 +156,8 @@ Write one rule per line into `/etc/ops/rules`:
 # /etc/ops/rules
 data: off
 logs: off
-deploy-from: github.com/acme/*, ghcr.io/acme/*
-backups-to: s3.eu-central-1.amazonaws.com/acme-backups
+deploy-from: github.com/<owner>/*, ghcr.io/<owner>/*
+backups-to: <endpoint-host>/<bucket-name>
 network: locked
 ```
 
@@ -170,10 +172,12 @@ network: locked
 A source in `deploy-from` is one of these:
 
 - a GitHub repo, as `github.com/<owner>/<repo>`,
-- an image without its tag, such as `ghcr.io/acme/web`,
+- an image without its tag, such as `ghcr.io/<owner>/<image>`,
 - `upload`, for `ops deploy` from your computer. With `backups-to` set, an upload must come from that bucket too.
 
-`*` stands for one part, so `github.com/acme/*` allows every repo of acme. A redeploy or a rollback brings no new code, so it is always allowed.
+`*` stands for one part, so `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
+
+For `backups-to`, the endpoint host is the endpoint of [your bucket](/docs/guides/bucket#add-it) without `https://`, such as `<account-id>.r2.cloudflarestorage.com`. For AWS S3 it is `s3.<region>.amazonaws.com`.
 
 Without the file, ops may do everything. A rule you leave out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it, so a typo never lets through what it was meant to stop.
 

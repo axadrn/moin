@@ -6,7 +6,7 @@ order: 6
 
 ops reads your app's SQLite database live from its server. You can browse tables, edit a cell, add or delete a row and run SQL. Nothing is copied to ops: every read goes to the server and back.
 
-ops finds the database by itself: every SQLite file on a volume of the live release, up to three folders deep. When there are several, name one with `x-ops.database`.
+ops finds the database by itself: every SQLite file on a [volume](/docs/guides/deploy#your-data-survives-every-deploy) of the live release, up to three folders deep. When there are several, name one with `x-ops.database` in [the repo](/docs/guides/config), or pick one with `--db <path>` in the CLI.
 
 ## See the tables
 
@@ -26,8 +26,8 @@ Shows the rows of one table, newest first.
 
 ```surfaces
 Web: the app page, **Data** tab, click a table
-CLI: ops db rows orders
-TUI: on the app, `s`, then type `SELECT * FROM orders`
+CLI: ops db rows <table>
+TUI: on the app, `s`, then type `SELECT * FROM <table>`
 API: GET /api/v1/apps/{app}/databases/rows
 MCP: query_database
 ```
@@ -40,7 +40,7 @@ Shows how a table is built: its `CREATE` statement and its indexes.
 
 ```surfaces
 Web: the app page, **Data** tab, a table, **Schema**
-CLI: ops db schema orders
+CLI: ops db schema <table>
 TUI: on the app, `s`, then type `SELECT sql FROM sqlite_schema`
 API: GET /api/v1/apps/{app}/databases/tables
 MCP: list_tables
@@ -99,4 +99,8 @@ Rows are your users' data, as sensitive as secrets. The API and MCP need a token
 
 ## Requirements
 
-The app keeps SQLite on a volume, as `/data/app.db` in the compose file ops writes. WAL mode is best: your app and ops then read and write at the same time without waiting. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
+The app keeps SQLite on a volume, as `/data/app.db` in the compose file ops writes. WAL mode is best: your app and ops then read and write at the same time without waiting. Your app turns it on with `PRAGMA journal_mode=WAL`.
+
+The data page says the app has no database? Then the live release keeps no SQLite file on a volume. Check that the database file sits in a mounted folder, such as `/data`, and deploy again. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
+
+With a bucket set up, every change you make here gets a snapshot first, so one restore undoes it: see [A snapshot before every change](/docs/guides/backups#a-snapshot-before-every-change).

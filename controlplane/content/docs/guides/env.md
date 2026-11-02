@@ -44,7 +44,7 @@ API: PATCH /api/v1/apps/{app}/env
 MCP: set_env
 ```
 
-`ops env set` takes several at once. In the API, send them as `set`. Then restart the app: `ops restart`.
+`ops env set` takes several at once: `ops env set KEY1=value KEY2=value`. Put quotes around a value with spaces: `ops env set GREETING="hello world"`. In the API, send them as `set`. Then restart the app: [`ops restart`](/docs/guides/deploy#restart). Until then the app runs with the old values.
 
 ## Remove an env var
 

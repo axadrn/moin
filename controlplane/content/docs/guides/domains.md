@@ -11,19 +11,21 @@ Every server runs one proxy, Traefik, which ops starts with the first domain. A 
 Puts your app on your own domain, with HTTPS.
 
 1. Buy the domain anywhere, for example at Cloudflare or Porkbun.
-2. Add it to the app:
+2. Add it to the app. You can add several at once, such as the domain with and without `www.`:
 
 ```surfaces
 Web: the app page, **Domains**, **Add domain**
-CLI: ops domains add blog.de www.blog.de
-TUI: on the app, `o`, then type `blog.de`
+CLI: ops domains add <domain> www.<domain>
+TUI: on the app, `o`, then type the domain
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
 
-3. Point each domain at the server: an A record to its IPv4 address and, when it has one, an AAAA record to its IPv6 address. ops shows both addresses and the record to set.
+3. Point each domain at the server. Open the DNS settings where you bought the domain and add an **A record**: its name is the domain, its value the server's IPv4 address. If the server has an IPv6 address, add an **AAAA record** with it too. ops shows both addresses and the record to set.
 
 Changes apply right away: ops restarts the running release with the new routing, without a build. Before the first deploy they wait for it.
+
+DNS takes a few minutes, sometimes longer. HTTPS starts once the domain points at the server: Traefik then gets a certificate by itself. Using a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel)? Then ops sets the DNS for you, as long as the domain is in your Cloudflare account.
 
 ## Check the DNS
 
@@ -45,14 +47,28 @@ blog.de       ● points here  203.0.113.5
 www.blog.de   ○ set DNS
 ```
 
+## Remove a domain
+
+Takes a domain off the app. It stops answering for this app.
+
+```surfaces
+Web: the app page, **Domains**, the × next to the domain
+CLI: ops domains rm <domain>
+TUI: on the app, `o`, then type `-` and the domain, then `y`
+API: PUT /api/v1/apps/{app}/domains
+MCP: set_domains
+```
+
+The web, the CLI and the TUI ask first; `--yes` skips it in scripts. In the API and MCP, send the domains the app should keep. Remove the DNS record where you bought the domain too.
+
 ## www or not
 
 Picks one domain as the main one. The others redirect to it for good, so visitors and search engines see one address.
 
 ```surfaces
 Web: the app page, **Domains**, **Make canonical** on a domain
-CLI: ops domains canonical blog.de
-TUI: on the app, `o`, then type `=blog.de`
+CLI: ops domains canonical <domain>
+TUI: on the app, `o`, then type `=` and the domain
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
@@ -65,13 +81,13 @@ Puts a username and password in front of an app, for example for a staging app o
 
 ```surfaces
 Web: the app page, **Password**, **Protect with password**
-CLI: ops protect --user ops
-TUI: on the app, `p`, then type `user:password`
+CLI: ops protect --user <username>
+TUI: on the app, `p`, then type `<username>:<password>`
 API: PUT /api/v1/apps/{app}/protection
 MCP: set_protection
 ```
 
-The CLI asks for the password on stdin.
+The username is `ops` unless you pick another with `--user`. The CLI asks for the password on stdin. Visitors then see a sign-in box of their browser.
 
 ## Remove the password
 

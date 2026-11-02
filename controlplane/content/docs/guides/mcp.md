@@ -4,16 +4,32 @@ description: "Let Claude and other agents run ops for you"
 order: 12
 ---
 
-The control plane serves an MCP server at `/mcp`. Every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back blog and show me its logs"*.
+MCP (Model Context Protocol) is how AI agents such as Claude, Cursor or VS Code use tools. The control plane serves an MCP server at `/mcp`. Every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back my app and show me its logs"*.
 
 Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_backup_storage` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
 
-## Connect Claude Code
+## Connect an agent
+
+First [create an API token](/docs/guides/account#create-an-api-token). Pick **Read and write** if the agent should change things, **Read only** if it should only look. Put the token where `pat_…` stands below.
+
+### Claude Code
 
 ```bash
 claude mcp add --transport http ops https://ops.example.com/mcp \
   --header "Authorization: Bearer pat_…"
 ```
+
+### Cursor
+
+In `.cursor/mcp.json`:
+
+```json
+{"mcpServers": {"ops": {"url": "https://ops.example.com/mcp", "headers": {"Authorization": "Bearer pat_…"}}}}
+```
+
+### Other clients
+
+Any client that speaks MCP over HTTP works: give it the URL `https://ops.example.com/mcp` and the header `Authorization: Bearer pat_…`.
 
 ## Tools
 

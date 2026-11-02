@@ -4,7 +4,7 @@ description: "Deploy a branch or commit without a checkout, and every push"
 order: 9
 ---
 
-Connect GitHub once, link a repo to an app, and ops deploys from GitHub: any branch, tag or commit from the web, the CLI, the terminal UI or an agent, with no checkout on your machine. With **Deploy every push** on, every push to the branch deploys. ops writes how it went back to GitHub as the commit status **ops/deploy**, so the pull request shows a green check when the deploy is live.
+Connect GitHub once, link a repo to an app, and ops deploys from GitHub: any branch, tag or commit from the web, the CLI, the terminal UI or an agent, with no checkout on your machine. A ref is any of these three: a branch like `main`, a tag like `v1.4.0` or a commit like `3f2a9c1`. With **Deploy every push** on, every push to the branch deploys. ops writes how it went back to GitHub as the commit status **ops/deploy**, so the pull request shows a green check when the deploy is live.
 
 ## Connect GitHub
 
@@ -42,8 +42,8 @@ The branches of a repo, the default branch first:
 
 ```surfaces
 Web: the app page, **GitHub**, the **Branch** select after you choose the repo
-CLI: ops github branches me/blog
-TUI: on the app, `g`, then type `branches me/blog`
+CLI: ops github branches <owner>/<repo>
+TUI: on the app, `g`, then type `branches <owner>/<repo>`
 API: GET /api/v1/github/repos/{owner}/{repo}/branches
 MCP: list_branches
 ```
@@ -54,8 +54,8 @@ Makes an app follow a repo and a branch. Deploy every push is on by default. The
 
 ```surfaces
 Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**
-CLI: ops link me/blog --branch main
-TUI: on the app, `g`, then type `link me/blog main`
+CLI: ops link <owner>/<repo> --branch main
+TUI: on the app, `g`, then type `link <owner>/<repo> main`
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
@@ -68,7 +68,7 @@ Deploys the linked branch, or any branch, tag or commit, without a checkout on y
 
 ```surfaces
 Web: the app page, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
-CLI: ops deploy --ref v1.4.0
+CLI: ops deploy --ref <ref>
 TUI: on the app, `g`, type a branch, tag or commit or nothing, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_ref
@@ -82,13 +82,13 @@ Deploys each push to the linked branch by itself.
 
 ```surfaces
 Web: the app page, **GitHub**, **Deploy every push**
-CLI: ops link me/blog --auto=false
-TUI: on the app, `g`, then type `link me/blog main manual`
+CLI: ops link <owner>/<repo> --auto=false
+TUI: on the app, `g`, then type `link <owner>/<repo> main manual`
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-These turn it off; `ops link me/blog` and `link me/blog` in the TUI turn it on again. In the API and MCP it is `auto_deploy`.
+These turn it off; `ops link <owner>/<repo>` and `link <owner>/<repo>` in the TUI turn it on again. In the API and MCP it is `auto_deploy`.
 
 A push to another branch does nothing. A push that arrives while a deploy of the app still runs is skipped; the next push, or **Deploy**, picks up the newest commit.
 
