@@ -111,10 +111,11 @@ func explain(err error) string {
 	return sentence(err.Error())
 }
 
-// sentence capitalizes the first word, but not one like "v4".
+// sentence capitalizes the first word, but not one like "v4" or the name
+// of ops, which is always lowercase.
 func sentence(text string) string {
 	runes := []rune(text)
-	if len(runes) < 2 || !unicode.IsLower(runes[1]) {
+	if len(runes) < 2 || !unicode.IsLower(runes[1]) || strings.HasPrefix(text, build.Name+" ") {
 		return text
 	}
 	return string(unicode.ToUpper(runes[0])) + string(runes[1:])

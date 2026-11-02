@@ -35,7 +35,7 @@ func (a *apps) database(request protocol.DBRequest) (protocol.Database, error) {
 	}
 	current := a.current(request.App)
 	if current == 0 {
-		return protocol.Database{}, fmt.Errorf("%s is not running on this server", request.App)
+		return protocol.Database{}, fmt.Errorf("no release of %s runs on this server", request.App)
 	}
 	var detected protocol.Detected
 	body, _ := os.ReadFile(filepath.Join(a.releaseDir(request.App, current), "detected.json"))
@@ -46,9 +46,9 @@ func (a *apps) database(request protocol.DBRequest) (protocol.Database, error) {
 		}
 	}
 	if request.Database == "" {
-		return protocol.Database{}, fmt.Errorf("%s has no SQLite database on a volume", request.App)
+		return protocol.Database{}, fmt.Errorf("no SQLite database on a volume of %s", request.App)
 	}
-	return protocol.Database{}, fmt.Errorf("%s has no database %s", request.App, request.Database)
+	return protocol.Database{}, fmt.Errorf("no database %s in %s", request.Database, request.App)
 }
 
 // openDatabase opens a database file on one connection. A read-only handle

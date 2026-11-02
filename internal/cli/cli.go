@@ -551,7 +551,7 @@ func updateAgents(ctx context.Context, args []string, stdout io.Writer) error {
 		updated, err := api.UpdateAgent(ctx, server.ID)
 		progress.end()
 		if err != nil {
-			printError(stdout, fmt.Errorf("%s: %w", server.Name, err))
+			printError(stdout, fmt.Errorf("server %s: %w", server.Name, err))
 			failed = true
 			continue
 		}

@@ -309,7 +309,7 @@ func (b *backups) databases(app, database string) ([]protocol.Database, error) {
 	all := b.apps.runningDatabases(app)
 	if database == "" {
 		if len(all) == 0 {
-			return nil, fmt.Errorf("%s has no SQLite database on a volume", app)
+			return nil, fmt.Errorf("no SQLite database on a volume of %s", app)
 		}
 		return all, nil
 	}
@@ -318,7 +318,7 @@ func (b *backups) databases(app, database string) ([]protocol.Database, error) {
 			return []protocol.Database{found}, nil
 		}
 	}
-	return nil, fmt.Errorf("%s has no database %s", app, database)
+	return nil, fmt.Errorf("no database %s in %s", database, app)
 }
 
 // snapshot copies every database of an app with VACUUM INTO, gzips it and
