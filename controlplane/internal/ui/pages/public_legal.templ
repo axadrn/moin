@@ -18,7 +18,7 @@ templ Legal(page *service.LegalPage) {
 					@legalLink("terms", "Terms of Service", page.Slug)
 					@legalLink("privacy", "Privacy Policy", page.Slug)
 				</nav>
-				<article>
+				<article class="min-w-0">
 					<header class="mb-10 border-b pb-8">
 												<h1 class="font-display text-[clamp(2.1rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.03em]">{ page.Title }</h1>
 						<p class="mt-4 font-mono text-[12.5px] text-muted-foreground">Last updated { page.LastUpdated }</p>
