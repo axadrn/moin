@@ -108,7 +108,7 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 				}
 			}
 			@fieldHint("api-token-access", form.Errors["access"]) {
-				The CLI needs Read and write to add servers and deploy. Read only tokens can look but not change anything.
+				The CLI needs Read and write to add servers and deploy. Pick Read only for a script or agent that should only look.
 			}
 		}
 		@field.Field(field.Props{Class: "gap-1"}) {

@@ -45,15 +45,15 @@ const (
 	APITokenExpiryNever = "never"
 )
 
-// NewAPITokenForm returns an empty form: read only, 90 days, bound to the
-// given workspace when there is one.
+// NewAPITokenForm returns an empty form: read and write, as the CLI needs
+// it, 90 days, bound to the given workspace when there is one.
 func NewAPITokenForm(workspaceID string) APITokenForm {
-	return APITokenForm{Access: APITokenAccessRead, Expiry: "90", WorkspaceID: workspaceID}
+	return APITokenForm{Access: APITokenAccessWrite, Expiry: "90", WorkspaceID: workspaceID}
 }
 
 var apiTokenAccessItems = []selectcomp.ItemData{
-	{Value: APITokenAccessRead, Label: "Read only"},
 	{Value: APITokenAccessWrite, Label: "Read and write"},
+	{Value: APITokenAccessRead, Label: "Read only"},
 }
 
 var apiTokenExpiryItems = []selectcomp.ItemData{
