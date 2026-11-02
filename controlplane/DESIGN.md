@@ -214,6 +214,53 @@ Rules every page follows:
 - **Text.** Muted for secondary facts, `tabular-nums` for numbers and
   times. Times are relative ("3h ago") with the full stamp as `title`.
 
+## Feedback
+
+Every answer to a click or a form takes one of these shapes, the same on
+every page. Nothing on the page moves to make room for it. The helpers are
+in `internal/handler/feedback.go` and `@fieldHint` in
+`internal/ui/pages/app_parts.templ`; use them, never build feedback by hand.
+
+- **If a field is wrong** (empty, too long, taken, not a domain): the field
+  turns red and takes the focus, and what was typed stays. Its message
+  replaces the hint in the line under the field. In a form with labels
+  above the fields (sign in, password, bucket, dialogs) every field has
+  that line, `@fieldHint(id, err) { hint }`, empty when there is no hint,
+  so the message only swaps text. Keep it to one short sentence.
+  Handler: `fieldError(w, title, field, message)`, or
+  `failed(w, r, title, err, fields)` for a service error.
+- **If the field sits in one row with its button** (add app, add server,
+  env var, domain, name, email, invite): the same, but the row has no hint
+  line, so the message is a toast. Never text under the row.
+- **If an action worked**: a toast that says what happened,
+  `toastDone(w, r, title, description)`. Title: the thing and the past
+  verb, "blog added", "Domain blog.de added". Description: what follows,
+  if anything, "Deploy v5 applies it now."
+- **If it worked only in part** (password changed, other sessions not
+  signed out): a warning toast, `toastWarning(...)`, that says what is left.
+- **If an action failed and no field is to blame** (agent offline, not
+  allowed, a key the provider refused): a toast,
+  `toastFailed(w, r, title, description)` or `failed(...)`. Title: what did
+  not happen, "Rollback not started", "Server not removed"; description:
+  why, in one sentence. The page stays as it was.
+- **If a control saves itself** (a switch, a cell of the data browser):
+  its new state is the answer, no toast. If saving fails, it goes back (the
+  cell turns red) and a toast says why.
+- **If something was copied**: the copy icon turns into a check for a
+  moment. The button keeps its size and its label.
+- **If a state lasts** while the page is open (trial ended, read-only
+  workspace, server offline, a backup that needs attention, data that could
+  not be read): an alert in the page, rendered with the page. Never a
+  toast, and never an alert inserted as the answer to a click.
+- **If a request runs**: the button that sent it is disabled until the
+  answer (`hx-disable`) and keeps its size; a running deploy or restore
+  shows the running status. No spinner that moves anything.
+- **If it is a console** (SQL, logs): its answer is its output area, an
+  error included.
+
+Toasts read like the CLI: short and concrete, never "Success", "Error" or
+"successfully".
+
 ## Status
 
 Every status shows as a colored dot or symbol plus a word, everywhere:
