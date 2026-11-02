@@ -50,29 +50,10 @@ templ appCI(appName string, hook bool) {
 			Title:       "Deploy hook",
 			Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
 			Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
-			Action:      newHookButton(appName),
 		}) {
 			@AppHook(appName, "", hook)
 		}
 	</div>
-}
-
-// newHookButton makes a new deploy hook URL; the old URL stops working.
-templ newHookButton(appName string) {
-	@button.Button(button.Props{
-		Variant: button.VariantSecondary,
-		Size:    button.SizeSm,
-		Attributes: templ.Attributes{
-			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
-			"hx-target":     "#app-hook",
-			"hx-swap":       "outerHTML",
-			"hx-disable":    "this",
-			"hx-confirm":    "Create a new deploy hook? The old URL stops working.",
-			"data-new-hook": true,
-		},
-	}) {
-		New deploy hook
-	}
 }
 
 // AppHook shows a new deploy hook URL once, with the curl CI runs, and
@@ -91,8 +72,9 @@ templ AppHook(appName, url string, on bool) {
 			<p class="text-sm text-muted-foreground">Then let CI call it after pushing the image:</p>
 			@command(`curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
 		}
-		if on {
-			<div>
+		<div class="flex flex-wrap gap-2">
+			@newHookButton(appName, on)
+			if on {
 				@button.Button(button.Props{
 					Variant: button.VariantSecondary,
 					Size:    button.SizeSm,
@@ -107,9 +89,29 @@ templ AppHook(appName, url string, on bool) {
 				}) {
 					Turn off
 				}
-			</div>
-		}
+			}
+		</div>
 	</div>
+}
+
+// newHookButton makes a new deploy hook URL. It asks first only when it
+// replaces a hook, whose URL then stops working.
+templ newHookButton(appName string, replaces bool) {
+	{{
+	attributes := templ.Attributes{
+		"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+		"hx-target":     "#app-hook",
+		"hx-swap":       "outerHTML",
+		"hx-disable":    "this",
+		"data-new-hook": true,
+	}
+	if replaces {
+		attributes["hx-confirm"] = "Create a new deploy hook? The old URL stops working."
+	}
+	}}
+	@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: attributes}) {
+		New deploy hook
+	}
 }
 
 // SettingsRegistriesSection lists the registry logins agents pull private images with.

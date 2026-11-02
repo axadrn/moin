@@ -59,12 +59,12 @@ Gives you a secret URL that deploys an image when CI calls it.
 ```surfaces
 Web: the app page, **Deploy hook**, **New deploy hook**
 CLI: ops hook <app-name>
-TUI: on the app, `h`, then `y`
+TUI: on the app, `h`, then `y` to replace a hook
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so ops asks first. In a script, add `--yes`.
+ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so ops asks first when the app has a hook already; the first one needs no question. In a script, add `--yes`.
 
 ### Turn the deploy hook off
 

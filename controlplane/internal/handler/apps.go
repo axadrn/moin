@@ -237,12 +237,21 @@ func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
 
 // RotateHook shows a new deploy hook URL once.
 func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
-	url, err := h.apps.RotateDeployHook(actor(r), r.PathValue("app"))
+	before, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
 		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(r.PathValue("app"), url, true))
+	url, err := h.apps.RotateDeployHook(actor(r), before.Name)
+	if err != nil {
+		failed(w, r, "Deploy hook not created", err, nil)
+		return
+	}
+	render(w, r, pages.AppHook(before.Name, url, true))
+	if before.DeployHookHash == nil {
+		toastDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
+		return
+	}
 	toastDone(w, r, "Deploy hook created", "The old URL stopped working.")
 }
 
