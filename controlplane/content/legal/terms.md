@@ -46,7 +46,7 @@ Your apps run on your servers, not on ours. If the control plane is unavailable,
 
 ## Ending
 
-You can delete your account at any time in the settings. This removes your servers, apps and deploys from ops; the agent stops and your containers keep running until you remove them. We may end the service for everyone with at least 30 days notice by email, and refund the unused part of a prepaid period.
+You can delete your account at any time in the settings. This removes your servers, apps and deploys from ops; the agent stops and your containers keep running until you remove them. If we ever end the service, we tell you by email and refund the unused part of a prepaid period.
 
 ## Liability
 
@@ -54,7 +54,7 @@ We are liable without limit for intent and gross negligence and for injury to li
 
 ## Changes
 
-We may change these terms. Material changes are announced by email at least 30 days before they apply. If you do not agree, you can cancel before they take effect.
+We may change these terms at any time. We tell you about important changes by email. If you do not agree, you can cancel.
 
 ## Contact
 
