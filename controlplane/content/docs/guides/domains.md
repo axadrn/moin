@@ -85,6 +85,8 @@ API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
 
+A change of the domains or the password restarts the app so it applies. If nothing changes, like the same domains again or `protect off` on an app without a password, ops says "Nothing changed" and restarts nothing. The API answers with `"unchanged": true`.
+
 ## In the repo
 
 You can also keep domains and the password switch next to your code, in `compose.yml`:
