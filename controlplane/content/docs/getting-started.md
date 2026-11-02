@@ -12,7 +12,7 @@ order: 2
 - **Your app in a folder**, with a `compose.yml`, a `Dockerfile` or a `go.mod` in it. [Deploy](/docs/guides/deploy#deploy-from-a-repo) says what ops does with each.
 - **A domain**, if people should reach the app in a browser. You can add it at the end.
 
-Not sure what a word means? [How ops works in 2 minutes](/docs/introduction#how-ops-works-in-2-minutes) explains each one.
+Not sure what a word means? [How ops works in 2 minutes](/docs#how-ops-works-in-2-minutes) explains each one.
 
 ## 1. Sign up
 
