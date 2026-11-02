@@ -90,7 +90,7 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 func checkEmail(email string) error {
 	address, err := mail.ParseAddress(email)
 	if err != nil || address.Address != email {
-		return fmt.Errorf("%s is not an email address", email)
+		return fmt.Errorf("that is not an email address: %s", email)
 	}
 	return nil
 }

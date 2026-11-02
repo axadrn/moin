@@ -989,7 +989,7 @@ func (m model) checkServer(name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("no server %s: pick one of the servers tab", name)
+	return fmt.Errorf("there is no server %s: pick one from the servers tab", name)
 }
 
 // placeholder is what an empty answer takes, or a hint when there is none.
