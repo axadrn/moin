@@ -87,6 +87,10 @@ func db(ctx context.Context, args []string, stdout io.Writer) error {
 				rows[index] = row[1:]
 			}
 		}
+		if len(rows) == 0 {
+			fmt.Fprintf(stdout, "No rows at offset %d: %s has %d.\n", page.Offset, page.Table.Name, page.Table.Rows)
+			return nil
+		}
 		printResult(stdout, columns, rows)
 		shown := page.Offset + len(page.Rows)
 		if int64(shown) < page.Table.Rows {

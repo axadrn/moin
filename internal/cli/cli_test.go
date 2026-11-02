@@ -478,3 +478,11 @@ func TestUnlinkWithoutARepoChangesNothing(t *testing.T) {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
 }
+
+func TestRowsPastTheEndSaySo(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/databases/rows": `{"database":"/data/app.db","table":{"name":"customers","rows":16},"columns":["id"],"rows":[],"offset":99,"limit":20}`}}
+	code, stdout, stderr := runCLI(t, api, "db", "rows", "--app", "shop", "customers", "--offset", "99")
+	if code != 0 || !strings.Contains(stdout, "No rows at offset 99: customers has 16.") {
+		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
