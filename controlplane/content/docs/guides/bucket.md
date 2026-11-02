@@ -34,17 +34,33 @@ Tells ops which bucket to use. Do it once per workspace: one bucket serves all y
 ```surfaces
 Web: **Bucket** in the sidebar, then **Save bucket**
 CLI: ops backups bucket set \
-  --endpoint https://<account>.r2.cloudflarestorage.com \
-  --bucket <your-bucket> \
-  --access-key <key id>
+  --endpoint https://<account-id>.r2.cloudflarestorage.com \
+  --bucket <bucket-name> \
+  --access-key <access-key>
 TUI: settings tab, **Bucket**, then `enter`
 API: PUT /api/v1/backup-storage
 MCP: set_backup_storage
 ```
 
-Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in. Create a bucket and a key that may read, write and delete in it first. The CLI asks for the secret key on stdin.
+Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in.
 
-ops writes and deletes a test file first, so a wrong key fails right away.
+Before you add it:
+
+1. Create a bucket in your storage provider's dashboard.
+2. Create an access key that may read, write and delete in that bucket. You get two parts: the access key (its ID) and the secret key.
+3. Look up the endpoint, the web address of the storage. Your provider shows it next to the bucket. For Cloudflare R2 it is `https://<account-id>.r2.cloudflarestorage.com`.
+
+What ops needs:
+
+| Field | What to type |
+| --- | --- |
+| Endpoint | The endpoint. It must start with `https://`. Only `http://localhost` and `http://127.0.0.1` may use plain `http://`, on a self-hosted control plane. For AWS S3, leave it empty. |
+| Bucket | The name of the bucket. |
+| Folder | Usually empty. See [The folder field](#the-folder-field). |
+| Access key, Secret key | The two parts of the key. The CLI asks for the secret key on stdin, so it never ends up in your shell history. |
+| Region | `auto` for Cloudflare R2. For AWS S3, the region of the bucket, like `eu-central-1`. Otherwise what your provider says. |
+
+ops writes and deletes a test file first, so a wrong key fails right away. The hosted control plane only reaches buckets on the public internet, not on a private or local address.
 
 ## What goes in the bucket
 
@@ -103,3 +119,9 @@ Remove an app and create a new one with the same name, and the new app starts wi
 The **Folder** field on the Bucket page is `--path` in the CLI and `path` in the API and MCP. Most people leave it empty. Fill it in when the bucket holds other files too, such as a bucket you already use for something else. Everything of ops then stays inside that one folder, like `ops/`, and the rest of the bucket is left alone.
 
 You do not need it to share one bucket between workspaces: each workspace gets its own folder anyway.
+
+## Next
+
+- [Backups](/docs/guides/backups): what ops keeps in the bucket and how to restore it.
+- [Deploy](/docs/guides/deploy#deploy-from-a-repo): how `ops deploy` puts your code into it.
+- [Stop backups](/docs/guides/backups#stop-backups): remove the bucket from ops.

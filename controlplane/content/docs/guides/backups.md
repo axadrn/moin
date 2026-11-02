@@ -19,16 +19,16 @@ Tells ops which bucket to back up into. One bucket serves all your apps, and it 
 ```surfaces
 Web: **Bucket** in the sidebar, then **Save bucket**
 CLI: ops backups bucket set \
-  --endpoint https://<account>.r2.cloudflarestorage.com \
+  --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --region auto \
-  --bucket <your-bucket> \
-  --access-key <key id>
+  --bucket <bucket-name> \
+  --access-key <access-key>
 TUI: settings tab, **Bucket**, then `enter`
 API: PUT /api/v1/backup-storage
 MCP: set_backup_storage
 ```
 
-Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, MinIO. Create a bucket and a key that may read and write it first. The CLI asks for the secret key on stdin. Leave `--endpoint` out for AWS S3.
+Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Create a bucket and a key that may read, write and delete in it first. The endpoint must start with `https://`. For AWS S3, leave `--endpoint` out and set `--region` to the bucket's region. The CLI asks for the secret key on stdin. [Add it](/docs/guides/bucket#add-it) explains every field.
 
 ops writes and deletes a test file first, so a wrong key fails right away. The secret key is stored encrypted. Every online server starts backing up at once, the others when they connect.
 
@@ -111,7 +111,9 @@ API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-Times are in UTC. In the API and MCP, send the time as `at`.
+Times are in UTC, not your local time. A time without a day, like `14:01`, means today. In the API and MCP, send the time as `at`.
+
+If the app has more than one database, the CLI restores the one you name with `--db /data/app.db`.
 
 ## What a restore does
 
@@ -152,4 +154,6 @@ ops asks you to type the bucket's name first; `--yes` skips it in scripts.
 
 ## Requirements
 
-The app keeps SQLite on a volume and uses WAL mode, as most apps do. Only the agent runs Litestream for a database: do not run a second Litestream for the same file.
+The app keeps SQLite on a volume and uses WAL mode, as most apps do. WAL mode is a SQLite setting that lets two programs read and write at the same time; your app turns it on with `PRAGMA journal_mode=WAL`. Only the agent runs Litestream for a database: do not run a second Litestream for the same file.
+
+No database shows up? See [Data](/docs/guides/data#requirements): ops only finds SQLite files on a volume of the live release.
