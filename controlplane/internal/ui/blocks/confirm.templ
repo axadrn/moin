@@ -1,0 +1,115 @@
+package blocks
+
+import (
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/dialog"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+)
+
+// ConfirmDialog asks before every request whose element has hx-confirm
+// (DESIGN.md, Asking first). The question is the hx-confirm text: up to the
+// first "? " the title, the rest the description. The button repeats the
+// label of the clicked button, or data-confirm-action. With
+// data-confirm-name on the element or one around it, the button works only
+// once that name is typed, for what is big and cannot be undone; the name
+// has a copy button.
+templ ConfirmDialog() {
+	@dialog.Dialog(dialog.Props{ID: "confirm-dialog"}) {
+		@dialog.Content(dialog.ContentProps{HideCloseButton: true}) {
+			@dialog.Header() {
+				@dialog.Title(dialog.TitleProps{Attributes: templ.Attributes{"data-confirm-question": true}})
+				@dialog.Description(dialog.DescriptionProps{Attributes: templ.Attributes{"data-confirm-detail": true}})
+			}
+			<div class="flex flex-col gap-2" data-confirm-typed hidden>
+				@field.Label(field.LabelProps{For: "confirm-name"}) {
+					<span>Type <span class="font-mono font-semibold" data-confirm-name></span> to confirm</span>
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Size:       button.SizeIconSm,
+						Class:      "group/copy text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
+						Attributes: templ.Attributes{"data-copy": "", "data-confirm-copy": true, "aria-label": "Copy the name", "title": "Copy the name"},
+					}) {
+						@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
+						@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
+					}
+				}
+				@input.Input(input.Props{ID: "confirm-name", Type: "text", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "data-confirm-input": true}})
+			</div>
+			@dialog.Footer() {
+				@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
+					Cancel
+				}
+				@button.Button(button.Props{Variant: button.VariantDestructive, Attributes: templ.Attributes{"data-confirm-accept": true}}) {
+					Continue
+				}
+			}
+		}
+	}
+	@confirmScript()
+}
+
+// confirmScript opens the dialog for htmx:confirm and lets the request go
+// once it closed with the button, or drops it.
+templ confirmScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			if (window.opsConfirm) return;
+			window.opsConfirm = true;
+			let pending = null;
+			const popup = () => document.getElementById("confirm-dialog");
+			const part = (name) => popup().querySelector("[data-confirm-" + name + "]");
+			document.addEventListener("htmx:confirm", (event) => {
+				if (!popup() || !window.templ?.dialog) return;
+				event.preventDefault();
+				const { ctx, issueRequest, dropRequest } = event.detail;
+				pending?.drop();
+				const text = ctx.confirm || "";
+				const split = text.indexOf("? ");
+				part("question").textContent = split < 0 ? text : text.slice(0, split + 1);
+				part("detail").textContent = split < 0 ? "" : text.slice(split + 2);
+				const source = ctx.sourceEvent?.submitter || event.target;
+				const label = source.closest("[data-confirm-action]")?.dataset.confirmAction || (source.matches("button") ? source.textContent.trim() : "");
+				const accept = part("accept");
+				accept.textContent = label && label.length <= 24 ? label : "Continue";
+				const name = event.target.closest("[data-confirm-name]")?.dataset.confirmName || "";
+				const typed = part("typed");
+				typed.hidden = name === "";
+				part("name").textContent = name;
+				part("copy").dataset.copy = name;
+				const field = part("input");
+				field.value = "";
+				accept.disabled = name !== "";
+				pending = { name, accepted: false, issue: issueRequest, drop: dropRequest };
+				window.templ.dialog.open(popup());
+				if (name) setTimeout(() => field.focus(), 50);
+			});
+			document.addEventListener("input", (event) => {
+				if (pending && event.target.matches("[data-confirm-input]")) part("accept").disabled = event.target.value.trim() !== pending.name;
+			});
+			const accept = () => {
+				if (!pending || part("accept").disabled) return;
+				pending.accepted = true;
+				window.templ.dialog.close(popup());
+			};
+			document.addEventListener("click", (event) => {
+				if (event.target.closest("[data-confirm-accept]")) accept();
+			});
+			document.addEventListener("keydown", (event) => {
+				if (event.key === "Enter" && event.target.matches("[data-confirm-input]")) {
+					event.preventDefault();
+					accept();
+				}
+			});
+			// The dialog closed: by the button, Cancel, Escape or a click
+			// outside. Only the button lets the request go.
+			document.addEventListener("dialog-close", (event) => {
+				if (!pending || event.target !== popup()) return;
+				const done = pending;
+				pending = null;
+				done.accepted ? done.issue() : done.drop();
+			});
+		})();
+	</script>
+}

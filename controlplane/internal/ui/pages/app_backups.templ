@@ -170,7 +170,8 @@ templ pointInTime(view BackupsView, database protocol.DatabaseBackup, index int)
 				hx-select="#app-backups"
 				hx-swap="outerHTML"
 				hx-disable="find button[type='submit']"
-				hx-confirm={ "Restore " + database.Database + " to this point in time? ops takes a snapshot of the current state first. The app stops for a moment." }
+				hx-confirm={ "Restore " + database.Database + " to this point in time? It replaces the data there now; ops takes a snapshot of it first. The app stops for a moment." }
+				data-confirm-name={ view.App.Name }
 				data-point-in-time={ id }
 			>
 				@csrf.Token()
@@ -249,7 +250,8 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 								hx-select="#app-backups"
 								hx-swap="outerHTML"
 								hx-disable="find button[type='submit']"
-								hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.UTC().Format("Jan 2, 15:04") + " UTC? ops takes a snapshot of the current state first. The app stops for a moment." }
+								hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.UTC().Format("Jan 2, 15:04") + " UTC? It replaces the data there now; ops takes a snapshot of it first. The app stops for a moment." }
+								data-confirm-name={ view.App.Name }
 							>
 								@csrf.Token()
 								<input type="hidden" name="database" value={ database.Database }/>

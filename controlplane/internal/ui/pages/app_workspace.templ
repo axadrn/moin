@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/dialog"
 	field "github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
@@ -177,6 +176,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 									hx-post={ basePath + "/workspace/invitations/" + invitation.ID + "/revoke" }
 									hx-swap="none"
 									hx-disable="find button[type='submit']"
+									hx-confirm={ "Revoke the invitation of " + invitation.Email + "? The link in the email stops working." }
 								>
 									@csrf.Token()
 									@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
@@ -210,71 +210,36 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 		}
 		@dangerPanel("Leave or delete the workspace", "The last Owner must hand ownership to someone else or delete the workspace.") {
 			<div class="flex flex-wrap gap-2">
-				@dialog.Dialog(dialog.Props{ID: "leave-workspace-dialog"}) {
-					@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: dialog.Trigger(ctx)}) {
+				<form
+					action={ templ.SafeURL(basePath + "/workspace/leave") }
+					method="POST"
+					hx-post={ basePath + "/workspace/leave" }
+					hx-swap="none"
+					hx-disable="find button[type='submit']"
+					hx-confirm={ "Leave " + workspace.Name + "? You lose access to this workspace. A sole Owner must hand ownership to someone else first." }
+					data-confirm-action="Leave workspace"
+				>
+					@csrf.Token()
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 						Leave
 					}
-					@dialog.Content() {
-						@dialog.Header() {
-							@dialog.Title() {
-								Leave { workspace.Name }?
-							}
-							@dialog.Description() {
-								You lose access to this workspace. A sole Owner must hand ownership to someone else first.
-							}
-						}
-						@dialog.Footer() {
-							@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
-								Cancel
-							}
-							<form
-								action={ templ.SafeURL(basePath + "/workspace/leave") }
-								method="POST"
-								hx-post={ basePath + "/workspace/leave" }
-								hx-swap="none"
-								hx-disable="find button[type='submit']"
-							>
-								@csrf.Token()
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive}) {
-									Leave workspace
-								}
-							</form>
-						}
-					}
-				}
+				</form>
 				if viewer.Can(model.WorkspacePermissionDeleteWorkspace) {
-					@dialog.Dialog(dialog.Props{ID: "delete-workspace-dialog"}) {
-						@button.Button(button.Props{Type: "button", Variant: button.VariantDestructive, Attributes: dialog.Trigger(ctx)}) {
+					<form
+						action={ templ.SafeURL(basePath + "/workspace/delete") }
+						method="POST"
+						hx-post={ basePath + "/workspace/delete" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+						hx-confirm={ "Permanently delete " + workspace.Name + "? This deletes the workspace, its members, invitations and activity. A paid subscription must be cancelled and run out first. This cannot be undone." }
+						data-confirm-name={ workspace.Name }
+						data-confirm-action="Delete permanently"
+					>
+						@csrf.Token()
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive}) {
 							Delete workspace
 						}
-						@dialog.Content() {
-							@dialog.Header() {
-								@dialog.Title() {
-									Permanently delete { workspace.Name }?
-								}
-								@dialog.Description() {
-									This deletes the workspace, its members, invitations and activity. A paid subscription must be cancelled and run out first. This cannot be undone.
-								}
-							}
-							@dialog.Footer() {
-								@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
-									Cancel
-								}
-								<form
-									action={ templ.SafeURL(basePath + "/workspace/delete") }
-									method="POST"
-									hx-post={ basePath + "/workspace/delete" }
-									hx-swap="none"
-									hx-disable="find button[type='submit']"
-								>
-									@csrf.Token()
-									@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive}) {
-										Delete permanently
-									}
-								</form>
-							}
-						}
-					}
+					</form>
 				}
 			</div>
 		}

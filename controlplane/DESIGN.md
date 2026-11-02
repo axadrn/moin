@@ -261,6 +261,35 @@ in `internal/handler/feedback.go` and `@fieldHint` in
 Toasts read like the CLI: short and concrete, never "Success", "Error" or
 "successfully".
 
+## Asking first
+
+Three tiers, the same on every surface. The API never asks: the caller
+decides.
+
+1. **Big and cannot be undone** (delete the workspace or the account,
+   remove an app, a server or the bucket, restore over live data): the
+   name must be typed out. Web: the confirm dialog shows the name with a
+   copy button and the button works only once it matches. CLI: "Type
+   blog to confirm:", `--yes` skips it for scripts. TUI: type the name,
+   then `enter`; paste works. MCP: destructive, and the tool takes
+   `confirm`, the name. Deleting the account asks for DELETE.
+2. **Reversible or small** (stop an app, roll back, revoke a token or an
+   invitation, remove a domain, an env var, a registry login, a key, a
+   member or the password, unlink a repo, a new or no deploy hook, change
+   how a server is reached): one question. Web: the confirm dialog. CLI:
+   `[y/N]`, `--yes` skips it. TUI: `y`. MCP: destructive.
+3. **Harmless** (deploy, redeploy, restart, start, back up, add or set
+   something): no question.
+
+Web: put the question in `hx-confirm` ("Remove blog? Its data stays."):
+up to the first "? " is the title, the rest the description. The dialog
+(`blocks.ConfirmDialog`, in the base layout) repeats the label of the
+clicked button, or `data-confirm-action`. Add `data-confirm-name` for
+tier 1. Never `window.confirm` and no question dialog of a page's own;
+only the account keeps its dialog, as the server checks the DELETE. CLI:
+`confirm` and `confirmName` in `internal/cli/args.go`; TUI: `confirmFirst`
+and `confirmName`; MCP: `confirmed`.
+
 ## Status
 
 Every status shows as a colored dot or symbol plus a word, everywhere:

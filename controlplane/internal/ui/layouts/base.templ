@@ -2,6 +2,7 @@ package layouts
 
 import "github.com/axadrn/ops/controlplane/internal/brand"
 import "github.com/axadrn/ops/controlplane/internal/ctxkeys"
+import "github.com/axadrn/ops/controlplane/internal/ui/blocks"
 import "github.com/axadrn/ops/controlplane/internal/ui/components"
 import "github.com/axadrn/ops/controlplane/internal/ui/components/button"
 import "github.com/axadrn/ops/controlplane/internal/ui/csrf"
@@ -80,6 +81,7 @@ templ Base(props ...SEOProps) {
 			{ children... }
 			@toast.Toaster()
 			<div id="toast-container"></div>
+			@blocks.ConfirmDialog()
 		</body>
 	</html>
 }
