@@ -34,7 +34,7 @@ Your team in ops: its servers, apps, bucket, settings and people. Invite teammat
 
 ## Do I pay per workspace?
 
-Yes. A plan covers one workspace with unlimited servers, apps and teammates. Most teams need one. A second workspace, for example for a client, has its own plan, and the free trial comes once, with your first workspace.
+Yes. One price per workspace, with unlimited servers, apps and teammates. No tiers, no per-server fees. Most teams need one. A second workspace, for example for a client, has its own plan, and the free trial comes once, with your first workspace.
 
 ## How does the hosted trial work?
 
