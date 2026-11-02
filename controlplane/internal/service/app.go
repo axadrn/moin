@@ -45,7 +45,7 @@ var (
 	ErrRegistryLogin  = errors.New("registry username and password are required")
 	ErrDomain         = errors.New("domains must be host names like blog.de")
 	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
-	ErrComposeDomains = errors.New("compose.yml sets the domains of this app with x-ops.domains")
+	ErrComposeDomains = errors.New("the domains of this app come from x-ops.domains in compose.yml")
 	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
 	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
 	ErrEnvKey         = errors.New("env keys are letters, digits and underscores and do not start with a digit")
