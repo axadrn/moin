@@ -12,6 +12,15 @@ Not for ops: the agent dials out. Visitors reach your apps through the proxy on 
 
 No. Builds run on your server. `ops deploy` puts your code into your own bucket and a GitHub deploy goes from GitHub straight to your server. The control plane only relays messages.
 
+## How is ops different from Coolify, Kamal or Heroku?
+
+- **No key to your servers.** Coolify Cloud and Dokploy Cloud keep an SSH key to your servers and connect in over SSH; Kamal does the same from your laptop. ops holds no SSH key: the agent on your server dials out, and your server needs no open port for ops. See [Security](/docs/guides/security).
+- **Your code and data stay yours.** Heroku, Render, Railway and Fly.io run your code and keep your volumes on their machines. With ops your apps run on your servers, your code goes through your own bucket and your backups live there too.
+- **Backups made for SQLite.** Every change copied about once a second, restore to any second of the last 7 days, and a restore check every day. Coolify, Dokploy, Render, Railway and Fly.io offer scheduled or daily backups and snapshots, without a daily restore check.
+- **One price.** Unlimited servers, apps and teammates per workspace. No tiers, no per-server fees. Or [host it yourself](/docs/self-hosting), free.
+
+The landing page has the full table, from each tool's own docs and pricing pages.
+
 ## What happens when a deploy fails?
 
 The previous release starts again and the deploy is marked failed with the reason. Its log ends with the last lines of the service that stopped: read it with `ops deploys v4`, for the number of the failed deploy.
