@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"net/mail"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/ops/internal/build"
@@ -63,7 +64,7 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "a":
 		return m.ask("Invite", func(values []string) tea.Cmd { return m.invite(values[0], values[1]) },
-			formField{label: "Email"},
+			formField{label: "Email", check: checkEmail},
 			formField{label: "Role", value: "member", hint: "member or admin, enter takes member", check: checkRole},
 		), nil
 	case "n":
@@ -83,6 +84,15 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 			m.teamChange(func() error { return m.api.RevokeInvitation(m.ctx, slug, row.invitation) }, "Revoked the invitation of "+row.email)), nil
 	}
 	return m, nil
+}
+
+// checkEmail lets the invite form ask the email again when it is no address.
+func checkEmail(email string) error {
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email {
+		return fmt.Errorf("%s is not an email address", email)
+	}
+	return nil
 }
 
 // checkRole lets the invite form ask the role again when it is wrong.

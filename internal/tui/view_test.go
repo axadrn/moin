@@ -532,3 +532,12 @@ func TestNewAppFormChecksEachField(t *testing.T) {
 		t.Fatalf("unknown server: mode %d, step %d, err %v", m.mode, m.form.step, m.err)
 	}
 }
+
+// The invite form asks the email again when it is no address.
+func TestInviteWrongEmail(t *testing.T) {
+	m := press(frames()["team"], "a")
+	m.input = "bad"
+	if m = press(m, "enter"); m.mode != modeForm || m.form.step != 0 || m.err == nil {
+		t.Errorf("mode %d, step %d, err %v; want the email asked again", m.mode, m.form.step, m.err)
+	}
+}
