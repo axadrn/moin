@@ -66,7 +66,7 @@ Removing a key changes no server right away. Without the Tailscale key, the next
 
 ### Create the keys
 
-- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Give it Account **Cloudflare Tunnel: Edit**, Zone **DNS: Edit** and Zone **Zone Settings: Edit**, for the zones of your apps. A zone is a domain you added to Cloudflare, such as `example.com`. ops checks the token before it stores it.
+- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Give it Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit**, for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it ops turns on **Always Use HTTPS** for your domains, without it you turn that on in Cloudflare yourself. A zone is a domain you added to Cloudflare, such as `example.com`. ops checks the token before it stores it.
 - **Tailscale key:** in the Tailscale admin console under **Settings**, **Keys**. Make it reusable.
 
 ## Cloudflare Tunnel

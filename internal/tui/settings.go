@@ -173,7 +173,7 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 		), nil
 	case "cloudflare":
 		return m.ask("Cloudflare token", func(values []string) tea.Cmd { return m.setKeys(&values[0], nil) },
-			formField{label: "API token", secret: true, hint: "Tunnel: Edit, DNS: Edit, Zone Settings: Edit"},
+			formField{label: "API token", secret: true, hint: "Tunnel: Edit, DNS: Edit (Zone Settings: Edit optional, for Always Use HTTPS)"},
 		), nil
 	case "tailscale":
 		return m.ask("Tailscale key", func(values []string) tea.Cmd { return m.setKeys(nil, &values[0]) },

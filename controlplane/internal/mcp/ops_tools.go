@@ -370,7 +370,7 @@ type Branches struct {
 
 // IntegrationsInput is the input of set_integrations.
 type IntegrationsInput struct {
-	CloudflareToken *string `json:"cloudflare_token,omitempty" jsonschema:"a Cloudflare API token with Account Cloudflare Tunnel Edit, Zone DNS Edit and Zone Settings Edit; empty removes it"`
+	CloudflareToken *string `json:"cloudflare_token,omitempty" jsonschema:"a Cloudflare API token with Account Cloudflare Tunnel Edit and Zone DNS Edit (Zone Settings Edit optional, for Always Use HTTPS); empty removes it"`
 	TailscaleKey    *string `json:"tailscale_key,omitempty" jsonschema:"a reusable Tailscale auth key, tskey-...; empty removes it"`
 }
 

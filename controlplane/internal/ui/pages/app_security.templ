@@ -131,7 +131,7 @@ templ securityKeys(view SecurityView) {
 		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
 			@csrf.Token()
 			<div class="grid items-start gap-3 lg:grid-cols-2">
-				@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit, Zone Settings Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount+".", "For the tunnel: Tunnel Edit, DNS Edit and Zone Settings Edit.")
+				@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount+".", "For the tunnel: Tunnel Edit and DNS Edit. Zone Settings Edit is optional, for Always Use HTTPS.")
 				@keyField("tailscale-key", "tailscale_key", "Tailscale auth key", "tskey-auth-…", view.Integrations.Tailscale, "Stored.", "For SSH on Tailscale: a reusable auth key.")
 			</div>
 			<div class="flex flex-wrap justify-end gap-2">

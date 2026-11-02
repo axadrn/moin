@@ -18,7 +18,7 @@ import (
 var (
 	ErrNoCloudflare    = errors.New("add a Cloudflare API token first")
 	ErrNoTailscale     = errors.New("add a Tailscale auth key first")
-	ErrCloudflareToken = errors.New("Cloudflare does not accept this token: it needs Account Cloudflare Tunnel Edit, Zone DNS Edit and Zone Settings Edit")
+	ErrCloudflareToken = errors.New("Cloudflare does not accept this token: it needs Account Cloudflare Tunnel Edit and Zone DNS Edit")
 	ErrTailscaleKey    = errors.New("a Tailscale auth key starts with tskey-")
 )
 

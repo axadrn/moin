@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/axadrn/ops/controlplane/internal/model"
@@ -15,6 +16,19 @@ func TestErrorForReadOnlyQuery(t *testing.T) {
 	}
 	if detail.Message != "This query changes data. Run it with execute_sql (MCP), --write (CLI) or Allow changes (web)." {
 		t.Fatalf("message = %q", detail.Message)
+	}
+}
+
+// Zone Settings Edit only turns on Always Use HTTPS, so a token without it
+// is fine and the message must not ask for it.
+func TestErrorForCloudflareTokenNeedsTunnelAndDNSOnly(t *testing.T) {
+	_, detail, _ := ErrorFor(service.ErrCloudflareToken)
+	message := detail.Fields["cloudflare_token"]
+	if !strings.Contains(message, "Tunnel Edit and Zone DNS Edit.") || !strings.Contains(message, "Zone Settings Edit is optional") {
+		t.Fatalf("message = %q", message)
+	}
+	if strings.Contains(service.ErrCloudflareToken.Error(), "Settings") {
+		t.Fatalf("error = %q", service.ErrCloudflareToken)
 	}
 }
 

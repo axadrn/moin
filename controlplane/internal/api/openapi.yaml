@@ -2521,7 +2521,7 @@ paths:
       tags: [Servers]
       operationId: setIntegrations
       summary: Set integrations
-      description: 'Stores the Cloudflare API token, checked against Cloudflare first, and the Tailscale auth key, both encrypted. A missing field keeps its key, an empty one removes it. The token needs Account: Cloudflare Tunnel Edit, Zone: DNS Edit and Zone: Zone Settings Edit.'
+      description: 'Stores the Cloudflare API token, checked against Cloudflare first, and the Tailscale auth key, both encrypted. A missing field keeps its key, an empty one removes it. The token needs Account: Cloudflare Tunnel Edit and Zone: DNS Edit; Zone: Zone Settings Edit is optional and lets ops turn on Always Use HTTPS.'
       requestBody:
         required: true
         content:

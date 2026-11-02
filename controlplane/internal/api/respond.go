@@ -258,6 +258,6 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRefName, field: "ref", message: "This is not a valid branch, tag or commit name. Use git's rules, at most 255 characters."},
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Add a Cloudflare API token first."},
 	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Add a Tailscale auth key first."},
-	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit, Zone DNS Edit and Zone Settings Edit."},
+	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it ops turns on Always Use HTTPS."},
 	{err: service.ErrTailscaleKey, field: "tailscale_key", message: "A Tailscale auth key starts with tskey-."},
 }
