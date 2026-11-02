@@ -147,6 +147,58 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	}
 }
 
+// A restart after docker image prune builds the gone image again from the
+// kept source instead of pulling it; with the source gone too it says what
+// to do.
+func TestRestartRebuildsMissingImages(t *testing.T) {
+	bin := t.TempDir()
+	// A docker that has every image but ops-blog-web:3.
+	script := "#!/bin/sh\ncase \"$*\" in\n*ops-blog-web:3*) exit 1 ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	source := t.TempDir()
+	base := map[string]any{"services": map[string]any{
+		"web":    map[string]any{"build": map[string]any{"context": source}},
+		"worker": map[string]any{"build": map[string]any{"context": source}},
+	}}
+	running := map[string]string{"web": "ops-blog-web:3", "worker": "ops-blog-worker:3"}
+	var lines []string
+	logf := func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) }
+	a := &apps{}
+	if err := a.rebuildMissing(context.Background(), base, running, "web", false, logf); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "compose.json")
+	if err := finish(base, protocol.DeployStart{App: "blog", Number: 5}, protocol.Detected{Service: "web"}, running, file); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(file)
+	var config struct {
+		Services map[string]struct {
+			Build any    `json:"build"`
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatal(err)
+	}
+	web, worker := config.Services["web"], config.Services["worker"]
+	if web.Image != "ops-blog-web:5" || web.Build == nil || worker.Image != "ops-blog-worker:3" || worker.Build != nil {
+		t.Fatalf("web = %+v, worker = %+v", web, worker)
+	}
+	if len(lines) != 1 || !strings.Contains(lines[0], "building it again") {
+		t.Fatalf("log = %q", lines)
+	}
+
+	gone := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": filepath.Join(source, "gone")}}}}
+	err := a.rebuildMissing(context.Background(), gone, map[string]string{"web": "ops-blog-web:3"}, "web", false, logf)
+	if err == nil || !strings.Contains(err.Error(), "deploy again with ops deploy") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestRoutingLabels(t *testing.T) {
 	detected, err := route(protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.de"}}, &protocol.Routing{Domains: []string{"Blog.de", "www.blog.de"}, Protect: "me:$2y$05$abc"})
 	if err != nil {

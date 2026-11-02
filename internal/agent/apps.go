@@ -219,6 +219,9 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			if err == nil && start.Image == "" {
 				start.Image = detected.Image
 			}
+			if err == nil {
+				err = a.rebuildMissing(ctx, config, running, detected.Service, start.Image != "", logf)
+			}
 		}
 		if err != nil {
 			return detected, err
@@ -575,7 +578,7 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 		case name == detected.Service && start.Image != "":
 			delete(service, "build")
 			service["image"] = start.Image
-		case service["build"] != nil && running != nil:
+		case service["build"] != nil && running[name] != "":
 			delete(service, "build")
 			service["image"] = running[name]
 		case service["build"] != nil:
@@ -617,6 +620,32 @@ func builds(config map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// rebuildMissing lets finish build again the images of built services that
+// are gone from the server, as after docker image prune, from the source
+// their release kept. Without it compose would try to pull them. replaced
+// says the main service runs another image.
+func (a *apps) rebuildMissing(ctx context.Context, base map[string]any, running map[string]string, main string, replaced bool, logf func(string, ...any)) error {
+	services, _ := base["services"].(map[string]any)
+	for name, item := range services {
+		service, _ := item.(map[string]any)
+		build, _ := service["build"].(map[string]any)
+		image := running[name]
+		if build == nil || image == "" || (replaced && name == main) {
+			continue
+		}
+		if _, err := a.output(ctx, "docker", "image", "inspect", "--format", "{{.Id}}", image); err == nil {
+			continue
+		}
+		source, _ := build["context"].(string)
+		if _, err := os.Stat(source); source == "" || err != nil {
+			return fmt.Errorf("image %s of service %s is gone from the server, and so is the source to build it: deploy again with ops deploy", image, name)
+		}
+		logf("image %s of service %s is gone from the server: building it again from the kept source", image, name)
+		delete(running, name)
+	}
+	return nil
 }
 
 // copySource copies the source a release kept into a new release.

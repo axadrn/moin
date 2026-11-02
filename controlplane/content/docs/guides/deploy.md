@@ -139,6 +139,8 @@ After changing env vars, a restart is enough and faster. An app deployed from an
 
 Starts the live release again with the [env vars](/docs/guides/env), [domains and password](/docs/guides/domains) as they are now. Nothing is built. Use it after changing env vars.
 
+If the app's images are gone from the server, for example after `docker image prune`, the restart builds them again from the source the release kept. If that source is gone too, it says so: deploy again.
+
 ```surfaces
 Web: the app page, **Restart**
 CLI: ops restart <app-name>
