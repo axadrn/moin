@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/testutil"
@@ -244,5 +245,32 @@ func TestNewInstallTokenMovesTheAgent(t *testing.T) {
 	}
 	if _, _, err := servers.NewInstallToken(other, "prod"); !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another workspace: err = %v", err)
+	}
+}
+
+// TestRegisterCleansHello: what an agent reports is stored without
+// control characters, which could move the cursor or recolor a terminal
+// that shows the server in the CLI or the TUI.
+func TestRegisterCleansHello(t *testing.T) {
+	servers := newServerService(t)
+	_, installToken, err := servers.Create(owner, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hello := testHello
+	hello.Hostname = "web\x1b]0;owned\x07-1\n"
+	hello.AgentVersion = strings.Repeat("é", 100)
+	if _, _, err := servers.Register(installToken, hello); err != nil {
+		t.Fatal(err)
+	}
+	server, err := servers.Get(owner.WorkspaceID, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if server.Hostname != "web]0;owned-1" {
+		t.Fatalf("hostname = %q", server.Hostname)
+	}
+	if len(server.AgentVersion) > 128 || !utf8.ValidString(server.AgentVersion) {
+		t.Fatalf("version = %q", server.AgentVersion)
 	}
 }

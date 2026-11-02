@@ -230,7 +230,8 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 		return nil, "", ErrInstallTokenValid
 	}
 	raw := agentTokenMarker + randomToken()
-	err = s.servers.Register(server.ID, hashToken(raw), helloServer(hello, nil))
+	reported := helloServer(hello, nil)
+	err = s.servers.Register(server.ID, hashToken(raw), reported)
 	if err != nil {
 		return nil, "", err
 	}
@@ -246,7 +247,7 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 	if server.AgentTokenHash != nil {
 		action = "server.reinstalled"
 	}
-	s.record(System(server.WorkspaceID), action, "server", server.Name, map[string]string{"hostname": hello.Hostname, "os": hello.OS, "arch": hello.Arch, "version": hello.AgentVersion})
+	s.record(System(server.WorkspaceID), action, "server", server.Name, map[string]string{"hostname": reported.Hostname, "os": reported.OS, "arch": reported.Arch, "version": reported.AgentVersion})
 	s.notify(server.WorkspaceID)
 	return server, raw, nil
 }
@@ -574,10 +575,18 @@ func ServerRules(server model.Server) *protocol.Rules {
 }
 
 // clip keeps what an agent reports short.
+// clip cleans a value an agent reports: at most 128 bytes and no control
+// characters, so it cannot move the cursor or recolor a terminal that
+// shows it in the CLI or the TUI.
 func clip(value string) string {
-	value = strings.TrimSpace(value)
+	value = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, value))
 	if len(value) > 128 {
-		return value[:128]
+		return strings.ToValidUTF8(value[:128], "")
 	}
 	return value
 }
