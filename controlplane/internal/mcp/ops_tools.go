@@ -174,7 +174,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Stops backups. What is in the bucket stays. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeBackupStorage)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
-		"Returns where the ops GitHub App is installed and the link that installs it on another account; installing happens on github.com. Needs the read scope.",
+		"Returns where the ops GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getGitHub)))
 	mcpsdk.AddTool(server, add("list_repos", "List GitHub repos",
 		"Lists the repos the ops GitHub App may read, and where on github.com the user gives it access to another repo. Needs the read scope.",
@@ -1090,6 +1090,7 @@ func (t opsTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHu
 	answer := api.GitHub{Installations: []api.GitHubInstallation{}}
 	link, err := t.services.Apps.GitHubInstallURL(caller.actor())
 	answer.Enabled, answer.InstallURL = err == nil, link
+	answer.ConnectURL, _ = t.services.Apps.GitHubConnectURL(caller.actor())
 	installations, err := t.services.Apps.GitHubInstallations(caller.Token.WorkspaceID)
 	if err != nil {
 		return GitHub{}, err

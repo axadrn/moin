@@ -2246,7 +2246,7 @@ paths:
       tags: [GitHub]
       operationId: getGitHub
       summary: GitHub connection
-      description: Where the ops GitHub App is installed, and the link that installs it on another account or organization.
+      description: Where the ops GitHub App is installed, the link that connects GitHub, and the link that installs it on another account or organization.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2262,8 +2262,12 @@ paths:
                 properties:
                   enabled:
                     type: boolean
+                  connect_url:
+                    type: string
+                    description: Connects GitHub. If the app is already installed, it connects those installations; if not, it installs the app.
                   install_url:
                     type: string
+                    description: Installs the app on another account or organization.
                   installations:
                     type: array
                     items:

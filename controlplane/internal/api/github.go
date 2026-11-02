@@ -10,9 +10,13 @@ import (
 )
 
 // GitHub is the answer of GET /api/v1/github: where the ops GitHub App is
-// installed, and the link that installs it on another account.
+// installed and the links that connect it.
 type GitHub struct {
-	Enabled       bool                 `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// ConnectURL connects GitHub: it connects the app where the user
+	// already installed it, or installs it.
+	ConnectURL string `json:"connect_url,omitempty"`
+	// InstallURL installs the app on another account or organization.
 	InstallURL    string               `json:"install_url,omitempty"`
 	Installations []GitHubInstallation `json:"installations"`
 }
@@ -50,7 +54,7 @@ type RepoRequest struct {
 	AutoDeploy bool   `json:"auto_deploy"`
 }
 
-// GetGitHub returns the installations and the install link.
+// GetGitHub returns the installations and the links that connect GitHub.
 func (h *AppsHandler) GetGitHub(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	answer := GitHub{Installations: []GitHubInstallation{}}
@@ -60,6 +64,7 @@ func (h *AppsHandler) GetGitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answer.Enabled, answer.InstallURL = err == nil, link
+	answer.ConnectURL, _ = h.apps.GitHubConnectURL(actor(r))
 	installations, err := h.apps.GitHubInstallations(workspace.ID)
 	if err != nil {
 		ServiceError(w, err)
