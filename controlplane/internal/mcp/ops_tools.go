@@ -358,7 +358,7 @@ func (l ServerList) Summary() string {
 			online++
 		}
 	}
-	summary := fmt.Sprintf("%d servers, %d online.", len(l.Items), online)
+	summary := fmt.Sprintf("%s, %d online.", count(len(l.Items), "server"), online)
 	for _, server := range l.Items {
 		if lines := server.Rules.Lines(); len(lines) > 0 {
 			summary += fmt.Sprintf(" %s has rules: %s.", server.Name, strings.Join(lines, "; "))
@@ -458,7 +458,7 @@ type AppDetail struct {
 }
 
 func (d AppDetail) Summary() string {
-	return fmt.Sprintf("%s on %s: live v%d, %d deploys listed.", d.App.Name, d.App.ServerName, d.App.LiveNumber, len(d.Deploys))
+	return fmt.Sprintf("%s on %s: live v%d, %s listed.", d.App.Name, d.App.ServerName, d.App.LiveNumber, count(len(d.Deploys), "deploy"))
 }
 
 func (t opsTools) getApp(_ context.Context, caller Caller, input NameInput) (AppDetail, error) {
@@ -500,7 +500,12 @@ type Deploy struct {
 }
 
 func (d Deploy) Summary() string {
-	summary := fmt.Sprintf("Deploy v%d is %s.", d.Number, d.Status)
+	// running reads "is running"; succeeded and failed stand alone.
+	status := d.Status
+	if status == model.DeployRunning {
+		status = "is running"
+	}
+	summary := fmt.Sprintf("Deploy v%d %s.", d.Number, status)
 	if d.FromNumber > 0 {
 		summary += fmt.Sprintf(" It starts the release of v%d again.", d.FromNumber)
 	}
@@ -576,7 +581,7 @@ type RegistryList struct {
 	api.RegistryList
 }
 
-func (l RegistryList) Summary() string { return fmt.Sprintf("%d registry logins.", len(l.Items)) }
+func (l RegistryList) Summary() string { return count(len(l.Items), "registry login") + "." }
 
 func (t opsTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (RegistryList, error) {
 	logins, err := t.services.Apps.Registries(caller.Token.WorkspaceID)
@@ -744,7 +749,7 @@ type Logs struct {
 	api.Logs
 }
 
-func (l Logs) Summary() string { return fmt.Sprintf("%d log lines.", len(l.Lines)) }
+func (l Logs) Summary() string { return count(len(l.Lines), "log line") + "." }
 
 func (t opsTools) getLogs(ctx context.Context, caller Caller, input LogsInput) (Logs, error) {
 	tail := input.Tail
@@ -766,7 +771,7 @@ type Env struct {
 	api.Env
 }
 
-func (e Env) Summary() string { return fmt.Sprintf("%d env vars.", len(e.Items)) }
+func (e Env) Summary() string { return count(len(e.Items), "env var") + "." }
 
 func (t opsTools) getEnv(_ context.Context, caller Caller, input NameInput) (Env, error) {
 	env, err := t.services.Apps.Env(caller.Token.WorkspaceID, input.Name)
@@ -788,10 +793,10 @@ type EnvSet struct {
 func (e EnvSet) Summary() string {
 	var parts []string
 	if e.set > 0 {
-		parts = append(parts, "set "+envVars(e.set))
+		parts = append(parts, "set "+count(e.set, "env var"))
 	}
 	if e.removed > 0 {
-		parts = append(parts, "removed "+envVars(e.removed))
+		parts = append(parts, "removed "+count(e.removed, "env var"))
 	}
 	missing := ""
 	if len(e.missing) > 0 {
@@ -808,11 +813,12 @@ func (e EnvSet) Summary() string {
 	return strings.ToUpper(changed[:1]) + changed[1:] + "." + missing + " Restart the app to apply " + it + ": restart_app."
 }
 
-func envVars(n int) string {
+// count is n and the noun, plural unless n is 1: "1 server", "2 servers".
+func count(n int, noun string) string {
 	if n == 1 {
-		return "1 env var"
+		return "1 " + noun
 	}
-	return strconv.Itoa(n) + " env vars"
+	return strconv.Itoa(n) + " " + noun + "s"
 }
 
 func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {

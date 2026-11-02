@@ -1,6 +1,12 @@
 package mcp
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/axadrn/ops/controlplane/internal/api"
+)
 
 func TestEnvSetSummary(t *testing.T) {
 	cases := []struct {
@@ -20,5 +26,26 @@ func TestEnvSetSummary(t *testing.T) {
 		if got := (EnvSet{set: c.set, removed: c.removed, missing: c.missing}).Summary(); got != c.want {
 			t.Errorf("set %d removed %d missing %v: %q, want %q", c.set, c.removed, c.missing, got, c.want)
 		}
+	}
+}
+
+func TestSummariesReadWell(t *testing.T) {
+	one := ServerList{api.ServerList{Items: []api.Server{{Name: "web-1", Online: true}}}}
+	for got, want := range map[string]string{
+		one.Summary(): "1 server, 1 online.",
+		(Deploy{api.Deploy{Number: 1, Status: "succeeded"}}).Summary(): "Deploy v1 succeeded.",
+		(Deploy{api.Deploy{Number: 2, Status: "running"}}).Summary():   "Deploy v2 is running.",
+		(Logs{api.Logs{Lines: []string{"listening"}}}).Summary():       "1 log line.",
+	} {
+		if got != want {
+			t.Errorf("%q, want %q", got, want)
+		}
+	}
+}
+
+func TestGetBillingWithBillingOff(t *testing.T) {
+	_, err := builtinTools{services: Services{BillingOff: true}}.getBilling(context.Background(), Caller{}, WorkspaceInput{})
+	if err == nil || !strings.Contains(err.Error(), "Billing is off") {
+		t.Errorf("err = %v", err)
 	}
 }

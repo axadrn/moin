@@ -166,11 +166,11 @@ type WorkspaceDetail struct {
 }
 
 func (d WorkspaceDetail) Summary() string {
-	seats := fmt.Sprintf("%d seats used, no seat limit", d.Seats.Used)
+	seats := count(d.Seats.Used, "seat") + " used, no seat limit"
 	if d.Seats.Limit != nil {
-		seats = fmt.Sprintf("%d of %d seats used", d.Seats.Used, *d.Seats.Limit)
+		seats = fmt.Sprintf("%d of %s used", d.Seats.Used, count(*d.Seats.Limit, "seat"))
 	}
-	return fmt.Sprintf("%s (slug %s): %s, %d pending invitations, your role is %s.", d.Workspace.Name, d.Workspace.Slug, seats, len(d.Invitations), d.Role)
+	return fmt.Sprintf("%s (slug %s): %s, %s, your role is %s.", d.Workspace.Name, d.Workspace.Slug, seats, count(len(d.Invitations), "pending invitation"), d.Role)
 }
 
 func (t builtinTools) getWorkspace(_ context.Context, caller Caller, input WorkspaceInput) (WorkspaceDetail, error) {
@@ -210,7 +210,7 @@ func (a Activity) Summary() string {
 	if a.NextCursor != nil {
 		more = "Pass next_cursor as cursor for older events."
 	}
-	return fmt.Sprintf("%d events, newest first. %s\n%s", len(a.Items), more, strings.Join(lines, "\n"))
+	return fmt.Sprintf("%s, newest first. %s\n%s", count(len(a.Items), "event"), more, strings.Join(lines, "\n"))
 }
 
 func (t builtinTools) listActivity(_ context.Context, caller Caller, input ActivityInput) (Activity, error) {
@@ -245,6 +245,9 @@ func (b Billing) Summary() string {
 }
 
 func (t builtinTools) getBilling(_ context.Context, caller Caller, input WorkspaceInput) (Billing, error) {
+	if t.services.BillingOff {
+		return Billing{}, &ToolError{Code: "not_found", Message: "Billing is off on this control plane. It is self-hosted, with every feature free."}
+	}
 	workspace, member, err := t.workspace(caller, input.Workspace)
 	if err != nil {
 		return Billing{}, err

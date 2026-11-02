@@ -42,7 +42,7 @@ func withScope[In, Out any](scope string, tool ToolFunc[In, Out]) mcpsdk.ToolHan
 		var empty Out
 		caller := Caller{User: ctxkeys.User(ctx), Token: ctxkeys.APIToken(ctx)}
 		if caller.User == nil || caller.Token == nil {
-			return nil, empty, &ToolError{Code: "unauthenticated", Message: "Send a personal API token as Authorization: Bearer pat_..."}
+			return nil, empty, &ToolError{Code: "unauthenticated", Message: "Send a personal API token, which starts with pat_, as Authorization: Bearer <token>."}
 		}
 		if !caller.Token.HasScope(scope) {
 			return nil, empty, &ToolError{Code: "insufficient_scope", Message: "This API token needs the " + scope + " scope. Use a token with read and write access."}

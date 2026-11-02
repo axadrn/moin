@@ -276,6 +276,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Invitations:   invitationLimiter,
 		Servers:       app.ServerService,
 		Apps:          app.AppService,
+		BillingOff:    !app.Cfg.Billing,
 	})
 	mux.Handle("/mcp", mcp.Handler(mcpServer))
 	mux.HandleFunc("/api/", middleware.APINotFound)

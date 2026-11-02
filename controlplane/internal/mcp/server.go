@@ -38,6 +38,9 @@ type Services struct {
 	Invitations *middleware.RateLimiter
 	Servers     *service.ServerService
 	Apps        *service.AppService
+	// BillingOff is set on a self-hosted control plane, BILLING=false:
+	// get_billing says so, like the JSON API.
+	BillingOff bool
 }
 
 // NewServer returns the MCP server with every built-in tool registered.
@@ -66,7 +69,7 @@ func Handler(server *mcpsdk.Server) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if ctxkeys.APIToken(r.Context()) == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="mcp"`)
-			api.Error(w, http.StatusUnauthorized, "unauthenticated", "Send a personal API token as Authorization: Bearer pat_....")
+			api.Error(w, http.StatusUnauthorized, "unauthenticated", "Send a personal API token, which starts with pat_, as Authorization: Bearer <token>.")
 			return
 		}
 		streamable.ServeHTTP(w, r)
