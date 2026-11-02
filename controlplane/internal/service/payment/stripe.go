@@ -253,11 +253,14 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 		return fmt.Errorf("subscription has no items")
 	}
 
+	// A price ops does not sell must not open a paid plan.
 	priceID := subscription.Items.Data[0].Price.ID
 	planID := s.getLocalPlanID(priceID)
-	if planID != "" {
-		sub.PlanID = planID
+	if planID == "" {
+		slog.Warn("stripe subscription has an unknown price, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "price_id", priceID)
+		return nil
 	}
+	sub.PlanID = planID
 
 	sub.Provider = model.ProviderStripe
 	sub.ProviderSubscriptionID = &subscription.ID
@@ -318,11 +321,14 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 	}
 
 	if len(subscription.Items.Data) > 0 {
+		// A price ops does not sell leaves plan and status as they are.
 		priceID := subscription.Items.Data[0].Price.ID
 		planID := s.getLocalPlanID(priceID)
-		if planID != "" {
-			sub.PlanID = planID
+		if planID == "" {
+			slog.Warn("stripe subscription has an unknown price, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "price_id", priceID)
+			return nil
 		}
+		sub.PlanID = planID
 
 		amount := int(subscription.Items.Data[0].Price.UnitAmount)
 		sub.Amount = &amount
@@ -455,7 +461,12 @@ func (s *StripeProvider) getStripePriceID(planID, interval string) string {
 	}
 }
 
+// getLocalPlanID answers the plan of a configured price, or "" for any
+// other price. An empty price never matches a price left unset.
 func (s *StripeProvider) getLocalPlanID(priceID string) string {
+	if priceID == "" {
+		return ""
+	}
 	switch priceID {
 	case s.cfg.StripePriceIDProMonthly, s.cfg.StripePriceIDProYearly:
 		return model.SubscriptionPlanPro

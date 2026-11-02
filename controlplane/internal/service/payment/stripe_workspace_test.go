@@ -66,3 +66,39 @@ func TestStripePeriodEndComesFromTheItemSinceBasil(t *testing.T) {
 		t.Fatalf("older payload: end = %d, want the subscription's", end)
 	}
 }
+
+// TestStripeUnknownPriceKeepsThePlan: a subscription for a price ops does
+// not sell, or with no price, neither opens nor changes a plan.
+func TestStripeUnknownPriceKeepsThePlan(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-unknown-price"})
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	provider := &StripeProvider{cfg: &config.Config{StripePriceIDProMonthly: "price_pro"}, subscriptionService: subscriptions}
+	before, err := subscriptions.Subscription(fixture.Workspace.ID)
+	if err != nil {
+		t.Fatalf("Subscription() error = %v", err)
+	}
+
+	for _, price := range []string{"price_other", ""} {
+		payload, _ := json.Marshal(map[string]any{
+			"id":       "sub-unknown",
+			"customer": "stripe-customer-2",
+			"status":   "active",
+			"metadata": map[string]string{"workspace_id": fixture.Workspace.ID},
+			"items": map[string]any{"data": []any{map[string]any{
+				"current_period_end": 1800000000,
+				"price":              map[string]any{"id": price, "unit_amount": 100, "currency": "usd", "recurring": map[string]string{"interval": "month"}},
+			}}},
+		})
+		if err := provider.handleSubscriptionCreated(payload); err != nil {
+			t.Fatalf("handleSubscriptionCreated(%q) error = %v", price, err)
+		}
+		after, err := subscriptions.Subscription(fixture.Workspace.ID)
+		if err != nil {
+			t.Fatalf("Subscription() error = %v", err)
+		}
+		if after.PlanID != before.PlanID || after.Status != before.Status || after.ProviderSubscriptionID != nil {
+			t.Fatalf("price %q changed the subscription: %#v", price, after)
+		}
+	}
+}
