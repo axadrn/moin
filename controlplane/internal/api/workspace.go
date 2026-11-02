@@ -114,10 +114,19 @@ type WorkspaceEvent struct {
 	TargetID    string  `json:"target_id"`
 	Metadata    string  `json:"metadata"`
 	// Actor and Summary read as a sentence: "ada@example.com deployed
-	// blog v12". Via is web, api, mcp, hook or github.
-	Actor     string    `json:"actor"`
-	Summary   string    `json:"summary"`
-	Via       string    `json:"via"`
+	// blog v12". Via is web, cli, tui, api, mcp, hook, github or system;
+	// Token is the API token it came with, by name.
+	Actor   string `json:"actor"`
+	Summary string `json:"summary"`
+	Via     string `json:"via"`
+	Token   string `json:"token"`
+	// App and Server are what the change touched, by name.
+	App    string `json:"app"`
+	Server string `json:"server"`
+	// IP and UserAgent are of the member's request, for admins only.
+	IP        string `json:"ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+	// CreatedAt is in UTC with full precision.
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -240,7 +249,7 @@ func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.workspaces.UpdateName(ctxkeys.WorkspaceMember(r.Context()), workspace, request.Name)
+	err := h.workspaces.UpdateName(ctxkeys.WorkspaceMember(r.Context()), workspace, request.Name, source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -260,7 +269,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), request.Email, request.Role, via(r))
+	err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), request.Email, request.Role, source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -270,7 +279,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 
 // ResendInvitation sends a pending invitation again.
 func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) {
-	err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), via(r))
+	err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -280,7 +289,7 @@ func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Reque
 
 // RevokeInvitation revokes a pending invitation.
 func (h *WorkspaceHandler) RevokeInvitation(w http.ResponseWriter, r *http.Request) {
-	err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()).ID, r.PathValue("invitationID"), via(r))
+	err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()).ID, r.PathValue("invitationID"), source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -296,7 +305,7 @@ func (h *WorkspaceHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.workspaces.ChangeRole(member, member.WorkspaceID, memberID, request.Role)
+	err := h.workspaces.ChangeRole(member, member.WorkspaceID, memberID, request.Role, source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -318,7 +327,7 @@ func (h *WorkspaceHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 // RemoveMember removes a member from the workspace.
 func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	member := ctxkeys.WorkspaceMember(r.Context())
-	err := h.workspaces.RemoveMember(member, member.WorkspaceID, r.PathValue("memberID"))
+	err := h.workspaces.RemoveMember(member, member.WorkspaceID, r.PathValue("memberID"), source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -328,7 +337,7 @@ func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) 
 
 // Leave removes the user from the workspace.
 func (h *WorkspaceHandler) Leave(w http.ResponseWriter, r *http.Request) {
-	err := h.workspaces.Leave(ctxkeys.Workspace(r.Context()).ID, ctxkeys.User(r.Context()).ID)
+	err := h.workspaces.Leave(ctxkeys.Workspace(r.Context()).ID, ctxkeys.User(r.Context()).ID, source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -363,7 +372,9 @@ func (h *WorkspaceHandler) Activity(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = parsed
 	}
-	page, err := NewActivityPage(h.workspaces, ctxkeys.WorkspaceMember(r.Context()), r.URL.Query().Get("cursor"), limit)
+	query := r.URL.Query()
+	filter := model.ActivityFilter{App: query.Get("app"), Server: query.Get("server"), User: query.Get("user")}
+	page, err := NewActivityPage(h.workspaces, ctxkeys.WorkspaceMember(r.Context()), filter, query.Get("cursor"), limit)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -371,12 +382,12 @@ func (h *WorkspaceHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, page)
 }
 
-// NewActivityPage loads up to limit events of the member's workspace, newest
-// first, after the event cursor points to. An empty cursor starts with the
+// NewActivityPage loads up to limit events of the member's workspace that
+// match the filter, newest first, after the event cursor points to. An empty cursor starts with the
 // newest event. Members who may not view the audit log get
 // ErrActivityPermission. A cursor that does not decode or no longer exists
 // returns ErrInvalidCursor.
-func NewActivityPage(workspaces *service.WorkspaceService, member *model.WorkspaceMember, cursor string, limit int) (ActivityPage, error) {
+func NewActivityPage(workspaces *service.WorkspaceService, member *model.WorkspaceMember, filter model.ActivityFilter, cursor string, limit int) (ActivityPage, error) {
 	if !member.Can(model.WorkspacePermissionViewAuditLog) {
 		return ActivityPage{}, ErrActivityPermission
 	}
@@ -389,16 +400,17 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 		afterID = string(decoded)
 	}
 
-	events, next, err := workspaces.AuditEventsPage(member.WorkspaceID, afterID, limit)
+	events, next, err := workspaces.AuditEventsPage(member.WorkspaceID, filter, afterID, limit)
 	if errors.Is(err, repository.ErrAuditCursorNotFound) {
 		return ActivityPage{}, ErrInvalidCursor
 	}
 	if err != nil {
 		return ActivityPage{}, err
 	}
+	admin := member.Can(model.WorkspacePermissionManageMembers)
 	page := ActivityPage{Items: make([]WorkspaceEvent, 0, len(events))}
 	for _, event := range events {
-		page.Items = append(page.Items, WorkspaceEvent{
+		item := WorkspaceEvent{
 			ID:          event.ID,
 			ActorUserID: event.ActorUserID,
 			ActorEmail:  event.ActorEmail,
@@ -408,9 +420,16 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 			Metadata:    event.Metadata,
 			Actor:       event.Actor(),
 			Summary:     event.Summary(),
-			Via:         event.Via(),
+			Via:         event.Via,
+			Token:       event.TokenName,
+			App:         event.App,
+			Server:      event.Server,
 			CreatedAt:   event.CreatedAt.UTC(),
-		})
+		}
+		if admin {
+			item.IP, item.UserAgent = event.IP, event.UserAgent
+		}
+		page.Items = append(page.Items, item)
 	}
 	if next != "" {
 		nextCursor := base64.RawURLEncoding.EncodeToString([]byte(next))

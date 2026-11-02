@@ -2854,7 +2854,22 @@ paths:
             default: 50
         - name: cursor
           in: query
-          description: The `next_cursor` of the previous page.
+          description: The `next_cursor` of the previous page. Keep the same filters.
+          schema:
+            type: string
+        - name: app
+          in: query
+          description: Only events of this app, by name.
+          schema:
+            type: string
+        - name: server
+          in: query
+          description: Only events of this server and of the apps on it, by name.
+          schema:
+            type: string
+        - name: user
+          in: query
+          description: Only events of this member, by email or user ID.
           schema:
             type: string
       security:
@@ -2903,7 +2918,22 @@ paths:
             default: 50
         - name: cursor
           in: query
-          description: The `next_cursor` of the previous page.
+          description: The `next_cursor` of the previous page. Keep the same filters.
+          schema:
+            type: string
+        - name: app
+          in: query
+          description: Only events of this app, by name.
+          schema:
+            type: string
+        - name: server
+          in: query
+          description: Only events of this server and of the apps on it, by name.
+          schema:
+            type: string
+        - name: user
+          in: query
+          description: Only events of this member, by email or user ID.
           schema:
             type: string
       security:
@@ -4554,7 +4584,7 @@ components:
           $ref: '#/components/schemas/WorkspaceRole'
     WorkspaceEvent:
       type: object
-      required: [id, actor_user_id, actor_email, action, target_type, target_id, metadata, actor, summary, via, created_at]
+      required: [id, actor_user_id, actor_email, action, target_type, target_id, metadata, actor, summary, via, token, app, server, created_at]
       properties:
         id:
           type: string
@@ -4571,7 +4601,7 @@ components:
           type: string
         metadata:
           type: string
-          description: 'JSON text with details of the event, such as `{"number":"12","ref":"main","via":"api"}`. Env values and passwords are never in it; a SQL write has its SQL.'
+          description: 'JSON text with details of the event, such as `{"number":"12","ref":"main"}`, and settings before and after, such as `{"from":"member","to":"admin"}`. Env values, secrets, tokens, passwords, SQL text and row contents are never in it; a SQL write has the kind of statement, its tables and the row count.'
         actor:
           type: string
           description: The member's email, or `GitHub`, `A deploy hook` or `ops` for changes without a member.
@@ -4582,11 +4612,27 @@ components:
           examples: [deployed blog v12 from main at 3f2a9c1]
         via:
           type: string
-          enum: [web, api, mcp, hook, github, '']
-          description: How the change came in. `api` is the CLI, the TUI and scripts with an API token. Empty for workspace events.
+          enum: [web, cli, tui, api, mcp, hook, github, system, '']
+          description: How the change came in. `system` is ops itself, such as a deploy that ended or a restore drill. Events from before the CLI and TUI were told apart say `api` for them. Empty for some older events.
+        token:
+          type: string
+          description: The name of the API token the change came with, empty without one.
+        app:
+          type: string
+          description: The app the change touched, by name, empty for none.
+        server:
+          type: string
+          description: The server the change touched, or the server of the app, by name.
+        ip:
+          type: string
+          description: The client IP of the member's request. Only for admins and owners.
+        user_agent:
+          type: string
+          description: The user agent of the member's request. Only for admins and owners.
         created_at:
           type: string
           format: date-time
+          description: When it happened, RFC 3339 in UTC with full precision.
     ActivityPage:
       type: object
       required: [items, next_cursor]

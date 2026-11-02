@@ -160,7 +160,7 @@ func (s *AppService) Delete(ctx context.Context, actor Actor, idOrName string) e
 	if err != nil {
 		return err
 	}
-	s.servers.record(actor, "app.deleted", "app", app.Name, nil)
+	s.servers.record(actor, "app.deleted", "app", app.Name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
 	return nil
 }
@@ -218,7 +218,7 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 	if err != nil {
 		return app, nil, err
 	}
-	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Via: "hook"}, app.ID, image)
+	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image)
 	return app, deploy, err
 }
 
@@ -451,6 +451,7 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 	if slices.Equal(clean, app.DomainList()) && canonical == app.Canonical {
 		return nil, false, nil
 	}
+	before := strings.Join(app.DomainList(), ", ")
 	body, _ := json.Marshal(clean)
 	err = s.apps.SetRouting(app.ID, string(body), canonical)
 	if err != nil {
@@ -458,7 +459,7 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 	}
 	app.Domains = string(body)
 	s.syncTunnelOf(app)
-	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"domains": strings.Join(clean, ", "), "canonical": canonical})
+	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"from": before, "domains": strings.Join(clean, ", "), "canonical": canonical})
 	deploy, err = s.applyIfLive(actor, app)
 	return deploy, true, err
 }
@@ -851,6 +852,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 	if err != nil {
 		slog.Error("store deploy result failed", "error", err, "deploy_id", deployID)
 	}
+	s.recordFinished(deployID, status, done.Error)
 	if live != nil {
 		s.mu.Lock()
 		for follower := range live.followers {
@@ -869,6 +871,29 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 			}
 		}
 	}
+}
+
+// recordFinished writes how a deploy ended to the activity, as ops itself:
+// its number, how long it took and, for a failed one, why.
+func (s *AppService) recordFinished(deployID, status, failure string) {
+	deploy, err := s.apps.DeployByID(deployID)
+	if err != nil {
+		return
+	}
+	app, err := s.apps.ByID(deploy.AppID)
+	if err != nil {
+		return
+	}
+	details := map[string]string{
+		"number":   strconv.Itoa(deploy.Number),
+		"duration": s.now().Sub(deploy.CreatedAt).Round(time.Second).String(),
+	}
+	action := "deploy.succeeded"
+	if status != model.DeploySucceeded {
+		action = "deploy.failed"
+		details["error"] = clipText(failure, 300)
+	}
+	s.servers.record(System(app.WorkspaceID), action, "app", app.Name, details)
 }
 
 // reportFinished writes the commit status of a finished deploy that came
@@ -1081,13 +1106,4 @@ func clipText(value string, limit int) string {
 		return value[:limit]
 	}
 	return value
-}
-
-// Actor is who changes something in a workspace: a member through the web,
-// the CLI or an agent, or GitHub for a push. Via names the way in: web, api,
-// mcp, hook or github.
-type Actor struct {
-	WorkspaceID string
-	UserID      string
-	Via         string
 }

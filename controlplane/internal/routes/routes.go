@@ -289,6 +289,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.NonceMiddleware,
 		securityHeaders,
 		middleware.RequestLogging(app.Cfg.LogHTTP, clientIPs),
+		middleware.Client(clientIPs),
 		middleware.CORS(app.Cfg.CORSAllowedOrigins),
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),

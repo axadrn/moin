@@ -56,6 +56,9 @@ type AppRepository interface {
 	GitHubInstallations(workspaceID string) ([]model.GitHubInstallation, error)
 	AddGitHubInstallation(installation model.GitHubInstallation) error
 	DeleteGitHubInstallation(installationID int64) error
+	// GitHubInstallation returns an installation with the apps linked
+	// through it.
+	GitHubInstallation(installationID int64) (*model.GitHubInstallation, []model.App, error)
 	SetRepo(appID, repo, branch string, autoDeploy bool, installationID int64) error
 	AppsForPush(installationID int64, repo, branch string) ([]model.App, error)
 
@@ -348,6 +351,17 @@ func (r *appRepository) AddGitHubInstallation(installation model.GitHubInstallat
 
 // DeleteGitHubInstallation forgets an installation and unlinks the apps
 // that followed one of its repos.
+func (r *appRepository) GitHubInstallation(installationID int64) (*model.GitHubInstallation, []model.App, error) {
+	installation := &model.GitHubInstallation{}
+	err := r.db.Get(installation, `SELECT * FROM github_installations WHERE installation_id = $1`, installationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	apps := []model.App{}
+	err = r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1`, installationID)
+	return installation, apps, err
+}
+
 func (r *appRepository) DeleteGitHubInstallation(installationID int64) error {
 	_, err := r.db.Exec(`UPDATE apps SET repo = '', branch = '', auto_deploy = 0, installation_id = 0 WHERE installation_id = $1`, installationID)
 	if err != nil {

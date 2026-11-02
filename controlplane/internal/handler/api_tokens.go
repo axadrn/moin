@@ -27,6 +27,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	input, form := parseAPITokenForm(r)
 	if len(form.Errors) == 0 {
+		input.Source = service.RequestSource(r.Context())
 		token, raw, err := h.tokens.Create(user.ID, input)
 		if err == nil {
 			slog.Info("api token created", "token_id", token.ID, "user_id", user.ID)
@@ -67,7 +68,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	tokenID := r.PathValue("id")
-	err := h.tokens.Revoke(user.ID, tokenID)
+	err := h.tokens.Revoke(user.ID, tokenID, service.RequestSource(r.Context()))
 	switch {
 	case errors.Is(err, repository.ErrAPITokenNotFound):
 		toastError(w, r, "Token not found", "That token was already revoked.")

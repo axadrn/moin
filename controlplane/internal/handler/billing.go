@@ -98,7 +98,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if h.workspaceService != nil {
-		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.checkout_started"); err != nil {
+		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.checkout_started", service.RequestSource(r.Context())); err != nil {
 			slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspace.ID)
 		}
 	}
@@ -154,7 +154,7 @@ func (h *BillingHandler) BillingManagement(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.workspaceService != nil {
-		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.management_opened"); err != nil {
+		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.management_opened", service.RequestSource(r.Context())); err != nil {
 			slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspace.ID)
 		}
 	}

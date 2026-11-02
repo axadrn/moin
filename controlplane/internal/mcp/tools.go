@@ -46,7 +46,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "list_activity",
 		Title:       "List workspace activity",
-		Description: "Lists the activity of a workspace, newest first: who did what, when and how (web, api, mcp, hook or github), with a summary sentence per event. It covers deploys, rollbacks, redeploys, restores, snapshots, SQL writes and row edits, env keys (never values), domains, passwords, registries, the bucket, GitHub, servers, security and member changes. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Every member may view it. Needs the read scope.",
+		Description: "Lists the activity of a workspace, newest first: who did what, when (RFC 3339, UTC, full precision) and how (via web, cli, tui, api, mcp, hook, github or system, and the API token by name), with a summary sentence and the app and server per event. It covers deploys and how they ended, rollbacks, redeploys, restarts, stops, restores, snapshots, SQL writes and row edits, env keys (never values), domains, passwords, deploy hooks, registries, the bucket, GitHub, servers, security, API tokens, billing and member changes. Filter with app, server or user (email). Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Admins also get the client IP and user agent. Every member may view it. Needs the read scope.",
 		Annotations: readOnly("List workspace activity"),
 	}, Read(tools.listActivity))
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
@@ -207,6 +207,9 @@ type ActivityInput struct {
 	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
 	Limit     int    `json:"limit,omitempty" jsonschema:"number of events, 1 to 200; default 50"`
 	Cursor    string `json:"cursor,omitempty" jsonschema:"next_cursor of the previous page; leave empty for the newest events"`
+	App       string `json:"app,omitempty" jsonschema:"only events of this app, by name"`
+	Server    string `json:"server,omitempty" jsonschema:"only events of this server and its apps, by name"`
+	User      string `json:"user,omitempty" jsonschema:"only events of this member, by email or user ID"`
 }
 
 // Activity is the output of list_activity.
@@ -217,7 +220,11 @@ type Activity struct {
 func (a Activity) Summary() string {
 	lines := []string{}
 	for _, event := range a.Items {
-		lines = append(lines, fmt.Sprintf("%s %s %s.", event.CreatedAt.Format(time.RFC3339), event.Actor, event.Summary))
+		via := event.Via
+		if event.Token != "" {
+			via += ", token " + event.Token
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s (%s).", event.CreatedAt.Format(time.RFC3339), event.Actor, event.Summary, via))
 	}
 	more := "This is the last page."
 	if a.NextCursor != nil {
@@ -238,7 +245,7 @@ func (t builtinTools) listActivity(_ context.Context, caller Caller, input Activ
 	if err != nil {
 		return Activity{}, err
 	}
-	page, err := api.NewActivityPage(t.services.Workspaces, member, input.Cursor, limit)
+	page, err := api.NewActivityPage(t.services.Workspaces, member, model.ActivityFilter{App: input.App, Server: input.Server, User: input.User}, input.Cursor, limit)
 	if err != nil {
 		return Activity{}, err
 	}
@@ -304,7 +311,7 @@ func (t builtinTools) inviteMember(_ context.Context, caller Caller, input Invit
 	if member.Can(model.WorkspacePermissionManageMembers) && !t.services.Invitations.Allow(member.WorkspaceID+":"+member.UserID) {
 		return Invitation{}, &ToolError{Code: "rate_limited", Message: "Too many invitations. Try again in an hour."}
 	}
-	err = t.services.Workspaces.Invite(member, workspace, input.Email, input.Role, "mcp")
+	err = t.services.Workspaces.Invite(member, workspace, input.Email, input.Role, caller.Source)
 	if err != nil {
 		return Invitation{}, err
 	}
@@ -331,7 +338,7 @@ func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input Re
 	if err != nil {
 		return RenamedWorkspace{}, err
 	}
-	err = t.services.Workspaces.UpdateName(member, workspace, input.Name)
+	err = t.services.Workspaces.UpdateName(member, workspace, input.Name, caller.Source)
 	if err != nil {
 		return RenamedWorkspace{}, err
 	}
@@ -370,7 +377,7 @@ func (t builtinTools) resendInvitation(_ context.Context, caller Caller, input I
 	if !t.services.Invitations.Allow(member.WorkspaceID + ":" + member.UserID) {
 		return InvitationChange{}, &ToolError{Code: "rate_limited", Message: "Too many invitations. Try again in an hour."}
 	}
-	err = t.services.Workspaces.ResendInvitation(member, workspace, invitation.ID, "mcp")
+	err = t.services.Workspaces.ResendInvitation(member, workspace, invitation.ID, caller.Source)
 	if err != nil {
 		return InvitationChange{}, err
 	}
@@ -382,7 +389,7 @@ func (t builtinTools) revokeInvitation(_ context.Context, caller Caller, input I
 	if err != nil {
 		return InvitationChange{}, err
 	}
-	err = t.services.Workspaces.RevokeInvitation(member, workspace.ID, invitation.ID, "mcp")
+	err = t.services.Workspaces.RevokeInvitation(member, workspace.ID, invitation.ID, caller.Source)
 	if err != nil {
 		return InvitationChange{}, err
 	}

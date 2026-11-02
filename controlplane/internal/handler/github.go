@@ -45,7 +45,7 @@ func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
-	_, err = h.apps.ConnectGitHub(r.Context(), service.Actor{UserID: user.ID, Via: "web"}, installationID, r.URL.Query().Get("state"))
+	_, err = h.apps.ConnectGitHub(r.Context(), service.Actor{UserID: user.ID, Source: service.RequestSource(r.Context())}, installationID, r.URL.Query().Get("state"))
 	if err != nil {
 		slog.Warn("github setup failed", "user_id", user.ID, "error", err)
 		w.WriteHeader(http.StatusBadRequest)

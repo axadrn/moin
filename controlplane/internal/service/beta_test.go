@@ -114,7 +114,7 @@ func TestSelfHostedClosedSignupIsPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := environment.workspaceService.Invite(member, workspace, "mate@example.com", model.WorkspaceRoleMember, "web"); err != nil {
+	if err := environment.workspaceService.Invite(member, workspace, "mate@example.com", model.WorkspaceRoleMember, Source{Via: "web"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := environment.auth.SendMagicLink("mate@example.com"); err != nil {

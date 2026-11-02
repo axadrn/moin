@@ -96,6 +96,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Scopes:        request.Scopes,
 		ExpiresInDays: expiresInDays,
 		WorkspaceID:   request.WorkspaceID,
+		Source:        source(r),
 	})
 	if err != nil {
 		ServiceError(w, err)
@@ -109,7 +110,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	tokenID := r.PathValue("id")
-	err := h.tokens.Revoke(user.ID, tokenID)
+	err := h.tokens.Revoke(user.ID, tokenID, service.RequestSource(r.Context()))
 	if err != nil {
 		ServiceError(w, err)
 		return

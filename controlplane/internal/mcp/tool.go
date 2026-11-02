@@ -18,6 +18,9 @@ import (
 type Caller struct {
 	User  *model.User
 	Token *model.APIToken
+	// Source is how the call came in, for the activity: MCP, the token by
+	// name, the client IP and user agent.
+	Source service.Source
 }
 
 // ToolFunc is the body of a tool. It gets the caller and the decoded input
@@ -40,7 +43,8 @@ func Write[In, Out any](tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
 func withScope[In, Out any](scope string, tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
 	return func(ctx context.Context, _ *mcpsdk.CallToolRequest, input In) (*mcpsdk.CallToolResult, Out, error) {
 		var empty Out
-		caller := Caller{User: ctxkeys.User(ctx), Token: ctxkeys.APIToken(ctx)}
+		caller := Caller{User: ctxkeys.User(ctx), Token: ctxkeys.APIToken(ctx), Source: service.RequestSource(ctx)}
+		caller.Source.Via = service.ViaMCP
 		if caller.User == nil || caller.Token == nil {
 			return nil, empty, &ToolError{Code: "unauthenticated", Message: "Send a personal API token, which starts with pat_, as Authorization: Bearer <token>."}
 		}
@@ -114,5 +118,5 @@ func toolError(err error) error {
 
 // actor is the token's user in the token's workspace, through MCP.
 func (c Caller) actor() service.Actor {
-	return service.Actor{WorkspaceID: c.Token.WorkspaceID, UserID: c.User.ID, Via: "mcp"}
+	return service.Actor{WorkspaceID: c.Token.WorkspaceID, UserID: c.User.ID, Source: c.Source}
 }

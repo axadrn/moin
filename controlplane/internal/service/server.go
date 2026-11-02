@@ -184,6 +184,7 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 		return nil, "", err
 	}
 	slog.Info("agent registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
+	s.record(System(server.WorkspaceID), "server.installed", "server", server.Name, map[string]string{"hostname": hello.Hostname, "os": hello.OS, "arch": hello.Arch, "version": hello.AgentVersion})
 	s.notify(server.WorkspaceID)
 	return server, raw, nil
 }

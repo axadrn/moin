@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/axadrn/ops/protocol"
@@ -205,7 +206,7 @@ func (s *AppService) GitHubPush(ctx context.Context, installationID int64, repo,
 			slog.Info("auto deploy skipped", "app_id", app.ID, "repo", repo, "error", err)
 			continue
 		}
-		deploy, err := s.DeployRef(ctx, Actor{WorkspaceID: app.WorkspaceID, Via: "github"}, app.ID, sha)
+		deploy, err := s.DeployRef(ctx, Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaGitHub}}, app.ID, sha)
 		if err != nil {
 			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)
 			continue
@@ -216,7 +217,21 @@ func (s *AppService) GitHubPush(ctx context.Context, installationID int64, repo,
 
 // GitHubUninstalled forgets an installation and unlinks its apps.
 func (s *AppService) GitHubUninstalled(installationID int64) error {
-	return s.apps.DeleteGitHubInstallation(installationID)
+	installation, apps, err := s.apps.GitHubInstallation(installationID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	err = s.apps.DeleteGitHubInstallation(installationID)
+	if err != nil || installation == nil {
+		return err
+	}
+	actor := Actor{WorkspaceID: installation.WorkspaceID, Source: Source{Via: ViaGitHub}}
+	s.servers.record(actor, "github.disconnected", "github", installation.Account, nil)
+	for _, app := range apps {
+		s.servers.record(actor, "repo.unlinked", "app", app.Name, map[string]string{"repo": app.Repo, "branch": app.Branch})
+	}
+	s.notify(installation.WorkspaceID)
+	return nil
 }
 
 // VerifyGitHubWebhook checks the signature of a webhook body.

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -28,7 +27,9 @@ type WorkspaceInvitationRepository interface {
 	ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error)
 	ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error)
 	Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error
-	Accept(tokenHash, userID, email, memberID, auditID, via string, now time.Time) (*model.WorkspaceMember, error)
+	// Accept makes the user a member. event is the activity of it; Accept fills
+	// in its workspace and invitation.
+	Accept(tokenHash, userID, email, memberID string, event *model.WorkspaceAuditEvent, now time.Time) (*model.WorkspaceMember, error)
 }
 
 type workspaceInvitationRepository struct {
@@ -152,7 +153,8 @@ func (r *workspaceInvitationRepository) Revoke(workspaceID, invitationID string,
 }
 
 func (r *workspaceInvitationRepository) Accept(
-	tokenHash, userID, email, memberID, auditID, via string,
+	tokenHash, userID, email, memberID string,
+	event *model.WorkspaceAuditEvent,
 	now time.Time,
 ) (*model.WorkspaceMember, error) {
 	var workspaceID string
@@ -249,21 +251,7 @@ func (r *workspaceInvitationRepository) Accept(
 	if acceptedRows != 1 {
 		return nil, ErrWorkspaceInvitationUsed
 	}
-	actorUserID := userID
-	event := &model.WorkspaceAuditEvent{
-		ID:          auditID,
-		WorkspaceID: workspaceID,
-		ActorUserID: &actorUserID,
-		Action:      "workspace.invitation.accepted",
-		TargetType:  "workspace_invitation",
-		TargetID:    invitation.ID,
-		Metadata:    "{}",
-		CreatedAt:   now,
-	}
-	if via != "" {
-		metadata, _ := json.Marshal(map[string]string{"via": via})
-		event.Metadata = string(metadata)
-	}
+	event.WorkspaceID, event.TargetType, event.TargetID = workspaceID, "workspace_invitation", invitation.ID
 	if err := insertAuditEvent(tx, event); err != nil {
 		return nil, err
 	}
@@ -271,12 +259,4 @@ func (r *workspaceInvitationRepository) Accept(
 		return nil, err
 	}
 	return member, nil
-}
-
-func insertAuditEvent(tx *sqlx.Tx, event *model.WorkspaceAuditEvent) error {
-	_, err := tx.Exec(`
-		INSERT INTO workspace_audit_events (id, workspace_id, actor_user_id, action, target_type, target_id, metadata, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, event.ID, event.WorkspaceID, event.ActorUserID, event.Action, event.TargetType, event.TargetID, event.Metadata, event.CreatedAt)
-	return err
 }

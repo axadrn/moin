@@ -19,8 +19,8 @@ import (
 
 // owner and other are members of their own workspaces.
 var (
-	owner = Actor{WorkspaceID: "workspace-owner", UserID: "owner", Via: "web"}
-	other = Actor{WorkspaceID: "workspace-other", UserID: "other", Via: "web"}
+	owner = Actor{WorkspaceID: "workspace-owner", UserID: "owner", Source: Source{Via: ViaWeb}}
+	other = Actor{WorkspaceID: "workspace-other", UserID: "other", Source: Source{Via: ViaWeb}}
 )
 
 // testUpload is an upload ID and SHA-256 as the CLI sends them.

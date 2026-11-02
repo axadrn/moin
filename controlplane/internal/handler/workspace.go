@@ -64,15 +64,21 @@ func (h *WorkspaceHandler) ActivityPage(w http.ResponseWriter, r *http.Request) 
 		render(w, r, pages.ErrorPage(http.StatusForbidden, "Access denied", "You do not have permission to view workspace activity."))
 		return
 	}
-	after := r.URL.Query().Get("after")
-	events, next, err := h.workspaces.AuditEventsPage(member.WorkspaceID, after, 50)
+	query := r.URL.Query()
+	after := query.Get("after")
+	filter := model.ActivityFilter{App: query.Get("app"), Server: query.Get("server"), User: query.Get("user")}
+	events, next, err := h.workspaces.AuditEventsPage(member.WorkspaceID, filter, after, 50)
+	var choices model.ActivityChoices
+	if err == nil && after == "" {
+		choices, err = h.workspaces.ActivityChoices(member.WorkspaceID)
+	}
 	if err != nil {
 		slog.Error("activity could not be loaded", "error", err, "workspace_id", member.WorkspaceID)
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Activity unavailable", "Workspace activity could not be loaded. Please try again."))
 		return
 	}
-	view := pages.ActivityView{Events: events, Next: next}
+	view := pages.ActivityView{Events: events, Next: next, Filter: filter, Choices: choices, Admin: member.Can(model.WorkspacePermissionManageMembers)}
 	if after != "" {
 		render(w, r, pages.ActivityRows(view))
 		return
@@ -81,7 +87,7 @@ func (h *WorkspaceHandler) ActivityPage(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
-	if err := h.workspaces.UpdateName(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("name")); err != nil {
+	if err := h.workspaces.UpdateName(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("name"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Name not saved", err)
 		return
 	}
@@ -89,7 +95,7 @@ func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
-	if err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("email"), r.FormValue("role"), "web"); err != nil {
+	if err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("email"), r.FormValue("role"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Invitation not sent", err)
 		return
 	}
@@ -97,7 +103,7 @@ func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) {
-	if err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), "web"); err != nil {
+	if err := h.workspaces.ResendInvitation(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.PathValue("invitationID"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Invitation not sent", err)
 		return
 	}
@@ -106,7 +112,7 @@ func (h *WorkspaceHandler) ResendInvitation(w http.ResponseWriter, r *http.Reque
 
 func (h *WorkspaceHandler) RevokeInvitation(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	if err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), workspace.ID, r.PathValue("invitationID"), "web"); err != nil {
+	if err := h.workspaces.RevokeInvitation(ctxkeys.WorkspaceMember(r.Context()), workspace.ID, r.PathValue("invitationID"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Invitation not revoked", err)
 		return
 	}
@@ -115,7 +121,7 @@ func (h *WorkspaceHandler) RevokeInvitation(w http.ResponseWriter, r *http.Reque
 
 func (h *WorkspaceHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 	member := ctxkeys.WorkspaceMember(r.Context())
-	if err := h.workspaces.ChangeRole(member, member.WorkspaceID, r.PathValue("memberID"), r.FormValue("role")); err != nil {
+	if err := h.workspaces.ChangeRole(member, member.WorkspaceID, r.PathValue("memberID"), r.FormValue("role"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Role not changed", err)
 		return
 	}
@@ -125,7 +131,7 @@ func (h *WorkspaceHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	member := ctxkeys.WorkspaceMember(r.Context())
 	memberID := r.PathValue("memberID")
-	if err := h.workspaces.RemoveMember(member, member.WorkspaceID, memberID); err != nil {
+	if err := h.workspaces.RemoveMember(member, member.WorkspaceID, memberID, service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Member not removed", err)
 		return
 	}
@@ -139,7 +145,7 @@ func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) 
 func (h *WorkspaceHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	user := ctxkeys.User(r.Context())
-	if err := h.workspaces.Leave(workspace.ID, user.ID); err != nil {
+	if err := h.workspaces.Leave(workspace.ID, user.ID, service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "You did not leave", err)
 		return
 	}

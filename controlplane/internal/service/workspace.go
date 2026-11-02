@@ -122,7 +122,7 @@ func (s *WorkspaceService) insert(userID, name, slug string) (*model.Workspace, 
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
-	event := workspaceAuditEvent(workspaceID, userID, "workspace.created", "workspace", workspaceID, nil, now)
+	event := workspaceAuditEvent(workspaceID, userID, Source{}, "workspace.created", "workspace", workspaceID, nil, now)
 	err := s.workspaces.CreateWithOwner(workspace, member, subscription, event)
 	if errors.Is(err, repository.ErrWorkspaceSlugTaken) {
 		return nil, err
@@ -210,8 +210,8 @@ func (s *WorkspaceService) AuditEvents(workspaceID string) ([]model.WorkspaceAud
 
 // AuditEventsPage returns one page of workspace activity, newest first,
 // and the event ID to continue after, empty on the last page.
-func (s *WorkspaceService) AuditEventsPage(workspaceID, afterID string, limit int) ([]model.WorkspaceAuditEvent, string, error) {
-	events, err := s.audit.ListPage(workspaceID, afterID, limit+1)
+func (s *WorkspaceService) AuditEventsPage(workspaceID string, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, string, error) {
+	events, err := s.audit.ListPage(workspaceID, filter, afterID, limit+1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -222,7 +222,13 @@ func (s *WorkspaceService) AuditEventsPage(workspaceID, afterID string, limit in
 	return events, events[limit-1].ID, nil
 }
 
-func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *model.Workspace, name string) error {
+// ActivityChoices returns what the activity of a workspace can be filtered
+// by.
+func (s *WorkspaceService) ActivityChoices(workspaceID string) (model.ActivityChoices, error) {
+	return s.audit.Choices(workspaceID)
+}
+
+func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *model.Workspace, name string, source Source) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionManageWorkspace) {
 		return ErrWorkspacePermission
 	}
@@ -231,16 +237,16 @@ func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *m
 	}
 	name = strings.TrimSpace(name)
 	now := time.Now()
-	event := workspaceAuditEvent(workspace.ID, actor.UserID, "workspace.updated", "workspace", workspace.ID, map[string]string{"name": name}, now)
+	event := workspaceAuditEvent(workspace.ID, actor.UserID, source, "workspace.updated", "workspace", workspace.ID, map[string]string{"from": workspace.Name, "name": name}, now)
 	if err := s.workspaces.UpdateName(workspace.ID, name, now, event); err != nil {
 		return fmt.Errorf("update workspace: %w", err)
 	}
 	return nil
 }
 
-// Invite, ResendInvitation, RevokeInvitation and AcceptInvitation take via,
-// how the change came in (web, api or mcp), for the activity.
-func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model.Workspace, email, role, via string) error {
+// The changes of the team take source, how the change came in, for the
+// activity.
+func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model.Workspace, email, role string, source Source) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
@@ -289,8 +295,8 @@ func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model
 		ExpiresAt:   now.Add(7 * 24 * time.Hour),
 		CreatedAt:   now,
 	}
-	metadata := withVia(map[string]string{"email": email, "role": role}, via)
-	event := workspaceAuditEvent(workspace.ID, actor.UserID, "workspace.invitation.created", "workspace_invitation", invitation.ID, metadata, now)
+	metadata := map[string]string{"email": email, "role": role}
+	event := workspaceAuditEvent(workspace.ID, actor.UserID, source, "workspace.invitation.created", "workspace_invitation", invitation.ID, metadata, now)
 	if err := s.invitations.Create(invitation, event); err != nil {
 		return fmt.Errorf("create invitation: %w", err)
 	}
@@ -302,13 +308,13 @@ func (s *WorkspaceService) Invite(actor *model.WorkspaceMember, workspace *model
 	if err := s.email.SendWorkspaceInvitationEmail(email, token, workspace.Name, inviterName); err != nil {
 		return fmt.Errorf("send invitation: %w", err)
 	}
-	if err := s.audit.Create(workspaceAuditEvent(workspace.ID, actor.UserID, "workspace.invitation.sent", "workspace_invitation", invitation.ID, metadata, time.Now())); err != nil {
+	if err := s.audit.Create(workspaceAuditEvent(workspace.ID, actor.UserID, source, "workspace.invitation.sent", "workspace_invitation", invitation.ID, metadata, time.Now())); err != nil {
 		slog.Warn("failed to record invitation delivery", "error", err, "workspace_id", workspace.ID, "invitation_id", invitation.ID)
 	}
 	return nil
 }
 
-func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, workspace *model.Workspace, invitationID, via string) error {
+func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, workspace *model.Workspace, invitationID string, source Source) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
@@ -319,15 +325,19 @@ func (s *WorkspaceService) ResendInvitation(actor *model.WorkspaceMember, worksp
 	if invitation.AcceptedAt != nil || invitation.RevokedAt != nil {
 		return repository.ErrWorkspaceInvitationNotFound
 	}
-	return s.Invite(actor, workspace, invitation.Email, invitation.Role, via)
+	return s.Invite(actor, workspace, invitation.Email, invitation.Role, source)
 }
 
-func (s *WorkspaceService) RevokeInvitation(actor *model.WorkspaceMember, workspaceID, invitationID, via string) error {
+func (s *WorkspaceService) RevokeInvitation(actor *model.WorkspaceMember, workspaceID, invitationID string, source Source) error {
 	if actor == nil || actor.WorkspaceID != workspaceID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
 	now := time.Now()
-	event := workspaceAuditEvent(workspaceID, actor.UserID, "workspace.invitation.revoked", "workspace_invitation", invitationID, withVia(nil, via), now)
+	var metadata map[string]string
+	if invitation, err := s.invitations.ByIDForWorkspace(invitationID, workspaceID); err == nil {
+		metadata = map[string]string{"email": invitation.Email, "role": invitation.Role}
+	}
+	event := workspaceAuditEvent(workspaceID, actor.UserID, source, "workspace.invitation.revoked", "workspace_invitation", invitationID, metadata, now)
 	return s.invitations.Revoke(workspaceID, invitationID, now, event)
 }
 
@@ -348,7 +358,7 @@ func (s *WorkspaceService) WorkspaceInvitation(token string) (*model.WorkspaceIn
 	return invitation, nil
 }
 
-func (s *WorkspaceService) AcceptInvitation(token string, user *model.User, via string) (*model.Workspace, error) {
+func (s *WorkspaceService) AcceptInvitation(token string, user *model.User, source Source) (*model.Workspace, error) {
 	invitation, err := s.WorkspaceInvitation(token)
 	if err != nil {
 		return nil, err
@@ -358,8 +368,7 @@ func (s *WorkspaceService) AcceptInvitation(token string, user *model.User, via 
 		user.ID,
 		user.Email,
 		uuid.New().String(),
-		uuid.New().String(),
-		via,
+		workspaceAuditEvent("", user.ID, source, "workspace.invitation.accepted", "", "", map[string]string{"email": user.Email, "role": invitation.Role}, time.Now()),
 		time.Now(),
 	); err != nil {
 		return nil, err
@@ -367,7 +376,7 @@ func (s *WorkspaceService) AcceptInvitation(token string, user *model.User, via 
 	return s.workspaces.ByID(invitation.WorkspaceID)
 }
 
-func (s *WorkspaceService) ChangeRole(actor *model.WorkspaceMember, workspaceID, memberID, role string) error {
+func (s *WorkspaceService) ChangeRole(actor *model.WorkspaceMember, workspaceID, memberID, role string, source Source) error {
 	if actor == nil || actor.WorkspaceID != workspaceID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
@@ -375,7 +384,7 @@ func (s *WorkspaceService) ChangeRole(actor *model.WorkspaceMember, workspaceID,
 		return ErrInvalidRole
 	}
 	now := time.Now()
-	event := workspaceAuditEvent(workspaceID, actor.UserID, "workspace.member.role_changed", "workspace_member", memberID, nil, now)
+	event := workspaceAuditEvent(workspaceID, actor.UserID, source, "workspace.member.role_changed", "workspace_member", memberID, nil, now)
 	err := s.members.UpdateRole(workspaceID, actor.UserID, memberID, role, event)
 	if errors.Is(err, repository.ErrWorkspaceMemberPermission) {
 		return ErrWorkspacePermission
@@ -383,12 +392,12 @@ func (s *WorkspaceService) ChangeRole(actor *model.WorkspaceMember, workspaceID,
 	return err
 }
 
-func (s *WorkspaceService) RemoveMember(actor *model.WorkspaceMember, workspaceID, memberID string) error {
+func (s *WorkspaceService) RemoveMember(actor *model.WorkspaceMember, workspaceID, memberID string, source Source) error {
 	if actor == nil || actor.WorkspaceID != workspaceID || !actor.Can(model.WorkspacePermissionManageMembers) {
 		return ErrWorkspacePermission
 	}
 	now := time.Now()
-	event := workspaceAuditEvent(workspaceID, actor.UserID, "workspace.member.removed", "workspace_member", memberID, nil, now)
+	event := workspaceAuditEvent(workspaceID, actor.UserID, source, "workspace.member.removed", "workspace_member", memberID, nil, now)
 	err := s.members.Delete(workspaceID, actor.UserID, memberID, event)
 	if errors.Is(err, repository.ErrWorkspaceMemberPermission) {
 		return ErrWorkspacePermission
@@ -396,13 +405,13 @@ func (s *WorkspaceService) RemoveMember(actor *model.WorkspaceMember, workspaceI
 	return err
 }
 
-func (s *WorkspaceService) Leave(workspaceID, userID string) error {
+func (s *WorkspaceService) Leave(workspaceID, userID string, source Source) error {
 	member, err := s.members.ByWorkspaceAndUser(workspaceID, userID)
 	if err != nil {
 		return err
 	}
 	now := time.Now()
-	event := workspaceAuditEvent(workspaceID, userID, "workspace.member.left", "workspace_member", member.ID, nil, now)
+	event := workspaceAuditEvent(workspaceID, userID, source, "workspace.member.left", "workspace_member", member.ID, nil, now)
 	return s.members.Delete(workspaceID, userID, member.ID, event)
 }
 
@@ -438,8 +447,8 @@ func (s *WorkspaceService) DeleteUserIfOwnershipSafe(userID string) error {
 	return s.members.DeleteUserIfOwnershipSafe(userID)
 }
 
-func (s *WorkspaceService) RecordBillingAction(workspaceID, userID, action string) error {
-	event := workspaceAuditEvent(workspaceID, userID, action, "subscription", workspaceID, nil, time.Now())
+func (s *WorkspaceService) RecordBillingAction(workspaceID, userID, action string, source Source) error {
+	event := workspaceAuditEvent(workspaceID, userID, source, action, "subscription", workspaceID, nil, time.Now())
 	return s.audit.Create(event)
 }
 
@@ -497,18 +506,7 @@ func workspaceSlug(name string) string {
 }
 
 // withVia adds how the change came in to the details of an event.
-func withVia(metadata map[string]string, via string) map[string]string {
-	if via == "" {
-		return metadata
-	}
-	if metadata == nil {
-		metadata = map[string]string{}
-	}
-	metadata["via"] = via
-	return metadata
-}
-
-func workspaceAuditEvent(workspaceID, actorUserID, action, targetType, targetID string, metadata map[string]string, now time.Time) *model.WorkspaceAuditEvent {
+func workspaceAuditEvent(workspaceID, actorUserID string, source Source, action, targetType, targetID string, metadata map[string]string, now time.Time) *model.WorkspaceAuditEvent {
 	encoded := "{}"
 	if len(metadata) > 0 {
 		if value, err := json.Marshal(metadata); err == nil {
@@ -524,6 +522,10 @@ func workspaceAuditEvent(workspaceID, actorUserID, action, targetType, targetID 
 		TargetType:  targetType,
 		TargetID:    targetID,
 		Metadata:    encoded,
-		CreatedAt:   now,
+		Via:         source.Via,
+		TokenName:   source.Token,
+		IP:          source.IP,
+		UserAgent:   clipText(source.UserAgent, 300),
+		CreatedAt:   now.UTC(),
 	}
 }

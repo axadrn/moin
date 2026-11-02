@@ -80,6 +80,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 	fileService := service.NewFileService(files, fileStorage)
 	subscriptionService := service.NewSubscriptionService(subscriptions, adminEvents)
+	subscriptionService.UseActivity(workspaceAuditEvents)
 	workspaceService := service.NewWorkspaceService(
 		workspaces, members, invitations, workspaceAuditEvents, users,
 		subscriptionService, email,

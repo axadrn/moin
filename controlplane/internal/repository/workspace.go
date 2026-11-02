@@ -67,10 +67,7 @@ func (r *workspaceRepository) CreateWithOwner(
 	`, subscription.ID, subscription.WorkspaceID, subscription.PlanID, subscription.Status, subscription.CurrentPeriodEnd, subscription.CreatedAt, subscription.UpdatedAt); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`
-		INSERT INTO workspace_audit_events (id, workspace_id, actor_user_id, action, target_type, target_id, metadata, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, event.ID, event.WorkspaceID, event.ActorUserID, event.Action, event.TargetType, event.TargetID, event.Metadata, event.CreatedAt); err != nil {
+	if err := insertAuditEvent(tx, event); err != nil {
 		return err
 	}
 

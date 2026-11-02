@@ -480,5 +480,5 @@ func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request) {
 
 // actor is the member who sends the request, in the workspace of its path.
 func actor(r *http.Request) service.Actor {
-	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Via: "web"}
+	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Source: service.RequestSource(r.Context())}
 }

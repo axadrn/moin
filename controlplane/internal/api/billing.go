@@ -75,7 +75,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.recordBillingAction(workspace.ID, user.ID, "billing.checkout_started")
+	h.recordBillingAction(r, workspace.ID, user.ID, "billing.checkout_started")
 	slog.Info("checkout created", "workspace_id", workspace.ID, "provider", h.paymentService.Name())
 	JSON(w, http.StatusOK, URLResponse{URL: checkoutURL})
 }
@@ -100,12 +100,12 @@ func (h *BillingHandler) BillingManagement(w http.ResponseWriter, r *http.Reques
 		Error(w, http.StatusInternalServerError, "internal", "Billing management could not be opened. Please try again.")
 		return
 	}
-	h.recordBillingAction(workspace.ID, user.ID, "billing.management_opened")
+	h.recordBillingAction(r, workspace.ID, user.ID, "billing.management_opened")
 	JSON(w, http.StatusOK, URLResponse{URL: managementURL})
 }
 
-func (h *BillingHandler) recordBillingAction(workspaceID, userID, action string) {
-	err := h.workspaceService.RecordBillingAction(workspaceID, userID, action)
+func (h *BillingHandler) recordBillingAction(r *http.Request, workspaceID, userID, action string) {
+	err := h.workspaceService.RecordBillingAction(workspaceID, userID, action, source(r))
 	if err != nil {
 		slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspaceID)
 	}

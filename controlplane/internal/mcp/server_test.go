@@ -13,6 +13,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/api"
 	"github.com/axadrn/ops/controlplane/internal/mcp"
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -71,7 +72,7 @@ func TestMCPRequiresAPersonalAPIToken(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "guest")
 	token, raw := createToken(t, env, owner)
-	err := env.tokens.Revoke(owner.user.ID, token.ID)
+	err := env.tokens.Revoke(owner.user.ID, token.ID, service.Source{})
 	if err != nil {
 		t.Fatal(err)
 	}

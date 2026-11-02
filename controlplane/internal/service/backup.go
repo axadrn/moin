@@ -241,7 +241,7 @@ func (s *AppService) backupRequest(ctx context.Context, workspaceID, idOrName st
 	if err != nil {
 		return app, backups, err
 	}
-	s.storeBackupStatus(app.ID, backups)
+	s.storeBackupStatus(app, backups)
 	return app, backups, nil
 }
 
@@ -320,12 +320,35 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 	if err != nil || app.ServerID != serverID {
 		return
 	}
-	s.storeBackupStatus(app.ID, backups)
+	s.storeBackupStatus(app, backups)
 	s.notify(workspaceID)
 }
 
-func (s *AppService) storeBackupStatus(appID string, backups protocol.Backups) {
+// storeBackupStatus stores the backup status of each database. A restore
+// drill that passed, and backups that start failing or work again, go into
+// the activity as ops itself.
+func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups) {
+	appID := app.ID
+	before := map[string]model.BackupStatus{}
+	if statuses, err := s.apps.BackupStatus(appID); err == nil {
+		for _, status := range statuses {
+			before[status.Database] = status
+		}
+	}
 	for _, database := range backups.Databases {
+		previous, known := before[database.Database]
+		details := map[string]string{"database": database.Database}
+		switch {
+		case database.Error != "" && (!known || previous.Error == ""):
+			details["error"] = clipText(database.Error, 300)
+			s.servers.record(System(app.WorkspaceID), "backup.failed", "app", app.Name, details)
+		case database.Error == "" && known && previous.Error != "":
+			s.servers.record(System(app.WorkspaceID), "backup.recovered", "app", app.Name, details)
+		}
+		if database.VerifiedAt != nil && (!known || previous.VerifiedAt == nil || database.VerifiedAt.After(*previous.VerifiedAt)) {
+			details := map[string]string{"database": database.Database, "verified_at": database.VerifiedAt.UTC().Format(time.RFC3339)}
+			s.servers.record(System(app.WorkspaceID), "backup.drill_passed", "app", app.Name, details)
+		}
 		err := s.apps.SetBackupStatus(model.BackupStatus{
 			AppID:        appID,
 			Database:     database.Database,

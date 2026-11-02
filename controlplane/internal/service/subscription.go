@@ -16,6 +16,34 @@ import (
 type SubscriptionService struct {
 	repo       repository.SubscriptionRepository
 	adminAudit repository.AdminRepository
+	// activity, when set, gets plan and status changes of a workspace.
+	activity repository.WorkspaceAuditRepository
+}
+
+// UseActivity writes plan and status changes to the activity of the
+// workspace.
+func (s *SubscriptionService) UseActivity(activity repository.WorkspaceAuditRepository) {
+	s.activity = activity
+}
+
+// recordPlanChange writes a change of plan or status, from the payment
+// provider, to the activity of the workspace.
+func (s *SubscriptionService) recordPlanChange(before *model.Subscription, after *model.Subscription) {
+	if s.activity == nil || before == nil || (before.PlanID == after.PlanID && before.Status == after.Status) {
+		return
+	}
+	recordActivity(s.activity, time.Now(), System(after.WorkspaceID), "billing.plan_changed", "subscription", after.WorkspaceID, map[string]string{
+		"from": before.PlanID, "to": after.PlanID, "status_from": before.Status, "status": after.Status, "provider": after.Provider,
+	})
+}
+
+// current is the stored subscription of a workspace, nil when there is none.
+func (s *SubscriptionService) current(workspaceID string) *model.Subscription {
+	sub, err := s.repo.ByWorkspaceID(workspaceID)
+	if err != nil {
+		return nil
+	}
+	return sub
 }
 
 func NewSubscriptionService(repo repository.SubscriptionRepository, adminAudit repository.AdminRepository) *SubscriptionService {
@@ -109,11 +137,13 @@ func (s *SubscriptionService) ByProviderCustomerID(providerCustomerID string) (*
 
 func (s *SubscriptionService) UpdateSubscription(sub *model.Subscription, providerEventID ...string) error {
 	sub.UpdatedAt = time.Now()
+	before := s.current(sub.WorkspaceID)
 
 	err := s.repo.Update(sub)
 	if err != nil {
 		return fmt.Errorf("failed to update subscription: %w", err)
 	}
+	s.recordPlanChange(before, sub)
 	eventID := ""
 	if len(providerEventID) > 0 {
 		eventID = providerEventID[0]
@@ -155,9 +185,13 @@ func (s *SubscriptionService) UpdateProviderState(
 	subscriptionCreatedAt *time.Time,
 ) (bool, error) {
 	sub.UpdatedAt = time.Now()
+	before := s.current(sub.WorkspaceID)
 	updated, err := s.repo.UpdateIfProviderStateNewer(sub, providerSubscriptionID, stateUpdatedAt, subscriptionCreatedAt)
 	if err != nil {
 		return false, fmt.Errorf("failed to update provider subscription state: %w", err)
+	}
+	if updated {
+		s.recordPlanChange(before, sub)
 	}
 	auditSubscription := sub
 	if !updated {

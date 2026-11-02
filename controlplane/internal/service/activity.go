@@ -1,24 +1,90 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
+	"time"
 
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/google/uuid"
 )
 
-// record writes what an actor did to the activity of the workspace. A failed
-// write is logged and never fails the action itself.
-func (s *ServerService) record(actor Actor, action, targetType, target string, details map[string]string) {
-	if s.audit == nil || actor.WorkspaceID == "" {
+// Ways a change comes in, for Source.Via.
+const (
+	ViaWeb    = "web"
+	ViaCLI    = "cli"
+	ViaTUI    = "tui"
+	ViaAPI    = "api"
+	ViaMCP    = "mcp"
+	ViaGitHub = "github"
+	ViaHook   = "hook"
+	// ViaSystem is ops itself, such as a deploy that ended or a server whose
+	// agent connected.
+	ViaSystem = "system"
+)
+
+// Source is how a change came in: the surface, the API token by name, and
+// the client IP and user agent of the member's own request.
+type Source struct {
+	Via       string
+	Token     string
+	IP        string
+	UserAgent string
+}
+
+// RequestSource is how a request came in. A session is the web. An API token
+// is the CLI or the TUI by their user agent, and the API for anything else;
+// MCP sets its own Via.
+func RequestSource(ctx context.Context) Source {
+	client := ctxkeys.ClientOf(ctx)
+	source := Source{Via: ViaWeb, IP: client.IP, UserAgent: client.UserAgent}
+	if token := ctxkeys.APIToken(ctx); token != nil {
+		source.Token = token.Name
+		switch {
+		case strings.HasPrefix(client.UserAgent, "ops-cli/"):
+			source.Via = ViaCLI
+		case strings.HasPrefix(client.UserAgent, "ops-tui/"):
+			source.Via = ViaTUI
+		default:
+			source.Via = ViaAPI
+		}
+	}
+	return source
+}
+
+// Actor is who changes something in a workspace: a member through the web,
+// the CLI, the TUI, the API or MCP, a deploy hook, GitHub for a push, or ops
+// itself.
+type Actor struct {
+	WorkspaceID string
+	UserID      string
+	Source
+}
+
+// System is ops itself acting in a workspace.
+func System(workspaceID string) Actor {
+	return Actor{WorkspaceID: workspaceID, Source: Source{Via: ViaSystem}}
+}
+
+// recordActivity writes what an actor did to the activity of the workspace.
+// A failed write is logged and never fails the action itself.
+//
+// What we log: the exact time, who and how, what it touched, and the settings
+// before and after: names, on and off, domains, branches, roles, counts,
+// versions, release numbers and error messages. What we never log: env var
+// values, secrets, tokens, passwords, SQL text, row contents or cell values,
+// file contents and log lines of an app. ops keeps none of the user's data,
+// so details only ever hold names, numbers and settings.
+func recordActivity(audit repository.WorkspaceAuditRepository, at time.Time, actor Actor, action, targetType, target string, details map[string]string) {
+	if audit == nil || actor.WorkspaceID == "" {
 		return
 	}
 	if details == nil {
 		details = map[string]string{}
-	}
-	if actor.Via != "" {
-		details["via"] = actor.Via
 	}
 	metadata, _ := json.Marshal(details)
 	event := &model.WorkspaceAuditEvent{
@@ -28,13 +94,43 @@ func (s *ServerService) record(actor Actor, action, targetType, target string, d
 		TargetType:  targetType,
 		TargetID:    target,
 		Metadata:    string(metadata),
-		CreatedAt:   s.now().UTC(),
+		Via:         actor.Via,
+		TokenName:   actor.Token,
+		IP:          actor.IP,
+		UserAgent:   clipText(actor.UserAgent, 300),
+		CreatedAt:   at.UTC(),
 	}
 	if actor.UserID != "" {
 		event.ActorUserID = &actor.UserID
 	}
-	err := s.audit.Create(event)
+	switch targetType {
+	case "app":
+		app, server, err := audit.AppServer(actor.WorkspaceID, target)
+		if err != nil {
+			slog.Warn("find the app of an activity failed", "workspace_id", actor.WorkspaceID, "error", err)
+		}
+		if app != "" {
+			event.TargetID = app
+		}
+		event.App, event.Server = event.TargetID, server
+		if event.Server == "" {
+			event.Server = details["server"]
+		}
+	case "server":
+		event.Server = target
+	}
+	err := audit.Create(event)
 	if err != nil {
 		slog.Error("record activity failed", "workspace_id", actor.WorkspaceID, "action", action, "error", err)
 	}
+}
+
+// record writes what an actor did to the activity of the workspace.
+func (s *ServerService) record(actor Actor, action, targetType, target string, details map[string]string) {
+	recordActivity(s.audit, s.now(), actor, action, targetType, target, details)
+}
+
+// record writes what an actor did to the activity of the workspace.
+func (s *WorkspaceService) record(actor Actor, action, targetType, target string, details map[string]string) {
+	recordActivity(s.audit, time.Now(), actor, action, targetType, target, details)
 }

@@ -741,14 +741,8 @@ func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 
 // actor is who sends the request.
 func actor(r *http.Request) service.Actor {
-	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Via: via(r)}
+	return service.Actor{WorkspaceID: ctxkeys.Workspace(r.Context()).ID, UserID: ctxkeys.User(r.Context()).ID, Source: service.RequestSource(r.Context())}
 }
 
-// via is how a request came in: an API token goes as "api", a session as
-// "web".
-func via(r *http.Request) string {
-	if ctxkeys.APIToken(r.Context()) != nil {
-		return "api"
-	}
-	return "web"
-}
+// source is how a request came in: the web, the CLI, the TUI or the API.
+func source(r *http.Request) service.Source { return service.RequestSource(r.Context()) }

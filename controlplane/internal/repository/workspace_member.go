@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -127,7 +129,7 @@ func (r *workspaceMemberRepository) UpdateRole(workspaceID, actorUserID, memberI
 	if rows == 0 {
 		return ErrWorkspaceMemberNotFound
 	}
-	event.Metadata = auditMetadata(map[string]string{"from": current.Role, "to": role})
+	event.Metadata = auditMetadata(map[string]string{"email": userEmail(tx, current.UserID), "from": current.Role, "to": role})
 	if err := insertAuditEvent(tx, event); err != nil {
 		return err
 	}
@@ -183,12 +185,19 @@ func (r *workspaceMemberRepository) Delete(workspaceID, actorUserID, memberID st
 		return ErrWorkspaceMemberNotFound
 	}
 	if !isLeaving {
-		event.Metadata = auditMetadata(map[string]string{"user_id": current.UserID})
+		event.Metadata = auditMetadata(map[string]string{"user_id": current.UserID, "email": userEmail(tx, current.UserID), "role": current.Role})
 	}
 	if err := insertAuditEvent(tx, event); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// userEmail is the email of a user, empty for one that is gone.
+func userEmail(tx *sqlx.Tx, userID string) string {
+	var email string
+	_ = tx.Get(&email, `SELECT email FROM users WHERE id = $1`, userID)
+	return email
 }
 
 func auditMetadata(values map[string]string) string {
@@ -239,6 +248,26 @@ func (r *workspaceMemberRepository) DeleteUserIfOwnershipSafe(userID string) err
 	}
 	if soleOwnerCount > 0 {
 		return ErrLastOwner
+	}
+
+	// Each workspace keeps in its activity that the member's account went;
+	// the event keeps the email after the user is gone.
+	now := time.Now().UTC()
+	for _, workspaceID := range workspaceIDs {
+		actor := userID
+		err := insertAuditEvent(tx, &model.WorkspaceAuditEvent{
+			ID:          uuid.New().String(),
+			WorkspaceID: workspaceID,
+			ActorUserID: &actor,
+			Action:      "workspace.member.account_deleted",
+			TargetType:  "user",
+			TargetID:    userID,
+			Metadata:    "{}",
+			CreatedAt:   now,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	result, err := tx.Exec(`DELETE FROM users WHERE id = $1`, userID)

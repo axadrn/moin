@@ -50,6 +50,8 @@ type CreateAPITokenInput struct {
 	ExpiresInDays int
 	// WorkspaceID binds the token to one of the user's workspaces.
 	WorkspaceID string
+	// Source is how the request came in, for the activity of the workspace.
+	Source Source
 }
 
 // APITokenService creates, lists, revokes and authenticates personal API
@@ -116,6 +118,11 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 	if err != nil {
 		return nil, "", err
 	}
+	expires := "never"
+	if token.ExpiresAt != nil {
+		expires = token.ExpiresAt.Format(time.RFC3339)
+	}
+	s.record(userID, input.Source, "api_token.created", *token, map[string]string{"scopes": token.Scopes, "expires": expires, "prefix": token.Prefix})
 	return token, raw, nil
 }
 
@@ -126,14 +133,48 @@ func (s *APITokenService) List(userID string) ([]model.APIToken, error) {
 }
 
 // Revoke deletes one token of the user. Another user's token is not found.
-func (s *APITokenService) Revoke(userID, tokenID string) error {
-	return s.tokens.DeleteByIDForUser(tokenID, userID)
+func (s *APITokenService) Revoke(userID, tokenID string, source Source) error {
+	tokens, err := s.tokens.ListByUserID(userID)
+	if err != nil {
+		return err
+	}
+	err = s.tokens.DeleteByIDForUser(tokenID, userID)
+	if err != nil {
+		return err
+	}
+	for _, token := range tokens {
+		if token.ID == tokenID {
+			s.record(userID, source, "api_token.revoked", token, map[string]string{"prefix": token.Prefix})
+		}
+	}
+	return nil
 }
 
 // RevokeAllForUser deletes every token of the user. Account recovery, password
 // changes and the admin kill switch call it through AuthService.
 func (s *APITokenService) RevokeAllForUser(userID string) error {
-	return s.tokens.DeleteByUserID(userID)
+	tokens, err := s.tokens.ListByUserID(userID)
+	if err != nil {
+		return err
+	}
+	err = s.tokens.DeleteByUserID(userID)
+	if err != nil {
+		return err
+	}
+	for _, token := range tokens {
+		s.record(userID, Source{Via: ViaSystem}, "api_token.revoked", token, map[string]string{"prefix": token.Prefix, "reason": "every token of the account was revoked"})
+	}
+	return nil
+}
+
+// record writes a token change to the activity of the token's workspace,
+// with the token's name, never the token.
+func (s *APITokenService) record(userID string, source Source, action string, token model.APIToken, details map[string]string) {
+	if s.workspaces == nil {
+		return
+	}
+	details["name"] = token.Name
+	s.workspaces.record(Actor{WorkspaceID: token.WorkspaceID, UserID: userID, Source: source}, action, "api_token", token.Name, details)
 }
 
 // Authenticate returns the token for a raw "pat_" token. Unknown and expired

@@ -132,6 +132,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	if input.SSHTailscale && stored.TailscaleKey == "" {
 		return nil, ErrNoTailscale
 	}
+	before := map[string]string{"tunnel": strconv.FormatBool(server.Tunnel), "ssh_tailscale": strconv.FormatBool(server.SSHTailscale), "firewall": strconv.FormatBool(server.Firewall)}
 	if input.Tunnel && server.TunnelID == "" {
 		token, account, err := s.cloudflareToken(actor.WorkspaceID)
 		if err != nil {
@@ -158,7 +159,10 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	if err != nil {
 		return nil, err
 	}
-	s.servers.record(actor, "server.security_set", "server", server.Name, map[string]string{"tunnel": strconv.FormatBool(server.Tunnel), "ssh_tailscale": strconv.FormatBool(server.SSHTailscale), "firewall": strconv.FormatBool(server.Firewall)})
+	s.servers.record(actor, "server.security_set", "server", server.Name, map[string]string{
+		"tunnel": strconv.FormatBool(server.Tunnel), "ssh_tailscale": strconv.FormatBool(server.SSHTailscale), "firewall": strconv.FormatBool(server.Firewall),
+		"tunnel_before": before["tunnel"], "ssh_tailscale_before": before["ssh_tailscale"], "firewall_before": before["firewall"],
+	})
 	var dnsProblems []string
 	if server.Tunnel {
 		dnsProblems, err = s.syncTunnel(ctx, server)

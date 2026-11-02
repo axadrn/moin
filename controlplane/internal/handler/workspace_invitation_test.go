@@ -29,7 +29,7 @@ func TestInvitationShowPreservesGuestAndIncompleteOnboardingFlow(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 			invitee := createHandlerTestUser(t, database, "show-invitee", "show@example.com", "")
-			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, "web"); err != nil {
+			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, service.Source{Via: "web"}); err != nil {
 				t.Fatalf("Invite() error = %v", err)
 			}
 			token := invitationToken(t, mailer)
@@ -81,7 +81,7 @@ func TestInvitationTerminalOutcomesClearPendingCookie(t *testing.T) {
 			name: "revoked",
 			show: true,
 			setup: func(t *testing.T, _ *sqlx.DB, workspaces *service.WorkspaceService, owner testutil.UserFixture, _ *model.User, invitationID, _ string) {
-				if err := workspaces.RevokeInvitation(owner.WorkspaceMember, owner.Workspace.ID, invitationID, "web"); err != nil {
+				if err := workspaces.RevokeInvitation(owner.WorkspaceMember, owner.Workspace.ID, invitationID, service.Source{Via: "web"}); err != nil {
 					t.Fatalf("RevokeInvitation() error = %v", err)
 				}
 			},
@@ -94,7 +94,7 @@ func TestInvitationTerminalOutcomesClearPendingCookie(t *testing.T) {
 				if err := repository.NewSubscriptionRepository(database).Update(owner.Subscription); err != nil {
 					t.Fatalf("upgrade subscription: %v", err)
 				}
-				if _, err := workspaces.AcceptInvitation(token, invitee, "web"); err != nil {
+				if _, err := workspaces.AcceptInvitation(token, invitee, service.Source{Via: "web"}); err != nil {
 					t.Fatalf("AcceptInvitation() error = %v", err)
 				}
 			},
@@ -121,7 +121,7 @@ func TestInvitationTerminalOutcomesClearPendingCookie(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 			invitee := createHandlerTestUser(t, database, "terminal-invitee", "terminal@example.com", "Invitee")
-			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, "web"); err != nil {
+			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, service.Source{Via: "web"}); err != nil {
 				t.Fatalf("Invite() error = %v", err)
 			}
 			token := invitationToken(t, mailer)
@@ -161,7 +161,7 @@ func TestInvitationTerminalOutcomesClearPendingCookie(t *testing.T) {
 func TestInvitationSeatLimitClearsPendingCookieForRecovery(t *testing.T) {
 	database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 	invitee := createHandlerTestUser(t, database, "seat-invitee", "seat@example.com", "Invitee")
-	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, "web"); err != nil {
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, service.Source{Via: "web"}); err != nil {
 		t.Fatalf("Invite() error = %v", err)
 	}
 	token := invitationToken(t, mailer)
@@ -196,7 +196,7 @@ func TestOnboardingValidatesPendingInvitationBeforeSkippingWorkspace(t *testing.
 		t.Run(test.name, func(t *testing.T) {
 			database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 			invitee := createHandlerTestUser(t, database, "onboarding-invitee", "onboarding@example.com", "")
-			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, "web"); err != nil {
+			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, invitee.Email, model.WorkspaceRoleMember, service.Source{Via: "web"}); err != nil {
 				t.Fatalf("Invite() error = %v", err)
 			}
 			token := invitationToken(t, mailer)
