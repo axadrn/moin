@@ -1,10 +1,25 @@
 # ops
 
-> ops is a server-rendered product built with Go, templ, htmx 4.0, Tailwind CSS, and SQLite, with a JSON API and an MCP server for AI agents.
+> ops deploys apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. It works from the web, the ops CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under AGPL-3.0.
+
+Every docs page is also available as Markdown: add .md to its URL.
+
+## Docs
+
+- [Introduction](/docs/introduction): What ops is and how its pieces fit
+- [Getting Started](/docs/getting-started): From a fresh server to a live app
+- [Self-hosting](/docs/self-hosting): Run all of ops yourself, free
+- [Deploy](/docs/guides/deploy): Deploy, redeploy and roll back apps
+- [Backups](/docs/guides/backups): Every change of every SQLite database in your own bucket
+- [AI agents (MCP)](/docs/guides/mcp): Let Claude and other agents run ops
+- [CLI](/docs/reference/cli): Every ops command
+- [API](/docs/reference/api): The JSON API under /api/v1
+- [FAQ](/docs/faq): Common questions
+- [Roadmap](/docs/roadmap): Now, next and later
 
 ## Public pages
 
-- [Home](/): Product overview and primary actions.
-- [Sign in](/auth): Account access.
-- [Privacy](/legal/privacy): Privacy policy.
-- [Terms](/legal/terms): Terms of service.
+- [Home](/): What ops does, pricing and questions
+- [Sign in](/auth): Account access
+- [Privacy](/legal/privacy): Privacy policy
+- [Terms](/legal/terms): Terms of service
