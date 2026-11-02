@@ -112,19 +112,26 @@ func (g *GitHub) InstallURL(state string) string {
 	return g.webURL + "/apps/" + g.slug + "/installations/new?state=" + url.QueryEscape(state)
 }
 
+// AuthorizeURL is where a user signs in to GitHub with the app. GitHub
+// sends them back to the callback URL, the setup URL, with a code and the
+// state: no installation ID, so ops looks up their installations itself.
+func (g *GitHub) AuthorizeURL(state string) string {
+	return g.webURL + "/login/oauth/authorize?client_id=" + url.QueryEscape(g.clientID) + "&state=" + url.QueryEscape(state)
+}
+
 // ChecksInstaller says whether ops can ask GitHub who installed the app.
 func (g *GitHub) ChecksInstaller() bool {
 	return g.clientID != "" && g.clientSecret != ""
 }
 
-// UserHasInstallation says whether the user who installed the app may
-// manage the installation. GitHub sends a code along after the install;
-// ops trades it for a token of that user and asks GitHub which
-// installations the user can reach. Without this check anyone could claim
-// someone else's installation by its ID, which is only a counter.
-func (g *GitHub) UserHasInstallation(ctx context.Context, code string, installationID int64) (bool, error) {
+// UserInstallations lists the installations of the app that a GitHub user
+// may manage. GitHub sends a code along after the install or the sign-in;
+// ops trades it for a token of that user and asks GitHub. Without this
+// check anyone could claim someone else's installation by its ID, which is
+// only a counter. A code that is wrong, used or expired finds none.
+func (g *GitHub) UserInstallations(ctx context.Context, code string) ([]int64, error) {
 	if code == "" {
-		return false, nil
+		return nil, nil
 	}
 	var grant struct {
 		AccessToken string `json:"access_token"`
@@ -132,13 +139,10 @@ func (g *GitHub) UserHasInstallation(ctx context.Context, code string, installat
 	}
 	form := map[string]string{"client_id": g.clientID, "client_secret": g.clientSecret, "code": code}
 	err := g.send(ctx, http.MethodPost, g.webURL+"/login/oauth/access_token", "", form, &grant)
-	if err != nil {
-		return false, err
+	if err != nil || grant.AccessToken == "" {
+		return nil, err
 	}
-	if grant.AccessToken == "" {
-		// A code that is wrong, used or expired.
-		return false, nil
-	}
+	ids := []int64{}
 	for page := 1; page <= 10; page++ {
 		var answer struct {
 			Installations []struct {
@@ -147,18 +151,16 @@ func (g *GitHub) UserHasInstallation(ctx context.Context, code string, installat
 		}
 		err = g.call(ctx, http.MethodGet, "/user/installations?per_page=100&page="+strconv.Itoa(page), "Bearer "+grant.AccessToken, nil, &answer)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		for _, installation := range answer.Installations {
-			if installation.ID == installationID {
-				return true, nil
-			}
+			ids = append(ids, installation.ID)
 		}
 		if len(answer.Installations) < 100 {
 			break
 		}
 	}
-	return false, nil
+	return ids, nil
 }
 
 // jwt signs the app's own token, valid for nine minutes.

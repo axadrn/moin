@@ -64,15 +64,16 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			// app's client ID and secret for a token of the user.
 			var grant map[string]string
 			json.NewDecoder(r.Body).Decode(&grant)
-			tokens := map[string]string{"code-axadrn": "ghu_axadrn", "code-mallory": "ghu_mallory"}
+			tokens := map[string]string{"code-axadrn": "ghu_axadrn", "code-mallory": "ghu_mallory", "code-nobody": "ghu_nobody"}
 			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" {
 				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code"})
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]string{"access_token": tokens[grant["code"]], "token_type": "bearer"})
 		case r.URL.Path == "/user/installations":
-			// axadrn reaches installation 7, mallory only her own 9.
-			installations := map[string][]map[string]any{"Bearer ghu_axadrn": {{"id": 7}}, "Bearer ghu_mallory": {{"id": 9}}}
+			// axadrn reaches installation 7, mallory only her own 9, nobody
+			// none.
+			installations := map[string][]map[string]any{"Bearer ghu_axadrn": {{"id": 7}}, "Bearer ghu_mallory": {{"id": 9}}, "Bearer ghu_nobody": {}}
 			found, ok := installations[auth]
 			if !ok {
 				http.Error(w, "token", http.StatusUnauthorized)
@@ -159,9 +160,14 @@ func TestGitHubDeploys(t *testing.T) {
 	if _, err := apps.ConnectGitHub(ctx, other, 7, state, ""); !errors.Is(err, ErrGitHubState) {
 		t.Fatalf("another user's state: err = %v", err)
 	}
-	account, err := apps.ConnectGitHub(ctx, owner, 7, state, "")
-	if err != nil || account != "axadrn" {
-		t.Fatalf("connect = %q, %v", account, err)
+	if link, err := apps.ConnectGitHub(ctx, owner, 7, state, ""); err != nil || link != "" {
+		t.Fatalf("connect = %q, %v", link, err)
+	}
+	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 || installations[0].Account != "axadrn" {
+		t.Fatalf("owner installations = %+v", installations)
+	}
+	if link, _ := apps.GitHubConnectURL(owner); !strings.HasPrefix(link, "https://github.example/apps/ops-test/installations/new?state=") {
+		t.Fatalf("without OAuth the connect link installs: %q", link)
 	}
 	// Installation IDs are public counters: another workspace's own valid
 	// state must not move this installation, and its private repos, there.
@@ -267,9 +273,9 @@ func TestGitHubChecksInstaller(t *testing.T) {
 		return parsed.Query().Get("state")
 	}
 
-	// No code, a wrong code, or a GitHub user who cannot reach the
-	// installation: refused.
-	for _, code := range []string{"", "code-wrong", "code-mallory"} {
+	// A wrong code, or a GitHub user who cannot reach the installation:
+	// refused.
+	for _, code := range []string{"code-wrong", "code-mallory"} {
 		if _, err := apps.ConnectGitHub(ctx, other, 7, stateOf(other), code); !errors.Is(err, ErrGitHubNotYours) {
 			t.Fatalf("code %q: err = %v", code, err)
 		}
@@ -277,8 +283,65 @@ func TestGitHubChecksInstaller(t *testing.T) {
 	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
 		t.Fatalf("other workspace took installation 7: %+v", installations)
 	}
-	account, err := apps.ConnectGitHub(ctx, owner, 7, stateOf(owner), "code-axadrn")
-	if err != nil || account != "axadrn" {
-		t.Fatalf("connect = %q, %v", account, err)
+	link, err := apps.ConnectGitHub(ctx, owner, 7, stateOf(owner), "code-axadrn")
+	if err != nil || link != "" {
+		t.Fatalf("connect = %q, %v", link, err)
+	}
+	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 || installations[0].Account != "axadrn" {
+		t.Fatalf("owner installations = %+v", installations)
+	}
+}
+
+// TestGitHubAlreadyInstalled: for an app that is already installed GitHub
+// shows its settings and sends no install back, so "Connect GitHub" signs
+// in to GitHub first and connects the installations the member has.
+func TestGitHubAlreadyInstalled(t *testing.T) {
+	apps, _, _, _ := newAppService(t)
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "ops-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apps.SetGitHub(github)
+	ctx := context.Background()
+
+	link, err := apps.GitHubConnectURL(owner)
+	if err != nil || !strings.HasPrefix(link, githubServer.URL+"/login/oauth/authorize?client_id=Iv1.test&state=") {
+		t.Fatalf("connect link = %q, %v", link, err)
+	}
+	parsed, _ := url.Parse(link)
+	state := parsed.Query().Get("state")
+
+	// After a change of the repos ("Redirect on update") GitHub sends the
+	// installation without a code: ops asks for a sign-in with the same
+	// state, which comes back with a code.
+	if next, err := apps.ConnectGitHub(ctx, owner, 7, state, ""); err != nil || next != link {
+		t.Fatalf("update without a code: %q, %v", next, err)
+	}
+	// Someone who installed the app nowhere installs it now.
+	if next, err := apps.ConnectGitHub(ctx, owner, 0, state, "code-nobody"); err != nil || next != githubServer.URL+"/apps/ops-test/installations/new?state="+url.QueryEscape(state) {
+		t.Fatalf("no installation yet: %q, %v", next, err)
+	}
+	// The sign-in comes back with a code alone: ops connects installation 7.
+	if next, err := apps.ConnectGitHub(ctx, owner, 0, state, "code-axadrn"); err != nil || next != "" {
+		t.Fatalf("sign-in: %q, %v", next, err)
+	}
+	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 || installations[0].InstallationID != 7 {
+		t.Fatalf("owner installations = %+v", installations)
+	}
+	// Another workspace of the same GitHub user cannot take it.
+	otherLink, _ := apps.GitHubConnectURL(other)
+	otherParsed, _ := url.Parse(otherLink)
+	if _, err := apps.ConnectGitHub(ctx, other, 0, otherParsed.Query().Get("state"), "code-axadrn"); !errors.Is(err, repository.ErrGitHubInstallationTaken) {
+		t.Fatalf("another workspace: err = %v", err)
+	}
+	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
+		t.Fatalf("other workspace installations = %+v", installations)
 	}
 }

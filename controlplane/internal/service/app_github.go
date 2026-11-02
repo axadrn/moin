@@ -8,11 +8,13 @@ import (
 	"github.com/axadrn/ops/protocol"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/repository"
 )
 
 var (
@@ -37,20 +39,51 @@ type GitHubRepoOf struct {
 	Account        string
 }
 
-// GitHubInstallURL is the link that installs the app for the workspace. Its
-// state names the workspace and the member, because GitHub sends them back
-// to one setup URL for every workspace.
+// GitHubInstallURL is the link that installs the app for the workspace,
+// on any account or organization. Its state names the workspace and the
+// member, because GitHub sends them back to one setup URL for every
+// workspace.
 func (s *AppService) GitHubInstallURL(actor Actor) (string, error) {
 	if s.github == nil {
 		return "", ErrGitHubOff
 	}
-	state := s.box.Seal(actor.WorkspaceID+"|"+actor.UserID+"|"+strconv.FormatInt(s.now().Add(githubStateExpiry).Unix(), 10), "github-state")
-	return s.github.InstallURL(state), nil
+	return s.github.InstallURL(s.gitHubState(actor)), nil
 }
 
-// ConnectGitHub stores the installation GitHub sent the member back with,
-// in the workspace the state names. actor has no workspace yet. code
-// proves that the member's GitHub account may manage the installation.
+// GitHubConnectURL is the link behind "Connect GitHub". The install link
+// alone fails for an app that is already installed: GitHub then shows the
+// installation's settings and never sends the member back. So with the
+// app's OAuth set up, the member signs in to GitHub first, and
+// ConnectGitHub connects the installations they already have or sends them
+// on to install the app.
+func (s *AppService) GitHubConnectURL(actor Actor) (string, error) {
+	if s.github == nil {
+		return "", ErrGitHubOff
+	}
+	if !s.github.ChecksInstaller() {
+		return s.github.InstallURL(s.gitHubState(actor)), nil
+	}
+	return s.github.AuthorizeURL(s.gitHubState(actor)), nil
+}
+
+func (s *AppService) gitHubState(actor Actor) string {
+	return s.box.Seal(actor.WorkspaceID+"|"+actor.UserID+"|"+strconv.FormatInt(s.now().Add(githubStateExpiry).Unix(), 10), "github-state")
+}
+
+// ConnectGitHub takes the member back from GitHub and connects
+// installations to the workspace the state names. actor has no workspace
+// yet. It returns a link on github.com when the member has to go on there:
+//
+//   - With an installation ID and a code (after an install), it connects
+//     that installation if the member's GitHub account may manage it.
+//   - Without a code (after a change of an installed app's repos, or an
+//     install without sign-in), it sends the member to sign in to GitHub,
+//     which comes back with a code.
+//   - With a code alone (after the sign-in), it connects every installation
+//     the member may manage that no other workspace holds, and sends the
+//     member to install the app if there is none.
+//
+// Without the app's OAuth, ops trusts the installation ID GitHub sent.
 func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installationID int64, state, code string) (string, error) {
 	if s.github == nil {
 		return "", ErrGitHubOff
@@ -65,26 +98,60 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", ErrGitHubState
 	}
 	actor.WorkspaceID = parts[0]
-	if s.github.ChecksInstaller() {
-		yours, err := s.github.UserHasInstallation(ctx, code, installationID)
-		if err != nil {
-			return "", err
+	if !s.github.ChecksInstaller() {
+		if installationID == 0 {
+			return s.github.InstallURL(state), nil
 		}
-		if !yours {
-			return "", ErrGitHubNotYours
-		}
+		return "", s.addGitHubInstallation(ctx, actor, installationID)
 	}
-	account, settingsURL, err := s.github.Installation(ctx, installationID)
+	if code == "" {
+		return s.github.AuthorizeURL(state), nil
+	}
+	ids, err := s.github.UserInstallations(ctx, code)
 	if err != nil {
 		return "", err
+	}
+	if installationID != 0 {
+		if !slices.Contains(ids, installationID) {
+			return "", ErrGitHubNotYours
+		}
+		return "", s.addGitHubInstallation(ctx, actor, installationID)
+	}
+	connected, taken := false, false
+	for _, id := range ids {
+		err = s.addGitHubInstallation(ctx, actor, id)
+		switch {
+		case err == nil:
+			connected = true
+		case errors.Is(err, repository.ErrGitHubInstallationTaken):
+			taken = true
+		default:
+			return "", err
+		}
+	}
+	if !connected && taken {
+		// Every installation the member has is another workspace's.
+		return "", repository.ErrGitHubInstallationTaken
+	}
+	if !connected {
+		return s.github.InstallURL(state), nil
+	}
+	return "", nil
+}
+
+// addGitHubInstallation stores an installation in the actor's workspace.
+func (s *AppService) addGitHubInstallation(ctx context.Context, actor Actor, installationID int64) error {
+	account, settingsURL, err := s.github.Installation(ctx, installationID)
+	if err != nil {
+		return err
 	}
 	err = s.apps.AddGitHubInstallation(model.GitHubInstallation{InstallationID: installationID, WorkspaceID: actor.WorkspaceID, Account: account, CreatedAt: s.now().UTC(), SettingsURL: settingsURL})
 	if err != nil {
-		return "", err
+		return err
 	}
 	s.servers.record(actor, "github.connected", "github", account, nil)
 	s.notify(actor.WorkspaceID)
-	return account, nil
+	return nil
 }
 
 // GitHubInstallations lists where the user installed the app.

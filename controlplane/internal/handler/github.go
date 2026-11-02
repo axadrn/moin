@@ -16,12 +16,12 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
 )
 
-// GitHubInstall sends the user to GitHub to install the ops GitHub App.
-// next is where to come back to.
+// GitHubInstall is "Connect GitHub": it sends the user to GitHub. next is
+// where to come back to.
 func (h *AppsHandler) GitHubInstall(w http.ResponseWriter, r *http.Request) {
-	link, err := h.apps.GitHubInstallURL(actor(r))
+	link, err := h.apps.GitHubConnectURL(actor(r))
 	if err != nil {
-		renderError(w, "github install link failed", err)
+		renderError(w, "github connect link failed", err)
 		return
 	}
 	next := r.URL.Query().Get("next")
@@ -31,8 +31,10 @@ func (h *AppsHandler) GitHubInstall(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 
-// GitHubSetup is where GitHub sends the user after the install. It is one
-// URL for every workspace; the state names the workspace.
+// GitHubSetup is where GitHub sends the user back: after an install, a
+// change of an installation (setup_action=update) or a sign-in. It is one
+// URL for every workspace; the state names the workspace. ConnectGitHub
+// may send the user on to GitHub once more.
 func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	next := "/app"
@@ -40,17 +42,23 @@ func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 	if err == nil && strings.HasPrefix(cookie.Value, "/app/") {
 		next = cookie.Value
 	}
-	installationID, err := strconv.ParseInt(r.URL.Query().Get("installation_id"), 10, 64)
-	if err != nil {
+	query := r.URL.Query()
+	// The user said no on GitHub, or asked an organization owner to
+	// install the app: nothing to connect yet.
+	if query.Get("error") != "" || query.Get("setup_action") == "request" {
 		http.Redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
-	_, err = h.apps.ConnectGitHub(r.Context(), service.Actor{UserID: user.ID, Source: service.RequestSource(r.Context())}, installationID, r.URL.Query().Get("state"), r.URL.Query().Get("code"))
+	installationID, _ := strconv.ParseInt(query.Get("installation_id"), 10, 64)
+	link, err := h.apps.ConnectGitHub(r.Context(), service.Actor{UserID: user.ID, Source: service.RequestSource(r.Context())}, installationID, query.Get("state"), query.Get("code"))
 	if err != nil {
 		slog.Warn("github setup failed", "user_id", user.ID, "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		render(w, r, pages.ErrorPage(http.StatusBadRequest, "GitHub is not connected", errorMessage(err)))
 		return
+	}
+	if link != "" {
+		next = link
 	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
