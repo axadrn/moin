@@ -712,7 +712,7 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 				for _, key := range keys {
 					<li data-env={ key }>
 						@item.Item(item.Props{Size: item.SizeSm, Class: "group/env flex-nowrap py-1.5 pr-1.5 hover:bg-muted/60"}) {
-							<span class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
+							<span class="max-w-[55%] min-w-0 truncate font-mono text-sm" title={ key }>{ key }</span>
 							<span class="min-w-0 flex-1 truncate text-right font-mono text-sm text-muted-foreground">
 								if value, ok := values[key]; ok {
 									<span data-env-value class="text-foreground">{ value }</span>
