@@ -1308,6 +1308,27 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '500':
           $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Apps]
+      operationId: deleteDeployHook
+      summary: Turn the deploy hook off
+      description: The hook URL stops working and CI can no longer deploy the app. A new hook can be made again later. Answers 204 also when the app had no hook. Works while the plan allows no changes.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The app has no deploy hook.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
 
   /api/v1/registries:
     get:
@@ -3803,6 +3824,9 @@ components:
         snapshot_before_changes:
           type: boolean
           description: A snapshot before every change made through ops.
+        hook:
+          type: boolean
+          description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
         created_at:
           type: string
           format: date-time

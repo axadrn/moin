@@ -238,6 +238,24 @@ func (s *AppService) RotateDeployHook(actor Actor, idOrName string) (string, err
 	return s.servers.appURL + "/webhooks/deploy/" + token, nil
 }
 
+// RemoveDeployHook turns the app's deploy hook off: its URL stops working
+// and CI can no longer deploy. It reports false when there was none.
+func (s *AppService) RemoveDeployHook(actor Actor, idOrName string) (bool, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return false, err
+	}
+	if app.DeployHookHash == nil {
+		return false, nil
+	}
+	err = s.apps.RemoveDeployHook(app.ID)
+	if err != nil {
+		return false, err
+	}
+	s.servers.record(actor, "app.hook_removed", "app", app.Name, nil)
+	return true, nil
+}
+
 // RegistryLogin is a registry login without its password.
 type RegistryLogin struct {
 	Host      string

@@ -41,6 +41,7 @@ type AppRepository interface {
 
 	ByDeployHookHash(hash string) (*model.App, error)
 	SetDeployHookHash(appID, hash string) error
+	RemoveDeployHook(appID string) error
 
 	BackupStorage(workspaceID string) (*model.BackupStorage, error)
 	SetBackupStorage(storage model.BackupStorage) error
@@ -216,6 +217,12 @@ func (r *appRepository) ByDeployHookHash(hash string) (*model.App, error) {
 // SetDeployHookHash replaces the deploy hook of an app; the old URL stops working.
 func (r *appRepository) SetDeployHookHash(appID, hash string) error {
 	_, err := r.db.Exec(`UPDATE apps SET deploy_hook_hash = $1 WHERE id = $2`, hash, appID)
+	return err
+}
+
+// RemoveDeployHook turns the deploy hook of an app off; its URL stops working.
+func (r *appRepository) RemoveDeployHook(appID string) error {
+	_, err := r.db.Exec(`UPDATE apps SET deploy_hook_hash = NULL WHERE id = $1`, appID)
 	return err
 }
 

@@ -128,6 +128,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/apps/{app}/rollback", m.InWorkspace(h.Apps.Rollback), TokenWrite},
 		{"POST /api/v1/apps/{app}/redeploy", m.InWorkspace(h.Apps.Redeploy), TokenWrite},
 		{"POST /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RotateHook), TokenWrite},
+		{"DELETE /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RemoveHook), TokenWrite},
 		{"POST /api/v1/apps/{app}/restart", m.InWorkspace(h.Apps.Restart), TokenWrite},
 		{"POST /api/v1/apps/{app}/start", m.InWorkspace(h.Apps.Start), TokenWrite},
 		{"POST /api/v1/apps/{app}/stop", m.InWorkspace(h.Apps.Stop), TokenWrite},

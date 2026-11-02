@@ -151,6 +151,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/stop", workspace(apps.Stop))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/image", workspace(apps.DeployImage))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/hook", workspace(apps.RotateHook))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/apps/{app}/hook", workspace(apps.RemoveHook))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/routing", workspace(apps.Routing))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/add", workspace(apps.AddDomain))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/remove", workspace(apps.RemoveDomain))

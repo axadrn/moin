@@ -45,7 +45,10 @@ type App struct {
 	Branch                string    `json:"branch"`
 	AutoDeploy            bool      `json:"auto_deploy"`
 	SnapshotBeforeChanges bool      `json:"snapshot_before_changes"`
-	CreatedAt             time.Time `json:"created_at"`
+	// Hook says the app has a deploy hook URL; the URL itself is shown
+	// only once, when it is made.
+	Hook      bool      `json:"hook"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // AppList is the answer of GET /api/v1/apps and every event of GET
@@ -132,6 +135,7 @@ func NewApp(app model.App) App {
 		Branch:                app.Branch,
 		AutoDeploy:            app.AutoDeploy,
 		SnapshotBeforeChanges: app.SnapshotBeforeChanges,
+		Hook:                  app.DeployHookHash != nil,
 		CreatedAt:             app.CreatedAt.UTC(),
 	}
 }
@@ -508,6 +512,16 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, DeployHook{URL: url})
+}
+
+// RemoveHook turns the app's deploy hook off; its URL stops working.
+func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.RemoveDeployHook(actor(r), r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	NoContent(w)
 }
 
 // Registry is a registry login without its password.

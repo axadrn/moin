@@ -174,8 +174,8 @@ func withWorkspaceOf(slugOf func(*http.Request) string, workspaceService *servic
 
 // readOnlyAllows says whether a request may run in a workspace whose plan
 // allows no changes: reading, SQL (writes are checked again), the workspace
-// with its team and billing, the account, sessions and tokens, and stopping
-// or starting an app.
+// with its team and billing, the account, sessions and tokens, stopping or
+// starting an app and turning its deploy hook off.
 func readOnlyAllows(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
@@ -187,10 +187,13 @@ func readOnlyAllows(r *http.Request) bool {
 			return true
 		}
 	}
-	// POST …/apps/{app}/stop and …/apps/{app}/start.
+	// POST …/apps/{app}/stop and …/apps/{app}/start, DELETE …/apps/{app}/hook.
 	parts := strings.Split(path, "/")
+	if len(parts) < 3 || parts[len(parts)-3] != "apps" {
+		return false
+	}
 	last := parts[len(parts)-1]
-	return r.Method == http.MethodPost && len(parts) >= 3 && parts[len(parts)-3] == "apps" && (last == "stop" || last == "start")
+	return (r.Method == http.MethodPost && (last == "stop" || last == "start")) || (r.Method == http.MethodDelete && last == "hook")
 }
 
 func renderAuthError(w http.ResponseWriter, r *http.Request, status int, title, description string) {

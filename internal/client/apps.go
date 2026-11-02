@@ -33,7 +33,9 @@ type App struct {
 	Branch                string    `json:"branch"`
 	AutoDeploy            bool      `json:"auto_deploy"`
 	SnapshotBeforeChanges bool      `json:"snapshot_before_changes"`
-	CreatedAt             time.Time `json:"created_at"`
+	// Hook says the app has a deploy hook URL.
+	Hook      bool      `json:"hook"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Deploy is one release of an app.
@@ -258,6 +260,11 @@ func (c *Client) RotateDeployHook(ctx context.Context, app string) (string, erro
 	}
 	err := c.do(ctx, http.MethodPost, appPath(app, "hook"), nil, &response)
 	return response.URL, err
+}
+
+// RemoveDeployHook turns the deploy hook off; its URL stops working.
+func (c *Client) RemoveDeployHook(ctx context.Context, app string) error {
+	return c.do(ctx, http.MethodDelete, appPath(app, "hook"), nil, nil)
 }
 
 // Registry is a registry login without its password.

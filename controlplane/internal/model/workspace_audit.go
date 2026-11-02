@@ -122,6 +122,8 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "took the password away from " + target
 	case "app.hook_rotated":
 		return "made a new deploy hook for " + target
+	case "app.hook_removed":
+		return "turned off the deploy hook of " + target
 	case "env.set":
 		return "set " + d["keys"] + " in the env of " + target
 	case "env.removed":

@@ -236,8 +236,20 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(r.PathValue("app"), url))
+	render(w, r, pages.AppHook(r.PathValue("app"), url, true))
 	toastDone(w, r, "Deploy hook created", "The old URL stopped working.")
+}
+
+// RemoveHook turns the deploy hook off; its URL stops working.
+func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("app")
+	_, err := h.apps.RemoveDeployHook(actor(r), name)
+	if err != nil {
+		failed(w, r, "Deploy hook not turned off", err, nil)
+		return
+	}
+	render(w, r, pages.AppHook(name, "", false))
+	toastDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+name+".")
 }
 
 // registryFields are the fields of the registry form, by API field name.

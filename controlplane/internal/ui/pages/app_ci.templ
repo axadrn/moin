@@ -12,8 +12,8 @@ import (
 )
 
 // appCI is the "Build in CI" part of the app page: deploy an image built
-// elsewhere, and the deploy hook CI calls.
-templ appCI(appName string) {
+// elsewhere, and the deploy hook CI calls; hook says the app has one.
+templ appCI(appName string, hook bool) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div class="grid items-stretch gap-4 lg:grid-cols-2">
 		@panel(panelProps{
@@ -51,7 +51,7 @@ templ appCI(appName string) {
 			Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
 			Action:      newHookButton(appName),
 		}) {
-			@AppHook(appName, "")
+			@AppHook(appName, "", hook)
 		}
 	</div>
 }
@@ -74,11 +74,14 @@ templ newHookButton(appName string) {
 	}
 }
 
-// AppHook shows a new deploy hook URL once, with the curl CI runs.
-templ AppHook(appName, url string) {
-	<div id="app-hook" class="flex flex-col gap-3">
-		if url == "" {
-			<p class="text-sm text-muted-foreground">ops shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
+// AppHook shows a new deploy hook URL once, with the curl CI runs, and
+// whether the app has a hook, which can be turned off.
+templ AppHook(appName, url string, on bool) {
+	<div id="app-hook" class="flex flex-col gap-3" data-hook-on?={ on }>
+		if url == "" && on {
+			<p class="text-sm text-muted-foreground">A hook is on: CI can deploy { appName } with it. ops showed its URL once; if it is lost, make a new one.</p>
+		} else if url == "" {
+			<p class="text-sm text-muted-foreground">No hook yet. ops shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
 		} else {
 			<p class="text-sm font-medium">Copy it now: ops shows it only this once. Store it as the CI secret <code class="font-mono">OPS_DEPLOY_HOOK</code>.</p>
 			<div data-deploy-hook>
@@ -86,6 +89,24 @@ templ AppHook(appName, url string) {
 			</div>
 			<p class="text-sm text-muted-foreground">Then let CI call it after pushing the image:</p>
 			@command(`curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
+		}
+		if on {
+			<div>
+				@button.Button(button.Props{
+					Variant: button.VariantSecondary,
+					Size:    button.SizeSm,
+					Attributes: templ.Attributes{
+						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+						"hx-target":     "#app-hook",
+						"hx-swap":       "outerHTML",
+						"hx-disable":    "this",
+						"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + appName + ".",
+						"data-hook-off": true,
+					},
+				}) {
+					Turn off
+				}
+			</div>
 		}
 	</div>
 }

@@ -332,7 +332,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 			<div hx-get={ appPath + "/routing" } hx-trigger="load" hx-swap="outerHTML">
 				@AppRouting(RoutingView{App: app})
 			</div>
-			@appCI(app.Name)
+			@appCI(app.Name, app.DeployHookHash != nil)
 			@dangerPanel("Remove "+app.Name, "Its containers stop and are removed. Its data stays on the server.") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
@@ -341,6 +341,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 						"hx-swap":         "none",
 						"hx-disable":      "this",
 						"hx-confirm":      "Remove " + app.Name + "? Its containers stop and are removed. Its data stays on the server.",
+						"data-confirm-name": app.Name,
 						"data-remove-app": true,
 					},
 				}) {
