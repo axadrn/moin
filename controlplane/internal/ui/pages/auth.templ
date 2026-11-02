@@ -7,6 +7,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
@@ -17,19 +18,33 @@ templ Auth(errorMsg string) {
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Sign in or sign up", "Enter your email. We send you a link, no password needed.") {
+			{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
+			@blocks.AuthCard("Sign in or sign up", authDescription(github)) {
 				@field.Group() {
-					@AuthMagicLinkForm(errorMsg)
-					if config.GoogleOAuthEnabled || ctxkeys.RenderConfig(ctx).GitHubLogin {
+					if github {
+						@button.Button(button.Props{Href: "/auth/github", Size: button.SizeLg, Class: blocks.AuthPrimary}) {
+							@icons.Github(icons.Props{Class: "size-4"})
+							Continue with GitHub
+						}
 						@blocks.AuthOr()
-						@blocks.OAuthButtons(config.GoogleOAuthEnabled, ctxkeys.RenderConfig(ctx).GitHubLogin)
 					}
-					@blocks.AuthOr()
-					@button.Button(button.Props{Href: "/auth/password", Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
-						Sign in with a password
+					@AuthMagicLinkForm(errorMsg)
+					if config.GoogleOAuthEnabled {
+						@blocks.AuthOr()
+						@blocks.OAuthButtons(true, false)
 					}
+					<p class="text-center text-xs text-muted-foreground">
+						Have a password? <a href="/auth/password" class="underline underline-offset-4 hover:text-foreground">Sign in with it</a>
+					</p>
 				}
 			}
 		}
 	}
+}
+
+func authDescription(github bool) string {
+	if github {
+		return "With GitHub or a link by email. No password needed."
+	}
+	return "Enter your email. We send you a link, no password needed."
 }
