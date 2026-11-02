@@ -917,7 +917,7 @@ func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *pro
 
 // sqliteFiles returns the files under dir, three levels deep, that are
 // SQLite databases: the magic string and a valid page size in the 100 byte
-// header.
+// header. Copies of snapshots being taken do not count.
 func sqliteFiles(dir string) []string {
 	files := []string{}
 	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
@@ -925,6 +925,10 @@ func sqliteFiles(dir string) []string {
 			return nil
 		}
 		if entry.IsDir() {
+			// A snapshot being taken copies the database there.
+			if strings.HasPrefix(entry.Name(), snapshotFolderPrefix) {
+				return filepath.SkipDir
+			}
 			if relative, _ := filepath.Rel(dir, path); strings.Count(relative, string(filepath.Separator)) >= 3 {
 				return filepath.SkipDir
 			}

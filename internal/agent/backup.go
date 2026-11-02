@@ -348,24 +348,11 @@ func (b *backups) snapshot(ctx context.Context, request protocol.BackupRequest) 
 func (b *backups) snapshotOne(ctx context.Context, app string, database protocol.Database, reason string) (protocol.Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, snapshotTimeout)
 	defer cancel()
-	copyPath := database.HostPath + ".ops-snapshot"
-	_ = os.Remove(copyPath)
-	defer os.Remove(copyPath)
-	// Read-only, but without query_only, which forbids VACUUM INTO.
-	db, err := sql.Open("sqlite", "file:"+database.HostPath+"?mode=ro&_pragma=busy_timeout(5000)")
+	gzipped, cleanup, err := gzippedCopy(ctx, database.HostPath)
 	if err != nil {
 		return protocol.Snapshot{}, err
 	}
-	_, err = db.ExecContext(ctx, `VACUUM INTO `+quoteText(copyPath))
-	db.Close()
-	if err != nil {
-		return protocol.Snapshot{}, err
-	}
-	gzipped, err := gzipFile(copyPath)
-	if err != nil {
-		return protocol.Snapshot{}, err
-	}
-	defer os.Remove(gzipped)
+	defer cleanup()
 	file, err := os.Open(gzipped)
 	if err != nil {
 		return protocol.Snapshot{}, err
@@ -441,6 +428,40 @@ func cleanReason(reason string) string {
 }
 
 func quoteText(text string) string { return `'` + strings.ReplaceAll(text, `'`, `''`) + `'` }
+
+// snapshotFolderPrefix starts the folder a snapshot copies a database to.
+const snapshotFolderPrefix = ".ops-snapshot-"
+
+// gzippedCopy copies a database with VACUUM INTO and gzips the copy. Each
+// copy gets its own folder next to the database, so two snapshots of one
+// database at the same time do not remove each other's files. cleanup
+// removes the folder.
+func gzippedCopy(ctx context.Context, hostPath string) (string, func(), error) {
+	dir, err := os.MkdirTemp(filepath.Dir(hostPath), snapshotFolderPrefix+"*")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() { os.RemoveAll(dir) }
+	copyPath := filepath.Join(dir, filepath.Base(hostPath))
+	// Read-only, but without query_only, which forbids VACUUM INTO.
+	db, err := sql.Open("sqlite", "file:"+hostPath+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	_, err = db.ExecContext(ctx, `VACUUM INTO `+quoteText(copyPath))
+	db.Close()
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	gzipped, err := gzipFile(copyPath)
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return gzipped, cleanup, nil
+}
 
 func gzipFile(source string) (string, error) {
 	in, err := os.Open(source)

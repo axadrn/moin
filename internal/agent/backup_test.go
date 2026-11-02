@@ -392,3 +392,41 @@ func TestDeployRefusesBadAppID(t *testing.T) {
 		t.Error("a bad app ID was stored")
 	}
 }
+
+// TestGzippedCopiesAtOnce: two snapshots of one database at the same time,
+// like a manual backup during the snapshot before a deploy, both work and
+// leave nothing behind.
+func TestGzippedCopiesAtOnce(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "app.db")
+	db, err := sql.Open("sqlite", "file:"+file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT); INSERT INTO notes (body) VALUES ('one')`)
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	first, firstCleanup, err := gzippedCopy(ctx, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, secondCleanup, err := gzippedCopy(ctx, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatalf("both copies are %s", first)
+	}
+	secondCleanup()
+	if _, err := os.Stat(first); err != nil {
+		t.Fatalf("the second cleanup removed the first copy: %v", err)
+	}
+	firstCleanup()
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Fatalf("left behind: %v", entries)
+	}
+}
