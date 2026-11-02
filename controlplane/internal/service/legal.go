@@ -14,6 +14,7 @@ import (
 
 type LegalPage struct {
 	Title       string
+	Description string
 	Slug        string
 	Content     string
 	LastUpdated string
@@ -87,6 +88,7 @@ func (s *LegalService) loadPage(slug string) (*LegalPage, error) {
 	}
 
 	title, _ := meta["title"].(string)
+	description, _ := meta["description"].(string)
 	if title == "" {
 		// Generate title from slug
 		title = cases.Title(language.English).String(strings.ReplaceAll(slug, "-", " "))
@@ -107,6 +109,7 @@ func (s *LegalService) loadPage(slug string) (*LegalPage, error) {
 
 	return &LegalPage{
 		Title:       title,
+		Description: description,
 		Slug:        slug,
 		Content:     string(html),
 		LastUpdated: lastUpdated,

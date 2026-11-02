@@ -9,7 +9,7 @@ import (
 templ Legal(page *service.LegalPage) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       page.Title,
-		Description: "Legal information and policies",
+		Description: page.Description,
 		Path:        "/legal/" + page.Slug,
 	}) {
 		<main class="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">

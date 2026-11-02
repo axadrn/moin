@@ -91,7 +91,7 @@ templ seo(props SEOProps) {
 	{{ baseURL := cfg.AppURL }}
 	{{ appName := brand.Name }}
 	{{ appTagline := brand.Tagline }}
-	{{ fullTitle := props.Title + " - " + appName }}
+	{{ fullTitle := props.Title + " · " + appName }}
 	@templ.Fragment("seo-title") {
 		<title id="page-title" hx-swap-oob="true">{ fullTitle }</title>
 	}
@@ -122,13 +122,13 @@ templ seo(props SEOProps) {
 	<meta property="og:image" content={ baseURL + "/assets/img/og.png" }/>
 	<meta property="og:image:width" content="1200"/>
 	<meta property="og:image:height" content="630"/>
-	<meta property="og:image:alt" content={ appName + " - " + appTagline }/>
+	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
 	// Twitter Card
 	<meta name="twitter:card" content="summary_large_image"/>
 	<meta name="twitter:title" content={ fullTitle }/>
 	<meta name="twitter:description" content={ props.Description }/>
 	<meta name="twitter:image" content={ baseURL + "/assets/img/og.png" }/>
-	<meta name="twitter:image:alt" content={ appName + " - " + appTagline }/>
+	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
 	// Theme Color
 	<meta name="theme-color" content="#000000"/>
 }

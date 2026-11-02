@@ -20,7 +20,7 @@ import (
 templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.DocPage, nextPage *model.DocPage) {
 	{{ cfg := ctxkeys.RenderConfig(ctx) }}
 	@layouts.Base(layouts.SEOProps{
-		Title:        fmt.Sprintf("%s - Documentation", currentPage.Title),
+		Title:        fmt.Sprintf("%s · Docs", currentPage.Title),
 		Description:  currentPage.Description,
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(currentPage),
