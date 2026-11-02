@@ -235,7 +235,14 @@ func (e WorkspaceAuditEvent) Summary() string {
 	case "github.connected":
 		return "connected the GitHub account " + target
 	case "repo.linked":
-		return "linked " + target + " to " + d["repo"] + " on " + d["branch"]
+		linked := "linked " + target + " to " + d["repo"] + " on " + d["branch"]
+		switch d["auto_deploy"] {
+		case "true":
+			return linked + ", every push deploys"
+		case "false":
+			return linked + ", deploys only by hand"
+		}
+		return linked
 	case "repo.unlinked":
 		return "unlinked " + target + " from " + d["repo"]
 	case "app.deleted":
