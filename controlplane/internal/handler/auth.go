@@ -256,27 +256,27 @@ func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	if email == "" || password == "" {
-		render(w, r, pages.AuthPasswordForm("Email and password are required"))
+		render(w, r, pages.AuthPasswordForm(email, "Email and password are required"))
 		return
 	}
 
 	err := validation.ValidateEmail(email)
 	if err != nil {
-		render(w, r, pages.AuthPasswordForm("Please provide a valid email address"))
+		render(w, r, pages.AuthPasswordForm(email, "Please provide a valid email address"))
 		return
 	}
 
 	user, err := h.authService.Login(email, password)
 	if err != nil {
 		slog.Warn("password login failed", "error", err)
-		render(w, r, pages.AuthPasswordForm("Invalid email or password"))
+		render(w, r, pages.AuthPasswordForm(email, "Invalid email or password"))
 		return
 	}
 
 	_, err = h.authService.StartSession(w, r, user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.AuthPasswordForm("An error occurred. Please try again."))
+		render(w, r, pages.AuthPasswordForm(email, "An error occurred. Please try again."))
 		return
 	}
 
