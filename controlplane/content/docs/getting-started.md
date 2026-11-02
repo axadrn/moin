@@ -12,17 +12,23 @@ On a Mac or Linux:
 curl -fsSL https://ops.example.com/cli.sh | sh
 ```
 
-It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writable. The commands on these pages name the control plane you read them on.
+It puts `ops` in `/usr/local/bin`, or in `~/.local/bin` when that is not writable. If it says to add `~/.local/bin` to your PATH, add this line to `~/.zshrc` or `~/.profile` and open a new terminal:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+The commands on these pages name the control plane you read them on.
 
 ## 2. Log in
 
-Create a personal API token on the web under **Settings**, **Tokens**, with read and write access. It belongs to your workspace; teammates you invite later work in the same one. Then:
+Create a personal API token on the web under **Settings**, **Tokens**. Set **Access** to **Read and write**: a read-only token cannot add servers or deploy. It belongs to your workspace; teammates you invite later work in the same one. Then:
 
 ```bash
-ops login
+ops login --url https://ops.example.com
 ```
 
-Paste the token when it asks. `ops login --url <control plane> --token <token>` works without the prompt.
+Paste the token when it asks. `ops login --url https://ops.example.com --token <token>` works without the prompt.
 
 ## 3. Add a server
 
@@ -32,13 +38,13 @@ Any Linux server with root access works, on amd64 or arm64.
 ops servers add web-1
 ```
 
-It prints one command. Run it on the server as root within the next hour:
+It prints one command. Run it on the server within the next hour. Logged in as root and `sudo` is missing? Leave out `sudo`.
 
 ```bash
 curl -fsSL https://ops.example.com/install.sh | sudo sh -s -- ins_…
 ```
 
-It installs Docker when it is missing, installs the agent as the `ops-agent` systemd service and connects it. `ops servers` now shows `web-1 online`. The web UI shows the same under **Servers**, live.
+It installs Docker when it is missing, which takes a few minutes, installs the agent as the `ops-agent` systemd service and connects it. `ops servers` now shows `web-1 online`. The web UI shows the same under **Servers**, live.
 
 ## 4. Add your bucket
 
@@ -76,5 +82,15 @@ Deploy v1 of blog started
   …
   v1 is live
 ```
+
+## 6. Open it
+
+Your app runs, but it has no address yet. Give it a domain, then point the domain at your server with an A record:
+
+```bash
+ops domains add blog.example.com
+```
+
+ops shows the server's address and the record to set, and the app gets HTTPS. [Domains](/docs/guides/domains) has the details.
 
 Next: [Deploy](/docs/guides/deploy) explains what ops detects and how to configure it.
