@@ -20,7 +20,7 @@ templ appCI(appName string, hook bool) {
 			Heading:     "app-image-heading",
 			Title:       "Deploy an image",
 			Description: "Ship an image built in CI or anywhere else. The server keeps the compose file of the live release and only pulls the new image.",
-			Action:      docsLink("/docs/guides/ci", "How it works"),
+			Docs:        "/docs/guides/ci#deploy-an-image-by-hand",
 		}) {
 			<form
 				class="flex flex-col gap-3"

@@ -335,7 +335,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				@AppRouting(RoutingView{App: app})
 			</div>
 			@appCI(app.Name, app.DeployHookHash != nil)
-			@dangerPanel("Remove "+app.Name, "Its containers stop and are removed. Its data stays on the server.") {
+			@dangerPanel("Remove "+app.Name, "Its containers stop and are removed. Its data stays on the server.", "/docs/guides/deploy#remove-an-app") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{

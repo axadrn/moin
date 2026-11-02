@@ -200,9 +200,9 @@ const panelHeaderStack = "max-sm:has-data-[slot=card-action]:grid-cols-1"
 
 const panelActionStack = "max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-auto max-sm:justify-self-start max-sm:pt-2"
 
-// dangerPanel is the last card of a page: one destructive action (children)
-// and what it does.
-templ dangerPanel(title, body string) {
+// dangerPanel is the last card of a page: one destructive action (children),
+// what it does and the docs section, with its anchor, that explains it.
+templ dangerPanel(title, body, docs string) {
 	@card.Card(card.Props{Class: "min-w-0"}) {
 		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
 			@card.Title(card.TitleProps{Class: "text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
@@ -212,6 +212,7 @@ templ dangerPanel(title, body string) {
 				{ body }
 			}
 			@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-2", panelActionStack)}) {
+				@docsLink(docs, "How it works")
 				{ children... }
 			}
 		}

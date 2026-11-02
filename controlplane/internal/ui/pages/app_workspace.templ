@@ -208,7 +208,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				</form>
 			}
 		}
-		@dangerPanel("Leave or delete the workspace", "The last Owner must hand ownership to someone else or delete the workspace.") {
+		@dangerPanel("Leave or delete the workspace", "The last Owner must hand ownership to someone else or delete the workspace.", "/docs/guides/team#leave-or-delete-a-workspace") {
 			<div class="flex flex-wrap gap-2">
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/leave") }

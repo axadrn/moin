@@ -281,7 +281,7 @@ templ SettingsPasswordSection() {
 
 templ SettingsDangerZoneSection() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@dangerPanel("Delete your account", "Your account, profile and API tokens are removed from ops. This cannot be undone.") {
+	@dangerPanel("Delete your account", "Your account, profile and API tokens are removed from ops. This cannot be undone.", "/docs/guides/account#delete-your-account") {
 		@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
 			@button.Button(button.Props{Type: "button", Variant: button.VariantDestructive, Attributes: dialog.Trigger(ctx)}) {
 				Delete account

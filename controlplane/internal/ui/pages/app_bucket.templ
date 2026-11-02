@@ -30,7 +30,7 @@ templ Bucket(view BucketView) {
 					</dl>
 				}
 				if view.Storage != nil {
-					@dangerPanel("Remove the bucket", "Backups stop and ops deploy needs a bucket again. What is in the bucket stays there.") {
+					@dangerPanel("Remove the bucket", "Backups stop and ops deploy needs a bucket again. What is in the bucket stays there.", "/docs/guides/backups#stop-backups") {
 						@button.Button(button.Props{
 							Variant: button.VariantDestructive,
 							Attributes: templ.Attributes{
@@ -66,7 +66,7 @@ templ bucketForm(view BucketView) {
 	@panel(panelProps{
 		Title:       bucketTitle(view.Storage != nil),
 		Description: bucketDescription(view.Storage != nil),
-		Action:      docsLink("/docs/guides/bucket", "How it works"),
+		Docs:        "/docs/guides/bucket#add-it",
 		Attrs:       templ.Attributes{"data-backup-storage": true},
 	}) {
 		<div class="flex flex-col gap-6">
