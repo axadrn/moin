@@ -445,3 +445,28 @@ func TestInviteWrongRole(t *testing.T) {
 		t.Errorf("mode %d, step %d, values %v, err %v; want the role asked again", m.mode, m.form.step, m.form.values, m.err)
 	}
 }
+
+// TestTypedNameConfirms: removing a server runs only once its name is
+// typed; another answer changes nothing.
+func TestTypedNameConfirms(t *testing.T) {
+	base := model{servers: []client.Server{{ID: "s1", Name: "web-1"}}}
+	m := press(base, "x")
+	if m.mode != modeConfirmName || m.confirm.name != "web-1" {
+		t.Fatalf("x: mode %v, name %q", m.mode, m.confirm.name)
+	}
+	ran := false
+	m.confirm.run = func() tea.Msg { ran = true; return nil }
+	wrong := press(m, "w", "e", "b", "enter")
+	if _, cmd := wrong.Update(tea.KeyPressMsg{Code: tea.KeyEnter}); cmd != nil || wrong.err == nil || wrong.mode != modeList {
+		t.Fatalf("a wrong name: mode %v, err %v", wrong.mode, wrong.err)
+	}
+	m.input = "web-1"
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil || next.(model).mode != modeList {
+		t.Fatal("the right name does not run")
+	}
+	cmd()
+	if !ran {
+		t.Fatal("the right name ran something else")
+	}
+}
