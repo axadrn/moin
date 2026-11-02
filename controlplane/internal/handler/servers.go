@@ -70,6 +70,18 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, server.Name+" added", "Run the install command on the server.")
 }
 
+// NewInstall answers a new install command for a server in the same panel
+// as after Add server. The old command stops working.
+func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
+	server, installToken, err := h.servers.NewInstallToken(actor(r), r.PathValue("id"))
+	if err != nil {
+		failed(w, r, "No new install command", err, nil)
+		return
+	}
+	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
+	toastDone(w, r, "New install command for "+server.Name, "Run it on the server within the hour. The old one stops working.")
+}
+
 // Delete removes a server from its page and goes back to the list.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// The list names the server, to show how to remove its agent there.

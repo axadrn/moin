@@ -149,6 +149,28 @@ func (s *ServerService) Rename(actor Actor, idOrName, name string) (*model.Serve
 	return server, nil
 }
 
+// NewInstallToken gives a server a new install token, for a lost install
+// command or to move the agent to another machine. The old token stops
+// working; the agent that registers with the new one takes over and the
+// old agent's token stops working. It returns the raw token, which works
+// once within InstallTokenLifetime.
+func (s *ServerService) NewInstallToken(actor Actor, idOrName string) (*model.Server, string, error) {
+	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return nil, "", err
+	}
+	raw := installTokenMarker + randomToken()
+	expiresAt := s.now().UTC().Add(InstallTokenLifetime)
+	err = s.servers.SetInstallToken(server.ID, actor.WorkspaceID, hashToken(raw), expiresAt)
+	if err != nil {
+		return nil, "", err
+	}
+	s.record(actor, "server.install_command", "server", server.Name, nil)
+	server.InstallExpiresAt = &expiresAt
+	server.Online = s.Online(server.ID)
+	return server, raw, nil
+}
+
 // UninstallCommand removes the agent from a server, run on it after the
 // server is removed here.
 func (s *ServerService) UninstallCommand() string {
@@ -211,6 +233,13 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 	err = s.servers.Register(server.ID, hashToken(raw), helloServer(hello, nil))
 	if err != nil {
 		return nil, "", err
+	}
+	// An agent that registers again, or on another machine, takes over.
+	s.mu.Lock()
+	session := s.sessions[server.ID]
+	s.mu.Unlock()
+	if session != nil {
+		session.kick()
 	}
 	slog.Info("agent registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
 	s.record(System(server.WorkspaceID), "server.installed", "server", server.Name, map[string]string{"hostname": hello.Hostname, "os": hello.OS, "arch": hello.Arch, "version": hello.AgentVersion})

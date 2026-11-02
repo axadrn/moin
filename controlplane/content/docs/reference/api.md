@@ -31,6 +31,7 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | a checkout link; the billing portal (owner, *session*) |
 | `GET /api/v1/servers` · `POST` | servers, with their `rules` from `/etc/ops/rules` |
 | `GET /api/v1/servers/events` | server list as server-sent events |
+| `POST /api/v1/servers/{id}/install` | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | renames a server `{"name": "…"}` |
 | `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |

@@ -65,6 +65,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
 		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
+	mcpsdk.AddTool(server, add("new_install_command", "New install command",
+		"Makes a new one-time install command for a server and returns it, for a lost command or to move the agent to another machine. It works once within an hour; ops stores only a fingerprint, so it is shown this once. The old install command stops working, and an agent that registers with the new one takes over from the old agent. Needs a token with read and write access.",
+		change(true, false)), Write(changes(services, tools.newInstallCommand)))
 	mcpsdk.AddTool(server, add("rename_server", "Rename a server",
 		"Gives a server a new name, 1 to 64 characters, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.renameServer)))
@@ -440,6 +443,28 @@ type CreatedServer struct {
 
 func (c CreatedServer) Summary() string {
 	return fmt.Sprintf("Added %s. Run this on the server as root within the hour: %s", c.Server.Name, c.InstallCommand)
+}
+
+// NewInstall is the output of new_install_command.
+type NewInstall struct {
+	api.CreatedServer
+}
+
+func (n NewInstall) Summary() string {
+	return fmt.Sprintf("New install command for %s. Run this on the server as root within the hour: %s", n.Server.Name, n.InstallCommand)
+}
+
+func (t opsTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
+	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.server())
+	if err != nil {
+		return NewInstall{}, err
+	}
+	return NewInstall{api.CreatedServer{
+		Server:         api.NewServer(*server),
+		InstallToken:   installToken,
+		InstallCommand: t.services.Servers.InstallCommand(installToken),
+		ExpiresAt:      server.InstallExpiresAt.UTC(),
+	}}, nil
 }
 
 func (t opsTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {

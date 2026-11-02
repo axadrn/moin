@@ -32,6 +32,18 @@ API: POST /api/v1/servers
 MCP: add_server
 ```
 
+## A new install command
+
+The install command shows once: ops stores only a fingerprint of its token. If you lost it, or move the agent to another machine, get a new one. It works once within one hour, like the first. The old command stops working, and the agent that registers with the new one takes over: the old agent's token stops working.
+
+```surfaces
+Web: **Servers**, open the server, **New install command**
+CLI: ops servers install-command web-1
+TUI: on the server, `i`
+API: POST /api/v1/servers/{id}/install
+MCP: new_install_command
+```
+
 ## Rename a server
 
 Gives a server a new name. The rules are those of adding one: up to 64 characters, unique in the workspace. Its apps stay on it.

@@ -122,8 +122,12 @@ func (m model) body(width, room int) []string {
 func (m model) serversView(width, room int) []string {
 	var added []string
 	if m.added != nil {
+		lead := " added. Run this on the server as root within the next hour:"
+		if m.again {
+			lead = ": a new install command. Run it on the server as root within the next hour; the old one stops working:"
+		}
 		added = append(added, "",
-			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.added.Server.Name)+" added. Run this on the server as root within the next hour:",
+			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(m.added.Server.Name)+lead,
 			"")
 		// The command keeps to one line where it fits, so it copies in one
 		// piece; narrow terminals break it after the pipe, which the shell
@@ -131,7 +135,7 @@ func (m model) serversView(width, room int) []string {
 		for _, line := range wrapCommand(m.added.InstallCommand, width-len(pad)-1) {
 			added = append(added, pad+style.Accent.Render(line))
 		}
-		added = append(added, "", pad+style.Muted.Render("It turns online here when its agent connects."))
+		added = append(added, "", pad+style.Muted.Render("It shows once: ops stores only a fingerprint of it. The server turns online here when its agent connects."))
 	}
 	if m.removed != nil {
 		added = append(added, "",
@@ -467,7 +471,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && len(m.servers) == 0:
 		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"n", "rename"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"n", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		var keys [][2]string
 		if len(m.detail.Deploys) > 0 {

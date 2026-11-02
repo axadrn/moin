@@ -220,6 +220,14 @@ func (c *Client) AddServer(ctx context.Context, name string) (NewServer, error) 
 	return response, err
 }
 
+// NewInstallCommand makes a new one-time install command for a server; the
+// old one stops working.
+func (c *Client) NewInstallCommand(ctx context.Context, idOrName string) (NewServer, error) {
+	var response NewServer
+	err := c.do(ctx, http.MethodPost, "/api/v1/servers/"+url.PathEscape(idOrName)+"/install", nil, &response)
+	return response, err
+}
+
 // RenameServer gives a server a new name and returns it.
 func (c *Client) RenameServer(ctx context.Context, idOrName, name string) (Server, error) {
 	var response Server

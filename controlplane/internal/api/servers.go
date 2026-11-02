@@ -136,6 +136,22 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// NewInstall answers 201 with a new install command for the server. The
+// old one stops working.
+func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
+	server, installToken, err := h.servers.NewInstallToken(actor(r), r.PathValue("id"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusCreated, CreatedServer{
+		Server:         NewServer(*server),
+		InstallToken:   installToken,
+		InstallCommand: h.servers.InstallCommand(installToken),
+		ExpiresAt:      server.InstallExpiresAt.UTC(),
+	})
+}
+
 type renameServerRequest struct {
 	Name string `json:"name"`
 }

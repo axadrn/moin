@@ -210,3 +210,39 @@ func TestRenameServer(t *testing.T) {
 		t.Fatalf("another workspace: err = %v", err)
 	}
 }
+
+func TestNewInstallTokenMovesTheAgent(t *testing.T) {
+	servers := newServerService(t)
+	_, first, err := servers.Create(owner, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, second, err := servers.NewInstallToken(owner, "prod")
+	if err != nil || second == first {
+		t.Fatalf("new install token = %q, %v", second, err)
+	}
+	if _, _, err := servers.Register(first, testHello); !errors.Is(err, ErrInstallTokenValid) {
+		t.Fatalf("old install token: err = %v", err)
+	}
+	_, oldAgent, err := servers.Register(second, testHello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, third, err := servers.NewInstallToken(owner, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, newAgent, err := servers.Register(third, testHello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := servers.Authenticate(oldAgent); !errors.Is(err, ErrAgentToken) {
+		t.Fatalf("old agent token: err = %v", err)
+	}
+	if _, err := servers.Authenticate(newAgent); err != nil {
+		t.Fatalf("new agent token: %v", err)
+	}
+	if _, _, err := servers.NewInstallToken(other, "prod"); !errors.Is(err, repository.ErrServerNotFound) {
+		t.Fatalf("another workspace: err = %v", err)
+	}
+}

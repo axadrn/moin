@@ -251,6 +251,8 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "added the server " + target
 	case "server.removed":
 		return "removed the server " + target
+	case "server.install_command":
+		return "made a new install command for " + target
 	case "server.renamed":
 		return "renamed the server " + d["from"] + " to " + target
 	case "server.agent_updated":

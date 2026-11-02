@@ -17,6 +17,7 @@ order: 1
 | `ops team rename <name>` | renames the workspace; its links stay the same |
 | `ops servers` | lists servers |
 | `ops servers add [name]` | adds a server, prints its install command; without a name it gets one like `brave-otter` |
+| `ops servers install-command <name>` | prints a new one-time install command; the old one stops working |
 | `ops servers rename <name> <new name>` | renames a server; its apps stay on it |
 | `ops servers rm <name> [--yes]` | asks you to type its name, removes the server and prints the command that removes its agent there |
 | `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |

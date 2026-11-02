@@ -911,6 +911,35 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/servers/{id}/install:
+    parameters:
+      - $ref: '#/components/parameters/ServerID'
+    post:
+      tags: [Servers]
+      operationId: newInstallCommand
+      summary: New install command
+      description: A new install token and command for the server, shown this once, for one hour; ops stores only a fingerprint of it. The old install command stops working. An agent that registers with it takes over the server, and the agent token of the old one stops working.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '201':
+          description: The server and its new install command.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedServer'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No server with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/servers/{id}/update:
     parameters:
       - $ref: '#/components/parameters/ServerID'

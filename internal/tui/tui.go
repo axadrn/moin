@@ -66,6 +66,7 @@ type (
 	streamErrMsg struct{ err error }
 	addedMsg     client.NewServer
 	removedMsg   removedServer
+	installMsg   client.NewServer
 	detailMsg    client.AppDetail
 	// outputMsg replaces the output panel. follow means a deploy streams
 	// into it.
@@ -202,7 +203,9 @@ type model struct {
 	selected int
 	input    string
 	added    *client.NewServer
-	removed  *removedServer
+	// again marks added as a new install command for a server ops has.
+	again   bool
+	removed *removedServer
 	// pendingSQL is a query that changes data, waiting for a yes.
 	pendingSQL string
 	// pendingSecurity is a change of a server's access, waiting for a yes.
@@ -342,7 +345,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode, m.pendingSQL = modeConfirmWrite, string(msg)
 	case addedMsg:
 		added := client.NewServer(msg)
-		m.added, m.removed, m.mode, m.input = &added, nil, modeList, ""
+		m.added, m.again, m.removed, m.mode, m.input = &added, false, nil, modeList, ""
+	case installMsg:
+		added := client.NewServer(msg)
+		m.added, m.again, m.removed = &added, true, nil
 	case removedMsg:
 		removed := removedServer(msg)
 		m.removed, m.added = &removed, nil
@@ -691,6 +697,11 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			server := m.servers[m.selected]
 			return m.confirmName("Remove "+server.Name+"?", "Its agent is disconnected; the agent stays on the machine until you uninstall it.", server.Name, m.removeServer(server.ID, server.Name)), nil
 		}
+	case "i":
+		if m.selected < len(m.servers) {
+			server := m.servers[m.selected]
+			return m, m.newInstallCommand(server.ID)
+		}
 	case "n":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
@@ -1027,6 +1038,16 @@ func (m model) removeServer(id, name string) tea.Cmd {
 			return errMsg{err}
 		}
 		return removedMsg{name: name, uninstall: uninstall}
+	}
+}
+
+func (m model) newInstallCommand(id string) tea.Cmd {
+	return func() tea.Msg {
+		created, err := m.api.NewInstallCommand(m.ctx, id)
+		if err != nil {
+			return errMsg{err}
+		}
+		return installMsg(created)
 	}
 }
 

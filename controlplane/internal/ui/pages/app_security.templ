@@ -64,11 +64,25 @@ templ ServerSecurity(view SecurityView) {
 	@layouts.AppShell(layouts.AppProps{Title: view.Server.Name + " security", Crumbs: []layouts.Crumb{{Label: "Servers", Href: basePath + "/servers"}, {Label: view.Server.Name}, {Label: "Security"}}}) {
 		@panelPage(templ.Attributes{"data-server-security": view.Server.Name}) {
 			@statusHeader(view.Server.Name, serverStatus(view.Server), "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.")
+			<div id="server-added" class="empty:hidden"></div>
 			<div id="server-security" class="flex flex-col gap-6">
 				@securityState(view, securityPath)
 				@securityKeys(view)
 				@serverRules(view.Server)
 			</div>
+			@panel(panelProps{
+				Title:       "Install command",
+				Description: "A new one-time install command, if you lost the first one or move the agent to another machine. The old command stops working; the agent that registers with the new one takes over.",
+			}) {
+				<div>
+					@button.Button(button.Props{
+						Variant:    button.VariantSecondary,
+						Attributes: templ.Attributes{"hx-post": basePath + "/servers/" + view.Server.ID + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": view.Server.Name},
+					}) {
+						New install command
+					}
+				</div>
+			}
 			@panel(panelProps{Title: "Name", Description: "Up to 64 characters, unique in the workspace. The apps on the server stay on it."}) {
 				<form
 					class="flex flex-col gap-2 sm:flex-row"

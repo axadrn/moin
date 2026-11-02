@@ -27,6 +27,7 @@ type ServerRepository interface {
 	TouchLastSeen(id string, at time.Time) error
 	DeleteForWorkspace(id, workspaceID string) error
 	Rename(id, workspaceID, name string) error
+	SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error
 	SetSecurity(server model.Server) error
 	SetSecurityReport(id, report string) error
 	Integrations(workspaceID string) (model.Integrations, error)
@@ -134,6 +135,23 @@ func (r *serverRepository) Rename(id, workspaceID, name string) error {
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: servers.workspace_id, servers.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateServer
 	}
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrServerNotFound
+	}
+	return nil
+}
+
+// SetInstallToken replaces the install token of a server; the old one
+// stops working.
+func (r *serverRepository) SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error {
+	result, err := r.db.Exec(`UPDATE servers SET install_token_hash = $1, install_expires_at = $2 WHERE id = $3 AND workspace_id = $4`, hash, expiresAt, id, workspaceID)
 	if err != nil {
 		return err
 	}

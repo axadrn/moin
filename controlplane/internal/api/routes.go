@@ -113,6 +113,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"DELETE /api/v1/servers/{id}", m.InWorkspace(h.Servers.Delete), TokenWrite},
 		{"PATCH /api/v1/servers/{id}", m.InWorkspace(h.Servers.Rename), TokenWrite},
 		{"POST /api/v1/servers/{id}/update", m.InWorkspace(h.Servers.Update), TokenWrite},
+		{"POST /api/v1/servers/{id}/install", m.InWorkspace(h.Servers.NewInstall), TokenWrite},
 		{"PUT /api/v1/servers/{id}/security", m.InWorkspace(h.Apps.SetSecurity), TokenWrite},
 		{"GET /api/v1/integrations", m.InWorkspace(h.Apps.GetIntegrations), TokenRead},
 		{"PUT /api/v1/integrations", m.InWorkspace(h.Apps.SetIntegrations), TokenWrite},

@@ -44,6 +44,7 @@ Servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
   servers rename     Rename a server: servers rename web-1 shop-1
+  servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
   servers update     Update the agent to the control plane's version: servers update [web-1]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for ops, from /etc/ops/rules on it
@@ -421,6 +422,27 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return printRules(ctx, api, flags.Arg(0), stdout)
 	case "update":
 		return updateAgents(ctx, args, stdout)
+	case "install-command":
+		flags := newFlags("servers install-command", "servers install-command <server>")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 1 {
+			return flags.wrong()
+		}
+		created, err := api.NewInstallCommand(ctx, flags.Arg(0))
+		if err != nil {
+			return err
+		}
+		done(stdout, "New install command for %s. Run this on the server as root within the next hour:", style.Bold.Render(created.Server.Name))
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
+		fmt.Fprintln(stdout)
+		hint(stdout, "It shows once: ops stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
+		return nil
 	case "rename":
 		flags := newFlags("servers rename", "servers rename <server> <new name>")
 		if err := flags.parse(args); err != nil {
