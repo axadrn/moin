@@ -302,7 +302,14 @@ func (s *AppService) DeployRef(ctx context.Context, actor Actor, idOrName, ref s
 	if ref == "" {
 		ref = app.Branch
 	}
-	commit, err := s.github.Commit(ctx, app.InstallationID, app.Repo, ref)
+	return s.deployCommit(ctx, actor, app, ref, ref)
+}
+
+// deployCommit deploys the commit that at points to and records it under
+// ref: a push names the branch and pins its exact commit, so a newer push
+// in between can't change what this deploy builds.
+func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.App, ref, at string) (*model.Deploy, error) {
+	commit, err := s.github.Commit(ctx, app.InstallationID, app.Repo, at)
 	var githubErr *GitHubError
 	if errors.As(err, &githubErr) && (githubErr.Status == 404 || githubErr.Status == 422) {
 		return nil, ErrRef
@@ -337,7 +344,13 @@ func (s *AppService) GitHubPush(ctx context.Context, installationID int64, repo,
 			slog.Info("auto deploy skipped", "app_id", app.ID, "repo", repo, "error", err)
 			continue
 		}
-		deploy, err := s.DeployRef(ctx, Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaGitHub}}, app.ID, sha)
+		actor := Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaGitHub}}
+		ready, err := s.ready(app.WorkspaceID, app.ID)
+		if err != nil {
+			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)
+			continue
+		}
+		deploy, err := s.deployCommit(ctx, actor, ready, branch, sha)
 		if err != nil {
 			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)
 			continue

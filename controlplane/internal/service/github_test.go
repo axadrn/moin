@@ -255,6 +255,10 @@ func TestGitHubDeploys(t *testing.T) {
 	if err != nil || len(deploys) != 2 || deploys[0].CommitSHA != "abc123" {
 		t.Fatalf("after the push: %d deploys, %v", len(deploys), err)
 	}
+	// A push deploy names the branch, not the commit twice.
+	if deploys[0].Ref != "main" {
+		t.Fatalf("push deploy ref = %q, want main", deploys[0].Ref)
+	}
 
 	err = apps.GitHubUninstalled(7)
 	if err != nil {
