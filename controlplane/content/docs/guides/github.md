@@ -18,7 +18,11 @@ API: GET /api/v1/github
 MCP: get_github
 ```
 
-The CLI, the TUI, the API and MCP give you the link; installing always happens on github.com. GitHub sends you back and the repos show up. The same command shows where the app is installed.
+The CLI, the TUI, the API and MCP give you the link; connecting always happens on github.com. GitHub sends you back and the repos show up. The same command shows where the app is installed.
+
+Already installed the app? Click **Connect GitHub** all the same. ops asks GitHub which accounts have the app and connects them. If none has it yet, GitHub asks you to install it. An account connected to another workspace stays there: disconnect it there first.
+
+To add another account or organization later, the CLI, the TUI, the API and MCP give a link that installs the app there.
 
 The app asks for the least it needs: read the contents of the repos you choose, and write commit statuses. It cannot push code.
 
