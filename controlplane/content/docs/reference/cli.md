@@ -23,6 +23,7 @@ order: 1
 | `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |
 | `ops servers rules <name>` | the server's own rules for ops, from `/etc/ops/rules` on it |
 | `ops apps` | lists apps |
+| `ops apps <app>` | one app: its state, server, domains, password, repo and deploys; `ops app <app>` works too |
 | `ops apps add --server <server> <name>` | adds an app |
 | `ops apps rm <app> [--yes]` | asks you to type its name, removes the app, keeps its data |
 | `ops deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |

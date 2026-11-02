@@ -94,7 +94,63 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		done(stdout, "Removed %s. Its data stays on the server", style.Bold.Render(name))
 		return nil
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+command, build.Name)
+	// apps shop shows one app, the way people try it after apps.
+	if len(args) > 0 {
+		return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+command, build.Name)
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	detail, err := api.App(ctx, command)
+	if client.IsNotFound(err) {
+		return fmt.Errorf("no app or command %q. Run `%s apps` for your apps, `%s help` for the commands", command, build.Name, build.Name)
+	}
+	if err != nil {
+		return err
+	}
+	printApp(stdout, detail, time.Now())
+	return nil
+}
+
+// printApp writes one app: its state, server, domains, repo and deploys.
+func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
+	app := detail.App
+	fmt.Fprintln(stdout, style.Bold.Render(app.Name)+" "+badge(stdout, style.App(app), app.Status()))
+	domains, canonical, fromCompose := app.Domains, app.Canonical, false
+	for _, deploy := range detail.Deploys {
+		// The live release says what it answers on; x-ops wins there.
+		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
+			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
+		}
+	}
+	domainText := "none"
+	if len(domains) > 0 {
+		domainText = strings.Join(domains, ", ")
+		if canonical != "" {
+			domainText += " (canonical " + canonical + ")"
+		}
+		if fromCompose {
+			domainText += ", from compose.yml"
+		}
+	}
+	repo := "none"
+	if app.Repo != "" {
+		auto := "off"
+		if app.AutoDeploy {
+			auto = "on"
+		}
+		repo = app.Repo + ", branch " + app.Branch + ", auto deploy " + auto
+	}
+	password := "off"
+	if app.Protected {
+		password = "on"
+	}
+	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"password", password}, {"repo", repo}}
+	for _, row := range rows {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-9s", row[0]))+" "+row[1])
+	}
+	fmt.Fprintln(stdout)
+	printDeploys(stdout, detail, now)
 }
 
 // PrintApps writes the app table.
@@ -381,10 +437,17 @@ func deploys(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	printDeploys(stdout, detail, now)
+	return nil
+}
+
+// printDeploys writes the deploy history of an app.
+func printDeploys(stdout io.Writer, detail client.AppDetail, now time.Time) {
+	name := detail.App.Name
 	if len(detail.Deploys) == 0 {
 		fmt.Fprintf(stdout, "%s has no deploys yet.\n", name)
 		hint(stdout, "Deploy it with", build.Name+" deploy")
-		return nil
+		return
 	}
 	rows := make([][]string, 0, len(detail.Deploys))
 	for _, deploy := range detail.Deploys {
@@ -401,7 +464,6 @@ func deploys(ctx context.Context, args []string, stdout io.Writer) error {
 	table(stdout, []string{"DEPLOY", "STATUS", "STARTED", "TOOK", "NOTE"}, rows)
 	fmt.Fprintln(stdout)
 	hint(stdout, "The log of one:", fmt.Sprintf("%s deploys %s v%d", build.Name, name, detail.Deploys[0].Number))
-	return nil
 }
 
 // deployTimes is "started 3 min ago, took 41s".

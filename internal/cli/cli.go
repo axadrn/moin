@@ -52,7 +52,7 @@ Servers
   integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
 
 Apps
-  apps               List apps
+  apps               List apps; one app with its domains and deploys: apps <app>
   apps add           Add an app: apps add --server <server> <name>
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
 
@@ -223,7 +223,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return team(ctx, rest, stdin, stdout)
 	case "servers":
 		return servers(ctx, rest, stdin, stdout)
-	case "apps":
+	case "apps", "app":
 		return apps(ctx, rest, stdin, stdout)
 	case "deploy":
 		return deploy(ctx, rest, stdout)

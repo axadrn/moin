@@ -404,6 +404,23 @@ func TestBadNamesStayLocal(t *testing.T) {
 	}
 }
 
+// ops apps shop and ops app shop show one app; a typo says what exists.
+func TestAppsWithANameShowsTheApp(t *testing.T) {
+	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true},
+		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.de"],"config":{"domains":["shop.de"]}}}]}`
+	for _, args := range [][]string{{"apps", "shop"}, {"app", "shop"}} {
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
+		code, stdout, stderr := runCLI(t, api, args...)
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.de, from compose.yml") || !strings.Contains(stdout, "me/shop, branch main, auto deploy on") || !strings.Contains(stdout, "v2") {
+			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
+		}
+	}
+	code, _, stderr := runCLI(t, &fakeAPI{}, "apps", "lsit")
+	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "ops apps") {
+		t.Errorf("typo: code %d, stderr %q", code, stderr)
+	}
+}
+
 // Domains that x-ops sets are marked, with where to change them.
 func TestDomainsFromComposeAreMarked(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.de","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
