@@ -140,6 +140,14 @@ func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io
 	value := ""
 	var err error
 	if remove {
+		stored, err := api.Integrations(ctx)
+		if err != nil {
+			return err
+		}
+		if (args[0] == "cloudflare" && !stored.Cloudflare) || (args[0] == "tailscale" && !stored.Tailscale) {
+			done(stdout, "Nothing changed: no %s key is stored.", args[0])
+			return nil
+		}
 		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove the %s key?", args[0]))
 		if err != nil {
 			return err

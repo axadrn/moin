@@ -154,7 +154,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -491,6 +491,14 @@ func TestActivityFilterThatMatchesNothing(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/activity": `{"items":[]}`}}
 	code, stdout, stderr := runCLI(t, api, "activity", "--server", "ghost")
 	if code != 0 || !strings.Contains(stdout, "No events match.") {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}
+
+func TestIntegrationsRmWithoutAKeyChangesNothing(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/integrations": `{"cloudflare":true,"tailscale":false}`}}
+	code, stdout, stderr := runCLI(t, api, "integrations", "rm", "tailscale", "--yes")
+	if code != 0 || !strings.Contains(stdout, "Nothing changed: no tailscale key is stored.") || api.seen("PUT") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
 }
