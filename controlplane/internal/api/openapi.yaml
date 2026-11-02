@@ -878,7 +878,7 @@ paths:
           description: '`not_found`. No server with this ID or name belongs to the account.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name`: empty, longer than 64 characters, or taken in the workspace.'
+          description: '`validation_failed` with `fields.name`: not 1 to 63 lowercase letters, digits or dashes starting with a letter or digit, or taken in the workspace.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:

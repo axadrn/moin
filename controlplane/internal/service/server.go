@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
@@ -27,11 +26,10 @@ const (
 	agentTokenMarker   = "agt_"
 	// InstallTokenLifetime is how long an install command works.
 	InstallTokenLifetime = time.Hour
-	maxServerNameLength  = 64
 )
 
 var (
-	ErrServerName        = errors.New("server name must contain between 1 and 64 characters")
+	ErrServerName        = errors.New("server name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
 	ErrInstallTokenValid = errors.New("install token is invalid, used or expired")
 	ErrAgentToken        = errors.New("agent token is invalid")
 	ErrServerOffline     = errors.New("server is offline")
@@ -120,23 +118,23 @@ func (s *ServerService) InstallCommand(installToken string) string {
 	return fmt.Sprintf("curl -fsSL %s/install.sh | sh -s -- %s", s.appURL, installToken)
 }
 
-func validServerName(name string) bool {
-	return name != "" && utf8.RuneCountInString(name) <= maxServerNameLength && strings.IndexFunc(name, unicode.IsControl) < 0
-}
+// validServerName follows the rule of app names: lowercase letters, digits
+// and dashes. Servers added before the rule keep their names until renamed.
+func validServerName(name string) bool { return protocol.ValidAppName(name) }
 
 // Rename gives a server a new name under the rules of Create. Apps follow,
 // since they point at the server, not its name.
 func (s *ServerService) Rename(actor Actor, idOrName, name string) (*model.Server, error) {
 	name = strings.TrimSpace(name)
-	if !validServerName(name) {
-		return nil, ErrServerName
-	}
 	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
 	if server.Name == name {
 		return server, nil
+	}
+	if !validServerName(name) {
+		return nil, ErrServerName
 	}
 	err = s.servers.Rename(server.ID, actor.WorkspaceID, name)
 	if err != nil {

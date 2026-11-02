@@ -84,7 +84,7 @@ templ ServerSecurity(view SecurityView) {
 					}
 				</div>
 			}
-			@panel(panelProps{Title: "Name", Docs: "/docs/guides/servers#rename-a-server", Description: "Up to 64 characters, unique in the workspace. The apps on the server stay on it."}) {
+			@panel(panelProps{Title: "Name", Docs: "/docs/guides/servers#rename-a-server", Description: "Lowercase letters, digits and dashes, unique in the workspace. The apps on the server stay on it."}) {
 				<form
 					class="flex flex-col gap-2 sm:flex-row"
 					hx-post={ basePath + "/servers/" + view.Server.ID + "/name" }
@@ -97,7 +97,7 @@ templ ServerSecurity(view SecurityView) {
 				>
 					@csrf.Token()
 					<label for="server-rename" class="sr-only">Server name</label>
-					@input.Input(input.Props{ID: "server-rename", Name: "name", Type: "text", Value: view.Server.Name, Class: "min-w-0 sm:max-w-sm", Attributes: templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false"}})
+					@input.Input(input.Props{ID: "server-rename", Name: "name", Type: "text", Value: view.Server.Name, Class: "min-w-0 sm:max-w-sm", Attributes: templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false"}})
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
 						Save
 					}

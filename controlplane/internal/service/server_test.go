@@ -89,9 +89,15 @@ func TestServerNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("another user may use the same name: %v", err)
 	}
-	_, _, err = servers.Create(owner, strings.Repeat("x", 65))
+	_, _, err = servers.Create(owner, strings.Repeat("x", 64))
 	if !errors.Is(err, ErrServerName) {
 		t.Fatalf("long name: err = %v", err)
+	}
+	// Server names follow the rule of app names.
+	for _, name := range []string{"Prod", "web 1", "web_1", "-web", "wéb"} {
+		if _, _, err := servers.Create(owner, name); !errors.Is(err, ErrServerName) {
+			t.Fatalf("name %q: err = %v, want ErrServerName", name, err)
+		}
 	}
 	generatedName := regexp.MustCompile(`^[a-z]+-[a-z]+$`)
 	first, _, err := servers.Create(owner, "")
@@ -207,8 +213,33 @@ func TestRenameServer(t *testing.T) {
 	if _, err := servers.Rename(owner, "live", " "); !errors.Is(err, ErrServerName) {
 		t.Fatalf("empty name: err = %v", err)
 	}
+	if _, err := servers.Rename(owner, "live", "Live Server"); !errors.Is(err, ErrServerName) {
+		t.Fatalf("name with spaces: err = %v", err)
+	}
 	if _, err := servers.Rename(other, "live", "mine"); !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another workspace: err = %v", err)
+	}
+}
+
+// A server named before the rule keeps its name and still works: found by
+// name, renamed to the same name without an error, renamed to a valid one.
+func TestOldServerNameKeepsWorking(t *testing.T) {
+	servers := newServerService(t)
+	created, _, err := servers.Create(owner, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := servers.servers.Rename(created.ID, owner.WorkspaceID, "Web Server"); err != nil {
+		t.Fatal(err)
+	}
+	if server, err := servers.Get(owner.WorkspaceID, "Web Server"); err != nil || server.ID != created.ID {
+		t.Fatalf("get old name = %v, %v", server, err)
+	}
+	if server, err := servers.Rename(owner, "Web Server", " Web Server "); err != nil || server.Name != "Web Server" {
+		t.Fatalf("rename to the same name = %v, %v", server, err)
+	}
+	if server, err := servers.Rename(owner, "Web Server", "web-server"); err != nil || server.Name != "web-server" {
+		t.Fatalf("rename to a valid name = %v, %v", server, err)
 	}
 }
 

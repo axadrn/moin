@@ -76,7 +76,7 @@ templ ServerAddForm() {
 			Type:        "text",
 			Placeholder: "Leave empty for a name like brave-otter",
 			Class:       "min-w-0 sm:w-72",
-			Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
+			Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
 		})
 		@button.Button(button.Props{Type: button.TypeSubmit}) {
 			@icon.Plus()

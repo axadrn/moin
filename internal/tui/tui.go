@@ -718,7 +718,13 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			server := m.servers[m.selected]
 			return m.ask("Rename "+server.Name, func(values []string) tea.Cmd {
 				return m.renameServer(server.ID, server.Name, values[0])
-			}, formField{label: "Name", value: server.Name, hint: placeholder(server.Name, "")}), nil
+			}, formField{label: "Name", value: server.Name, hint: placeholder(server.Name, "lowercase letters, digits and dashes"), check: func(name string) error {
+				// A name from before the rule may stay as it is.
+				if name == server.Name {
+					return nil
+				}
+				return checkName(name)
+			}}), nil
 		}
 	case "u":
 		if m.selected < len(m.servers) {
@@ -969,13 +975,14 @@ func (m model) addAppForm() model {
 		hint = "add a server first, on the servers tab"
 	}
 	return m.ask("New app", func(values []string) tea.Cmd { return m.addApp(values[0], values[1]) },
-		formField{label: "Name", value: here, hint: placeholder(here, "lowercase letters, digits and dashes"), check: checkAppName},
+		formField{label: "Name", value: here, hint: placeholder(here, "lowercase letters, digits and dashes"), check: checkName},
 		formField{label: "Server", value: server, hint: placeholder(server, hint), check: m.checkServer},
 	)
 }
 
-// checkAppName asks again for a name the control plane would refuse.
-func checkAppName(name string) error {
+// checkName asks again for an app or server name the control plane would
+// refuse.
+func checkName(name string) error {
 	if !protocol.ValidAppName(name) {
 		return fmt.Errorf("use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
 	}

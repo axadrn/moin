@@ -541,3 +541,21 @@ func TestInviteWrongEmail(t *testing.T) {
 		t.Errorf("mode %d, step %d, err %v; want the email asked again", m.mode, m.form.step, m.err)
 	}
 }
+
+// The rename form asks again for a name the control plane refuses, but a
+// server named before the rule may keep its name.
+func TestRenameServerChecksName(t *testing.T) {
+	m := frames()["servers"]
+	m.servers = slices.Clone(m.servers)
+	m.servers[0].Name = "Old Box"
+	m = press(m, "n")
+	m.input = "New Box"
+	if m = press(m, "enter"); m.mode != modeForm || m.err == nil || m.input != "New Box" {
+		t.Fatalf("bad name: mode %d, input %q, err %v", m.mode, m.input, m.err)
+	}
+	m.input = ""
+	m.form.submit = func([]string) tea.Cmd { return nil }
+	if m = press(m, "enter"); m.mode != modeList || m.err != nil {
+		t.Fatalf("same old name: mode %d, err %v", m.mode, m.err)
+	}
+}

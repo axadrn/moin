@@ -204,7 +204,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrFilePermission, status: http.StatusForbidden, code: "forbidden", message: "This file belongs to another account."},
 	{err: repository.ErrServerNotFound, status: http.StatusNotFound, code: "not_found", message: "The server was not found."},
 	{err: repository.ErrDuplicateServer, field: "name", message: "A server with this name already exists."},
-	{err: service.ErrServerName, field: "name", message: "Name must contain between 1 and 64 characters."},
+	{err: service.ErrServerName, field: "name", message: "Use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit."},
 	{err: repository.ErrServerHasApps, status: http.StatusConflict, code: "server_has_apps", message: "Remove the apps on this server first."},
 	{err: service.ErrTrialEnded, status: http.StatusPaymentRequired, code: "trial_ended", message: TrialEndedMessage},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to ops under Billing to add servers."},

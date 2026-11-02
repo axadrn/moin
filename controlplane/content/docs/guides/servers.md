@@ -26,7 +26,7 @@ If a server stays **waiting**, the install command did not finish. If it is **of
 
 ## Add a server
 
-Gives you one install command for a new server. The name is yours to pick, such as `web-1`. Leave it empty and ops picks one like `brave-otter`.
+Gives you one install command for a new server. The name is yours to pick, such as `web-1`: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, like an app name. Leave it empty and ops picks one like `brave-otter`.
 
 Log in to the server as root, for example with `ssh root@<server-ip>`, and run the command there within one hour. Not root? Put `sudo` before `sh`. The command works once. The server needs Linux with systemd, the program that starts services; Ubuntu and Debian have it. If the install stops halfway, get [a new install command](#a-new-install-command).
 
@@ -52,7 +52,7 @@ MCP: new_install_command
 
 ## Rename a server
 
-Gives a server a new name. The rules are those of adding one: up to 64 characters, unique in the workspace. Its apps stay on it.
+Gives a server a new name. The rules are those of adding one: lowercase letters, digits and dashes, unique in the workspace. Its apps stay on it. A server added before this rule keeps its name until you rename it.
 
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**

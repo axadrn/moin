@@ -69,7 +69,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Makes a new one-time install command for a server and returns it, for a lost command or to move the agent to another machine. It works once within an hour; ops stores only a fingerprint, so it is shown this once. The old install command stops working, and an agent that registers with the new one takes over from the old agent. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.newInstallCommand)))
 	mcpsdk.AddTool(server, add("rename_server", "Rename a server",
-		"Gives a server a new name, 1 to 64 characters, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
+		"Gives a server a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.renameServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
@@ -262,7 +262,7 @@ type RenameServerInput struct {
 
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
-	Server string `json:"server,omitempty" jsonschema:"the server name; empty gets one like brave-otter"`
+	Server string `json:"server,omitempty" jsonschema:"the server name: lowercase letters, digits and dashes; empty gets one like brave-otter"`
 	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 
