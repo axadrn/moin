@@ -377,3 +377,13 @@ func TestEnvRmMissing(t *testing.T) {
 		t.Errorf("code %d, stdout %q, requests %v", code, stdout, api.requests)
 	}
 }
+
+// TestLoginRefusesPlainHTTP: login never sends a token over plain http
+// to a host on the internet.
+func TestLoginRefusesPlainHTTP(t *testing.T) {
+	api := &fakeAPI{}
+	code, _, stderr := runCLI(t, api, "login", "--url", "http://ops.example.com", "--token", "ops_test")
+	if code == 0 || !strings.Contains(stderr, "https://ops.example.com") || len(api.requests) > 0 {
+		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}

@@ -319,6 +319,10 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 		return flags.wrong()
 	}
 	config.URL = strings.TrimRight(*baseURL, "/")
+	// The token must not cross the internet in plain text.
+	if err := client.CheckURL(config.URL); err != nil {
+		return err
+	}
 	config.Token, config.TokenFromEnv = *token, false
 	if config.Token == "" {
 		if isTerminal(stdin) {
