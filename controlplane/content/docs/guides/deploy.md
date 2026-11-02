@@ -54,7 +54,7 @@ MCP: list_apps
 
 ## Create an app
 
-Makes an empty app on a server, ready for its first deploy. The first `ops deploy` in a repo does this by itself.
+Makes an empty app on a [server](/docs/guides/servers), ready for its first deploy. The first `ops deploy` in a repo does this by itself.
 
 ```surfaces
 Web: **Apps**, **Add app**
@@ -71,7 +71,7 @@ MCP: create_app
 3. Tags the built images per deploy, sets the env vars and `restart: unless-stopped`.
 4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 5 seconds later.
 5. Calls the health path, if x-ops sets one, until it answers below 500.
-6. Reports the SQLite databases it finds on the app's volumes.
+6. Reports the SQLite databases it finds on the app's volumes, for the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups).
 
 If the start fails, the previous release starts again and the deploy is marked **failed**. Its log ends with the last lines of the service that stopped.
 
@@ -137,7 +137,7 @@ After changing env vars, a restart is enough and faster. An app deployed from an
 
 ## Restart
 
-Starts the live release again with the env vars, domains and password as they are now. Nothing is built. Use it after changing env vars.
+Starts the live release again with the [env vars](/docs/guides/env), [domains and password](/docs/guides/domains) as they are now. Nothing is built. Use it after changing env vars.
 
 ```surfaces
 Web: the app page, **Restart**

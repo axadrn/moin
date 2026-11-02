@@ -53,7 +53,7 @@ Deletes an env var from the app.
 ```surfaces
 Web: the app page, **Environment**, the × next to the env var
 CLI: ops env rm KEY
-TUI: on the app, `e`, then type `-KEY`
+TUI: on the app, `e`, type `-KEY`, then `y`
 API: PATCH /api/v1/apps/{app}/env
 MCP: set_env
 ```
@@ -69,4 +69,4 @@ ops env pull           # writes .env, readable only by you
 ops run -- go run .    # runs a command with the env vars, without a file
 ```
 
-Commands take the app from `--app`, from `x-ops.app` or from the folder name.
+Commands take the app from `--app`, from `x-ops.app` in [the repo](/docs/guides/config) or from the folder name.

@@ -50,7 +50,7 @@ MCP: list_branches
 
 ## Link a repo
 
-Makes an app follow a repo and a branch. Deploy every push is on by default. The app needs no deploy before: add it, link the repo and deploy it from GitHub.
+Makes an app follow a repo and a branch. Deploy every push is on by default. A branch or ref name follows git's rules and has at most 255 characters; ops refuses others, like one that starts with `-` or has `..`. The app needs no deploy before: add it, link the repo and deploy it from GitHub.
 
 ```surfaces
 Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**
@@ -115,4 +115,6 @@ The deploy list shows the commit and its message, in the web, the TUI and the AP
 
 ## Without the GitHub App
 
-`ops deploy` uploads the directory you are in, and [CI](/docs/guides/ci) can build an image and call a deploy hook. Both work without connecting GitHub.
+[`ops deploy`](/docs/guides/deploy) uploads the directory you are in through [your bucket](/docs/guides/bucket), and [CI](/docs/guides/ci) can build an image and call a deploy hook. Both work without connecting GitHub.
+
+On a self-hosted control plane, deploys from GitHub need [your own GitHub App](/docs/self-hosting#your-own-github-app).

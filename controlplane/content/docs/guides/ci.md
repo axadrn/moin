@@ -4,7 +4,7 @@ description: "Build images in GitHub Actions and deploy them with a hook"
 order: 13
 ---
 
-By default your server builds the app. You can also build the image in CI, push it to a registry and let ops deploy it. The server then only pulls and starts it.
+By default your server builds the app, as in [Deploy](/docs/guides/deploy). You can also build the image in CI, push it to a registry and let ops deploy it. The server then only pulls and starts it.
 
 | | Server builds | CI builds |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ Lets your servers pull private images. A registry is where CI stores the images 
 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Registries**, **Save login**
-CLI: ops registry set ghcr.io <user>
+CLI: ops registry set ghcr.io <username>
 TUI: settings tab, `a`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
@@ -58,8 +58,8 @@ Gives you a secret URL that deploys an image when CI calls it.
 
 ```surfaces
 Web: the app page, **Deploy hook**, **New deploy hook**
-CLI: ops hook blog
-TUI: on the app, `h`
+CLI: ops hook <app-name>
+TUI: on the app, `h`, then `y`
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
@@ -72,7 +72,7 @@ Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop
 
 ```surfaces
 Web: the app page, **Deploy hook**, **Turn off**
-CLI: ops hook off blog
+CLI: ops hook off <app-name>
 TUI: on the app, `H`, then `y`
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
@@ -135,10 +135,10 @@ Deploys an image that is already in a registry, without CI.
 
 ```surfaces
 Web: the app page, **Deploy an image**, **Deploy image**
-CLI: ops deploy --image ghcr.io/me/blog:3f2a9c1 blog
-TUI: on the app, `i`
+CLI: ops deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
+TUI: on the app, `i`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_image
 ```
 
-In the API, send `{"image": "ghcr.io/me/blog:3f2a9c1"}`. A redeploy of an image deploy pulls the same image again.
+In the API, send `{"image": "ghcr.io/<owner>/<image>:<tag>"}`. A redeploy of an image deploy pulls the same image again.

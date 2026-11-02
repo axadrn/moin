@@ -47,7 +47,7 @@ Yes. One price per workspace, with unlimited servers, apps and teammates. No tie
 
 ## How does the hosted trial work?
 
-A new account gets 30 days with everything, without a card. Afterwards the workspace is read-only until you subscribe: your apps keep running, their backups too, and you can still see everything, stop and start apps and manage your account and team.
+Your first workspace gets 30 days with everything, without a card. Afterwards the workspace is read-only until you subscribe: your apps keep running, their backups too, and you can still see everything, stop and start apps and manage your account and team.
 
 ## Will the name change?
 
@@ -55,7 +55,7 @@ Maybe. If it does, your servers, the CLI and the agents move over by themselves,
 
 ## Can I see and change everything from an AI agent?
 
-Yes. Every action is an [MCP tool](/docs/guides/mcp).
+Almost everything. Every action on servers, apps, data, backups, domains and invitations is an [MCP tool](/docs/guides/mcp). Your account, roles and deleting a workspace stay on the web, so a leaked token can never take them over.
 
 ## Is ops open source?
 

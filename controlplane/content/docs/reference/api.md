@@ -4,7 +4,7 @@ description: "The JSON API under /api/v1"
 order: 3
 ---
 
-The web UI, the CLI and the terminal UI all use this API. Its OpenAPI 3.1 document is served at [`/api/v1/openapi.yaml`](/api/v1/openapi.yaml).
+The CLI and the terminal UI use this API, and so can your own scripts. Its OpenAPI 3.1 document is served at [`/api/v1/openapi.yaml`](/api/v1/openapi.yaml).
 
 Send a personal API token as `Authorization: Bearer pat_…`. The token belongs to one workspace, and every endpoint below works in it. Errors are `{"error":{"code","message","fields"}}` with stable codes such as `server_offline`, `deploy_running` and `no_rollback`.
 
@@ -30,8 +30,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `DELETE /api/v1/workspaces/{slug}` | deletes the workspace (owner, *session*) |
 | `POST /api/v1/workspaces/{slug}/invitations` | invites someone by email (admin) |
 | `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /{id}` | sends an invitation again; revokes it (admin) |
-| `PATCH /api/v1/workspaces/{slug}/members/{id}/role` | changes a role (owner, *session*) |
-| `DELETE /api/v1/workspaces/{slug}/members/{id}` | removes a member (*session*) |
+| `PATCH /api/v1/workspaces/{slug}/members/{id}/role` | changes a role (admin; only an owner makes or changes an owner, *session*) |
+| `DELETE /api/v1/workspaces/{slug}/members/{id}` | removes a member (admin; only an owner removes an owner, *session*) |
 | `POST /api/v1/workspaces/{slug}/leave` | leaves the workspace (*session*) |
 | `GET /api/v1/workspaces/{slug}/billing` | the plan and the subscription, where billing is on |
 | `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | a checkout link; the billing portal (owner, *session*) |

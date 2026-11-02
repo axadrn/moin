@@ -64,7 +64,7 @@ Web: **Activity**, pick an app, a server or a member, then **Filter**
 CLI: ops activity --app <app-name> --server <server-name> --user <email>
 TUI: on the activity tab, `f`; `c` clears it
 API: GET /api/v1/activity?app=<app-name>&server=<server-name>&user=<email>
-MCP: list_activity with app, server or user
+MCP: list_activity
 ```
 
 ## Go further back
@@ -73,13 +73,13 @@ Everything stays. Page back as far as you like.
 
 ```surfaces
 Web: **Activity**, **Show older** at the end
-CLI: ops activity --cursor <cursor>, from the hint at the end
+CLI: ops activity --cursor <cursor>
 TUI: on the activity tab, `m`
 API: GET /api/v1/activity?cursor=<next_cursor>
-MCP: list_activity with cursor set to next_cursor
+MCP: list_activity
 ```
 
-`ops activity --limit 200` shows up to 200 at once.
+The CLI prints the next `--cursor` in its hint at the end. In the API and MCP, send `next_cursor` back as `cursor`, and filter with `app`, `server` and `user`. `ops activity --limit 200` shows up to 200 at once.
 
 ## Good to know
 

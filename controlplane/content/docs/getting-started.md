@@ -43,7 +43,7 @@ The CLI signs in with a personal API token: a long password just for the CLI, sc
 1. On the web, open **Settings** in the sidebar, then the **Tokens** tab.
 2. Press **Create token**.
 3. Give it a name, such as the name of your computer.
-4. Set **Access** to **Read and write**. The dialog starts at **Read only**, and a read only token cannot add servers or deploy.
+4. Leave **Access** at **Read and write**. The CLI needs it to add servers and deploy.
 5. Pick how long it works. When it ends, make a new one and log in again.
 6. Press **Create token** and copy the token. ops shows it only once.
 

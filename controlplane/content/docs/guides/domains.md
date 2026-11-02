@@ -42,9 +42,9 @@ MCP: check_domains
 A domain that resolves to either address of the server points here:
 
 ```text
-DOMAIN        DNS            RESOLVES TO
-blog.de       ● points here  203.0.113.5
-www.blog.de   ○ set DNS
+DOMAIN          DNS            RESOLVES TO
+<domain>        ● points here  203.0.113.5
+www.<domain>    ○ set DNS
 ```
 
 ## Remove a domain
@@ -96,7 +96,7 @@ Makes the app public again.
 ```surfaces
 Web: the app page, **Password**, **Remove password**
 CLI: ops protect off
-TUI: on the app, `p`, then type `off`
+TUI: on the app, `p`, type `off`, then `y`
 API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
@@ -109,8 +109,8 @@ You can also keep domains and the password switch next to your code, in `compose
 
 ```yaml
 x-ops:
-  domains: [blog.de, www.blog.de]
-  canonical: blog.de
+  domains: [<domain>, www.<domain>]
+  canonical: <domain>
   protect: true   # the password itself is set in ops, never in the repo
 ```
 

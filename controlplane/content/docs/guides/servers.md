@@ -44,7 +44,7 @@ The install command shows once: ops stores only a fingerprint of its token. If y
 
 ```surfaces
 Web: **Servers**, open the server, **New install command**
-CLI: ops servers install-command web-1
+CLI: ops servers install-command <server-name>
 TUI: on the server, `i`
 API: POST /api/v1/servers/{id}/install
 MCP: new_install_command
@@ -56,7 +56,7 @@ Gives a server a new name. The rules are those of adding one: up to 64 character
 
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**
-CLI: ops servers rename web-1 shop-1
+CLI: ops servers rename <server-name> <new-name>
 TUI: on the server, `n`
 API: PATCH /api/v1/servers/{id}
 MCP: rename_server
@@ -68,7 +68,7 @@ Puts the agent version of your control plane on a server. Use it when ops says a
 
 ```surfaces
 Web: **Servers**, **Update agent** on the server
-CLI: ops servers update web-1
+CLI: ops servers update <server-name>
 TUI: on the server, `u`
 API: POST /api/v1/servers/{id}/update
 MCP: update_agent
@@ -84,7 +84,7 @@ You cannot undo it, so ops asks you to type the server's name first: in the web 
 
 ```surfaces
 Web: **Servers**, open the server, **Remove server**
-CLI: ops servers rm web-1
+CLI: ops servers rm <server-name>
 TUI: on the server, `x`, then type its name
 API: DELETE /api/v1/servers/{id}
 MCP: remove_server

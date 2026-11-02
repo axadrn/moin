@@ -60,7 +60,7 @@ What ops needs:
 | Access key, Secret key | The two parts of the key. The CLI asks for the secret key on stdin, so it never ends up in your shell history. |
 | Region | `auto` for Cloudflare R2. For AWS S3, the region of the bucket, like `eu-central-1`. Otherwise what your provider says. |
 
-ops writes and deletes a test file first, so a wrong key fails right away. The hosted control plane only reaches buckets on the public internet, not on a private or local address.
+ops writes and deletes a test file first, so a wrong key fails right away. To make a server back up only to this bucket, see the `backups-to` [rule](/docs/guides/security#rules). The hosted control plane only reaches buckets on the public internet, not on a private or local address.
 
 ## What goes in the bucket
 

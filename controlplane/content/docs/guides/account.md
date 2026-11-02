@@ -4,7 +4,7 @@ description: "Your name, email, password, sessions and API tokens"
 order: 16
 ---
 
-**The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token, which can never change your account.
+**The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token. A token with write access can change your name and picture, never your email, password, sessions or tokens.
 
 ## Change your name
 
@@ -59,7 +59,7 @@ API: GET /api/v1/account/sessions
 
 The CLI, the TUI, the GitHub Action and agents sign in with a personal API token. Each token belongs to one workspace and can read, or read and write.
 
-For the CLI, pick **Read and write**: the dialog starts at **Read only**, and a read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
+The dialog starts at **Read and write**, which the CLI needs. A read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Create token**
@@ -90,7 +90,7 @@ A token cannot be renamed or get more rights. Make a new one and revoke the old 
 
 Removes your account, your profile, your picture, your sessions and your API tokens, and takes you out of every workspace. It cannot be undone, so you type `DELETE` first.
 
-Your servers, apps and env vars belong to a workspace, not to you, so they stay for your team. If you are the last owner of a workspace, hand it to someone else or [delete the workspace](/docs/guides/team#change-roles-remove-people-leave-or-delete) first. Deleting a workspace removes its servers and apps from ops; the apps keep running on your servers.
+Your servers, apps and env vars belong to a workspace, not to you, so they stay for your team. If you are the last owner of a workspace, hand it to someone else or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first. Deleting a workspace removes its servers and apps from ops; the apps keep running on your servers.
 
 ```surfaces
 Web: **Settings**, **Security** tab, **Delete account**
@@ -111,4 +111,6 @@ Only the owner of the workspace sees the plan and pays, on the web: **Billing** 
 Web: **Billing** in the sidebar
 API: GET /api/v1/workspaces/{slug}/billing
 MCP: get_billing
-``` A self-hosted control plane has no billing: every feature is free.
+```
+
+A self-hosted control plane has no billing: every feature is free.

@@ -7,7 +7,7 @@ order: 2
 Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
 
 The header shows the tabs and the control plane, the footer only the keys
-that work in the place you are in. A question like "Stop blog?" waits
+that work in the place you are in. A question like "Stop <app-name>?" waits
 there for `y`; any other key cancels. Removing a server, an app or the
 bucket and a restore cannot be undone, so they ask you to type the name
 first, then `enter`; you can paste it. A form, such as a new app or the
@@ -47,7 +47,7 @@ removing members, leaving and deleting the workspace are web only.
 | `i` | apps | deploys an image built in CI; type the image, then `enter` |
 | `h` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
 | `H`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
-| `o` | apps | shows domains and DNS; type `blog.de`, `-blog.de` (asks first) or `=blog.de` |
+| `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first) or `=<domain>` for the canonical one |
 | `p` | apps | password: type `user:password`, or `off` (asks first) |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
 | `l` | apps | shows the logs |

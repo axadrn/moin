@@ -4,7 +4,7 @@ description: "What ops is and how its pieces fit"
 order: 1
 ---
 
-ops deploys your apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. You use it from the browser, the `ops` CLI (commands you type), the `ops` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same things, and so does the [API](/docs/reference/api) for your own scripts.
+ops deploys your apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. You use it from the browser, the `ops` CLI (commands you type), the `ops` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
 
 New here? Read [How ops works in 2 minutes](#how-ops-works-in-2-minutes) below, then [Getting Started](/docs/getting-started).
 
@@ -46,9 +46,9 @@ ops is in beta: it works and runs real sites, and it keeps getting better fast, 
 - **backup**: every change of your app's SQLite database, copied to your bucket about once a second.
 - **snapshot**: a full copy of the database at one moment, like a photo. ops takes one before every deploy, restore and data change.
 - **restore**: puts the database back to a snapshot, or to any second of the last 7 days.
-- **team members and roles**: the people in your workspace. Members deploy and fix things, admins also invite people, the owner also handles billing and roles.
+- **team members and roles**: the people in your workspace. Members deploy and fix things. Admins also invite people and change their roles. The owner also pays and decides who else is an owner.
 - **API token**: a key for the CLI, scripts and AI agents to act for you. It belongs to one workspace and can read, or read and write.
-- **MCP**: the way AI agents such as Claude or Cursor use tools. ops offers every action as an MCP tool. [AI agents (MCP)](/docs/guides/mcp).
+- **MCP**: the way AI agents such as Claude or Cursor use tools. ops offers almost every action as an MCP tool. [AI agents (MCP)](/docs/guides/mcp).
 - **activity log**: the list of who changed what in your workspace, and when.
 
 ```

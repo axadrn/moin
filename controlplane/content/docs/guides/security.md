@@ -4,7 +4,7 @@ description: "No open port, SSH only on your tailnet, everything else dropped"
 order: 8
 ---
 
-A server ops runs can have no open port at all. ops sets up three switches per server, and each one closes a door:
+A [server](/docs/guides/servers) ops runs can have no open port at all. ops sets up three switches per server, and each one closes a door:
 
 - **Cloudflare Tunnel.** Visitors reach your apps through Cloudflare instead of ports 80 and 443. A tunnel is a connection your server opens to Cloudflare, so nothing has to come in.
 - **SSH only on Tailscale.** SSH, the way you log in to the server, answers only on your tailnet. [Tailscale](https://tailscale.com) is a free service that links your own devices in a private network, your tailnet.
@@ -75,7 +75,7 @@ Sends all web traffic of a server through Cloudflare and closes ports 80 and 443
 
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **Cloudflare Tunnel**, then **Apply**
-CLI: ops servers secure web-1 --tunnel on
+CLI: ops servers secure <server-name> --tunnel on
 TUI: on the server, `t`, then `y`
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
@@ -100,7 +100,7 @@ Lets SSH answer only on your tailnet, so nobody else on the internet can even tr
 
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **SSH only on Tailscale**, then **Apply**
-CLI: ops servers secure web-1 --ssh tailscale
+CLI: ops servers secure <server-name> --ssh tailscale
 TUI: on the server, `s`, then `y`
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
@@ -116,7 +116,7 @@ Drops every connection the server does not need. Turn it on for every server: wi
 
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **Firewall**, then **Apply**
-CLI: ops servers secure web-1 --firewall on
+CLI: ops servers secure <server-name> --firewall on
 TUI: on the server, `f`, then `y`
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
@@ -195,7 +195,7 @@ Shows the rules a server has, as its agent reported them.
 
 ```surfaces
 Web: **Servers**, **Security** on the server, **Rules**
-CLI: ops servers rules web-1
+CLI: ops servers rules <server-name>
 TUI: the RULES column on the servers tab
 API: GET /api/v1/servers
 MCP: list_servers

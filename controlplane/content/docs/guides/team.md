@@ -10,7 +10,18 @@ order: 14
 
 Everything you add to ops lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App. Everyone in the workspace sees and works on all of it. The plan belongs to the workspace too, so one subscription covers the whole team.
 
-You get a workspace when you sign up. Make more from the workspace switcher at the top of the sidebar, for example one per client.
+You get a workspace when you sign up.
+
+## Create a workspace
+
+Makes one more workspace, for example one per client. On hosted ops each workspace has its own plan.
+
+```surfaces
+Web: the workspace switcher at the top of the sidebar, **New workspace**
+API: POST /api/v1/workspaces
+```
+
+The new workspace starts empty. Your API tokens stay with their own workspace: [make a token](/docs/guides/account#create-an-api-token) in the new one for the CLI.
 
 ## Roles
 
@@ -19,7 +30,10 @@ You get a workspace when you sign up. Make more from the workspace switcher at t
 | Deploy, roll back, edit data, restore, servers, domains, env | ✓ | ✓ | ✓ |
 | See the activity | ✓ | ✓ | ✓ |
 | Invite people, rename the workspace | | ✓ | ✓ |
-| Change roles, billing, delete the workspace | | | ✓ |
+| Make someone a member or an admin, remove members and admins | | ✓ | ✓ |
+| Make someone an owner, remove an owner, billing, delete the workspace | | | ✓ |
+
+Everyone can leave a workspace. A workspace always keeps one owner: the last owner hands the role to someone else first, or deletes the workspace.
 
 ## See the team
 
@@ -85,16 +99,42 @@ API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
 ```
 
-## Change roles, remove people, leave or delete
+## Change a role
 
-These four work only on the web, signed in:
+Makes a member an admin, or the other way round. Only an owner makes someone an owner or changes an owner's role.
 
-- **Change a role:** **Team**, **Role** on a member, then **Save**.
-- **Remove a member:** **Team**, **Remove** on a member. Their tokens stop reaching the workspace right away.
-- **Leave a workspace:** **Team**, **Leave workspace**.
-- **Delete a workspace:** **Team**, **Delete workspace**, then type its name. It cannot be undone.
+```surfaces
+Web: **Team**, **Members**, the role next to the person, then **Save**
+API: PATCH /api/v1/workspaces/{slug}/members/{id}/role
+```
 
-An API token, and so the CLI, the TUI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
+## Remove a member
+
+Takes someone out of the workspace. Their API tokens for it stop working right away.
+
+```surfaces
+Web: **Team**, **Members**, **Remove** next to the person
+API: DELETE /api/v1/workspaces/{slug}/members/{id}
+```
+
+## Leave or delete a workspace
+
+**Leave** takes you out of the workspace. Its servers and apps stay for the others.
+
+**Delete workspace** removes the workspace with its members, invitations, activity, servers and apps from ops. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner deletes a workspace, and you type its name first. It cannot be undone. A paid plan must be cancelled and run out first.
+
+```surfaces
+Web: **Team**, **Leave**, then **Leave workspace**
+Web: **Team**, **Delete workspace**, then type its name
+API: POST /api/v1/workspaces/{slug}/leave
+API: DELETE /api/v1/workspaces/{slug}
+```
+
+The last owner cannot leave: [change a role](#change-a-role) to make someone else an owner first.
+
+## Why only the web
+
+Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. An API token, and so the CLI, the TUI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
 
 ## Tokens and workspaces
 

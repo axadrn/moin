@@ -49,7 +49,7 @@ order: 1
 | `ops db [--db <path>] [app]` | tables, row counts and migration of the database |
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |
-| `ops sql [--app <app>] [--limit 100] "<sql>"` | runs SQL read-only; the SQL may come on stdin |
+| `ops sql [--app <app>] [--db <path>] [--limit 100] "<sql>"` | runs SQL read-only; the SQL may come on stdin |
 | `ops sql --write "<sql>" [--yes]` | runs SQL that changes data, in one transaction; DROP and DELETE ask first |
 | `ops backups [app]` | snapshots, point in time window and restore drills |
 | `ops backup [app]` | takes a snapshot now |
@@ -73,7 +73,7 @@ order: 1
 | `ops agent uninstall [--apps] [--yes]` | removes the agent from this server; the apps keep running unless `--apps` |
 | `ops version` | prints the version |
 
-Commands that work on an app take it as an argument or as `--app`, then from `x-ops.app` in `compose.yml`, then from the directory name. Flags may come before or after the arguments: `ops rollback v3 --app shop` is `ops rollback --app shop v3`. When there is no such app, the error names it and where the name came from. Every command shows its usage and flags with `--help`.
+Commands that work on an app take it as an argument or as `--app`, then from `x-ops.app` in `compose.yml`, then from the directory name. Flags may come before or after the arguments: `ops rollback v3 --app <app-name>` is `ops rollback --app <app-name> v3`. When there is no such app, the error names it and where the name came from. Every command shows its usage and flags with `--help`.
 
 ## Asking first
 
@@ -81,7 +81,7 @@ ops asks before it removes or replaces something. How it asks depends on how big
 
 | | Commands | Asks |
 | --- | --- | --- |
-| Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type blog to confirm:` |
+| Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type <app-name> to confirm:` |
 | Small or reversible | `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup`, adding and setting things | nothing |
 
@@ -92,10 +92,10 @@ ops asks before it removes or replaces something. How it asks depends on how big
 `ops servers` shows each agent's version and marks one that differs from the control plane's. `ops servers update` has the agent download the `ops` binary the control plane serves, from the control plane URL it already uses, check its SHA-256, swap it in and restart through systemd. It waits until the new agent is back. The agent refuses while a deploy runs, and on a server with rules in `/etc/ops/rules`, since a new binary could allow what they stop. There, and for agents older than the update, update it on the server as root:
 
 ```bash
-curl -fsSL https://ops.goilerplate.com/download/ops-linux-amd64 -o /usr/local/bin/ops.new && chmod 755 /usr/local/bin/ops.new && mv /usr/local/bin/ops.new /usr/local/bin/ops && systemctl restart ops-agent
+curl -fsSL https://ops.example.com/download/ops-linux-amd64 -o /usr/local/bin/ops.new && chmod 755 /usr/local/bin/ops.new && mv /usr/local/bin/ops.new /usr/local/bin/ops && systemctl restart ops-agent
 ```
 
-Use `ops-linux-arm64` on an ARM server, and your own URL when you host the control plane. The error of a refused update prints the command for that server.
+Use `ops-linux-arm64` on an ARM server. The error of a refused update prints the command for that server.
 
 `/download/SHA256SUMS` lists the checksums of every binary.
 

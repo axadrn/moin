@@ -10,7 +10,7 @@ Shows the last lines your app printed, from every container of the app. Use it w
 
 ```surfaces
 Web: the app page, **Container logs**, **Load logs**
-CLI: ops logs blog
+CLI: ops logs <app-name>
 TUI: on the app, `l`
 API: GET /api/v1/apps/{app}/logs
 MCP: get_logs
