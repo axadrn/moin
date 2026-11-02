@@ -1142,16 +1142,36 @@ func (t opsTools) listBranches(ctx context.Context, caller Caller, input Branche
 	return Branches{api.GitHubBranches{Items: branches}}, nil
 }
 
-func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) (App, error) {
+// LinkedApp is the output of link_repo.
+type LinkedApp struct {
+	api.App
+}
+
+func (a LinkedApp) Summary() string {
+	next := "Deploy it with deploy_ref."
+	if a.AutoDeploy {
+		next = "Every push to " + a.Branch + " deploys it; deploy_ref deploys it now."
+	}
+	return fmt.Sprintf("%s follows %s on %s. %s", a.Name, a.Repo, a.Branch, next)
+}
+
+func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) (LinkedApp, error) {
 	app, err := t.services.Apps.LinkRepo(ctx, caller.actor(), input.App, input.Repo, input.Branch, input.AutoDeploy)
 	if err != nil {
-		return App{}, err
+		return LinkedApp{}, err
 	}
-	return App{api.NewApp(*app)}, nil
+	return LinkedApp{api.NewApp(*app)}, nil
 }
 
 func (t opsTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
-	err := t.services.Apps.UnlinkRepo(caller.actor(), input.app())
+	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.app())
+	if err != nil {
+		return Done{}, err
+	}
+	if app.Repo == "" {
+		return Done{Message: input.app() + " follows no repo. Nothing changed."}, nil
+	}
+	err = t.services.Apps.UnlinkRepo(caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
 	}

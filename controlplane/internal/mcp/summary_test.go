@@ -36,6 +36,8 @@ func TestSummariesReadWell(t *testing.T) {
 		(Deploy{api.Deploy{Number: 1, Status: "succeeded"}}).Summary():                                                             "Deploy v1 succeeded.",
 		(Deploy{api.Deploy{Number: 2, Status: "running"}}).Summary():                                                               "Deploy v2 is running.",
 		(Logs{api.Logs{Lines: []string{"listening"}}}).Summary():                                                                   "1 log line.",
+		(LinkedApp{api.App{Name: "shop", Repo: "me/shop", Branch: "main"}}).Summary():                                              "shop follows me/shop on main. Deploy it with deploy_ref.",
+		(LinkedApp{api.App{Name: "shop", Repo: "me/shop", Branch: "main", AutoDeploy: true}}).Summary():                            "shop follows me/shop on main. Every push to main deploys it; deploy_ref deploys it now.",
 		(DomainChecks{api.DomainChecks{Items: []api.DomainCheck{{Domain: "shop.de", Points: true, FromCompose: true}}}}).Summary(): "shop.de points at the server. x-ops.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot.",
 	} {
 		if got != want {
