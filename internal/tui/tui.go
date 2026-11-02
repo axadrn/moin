@@ -1080,6 +1080,9 @@ func (m model) removeServer(id, name string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
+		if uninstall == "" {
+			return noticeMsg(name + " removed. Its agent never connected, so nothing is installed there")
+		}
 		return removedMsg{name: name, uninstall: uninstall}
 	}
 }

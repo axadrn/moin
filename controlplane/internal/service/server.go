@@ -190,15 +190,16 @@ func (s *ServerService) List(workspaceID string) ([]model.Server, error) {
 }
 
 // Delete removes a server by ID or name and disconnects its agent. The agent
-// token stops working.
-func (s *ServerService) Delete(actor Actor, idOrName string) error {
+// token stops working. It returns the command that removes the agent on the
+// machine, empty when no agent ever connected, so none is installed there.
+func (s *ServerService) Delete(actor Actor, idOrName string) (uninstall string, err error) {
 	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	err = s.servers.DeleteForWorkspace(server.ID, actor.WorkspaceID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.mu.Lock()
 	session := s.sessions[server.ID]
@@ -208,7 +209,10 @@ func (s *ServerService) Delete(actor Actor, idOrName string) error {
 	}
 	s.record(actor, "server.removed", "server", server.Name, nil)
 	s.notify(actor.WorkspaceID)
-	return nil
+	if server.LastSeenAt == nil {
+		return "", nil
+	}
+	return s.UninstallCommand(), nil
 }
 
 // Register trades a raw install token for an agent token. The install token

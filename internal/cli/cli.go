@@ -502,6 +502,10 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
+		if uninstall == "" {
+			done(stdout, "Removed %s. Its agent never connected, so nothing is installed there", style.Bold.Render(name))
+			return nil
+		}
 		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
 		hint(stdout, "The agent is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
 		return nil

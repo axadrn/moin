@@ -142,6 +142,12 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "ops agent uninstall") {
 		t.Errorf("with --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
+	// A server whose agent never connected has nothing to uninstall.
+	api = &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":""}`}}
+	code, stdout, _ = runCLI(t, api, "servers", "rm", "web-1", "--yes")
+	if code != 0 || strings.Contains(stdout, "uninstall") || !strings.Contains(stdout, "never connected") {
+		t.Errorf("never connected: code %d, stdout %q", code, stdout)
+	}
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
 		{"env", "rm", "--app", "shop", "KEY"},

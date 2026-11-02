@@ -172,12 +172,12 @@ func (h *ServersHandler) Rename(w http.ResponseWriter, r *http.Request) {
 
 // Delete removes a server by ID or name and disconnects its agent.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, RemovedServer{UninstallCommand: h.servers.UninstallCommand()})
+	JSON(w, http.StatusOK, RemovedServer{UninstallCommand: uninstall})
 }
 
 // Update has the server's agent swap its binary for the control plane's and

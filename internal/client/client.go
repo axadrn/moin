@@ -266,16 +266,21 @@ func (s Server) Outdated(version string) bool {
 }
 
 // RemoveServer deletes a server by ID or name. Its agent is disconnected
-// and stays installed: it answers the command that removes it on the server.
+// and stays installed: it answers the command that removes it on the server,
+// empty when no agent ever connected there.
 func (c *Client) RemoveServer(ctx context.Context, idOrName string) (string, error) {
 	var removed struct {
-		UninstallCommand string `json:"uninstall_command"`
+		UninstallCommand *string `json:"uninstall_command"`
 	}
 	err := c.do(ctx, http.MethodDelete, "/api/v1/servers/"+url.PathEscape(idOrName), nil, &removed)
-	if err == nil && removed.UninstallCommand == "" {
-		removed.UninstallCommand = protocol.UninstallCommand(build.Name)
+	if err != nil {
+		return "", err
 	}
-	return removed.UninstallCommand, err
+	// A control plane from before uninstall_command answers none.
+	if removed.UninstallCommand == nil {
+		return protocol.UninstallCommand(build.Name), nil
+	}
+	return *removed.UninstallCommand, nil
 }
 
 // WatchServers calls fn with the full server list on connect and on every

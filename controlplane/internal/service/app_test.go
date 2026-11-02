@@ -293,7 +293,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	if _, err := apps.Get(owner.WorkspaceID, "blog"); err != nil {
 		t.Fatalf("a failed delete removed the app: %v", err)
 	}
-	if err := servers.Delete(owner, server.ID); !errors.Is(err, repository.ErrServerHasApps) {
+	if _, err := servers.Delete(owner, server.ID); !errors.Is(err, repository.ErrServerHasApps) {
 		t.Fatalf("delete a server with apps: err = %v", err)
 	}
 
@@ -319,8 +319,9 @@ func TestDeleteOnAServerThatNeverConnected(t *testing.T) {
 	if err := apps.Delete(context.Background(), owner, "blog"); err != nil {
 		t.Fatalf("delete on a server that never connected: %v", err)
 	}
-	if err := servers.Delete(owner, server.ID); err != nil {
-		t.Fatalf("delete the empty server: %v", err)
+	// No agent ever connected, so none is left to uninstall.
+	if uninstall, err := servers.Delete(owner, server.ID); err != nil || uninstall != "" {
+		t.Fatalf("delete the empty server = %q, %v", uninstall, err)
 	}
 }
 

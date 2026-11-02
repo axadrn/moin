@@ -84,12 +84,12 @@ func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
 
 // Delete removes a server from its page and goes back to the list.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	// The list names the server, to show how to remove its agent there.
 	location := ctxkeys.AppBasePath(r.Context()) + "/servers"
+	name := ""
 	if server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id")); err == nil {
-		location += "?removed=" + url.QueryEscape(server.Name)
+		name = server.Name
 	}
-	err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if errors.Is(err, repository.ErrServerHasApps) {
 		toastFailed(w, r, "Server not removed", "Remove the apps on this server first.")
 		return
@@ -97,6 +97,11 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil && !errors.Is(err, repository.ErrServerNotFound) {
 		failed(w, r, "Server not removed", err, nil)
 		return
+	}
+	// The list names a server whose agent connected, to show how to remove
+	// the agent there.
+	if uninstall != "" && name != "" {
+		location += "?removed=" + url.QueryEscape(name)
 	}
 	redirect(w, r, location, http.StatusSeeOther)
 }

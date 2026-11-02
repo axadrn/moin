@@ -40,7 +40,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `whoami` | the account and token | read |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
-| `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server | write, destructive |
+| `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no agent ever connected | write, destructive |
 | `new_install_command` | a new one-time install command for a server | write, destructive |
 | `rename_server` | renames a server | write |
 | `update_agent` | puts the control plane's agent version on a server | write |

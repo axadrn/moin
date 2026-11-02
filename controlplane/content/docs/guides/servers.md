@@ -90,7 +90,7 @@ API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```
 
-The agent stays installed on the machine. Every surface answers the command that removes it; run it on the server as root, or put `sudo` in front:
+The agent stays installed on the machine. Every surface answers the command that removes it; run it on the server as root, or put `sudo` in front. If the agent never connected, there is nothing to remove and no command shows.
 
 ```bash
 ops agent uninstall

@@ -425,7 +425,10 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 		t.Fatalf("rename_server = %#v", renamed)
 	}
 	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box"}), "validation_failed")
-	output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box-3"}))
+	// box-3 never connected: no agent to uninstall there.
+	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box-3"})); removed.UninstallCommand != "" || !strings.Contains(removed.Message, "never connected") {
+		t.Fatalf("removed a server that never connected = %+v", removed)
+	}
 	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"}), "server_has_apps")
 	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "validation_failed")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
