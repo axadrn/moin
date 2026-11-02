@@ -134,7 +134,7 @@ templ panel(p panelProps) {
 				}
 			}
 			if p.Action != nil || p.Docs != "" {
-				@card.Action(card.ActionProps{Class: utils.CN("flex items-center gap-1", panelActionStack)}) {
+				@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-1", panelActionStack)}) {
 					if p.Docs != "" {
 						@docsLink(p.Docs, "How it works")
 					}
