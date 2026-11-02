@@ -1904,7 +1904,7 @@ paths:
       tags: [Data]
       operationId: queryDatabase
       summary: Run SQL
-      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100, at most 1000). With `write` it runs in one transaction and returns `changes`.
+      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. With `write` it runs in one transaction and returns `changes`.
       requestBody:
         required: true
         content:
@@ -1934,7 +1934,7 @@ paths:
           description: '`server_offline`, or `read_only_query` when a read without `write` changes data.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.sql`.'
+          description: '`validation_failed` with `fields.sql`, or `fields.limit` outside 1 to 1000.'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
@@ -4171,6 +4171,9 @@ components:
           type: boolean
         limit:
           type: integer
+          minimum: 1
+          maximum: 1000
+          description: Rows a read returns; default 100.
     DBResult:
       type: object
       required: [database, columns, rows]

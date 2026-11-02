@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/repository"
@@ -198,19 +199,33 @@ type opsTools struct {
 	services Services
 }
 
-// NameInput names one server or app.
-type NameInput struct {
-	Name string `json:"name" jsonschema:"the name or ID"`
+// AppInput names one app. name is the old spelling of app, still accepted.
+type AppInput struct {
+	App  string `json:"app,omitempty" jsonschema:"the app name or ID"`
+	Name string `json:"name,omitempty" jsonschema:"the old name of the app field; use app"`
 }
+
+func (i AppInput) app() string { return cmp.Or(i.App, i.Name) }
+
+// ServerInput names one server. name is the old spelling of server, still
+// accepted.
+type ServerInput struct {
+	Server string `json:"server,omitempty" jsonschema:"the server name or ID"`
+	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
+}
+
+func (i ServerInput) server() string { return cmp.Or(i.Server, i.Name) }
 
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
-	Name string `json:"name,omitempty" jsonschema:"the server name; empty gets a generated one"`
+	Server string `json:"server,omitempty" jsonschema:"the server name; empty gets a generated one"`
+	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 
 // CreateAppInput is the input of create_app.
 type CreateAppInput struct {
-	Name   string `json:"name" jsonschema:"lowercase letters, digits and dashes; also the compose project on the server"`
+	App    string `json:"app,omitempty" jsonschema:"the app name: lowercase letters, digits and dashes; also the compose project on the server"`
+	Name   string `json:"name,omitempty" jsonschema:"the old name of the app field; use app"`
 	Server string `json:"server" jsonschema:"the server name or ID"`
 }
 
@@ -389,7 +404,7 @@ func (c CreatedServer) Summary() string {
 }
 
 func (t opsTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {
-	server, installToken, err := t.services.Servers.Create(caller.actor(), input.Name)
+	server, installToken, err := t.services.Servers.Create(caller.actor(), cmp.Or(input.Server, input.Name))
 	if err != nil {
 		return CreatedServer{}, err
 	}
@@ -416,20 +431,20 @@ type RemovedServer struct {
 
 func (r RemovedServer) Summary() string { return r.Message }
 
-func (t opsTools) removeServer(_ context.Context, caller Caller, input NameInput) (RemovedServer, error) {
-	err := t.services.Servers.Delete(caller.actor(), input.Name)
+func (t opsTools) removeServer(_ context.Context, caller Caller, input ServerInput) (RemovedServer, error) {
+	err := t.services.Servers.Delete(caller.actor(), input.server())
 	if err != nil {
 		return RemovedServer{}, err
 	}
 	command := t.services.Servers.UninstallCommand()
 	return RemovedServer{
-		Message:          "Removed server " + input.Name + ". Its agent is still installed: run " + command + " on the server to remove it.",
+		Message:          "Removed server " + input.server() + ". Its agent is still installed: run " + command + " on the server to remove it.",
 		UninstallCommand: command,
 	}, nil
 }
 
-func (t opsTools) updateAgent(ctx context.Context, caller Caller, input NameInput) (ServerOutput, error) {
-	server, err := t.services.Servers.UpdateAgent(ctx, caller.actor(), input.Name)
+func (t opsTools) updateAgent(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {
+	server, err := t.services.Servers.UpdateAgent(ctx, caller.actor(), input.server())
 	if err != nil {
 		return ServerOutput{}, err
 	}
@@ -473,8 +488,8 @@ func (d AppDetail) Summary() string {
 	return fmt.Sprintf("%s on %s: live v%d, %s listed.", d.App.Name, d.App.ServerName, d.App.LiveNumber, count(len(d.Deploys), "deploy"))
 }
 
-func (t opsTools) getApp(_ context.Context, caller Caller, input NameInput) (AppDetail, error) {
-	app, deploys, err := t.services.Apps.Deploys(caller.Token.WorkspaceID, input.Name, 20)
+func (t opsTools) getApp(_ context.Context, caller Caller, input AppInput) (AppDetail, error) {
+	app, deploys, err := t.services.Apps.Deploys(caller.Token.WorkspaceID, input.app(), 20)
 	if err != nil {
 		return AppDetail{}, err
 	}
@@ -491,19 +506,19 @@ func (a App) Summary() string {
 }
 
 func (t opsTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (App, error) {
-	app, err := t.services.Apps.Create(caller.actor(), input.Name, input.Server)
+	app, err := t.services.Apps.Create(caller.actor(), cmp.Or(input.App, input.Name), input.Server)
 	if err != nil {
 		return App{}, err
 	}
 	return App{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) removeApp(ctx context.Context, caller Caller, input NameInput) (Done, error) {
-	err := t.services.Apps.Delete(ctx, caller.actor(), input.Name)
+func (t opsTools) removeApp(ctx context.Context, caller Caller, input AppInput) (Done, error) {
+	err := t.services.Apps.Delete(ctx, caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Removed app " + input.Name + ". Its data stays on the server."}, nil
+	return Done{Message: "Removed app " + input.app() + ". Its data stays on the server."}, nil
 }
 
 // Deploy is the output of get_deploy and rollback_app.
@@ -549,8 +564,8 @@ func (t opsTools) rollback(_ context.Context, caller Caller, input RollbackInput
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) redeploy(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Redeploy(caller.actor(), input.Name)
+func (t opsTools) redeploy(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Redeploy(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -580,8 +595,8 @@ func (h DeployHook) Summary() string {
 	return "New deploy hook. Store it as a CI secret; it is shown once: " + h.URL
 }
 
-func (t opsTools) createDeployHook(_ context.Context, caller Caller, input NameInput) (DeployHook, error) {
-	url, err := t.services.Apps.RotateDeployHook(caller.actor(), input.Name)
+func (t opsTools) createDeployHook(_ context.Context, caller Caller, input AppInput) (DeployHook, error) {
+	url, err := t.services.Apps.RotateDeployHook(caller.actor(), input.app())
 	if err != nil {
 		return DeployHook{}, err
 	}
@@ -635,28 +650,28 @@ func (t opsTools) removeRegistry(_ context.Context, caller Caller, input HostInp
 	return Done{Message: "Removed the login for " + input.Host + "."}, nil
 }
 
-func (t opsTools) restart(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Restart(caller.actor(), input.Name)
+func (t opsTools) restart(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Restart(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
 	}
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) start(_ context.Context, caller Caller, input NameInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Start(caller.actor(), input.Name)
+func (t opsTools) start(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Start(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
 	}
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) stop(ctx context.Context, caller Caller, input NameInput) (Done, error) {
-	err := t.services.Apps.Stop(ctx, caller.actor(), input.Name)
+func (t opsTools) stop(ctx context.Context, caller Caller, input AppInput) (Done, error) {
+	err := t.services.Apps.Stop(ctx, caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Stopped " + input.Name + ". Its data stays; start_app runs it again."}, nil
+	return Done{Message: "Stopped " + input.app() + ". Its data stays; start_app runs it again."}, nil
 }
 
 // DomainChecks is the output of check_domains.
@@ -679,8 +694,8 @@ func (d DomainChecks) Summary() string {
 	return strings.Join(parts, "; ") + "."
 }
 
-func (t opsTools) checkDomains(ctx context.Context, caller Caller, input NameInput) (DomainChecks, error) {
-	checks, err := t.services.Apps.CheckDomains(ctx, caller.Token.WorkspaceID, input.Name)
+func (t opsTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
+	checks, err := t.services.Apps.CheckDomains(ctx, caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return DomainChecks{}, err
 	}
@@ -748,12 +763,12 @@ func (t opsTools) setProtection(_ context.Context, caller Caller, input Protecti
 	return t.change(caller, input.App, deploy, changed)
 }
 
-func (t opsTools) removeProtection(_ context.Context, caller Caller, input NameInput) (Change, error) {
-	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.Name, "", "")
+func (t opsTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
+	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.app(), "", "")
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.Name, deploy, changed)
+	return t.change(caller, input.app(), deploy, changed)
 }
 
 // Logs is the output of get_logs.
@@ -785,8 +800,8 @@ type Env struct {
 
 func (e Env) Summary() string { return count(len(e.Items), "env var") + "." }
 
-func (t opsTools) getEnv(_ context.Context, caller Caller, input NameInput) (Env, error) {
-	env, err := t.services.Apps.Env(caller.Token.WorkspaceID, input.Name)
+func (t opsTools) getEnv(_ context.Context, caller Caller, input AppInput) (Env, error) {
+	env, err := t.services.Apps.Env(caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Env{}, err
 	}
@@ -844,7 +859,7 @@ func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (E
 			missing = append(missing, key)
 		}
 	}
-	env, err := t.getEnv(context.Background(), caller, NameInput{Name: input.App})
+	env, err := t.getEnv(context.Background(), caller, AppInput{App: input.App})
 	return EnvSet{Env: env, set: len(input.Set), removed: len(removed), missing: missing}, err
 }
 
@@ -858,8 +873,8 @@ func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input QueryI
 	if limit == 0 {
 		limit = 100
 	}
-	if limit < 1 || limit > 1000 {
-		return QueryResult{}, InvalidField("limit", "Choose between 1 and 1000 rows.")
+	if limit < 1 || limit > api.MaxQueryLimit {
+		return QueryResult{}, InvalidField("limit", api.QueryLimitMessage)
 	}
 	result, err := t.services.Apps.Query(ctx, caller.actor(), input.App, input.Database, input.SQL, input.Params, false, limit)
 	return QueryResult{result}, err
@@ -870,16 +885,16 @@ func (t opsTools) executeSQL(ctx context.Context, caller Caller, input SQLInput)
 	return QueryResult{result}, err
 }
 
-func (t opsTools) getBackups(ctx context.Context, caller Caller, input NameInput) (Backups, error) {
-	app, backups, err := t.services.Apps.Backups(ctx, caller.Token.WorkspaceID, input.Name)
+func (t opsTools) getBackups(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
+	app, backups, err := t.services.Apps.Backups(ctx, caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Backups{}, err
 	}
 	return Backups{api.AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, Databases: backups.Databases}}, nil
 }
 
-func (t opsTools) backUpApp(ctx context.Context, caller Caller, input NameInput) (Backups, error) {
-	app, backups, err := t.services.Apps.BackUp(ctx, caller.actor(), input.Name)
+func (t opsTools) backUpApp(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
+	app, backups, err := t.services.Apps.BackUp(ctx, caller.actor(), input.app())
 	if err != nil {
 		return Backups{}, err
 	}
@@ -968,12 +983,12 @@ func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) 
 	return App{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) unlinkRepo(_ context.Context, caller Caller, input NameInput) (Done, error) {
-	err := t.services.Apps.UnlinkRepo(caller.actor(), input.Name)
+func (t opsTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
+	err := t.services.Apps.UnlinkRepo(caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: input.Name + " follows no repo now."}, nil
+	return Done{Message: input.app() + " follows no repo now."}, nil
 }
 
 func (t opsTools) deployRef(ctx context.Context, caller Caller, input RefInput) (Deploy, error) {

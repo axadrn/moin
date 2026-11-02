@@ -32,7 +32,7 @@ API: GET /api/v1/apps/{app}/databases/rows
 MCP: query_database
 ```
 
-A read returns at most 1000 rows. `--limit` in the CLI and `limit` in the API and MCP choose fewer.
+A read returns at most 1000 rows. `--limit` in the CLI and `limit` in the API and MCP choose fewer; a limit outside 1 to 1000 is refused.
 
 ## See the schema
 

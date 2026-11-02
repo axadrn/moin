@@ -388,3 +388,21 @@ func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
 		t.Errorf("limit %v, tail %v", limit, tail)
 	}
 }
+
+func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "names")
+	upgrade(t, env, owner)
+	token, _ := createToken(t, env, owner, "read", "write")
+	session := connectMemory(t, env.server, owner, token)
+
+	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
+	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"name": "box-2"}))
+	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	output[mcp.App](t, call(t, session, "create_app", map[string]any{"name": "blog", "server": "box-1"}))
+	for _, input := range []map[string]any{{"app": "shop"}, {"name": "blog"}} {
+		output[mcp.AppDetail](t, call(t, session, "get_app", input))
+	}
+	output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-2"}))
+	toolError(t, call(t, session, "remove_server", map[string]any{"name": "box-1"}), "server_has_apps")
+}

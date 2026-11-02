@@ -17,6 +17,8 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 
 ## Tools
 
+Tools take the app as `app` and the server as `server`. The older `name` still works for both, for now.
+
 | Tool | Does | Scope |
 | --- | --- | --- |
 | `whoami` | the account and token | read |

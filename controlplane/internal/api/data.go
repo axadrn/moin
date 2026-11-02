@@ -142,11 +142,22 @@ func (h *AppsHandler) DeleteRow(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
+// MaxQueryLimit is the most rows a read returns; QueryLimitMessage explains
+// a limit outside 1 to MaxQueryLimit.
+const (
+	MaxQueryLimit     = 1000
+	QueryLimitMessage = "Choose between 1 and 1000 rows."
+)
+
 // Query runs SQL. A read cannot change anything; write runs it in one
 // transaction.
 func (h *AppsHandler) Query(w http.ResponseWriter, r *http.Request) {
 	var request QueryRequest
 	if !Decode(w, r, &request) {
+		return
+	}
+	if request.Limit < 0 || request.Limit > MaxQueryLimit {
+		ValidationError(w, map[string]string{"limit": QueryLimitMessage})
 		return
 	}
 	result, err := h.apps.Query(r.Context(), actor(r), r.PathValue("app"), request.Database, request.SQL, request.Params, request.Write, request.Limit)
