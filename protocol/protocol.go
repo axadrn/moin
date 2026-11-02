@@ -207,8 +207,12 @@ type RegisterResponse struct {
 // the deploy applies env and routing to the running release, without a
 // build.
 type DeployStart struct {
-	DeployID  string `json:"deploy_id"`
-	App       string `json:"app"`
+	DeployID string `json:"deploy_id"`
+	App      string `json:"app"`
+	// AppID is the app's ID in the control plane. Its backups live under
+	// it, so an app removed and created again with the same name starts
+	// with an empty backup folder.
+	AppID     string `json:"app_id,omitempty"`
 	Number    int    `json:"number"`
 	SourceURL string `json:"source_url,omitempty"`
 	// SourceAuthorization is sent with the download, such as a GitHub
@@ -389,13 +393,21 @@ type DBResult struct {
 	Changes   int64    `json:"changes,omitempty"`
 }
 
-// BackupStorage is an S3-compatible bucket. Backups go to
-// <Path>/<app>/<database>/ in it.
+// BackupStorage is an S3-compatible bucket. Everything of a workspace
+// goes under <Path>/<Workspace>/, each app under <app>/<app ID>/:
+//
+//	<Path>/<Workspace>/<app>/<app ID>/uploads/
+//	<Path>/<Workspace>/<app>/<app ID>/<database>/litestream/
+//	<Path>/<Workspace>/<app>/<app ID>/<database>/snapshots/
+//
+// Workspace is the workspace's ID, which never changes, so workspaces
+// sharing one bucket never touch each other's files.
 type BackupStorage struct {
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
 	Bucket    string `json:"bucket"`
 	Path      string `json:"path,omitempty"`
+	Workspace string `json:"workspace"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
 }

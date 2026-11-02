@@ -11,7 +11,7 @@ import (
 
 func TestUninstallKeepsTheApps(t *testing.T) {
 	dir := t.TempDir()
-	for _, file := range []string{"agent.json", "server.json", "backup-target", "apps/shop/volumes/data/app.db", "traefik/acme.json"} {
+	for _, file := range []string{"agent.json", "server.json", "backup-targets.json", "apps/shop/volumes/data/app.db", "traefik/acme.json"} {
 		path := filepath.Join(dir, file)
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)

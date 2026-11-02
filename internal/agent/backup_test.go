@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,12 +54,13 @@ func TestBackups(t *testing.T) {
 	os.MkdirAll(release, 0o700)
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
 	os.WriteFile(filepath.Join(a.appDir(app), "current"), []byte("1"), 0o600)
+	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("app-one"), 0o600)
 
 	_, err = b.snapshot(ctx, protocol.BackupRequest{App: app})
 	if err == nil {
 		t.Fatal("a snapshot without storage worked")
 	}
-	storage := &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: "test", AccessKey: "x", SecretKey: "y"}
+	storage := &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: "test", Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
 	err = b.configure(ctx, storage)
 	if err != nil {
 		t.Fatal(err)
@@ -186,9 +189,123 @@ func TestBackups(t *testing.T) {
 	}
 
 	client := b.s3Client()
-	list, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/" + app + "/data-app.db/")})
+	list, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/ws-one/" + app + "/app-one/data-app.db/")})
 	if len(list.Contents) < 2 {
 		t.Fatalf("bucket has %d objects for the app", len(list.Contents))
+	}
+
+	// The app removed and created again with the same name: the same file
+	// replicates into a new, empty folder, and the old backups stay apart.
+	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("app-two"), 0o600)
+	b.reconcile()
+	snapshots, err := b.snapshots(ctx, app, "/data/app.db")
+	if err != nil || len(snapshots) != 0 {
+		t.Fatalf("the new app sees snapshots %v, %v", snapshots, err)
+	}
+	_, err = db.Exec(`INSERT INTO notes (body) VALUES ('new app')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replicated(time.Now().Add(-time.Second))
+	list, _ = client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/ws-one/" + app + "/app-two/data-app.db/litestream/")})
+	if len(list.Contents) == 0 {
+		t.Fatal("nothing replicated under the new app ID")
+	}
+	old, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/ws-one/" + app + "/app-one/data-app.db/snapshots/")})
+	if len(old.Contents) < 3 {
+		t.Fatalf("the old app's snapshots are gone: %d left", len(old.Contents))
+	}
+
+	// Without an app ID, from a deploy before deploys brought one, nothing
+	// is backed up and the status says what to do.
+	os.Remove(filepath.Join(a.appDir(app), "app-id"))
+	b.reconcile()
+	if len(b.watched) != 0 {
+		t.Fatalf("watched without an app ID = %v", b.watched)
+	}
+	if status := b.status(ctx, app, a.runningDatabases(app)[0], true); !strings.Contains(status.Error, "deploy "+app+" once more") {
+		t.Fatalf("status without an app ID = %+v", status)
+	}
+}
+
+// TestBucketLayout: two workspaces share one bucket and folder, each with
+// an app of the same name. Their keys never overlap.
+func TestBucketLayout(t *testing.T) {
+	prefixes := map[string]string{}
+	for _, workspace := range []string{"0b6c1f8e-1111-4c1a-9a7e-5d2b3c4d5e6f", "7a9e2d4c-2222-4b8f-8c3d-1e2f3a4b5c6d"} {
+		for _, folder := range []string{"", "ops"} {
+			a := newApps(t.TempDir(), nil)
+			os.MkdirAll(a.appDir("shop"), 0o700)
+			os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-"+workspace[:8]), 0o600)
+			b := newBackups(a, nil)
+			b.storage = &protocol.BackupStorage{Bucket: "shared", Path: folder, Workspace: workspace}
+			prefix, err := b.prefix("shop", "/data/app.db")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := strings.TrimLeft(folder+"/"+workspace+"/shop/id-"+workspace[:8]+"/data-app.db", "/")
+			if prefix != want {
+				t.Errorf("prefix = %s, want %s", prefix, want)
+			}
+			for other, key := range prefixes {
+				if strings.HasPrefix(prefix+"/", key+"/") || strings.HasPrefix(key+"/", prefix+"/") {
+					t.Errorf("%s overlaps %s (%s)", prefix, key, other)
+				}
+			}
+			prefixes[workspace+folder] = prefix
+		}
+	}
+	err := newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.BackupStorage{Bucket: "shared"})
+	if err == nil {
+		t.Error("a bucket without a workspace folder was accepted")
+	}
+}
+
+// TestSweepUploads: uploads older than a day go, newer ones and backups
+// stay, and another workspace's uploads are never touched.
+func TestSweepUploads(t *testing.T) {
+	endpoint := os.Getenv("OPS_TEST_S3")
+	if endpoint == "" {
+		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+	}
+	bucket := os.Getenv("OPS_TEST_S3_BUCKET")
+	if bucket == "" {
+		bucket = "ops-dev"
+	}
+	ctx := context.Background()
+	folder := fmt.Sprintf("sweep-%d", time.Now().UnixNano())
+	b := newBackups(newApps(t.TempDir(), nil), nil)
+	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: folder, Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
+	client := b.s3Client()
+	keys := []string{
+		folder + "/ws-one/shop/app-1/uploads/up_old.tar.gz",
+		folder + "/ws-one/gone/app-2/uploads/up_old.tar.gz",
+		folder + "/ws-one/shop/app-1/data-app.db/snapshots/20261031T143638Z-manual.db.gz",
+		folder + "/ws-two/shop/app-3/uploads/up_old.tar.gz",
+	}
+	for _, key := range keys {
+		_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), Body: strings.NewReader("x")})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	exists := func(key string) bool {
+		_, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+		return err == nil
+	}
+	b.sweepOnce(ctx, time.Now().Add(-time.Hour))
+	for _, key := range keys {
+		if !exists(key) {
+			t.Fatalf("%s went before it was a day old", key)
+		}
+	}
+	b.sweepOnce(ctx, time.Now().Add(time.Minute))
+	want := map[string]bool{keys[0]: false, keys[1]: false, keys[2]: true, keys[3]: true}
+	for key, kept := range want {
+		if exists(key) != kept {
+			t.Errorf("%s exists = %v, want %v", key, !kept, kept)
+		}
+		client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
 	}
 }
 
@@ -204,19 +321,35 @@ func TestDrillBeforeReplication(t *testing.T) {
 		bucket = "ops-dev"
 	}
 	reports := make(chan protocol.Backups, 1)
-	b := newBackups(newApps(t.TempDir(), func(protocol.MessageType, string, any) {}), func(_ protocol.MessageType, _ string, data any) {
+	apps := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	os.MkdirAll(apps.appDir("fresh"), 0o700)
+	os.WriteFile(filepath.Join(apps.appDir("fresh"), "app-id"), []byte("app-1"), 0o600)
+	b := newBackups(apps, func(_ protocol.MessageType, _ string, data any) {
 		if backups, ok := data.(protocol.Backups); ok {
 			reports <- backups
 		}
 	})
-	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: fmt.Sprintf("empty-%d", time.Now().UnixNano()), AccessKey: "x", SecretKey: "y"}
+	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: fmt.Sprintf("empty-%d", time.Now().UnixNano()), Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
 	database := protocol.Database{Path: "/data/app.db", HostPath: filepath.Join(t.TempDir(), "app.db")}
-	b.watched[database.HostPath] = watched{app: "fresh", database: database}
+	b.watched[database.HostPath] = watched{app: "fresh", prefix: path.Join(b.storage.Path, "ws-one/fresh/app-1/data-app.db"), database: database}
 	if !b.drillAll(context.Background()) {
 		t.Error("a drill before the first replication does not try again soon")
 	}
 	report := <-reports
 	if report.Databases[0].VerifiedAt != nil || report.Databases[0].Error != "" {
 		t.Errorf("report = %+v, want no drill yet", report.Databases[0])
+	}
+}
+
+// TestDeployRefusesBadAppID: the app ID becomes a folder in the bucket, so
+// a deploy with one that could leave it fails before anything happens.
+func TestDeployRefusesBadAppID(t *testing.T) {
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	_, err := a.runDeploy(context.Background(), protocol.DeployStart{App: "shop", AppID: "../other", Number: 1}, func(string, ...any) {})
+	if err == nil {
+		t.Fatal("a deploy with a bad app ID ran")
+	}
+	if a.appID("shop") != "" {
+		t.Error("a bad app ID was stored")
 	}
 }

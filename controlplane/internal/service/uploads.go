@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -48,7 +49,7 @@ func (s *AppService) Upload(ctx context.Context, workspaceID, idOrName string) (
 	id := "up_" + randomToken()
 	request, err := s3.NewPresignClient(bucketClient(*storage)).PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(storage.Bucket),
-		Key:    aws.String(uploadKey(*storage, app.Name, id)),
+		Key:    aws.String(uploadKey(*storage, app, id)),
 	}, s3.WithPresignExpires(uploadLinkLifetime))
 	if err != nil {
 		return Upload{}, err
@@ -71,7 +72,7 @@ func (s *AppService) DeployUpload(ctx context.Context, actor Actor, idOrName, up
 		return nil, ErrUploadBucket
 	}
 	presign := s3.NewPresignClient(bucketClient(*storage))
-	key := aws.String(uploadKey(*storage, app.Name, uploadID))
+	key := aws.String(uploadKey(*storage, app, uploadID))
 	get, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(storage.Bucket), Key: key}, s3.WithPresignExpires(downloadLinkLifetime))
 	if err != nil {
 		return nil, err
@@ -86,6 +87,9 @@ func (s *AppService) DeployUpload(ctx context.Context, actor Actor, idOrName, up
 	return s.start(actor, "app.deployed", app, deploy, start)
 }
 
-func uploadKey(storage protocol.BackupStorage, app, id string) string {
-	return strings.Trim(storage.Path+"/"+app+"/uploads/"+id+".tar.gz", "/")
+// uploadKey is where a source waits for the server, next to the app's
+// backups: <path>/<workspace>/<app>/<app ID>/uploads/<id>.tar.gz. The
+// agent deletes what it never fetched after a day.
+func uploadKey(storage protocol.BackupStorage, app *model.App, id string) string {
+	return strings.TrimLeft(path.Join(storage.Path, storage.Workspace, app.Name, app.ID, "uploads", id+".tar.gz"), "/")
 }

@@ -46,7 +46,10 @@ const (
 	healthTimeout = 30 * time.Second
 )
 
-var appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+var (
+	appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+	appIDPattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
+)
 
 // apps runs the deploys, logs and removals the control plane asks for.
 type apps struct {
@@ -86,6 +89,17 @@ func (a *apps) releaseDir(app string, number int) string {
 	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
 }
 
+// appID is the app's ID in the control plane, which every deploy brings,
+// or "" before the first deploy that brought one.
+func (a *apps) appID(app string) string {
+	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "app-id"))
+	id := strings.TrimSpace(string(body))
+	if !appIDPattern.MatchString(id) {
+		return ""
+	}
+	return id
+}
+
 func (a *apps) current(app string) int {
 	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "current"))
 	number, _ := strconv.Atoi(strings.TrimSpace(string(body)))
@@ -113,10 +127,19 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 
 func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
 	var detected protocol.Detected
-	if !appNamePattern.MatchString(start.App) || start.Number < 1 {
-		return detected, errors.New("invalid app name or deploy number")
+	if !appNamePattern.MatchString(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
+		return detected, errors.New("invalid app name, app ID or deploy number")
 	}
 	defer a.lock(start.App)()
+	if start.AppID != "" {
+		err := os.MkdirAll(a.appDir(start.App), 0o700)
+		if err == nil {
+			err = os.WriteFile(filepath.Join(a.appDir(start.App), "app-id"), []byte(start.AppID), 0o600)
+		}
+		if err != nil {
+			return detected, err
+		}
+	}
 
 	release := a.releaseDir(start.App, start.Number)
 	_ = os.RemoveAll(release)
@@ -976,7 +999,8 @@ func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol
 }
 
 // remove stops the app and deletes its containers, images and releases. The
-// volumes stay, so the data survives.
+// volumes stay, so the data survives. Its backups stop; what is in the
+// bucket stays there.
 func (a *apps) remove(ctx context.Context, app string) error {
 	if !appNamePattern.MatchString(app) {
 		return errors.New("invalid app name")
@@ -992,6 +1016,10 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	}
 	_ = os.RemoveAll(filepath.Join(a.appDir(app), "releases"))
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
+	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
+	if a.backups != nil {
+		a.backups.reconcile()
+	}
 	return nil
 }
 

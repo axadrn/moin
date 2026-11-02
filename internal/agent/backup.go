@@ -30,8 +30,11 @@ import (
 
 // Backups run inside the agent, two ways, into the user's bucket:
 //
-//	<path>/<app>/<database>/litestream/   every change, for a point in time restore
-//	<path>/<app>/<database>/snapshots/    full copies: before deploys, changes, restores
+//	<path>/<workspace>/<app>/<app ID>/<database>/litestream/   every change, for a point in time restore
+//	<path>/<workspace>/<app>/<app ID>/<database>/snapshots/    full copies: before deploys, changes, restores
+//
+// The workspace ID keeps workspaces that share a bucket apart, the app ID
+// an app from an earlier one of the same name.
 //
 // Once a day the agent restores the newest state into a temp file and runs
 // the integrity check on it, so "backed up" means "restored and verified".
@@ -42,6 +45,8 @@ const (
 	firstDrill       = 2 * time.Minute
 	snapshotTimeout  = 10 * time.Minute
 	snapshotIDLayout = "20060102T150405Z"
+	keepUploads      = 24 * time.Hour
+	sweepEvery       = time.Hour
 )
 
 // backups replicates every database of the running apps and answers the
@@ -57,9 +62,10 @@ type backups struct {
 	verified map[string]drill
 }
 
-// watched is one replicated database.
+// watched is one replicated database; prefix is its folder in the bucket.
 type watched struct {
 	app      string
+	prefix   string
 	database protocol.Database
 }
 
@@ -86,7 +92,10 @@ func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage
 	if storage == nil {
 		return nil
 	}
-	b.resetForTarget()
+	if storage.Workspace == "" {
+		b.storage = nil
+		return errors.New("start backups: the bucket has no workspace folder, update the control plane")
+	}
 	b.store = litestream.NewStore(nil, litestream.DefaultCompactionLevels)
 	b.store.SnapshotRetention = pointInTime
 	b.store.Logger = slog.Default().With("part", "backup")
@@ -99,24 +108,29 @@ func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage
 	return nil
 }
 
-// resetForTarget clears Litestream's local state next to every database
-// when backups go somewhere new. That state tracks what the old target
-// holds; against a new, empty one Litestream would wait for files it
-// already cleaned up. The new target starts with a full snapshot.
-func (b *backups) resetForTarget() {
-	target := b.storage.Endpoint + "|" + b.storage.Bucket + "|" + b.storage.Path
-	file := filepath.Join(filepath.Dir(b.apps.dir), "backup-target")
-	previous, _ := os.ReadFile(file)
-	if string(previous) == target {
-		return
+// moved reports whether a database's backups go somewhere new: another
+// bucket, folder or app ID. backup-targets.json remembers where each
+// database went. Litestream's local state next to a moved database must
+// go: it tracks what the old place holds, and against a new, empty one
+// Litestream would wait for files it already cleaned up. The new place
+// starts with a full snapshot.
+func (b *backups) moved(hostPath, prefix string) bool {
+	file := filepath.Join(filepath.Dir(b.apps.dir), "backup-targets.json")
+	targets := map[string]string{}
+	body, _ := os.ReadFile(file)
+	_ = json.Unmarshal(body, &targets)
+	target := b.storage.Endpoint + "|" + b.storage.Bucket + "|" + prefix
+	if targets[hostPath] == target {
+		return false
 	}
-	entries, _ := os.ReadDir(b.apps.dir)
-	for _, entry := range entries {
-		for _, database := range b.apps.runningDatabases(entry.Name()) {
-			_ = os.RemoveAll(filepath.Join(filepath.Dir(database.HostPath), "."+filepath.Base(database.HostPath)+litestream.MetaDirSuffix))
-		}
-	}
-	_ = os.WriteFile(file, []byte(target), 0o600)
+	targets[hostPath] = target
+	saveJSON(file, targets)
+	return true
+}
+
+// litestreamState is the folder Litestream keeps next to a database.
+func litestreamState(hostPath string) string {
+	return filepath.Join(filepath.Dir(hostPath), "."+filepath.Base(hostPath)+litestream.MetaDirSuffix)
 }
 
 func (b *backups) stopLocked() {
@@ -128,41 +142,63 @@ func (b *backups) stopLocked() {
 }
 
 // reconcile replicates the databases of the running releases: new ones
-// start, gone ones stop. Deploys and restores call it. A database that is
-// slow to open never holds up the others or a backup request.
+// start, gone ones stop. Deploys, restores and removals call it. A
+// database that is slow to open never holds up the others or a backup
+// request. Gone ones stop before it returns, so an app created again
+// right after starts on a clean slate.
 func (b *backups) reconcile() {
 	b.mu.Lock()
-	b.reconcileLocked()
+	store, gone := b.store, b.reconcileLocked()
 	b.mu.Unlock()
+	for _, hostPath := range gone {
+		_ = store.UnregisterDB(context.Background(), hostPath)
+	}
 }
 
-func (b *backups) reconcileLocked() {
+// reconcileLocked starts the new databases and returns the gone ones for
+// the caller to stop.
+func (b *backups) reconcileLocked() (gone []string) {
 	store := b.store
 	if store == nil {
-		return
+		return nil
 	}
 	want := map[string]watched{}
 	entries, _ := os.ReadDir(b.apps.dir)
 	for _, entry := range entries {
 		for _, database := range b.apps.runningDatabases(entry.Name()) {
-			want[database.HostPath] = watched{app: entry.Name(), database: database}
+			prefix, err := b.prefix(entry.Name(), database.Path)
+			if err != nil {
+				slog.Warn("backup: not replicated", "app", entry.Name(), "database", database.Path, "error", err)
+				continue
+			}
+			want[database.HostPath] = watched{app: entry.Name(), prefix: prefix, database: database}
 		}
 	}
 	for hostPath := range b.watched {
 		if _, ok := want[hostPath]; !ok {
-			go store.UnregisterDB(context.Background(), hostPath)
+			gone = append(gone, hostPath)
 			delete(b.watched, hostPath)
 		}
 	}
 	for hostPath, item := range want {
-		if _, ok := b.watched[hostPath]; ok {
+		old, known := b.watched[hostPath]
+		if known && old.prefix == item.prefix {
 			continue
 		}
 		b.watched[hostPath] = item
+		moved := b.moved(hostPath, item.prefix)
 		db := litestream.NewDB(hostPath)
-		replica := litestream.NewReplicaWithClient(db, b.replicaClient(item.app, item.database.Path))
+		replica := litestream.NewReplicaWithClient(db, b.replicaClientAt(item.prefix))
 		db.Replica = replica
 		go func() {
+			// The same file under a new app ID: the old replica stops
+			// first, or the store would keep it.
+			if known {
+				_ = store.UnregisterDB(context.Background(), hostPath)
+			}
+			if moved {
+				_ = os.RemoveAll(litestreamState(hostPath))
+			}
 			err := store.RegisterDB(db)
 			if err != nil {
 				slog.Error("backup: replicate failed", "app", item.app, "database", item.database.Path, "error", err)
@@ -176,6 +212,7 @@ func (b *backups) reconcileLocked() {
 			matchOwner(hostPath)
 		}()
 	}
+	return gone
 }
 
 // runningDatabases are the databases of an app's running release.
@@ -196,11 +233,27 @@ func databaseKey(database string) string {
 	return strings.ReplaceAll(strings.Trim(database, "/"), "/", "-")
 }
 
-func (b *backups) prefix(app, database string) string {
-	return strings.Trim(path.Join(b.storage.Path, app, databaseKey(database)), "/")
+// prefix is a database's folder in the bucket:
+// <path>/<workspace>/<app>/<app ID>/<database>. An app deployed before
+// deploys brought the app ID has none until its next deploy.
+func (b *backups) prefix(app, database string) (string, error) {
+	id := b.apps.appID(app)
+	if id == "" {
+		return "", fmt.Errorf("deploy %s once more to start its backups", app)
+	}
+	return strings.Trim(path.Join(b.storage.Path, b.storage.Workspace, app, id, databaseKey(database)), "/"), nil
 }
 
-func (b *backups) replicaClient(app, database string) *lss3.ReplicaClient {
+// replicaClient is where Litestream keeps every change of a database.
+func (b *backups) replicaClient(app, database string) (*lss3.ReplicaClient, error) {
+	prefix, err := b.prefix(app, database)
+	if err != nil {
+		return nil, err
+	}
+	return b.replicaClientAt(prefix), nil
+}
+
+func (b *backups) replicaClientAt(prefix string) *lss3.ReplicaClient {
 	client := lss3.NewReplicaClient()
 	client.AccessKeyID = b.storage.AccessKey
 	client.SecretAccessKey = b.storage.SecretKey
@@ -208,7 +261,7 @@ func (b *backups) replicaClient(app, database string) *lss3.ReplicaClient {
 	client.Bucket = b.storage.Bucket
 	client.Endpoint = b.storage.Endpoint
 	client.ForcePathStyle = b.storage.Endpoint != ""
-	client.Path = b.prefix(app, database) + "/litestream"
+	client.Path = prefix + "/litestream"
 	return client
 }
 
@@ -335,8 +388,13 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 		snapshot.ID = now.Format(snapshotIDLayout) + "-" + snapshot.Reason
 	}
 	b.mu.Lock()
-	client, bucket, key := b.s3Client(), b.storage.Bucket, b.prefix(app, database.Path)+"/snapshots/"+snapshot.ID+".db.gz"
+	client, bucket := b.s3Client(), b.storage.Bucket
+	prefix, err := b.prefix(app, database.Path)
 	b.mu.Unlock()
+	if err != nil {
+		return protocol.Snapshot{}, err
+	}
+	key := prefix + "/snapshots/" + snapshot.ID + ".db.gz"
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), Body: file, ContentLength: aws.Int64(info.Size())})
 	if err != nil {
 		return protocol.Snapshot{}, fmt.Errorf("upload: %w", err)
@@ -344,7 +402,7 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 	snapshots = append([]protocol.Snapshot{snapshot}, snapshots...)
 	if listErr == nil && len(snapshots) > keepSnapshots {
 		for _, old := range snapshots[keepSnapshots:] {
-			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(b.prefix(app, database.Path) + "/snapshots/" + old.ID + ".db.gz")})
+			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(prefix + "/snapshots/" + old.ID + ".db.gz")})
 		}
 	}
 	slog.Info("backup: snapshot", "app", app, "database", database.Path, "id", snapshot.ID, "size", snapshot.Size)
@@ -413,8 +471,13 @@ func gzipFile(source string) (string, error) {
 // snapshots lists the snapshots of a database, newest first.
 func (b *backups) snapshots(ctx context.Context, app, database string) ([]protocol.Snapshot, error) {
 	b.mu.Lock()
-	client, bucket, prefix := b.s3Client(), b.storage.Bucket, b.prefix(app, database)+"/snapshots/"
+	client, bucket := b.s3Client(), b.storage.Bucket
+	folder, err := b.prefix(app, database)
 	b.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	prefix := folder + "/snapshots/"
 	snapshots := []protocol.Snapshot{}
 	pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(prefix)})
 	for pages.HasMorePages() {
@@ -471,9 +534,13 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		}
 	}
 	b.mu.Lock()
-	client := b.replicaClient(app, database.Path)
+	client, err := b.replicaClient(app, database.Path)
 	last := b.verified[database.HostPath]
 	b.mu.Unlock()
+	if err != nil {
+		backup.Error = err.Error()
+		return backup
+	}
 	since, until, err := litestream.NewReplicaWithClient(nil, client).TimeBounds(ctx)
 	if err == nil && !since.IsZero() {
 		backup.Since, backup.ReplicatedAt = &since, &until
@@ -544,9 +611,9 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	// The point in time history belongs to the old database; it starts
 	// again from the restored one.
 	b.mu.Lock()
-	client := b.replicaClient(request.App, database.Path)
+	client, clientErr := b.replicaClient(request.App, database.Path)
 	b.mu.Unlock()
-	if swapErr == nil {
+	if swapErr == nil && clientErr == nil {
 		if err := client.DeleteAll(ctx); err != nil {
 			slog.Warn("backup: clear the old replica", "error", err)
 		}
@@ -565,8 +632,13 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 
 func (b *backups) download(ctx context.Context, app, database, id, target string) error {
 	b.mu.Lock()
-	client, bucket, key := b.s3Client(), b.storage.Bucket, b.prefix(app, database)+"/snapshots/"+id+".db.gz"
+	client, bucket := b.s3Client(), b.storage.Bucket
+	prefix, err := b.prefix(app, database)
 	b.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	key := prefix + "/snapshots/" + id + ".db.gz"
 	object, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
 	var missing *types.NoSuchKey
 	if errors.As(err, &missing) {
@@ -594,12 +666,15 @@ func (b *backups) download(ctx context.Context, app, database, id, target string
 // restorePoint restores the replica as it was at a point in time.
 func (b *backups) restorePoint(ctx context.Context, app, database string, at time.Time, target string) error {
 	b.mu.Lock()
-	client := b.replicaClient(app, database)
+	client, err := b.replicaClient(app, database)
 	b.mu.Unlock()
+	if err != nil {
+		return err
+	}
 	options := litestream.NewRestoreOptions()
 	options.OutputPath = target
 	options.Timestamp = at
-	err := litestream.NewReplicaWithClient(nil, client).Restore(ctx, options)
+	err = litestream.NewReplicaWithClient(nil, client).Restore(ctx, options)
 	if err != nil {
 		return fmt.Errorf("restore to %s: %w", at.Format(time.RFC3339), err)
 	}
@@ -623,7 +698,7 @@ func swapDatabase(restored, target string) error {
 	}
 	// Litestream keeps its position in the old file next to it; the new
 	// file starts over.
-	_ = os.RemoveAll(filepath.Join(filepath.Dir(target), "."+filepath.Base(target)+litestream.MetaDirSuffix))
+	_ = os.RemoveAll(litestreamState(target))
 	err = os.Rename(restored, target)
 	if err != nil {
 		return err
@@ -715,7 +790,7 @@ func (b *backups) drillOne(ctx context.Context, item watched) error {
 	removeDatabase(target)
 	defer removeDatabase(target)
 	b.mu.Lock()
-	client := b.replicaClient(item.app, item.database.Path)
+	client := b.replicaClientAt(item.prefix)
 	b.mu.Unlock()
 	options := litestream.NewRestoreOptions()
 	options.OutputPath = target
@@ -724,4 +799,72 @@ func (b *backups) drillOne(ctx context.Context, item watched) error {
 		return err
 	}
 	return integrityCheck(ctx, target)
+}
+
+// sweepUploads deletes, once an hour, what ops deploy left in the bucket:
+// a source the server never fetched, because the CLI stopped after the
+// upload or the deploy never started. The server deletes each source as
+// soon as it has it; this catches the rest after a day.
+func (b *backups) sweepUploads(ctx context.Context) {
+	ticker := time.NewTicker(sweepEvery)
+	defer ticker.Stop()
+	for {
+		b.sweepOnce(ctx, time.Now().Add(-keepUploads))
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// sweepOnce deletes the uploads of the workspace older than before, under
+// <path>/<workspace>/<app>/<app ID>/uploads/, also those of removed apps.
+func (b *backups) sweepOnce(ctx context.Context, before time.Time) {
+	b.mu.Lock()
+	if b.storage == nil {
+		b.mu.Unlock()
+		return
+	}
+	client, bucket := b.s3Client(), b.storage.Bucket
+	root := strings.TrimLeft(path.Join(b.storage.Path, b.storage.Workspace)+"/", "/")
+	b.mu.Unlock()
+	folders := func(prefix string) []string {
+		var found []string
+		pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(prefix), Delimiter: aws.String("/")})
+		for pages.HasMorePages() {
+			page, err := pages.NextPage(ctx)
+			if err != nil {
+				slog.Warn("backup: sweep uploads", "prefix", prefix, "error", err)
+				return found
+			}
+			for _, folder := range page.CommonPrefixes {
+				found = append(found, aws.ToString(folder.Prefix))
+			}
+		}
+		return found
+	}
+	for _, app := range folders(root) {
+		for _, id := range folders(app) {
+			pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(id + "uploads/")})
+			for pages.HasMorePages() {
+				page, err := pages.NextPage(ctx)
+				if err != nil {
+					slog.Warn("backup: sweep uploads", "prefix", id, "error", err)
+					break
+				}
+				for _, object := range page.Contents {
+					if object.LastModified == nil || !object.LastModified.Before(before) {
+						continue
+					}
+					_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: object.Key})
+					if err != nil {
+						slog.Warn("backup: delete old upload", "key", aws.ToString(object.Key), "error", err)
+					} else {
+						slog.Info("backup: deleted an upload nobody fetched", "key", aws.ToString(object.Key))
+					}
+				}
+			}
+		}
+	}
 }
