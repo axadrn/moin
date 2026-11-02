@@ -79,7 +79,8 @@ func RequestLogging(enabled bool, clientIPs ClientIPResolver) func(http.Handler)
 	}
 }
 
-// safeRequestLogPath replaces the secret token of an email link with :token.
+// safeRequestLogPath replaces the secret token of an email link or a deploy
+// hook with :token.
 func safeRequestLogPath(path string) string {
 	const apiInvitations = "/api/v1/invitations/"
 	if strings.HasPrefix(path, apiInvitations) {
@@ -93,6 +94,7 @@ func safeRequestLogPath(path string) string {
 		"/auth/forgot-password/",
 		"/auth/verify-email-change/",
 		"/workspaces/invitations/",
+		"/webhooks/deploy/",
 	} {
 		if strings.HasPrefix(path, prefix) {
 			return prefix + ":token"
