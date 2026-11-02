@@ -122,6 +122,11 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 	appService.SetGitHub(github)
+	// The hosted plane reaches only public buckets; in development it may
+	// use the local fake S3.
+	if cfg.Billing && !cfg.IsDevelopment() {
+		appService.AllowOnlyPublicBuckets()
+	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
 	application := &App{
 		Cfg: cfg, DB: database, AuthService: auth, UserService: userService,

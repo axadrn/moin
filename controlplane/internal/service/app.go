@@ -71,6 +71,8 @@ type AppService struct {
 	github     *GitHub
 	cloudflare *Cloudflare
 	now        func() time.Time
+	// publicBucketsOnly refuses buckets on private or local addresses.
+	publicBucketsOnly bool
 
 	mu          sync.Mutex
 	live        map[string]*liveDeploy

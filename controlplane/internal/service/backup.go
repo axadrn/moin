@@ -6,14 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/ops/controlplane/internal/model"
@@ -30,6 +36,7 @@ var (
 	ErrBackupEndpoint = errors.New("the endpoint must be an https:// URL, or empty for AWS S3")
 	ErrBackupBucket   = errors.New("bucket, access key and secret key are required")
 	ErrBackupAccess   = errors.New("ops could not write to the bucket with these keys")
+	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: ops only reaches buckets on the public internet")
 	ErrNoBackups      = errors.New("backups are not set up: add a bucket first")
 	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
 )
@@ -100,7 +107,10 @@ func (s *AppService) SetBackupStorage(ctx context.Context, actor Actor, input Ba
 	if storage.Region == "" {
 		storage.Region = "auto"
 	}
-	err := checkBucket(ctx, storage)
+	err := checkBucket(ctx, storage, s.publicBucketsOnly)
+	if errors.Is(err, ErrBucketPrivate) {
+		return ErrBucketPrivate
+	}
 	if err != nil {
 		slog.Info("backup bucket check failed", "workspace_id", actor.WorkspaceID, "error", err)
 		return ErrBackupAccess
@@ -140,12 +150,34 @@ func (s *AppService) RemoveBackupStorage(actor Actor) error {
 	return nil
 }
 
+// AllowOnlyPublicBuckets makes the bucket check refuse private and local
+// addresses. The hosted control plane turns it on: otherwise a user could
+// make it call into its own network. A self-hosted one may use a bucket
+// next to it.
+func (s *AppService) AllowOnlyPublicBuckets() { s.publicBucketsOnly = true }
+
 // checkBucket writes and deletes a small object in the workspace's folder,
-// which needs the same rights as backups.
-func checkBucket(ctx context.Context, storage protocol.BackupStorage) error {
+// which needs the same rights as backups. publicOnly refuses addresses that
+// are not on the public internet.
+func checkBucket(ctx context.Context, storage protocol.BackupStorage, publicOnly bool) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	client := bucketClient(storage)
+	if publicOnly {
+		client = s3.New(client.Options(), func(options *s3.Options) {
+			options.HTTPClient = publicHTTPClient()
+			// A refused address stays refused: do not try it again.
+			options.Retryer = retry.NewStandard(func(retries *retry.StandardOptions) {
+				refused := retry.IsErrorRetryableFunc(func(err error) aws.Ternary {
+					if errors.Is(err, ErrBucketPrivate) {
+						return aws.FalseTernary
+					}
+					return aws.UnknownTernary
+				})
+				retries.Retryables = append([]retry.IsErrorRetryable{refused}, retries.Retryables...)
+			})
+		})
+	}
 	key := strings.TrimLeft(path.Join(storage.Path, storage.Workspace, ".ops-check"), "/")
 	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("ops"))})
 	if err != nil {
@@ -153,6 +185,39 @@ func checkBucket(ctx context.Context, storage protocol.BackupStorage) error {
 	}
 	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key)})
 	return err
+}
+
+// publicHTTPClient connects only to public addresses. The check runs when
+// the connection opens, after DNS: a name that points inside cannot slip
+// past it. It goes without a proxy, so the check sees the bucket itself.
+func publicHTTPClient() *awshttp.BuildableClient {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: refusePrivate}
+	return awshttp.NewBuildableClient().WithTransportOptions(func(transport *http.Transport) {
+		transport.Proxy = nil
+		transport.DialContext = dialer.DialContext
+	})
+}
+
+// sharedNetwork is 100.64.0.0/10: carrier networks and Tailscale.
+var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
+
+// refusePrivate stops a connection to loopback, private, link-local,
+// shared or unspecified addresses, like 127.0.0.1, 10.0.0.5, 169.254.169.254
+// or 0.0.0.0.
+func refusePrivate(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return err
+	}
+	ip = ip.Unmap()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() || sharedNetwork.Contains(ip) {
+		return ErrBucketPrivate
+	}
+	return nil
 }
 
 func bucketClient(storage protocol.BackupStorage) *s3.Client {
@@ -216,10 +281,28 @@ func (s *AppService) configureAgents(workspaceID string) {
 func (s *AppService) configureAgent(serverID, workspaceID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := s.servers.Request(ctx, serverID, protocol.TypeBackupConfig, s.backupConfig(workspaceID), nil)
+	config := s.backupConfig(workspaceID)
+	config.Apps = s.appIDs(serverID, workspaceID)
+	err := s.servers.Request(ctx, serverID, protocol.TypeBackupConfig, config, nil)
 	if err != nil {
 		slog.Warn("send backup config failed", "server_id", serverID, "error", err)
 	}
+}
+
+// appIDs are the IDs of a server's apps by name.
+func (s *AppService) appIDs(serverID, workspaceID string) map[string]string {
+	apps, err := s.apps.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		slog.Error("list apps for backups failed", "workspace_id", workspaceID, "error", err)
+		return nil
+	}
+	ids := map[string]string{}
+	for _, app := range apps {
+		if app.ServerID == serverID {
+			ids[app.Name] = app.ID
+		}
+	}
+	return ids
 }
 
 // Backups asks the agent for the snapshots and the restore window of an

@@ -242,6 +242,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrUpload, field: "upload", message: "The upload is unknown or expired. Run ops deploy again."},
 	{err: service.ErrNoBackups, status: http.StatusConflict, code: "no_backups", message: "Backups are not set up. Add a bucket first."},
 	{err: service.ErrBackupEndpoint, field: "endpoint", message: "Use an https:// URL, or leave it empty for AWS S3."},
+	{err: service.ErrBucketPrivate, field: "endpoint", message: "This endpoint points to a private or local address. ops can only reach buckets on the public internet."},
 	{err: service.ErrBackupBucket, field: "bucket", message: "Enter the bucket, the access key and the secret key."},
 	{err: service.ErrBackupAccess, field: "secret_key", message: "ops could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
 	{err: service.ErrRestoreTarget, field: "snapshot", message: "Choose a snapshot or a point in time."},
