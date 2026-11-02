@@ -15,6 +15,8 @@ func renderMiddlewareError(w http.ResponseWriter, r *http.Request, status int, t
 		return
 	}
 	if r.Header.Get("HX-Request") == "true" {
+		// A toast, and the page stays as it was (DESIGN.md, Feedback).
+		w.Header().Set("HX-Reswap", "none")
 		if _, err := fmt.Fprint(w, `<div hx-swap-oob="beforeend:#toast-container">`); err != nil {
 			slog.Error("render middleware error toast wrapper failed", "error", err)
 			return
