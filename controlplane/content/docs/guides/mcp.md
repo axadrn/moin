@@ -64,7 +64,7 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 | `get_integrations` | whether the Cloudflare token and Tailscale key are stored | read |
 | `set_integrations` | stores them | write |
 | `set_server_security` | Cloudflare Tunnel, SSH on Tailscale, firewall | write, destructive |
-| `get_billing` | the subscription | read |
+| `get_billing` | the subscription; on a self-hosted control plane it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its members | read |
 | `list_activity` | who did what, newest first | read |
 | `invite_member` | invites someone by email | write |
