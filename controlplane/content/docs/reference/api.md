@@ -17,7 +17,7 @@ Endpoints marked *session* answer only a signed-in browser, never a token, so a 
 | `POST` · `DELETE /api/v1/account/avatar` | the profile picture |
 | `GET` · `POST /api/v1/account/tokens` · `DELETE /{id}` | personal API tokens (*session*) |
 | `GET /api/v1/account/sessions` · `DELETE /{id}` · `DELETE` | signed-in browsers; signs one or all others out (*session*) |
-| `GET /api/v1/activity` | who did what in the workspace, newest first, with `next_cursor` |
+| `GET /api/v1/activity` | who did what in the workspace, newest first, with `next_cursor`; `app`, `server` and `user` filter it |
 | `GET /api/v1/workspaces` · `POST` | the workspaces you are in; a new one (*session*) |
 | `GET /api/v1/workspaces/{slug}` | the team: members, roles and open invitations |
 | `PATCH /api/v1/workspaces/{slug}/name` | renames the workspace (admin) |

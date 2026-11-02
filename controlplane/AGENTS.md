@@ -7,7 +7,7 @@ Add project-specific rules here. Keep generated defaults below this section easy
 - This is the ops control plane. Read `PLAN.md` first: pieces, words, connection, slices.
 - The agent, CLI, TUI and the protocol package live at the root of this repo, one Go module for all. The repo is public: never commit secrets, `.env` files or anything private.
 - Every feature works in all surfaces: web UI, CLI, TUI, JSON API (with `openapi.yaml`) and an MCP tool. A feature is done when each one works end to end.
-- Everything belongs to a workspace: ops services take the workspace ID to read and a `service.Actor` (workspace, user, how it came in) to change. Every change records itself in the activity with `ServerService.record`, without secret values, so the team sees who did what on the web, in `ops activity`, the TUI, the API and MCP.
+- Everything belongs to a workspace: ops services take the workspace ID to read and a `service.Actor` (workspace, user, how it came in) to change. Every change records itself in the activity with `record` (`internal/service/activity.go`), never with secret values or user data (see Activity in `DESIGN.md`), so the team sees who did what on the web, in `ops activity`, the TUI, the API and MCP.
 - Every feature is in the docs under `content/docs`. Change the docs in the same commit as the feature: the guide, the CLI and TUI reference, the API table and the MCP tool table. The docs are the only source of truth; READMEs stay short and point to them.
 
 ## Stack

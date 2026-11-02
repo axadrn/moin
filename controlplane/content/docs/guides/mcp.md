@@ -69,7 +69,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `set_server_security` | Cloudflare Tunnel, SSH on Tailscale, firewall | write, destructive |
 | `get_billing` | the subscription; on a self-hosted control plane it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its members | read |
-| `list_activity` | who did what, newest first | read |
+| `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |
 | `invite_member` | invites someone by email | write |
 | `resend_invitation` | sends an invitation again | write |
 | `revoke_invitation` | takes an invitation back | write, destructive |

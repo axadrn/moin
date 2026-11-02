@@ -1,6 +1,6 @@
 ---
 title: "Guides"
-description: "Servers, deploys, GitHub, data, backups, security, config, env vars, logs, agents, your team and your account"
+description: "Servers, deploys, GitHub, data, backups, security, config, env vars, logs, agents, your team, the activity log and your account"
 order: 4
 ---
 

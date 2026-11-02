@@ -15,6 +15,7 @@ All of ops is open source. Use the hosted control plane, or [host it yourself fo
 - **Data**: browse tables, edit rows and run SQL on the live database. [Reads can never change a row](/docs/guides/data).
 - **Domains**: HTTPS, www redirects and a password in front, in seconds. [Domains and access](/docs/guides/domains).
 - **Security**: a Cloudflare Tunnel instead of open ports, SSH only on Tailscale, a firewall. [No open port](/docs/guides/security).
+- **Activity log**: who changed what, to the second, from the web, the CLI, an agent or GitHub. Never your secrets or your data. [See what it records](/docs/guides/activity).
 
 ## The pieces
 

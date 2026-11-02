@@ -4,7 +4,7 @@ description: "Every key of ops without a command"
 order: 2
 ---
 
-Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, the team tab its members and open invitations, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
+Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Stop blog?" waits
@@ -52,6 +52,9 @@ removing members, leaving and deleting the workspace are web only.
 | `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
 | `b` | apps | shows the backups; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `on` or `off` turns the snapshot before every change on or off |
+| `f` | activity | filters by app, server or member; empty fields keep everything |
+| `c` | activity | clears the filter |
+| `m` | activity | loads older events |
 | `a` | team | invites someone: the email, then `member` or `admin` |
 | `enter` | team | sends the selected invitation again |
 | `x`, then `y` | team | revokes the selected invitation |

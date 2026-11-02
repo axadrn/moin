@@ -106,22 +106,4 @@ ops login --token pat_…
 
 ## Activity
 
-Every change goes into the activity of the workspace: who did it, when, and how it came in.
-
-### See the activity
-
-Lists who changed what, newest first.
-
-```surfaces
-Web: **Activity** in the sidebar
-CLI: ops activity
-TUI: the **activity** tab
-API: GET /api/v1/activity
-MCP: list_activity
-```
-
-On the web, `g` then `y` opens it too. `ops activity --limit 30` shows fewer or more.
-
-It records deploys, redeploys, restarts, stops, starts, rollbacks, restores, snapshots, SQL writes, row edits, env vars, domains, passwords, registry logins, the bucket, GitHub, servers, their security and every member change. **Via** says how it came in: the web, the CLI (any API token), an agent over MCP, a deploy hook or a GitHub push.
-
-The activity never holds your data: env vars show their names, never their values, a SQL write shows what it did and how many rows it changed, such as `ran UPDATE on orders in shop, 3 rows changed`, never its SQL or a value, and a row edit names the table, row and column, never the value.
+Every change goes into the activity of the workspace: who did it, to the second, how it came in and what changed. Filter it by app, server or member and page back as far as you like. The [activity log](/docs/guides/activity) shows what it records and what it never records.

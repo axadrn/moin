@@ -303,6 +303,15 @@ Every status shows as a colored dot or symbol plus a word, everywhere:
 | failed | ✗ | failed, offline |
 | idle | ○ | new, unknown |
 
+## Activity
+
+Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the API token by name, the client IP and user agent) and what it touched. ops itself acts as `service.System(workspaceID)`.
+
+- **What we log:** the exact time in UTC, who, how, the app and server, and the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
+- **What we never log:** env var values, secrets, tokens, passwords, SQL text, row contents or cell values, file contents and app log lines. A SQL write keeps the kind of statement, its tables and the row count; a row edit the table, row and column names.
+- **Showing it:** seconds and the time zone everywhere (UTC on the web, local in the CLI and TUI, RFC 3339 in the API and MCP). IP and user agent only for admins and owners.
+- `TestActivityNeverHoldsSecrets` guards the rule. A new action gets a sentence in `WorkspaceAuditEvent.Summary`.
+
 ## Terminal (ops/internal/style)
 
 The TUI and the CLI use `internal/style`: the status colors as hex, the
