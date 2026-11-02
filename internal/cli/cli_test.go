@@ -146,6 +146,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"restore", "--app", "shop", "snap-1"},
 		{"domains", "rm", "--app", "shop", "blog.de"},
 		{"unlink", "shop"},
+		{"hook", "shop"},
 		{"backups", "bucket", "rm"},
 		{"registry", "rm", "ghcr.io"},
 		{"integrations", "rm", "tailscale"},

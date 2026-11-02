@@ -444,9 +444,10 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 	return follow(ctx, api, name, started, "Redeploy", false, stdout)
 }
 
-// hook gives the app a new deploy hook URL for CI.
-func hook(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("hook", "hook [app]").withApp()
+// hook gives the app a new deploy hook URL for CI. It asks first: the old
+// URL stops working.
+func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("hook", "hook [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -458,6 +459,10 @@ func hook(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
 	if err != nil {
 		return err
 	}

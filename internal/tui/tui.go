@@ -814,7 +814,7 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		}
 	case "h":
 		if ok {
-			return m, m.newHook(app.Name)
+			return m.confirmFirst("Make a new deploy hook for "+app.Name+"?", "The old one stops working.", "replace", true, m.newHook(app.Name)), nil
 		}
 	case "o":
 		if ok {

@@ -77,7 +77,7 @@ GitHub
   unlink             Stop following it: unlink [app] [--yes]
 
 CI
-  hook               New deploy hook URL for CI: hook [app]
+  hook               New deploy hook URL for CI: hook [app] [--yes]
   registry           List registry logins for private images
   registry set       Save a login: registry set <host> <username>
   registry rm        Remove a login: registry rm <host> [--yes]
@@ -228,7 +228,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "env":
 		return env(ctx, rest, stdin, stdout)
 	case "hook":
-		return hook(ctx, rest, stdout)
+		return hook(ctx, rest, stdin, stdout)
 	case "domains":
 		return domains(ctx, rest, stdin, stdout)
 	case "protect":

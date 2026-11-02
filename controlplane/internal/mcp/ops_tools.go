@@ -92,7 +92,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		change(false, false)), Write(changes(services, tools.deployImage)))
 	mcpsdk.AddTool(server, add("create_deploy_hook", "Create a deploy hook",
 		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. CI calls POST <url> with {\"image\": \"...\"}. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.createDeployHook)))
+		change(true, false)), Write(changes(services, tools.createDeployHook)))
 	mcpsdk.AddTool(server, add("list_registries", "List registry logins",
 		"Lists the registry logins agents use to pull private images, without passwords. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRegistries)))
