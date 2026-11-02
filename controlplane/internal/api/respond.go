@@ -257,6 +257,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRepoName, field: "repo", message: "Name the repo as owner/name."},
 	{err: service.ErrNoRepo, status: http.StatusConflict, code: "no_repo", message: "The app follows no repo. Link one first."},
 	{err: service.ErrRef, field: "ref", message: "GitHub knows no branch, tag or commit by this name."},
+	{err: service.ErrBranch, field: "branch", message: "The repo on GitHub has no branch by this name. List them with ops github branches."},
 	{err: service.ErrRefName, field: "ref", message: "This is not a valid branch, tag or commit name. Use git's rules, at most 255 characters."},
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Add a Cloudflare API token first."},
 	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Add a Tailscale auth key first."},

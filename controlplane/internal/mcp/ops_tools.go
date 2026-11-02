@@ -183,7 +183,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Lists the branches of a repo the ops GitHub App may read, the default branch first. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listBranches)))
 	mcpsdk.AddTool(server, add("link_repo", "Link a repo",
-		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. Needs a token with read and write access.",
+		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. A branch the repo does not have on GitHub is refused; list_branches lists them. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.linkRepo)))
 	mcpsdk.AddTool(server, add("unlink_repo", "Unlink the repo",
 		"Stops an app from following its GitHub repo. Needs a token with read and write access.",

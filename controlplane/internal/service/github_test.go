@@ -84,6 +84,8 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			http.Error(w, "token", http.StatusUnauthorized)
 		case r.URL.Path == "/installation/repositories":
 			json.NewEncoder(w).Encode(map[string]any{"repositories": []map[string]any{{"full_name": "axadrn/blog", "default_branch": "main", "private": true}}})
+		case r.URL.Path == "/repos/axadrn/blog/branches":
+			json.NewEncoder(w).Encode([]map[string]string{{"name": "main"}, {"name": "dev"}})
 		case r.URL.Path == "/repos/axadrn/blog/commits/main" || r.URL.Path == "/repos/axadrn/blog/commits/abc123":
 			json.NewEncoder(w).Encode(map[string]any{"sha": "abc123", "commit": map[string]string{"message": "Fix the footer\n\nLonger text"}})
 		case strings.HasPrefix(r.URL.Path, "/repos/axadrn/blog/commits/"):
@@ -195,6 +197,12 @@ func TestGitHubDeploys(t *testing.T) {
 	}
 	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", true); !errors.Is(err, ErrRepo) {
 		t.Fatalf("link a repo ops cannot read: err = %v", err)
+	}
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", true); !errors.Is(err, ErrBranch) {
+		t.Fatalf("link a branch GitHub does not have: err = %v", err)
+	}
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", false); err != nil || app.Branch != "dev" {
+		t.Fatalf("link dev = %+v, %v", app, err)
 	}
 	app, err := apps.LinkRepo(ctx, owner, "blog", "https://github.com/axadrn/blog.git", "", true)
 	if err != nil || app.Repo != "axadrn/blog" || app.Branch != "main" || !app.AutoDeploy || app.InstallationID != 7 {

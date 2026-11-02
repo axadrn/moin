@@ -24,6 +24,7 @@ var (
 	ErrNoRepo         = errors.New("the app follows no repo: link one first")
 	ErrRef            = errors.New("GitHub knows no branch, tag or commit by this name")
 	ErrRefName        = errors.New("this is not a valid branch, tag or commit name")
+	ErrBranch         = errors.New("the repo on GitHub has no branch by this name")
 	repoPattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
 	githubStateExpiry = time.Hour
 )
@@ -238,9 +239,18 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	if err != nil {
 		return nil, err
 	}
-	branch = strings.TrimSpace(branch)
 	if branch == "" {
 		branch = found.DefaultBranch
+	}
+	// A branch GitHub does not have would never deploy.
+	if branch != found.DefaultBranch {
+		branches, err := s.github.Branches(ctx, found.InstallationID, found.FullName)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(branches, branch) {
+			return nil, ErrBranch
+		}
 	}
 	err = s.apps.SetRepo(app.ID, found.FullName, branch, autoDeploy, found.InstallationID)
 	if err != nil {

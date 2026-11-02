@@ -151,7 +151,7 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, service.ErrRepo):
 		fieldRefused(w, r, "Repo not linked", "link-repo", errorMessage(err))
 	case err != nil:
-		failed(w, r, "Repo not linked", err, map[string]string{"repo": "link-repo", "ref": "link-branch"})
+		failed(w, r, "Repo not linked", err, map[string]string{"repo": "link-repo", "ref": "link-branch", "branch": "link-branch"})
 	case before.Repo != "":
 		// The switch saved itself; its position says so.
 		h.renderRepo(w, r)

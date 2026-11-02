@@ -54,7 +54,7 @@ MCP: list_branches
 
 ## Link a repo
 
-Makes an app follow a repo and a branch. Deploy every push is on by default. A branch or ref name follows git's rules and has at most 255 characters; ops refuses others, like one that starts with `-` or has `..`. The app needs no deploy before: add it, link the repo and deploy it from GitHub.
+Makes an app follow a repo and a branch. Deploy every push is on by default. A branch or ref name follows git's rules and has at most 255 characters; ops refuses others, like one that starts with `-` or has `..`. ops also refuses a branch the repo does not have on GitHub: [list its branches](#see-the-repos) to see them. The app needs no deploy before: add it, link the repo and deploy it from GitHub.
 
 ```surfaces
 Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**

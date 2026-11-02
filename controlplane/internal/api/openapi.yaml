@@ -2427,7 +2427,7 @@ paths:
           description: '`github_off` when the control plane has no GitHub App.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.repo`.'
+          description: '`validation_failed` with `fields.repo`, or with `fields.branch` when the repo on GitHub has no branch by this name.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:
