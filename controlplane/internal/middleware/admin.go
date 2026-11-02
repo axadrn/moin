@@ -59,6 +59,10 @@ func allowedDuringImpersonation(r *http.Request) bool {
 	if path == "/auth/onboarding" {
 		return true
 	}
+	// GitHub's return link connects an installation: a write behind a GET.
+	if path == "/app/github/setup" {
+		return false
+	}
 	if path == "/app" || strings.HasPrefix(path, "/app/") {
 		return !strings.HasSuffix(path, "/billing/manage") && !strings.HasSuffix(path, "/billing/portal")
 	}

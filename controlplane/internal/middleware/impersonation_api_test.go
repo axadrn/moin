@@ -82,3 +82,16 @@ func TestBlockImpersonatedWritesKeepsOrdinarySessions(t *testing.T) {
 		t.Fatalf("ordinary session was blocked: %d %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+// TestImpersonationCannotConnectGitHub: GitHub's return link stores an
+// installation, so a read-only session may not follow it.
+func TestImpersonationCannotConnectGitHub(t *testing.T) {
+	operatorID := "operator"
+	for path, allowed := range map[string]bool{"/app/github/setup": false, "/app/acme/apps": true} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request = request.WithContext(ctxkeys.WithSession(request.Context(), &model.Session{ImpersonatorUserID: &operatorID}))
+		if got := allowedDuringImpersonation(request); got != allowed {
+			t.Errorf("%s: allowed = %t, want %t", path, got, allowed)
+		}
+	}
+}
