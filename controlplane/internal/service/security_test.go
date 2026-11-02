@@ -98,6 +98,19 @@ func TestCloudflareAccountFromZones(t *testing.T) {
 	}
 }
 
+// SSH kept on the tailnet without the firewall is a leftover too: an agent
+// that comes back after SSH on Tailscale was turned off must open it again.
+func TestLeftOver(t *testing.T) {
+	for _, report := range []protocol.ServerConfigResult{{Proxy: "direct", Firewall: true}, {Proxy: "tunnel"}, {Proxy: "direct", TailscaleIP: "100.64.0.9"}} {
+		if !leftOver(&report) {
+			t.Errorf("leftOver(%+v) = false", report)
+		}
+	}
+	if leftOver(nil) || leftOver(&protocol.ServerConfigResult{Proxy: "direct"}) {
+		t.Error("nothing set up is no leftover")
+	}
+}
+
 func TestServerSecurity(t *testing.T) {
 	apps, _, server, agent := newAppService(t)
 	fake := &fakeCloudflare{body: map[string]string{}}

@@ -218,20 +218,24 @@ func (s *AppService) configureServer(ctx context.Context, server *model.Server, 
 
 // configureServerOnConnect sends the config to an agent that just
 // connected, when the server has one, or when the agent last reported a
-// firewall or tunnel the server no longer has, such as one turned off while
-// the agent was offline.
+// firewall, tunnel or SSH on the tailnet the server no longer has, such as
+// one turned off while the agent was offline.
 func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(serverID, workspaceID)
 	if err != nil {
 		return
 	}
-	report := SecurityReport(*server)
-	leftover := report != nil && (report.Firewall || report.Proxy == "tunnel")
-	if !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftover {
+	if !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftOver(SecurityReport(*server)) {
 		return
 	}
 	s.configureServer(context.Background(), server, nil)
 	s.servers.notify(workspaceID)
+}
+
+// leftOver says whether the agent last set up a firewall, a tunnel or SSH
+// on the tailnet. Only SSH on the tailnet reports a tailnet address.
+func leftOver(report *protocol.ServerConfigResult) bool {
+	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.TailscaleIP != "")
 }
 
 // tunnelHosts are the domains of every app on a server: the ones set

@@ -103,7 +103,8 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 		}
 	}
 
-	if config.Firewall {
+	switch {
+	case config.Firewall:
 		ports := openPorts(result.Proxy, sshOnTailscale, config.TailscaleKey != "")
 		err = applyFirewall(ctx, firewallRules(ports, sshOnTailscale))
 		if err != nil {
@@ -112,7 +113,12 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 			result.Firewall = true
 			result.OpenPorts = ports
 		}
-	} else {
+	case sshOnTailscale:
+		err = applyFirewall(ctx, sshOnTailscaleRules())
+		if err != nil {
+			problem("SSH stays open: %s", err)
+		}
+	default:
 		_ = removeFirewall(ctx)
 	}
 	return result
@@ -233,6 +239,20 @@ func firewallRules(ports []string, sshOnTailscale bool) string {
 		number, protocol, _ := strings.Cut(port, "/")
 		fmt.Fprintf(&rules, "\t\t%s dport %s accept\n", protocol, number)
 	}
+	rules.WriteString("\t}\n}\n")
+	return rules.String()
+}
+
+// sshOnTailscaleRules is the ops table without the firewall: it only
+// keeps SSH off every network but the tailnet and lets the rest in.
+func sshOnTailscaleRules() string {
+	var rules strings.Builder
+	fmt.Fprintf(&rules, "table inet %s {\n", firewallTable)
+	rules.WriteString("\tchain input {\n")
+	rules.WriteString("\t\ttype filter hook input priority filter; policy accept;\n")
+	rules.WriteString("\t\tct state established,related accept\n")
+	rules.WriteString("\t\tiif lo accept\n")
+	rules.WriteString("\t\tiifname != \"tailscale0\" tcp dport 22 drop\n")
 	rules.WriteString("\t}\n}\n")
 	return rules.String()
 }

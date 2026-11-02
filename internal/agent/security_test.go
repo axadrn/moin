@@ -26,7 +26,16 @@ func TestFirewallRules(t *testing.T) {
 			t.Errorf("tunnel rules miss %q:\n%s", want, tunnel)
 		}
 	}
+	// SSH on Tailscale without the firewall still closes port 22 to the
+	// internet, and only that.
+	ssh := sshOnTailscaleRules()
+	for _, want := range []string{"policy accept", "ct state established,related accept", `iifname != "tailscale0" tcp dport 22 drop`} {
+		if !strings.Contains(ssh, want) {
+			t.Errorf("SSH on Tailscale rules miss %q:\n%s", want, ssh)
+		}
+	}
 	if path := os.Getenv("OPS_WRITE_RULES"); path != "" {
+		os.WriteFile(path+"-ssh.nft", []byte("table inet ops\ndelete table inet ops\n"+ssh), 0o644)
 		os.WriteFile(path+"-direct.nft", []byte("table inet ops\ndelete table inet ops\n"+direct), 0o644)
 		os.WriteFile(path+"-tunnel.nft", []byte("table inet ops\ndelete table inet ops\n"+tunnel), 0o644)
 	}

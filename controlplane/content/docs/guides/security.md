@@ -106,7 +106,7 @@ API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
 
-The agent installs Tailscale when it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address. Until then it stays open and ops says why.
+The agent installs Tailscale when it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address. Until then it stays open and ops says why. It closes with the firewall off too: the agent then drops only SSH from other networks.
 
 Before you close SSH, keep a second way into the server, such as the web console of your provider.
 
