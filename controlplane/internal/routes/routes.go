@@ -36,7 +36,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
 	}
 	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing)
-	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
+	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
 	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)

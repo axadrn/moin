@@ -17,21 +17,28 @@ var publicRoutes = []struct {
 	{"/", "1.0", "daily"},
 	{"/docs", "0.8", "weekly"},
 	{"/auth", "0.3", "monthly"},
-	{"/auth/password", "0.3", "monthly"},
 }
+
+// legalRoutes are the terms and privacy pages of the hosted service.
+var legalRoutes = []string{"/legal/terms", "/legal/privacy"}
 
 type SitemapService struct {
 	docsService *DocsService
 	baseURL     string
+	// legal lists the terms and privacy pages, which only the hosted
+	// service serves.
+	legal bool
 }
 
 func NewSitemapService(
 	docsService *DocsService,
 	baseURL string,
+	legal bool,
 ) *SitemapService {
 	return &SitemapService{
 		docsService: docsService,
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
+		legal:       legal,
 	}
 }
 
@@ -54,6 +61,11 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 			Loc: s.baseURL + route.Path, LastMod: today,
 			ChangeFreq: route.ChangeFreq, Priority: route.Priority,
 		})
+	}
+	if s.legal {
+		for _, path := range legalRoutes {
+			urls = append(urls, model.SitemapURL{Loc: s.baseURL + path, LastMod: today, ChangeFreq: "yearly", Priority: "0.3"})
+		}
 	}
 	return urls
 }

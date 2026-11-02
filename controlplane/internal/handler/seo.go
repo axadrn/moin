@@ -22,9 +22,10 @@ func NewSEOHandler(
 	baseURL string,
 	contentPath string,
 	robotsNoIndex bool,
+	legal bool,
 ) *SEOHandler {
 	return &SEOHandler{
-		sitemapService: service.NewSitemapService(docsService, baseURL),
+		sitemapService: service.NewSitemapService(docsService, baseURL, legal),
 		docsService:    docsService,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
 		llmsPath:       filepath.Join(contentPath, "llms.txt"),
