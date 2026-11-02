@@ -59,6 +59,26 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			json.NewEncoder(w).Encode(map[string]any{"token": token, "expires_at": time.Now().Add(time.Hour)})
 		case r.URL.Path == "/app/installations/7":
 			json.NewEncoder(w).Encode(map[string]any{"account": map[string]string{"login": "axadrn"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/login/oauth/access_token":
+			// The code GitHub sends after the install, traded with the
+			// app's client ID and secret for a token of the user.
+			var grant map[string]string
+			json.NewDecoder(r.Body).Decode(&grant)
+			tokens := map[string]string{"code-axadrn": "ghu_axadrn", "code-mallory": "ghu_mallory"}
+			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" {
+				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code"})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]string{"access_token": tokens[grant["code"]], "token_type": "bearer"})
+		case r.URL.Path == "/user/installations":
+			// axadrn reaches installation 7, mallory only her own 9.
+			installations := map[string][]map[string]any{"Bearer ghu_axadrn": {{"id": 7}}, "Bearer ghu_mallory": {{"id": 9}}}
+			found, ok := installations[auth]
+			if !ok {
+				http.Error(w, "token", http.StatusUnauthorized)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"total_count": len(found), "installations": found})
 		case auth != "token ghs_test":
 			http.Error(w, "token", http.StatusUnauthorized)
 		case r.URL.Path == "/installation/repositories":
@@ -119,7 +139,7 @@ func TestGitHubDeploys(t *testing.T) {
 		t.Fatal(err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	github, err := NewGitHub("123", "ops-test", strings.ReplaceAll(string(keyPEM), "\n", `\n`), "hook-secret", githubServer.URL, "https://github.example")
+	github, err := NewGitHub("123", "ops-test", strings.ReplaceAll(string(keyPEM), "\n", `\n`), "hook-secret", "", "", githubServer.URL, "https://github.example")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,10 +156,10 @@ func TestGitHubDeploys(t *testing.T) {
 	}
 	parsed, _ := url.Parse(link)
 	state := parsed.Query().Get("state")
-	if _, err := apps.ConnectGitHub(ctx, other, 7, state); !errors.Is(err, ErrGitHubState) {
+	if _, err := apps.ConnectGitHub(ctx, other, 7, state, ""); !errors.Is(err, ErrGitHubState) {
 		t.Fatalf("another user's state: err = %v", err)
 	}
-	account, err := apps.ConnectGitHub(ctx, owner, 7, state)
+	account, err := apps.ConnectGitHub(ctx, owner, 7, state, "")
 	if err != nil || account != "axadrn" {
 		t.Fatalf("connect = %q, %v", account, err)
 	}
@@ -147,7 +167,7 @@ func TestGitHubDeploys(t *testing.T) {
 	// state must not move this installation, and its private repos, there.
 	otherLink, _ := apps.GitHubInstallURL(other)
 	otherParsed, _ := url.Parse(otherLink)
-	if _, err := apps.ConnectGitHub(ctx, other, 7, otherParsed.Query().Get("state")); !errors.Is(err, repository.ErrGitHubInstallationTaken) {
+	if _, err := apps.ConnectGitHub(ctx, other, 7, otherParsed.Query().Get("state"), ""); !errors.Is(err, repository.ErrGitHubInstallationTaken) {
 		t.Fatalf("another workspace took the installation: err = %v", err)
 	}
 	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
@@ -156,7 +176,7 @@ func TestGitHubDeploys(t *testing.T) {
 	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 {
 		t.Fatalf("owner lost the installation: %+v", installations)
 	}
-	if _, err := apps.ConnectGitHub(ctx, owner, 7, state); err != nil {
+	if _, err := apps.ConnectGitHub(ctx, owner, 7, state, ""); err != nil {
 		t.Fatalf("connect again in the same workspace: %v", err)
 	}
 
@@ -220,5 +240,45 @@ func TestGitHubDeploys(t *testing.T) {
 	app, _ = apps.Get(owner.WorkspaceID, "blog")
 	if app.Repo != "" || app.InstallationID != 0 {
 		t.Fatalf("uninstall left the app linked: %+v", app)
+	}
+}
+
+// TestGitHubChecksInstaller: with the app's client ID and secret, ops
+// connects an installation only for a member whose GitHub account may
+// manage it.
+func TestGitHubChecksInstaller(t *testing.T) {
+	apps, _, _, _ := newAppService(t)
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "ops-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apps.SetGitHub(github)
+	ctx := context.Background()
+	stateOf := func(actor Actor) string {
+		link, _ := apps.GitHubInstallURL(actor)
+		parsed, _ := url.Parse(link)
+		return parsed.Query().Get("state")
+	}
+
+	// No code, a wrong code, or a GitHub user who cannot reach the
+	// installation: refused.
+	for _, code := range []string{"", "code-wrong", "code-mallory"} {
+		if _, err := apps.ConnectGitHub(ctx, other, 7, stateOf(other), code); !errors.Is(err, ErrGitHubNotYours) {
+			t.Fatalf("code %q: err = %v", code, err)
+		}
+	}
+	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
+		t.Fatalf("other workspace took installation 7: %+v", installations)
+	}
+	account, err := apps.ConnectGitHub(ctx, owner, 7, stateOf(owner), "code-axadrn")
+	if err != nil || account != "axadrn" {
+		t.Fatalf("connect = %q, %v", account, err)
 	}
 }

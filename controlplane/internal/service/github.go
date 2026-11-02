@@ -32,9 +32,13 @@ type GitHub struct {
 	slug          string
 	key           *rsa.PrivateKey
 	webhookSecret string
-	apiURL        string
-	webURL        string
-	http          *http.Client
+	// clientID and clientSecret let ops ask GitHub who installed the app.
+	// Without them ops trusts the installation ID in the setup link.
+	clientID     string
+	clientSecret string
+	apiURL       string
+	webURL       string
+	http         *http.Client
 
 	mu     sync.Mutex
 	tokens map[int64]installationToken
@@ -58,11 +62,14 @@ type GitHubCommit struct {
 	Message string
 }
 
-var ErrGitHubOff = errors.New("the GitHub App is not set up on this control plane")
+var (
+	ErrGitHubOff      = errors.New("the GitHub App is not set up on this control plane")
+	ErrGitHubNotYours = errors.New("your GitHub account cannot manage this installation: install the app from an account you own")
+)
 
 // NewGitHub returns nil without an app ID, so the control plane runs
 // without GitHub.
-func NewGitHub(appID, slug, privateKey, webhookSecret, apiURL, webURL string) (*GitHub, error) {
+func NewGitHub(appID, slug, privateKey, webhookSecret, clientID, clientSecret, apiURL, webURL string) (*GitHub, error) {
 	if appID == "" {
 		return nil, nil
 	}
@@ -90,6 +97,8 @@ func NewGitHub(appID, slug, privateKey, webhookSecret, apiURL, webURL string) (*
 		slug:          slug,
 		key:           key,
 		webhookSecret: webhookSecret,
+		clientID:      clientID,
+		clientSecret:  clientSecret,
 		apiURL:        strings.TrimRight(apiURL, "/"),
 		webURL:        strings.TrimRight(webURL, "/"),
 		http:          &http.Client{Timeout: 2 * time.Minute},
@@ -101,6 +110,55 @@ func NewGitHub(appID, slug, privateKey, webhookSecret, apiURL, webURL string) (*
 // the setup URL with the installation ID and state.
 func (g *GitHub) InstallURL(state string) string {
 	return g.webURL + "/apps/" + g.slug + "/installations/new?state=" + url.QueryEscape(state)
+}
+
+// ChecksInstaller says whether ops can ask GitHub who installed the app.
+func (g *GitHub) ChecksInstaller() bool {
+	return g.clientID != "" && g.clientSecret != ""
+}
+
+// UserHasInstallation says whether the user who installed the app may
+// manage the installation. GitHub sends a code along after the install;
+// ops trades it for a token of that user and asks GitHub which
+// installations the user can reach. Without this check anyone could claim
+// someone else's installation by its ID, which is only a counter.
+func (g *GitHub) UserHasInstallation(ctx context.Context, code string, installationID int64) (bool, error) {
+	if code == "" {
+		return false, nil
+	}
+	var grant struct {
+		AccessToken string `json:"access_token"`
+		Error       string `json:"error"`
+	}
+	form := map[string]string{"client_id": g.clientID, "client_secret": g.clientSecret, "code": code}
+	err := g.send(ctx, http.MethodPost, g.webURL+"/login/oauth/access_token", "", form, &grant)
+	if err != nil {
+		return false, err
+	}
+	if grant.AccessToken == "" {
+		// A code that is wrong, used or expired.
+		return false, nil
+	}
+	for page := 1; page <= 10; page++ {
+		var answer struct {
+			Installations []struct {
+				ID int64 `json:"id"`
+			} `json:"installations"`
+		}
+		err = g.call(ctx, http.MethodGet, "/user/installations?per_page=100&page="+strconv.Itoa(page), "Bearer "+grant.AccessToken, nil, &answer)
+		if err != nil {
+			return false, err
+		}
+		for _, installation := range answer.Installations {
+			if installation.ID == installationID {
+				return true, nil
+			}
+		}
+		if len(answer.Installations) < 100 {
+			break
+		}
+	}
+	return false, nil
 }
 
 // jwt signs the app's own token, valid for nine minutes.
@@ -273,7 +331,14 @@ func (g *GitHub) VerifyWebhook(body []byte, signature string) bool {
 	return hmac.Equal([]byte(given), []byte(want))
 }
 
+// call calls the GitHub API.
 func (g *GitHub) call(ctx context.Context, method, path, authorization string, body, target any) error {
+	return g.send(ctx, method, g.apiURL+path, authorization, body, target)
+}
+
+// send sends body as JSON to a GitHub URL and decodes the answer into
+// target.
+func (g *GitHub) send(ctx context.Context, method, url, authorization string, body, target any) error {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -282,11 +347,13 @@ func (g *GitHub) call(ctx context.Context, method, path, authorization string, b
 		}
 		reader = bytes.NewReader(encoded)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, g.apiURL+path, reader)
+	request, err := http.NewRequestWithContext(ctx, method, url, reader)
 	if err != nil {
 		return err
 	}
-	request.Header.Set("Authorization", authorization)
+	if authorization != "" {
+		request.Header.Set("Authorization", authorization)
+	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	if body != nil {

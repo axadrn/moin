@@ -125,6 +125,28 @@ Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Pas
 
 `update.sh` fills them in from 1Password on every start. A changed password counts after the next `update.sh`.
 
+### Your own GitHub App
+
+For deploys from GitHub, the control plane needs a GitHub App of its own. Create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**:
+
+1. **Permissions:** Contents read, Commit statuses read and write. **Events:** Push and Installation.
+2. **Callback URL:** `{APP_URL}/app/github/setup`. Tick **Request user authorization (OAuth) during installation**.
+3. **Webhook URL:** `{APP_URL}/webhooks/github`, with a secret of your own.
+4. Generate a private key and a client secret.
+
+Put the key next to the settings as `/etc/ops-controlplane/github-app.pem`, add the rest to the settings and run `update.sh` again:
+
+```bash
+GITHUB_APP_ID=
+GITHUB_APP_SLUG=
+GITHUB_APP_PRIVATE_KEY_FILE=/run/ops-controlplane/github-app.pem
+GITHUB_APP_WEBHOOK_SECRET=
+GITHUB_APP_CLIENT_ID=
+GITHUB_APP_CLIENT_SECRET=
+```
+
+With the client ID and secret, ops asks GitHub who installed the app, and connects an installation only for someone whose GitHub account may manage it. Without them, ops trusts the installation in the link GitHub sends back and says so in its log when it starts.
+
 ### Who signs in
 
 - **You, first.** Put your address in `ADMIN_EMAILS` and sign up with it, with a sign-in link. Add a password later under **Settings** if you like. `ADMIN_EMAILS` takes several addresses, separated by commas.

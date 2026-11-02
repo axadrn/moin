@@ -55,8 +55,11 @@ type Config struct {
 	GitHubAppSlug          string
 	GitHubAppPrivateKey    string
 	GitHubAppWebhookSecret string
-	GitHubAPIURL           string
-	GitHubURL              string
+	// The app's client ID and secret check who installed it.
+	GitHubAppClientID     string
+	GitHubAppClientSecret string
+	GitHubAPIURL          string
+	GitHubURL             string
 
 	// CloudflareAPIURL is where tunnels are made with the users' own
 	// Cloudflare tokens; tests point it at a fake.
@@ -201,6 +204,8 @@ func Load() (*Config, error) {
 		cfg.GitHubAppPrivateKey = string(key)
 	}
 	cfg.GitHubAppWebhookSecret = r.string("GITHUB_APP_WEBHOOK_SECRET", "")
+	cfg.GitHubAppClientID = r.string("GITHUB_APP_CLIENT_ID", "")
+	cfg.GitHubAppClientSecret = r.string("GITHUB_APP_CLIENT_SECRET", "")
 	cfg.GitHubAPIURL = r.string("GITHUB_API_URL", "https://api.github.com")
 	cfg.GitHubURL = r.string("GITHUB_URL", "https://github.com")
 	cfg.CloudflareAPIURL = r.string("CLOUDFLARE_API_URL", "https://api.cloudflare.com/client/v4")

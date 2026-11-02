@@ -117,9 +117,12 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
-	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
+	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAppClientID, cfg.GitHubAppClientSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
 	if err != nil {
 		return nil, err
+	}
+	if github != nil && !github.ChecksInstaller() {
+		slog.Warn("GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set: ops cannot check who installed the GitHub App, so a member could connect another account's installation by its ID. Set both and turn on \"Request user authorization (OAuth) during installation\" in the app settings")
 	}
 	appService.SetGitHub(github)
 	// The hosted plane reaches only public buckets; in development it may

@@ -48,8 +48,9 @@ func (s *AppService) GitHubInstallURL(actor Actor) (string, error) {
 }
 
 // ConnectGitHub stores the installation GitHub sent the member back with,
-// in the workspace the state names. actor has no workspace yet.
-func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installationID int64, state string) (string, error) {
+// in the workspace the state names. actor has no workspace yet. code
+// proves that the member's GitHub account may manage the installation.
+func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installationID int64, state, code string) (string, error) {
 	if s.github == nil {
 		return "", ErrGitHubOff
 	}
@@ -63,6 +64,15 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", ErrGitHubState
 	}
 	actor.WorkspaceID = parts[0]
+	if s.github.ChecksInstaller() {
+		yours, err := s.github.UserHasInstallation(ctx, code, installationID)
+		if err != nil {
+			return "", err
+		}
+		if !yours {
+			return "", ErrGitHubNotYours
+		}
+	}
 	account, settingsURL, err := s.github.Installation(ctx, installationID)
 	if err != nil {
 		return "", err
