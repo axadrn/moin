@@ -89,3 +89,44 @@ func TestTablesAndQueries(t *testing.T) {
 		t.Fatal("an unknown database answered")
 	}
 }
+
+// TestSQLReachesOnlyItsDatabase checks that no query, a read or a write,
+// can attach or write another file: the agent runs as root.
+func TestSQLReachesOnlyItsDatabase(t *testing.T) {
+	dir := t.TempDir()
+	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	file := filepath.Join(dir, "app.db")
+	db, err := sql.Open("sqlite", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)`)
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := a.releaseDir("blog", 1)
+	os.MkdirAll(release, 0o700)
+	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
+	os.WriteFile(filepath.Join(a.appDir("blog"), "current"), []byte("1"), 0o600)
+	other := filepath.Join(dir, "other")
+	for _, write := range []bool{false, true} {
+		for _, statement := range []string{
+			`ATTACH DATABASE '` + other + `' AS o`,
+			`PRAGMA query_only=0; ATTACH DATABASE '` + other + `' AS o; CREATE TABLE o.t (a)`,
+			`PRAGMA query_only=0; VACUUM INTO '` + other + `'`,
+		} {
+			_, err := a.query(context.Background(), protocol.DBQuery{DBRequest: protocol.DBRequest{App: "blog"}, SQL: statement, Write: write})
+			if err == nil {
+				t.Errorf("write=%v %q ran", write, statement)
+			}
+			if _, err := os.Stat(other); err == nil {
+				t.Fatalf("write=%v %q created %s", write, statement, other)
+			}
+		}
+	}
+	result, err := a.query(context.Background(), protocol.DBQuery{DBRequest: protocol.DBRequest{App: "blog"}, SQL: `INSERT INTO posts (title) VALUES ('ok')`, Write: true})
+	if err != nil || result.Changes != 1 {
+		t.Fatalf("a plain write failed: %+v, %v", result, err)
+	}
+}

@@ -16,7 +16,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/axadrn/ops/protocol"
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 const (
@@ -50,9 +51,12 @@ func (a *apps) database(request protocol.DBRequest) (protocol.Database, error) {
 	return protocol.Database{}, fmt.Errorf("%s has no database %s", request.App, request.Database)
 }
 
-// openDatabase opens a database file. A read-only handle cannot change
-// anything, not even by a statement that tries.
-func openDatabase(path string, write bool) (*sql.DB, error) {
+// openDatabase opens a database file on one connection. A read-only handle
+// cannot change anything, not even by a statement that tries. Neither handle
+// can attach another file, so SQL reaches only this database: ATTACH and
+// VACUUM INTO would otherwise read and write any path as root. close closes
+// the connection and the database.
+func openDatabase(ctx context.Context, path string, write bool) (conn *sql.Conn, close func(), err error) {
 	query := url.Values{}
 	query.Add("_pragma", "busy_timeout(5000)")
 	if !write {
@@ -61,10 +65,21 @@ func openDatabase(path string, write bool) (*sql.DB, error) {
 	}
 	db, err := sql.Open("sqlite", "file:"+path+"?"+query.Encode())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	db.SetMaxOpenConns(1)
-	return db, nil
+	conn, err = db.Conn(ctx)
+	if err == nil {
+		_, err = sqlite.Limit(conn, sqlite3.SQLITE_LIMIT_ATTACHED, 0)
+	}
+	if err != nil {
+		if conn != nil {
+			conn.Close()
+		}
+		db.Close()
+		return nil, nil, err
+	}
+	return conn, func() { conn.Close(); db.Close() }, nil
 }
 
 // matchOwner gives the -wal and -shm files of a database the owner of the
@@ -101,11 +116,11 @@ func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	db, err := openDatabase(database.HostPath, false)
+	db, closeDB, err := openDatabase(ctx, database.HostPath, false)
 	if err != nil {
 		return protocol.DBTables{}, err
 	}
-	defer db.Close()
+	defer closeDB()
 
 	result := protocol.DBTables{Database: database.Path, Tables: []protocol.DBTable{}}
 	// Litestream keeps its own _litestream_seq and _litestream_lock tables
@@ -181,7 +196,7 @@ var migrationTools = []struct{ table, tool, query string }{
 
 // migration reads the newest migration of the first migration tool whose
 // table the database has.
-func migration(ctx context.Context, db *sql.DB, tables []protocol.DBTable) *protocol.DBMigration {
+func migration(ctx context.Context, db *sql.Conn, tables []protocol.DBTable) *protocol.DBMigration {
 	for _, known := range migrationTools {
 		for _, table := range tables {
 			if table.Name != known.table {
@@ -208,11 +223,11 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	db, err := openDatabase(database.HostPath, request.Write)
+	db, closeDB, err := openDatabase(ctx, database.HostPath, request.Write)
 	if err != nil {
 		return protocol.DBResult{}, err
 	}
-	defer db.Close()
+	defer closeDB()
 	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
 
 	if request.Write {
