@@ -776,9 +776,9 @@ templ AppEnv(appName string, keys []string, values map[string]string, formError 
 
 // appsScript reloads apps whenever the event stream reports a change.
 templ appsScript() {
-	<script nonce={ templ.GetNonce(ctx) }>
+	<script nonce={ templ.GetNonce(ctx) } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
 		(() => {
-			const events = new EventSource("/api/v1/apps/events");
+			const events = new EventSource(`/api/v1/apps/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			events.addEventListener("apps", () => document.body.dispatchEvent(new Event("apps-changed")));
 			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
 		})();
@@ -791,9 +791,10 @@ templ appsScript() {
 // show; the tool output between two steps folds into one line that opens on
 // click, and errors in it stay visible.
 templ appScript(appName string) {
-	<script nonce={ templ.GetNonce(ctx) } data-app={ appName }>
+	<script nonce={ templ.GetNonce(ctx) } data-app={ appName } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
 		(() => {
 			const app = document.currentScript.dataset.app;
+			const workspace = document.currentScript.dataset.workspace;
 			const log = document.getElementById("deploy-log");
 			const version = document.getElementById("deploy-log-version");
 			const state = document.getElementById("deploy-log-state");
@@ -930,7 +931,7 @@ templ appScript(appName string) {
 				version.textContent = `v${number}`;
 				show("following", "running");
 				select();
-				stream = new EventSource(`/api/v1/apps/${encodeURIComponent(app)}/deploys/${number}/events`);
+				stream = new EventSource(`/api/v1/apps/${encodeURIComponent(app)}/deploys/${number}/events?workspace=${encodeURIComponent(workspace)}`);
 				stream.addEventListener("line", (event) => add(JSON.parse(event.data).line));
 				stream.addEventListener("done", (event) => {
 					const deploy = JSON.parse(event.data);

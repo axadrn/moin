@@ -147,9 +147,9 @@ templ keyField(id, name, label, placeholder string, stored bool, storedText, hel
 // changes, like the servers page, but not while a flipped switch waits for
 // Apply or the server is being removed.
 templ securityScript() {
-	<script nonce={ templ.GetNonce(ctx) }>
+	<script nonce={ templ.GetNonce(ctx) } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
 		(() => {
-			const events = new EventSource("/api/v1/servers/events");
+			const events = new EventSource(`/api/v1/servers/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			const waiting = () => {
 				if (document.querySelector("[data-remove-server]:disabled")) return true;
 				const form = document.querySelector("[data-security-form]");
