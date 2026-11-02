@@ -884,7 +884,14 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 				return noticeMsg("Turned off the deploy hook of " + name)
 			}), nil
 		}
+		if ok {
+			m.notice = "Nothing changed: " + app.Name + " has no deploy hook."
+		}
 	case "h":
+		// The first hook replaces nothing, so it asks nothing.
+		if ok && !app.Hook {
+			return m, m.newHook(app.Name)
+		}
 		if ok {
 			return m.confirmFirst("Make a new deploy hook for "+app.Name+"?", "The old one stops working.", "replace", true, m.newHook(app.Name)), nil
 		}

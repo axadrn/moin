@@ -497,3 +497,20 @@ func TestRestoreTargetCheckedFirst(t *testing.T) {
 		}
 	}
 }
+
+// h asks first only when a hook exists to replace; H without one says so.
+func TestHookKeysWithoutAHook(t *testing.T) {
+	m := frames()["apps"]
+	if m = press(m, "h"); m.mode == modeConfirm {
+		t.Errorf("h without a hook asks to replace one")
+	}
+	m = frames()["apps"]
+	if m = press(m, "H"); m.mode == modeConfirm || !strings.Contains(m.notice, "has no deploy hook") {
+		t.Errorf("H without a hook: mode %v, notice %q", m.mode, m.notice)
+	}
+	m = frames()["apps"]
+	m.apps[0].Hook = true
+	if m = press(m, "h"); m.mode != modeConfirm {
+		t.Errorf("h with a hook does not ask: mode %v", m.mode)
+	}
+}
