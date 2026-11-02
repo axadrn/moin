@@ -55,7 +55,7 @@ templ ActivityRows(view ActivityView) {
 					<p class="truncate text-xs text-muted-foreground">{ details["message"] }</p>
 				}
 			</div>
-			<div class="flex shrink-0 items-center gap-2 pt-1">
+			<div class="mt-1.5 flex h-5 shrink-0 items-center gap-2">
 				if label := viaLabel(event.Via()); label != "" {
 					@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "hidden sm:inline-flex"}) {
 						{ label }

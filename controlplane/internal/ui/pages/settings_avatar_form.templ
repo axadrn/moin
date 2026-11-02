@@ -8,7 +8,9 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
-templ SettingsAvatarForm() {
+// SettingsAvatarForm uploads a picture; Remove picture shows only when
+// there is one.
+templ SettingsAvatarForm(hasAvatar bool) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@templ.Fragment("settings-avatar-form") {
 		<form
@@ -25,18 +27,20 @@ templ SettingsAvatarForm() {
 			@SettingsAvatarFields()
 			<div class="flex flex-col gap-2 sm:flex-row-reverse">
 				@SettingsAvatarUploadButton()
-				@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
-					@SettingsAvatarDeleteTrigger()
-					@dialog.Content() {
-						@SettingsAvatarDeleteDialog()
-						@dialog.Footer() {
-							@SettingsAvatarDeleteCancel()
-							@button.Button(button.Props{Attributes: utils.MergeAttributes(dialog.Close(ctx), templ.Attributes{
-								"hx-delete":  basePath + "/account/avatar",
-								"hx-swap":    "none",
-								"hx-disable": "this",
-							})}) {
-								Remove
+				if hasAvatar {
+					@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
+						@SettingsAvatarDeleteTrigger()
+						@dialog.Content() {
+							@SettingsAvatarDeleteDialog()
+							@dialog.Footer() {
+								@SettingsAvatarDeleteCancel()
+								@button.Button(button.Props{Attributes: utils.MergeAttributes(dialog.Close(ctx), templ.Attributes{
+									"hx-delete":  basePath + "/account/avatar",
+									"hx-swap":    "none",
+									"hx-disable": "this",
+								})}) {
+									Remove
+								}
 							}
 						}
 					}

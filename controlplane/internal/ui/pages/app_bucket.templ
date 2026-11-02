@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
@@ -23,11 +22,13 @@ templ Bucket(view BucketView) {
 			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
 			<div id="bucket" class="flex flex-col gap-6">
 				@bucketForm(view)
-				<div class="grid items-stretch gap-4 md:grid-cols-3" role="region" aria-label="What goes in the bucket">
-					@bucketUse("Your code", "ops deploy puts it there, your server picks it up and deletes it. Code from GitHub goes straight to your server.")
-					@bucketUse("Your backups", "Every change of every SQLite database, and a snapshot before every change. Restore any second of the last week.")
-					@bucketUse("Nothing of ours", "ops keeps the key encrypted and only signs short links. Your data never passes through ops.")
-				</div>
+				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it"}) {
+					<dl class="grid gap-4 text-sm md:grid-cols-3">
+						@bucketUse("Your code", "ops deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
+						@bucketUse("Your backups", "Every change of every SQLite database. Restore any second of the last week.")
+						@bucketUse("Nothing of ours", "ops keeps the key encrypted. Your data never passes through ops.")
+					</dl>
+				}
 				if view.Storage != nil {
 					@dangerPanel("Remove the bucket", "Backups stop and ops deploy needs a bucket again. What is in the bucket stays there.") {
 						@button.Button(button.Props{
@@ -51,16 +52,10 @@ templ Bucket(view BucketView) {
 }
 
 templ bucketUse(title, text string) {
-	@card.Card(card.Props{Class: "h-full min-w-0"}) {
-		@card.Header() {
-			@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
-				{ title }
-			}
-			@card.Description(card.DescriptionProps{Class: "text-pretty"}) {
-				{ text }
-			}
-		}
-	}
+	<div class="flex flex-col gap-1">
+		<dt class="font-medium">{ title }</dt>
+		<dd class="text-pretty text-muted-foreground">{ text }</dd>
+	</div>
 }
 
 // bucketForm is the bucket: what is stored, and the form that adds or

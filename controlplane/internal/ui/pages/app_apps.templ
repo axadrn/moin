@@ -140,7 +140,7 @@ templ AppList(view AppsView) {
 					for _, app := range view.Apps {
 						{{ newest, hasNewest := view.Newest[app.ID] }}
 						<li data-app={ app.Name }>
-							@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid grid-cols-[minmax(0,1fr)_auto] gap-4 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
+							@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
 								@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
 									@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
 										{ app.Name }

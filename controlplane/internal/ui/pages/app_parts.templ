@@ -278,15 +278,30 @@ templ docsLink(href, label string) {
 // emptyState is a card that says what is missing, what makes it appear
 // and the command that adds it.
 templ emptyState(title, body, cmd string) {
+	{{ var bodyText templ.Component }}
+	if body != "" {
+		{{ bodyText = plainText(body) }}
+	}
+	@emptyStateWith(title, bodyText, cmd) {
+		{ children... }
+	}
+}
+
+templ plainText(text string) {
+	{ text }
+}
+
+// emptyStateWith is emptyState with a body that has markup, like a path.
+templ emptyStateWith(title string, body templ.Component, cmd string) {
 	@card.Card(card.Props{Class: "min-w-0"}) {
 		@empty.Empty(empty.Props{Class: "gap-4 p-6 sm:p-10"}) {
 			@empty.Header(empty.HeaderProps{Class: "max-w-md gap-1"}) {
 				@empty.Title(empty.TitleProps{Class: "text-base font-semibold"}) {
 					{ title }
 				}
-				if body != "" {
+				if body != nil {
 					@empty.Description(empty.DescriptionProps{Class: "text-sm text-pretty"}) {
-						{ body }
+						@body
 					}
 				}
 			}

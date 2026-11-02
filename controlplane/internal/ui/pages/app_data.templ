@@ -55,7 +55,7 @@ templ AppData(view DataView) {
 					@emptyState("The data could not be read", view.Error, "")
 				</div>
 			} else if len(view.Databases) == 0 {
-				@emptyState("No SQLite database yet", "ops finds SQLite files on the volumes of the live release. Deploy an app that keeps its database on a volume, like /data/app.db.", "ops deploy "+view.App.Name)
+				@emptyStateWith("No SQLite database yet", noDatabase(), "ops deploy "+view.App.Name)
 			} else {
 				<div class="grid items-stretch gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
 					@dataSidebar(view)
@@ -681,4 +681,8 @@ func cellInput(value any) string {
 
 func isBlob(column protocol.DBColumn) bool {
 	return strings.Contains(strings.ToUpper(column.Type), "BLOB")
+}
+
+templ noDatabase() {
+	ops finds SQLite files on the volumes of the live release. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>.
 }
