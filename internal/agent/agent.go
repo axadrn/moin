@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -164,7 +165,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.updater = newUpdater(state.URL)
 	go agent.backups.drills(ctx)
 	go agent.backups.sweepUploads(ctx)
-	defer agent.backups.configure(context.Background(), nil)
+	defer agent.backups.configure(context.Background(), nil, nil)
 	wait := minReconnect
 	for {
 		connected, err := agent.session(ctx)
@@ -423,8 +424,14 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
+		for _, storage := range config.AppStorage {
+			if err := checkStorage(rules, r.rulesFile, storage); err != nil {
+				fail(err)
+				return
+			}
+		}
 		kept := r.apps.keepIDs(config.Apps)
-		if err := r.backups.configure(ctx, config.Storage); err != nil {
+		if err := r.backups.configure(ctx, config.Storage, config.AppStorage); err != nil {
 			fail(err)
 			return
 		}
@@ -438,6 +445,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
+		// Older buckets the rules do not allow stay unread.
+		request.Older = slices.DeleteFunc(request.Older, func(storage protocol.BackupStorage) bool {
+			return checkStorage(rules, r.rulesFile, &storage) != nil
+		})
 		list := r.backups.list
 		if message.Type == protocol.TypeBackupSnapshot {
 			list = r.backups.snapshot
@@ -451,6 +462,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeBackupRestore:
 		var request protocol.BackupRestore
 		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		if err := checkStorage(rules, r.rulesFile, request.Storage); err != nil {
 			fail(err)
 			return
 		}

@@ -443,7 +443,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case modeSQL:
 		return bar(style.Accent, style.Bold.Render("SQL: ")+m.input+cursor), [][2]string{{"enter", "run"}, {"esc", "close"}}
 	case modeBackups:
-		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"on/off", "snapshot before changes"}, {"esc", "close"}}
+		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"snapshot bucket", "restore from an older bucket"}, {"bucket name", "move uploads and new backups"}, {"bucket -", "the default"}, {"on/off", "snapshot before changes"}, {"esc", "close"}}
 	case modeUptime:
 		return bar(style.Accent, style.Bold.Render("Uptime: ")+m.input+cursor), [][2]string{{"enter", "check again"}, {"pause blog.de", "pause"}, {"resume blog.de", "resume"}, {"blog.de /health", "path"}, {"esc", "close"}}
 	case modeGitHub:
@@ -521,7 +521,10 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabTeam:
 		return nil, m.teamKeys()
 	case m.tab == tabSettings:
-		keys := [][2]string{{"tab", "servers"}, {"j k", "select"}, {"enter", "set"}, {"a", "add a registry"}}
+		keys := [][2]string{{"tab", "servers"}, {"j k", "select"}, {"enter", "set"}, {"a", "add a registry"}, {"b", "add a bucket"}}
+		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].bucket != nil && !rows[m.settingSelected].bucket.Default {
+			keys = append(keys, [2]string{"D", "make default"})
+		}
 		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].set {
 			keys = append(keys, [2]string{"x", "remove"})
 		}

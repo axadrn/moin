@@ -168,7 +168,7 @@ network: locked
 | `data: off` | reading tables, running SQL and editing rows through ops |
 | `logs: off` | reading container logs through ops; logs often hold what your users sent |
 | `deploy-from: <sources>` | deploys from anywhere else, see below |
-| `backups-to: <host>/<bucket>` | backups to and restores from any other bucket |
+| `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to the tunnel, SSH on Tailscale and the firewall. Set them up first, then lock them |
 
 A source in `deploy-from` is one of these:

@@ -93,9 +93,10 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 
 // restore puts a database back from a snapshot or to a point in time.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", `restore [--app <app>] [--db <path>] <snapshot> [--yes], or restore --at "2026-10-31 14:02" [--yes]`).withApp().withYes()
+	flags := newFlags("restore", `restore [--app <app>] [--db <path>] <snapshot> [--bucket <bucket>] [--yes], or restore --at "2026-10-31 14:02" [--yes]`).withApp().withYes()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
 	at := flags.String("at", "", `point in time in UTC, like "2026-10-31 14:02:00", or "14:02" for today`)
+	from := flags.String("bucket", "", "the bucket of the snapshot, when "+build.Name+" backups shows it in an older bucket the app left")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return err
 	}
 	step(stdout, "restoring %s; %s takes a snapshot of the current state first", name, build.Name)
-	err = api.Restore(ctx, name, *database, snapshot, when)
+	err = api.Restore(ctx, name, *database, snapshot, *from, when)
 	if err != nil {
 		return err
 	}
@@ -268,19 +269,25 @@ func printBackups(w io.Writer, list client.AppBackups) {
 		}
 		rows := [][]string{}
 		for _, snapshot := range database.Snapshots {
-			rows = append(rows, []string{snapshot.ID, snapshot.Reason, byteSize(snapshot.Size), since(snapshot.CreatedAt, now)})
+			rows = append(rows, []string{snapshot.ID, snapshot.Reason, byteSize(snapshot.Size), since(snapshot.CreatedAt, now), dash(snapshot.Bucket)})
 		}
 		if len(rows) == 0 {
 			fmt.Fprintln(w, style.Muted.Render("  no snapshots yet"))
 			continue
 		}
-		table(w, []string{"SNAPSHOT", "REASON", "SIZE", "TAKEN"}, rows)
+		table(w, []string{"SNAPSHOT", "REASON", "SIZE", "TAKEN", "BUCKET"}, rows)
 	}
 	auto := "on"
 	if !list.SnapshotBeforeChanges {
 		auto = "off"
 	}
 	fmt.Fprintln(w)
+	if list.Bucket != "" {
+		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket))
+	}
+	if len(list.OlderBuckets) > 0 {
+		fmt.Fprintln(w, style.Muted.Render("older backups in "+strings.Join(list.OlderBuckets, ", ")+": restore them with "+build.Name+" restore <snapshot> --bucket <bucket>"))
+	}
 	fmt.Fprintln(w, style.Muted.Render("snapshot before every change: "+auto))
 }
 

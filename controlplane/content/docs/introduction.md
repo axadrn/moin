@@ -41,7 +41,7 @@ ops is in beta: it works and runs real sites, and it keeps getting better fast, 
 - **health check**: after a deploy, ops checks that the app starts and stays up, and can call a web address of the app, such as `/healthz`. If the check fails, the last good release starts again.
 - **env vars**: the settings and secrets of an app, such as an API key. ops keeps them encrypted and hands them to your server with each deploy.
 - **domain**: the address people type to reach your app, such as shop.example.com. ops gives it HTTPS.
-- **bucket**: your own storage box, for example at Cloudflare R2. One per workspace. It holds your code on its way to the server and your backups. ops never stores either.
+- **bucket**: your own storage box, for example at Cloudflare R2. One per workspace, or one per client or region: each app picks one, the default serves the rest. It holds your code on its way to the server and your backups. ops never stores either.
 - **SQLite**: a database that lives in one file next to your app, such as `/data/app.db`. ops finds it, backs it up and lets you edit it.
 - **backup**: every change of your app's SQLite database, copied to your bucket about once a second.
 - **snapshot**: a full copy of the database at one moment, like a photo. ops takes one before every deploy, restore and data change.

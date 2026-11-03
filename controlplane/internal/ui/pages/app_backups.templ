@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -15,6 +16,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/popover"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/select"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
@@ -26,7 +28,11 @@ import (
 // BackupsView is the backups page of an app.
 type BackupsView struct {
 	App     model.App
-	Storage *service.BackupStorage
+	Storage *service.Bucket
+	// Buckets are the workspace's buckets to pick from; Older the ones the
+	// app left, which keep its older backups.
+	Buckets []service.Bucket
+	Older   []service.Bucket
 	Backups protocol.Backups
 	// Error says why the server could not report its backups.
 	Error string
@@ -243,6 +249,9 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 							}
 							@item.Description(item.DescriptionProps{Class: "text-xs"}) {
 								{ reasonText(snapshot.Reason) } · { size(snapshot.Size) } · { ago(snapshot.CreatedAt, view.Now) }
+								if olderSnapshot(view, snapshot) {
+									· <span data-snapshot-bucket={ snapshot.Bucket }>in the older bucket { snapshot.Bucket }</span>
+								}
 							}
 						}
 						@item.Actions() {
@@ -258,6 +267,9 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 								@csrf.Token()
 								<input type="hidden" name="database" value={ database.Database }/>
 								<input type="hidden" name="snapshot" value={ snapshot.ID }/>
+								if olderSnapshot(view, snapshot) {
+									<input type="hidden" name="bucket" value={ snapshot.Bucket }/>
+								}
 								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
 									Restore
 								}
@@ -298,23 +310,113 @@ templ BackupSettingsForm(app model.App) {
 		</form>
 }
 
+// bucketSummary is where this app's uploads and backups go, and the
+// choice of another bucket of the workspace.
 templ bucketSummary(view BackupsView) {
-	@panel(panelProps{Title: "Bucket", Description: "Where the backups of all your apps go.", Docs: "/docs/guides/bucket", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": true}}) {
-		<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
-			<dt class="text-muted-foreground">Bucket</dt>
-			<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }</dd>
-			<dt class="text-muted-foreground">Folder</dt>
-			<dd class="truncate font-mono" data-bucket-folder>{ view.Storage.AppFolder(&view.App) }</dd>
-			<dt class="text-muted-foreground">Endpoint</dt>
-			<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
-		</dl>
+	@panel(panelProps{Title: "Bucket", Description: "Where the uploads and backups of " + view.App.Name + " go.", Docs: "/docs/guides/bucket#more-than-one-bucket", Action: bucketChange(), Attrs: templ.Attributes{"data-backup-storage": view.Storage.Name}}) {
+		<div class="flex flex-col gap-6">
+			<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
+				<dt class="text-muted-foreground">Bucket</dt>
+				<dd class="truncate font-mono" data-bucket>{ view.Storage.Name } · { view.Storage.Bucket }</dd>
+				<dt class="text-muted-foreground">Folder</dt>
+				<dd class="truncate font-mono" data-bucket-folder>{ view.Storage.AppFolder(&view.App) }</dd>
+				<dt class="text-muted-foreground">Endpoint</dt>
+				<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
+				if len(view.Older) > 0 {
+					<dt class="text-muted-foreground">Older backups</dt>
+					<dd class="text-pretty" data-bucket-older>In { olderNames(view.Older) }. They stay there; restores of them read from there.</dd>
+				}
+			</dl>
+			if len(view.Buckets) > 1 {
+				@AppBucketForm(view)
+			}
+		</div>
 	}
+}
+
+// AppBucketForm picks the bucket of the app. It asks first, because new
+// backups start in the other bucket and the older ones stay where they
+// are.
+templ AppBucketForm(view BackupsView) {
+	<form
+		id="app-bucket-form"
+		class="flex flex-col gap-3 sm:flex-row sm:items-end"
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/bucket" }
+		hx-target="#app-backups"
+		hx-select="#app-backups"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+		hx-confirm={ "Move the uploads and new backups of " + view.App.Name + " to this bucket? Its older backups stay in " + view.Storage.Name + "; restores of them read from there. The new bucket starts with a full copy." }
+	>
+		@csrf.Token()
+		@field.Field(field.Props{Class: "gap-1 sm:flex-1"}) {
+			@field.Label(field.LabelProps{For: "app-bucket"}) {
+				Use another bucket
+			}
+			@selectcomp.Select(selectcomp.Props{Name: "bucket", DefaultValue: appBucketValue(view.App), Items: appBucketItems(view.Buckets)}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-bucket", Class: "w-full"}) {
+					@selectcomp.Value()
+				}
+				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+					@selectcomp.Group() {
+						for _, item := range appBucketItems(view.Buckets) {
+							@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
+								{ item.Label.(string) }
+							}
+						}
+					}
+				}
+			}
+		}
+		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
+			Move
+		}
+	</form>
 }
 
 templ bucketChange() {
 	@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Variant: button.VariantSecondary, Size: button.SizeSm}) {
-		Change
+		Buckets
 	}
+}
+
+// appBucketDefault is the select's value for "the workspace's default".
+// Bucket names never start with a dash, so it is no bucket's name.
+const appBucketDefault = "-default"
+
+func appBucketValue(app model.App) string {
+	if app.BucketName == "" {
+		return appBucketDefault
+	}
+	return app.BucketName
+}
+
+// appBucketItems are the choices: the default, whichever it is, then each
+// bucket by name.
+func appBucketItems(buckets []service.Bucket) []selectcomp.ItemData {
+	items := []selectcomp.ItemData{}
+	for _, bucket := range buckets {
+		if bucket.Default {
+			items = append(items, selectcomp.ItemData{Value: appBucketDefault, Label: "The default (" + bucket.Name + ")"})
+		}
+	}
+	for _, bucket := range buckets {
+		items = append(items, selectcomp.ItemData{Value: bucket.Name, Label: bucket.Name})
+	}
+	return items
+}
+
+func olderNames(buckets []service.Bucket) string {
+	names := make([]string, 0, len(buckets))
+	for _, bucket := range buckets {
+		names = append(names, bucket.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// olderSnapshot says a snapshot is in a bucket the app left.
+func olderSnapshot(view BackupsView, snapshot protocol.Snapshot) bool {
+	return snapshot.Bucket != "" && view.Storage != nil && snapshot.Bucket != view.Storage.Name
 }
 
 // pointInTimeScript keeps the date of each point in time form: a day picked

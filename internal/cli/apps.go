@@ -242,7 +242,7 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	started, err := api.Deploy(ctx, name, source.Bytes())
 	var apiErr *client.Error
 	if errors.As(err, &apiErr) && apiErr.Code == "no_bucket" {
-		return fmt.Errorf("%s deploy puts your code into your own bucket, never on ours: add one with %s backups bucket set, or deploy from GitHub with %s deploy --ref main", build.Name, build.Name, build.Name)
+		return fmt.Errorf("%s deploy puts your code into your own bucket, never on ours: add one with %s buckets add, or deploy from GitHub with %s deploy --ref main", build.Name, build.Name, build.Name)
 	}
 	if err != nil {
 		return err

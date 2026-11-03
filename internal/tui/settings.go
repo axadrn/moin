@@ -22,8 +22,8 @@ type settings struct {
 	loaded          bool
 	github          client.GitHub
 	githubErr       error
-	storage         *client.BackupStorage
-	storageErr      error
+	buckets         []client.Bucket
+	bucketsErr      error
 	integrations    client.Integrations
 	integrationsErr error
 	registries      []client.Registry
@@ -40,6 +40,8 @@ type settingRow struct {
 	// set says there is something to remove with x.
 	set  bool
 	host string
+	// bucket is the bucket of a bucket row.
+	bucket *client.Bucket
 }
 
 // loadSettings fetches every part of the settings tab.
@@ -47,15 +49,7 @@ func (m model) loadSettings() tea.Cmd {
 	return func() tea.Msg {
 		loaded := settings{loaded: true}
 		loaded.github, loaded.githubErr = m.api.GitHub(m.ctx)
-		storage, err := m.api.BackupStorage(m.ctx)
-		var apiErr *client.Error
-		switch {
-		case errors.As(err, &apiErr) && apiErr.Code == "no_backups":
-		case err != nil:
-			loaded.storageErr = err
-		default:
-			loaded.storage = &storage
-		}
+		loaded.buckets, loaded.bucketsErr = m.api.Buckets(m.ctx)
 		loaded.integrations, loaded.integrationsErr = m.api.Integrations(m.ctx)
 		loaded.registries, loaded.registriesErr = m.api.Registries(m.ctx)
 		loaded.version, loaded.versionErr = m.api.Version(m.ctx)
@@ -83,16 +77,31 @@ func (m model) settingRows() []settingRow {
 		github = "connected to " + strings.Join(accounts, ", ")
 	}
 
-	bucket := off("not set · enter sets it")
+	var buckets []settingRow
 	switch {
-	case s.storageErr != nil:
-		bucket = failed(s.storageErr)
-	case s.storage != nil:
-		endpoint := s.storage.Endpoint
+	case s.bucketsErr != nil:
+		buckets = append(buckets, settingRow{kind: "buckets", name: "Buckets", value: failed(s.bucketsErr)})
+	case len(s.buckets) == 0:
+		buckets = append(buckets, settingRow{kind: "buckets", name: "Bucket", value: off("not set · enter adds it")})
+	}
+	for index := range s.buckets {
+		bucket := &s.buckets[index]
+		endpoint := bucket.Endpoint
 		if endpoint == "" {
 			endpoint = "AWS S3"
 		}
-		bucket = s.storage.Bucket + "/" + s.storage.Folder + off(" at "+host(endpoint)+" · key "+s.storage.AccessKey)
+		used := "no app yet"
+		if len(bucket.Apps) > 0 {
+			used = strings.Join(bucket.Apps, ", ")
+		}
+		if bucket.Default {
+			used = "default · " + used
+		}
+		if len(bucket.OlderBackups) > 0 {
+			used += " · older backups of " + strings.Join(bucket.OlderBackups, ", ")
+		}
+		value := bucket.Bucket + "/" + bucket.Folder + off(" at "+host(endpoint)+" · key "+bucket.AccessKey+" · "+used)
+		buckets = append(buckets, settingRow{kind: "bucket", name: "Bucket " + bucket.Name, value: value, set: true, bucket: bucket})
 	}
 
 	cloudflare, tailscale := off("not set · enter sets it"), off("not set · enter sets it")
@@ -133,10 +142,12 @@ func (m model) settingRows() []settingRow {
 		{kind: "controlplane", name: "Control plane", value: controlPlane},
 		{kind: "agentupdates", name: "Agent updates", value: agentUpdates},
 		{kind: "github", name: "GitHub", value: github},
-		{kind: "bucket", name: "Bucket", value: bucket, set: s.storage != nil},
-		{kind: "cloudflare", name: "Cloudflare token", value: cloudflare, set: s.integrations.Cloudflare},
-		{kind: "tailscale", name: "Tailscale key", value: tailscale, set: s.integrations.Tailscale},
 	}
+	rows = append(rows, buckets...)
+	rows = append(rows,
+		settingRow{kind: "cloudflare", name: "Cloudflare token", value: cloudflare, set: s.integrations.Cloudflare},
+		settingRow{kind: "tailscale", name: "Tailscale key", value: tailscale, set: s.integrations.Tailscale},
+	)
 	if s.registriesErr != nil {
 		rows = append(rows, settingRow{kind: "registries", name: "Registries", value: failed(s.registriesErr)})
 	}
@@ -159,6 +170,8 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 		return m.updateControlPlane()
 	case "A":
 		return m, m.setAgentUpdates(!m.settings.autoUpdate)
+	case "b":
+		return m.bucketForm(nil), nil
 	}
 	if m.settingSelected >= len(rows) {
 		return m, nil
@@ -171,8 +184,58 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 		if row.set {
 			return m.removeSetting(row), nil
 		}
+	case "D":
+		if row.bucket == nil {
+			m.notice = "Pick a bucket row first, then D makes it the default"
+			return m, nil
+		}
+		if row.bucket.Default {
+			m.notice = row.bucket.Name + " is the default bucket already"
+			return m, nil
+		}
+		input := row.bucket.Input()
+		input.Default = true
+		name := row.bucket.Name
+		return m.confirmFirst("Make "+name+" the default bucket?", "Apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default.", "make default", false,
+			m.done(func() error {
+				_, err := m.api.EditBucket(m.ctx, name, input)
+				return err
+			}, name+" is the default bucket now")), nil
 	}
 	return m, nil
+}
+
+// bucketForm asks for a new bucket, or for the changes of one. A change
+// keeps the stored secret key when it is left empty.
+func (m model) bucketForm(current *client.Bucket) model {
+	var stored client.Bucket
+	title, secretHint, name := "New bucket", build.Name+" checks that it can write before it stores the bucket", ""
+	if current != nil {
+		stored, title, secretHint, name = *current, "Bucket "+current.Name, "empty keeps the stored one", current.Name
+	} else if len(m.settings.buckets) == 0 {
+		stored.Name = "default"
+	}
+	return m.ask(title, func(values []string) tea.Cmd {
+		input := client.BucketInput{Name: values[0], Endpoint: values[1], Region: values[2], Bucket: values[3], Path: values[4], AccessKey: values[5], SecretKey: values[6], Default: stored.Default}
+		if name == "" {
+			return m.done(func() error {
+				_, err := m.api.AddBucket(m.ctx, input)
+				return err
+			}, "Bucket "+input.Name+" added; :bucket "+input.Name+" on an app moves it there")
+		}
+		return m.done(func() error {
+			_, err := m.api.EditBucket(m.ctx, name, input)
+			return err
+		}, "Bucket "+input.Name+" saved; its apps upload and back up there now")
+	},
+		formField{label: "Name", value: stored.Name, hint: placeholder(stored.Name, "your name for it, like client-a"), check: checkName},
+		formField{label: "Endpoint", value: stored.Endpoint, optional: true, hint: placeholder(stored.Endpoint, "https://… of an S3-compatible store, empty for AWS S3")},
+		formField{label: "Region", value: stored.Region, optional: true, hint: placeholder(stored.Region, "auto for Cloudflare R2")},
+		formField{label: "Bucket", value: stored.Bucket, hint: placeholder(stored.Bucket, "your bucket's name")},
+		formField{label: "Folder", value: stored.Path, optional: true, hint: placeholder(stored.Path, "only if the bucket holds other files too")},
+		formField{label: "Access key", value: stored.AccessKey, hint: placeholder(stored.AccessKey, "the access key ID")},
+		formField{label: "Secret key", secret: true, optional: current != nil, hint: secretHint},
+	)
 }
 
 // editSetting opens the form of a row, or says how to connect GitHub.
@@ -189,21 +252,10 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 		}
 		m.notice = "Connect GitHub, also when the " + build.Name + " GitHub App is already installed: " + cmp.Or(m.settings.github.ConnectURL, m.settings.github.InstallURL)
 		return m, nil
+	case "buckets":
+		return m.bucketForm(nil), nil
 	case "bucket":
-		var current client.BackupStorage
-		if m.settings.storage != nil {
-			current = *m.settings.storage
-		}
-		return m.ask("Bucket", func(values []string) tea.Cmd {
-			return m.setBucket(client.BackupStorage{Endpoint: values[0], Region: values[1], Bucket: values[2], Path: values[3], AccessKey: values[4], SecretKey: values[5]})
-		},
-			formField{label: "Endpoint", value: current.Endpoint, optional: true, hint: placeholder(current.Endpoint, "https://… of an S3-compatible store, empty for AWS S3")},
-			formField{label: "Region", value: current.Region, optional: true, hint: placeholder(current.Region, "auto for Cloudflare R2")},
-			formField{label: "Bucket", value: current.Bucket, hint: placeholder(current.Bucket, "your bucket's name")},
-			formField{label: "Folder", value: current.Path, optional: true, hint: placeholder(current.Path, "only if the bucket holds other files too")},
-			formField{label: "Access key", value: current.AccessKey, hint: placeholder(current.AccessKey, "the access key ID")},
-			formField{label: "Secret key", secret: true, hint: build.Name + " checks that it can write before it stores the bucket"},
-		), nil
+		return m.bucketForm(row.bucket), nil
 	case "cloudflare":
 		return m.ask("Cloudflare token", func(values []string) tea.Cmd { return m.setKeys(&values[0], nil) },
 			formField{label: "API token", secret: true, hint: "Tunnel: Edit, DNS: Edit (Zone Settings: Edit optional, for Always Use HTTPS)"},
@@ -227,7 +279,8 @@ func (m model) removeSetting(row settingRow) model {
 	blank := ""
 	switch row.kind {
 	case "bucket":
-		return m.confirmName("Stop backups?", "The bucket keeps what is in it.", m.settings.storage.Bucket, m.done(func() error { return m.api.RemoveBackupStorage(m.ctx) }, "Backups stopped; the bucket keeps what is in it"))
+		name := row.bucket.Name
+		return m.confirmName("Remove the bucket "+name+"?", "What is in it stays. A bucket that apps use or that keeps older backups is refused.", name, m.done(func() error { return m.api.RemoveBucket(m.ctx, name) }, "Removed the bucket "+name+"; what is in it stays"))
 	case "cloudflare":
 		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it ops cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
 	case "tailscale":
@@ -248,13 +301,6 @@ func (m model) done(change func() error, notice string) tea.Cmd {
 		m.shared.program.Send(noticeMsg(notice))
 		return m.loadSettings()()
 	}
-}
-
-func (m model) setBucket(storage client.BackupStorage) tea.Cmd {
-	return m.done(func() error {
-		_, err := m.api.SetBackupStorage(m.ctx, storage)
-		return err
-	}, "Bucket saved; backups go there now")
 }
 
 // setKeys stores or, with "", removes the Cloudflare token or the

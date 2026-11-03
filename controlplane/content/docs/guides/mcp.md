@@ -6,7 +6,7 @@ order: 12
 
 MCP (Model Context Protocol) is how AI agents such as Claude, Cursor or VS Code use tools. The control plane serves an MCP server at `/mcp`. Almost every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back my app and show me its logs"*.
 
-Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_backup_storage` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
+Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
 
 ## Connect an agent
 
@@ -68,11 +68,14 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `execute_sql` | runs SQL that changes data | write, destructive |
 | `get_backups` | snapshots, point in time window, restore drills | read |
 | `back_up_app` | takes a snapshot now | write |
-| `restore_app` | restores a snapshot or a point in time; `confirm` is the app's name | write, destructive |
+| `restore_app` | restores a snapshot or a point in time; `bucket` names an older bucket the snapshot is in; `confirm` is the app's name | write, destructive |
 | `set_backup_settings` | snapshot before every change | write |
-| `get_backup_storage` | the bucket, without its secret | read |
-| `set_backup_storage` | sets the bucket | write |
-| `remove_backup_storage` | stops backups; `confirm` is the bucket's name | write, destructive |
+| `list_buckets` | the buckets, without their secrets, with the apps that use each | read |
+| `add_bucket` | adds a bucket; the first is the default | write |
+| `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
+| `set_default_bucket` | makes a bucket the default | write |
+| `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
+| `set_app_bucket` | moves an app's uploads and new backups to a bucket; older backups stay | write |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
 | `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |

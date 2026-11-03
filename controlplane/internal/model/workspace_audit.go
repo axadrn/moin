@@ -203,8 +203,23 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "removed the registry login for " + target
 	case "bucket.set":
 		return "connected the bucket " + target
+	case "bucket.added":
+		return "added the bucket " + target
+	case "bucket.changed":
+		return "changed the bucket " + target
+	case "bucket.default":
+		return "made " + target + " the default bucket"
 	case "bucket.removed":
-		return "removed the bucket"
+		if target == "" {
+			return "removed the bucket"
+		}
+		return "removed the bucket " + target
+	case "app.bucket_set":
+		to := "the default bucket"
+		if d["bucket"] != "" {
+			to = "the bucket " + d["bucket"]
+		}
+		return "moved the uploads and backups of " + target + " to " + to
 	case "backup.taken":
 		return "took a snapshot of " + target
 	case "backup.restored":

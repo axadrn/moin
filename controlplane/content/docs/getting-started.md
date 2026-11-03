@@ -97,14 +97,14 @@ Your code and your backups go into your own bucket, never to us.
 Then tell ops:
 
 ```surfaces
-Web: **Bucket** in the sidebar, then **Save bucket**
-CLI: ops backups bucket set \
+Web: **Buckets** in the sidebar, then **Add bucket**
+CLI: ops buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, **Bucket**, then `enter`
-API: PUT /api/v1/backup-storage
-MCP: set_backup_storage
+TUI: settings tab, `b`
+API: POST /api/v1/buckets
+MCP: add_bucket
 ```
 
 The CLI asks for the secret key. ops writes a test file and deletes it, so a wrong key fails right away. [Your bucket](/docs/guides/bucket#add-it) has the details.

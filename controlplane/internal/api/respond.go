@@ -81,6 +81,10 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &agentErr) {
 		return http.StatusFailedDependency, ErrorDetail{Code: "agent_error", Message: agentErr.Message}, true
 	}
+	var inUse *service.BucketInUseError
+	if errors.As(err, &inUse) {
+		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true
+	}
 	for _, known := range serviceErrors {
 		if !errors.Is(err, known.err) {
 			continue
@@ -250,6 +254,10 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBackupEndpoint, field: "endpoint", message: "Use an https:// URL, or leave it empty for AWS S3."},
 	{err: service.ErrBucketPrivate, field: "endpoint", message: "This endpoint points to a private or local address. ops can only reach buckets on the public internet."},
 	{err: service.ErrBackupBucket, field: "bucket", message: "Enter the bucket, the access key and the secret key."},
+	{err: service.ErrBucketName, field: "name", message: "Name the bucket with 1 to 63 lowercase letters, digits or dashes, like client-a."},
+	{err: repository.ErrDuplicateBucket, field: "name", message: "A bucket with this name already exists."},
+	{err: repository.ErrBucketNotFound, status: http.StatusNotFound, code: "not_found", message: "The bucket was not found. List them with ops buckets."},
+	{err: service.ErrRestoreOlder, field: "bucket", message: "A point in time restore reads from the app's bucket. Pick a snapshot to restore from an older bucket."},
 	{err: service.ErrBackupAccess, field: "secret_key", message: "ops could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
 	{err: service.ErrRestoreTarget, field: "snapshot", message: "Choose a snapshot or a point in time."},
 	{err: service.ErrSnapshotID, field: "snapshot", message: "This is not a snapshot ID. Copy one from the backups list, like 20261031T140200Z-daily."},

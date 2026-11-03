@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/protocol"
 )
@@ -32,9 +33,27 @@ type BackupStorageRequest struct {
 }
 
 // AppBackups is the answer of GET and POST /api/v1/apps/{app}/backups.
+// Bucket is the bucket new backups go to; OlderBuckets are the buckets the
+// app left, which keep its older backups. Each snapshot names its bucket.
 type AppBackups struct {
 	SnapshotBeforeChanges bool                      `json:"snapshot_before_changes"`
+	Bucket                string                    `json:"bucket"`
+	OlderBuckets          []string                  `json:"older_buckets"`
 	Databases             []protocol.DatabaseBackup `json:"databases"`
+}
+
+// NewAppBackups is the JSON shape of an app's backups.
+func NewAppBackups(apps *service.AppService, app *model.App, backups protocol.Backups) AppBackups {
+	answer := AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, OlderBuckets: []string{}, Databases: backups.Databases}
+	if bucket, err := apps.AppBucket(app); err == nil {
+		answer.Bucket = bucket.Name
+	}
+	if older, err := apps.OlderBuckets(app); err == nil {
+		for _, bucket := range older {
+			answer.OlderBuckets = append(answer.OlderBuckets, bucket.Name)
+		}
+	}
+	return answer
 }
 
 // BackupSettings is the body of PUT /api/v1/apps/{app}/backups/settings.
@@ -43,14 +62,16 @@ type BackupSettings struct {
 }
 
 // RestoreRequest is the body of POST /api/v1/apps/{app}/restore: a
-// snapshot ID, or a point in time.
+// snapshot ID, or a point in time. Bucket is the bucket the snapshot is in
+// when the app left it; empty is the app's bucket.
 type RestoreRequest struct {
 	Database string     `json:"database"`
 	Snapshot string     `json:"snapshot"`
+	Bucket   string     `json:"bucket"`
 	At       *time.Time `json:"at"`
 }
 
-func newBackupStorage(storage *service.BackupStorage) BackupStorage {
+func newBackupStorage(storage *service.Bucket) BackupStorage {
 	return BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: storage.Folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}
 }
 
@@ -97,7 +118,7 @@ func (h *AppsHandler) Backups(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, Databases: backups.Databases})
+	JSON(w, http.StatusOK, NewAppBackups(h.apps, app, backups))
 }
 
 // BackUp takes a snapshot now.
@@ -107,7 +128,7 @@ func (h *AppsHandler) BackUp(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, Databases: backups.Databases})
+	JSON(w, http.StatusCreated, NewAppBackups(h.apps, app, backups))
 }
 
 // SetBackupSettings turns the snapshot before every change on or off.
@@ -130,7 +151,7 @@ func (h *AppsHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Snapshot, request.At)
+	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Snapshot, request.Bucket, request.At)
 	if err != nil {
 		ServiceError(w, err)
 		return

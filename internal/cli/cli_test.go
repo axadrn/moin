@@ -164,6 +164,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"unlink", "shop"},
 		{"hook", "shop"},
 		{"backups", "bucket", "rm"},
+		{"buckets", "rm", "client-a"},
 		{"registry", "rm", "ghcr.io"},
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},

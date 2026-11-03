@@ -55,16 +55,20 @@ type backups struct {
 	apps *apps
 	send func(protocol.MessageType, string, any)
 
-	mu       sync.Mutex
-	storage  *protocol.BackupStorage
-	store    *litestream.Store
-	watched  map[string]watched
-	verified map[string]drill
+	mu sync.Mutex
+	// storage is the workspace's default bucket, appStorage the bucket of
+	// each app that uses another one.
+	storage    *protocol.BackupStorage
+	appStorage map[string]*protocol.BackupStorage
+	store      *litestream.Store
+	watched    map[string]watched
+	verified   map[string]drill
 }
 
 // watched is one replicated database; prefix is its folder in the bucket.
 type watched struct {
 	app      string
+	storage  protocol.BackupStorage
 	prefix   string
 	database protocol.Database
 }
@@ -79,16 +83,33 @@ func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups 
 	return &backups{apps: a, send: send, watched: map[string]watched{}, verified: map[string]drill{}}
 }
 
-// configure sets the bucket and replicates every database to it. Nil
-// stops replication.
-func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage) error {
+// configure sets the default bucket and the buckets of single apps, and
+// replicates every database to its app's bucket. A nil storage stops
+// replication.
+func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage, appStorage map[string]*protocol.BackupStorage) error {
+	for _, other := range appStorage {
+		if other == nil || other.Workspace == "" {
+			return errors.New("start backups: a bucket has no workspace folder, update the control plane")
+		}
+	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if b.storage != nil && storage != nil && *b.storage == *storage {
+		// The same default: only apps that changed buckets start again.
+		if sameStorage(b.appStorage, appStorage) {
+			b.mu.Unlock()
+			return nil
+		}
+		b.appStorage = appStorage
+		store, gone := b.store, b.reconcileLocked()
+		b.mu.Unlock()
+		for _, hostPath := range gone {
+			_ = store.UnregisterDB(context.Background(), hostPath)
+		}
 		return nil
 	}
+	defer b.mu.Unlock()
 	b.stopLocked()
-	b.storage = storage
+	b.storage, b.appStorage = storage, appStorage
 	if storage == nil {
 		return nil
 	}
@@ -114,12 +135,12 @@ func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage
 // go: it tracks what the old place holds, and against a new, empty one
 // Litestream would wait for files it already cleaned up. The new place
 // starts with a full snapshot.
-func (b *backups) moved(hostPath, prefix string) bool {
+func (b *backups) moved(hostPath string, storage protocol.BackupStorage, prefix string) bool {
 	file := filepath.Join(filepath.Dir(b.apps.dir), "backup-targets.json")
 	targets := map[string]string{}
 	body, _ := os.ReadFile(file)
 	_ = json.Unmarshal(body, &targets)
-	target := b.storage.Endpoint + "|" + b.storage.Bucket + "|" + prefix
+	target := storage.Endpoint + "|" + storage.Bucket + "|" + prefix
 	if targets[hostPath] == target {
 		return false
 	}
@@ -171,7 +192,7 @@ func (b *backups) reconcileLocked() (gone []string) {
 				slog.Warn("backup: not replicated", "app", entry.Name(), "database", database.Path, "error", err)
 				continue
 			}
-			want[database.HostPath] = watched{app: entry.Name(), prefix: prefix, database: database}
+			want[database.HostPath] = watched{app: entry.Name(), storage: *b.storageFor(entry.Name()), prefix: prefix, database: database}
 		}
 	}
 	for hostPath := range b.watched {
@@ -182,13 +203,13 @@ func (b *backups) reconcileLocked() (gone []string) {
 	}
 	for hostPath, item := range want {
 		old, known := b.watched[hostPath]
-		if known && old.prefix == item.prefix {
+		if known && old.prefix == item.prefix && old.storage == item.storage {
 			continue
 		}
 		b.watched[hostPath] = item
-		moved := b.moved(hostPath, item.prefix)
+		moved := b.moved(hostPath, item.storage, item.prefix)
 		db := litestream.NewDB(hostPath)
-		replica := litestream.NewReplicaWithClient(db, b.replicaClientAt(item.prefix))
+		replica := litestream.NewReplicaWithClient(db, replicaClientAt(&item.storage, item.prefix))
 		db.Replica = replica
 		go func() {
 			// The same file under a new app ID: the old replica stops
@@ -237,11 +258,38 @@ func databaseKey(database string) string {
 // <path>/<workspace>/<app>/<app ID>/<database>. An app deployed before
 // deploys brought the app ID has none until its next deploy.
 func (b *backups) prefix(app, database string) (string, error) {
+	return b.prefixIn(b.storageFor(app), app, database)
+}
+
+// prefixIn is a database's folder in another bucket, one the app left.
+func (b *backups) prefixIn(storage *protocol.BackupStorage, app, database string) (string, error) {
 	id := b.apps.appID(app)
 	if id == "" {
 		return "", fmt.Errorf("deploy %s once more to start its backups", app)
 	}
-	return strings.Trim(path.Join(b.storage.Path, b.storage.Workspace, app, id, databaseKey(database)), "/"), nil
+	return strings.Trim(path.Join(storage.Path, storage.Workspace, app, id, databaseKey(database)), "/"), nil
+}
+
+// storageFor is the bucket of an app: its own, or the default. The caller
+// holds the lock.
+func (b *backups) storageFor(app string) *protocol.BackupStorage {
+	if storage := b.appStorage[app]; storage != nil {
+		return storage
+	}
+	return b.storage
+}
+
+// sameStorage reports whether two sets of app buckets are the same.
+func sameStorage(one, other map[string]*protocol.BackupStorage) bool {
+	if len(one) != len(other) {
+		return false
+	}
+	for app, storage := range one {
+		if theirs := other[app]; theirs == nil || storage == nil || *theirs != *storage {
+			return false
+		}
+	}
+	return true
 }
 
 // replicaClient is where Litestream keeps every change of a database.
@@ -250,23 +298,22 @@ func (b *backups) replicaClient(app, database string) (*lss3.ReplicaClient, erro
 	if err != nil {
 		return nil, err
 	}
-	return b.replicaClientAt(prefix), nil
+	return replicaClientAt(b.storageFor(app), prefix), nil
 }
 
-func (b *backups) replicaClientAt(prefix string) *lss3.ReplicaClient {
+func replicaClientAt(storage *protocol.BackupStorage, prefix string) *lss3.ReplicaClient {
 	client := lss3.NewReplicaClient()
-	client.AccessKeyID = b.storage.AccessKey
-	client.SecretAccessKey = b.storage.SecretKey
-	client.Region = b.storage.Region
-	client.Bucket = b.storage.Bucket
-	client.Endpoint = b.storage.Endpoint
-	client.ForcePathStyle = b.storage.Endpoint != ""
+	client.AccessKeyID = storage.AccessKey
+	client.SecretAccessKey = storage.SecretKey
+	client.Region = storage.Region
+	client.Bucket = storage.Bucket
+	client.Endpoint = storage.Endpoint
+	client.ForcePathStyle = storage.Endpoint != ""
 	client.Path = prefix + "/litestream"
 	return client
 }
 
-func (b *backups) s3Client() *s3.Client {
-	storage := b.storage
+func s3Client(storage *protocol.BackupStorage) *s3.Client {
 	region := storage.Region
 	if region == "" {
 		region = "auto"
@@ -341,7 +388,7 @@ func (b *backups) snapshot(ctx context.Context, request protocol.BackupRequest) 
 			return protocol.Backups{}, fmt.Errorf("snapshot %s: %w", database.Path, err)
 		}
 	}
-	return b.list(ctx, protocol.BackupRequest{App: request.App, Database: request.Database})
+	return b.list(ctx, protocol.BackupRequest{App: request.App, Database: request.Database, Older: request.Older})
 }
 
 // snapshotOne uploads one snapshot and drops the oldest beyond the limit.
@@ -375,7 +422,9 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 		snapshot.ID = now.Format(snapshotIDLayout) + "-" + snapshot.Reason
 	}
 	b.mu.Lock()
-	client, bucket := b.s3Client(), b.storage.Bucket
+	storage := b.storageFor(app)
+	client, bucket := s3Client(storage), storage.Bucket
+	snapshot.Bucket = storage.Name
 	prefix, err := b.prefix(app, database.Path)
 	b.mu.Unlock()
 	if err != nil {
@@ -492,9 +541,19 @@ func gzipFile(source string) (string, error) {
 // snapshots lists the snapshots of a database, newest first.
 func (b *backups) snapshots(ctx context.Context, app, database string) ([]protocol.Snapshot, error) {
 	b.mu.Lock()
-	client, bucket := b.s3Client(), b.storage.Bucket
-	folder, err := b.prefix(app, database)
+	storage := b.storageFor(app)
 	b.mu.Unlock()
+	if storage == nil {
+		return nil, errors.New("backups are not set up")
+	}
+	return b.snapshotsIn(ctx, storage, app, database)
+}
+
+// snapshotsIn lists the snapshots of a database in one bucket, newest
+// first, each with the bucket's name.
+func (b *backups) snapshotsIn(ctx context.Context, storage *protocol.BackupStorage, app, database string) ([]protocol.Snapshot, error) {
+	client, bucket := s3Client(storage), storage.Bucket
+	folder, err := b.prefixIn(storage, app, database)
 	if err != nil {
 		return nil, err
 	}
@@ -513,15 +572,19 @@ func (b *backups) snapshots(ctx context.Context, app, database string) ([]protoc
 			if err != nil {
 				continue
 			}
-			snapshots = append(snapshots, protocol.Snapshot{ID: id, Reason: reason, Size: aws.ToInt64(object.Size), CreatedAt: created})
+			snapshots = append(snapshots, protocol.Snapshot{ID: id, Reason: reason, Size: aws.ToInt64(object.Size), CreatedAt: created, Bucket: storage.Name})
 		}
 	}
-	// Newest first; in one second the numbered ones like before-sql-2 came
-	// after the first.
+	sortSnapshots(snapshots)
+	return snapshots, nil
+}
+
+// sortSnapshots puts the newest first; in one second the numbered ones
+// like before-sql-2 came after the first.
+func sortSnapshots(snapshots []protocol.Snapshot) {
 	slices.SortFunc(snapshots, func(x, y protocol.Snapshot) int {
 		return cmp.Or(y.CreatedAt.Compare(x.CreatedAt), cmp.Compare(len(y.ID), len(x.ID)), strings.Compare(y.ID, x.ID))
 	})
-	return snapshots, nil
 }
 
 // list reports the backups of an app: snapshots, the point in time window
@@ -536,7 +599,19 @@ func (b *backups) list(ctx context.Context, request protocol.BackupRequest) (pro
 		return result, err
 	}
 	for _, database := range databases {
-		result.Databases = append(result.Databases, b.status(ctx, request.App, database, true))
+		backup := b.status(ctx, request.App, database, true)
+		// The buckets the app left keep its older snapshots; restores
+		// read them from there.
+		for _, older := range request.Older {
+			snapshots, err := b.snapshotsIn(ctx, &older, request.App, database.Path)
+			if err != nil {
+				slog.Warn("backup: list older snapshots", "app", request.App, "bucket", older.Name, "error", err)
+				continue
+			}
+			backup.Snapshots = append(backup.Snapshots, snapshots...)
+		}
+		sortSnapshots(backup.Snapshots)
+		result.Databases = append(result.Databases, backup)
 	}
 	return result, nil
 }
@@ -600,7 +675,7 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	removeDatabase(restored)
 	defer removeDatabase(restored)
 	if request.Snapshot != "" {
-		err = b.download(ctx, request.App, database.Path, request.Snapshot, restored)
+		err = b.download(ctx, request.Storage, request.App, database.Path, request.Snapshot, restored)
 	} else {
 		err = b.restorePoint(ctx, request.App, database.Path, *request.At, restored)
 	}
@@ -651,10 +726,16 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	return nil
 }
 
-func (b *backups) download(ctx context.Context, app, database, id, target string) error {
+// download fetches a snapshot from the app's bucket, or from older, a
+// bucket the app left.
+func (b *backups) download(ctx context.Context, older *protocol.BackupStorage, app, database, id, target string) error {
 	b.mu.Lock()
-	client, bucket := b.s3Client(), b.storage.Bucket
-	prefix, err := b.prefix(app, database)
+	storage := b.storageFor(app)
+	if older != nil {
+		storage = older
+	}
+	client, bucket := s3Client(storage), storage.Bucket
+	prefix, err := b.prefixIn(storage, app, database)
 	b.mu.Unlock()
 	if err != nil {
 		return err
@@ -814,7 +895,7 @@ func (b *backups) drillOne(ctx context.Context, item watched) error {
 	removeDatabase(target)
 	defer removeDatabase(target)
 	b.mu.Lock()
-	client := b.replicaClientAt(item.prefix)
+	client := replicaClientAt(&item.storage, item.prefix)
 	b.mu.Unlock()
 	options := litestream.NewRestoreOptions()
 	options.OutputPath = target
@@ -843,16 +924,32 @@ func (b *backups) sweepUploads(ctx context.Context) {
 }
 
 // sweepOnce deletes the uploads of the workspace older than before, under
-// <path>/<workspace>/<app>/<app ID>/uploads/, also those of removed apps.
+// <path>/<workspace>/<app>/<app ID>/uploads/, also those of removed apps,
+// in the default bucket and in every bucket of an app.
 func (b *backups) sweepOnce(ctx context.Context, before time.Time) {
 	b.mu.Lock()
 	if b.storage == nil {
 		b.mu.Unlock()
 		return
 	}
-	client, bucket := b.s3Client(), b.storage.Bucket
-	root := strings.TrimLeft(path.Join(b.storage.Path, b.storage.Workspace)+"/", "/")
+	storages := []protocol.BackupStorage{*b.storage}
+	for _, storage := range b.appStorage {
+		if !slices.ContainsFunc(storages, func(known protocol.BackupStorage) bool {
+			return known.Endpoint == storage.Endpoint && known.Bucket == storage.Bucket && known.Path == storage.Path
+		}) {
+			storages = append(storages, *storage)
+		}
+	}
 	b.mu.Unlock()
+	for _, storage := range storages {
+		sweepIn(ctx, &storage, before)
+	}
+}
+
+// sweepIn deletes the old uploads of the workspace in one bucket.
+func sweepIn(ctx context.Context, storage *protocol.BackupStorage, before time.Time) {
+	client, bucket := s3Client(storage), storage.Bucket
+	root := strings.TrimLeft(path.Join(storage.Path, storage.Workspace)+"/", "/")
 	folders := func(prefix string) []string {
 		var found []string
 		pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(prefix), Delimiter: aws.String("/")})

@@ -44,7 +44,7 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 		}
 		at = &parsed
 	}
-	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), database, r.FormValue("snapshot"), at)
+	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), database, r.FormValue("snapshot"), r.FormValue("bucket"), at)
 	if err != nil {
 		failed(w, r, database+" not restored", err, nil)
 		return
@@ -66,39 +66,88 @@ func (h *AppsHandler) BackupSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Bucket is the bucket page.
+// SetAppBucket moves the app's uploads and new backups to another bucket.
+func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("bucket")
+	if name == "-default" {
+		name = ""
+	}
+	app, err := h.apps.SetAppBucket(actor(r), r.PathValue("app"), name)
+	if err != nil {
+		failed(w, r, "Bucket not changed", err, nil)
+		return
+	}
+	h.renderBackups(w, r)
+	bucket := "the default bucket"
+	if app.BucketName != "" {
+		bucket = app.BucketName
+	}
+	toastDone(w, r, "Uploads and new backups go to "+bucket, "Older backups stay where they are; restores of them read from there.")
+}
+
+// Bucket is the buckets page.
 func (h *AppsHandler) Bucket(w http.ResponseWriter, r *http.Request) {
 	h.renderBucket(w, r)
 }
 
-// bucketFields are the fields of the bucket form, by API field name.
-var bucketFields = map[string]string{"endpoint": "bucket-endpoint", "bucket": "bucket-bucket"}
+// bucketFields are the fields of a bucket form, by API field name, with
+// prefix the start of their IDs.
+func bucketFields(prefix string) map[string]string {
+	return map[string]string{"name": prefix + "name", "endpoint": prefix + "endpoint", "bucket": prefix + "bucket", "secret_key": prefix + "secret_key"}
+}
 
-// SaveBucket checks and stores the bucket.
-func (h *AppsHandler) SaveBucket(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.SetBackupStorage(r.Context(), actor(r), service.BackupStorageInput{
+func bucketInput(r *http.Request) service.BucketInput {
+	return service.BucketInput{
+		Name:      r.FormValue("name"),
 		Endpoint:  r.FormValue("endpoint"),
 		Region:    r.FormValue("region"),
 		Bucket:    r.FormValue("bucket"),
 		Path:      r.FormValue("path"),
 		AccessKey: r.FormValue("access_key"),
 		SecretKey: r.FormValue("secret_key"),
-	})
-	if errors.Is(err, service.ErrBackupAccess) {
-		fieldRefused(w, r, "Bucket not saved", "bucket-secret_key", errorMessage(err))
-		return
 	}
-	if err != nil {
-		failed(w, r, "Bucket not saved", err, bucketFields)
+}
+
+// AddBucket checks and stores a new bucket.
+func (h *AppsHandler) AddBucket(w http.ResponseWriter, r *http.Request) {
+	bucket, err := h.apps.AddBucket(r.Context(), actor(r), bucketInput(r))
+	if h.bucketFailed(w, r, "Bucket not added", "bucket-new-", err) {
 		return
 	}
 	h.renderBucket(w, r)
-	toastDone(w, r, "Bucket saved", "Backups and ops deploy use it now, on every server.")
+	if bucket.Default {
+		toastDone(w, r, "Bucket added", "Backups and ops deploy of every app use it now.")
+		return
+	}
+	toastDone(w, r, "Bucket added", "Pick it for an app on the app's Backups tab.")
 }
 
-// RemoveBucket forgets the bucket; backups stop.
+// EditBucket changes a bucket.
+func (h *AppsHandler) EditBucket(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	_, err := h.apps.EditBucket(r.Context(), actor(r), name, bucketInput(r))
+	if h.bucketFailed(w, r, "Bucket not saved", "bucket-"+name+"-", err) {
+		return
+	}
+	h.renderBucket(w, r)
+	toastDone(w, r, "Bucket saved", "Its apps upload and back up there now.")
+}
+
+// DefaultBucket makes a bucket the workspace's default.
+func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	_, err := h.apps.MakeDefaultBucket(r.Context(), actor(r), name)
+	if err != nil {
+		failed(w, r, "Default not changed", err, nil)
+		return
+	}
+	h.renderBucket(w, r)
+	toastDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their older backups stay in the old default.")
+}
+
+// RemoveBucket forgets a bucket nothing uses.
 func (h *AppsHandler) RemoveBucket(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveBackupStorage(actor(r))
+	err := h.apps.RemoveBucket(actor(r), r.PathValue("name"))
 	if err != nil {
 		failed(w, r, "Bucket not removed", err, nil)
 		return
@@ -107,14 +156,27 @@ func (h *AppsHandler) RemoveBucket(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, "Bucket removed", "What is in it stays there.")
 }
 
+// bucketFailed answers a bucket form that failed and reports whether it
+// did. A check that could not write points at the secret key.
+func (h *AppsHandler) bucketFailed(w http.ResponseWriter, r *http.Request, title, prefix string, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, service.ErrBackupAccess):
+		fieldRefused(w, r, title, prefix+"secret_key", errorMessage(err))
+	default:
+		failed(w, r, title, err, bucketFields(prefix))
+	}
+	return true
+}
+
 func (h *AppsHandler) renderBucket(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	storage, err := h.apps.BackupStorage(workspace.ID)
-	if err != nil && !errors.Is(err, service.ErrNoBackups) {
-		renderError(w, "load bucket failed", err)
+	buckets, err := h.apps.Buckets(ctxkeys.Workspace(r.Context()).ID)
+	if err != nil {
+		renderError(w, "load buckets failed", err)
 		return
 	}
-	render(w, r, pages.Bucket(pages.BucketView{Storage: storage}))
+	render(w, r, pages.Bucket(pages.BucketView{Buckets: buckets}))
 }
 
 // renderBackups renders the backups page. Error says why the server could
@@ -131,12 +193,22 @@ func (h *AppsHandler) renderBackups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := pages.BackupsView{App: *app, Now: time.Now()}
-	view.Storage, err = h.apps.BackupStorage(workspace.ID)
+	view.Storage, err = h.apps.AppBucket(app)
 	if err != nil && !errors.Is(err, service.ErrNoBackups) {
 		renderError(w, "load backup storage failed", err)
 		return
 	}
 	if view.Storage != nil {
+		view.Buckets, err = h.apps.Buckets(workspace.ID)
+		if err != nil {
+			renderError(w, "load buckets failed", err)
+			return
+		}
+		view.Older, err = h.apps.OlderBuckets(app)
+		if err != nil {
+			renderError(w, "load older buckets failed", err)
+			return
+		}
 		_, view.Backups, err = h.apps.Backups(r.Context(), workspace.ID, app.ID)
 		if err != nil {
 			view.Error = errorMessage(err)

@@ -109,11 +109,16 @@ Data
 Backups
   backups            Snapshots, point in time window and restore drills of an app: backups [app]
   backup             Take a snapshot now: backup [app]
-  restore            Restore a snapshot: restore <snapshot>, or a time: restore --at "2026-10-31 14:02" [--yes]
+  restore            Restore a snapshot: restore <snapshot> [--bucket <older bucket>], or a time: restore --at "2026-10-31 14:02" [--yes]
   backups auto       Snapshot before every change: backups auto on|off
-  backups bucket     Show the bucket backups go to
-  backups bucket set  Set it: --endpoint https://… --bucket … --access-key …, secret key on stdin
-  backups bucket rm  Stop backups; the bucket keeps what is in it: backups bucket rm [--yes]
+
+Buckets
+  buckets            Your buckets, the default first, and the apps that use each
+  buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default], secret key on stdin
+  buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
+  buckets default    Make one the default for apps without their own: buckets default <name>
+  buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--yes]
+  buckets use        Move an app's uploads and new backups: buckets use <bucket> [app], or --default
 
 Env
   env                List env vars: env [--show] [app]
@@ -250,6 +255,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return sql(ctx, rest, stdin, stdout)
 	case "backups":
 		return backups(ctx, rest, stdin, stdout)
+	case "buckets":
+		return buckets(ctx, rest, stdin, stdout)
 	case "github":
 		return github(ctx, rest, stdout)
 	case "integrations":

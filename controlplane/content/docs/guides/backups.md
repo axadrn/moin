@@ -14,18 +14,18 @@ Everything runs in the agent on your server. Your data goes from your server to 
 
 ## Set up the bucket
 
-Tells ops which bucket to back up into. One bucket serves all your apps, and it is the same bucket `ops deploy` uses.
+Tells ops which bucket to back up into. One bucket serves all your apps, and it is the same bucket `ops deploy` uses. An app can also [have its own bucket](/docs/guides/bucket#more-than-one-bucket).
 
 ```surfaces
-Web: **Bucket** in the sidebar, then **Save bucket**
-CLI: ops backups bucket set \
+Web: **Buckets** in the sidebar, then **Add bucket**
+CLI: ops buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --region auto \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, **Bucket**, then `enter`
-API: PUT /api/v1/backup-storage
-MCP: set_backup_storage
+TUI: settings tab, `b`
+API: POST /api/v1/buckets
+MCP: add_bucket
 ```
 
 Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Create a bucket and a key that may read, write and delete in it first. The endpoint must start with `https://`. For AWS S3, leave `--endpoint` out and set `--region` to the bucket's region. The CLI asks for the secret key on stdin. [Add it](/docs/guides/bucket#add-it) explains every field.
@@ -51,21 +51,33 @@ In the bucket each database of an app gets a folder with two folders inside:
 
 A snapshot is a plain gzipped SQLite file: `gunzip` it and open it with `sqlite3`, no ops needed.
 
-## See the bucket
+## See the buckets
 
-Shows which bucket ops uses, without its secret key.
+Shows which buckets ops uses, without their secret keys, and which apps use each one. The **Backups** tab of an app shows its bucket.
 
 ```surfaces
-Web: **Bucket** in the sidebar
-CLI: ops backups bucket
+Web: **Buckets** in the sidebar
+CLI: ops buckets
 TUI: settings tab
-API: GET /api/v1/backup-storage
-MCP: get_backup_storage
+API: GET /api/v1/buckets
+MCP: list_buckets
+```
+
+## Move an app to another bucket
+
+Its uploads and new backups go to the other bucket; its older backups stay where they are, and ops still lists them and restores them from there. [Choose the bucket of an app](/docs/guides/bucket#choose-the-bucket-of-an-app) explains it.
+
+```surfaces
+Web: the app page, **Backups** tab, **Use another bucket**
+CLI: ops buckets use client-a [app]
+TUI: on the app, `b`, then `bucket client-a`
+API: PUT /api/v1/apps/{app}/bucket
+MCP: set_app_bucket
 ```
 
 ## See the backups of an app
 
-Lists the snapshots, how far back a point in time restore reaches, and the last restore check.
+Lists the snapshots, how far back a point in time restore reaches, and the last restore check. Snapshots in a bucket the app left show with that bucket's name.
 
 ```surfaces
 Web: the app page, **Backups** tab
@@ -101,6 +113,8 @@ API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
+A snapshot in an older bucket, from before the app moved, restores from that bucket: the web knows it, the CLI takes `--bucket <bucket>`, the TUI `<snapshot-id> <bucket>`, the API and MCP `bucket`.
+
 ## Restore to a point in time
 
 Puts the database back to any second of the last 7 days. Deleted the wrong rows at 14:02? Restore to 14:01.
@@ -113,7 +127,7 @@ API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-Times are in UTC, not your local time. A time without a day, like `14:01`, means today. In the API and MCP, send the time as `at`.
+A point in time comes from the app's bucket: after a move it reaches back to the move. Times are in UTC, not your local time. A time without a day, like `14:01`, means today. In the API and MCP, send the time as `at`.
 
 If the app has more than one database, the CLI restores the one you name with `--db /data/app.db`.
 
@@ -142,17 +156,17 @@ ops then takes a snapshot before a [deploy](/docs/guides/deploy) (`before-v4`), 
 
 ## Stop backups
 
-Removes the bucket from ops, so no server backs up any more. What is in the bucket stays there.
+Removing a bucket from ops stops its backups. What is in the bucket stays there.
 
 ```surfaces
-Web: **Bucket** in the sidebar, **Remove bucket**
-CLI: ops backups bucket rm
-TUI: settings tab, **Bucket**, `x`, then type the bucket name
-API: DELETE /api/v1/backup-storage
-MCP: remove_backup_storage
+Web: **Buckets** in the sidebar, **Remove** on the bucket
+CLI: ops buckets rm <name>
+TUI: settings tab, `x` on the bucket, then type its name
+API: DELETE /api/v1/buckets/{name}
+MCP: remove_bucket
 ```
 
-ops asks you to type the bucket's name first; `--yes` skips it in scripts.
+ops refuses a bucket that apps still use or that keeps older backups of an app, and names the apps: move them to another bucket first. [Remove a bucket](/docs/guides/bucket#remove-a-bucket) has the rules. ops asks you to type the bucket's name first; `--yes` skips it in scripts.
 
 ## Requirements
 

@@ -69,10 +69,13 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/databases/query` | runs SQL; `write: true` for changes |
 | `GET` · `POST /api/v1/apps/{app}/backups` | backups; a snapshot now |
 | `PUT /api/v1/apps/{app}/backups/settings` | snapshot before every change |
-| `POST /api/v1/apps/{app}/restore` | restores a snapshot or a point in time |
+| `POST /api/v1/apps/{app}/restore` | restores a snapshot or a point in time; `bucket` names an older bucket the snapshot is in |
 | `GET /api/v1/apps/{app}/uptime` | uptime per domain: state, 24 hours, 7 and 30 days, the newest check and the last outages |
 | `PUT /api/v1/apps/{app}/uptime/{domain}` | the path of a domain's check `{"path": "/health"}`, or pauses it `{"paused": true}` |
-| `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the bucket backups go to |
+| `GET` · `POST /api/v1/buckets` | the workspace's buckets, the default first, with the apps that use each; adds one |
+| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it, `409 bucket_in_use` while apps use it or it keeps older backups |
+| `PUT /api/v1/apps/{app}/bucket` | the app's bucket `{"bucket": "client-a"}`, or `""` for the default; older backups stay in the old bucket |
+| `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the default bucket, for older clients |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |
 | `POST /api/v1/apps/{app}/restart` | starts the live release again with the current settings |

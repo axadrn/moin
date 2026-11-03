@@ -1,8 +1,11 @@
 package pages
 
 import (
+	"strings"
+
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
@@ -11,41 +14,27 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
-// BucketView is the bucket page: the account's own S3-compatible bucket.
+// BucketView is the buckets page: the workspace's own S3-compatible
+// buckets, the default first.
 type BucketView struct {
-	Storage *service.BackupStorage
+	Buckets []service.Bucket
 }
 
 templ Bucket(view BucketView) {
-	@layouts.App("Bucket") {
+	@layouts.App("Buckets") {
 		@panelPage(templ.Attributes{"data-bucket-page": true}) {
-			@pageHeader("Bucket", "Your own S3-compatible bucket, one for all your servers: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO.")
+			@pageHeader("Buckets", "Your own S3-compatible buckets: Cloudflare R2, AWS S3, Backblaze B2, Hetzner, Exoscale or MinIO. The default one serves every app; give an app another one on its Backups tab.")
 			<div id="bucket" class="flex flex-col gap-6">
-				@bucketForm(view)
+				for _, bucket := range view.Buckets {
+					@bucketPanel(bucket)
+				}
+				@bucketAdd(len(view.Buckets) == 0)
 				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it", Docs: "/docs/guides/bucket#what-goes-in-the-bucket"}) {
 					<dl class="grid gap-4 text-sm md:grid-cols-3">
 						@bucketUse("Your code", "ops deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
 						@bucketUse("Your backups", "Every change of every SQLite database. Restore any second of the last week.")
-						@bucketUse("Nothing of ours", "ops keeps the key encrypted. Your data never passes through ops.")
+						@bucketUse("Nothing of ours", "ops keeps the keys encrypted. Your data never passes through ops.")
 					</dl>
-				}
-				if view.Storage != nil {
-					@dangerPanel("Remove the bucket", "Backups stop and ops deploy needs a bucket again. What is in the bucket stays there.", "/docs/guides/backups#stop-backups") {
-						@button.Button(button.Props{
-							Variant: button.VariantDestructive,
-							Attributes: templ.Attributes{
-								"hx-post":    ctxkeys.AppBasePath(ctx) + "/bucket/remove",
-								"hx-target":  "#bucket",
-								"hx-select":  "#bucket",
-								"hx-swap":    "outerHTML",
-								"hx-disable": "this",
-								"hx-confirm": "Remove the bucket? Backups stop and ops deploy needs a bucket again. What is in it stays.",
-								"data-confirm-name": view.Storage.Bucket,
-							},
-						}) {
-							Remove bucket
-						}
-					}
 				}
 			</div>
 		}
@@ -59,70 +48,137 @@ templ bucketUse(title, text string) {
 	</div>
 }
 
-// bucketForm is the bucket: what is stored, and the form that adds or
-// changes it. Without a bucket the form is open.
-templ bucketForm(view BucketView) {
-	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket" }}
+// bucketPanel is one bucket: where it is, which apps use it, the form that
+// changes it, and making it the default or removing it.
+templ bucketPanel(bucket service.Bucket) {
+	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket/" + bucket.Name }}
 	@panel(panelProps{
-		Title:       bucketTitle(view.Storage != nil),
-		Description: bucketDescription(view.Storage != nil),
-		Docs:        "/docs/guides/bucket#add-it",
-		Attrs:       templ.Attributes{"data-backup-storage": true},
+		Title:       bucket.Name,
+		Description: bucketUsedBy(bucket),
+		Docs:        "/docs/guides/bucket#more-than-one-bucket",
+		Action:      bucketBadge(bucket.Default),
+		Attrs:       templ.Attributes{"data-backup-storage": bucket.Name},
 	}) {
 		<div class="flex flex-col gap-6">
-			if view.Storage != nil {
-				<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
-					<dt class="text-muted-foreground">Bucket</dt>
-					<dd class="truncate font-mono" data-bucket>{ view.Storage.Bucket }</dd>
-					<dt class="text-muted-foreground">Folder</dt>
-					<dd class="truncate font-mono" data-bucket-folder>{ view.Storage.Folder }</dd>
-					<dt class="text-muted-foreground">Endpoint</dt>
-					<dd class="truncate font-mono">{ orAWS(view.Storage.Endpoint) }</dd>
-					<dt class="text-muted-foreground">Access key</dt>
-					<dd class="truncate font-mono">{ view.Storage.AccessKey }</dd>
-				</dl>
-			}
-			@collapsible.Collapsible(collapsible.Props{DefaultOpen: view.Storage == nil, Class: "flex flex-col gap-6"}) {
-				if view.Storage != nil {
-					<div>
-						@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
-							Change the bucket
-						}
-					</div>
+			<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
+				<dt class="text-muted-foreground">Bucket</dt>
+				<dd class="truncate font-mono" data-bucket>{ bucket.Bucket }</dd>
+				<dt class="text-muted-foreground">Folder</dt>
+				<dd class="truncate font-mono" data-bucket-folder>{ bucket.Folder }</dd>
+				<dt class="text-muted-foreground">Endpoint</dt>
+				<dd class="truncate font-mono">{ orAWS(bucket.Endpoint) }</dd>
+				<dt class="text-muted-foreground">Access key</dt>
+				<dd class="truncate font-mono">{ bucket.AccessKey }</dd>
+				if len(bucket.Older) > 0 {
+					<dt class="text-muted-foreground">Older backups</dt>
+					<dd class="text-pretty" data-bucket-older>{ strings.Join(bucket.Older, ", ") }: they moved to another bucket, restores of their older snapshots read from here.</dd>
 				}
-				@collapsible.Content() {
-					<form class="flex flex-col gap-6" hx-post={ bucketPath } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-storage-form>
-						@csrf.Token()
-						<div class="grid gap-3 sm:grid-cols-2">
-							@bucketField("endpoint", "Endpoint", "https://<account>.r2.cloudflarestorage.com", "Starts with https://. Empty for AWS S3.", "text", true)
-							@bucketField("bucket", "Bucket", "your bucket's name", "", "text", false)
-							@bucketField("path", "Folder", "optional", "Only if the bucket holds other files too.", "text", false)
-							@bucketField("access_key", "Access key", "", "", "text", false)
-							@bucketField("secret_key", "Secret key", "", "Stored encrypted.", "password", false)
-							@bucketField("region", "Region", "auto", "auto for R2.", "text", false)
-						</div>
-						<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-							<p class="text-xs text-muted-foreground">ops writes and deletes a test file first.</p>
-							@button.Button(button.Props{Type: button.TypeSubmit}) {
-								Save bucket
+			</dl>
+			@collapsible.Collapsible(collapsible.Props{Class: "flex flex-col gap-6"}) {
+				<div class="flex flex-wrap items-center gap-2">
+					@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
+						Change
+					}
+					if !bucket.Default {
+						<form hx-post={ bucketPath + "/default" } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-confirm={ "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default." }>
+							@csrf.Token()
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: templ.Attributes{"data-make-default": bucket.Name}}) {
+								Make default
 							}
-						</div>
-					</form>
+						</form>
+					}
+					@button.Button(button.Props{
+						Variant: button.VariantDestructive,
+						Size:    button.SizeSm,
+						Attributes: templ.Attributes{
+							"hx-post":           bucketPath + "/remove",
+							"hx-target":         "#bucket",
+							"hx-select":         "#bucket",
+							"hx-swap":           "outerHTML",
+							"hx-disable":        "this",
+							"hx-confirm":        "Remove the bucket " + bucket.Name + " from ops? What is in it stays there.",
+							"data-confirm-name": bucket.Name,
+							"data-remove-bucket": bucket.Name,
+						},
+					}) {
+						Remove
+					}
+				</div>
+				@collapsible.Content() {
+					@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
 				}
 			}
 		</div>
 	}
 }
 
-// bucketField is one field of the bucket form, with a hint below.
-templ bucketField(name, label, placeholder, hint, kind string, wide bool) {
+// bucketAdd adds a bucket. Without any bucket its form is open.
+templ bucketAdd(first bool) {
+	@panel(panelProps{
+		Title:       addBucketTitle(first),
+		Description: addBucketDescription(first),
+		Docs:        "/docs/guides/bucket#add-it",
+		Attrs:       templ.Attributes{"data-add-bucket": true},
+	}) {
+		@collapsible.Collapsible(collapsible.Props{DefaultOpen: first, Class: "flex flex-col gap-6"}) {
+			if !first {
+				<div>
+					@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
+						Add a bucket
+					}
+				</div>
+			}
+			@collapsible.Content() {
+				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: firstBucketName(first)}, true)
+			}
+		}
+	}
+}
+
+// bucketForm adds a bucket or changes one. The IDs of its fields start
+// with prefix, so every form on the page has its own.
+templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
+	<form class="flex flex-col gap-6" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-storage-form>
+		@csrf.Token()
+		<div class="grid gap-3 sm:grid-cols-2">
+			@bucketField(prefix, "name", "Name", bucket.Name, "like client-a", "Your name for it in ops.", "text", false)
+			@bucketField(prefix, "region", "Region", bucket.Region, "auto", "auto for R2.", "text", false)
+			@bucketField(prefix, "endpoint", "Endpoint", bucket.Endpoint, "https://<account>.r2.cloudflarestorage.com", "Starts with https://. Empty for AWS S3.", "text", true)
+			@bucketField(prefix, "bucket", "Bucket", bucket.Bucket, "your bucket's name", "", "text", false)
+			@bucketField(prefix, "path", "Folder", bucket.Path, "optional", "Only if the bucket holds other files too.", "text", false)
+			@bucketField(prefix, "access_key", "Access key", bucket.AccessKey, "", "", "text", false)
+			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Stored encrypted.", "password", false)
+		</div>
+		<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+			<p class="text-xs text-muted-foreground">ops writes and deletes a test file first.</p>
+			@button.Button(button.Props{Type: button.TypeSubmit}) {
+				if adding {
+					Add bucket
+				} else {
+					Save bucket
+				}
+			}
+		</div>
+	</form>
+}
+
+// bucketField is one field of a bucket form, with a hint below.
+templ bucketField(prefix, name, label, value, placeholder, hint, kind string, wide bool) {
 	@field.Field(field.Props{Class: "gap-1" + bucketWide(wide)}) {
-		@field.Label(field.LabelProps{For: "bucket-" + name}) {
+		@field.Label(field.LabelProps{For: prefix + name}) {
 			{ label }
 		}
-		@input.Input(input.Props{ID: "bucket-" + name, Name: name, Type: kind, Placeholder: placeholder, Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": "bucket-" + name + "-hint"}})
-		@fieldHint("bucket-"+name, "") {
+		@input.Input(input.Props{ID: prefix + name, Name: name, Type: kind, Value: value, Placeholder: placeholder, Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": prefix + name + "-hint"}})
+		@fieldHint(prefix+name, "") {
 			{ hint }
+		}
+	}
+}
+
+templ bucketBadge(isDefault bool) {
+	if isDefault {
+		@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Attributes: templ.Attributes{"data-default-bucket": true}}) {
+			Default
 		}
 	}
 }
@@ -134,16 +190,43 @@ func bucketWide(wide bool) string {
 	return ""
 }
 
-func bucketTitle(stored bool) string {
-	if stored {
-		return "Your bucket"
+// bucketUsedBy says which apps upload and back up to a bucket.
+func bucketUsedBy(bucket service.Bucket) string {
+	switch {
+	case len(bucket.Apps) > 0 && bucket.Default:
+		return "The default: " + strings.Join(bucket.Apps, ", ") + " and every new app use it."
+	case len(bucket.Apps) > 0:
+		return "Used by " + strings.Join(bucket.Apps, ", ") + "."
+	case bucket.Default:
+		return "The default: every new app uses it."
 	}
-	return "Add your bucket"
+	return "No app uses it yet. Pick it on the Backups tab of an app."
 }
 
-func bucketDescription(stored bool) string {
-	if stored {
-		return "ops deploy and the backups of every server use it."
+func addBucketTitle(first bool) string {
+	if first {
+		return "Add your bucket"
 	}
-	return "Deploys from your terminal and backups need it. The keys need read and write access to this one bucket."
+	return "Another bucket"
+}
+
+func addBucketDescription(first bool) string {
+	if first {
+		return "Deploys from your terminal and backups need it. The keys need read and write access to this one bucket."
+	}
+	return "For a client's own bucket, a region near a server, separate costs, or production backups apart from tests."
+}
+
+func firstBucketName(first bool) string {
+	if first {
+		return "default"
+	}
+	return ""
+}
+
+func secretPlaceholder(adding bool) string {
+	if adding {
+		return ""
+	}
+	return "empty keeps the stored one"
 }

@@ -32,12 +32,16 @@ type App struct {
 	InstallationID int64  `db:"installation_id"`
 	// Stopped is set when its owner stopped the app. A deploy, a restart
 	// or a start clears it.
-	Stopped       bool   `db:"stopped"`
-	ServerName    string `db:"server_name"`
-	WorkspaceSlug string `db:"workspace_slug"`
-	LatestNumber  int    `db:"latest_number"`
-	LatestStatus  string `db:"latest_status"`
-	LiveNumber    int    `db:"live_number"`
+	Stopped bool `db:"stopped"`
+	// BucketID is the bucket the app's uploads and backups go to; nil
+	// uses the workspace's default bucket. BucketName is its name.
+	BucketID      *string `db:"bucket_id"`
+	BucketName    string  `db:"bucket_name"`
+	ServerName    string  `db:"server_name"`
+	WorkspaceSlug string  `db:"workspace_slug"`
+	LatestNumber  int     `db:"latest_number"`
+	LatestStatus  string  `db:"latest_status"`
+	LiveNumber    int     `db:"live_number"`
 }
 
 // Deploy statuses.
@@ -84,10 +88,14 @@ func (a App) DomainList() []string {
 	return domains
 }
 
-// BackupStorage is the bucket an account's backups go to. SecretKey is
-// sealed.
-type BackupStorage struct {
+// Bucket is one of a workspace's S3-compatible buckets, where the uploads
+// and backups of its apps go. SecretKey is sealed. One bucket of a
+// workspace is its default: apps without a bucket of their own use it.
+type Bucket struct {
+	ID          string    `db:"id"`
 	WorkspaceID string    `db:"workspace_id"`
+	Name        string    `db:"name"`
+	IsDefault   bool      `db:"is_default"`
 	Endpoint    string    `db:"endpoint"`
 	Region      string    `db:"region"`
 	Bucket      string    `db:"bucket"`

@@ -55,7 +55,7 @@ func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
 	if want := "/owner/" + owner.WorkspaceID + "/blog/" + app.ID + "/uploads/" + upload.ID + ".tar.gz"; link.Path != want {
 		t.Errorf("upload path = %s, want %s", link.Path, want)
 	}
-	if storage := apps.backupConfig(owner.WorkspaceID).Storage; storage == nil || storage.Workspace != owner.WorkspaceID {
+	if storage := apps.backupConfig(owner.WorkspaceID, server.ID).Storage; storage == nil || storage.Workspace != owner.WorkspaceID {
 		t.Errorf("the agent's bucket = %+v, want the workspace folder", storage)
 	}
 	shown, err := apps.BackupStorage(owner.WorkspaceID)

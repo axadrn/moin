@@ -60,9 +60,15 @@ order: 1
 | `ops sql --write "<sql>" [--yes]` | runs SQL that changes data, in one transaction; DROP and DELETE ask first |
 | `ops backups [app]` | snapshots, point in time window and restore drills |
 | `ops backup [app]` | takes a snapshot now |
-| `ops restore <snapshot> [--yes]` · `ops restore --at "<time>" [--yes]` | restores a snapshot, or a point in time in UTC: `"2026-10-31 14:01"`, or `14:01` for today; `--db <path>` picks one of several databases |
+| `ops restore <snapshot> [--yes]` · `ops restore --at "<time>" [--yes]` | restores a snapshot, or a point in time in UTC: `"2026-10-31 14:01"`, or `14:01` for today; `--db <path>` picks one of several databases, `--bucket <bucket>` restores a snapshot from an older bucket the app left |
 | `ops backups auto on\|off [app]` | snapshot before every change |
-| `ops backups bucket` · `bucket set` · `bucket rm [--yes]` | the bucket backups go to, the same for every app; the secret key comes on stdin |
+| `ops buckets` | your buckets, the default first, with the apps that use each and the apps that keep older backups there |
+| `ops buckets add <name> --endpoint … --bucket … --access-key … [--region auto] [--path <folder>] [--default]` | adds a bucket; the secret key comes on stdin; the first one is the default |
+| `ops buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
+| `ops buckets default <name>` | makes a bucket the default for apps without one of their own |
+| `ops buckets rm <name> [--yes]` | removes a bucket from ops, refused while apps use it or it keeps older backups; what is in it stays |
+| `ops buckets use <bucket> [app]` · `ops buckets use --default [app]` | moves an app's uploads and new backups to a bucket, or back to the default; older backups stay where they are |
+| `ops backups bucket` · `bucket set` · `bucket rm [--yes]` | the default bucket, as before there were several |
 | `ops deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `ops github` · `ops github repos` | where the GitHub App is installed, with the install link; the repos it reads and where to give it more |
 | `ops github branches <owner/name>` | the branches of a repo, the default first |
@@ -90,7 +96,7 @@ ops asks before it removes or replaces something. How it asks depends on how big
 
 | | Commands | Asks |
 | --- | --- | --- |
-| Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type <app-name> to confirm:` |
+| Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `backups bucket rm`, `restore` | type the name: `Type <app-name> to confirm:` |
 | Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup`, adding and setting things | nothing |
 
