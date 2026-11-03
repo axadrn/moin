@@ -20,7 +20,8 @@ order: 1
 | `ops servers install-command <name>` | prints a new one-time install command; the old one stops working |
 | `ops servers rename <name> <new name>` | renames a server; its apps stay on it |
 | `ops servers rm <name> [--yes]` | asks you to type its name, removes the server and prints the command that removes its agent there |
-| `ops servers update [name]` | updates the agent to the control plane's version; without a name every online server whose agent differs |
+| `ops servers update [name]` | updates the agent to the control plane's version now; without a name every online server whose agent differs |
+| `ops servers auto-update [on\|off]` | shows or sets whether agents update to the control plane's version by themselves; on by default |
 | `ops servers rules <name>` | the server's own rules for ops, from `/etc/ops/rules` on it |
 | `ops apps` | lists apps |
 | `ops apps <app>` | one app: its state, server, domains, password, repo and deploys; `ops app <app>` works too |
@@ -73,7 +74,8 @@ order: 1
 | `ops agent register --url <url> --token <install token>` | connects a server, done by the install script |
 | `ops agent` | runs the agent |
 | `ops agent uninstall [--apps] [--yes]` | removes the agent from this server; the apps keep running unless `--apps` |
-| `ops version` | prints the version |
+| `ops version` | prints the version of `ops` and of the control plane, and says when a newer release is out |
+| `ops update [--yes]` | updates a self-hosted control plane to the newest release, for its admins, and waits until it is back |
 
 Commands that work on an app take it as an argument or as `--app`, then from `x-ops.app` in `compose.yml`, then from the directory name. Flags may come before or after the arguments: `ops rollback v3 --app <app-name>` is `ops rollback --app <app-name> v3`. When there is no such app, the error names it and where the name came from. Every command shows its usage and flags with `--help`.
 
@@ -84,14 +86,14 @@ ops asks before it removes or replaces something. How it asks depends on how big
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type <app-name> to confirm:` |
-| Small or reversible | `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup`, adding and setting things | nothing |
 
 `--yes` skips the question, the typed name too. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident. The web, the TUI and agents ask the same way; the API never asks.
 
 ## Agent updates
 
-`ops servers` shows each agent's version and marks one that differs from the control plane's. `ops servers update` has the agent download the `ops` binary the control plane serves, from the control plane URL it already uses, check its SHA-256, swap it in and restart through systemd. It waits until the new agent is back. The agent refuses while a deploy runs, and on a server with rules in `/etc/ops/rules`, since a new binary could allow what they stop. There, and for agents older than the update, update it on the server as root:
+Agents update themselves to the control plane's version, unless `ops servers auto-update off`. `ops servers` shows each agent's version and marks one that differs from the control plane's. `ops servers update` has the agent download the `ops` binary the control plane serves, from the control plane URL it already uses, check its SHA-256, swap it in and restart through systemd. It waits until the new agent is back. The agent refuses while a deploy runs, and on a server with rules in `/etc/ops/rules`, since a new binary could allow what they stop. There, and for agents older than the update, update it on the server as root:
 
 ```bash
 curl -fsSL https://ops.example.com/download/ops-linux-amd64 -o /usr/local/bin/ops.new && chmod 755 /usr/local/bin/ops.new && mv /usr/local/bin/ops.new /usr/local/bin/ops && systemctl restart ops-agent

@@ -28,6 +28,7 @@ type Handlers struct {
 	Invitations *WorkspaceInvitationHandler
 	Servers     *ServersHandler
 	Apps        *AppsHandler
+	Version     *VersionHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -67,6 +68,8 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/openapi.yaml", OpenAPI, TokenRead},
 		{"GET /api/v1/csrf", CSRFToken, TokenRead},
 		{"GET /api/v1/meta", h.Meta.Meta, TokenRead},
+		{"GET /api/v1/version", m.RequireOnboarded(h.Version.Show), TokenRead},
+		{"POST /api/v1/version/update", m.InWorkspace(h.Version.Update), TokenWrite},
 		{"POST /api/v1/auth/password", m.RateLimitAuth(h.Auth.PasswordAuth), TokenDenied},
 		{"POST /api/v1/auth/magic-link", m.RateLimitAuthEmail(h.Auth.SendMagicLink), TokenDenied},
 		{"POST /api/v1/auth/magic-link/verify", h.Auth.VerifyMagicLink, TokenDenied},
@@ -117,6 +120,8 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PUT /api/v1/servers/{id}/security", m.InWorkspace(h.Apps.SetSecurity), TokenWrite},
 		{"GET /api/v1/integrations", m.InWorkspace(h.Apps.GetIntegrations), TokenRead},
 		{"PUT /api/v1/integrations", m.InWorkspace(h.Apps.SetIntegrations), TokenWrite},
+		{"GET /api/v1/agent-updates", m.InWorkspace(h.Version.AgentUpdates), TokenRead},
+		{"PUT /api/v1/agent-updates", m.InWorkspace(h.Version.SetAgentUpdates), TokenWrite},
 		{"GET /api/v1/servers/events", m.InWorkspace(streams.wrap(h.Servers.Events)), TokenRead},
 		{"GET /api/v1/apps", m.InWorkspace(h.Apps.List), TokenRead},
 		{"POST /api/v1/apps", m.InWorkspace(h.Apps.Create), TokenWrite},

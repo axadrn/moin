@@ -30,8 +30,11 @@ type environment struct {
 	mailer   *testutil.MemoryMailer
 	tokens   *service.APITokenService
 	services mcp.Services
-	server   *mcpsdk.Server
-	handler  http.Handler
+	// updates is where the updater of the self-hosted test control plane
+	// keeps its files; ada@example.com is its admin.
+	updates string
+	server  *mcpsdk.Server
+	handler http.Handler
 }
 
 func newEnvironment(t *testing.T) *environment {
@@ -63,6 +66,12 @@ func newEnvironment(t *testing.T) *environment {
 		t.Fatal(err)
 	}
 	env.services.Apps = service.NewAppService(repository.NewAppRepository(database), env.services.Servers, box)
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/ops/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** Updates in one click."}`))
+	}))
+	t.Cleanup(releases.Close)
+	env.updates = t.TempDir()
+	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, env.updates, true, true, []string{"ada@example.com"}, repository.NewWorkspaceAuditRepository(database))
 	env.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
 	tokenAuth := middleware.APITokenAuth(env.tokens, env.services.Users)
 	env.server = mcp.NewServer(env.services)

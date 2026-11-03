@@ -33,6 +33,8 @@ type ServerRepository interface {
 	SetSecurityReport(id, report string) error
 	Integrations(workspaceID string) (model.Integrations, error)
 	SetIntegrations(integrations model.Integrations) error
+	AutoUpdateAgents(workspaceID string) (bool, error)
+	SetAutoUpdateAgents(workspaceID string, on bool) error
 }
 
 type serverRepository struct {
@@ -220,5 +222,21 @@ func (r *serverRepository) SetIntegrations(integrations model.Integrations) erro
 		ON CONFLICT (workspace_id) DO UPDATE SET cloudflare_token = excluded.cloudflare_token, cloudflare_account = excluded.cloudflare_account,
 			tailscale_key = excluded.tailscale_key, updated_at = excluded.updated_at
 	`, integrations.WorkspaceID, integrations.CloudflareToken, integrations.CloudflareAccount, integrations.TailscaleKey, integrations.UpdatedAt)
+	return err
+}
+
+// AutoUpdateAgents reports whether the control plane updates the agents of
+// the workspace by itself.
+func (r *serverRepository) AutoUpdateAgents(workspaceID string) (bool, error) {
+	var on bool
+	err := r.db.Get(&on, `SELECT auto_update_agents FROM workspaces WHERE id = $1`, workspaceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrWorkspaceNotFound
+	}
+	return on, err
+}
+
+func (r *serverRepository) SetAutoUpdateAgents(workspaceID string, on bool) error {
+	_, err := r.db.Exec(`UPDATE workspaces SET auto_update_agents = $1 WHERE id = $2`, on, workspaceID)
 	return err
 }

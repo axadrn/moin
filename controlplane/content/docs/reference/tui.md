@@ -4,7 +4,7 @@ description: "Every key of ops without a command"
 order: 2
 ---
 
-Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins.
+Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Stop <app-name>?" waits
@@ -88,6 +88,8 @@ The TUI moves like vim, and `?` shows every key.
 | `x`, then `y` | team | revokes the selected invitation |
 | `cw` or `:rename` | team | renames the workspace |
 | `enter` | settings | sets the selected one: the bucket, a key or a registry login; on GitHub it shows the install link |
+| `u` or `:update` | settings | updates a self-hosted control plane to the newest release, after `y`; for its admins |
+| `A` or `:auto-update` | settings | turns automatic agent updates on or off; `enter` on **Agent updates** does the same |
 | `a` | settings | adds a registry login |
 | `x`, then `y` | settings | removes a key or a registry login; the bucket asks for its name |
 | `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |

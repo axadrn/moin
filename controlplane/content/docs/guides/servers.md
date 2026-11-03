@@ -62,9 +62,23 @@ API: PATCH /api/v1/servers/{id}
 MCP: rename_server
 ```
 
-## Update the agent
+## Updates
 
-Puts the agent version of your control plane on a server. Use it when ops says a newer agent is there.
+**The control plane.** On our hosted control plane we update it, you do nothing. On your own, ops tells you when a release is out and updates with one click, see [Self-hosting](/docs/self-hosting#updates).
+
+**The agents** update themselves to the version of the control plane. When an agent is older, ops updates it: one server at a time, never during a deploy. Your apps keep running while the agent restarts. If an agent does not come back, ops stops there and says so in the activity.
+
+Switch it off for your workspace with **Update agents automatically**:
+
+```surfaces
+Web: **Servers**, **Agent updates**
+CLI: ops servers auto-update on|off
+TUI: settings tab, **Agent updates**, `enter`, or `:auto-update`
+API: PUT /api/v1/agent-updates
+MCP: set_agent_updates
+```
+
+Update an agent by hand:
 
 ```surfaces
 Web: **Servers**, **Update agent** on the server
@@ -74,7 +88,7 @@ API: POST /api/v1/servers/{id}/update
 MCP: update_agent
 ```
 
-`ops servers update` without a name updates every online server with an older agent.
+`ops servers update` without a name updates every online server with an older agent. A server with rules in `/etc/ops/rules` never updates from ops; update it on the server, see the [CLI reference](/docs/reference/cli#agent-updates).
 
 ## Remove a server
 

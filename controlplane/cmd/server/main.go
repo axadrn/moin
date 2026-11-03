@@ -69,6 +69,7 @@ func run(cfg *config.Config) error {
 	telemetry, stopTelemetry := context.WithCancel(context.Background())
 	defer stopTelemetry()
 	go application.TelemetryService.Run(telemetry)
+	go application.UpdateService.Run(telemetry)
 	defer func() {
 		if closeErr := application.Close(); closeErr != nil {
 			slog.Error("failed to close app", "error", closeErr)

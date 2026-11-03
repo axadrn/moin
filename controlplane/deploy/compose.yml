@@ -16,6 +16,21 @@ services:
     ports:
       - "127.0.0.1:8090:8090"
 
+  # "Update now" in ops: the updater runs update.sh with the version the
+  # control plane asks for in its data directory, and starts the old one
+  # again if the new one does not answer. Only it has access to Docker, not
+  # the control plane. update.sh turns it on when updater.sh is next to it.
+  updater:
+    image: docker:28-cli
+    restart: unless-stopped
+    entrypoint: ["sh", "/deploy/updater.sh"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/deploy:ro
+      - /etc/ops-controlplane:/etc/ops-controlplane
+      - /var/lib/ops-controlplane:/var/lib/ops-controlplane
+    profiles: [updater]
+
   # With TUNNEL_TOKEN in the settings, a Cloudflare Tunnel carries all
   # traffic and no web port is open. update.sh turns it on.
   cloudflared:

@@ -44,6 +44,9 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `new_install_command` | a new one-time install command for a server | write, destructive |
 | `rename_server` | renames a server | write |
 | `update_agent` | puts the control plane's agent version on a server | write |
+| `set_agent_updates` | turns automatic agent updates on or off | write |
+| `get_version` | the control plane's version, the newest release and whether agents update by themselves | read |
+| `update_control_plane` | updates a self-hosted control plane to the newest release, for its admins | write |
 | `list_apps` | apps with live and newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |

@@ -71,6 +71,11 @@ templ AppShell(p AppProps) {
 			}
 			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background"}) {
 				@blocks.AppHeader(blocks.AppHeaderProps{Title: p.Title, Crumbs: appCrumbs(p)})
+				// A new release of a self-hosted control plane, for its admins.
+				// It loads once per page and stays through boosted swaps.
+				if ctxkeys.Workspace(ctx) != nil && !ctxkeys.RenderConfig(ctx).Billing {
+					<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
+				}
 				<div id="main" class="flex-1">
 					{ children... }
 				</div>

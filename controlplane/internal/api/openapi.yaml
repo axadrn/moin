@@ -125,6 +125,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Meta'
 
+  /api/v1/version:
+    get:
+      tags: [Meta]
+      operationId: getVersion
+      summary: Get the version and the newest release
+      description: The control plane's version for everyone. A self-hosted control plane (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted control plane updates with every release and leaves these fields empty.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+
+  /api/v1/version/update:
+    post:
+      tags: [Meta]
+      operationId: updateControlPlane
+      summary: Update the control plane to the newest release
+      description: For an admin of a self-hosted control plane. The updater next to it pulls the new image and restarts the control plane, which snapshots its database and migrates it. If the new version does not answer within two minutes, the updater starts the old one again. Follow `update.state` with `GET /api/v1/version`: `requested`, `updating`, then `done`, `rolled_back` or `failed` with a `reason`. The activity of the workspace notes the start and the end.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '202':
+          description: The update is requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`forbidden` for anyone but an admin in `ADMIN_EMAILS`.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`hosted` on the hosted control plane, `up_to_date`, `no_updater` when the updater does not run, or `update_running`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/auth/password:
     post:
       tags: [Auth]
@@ -2559,6 +2609,61 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/agent-updates:
+    get:
+      tags: [Servers]
+      operationId: getAgentUpdates
+      summary: Get automatic agent updates
+      description: Whether the agents of the workspace update to the control plane's version by themselves. On by default.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUpdates'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags: [Servers]
+      operationId: setAgentUpdates
+      summary: Turn automatic agent updates on or off
+      description: With `auto` on, an agent older than the control plane updates when it connects, one server at a time, never during a deploy and never on a server with rules. An agent that does not come back stops it for the workspace, and the activity says so; an update by hand starts it again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdates'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUpdates'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.auto`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/apps/{app}/env:
     parameters:
       - $ref: '#/components/parameters/AppName'
@@ -3650,6 +3755,65 @@ components:
         version:
           type: string
           description: The control plane's version, like `v3.2.3`, or `dev`. Agents update to it.
+    Version:
+      type: object
+      required: [version, self_hosted, latest, update_available, published_at, notes_url, summary, notes, checked_at, can_update, updater, update]
+      properties:
+        version:
+          type: string
+          description: The control plane's version, like `v0.3.0`, or `dev`.
+        self_hosted:
+          type: boolean
+          description: False on the hosted control plane, which updates with every release.
+        latest:
+          type: string
+          description: The newest release on GitHub; empty until the first check.
+        update_available:
+          type: boolean
+        published_at:
+          type: [string, 'null']
+          format: date-time
+        notes_url:
+          type: string
+          description: The release notes on GitHub.
+        summary:
+          type: string
+          description: The "In short" line of the release notes.
+        notes:
+          type: string
+          description: The release notes in Markdown.
+        checked_at:
+          type: [string, 'null']
+          format: date-time
+        can_update:
+          type: boolean
+          description: The caller can start an update now.
+        updater:
+          type: boolean
+          description: The updater runs next to the control plane.
+        update:
+          type: [object, 'null']
+          required: [state, version, from, at]
+          properties:
+            state:
+              type: string
+              enum: [requested, updating, done, rolled_back, failed]
+            version:
+              type: string
+            from:
+              type: string
+            reason:
+              type: string
+            at:
+              type: string
+              format: date-time
+    AgentUpdates:
+      type: object
+      required: [auto]
+      properties:
+        auto:
+          type: boolean
+          description: Agents older than the control plane update by themselves.
     EmailRequest:
       type: object
       additionalProperties: false

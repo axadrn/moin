@@ -1,0 +1,115 @@
+package pages
+
+import (
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/alert"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/internal/build"
+)
+
+// UpdateNotice tells the admins of a self-hosted control plane that a new
+// release is out, with its "In short" line, and updates it with one click.
+// While an update runs it asks again every five seconds. Everyone else, and
+// everyone on the hosted control plane, gets an empty element.
+templ UpdateNotice(info model.VersionInfo) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ update := info.Update }}
+	{{ running := update != nil && update.Running() }}
+	<div
+		id="update-notice"
+		class="px-4 pt-4 empty:hidden md:px-6"
+		if running {
+			hx-get={ basePath + "/update" }
+			hx-trigger="every 5s"
+			hx-swap="outerHTML"
+		}
+		data-update-notice
+	>
+		if info.Admin {
+			switch {
+				case running:
+					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-update-state": update.State}}) {
+						@alert.Title() {
+							{ "Updating " + build.Name + " to " + update.Version }
+						}
+						@alert.Description() {
+							The control plane restarts and is away for a minute. Your apps keep running. This note says when it is back.
+						}
+					}
+				case update != nil && (update.State == "rolled_back" || update.State == "failed"):
+					@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-update-state": update.State}}) {
+						@alert.Title() {
+							{ "The update to " + update.Version + " did not work" }
+						}
+						@alert.Description() {
+							{ update.Reason }
+							if update.State == "rolled_back" {
+								{ " " + build.Name + " runs " + info.Version + " again." }
+							}
+							<a class="underline underline-offset-4" href={ templ.SafeURL("/docs/self-hosting#updates") }>What to do</a>
+						}
+					}
+				case update != nil && update.State == "done" && update.Version == info.Version && time.Since(update.At) < 10*time.Minute:
+					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-update-state": "done"}}) {
+						@alert.Title() {
+							{ build.Name + " " + info.Version + " runs now" }
+						}
+						@alert.Description() {
+							<a class="underline underline-offset-4" href={ templ.SafeURL(info.NotesURL) } target="_blank" rel="noopener">What is new</a>
+						}
+					}
+				case info.UpdateAvailable:
+					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-update-available": info.Latest}}) {
+						@alert.Title() {
+							{ build.Name + " " + info.Latest + " is out" }
+						}
+						@alert.Description() {
+							if info.Summary != "" {
+								<p>{ info.Summary }</p>
+							}
+							<p class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+								if info.CanUpdate {
+									<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button">
+										@csrf.Token()
+										@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+											Update now
+										}
+									</form>
+								} else {
+									<span>On the server: <code class="font-mono">sh update.sh</code></span>
+								}
+								if info.NotesURL != "" {
+									<a class="underline underline-offset-4" href={ templ.SafeURL(info.NotesURL) } target="_blank" rel="noopener">Release notes</a>
+								}
+							</p>
+						}
+					}
+			}
+		}
+	</div>
+}
+
+// AgentUpdatesForm is the switch for automatic agent updates. A change
+// saves itself; a failed save answers the form as stored, so it flips back.
+templ AgentUpdatesForm(on bool) {
+	<form id="agent-updates-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/servers/agent-updates" } hx-trigger="change" hx-swap="none">
+		@csrf.Token()
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+			@field.Content() {
+				@field.Label(field.LabelProps{For: "agent-updates"}) {
+					Update agents automatically
+				}
+				@field.Description() {
+					{ "Agents update to the control plane's version, " + build.Version + ", by themselves. One server at a time, never during a deploy. Your apps keep running." }
+				}
+			}
+			@switchcomp.Switch(switchcomp.Props{ID: "agent-updates", Name: "on", Value: "1", DefaultChecked: on})
+		}
+	</form>
+}

@@ -87,6 +87,10 @@ type Config struct {
 	// to TelemetryURL every five minutes. The hosted one never sends.
 	Telemetry    bool
 	TelemetryURL string
+	// UpdateCheck has a self-hosted control plane ask GitHub once a day for
+	// the newest release, so admins see when an update is out. The hosted
+	// one never asks: the Deploy workflow updates it.
+	UpdateCheck bool
 	// Payment, Stripe
 	StripeSecretKey         string
 	StripeWebhookSecret     string
@@ -164,6 +168,7 @@ func Load() (*Config, error) {
 		Billing:                 r.boolean("BILLING", true),
 		Telemetry:               r.boolean("TELEMETRY", true),
 		TelemetryURL:            r.string("TELEMETRY_URL", client.DefaultURL+"/webhooks/telemetry"),
+		UpdateCheck:             r.boolean("UPDATE_CHECK", true),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:     r.string("STRIPE_WEBHOOK_SECRET", ""),
 		StripePriceIDProMonthly: r.string("STRIPE_PRICE_ID_PRO_MONTHLY", ""),

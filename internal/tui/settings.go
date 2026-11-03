@@ -12,8 +12,9 @@ import (
 )
 
 // The settings tab holds what belongs to the workspace rather than to one
-// app: the GitHub App, the bucket, the Cloudflare token, the Tailscale key
-// and the registry logins.
+// app: the version of the control plane and its update, automatic agent
+// updates, the GitHub App, the bucket, the Cloudflare token, the Tailscale
+// key and the registry logins.
 
 // settings is what the settings tab shows. A part that failed to load
 // keeps its error and the rest still shows.
@@ -27,6 +28,10 @@ type settings struct {
 	integrationsErr error
 	registries      []client.Registry
 	registriesErr   error
+	version         client.Version
+	versionErr      error
+	autoUpdate      bool
+	autoUpdateErr   error
 }
 
 // settingRow is one line of the settings tab.
@@ -53,6 +58,8 @@ func (m model) loadSettings() tea.Cmd {
 		}
 		loaded.integrations, loaded.integrationsErr = m.api.Integrations(m.ctx)
 		loaded.registries, loaded.registriesErr = m.api.Registries(m.ctx)
+		loaded.version, loaded.versionErr = m.api.Version(m.ctx)
+		loaded.autoUpdate, loaded.autoUpdateErr = m.api.AgentUpdates(m.ctx)
 		return settingsMsg(loaded)
 	}
 }
@@ -101,7 +108,30 @@ func (m model) settingRows() []settingRow {
 		}
 	}
 
+	controlPlane := s.version.Version
+	switch {
+	case s.versionErr != nil:
+		controlPlane = failed(s.versionErr)
+	case s.version.Update.Running():
+		controlPlane += style.Warning.Render(" · updating to " + s.version.Update.Version)
+	case s.version.UpdateAvailable && s.version.CanUpdate:
+		controlPlane += style.Warning.Render(" · "+s.version.Latest+" is out") + off(" · u updates · "+s.version.Summary)
+	case s.version.UpdateAvailable:
+		controlPlane += style.Warning.Render(" · "+s.version.Latest+" is out") + off(" · update it on the server with sh update.sh")
+	case !s.version.SelfHosted:
+		controlPlane += off(" · updates itself with every release")
+	}
+	agentUpdates := "on" + off(" · agents update to the control plane's version · enter turns it off")
+	switch {
+	case s.autoUpdateErr != nil:
+		agentUpdates = failed(s.autoUpdateErr)
+	case !s.autoUpdate:
+		agentUpdates = "off" + off(" · enter turns it on; u on a server updates its agent")
+	}
+
 	rows := []settingRow{
+		{kind: "controlplane", name: "Control plane", value: controlPlane},
+		{kind: "agentupdates", name: "Agent updates", value: agentUpdates},
 		{kind: "github", name: "GitHub", value: github},
 		{kind: "bucket", name: "Bucket", value: bucket, set: s.storage != nil},
 		{kind: "cloudflare", name: "Cloudflare token", value: cloudflare, set: s.integrations.Cloudflare},
@@ -125,6 +155,10 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 			formField{label: "Username"},
 			formField{label: "Password", hint: "a token that may read the images", secret: true},
 		), nil
+	case "u":
+		return m.updateControlPlane()
+	case "A":
+		return m, m.setAgentUpdates(!m.settings.autoUpdate)
 	}
 	if m.settingSelected >= len(rows) {
 		return m, nil
@@ -144,6 +178,10 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 // editSetting opens the form of a row, or says how to connect GitHub.
 func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 	switch row.kind {
+	case "controlplane":
+		return m.updateControlPlane()
+	case "agentupdates":
+		return m, m.setAgentUpdates(!m.settings.autoUpdate)
 	case "github":
 		if !m.settings.github.Enabled {
 			m.err = errors.New("the GitHub App is not set up on this control plane")
@@ -258,4 +296,38 @@ func (m model) settingsView(room int) []string {
 		lines = append(lines, "", pad+style.Muted.Render("No registry logins. Press a to add one for private images."))
 	}
 	return lines
+}
+
+// updateControlPlane asks before it updates a self-hosted control plane to
+// the newest release.
+func (m model) updateControlPlane() (tea.Model, tea.Cmd) {
+	version := m.settings.version
+	switch {
+	case !version.SelfHosted:
+		m.notice = "This control plane updates itself with every release"
+		return m, nil
+	case version.Update.Running():
+		m.notice = "The control plane is updating to " + version.Update.Version
+		return m, nil
+	case !version.UpdateAvailable:
+		m.notice = "The control plane runs " + version.Version + ", the newest release"
+		return m, nil
+	case !version.CanUpdate:
+		m.err = errors.New("only an admin of this control plane updates it, here or on the server with sh update.sh")
+		return m, nil
+	}
+	return m.confirmFirst("Update the control plane to "+version.Latest+"?", "It is away for a minute; your apps keep running. "+version.Summary, "update", false,
+		m.done(func() error {
+			_, err := m.api.UpdateControlPlane(m.ctx)
+			return err
+		}, "Updating the control plane to "+version.Latest+"; this tab shows when it is back")), nil
+}
+
+// setAgentUpdates turns automatic agent updates on or off.
+func (m model) setAgentUpdates(on bool) tea.Cmd {
+	notice := "Agents update to the control plane's version by themselves now"
+	if !on {
+		notice = "Agents no longer update by themselves; u on a server updates its agent"
+	}
+	return m.done(func() error { return m.api.SetAgentUpdates(m.ctx, on) }, notice)
 }

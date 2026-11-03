@@ -37,6 +37,13 @@ func Run(ctx context.Context, api *client.Client, url, dir string) error {
 	go watch(ctx, program, func(ctx context.Context) error {
 		return api.WatchApps(ctx, func(apps []client.App) { program.Send(appsMsg(apps)) })
 	})
+	// A self-hosted control plane tells when a newer release is out.
+	go func() {
+		version, err := api.Version(ctx)
+		if err == nil && version.UpdateAvailable {
+			program.Send(noticeMsg(build.Name + " " + version.Latest + " is out: " + version.Summary + " See the settings tab"))
+		}
+	}()
 	_, err := program.Run()
 	if ctx.Err() != nil {
 		return nil

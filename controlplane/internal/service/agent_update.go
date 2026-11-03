@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,6 +79,12 @@ func (s *ServerService) UpdateAgent(ctx context.Context, actor Actor, idOrName s
 	if err != nil {
 		return nil, err
 	}
+	// An update by hand lets the automatic updates go on.
+	if actor.Via != ViaSystem {
+		s.mu.Lock()
+		delete(s.autoHalted, actor.WorkspaceID)
+		s.mu.Unlock()
+	}
 	// The agent restarts with the new binary: wait for its next session.
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -102,4 +110,95 @@ func (s *ServerService) UpdateAgent(ctx context.Context, actor Actor, idOrName s
 		s.record(actor, "server.agent_updated", "server", server.Name, map[string]string{"from": server.AgentVersion, "to": updated.AgentVersion})
 	}
 	return updated, nil
+}
+
+// AutoUpdateAgents reports whether the control plane updates the agents of
+// the workspace to its own version by itself.
+func (s *ServerService) AutoUpdateAgents(workspaceID string) (bool, error) {
+	return s.servers.AutoUpdateAgents(workspaceID)
+}
+
+// SetAutoUpdateAgents turns updating the agents by themselves on or off.
+// Turned on, it updates the agents that are behind right away.
+func (s *ServerService) SetAutoUpdateAgents(actor Actor, on bool) error {
+	before, err := s.servers.AutoUpdateAgents(actor.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	if err := s.servers.SetAutoUpdateAgents(actor.WorkspaceID, on); err != nil {
+		return err
+	}
+	if before != on {
+		s.record(actor, "workspace.agent_updates", "workspace", "", map[string]string{"on": strconv.FormatBool(on)})
+	}
+	if on {
+		s.mu.Lock()
+		delete(s.autoHalted, actor.WorkspaceID)
+		s.mu.Unlock()
+		go s.autoUpdate(actor.WorkspaceID)
+	}
+	return nil
+}
+
+// UpdateAgentsTo has the control plane update every agent older than
+// version by itself, whenever an agent connects. "" or a development build
+// turns it off.
+func (s *ServerService) UpdateAgentsTo(version string) {
+	s.mu.Lock()
+	s.autoVersion = version
+	s.mu.Unlock()
+}
+
+// autoUpdate updates the agents of a workspace that are behind, one at a
+// time. An agent that refuses, such as during a deploy, is tried again when
+// it connects next. One that does not come back stops it for the workspace
+// until someone updates an agent by hand, and the activity says so.
+func (s *ServerService) autoUpdate(workspaceID string) {
+	s.mu.Lock()
+	version := s.autoVersion
+	if parseVersion(version) == nil || s.autoRunning[workspaceID] || s.autoHalted[workspaceID] {
+		s.mu.Unlock()
+		return
+	}
+	s.autoRunning[workspaceID] = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		delete(s.autoRunning, workspaceID)
+		s.mu.Unlock()
+	}()
+	if on, err := s.servers.AutoUpdateAgents(workspaceID); err != nil || !on {
+		return
+	}
+	tried := map[string]bool{}
+	for {
+		servers, err := s.List(workspaceID)
+		if err != nil {
+			slog.Error("list servers to update their agents", "error", err, "workspace_id", workspaceID)
+			return
+		}
+		var next *model.Server
+		for index, server := range servers {
+			if server.Online && server.Rules == "" && !tried[server.ID] && NewerVersion(version, server.AgentVersion) {
+				next = &servers[index]
+				break
+			}
+		}
+		if next == nil {
+			return
+		}
+		tried[next.ID] = true
+		_, err = s.UpdateAgent(context.Background(), System(workspaceID), next.ID)
+		var agentErr *AgentError
+		switch {
+		case err == nil, errors.As(err, &agentErr), errors.Is(err, ErrServerOffline), errors.Is(err, ErrNoAgentBinary):
+			// Updated, or refused for now: the next connect tries again.
+		default:
+			s.mu.Lock()
+			s.autoHalted[workspaceID] = true
+			s.mu.Unlock()
+			s.record(System(workspaceID), "server.agent_update_failed", "server", next.Name, map[string]string{"from": next.AgentVersion, "to": version, "error": clipText(err.Error(), 300)})
+			return
+		}
+	}
 }

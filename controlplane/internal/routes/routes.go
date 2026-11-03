@@ -136,6 +136,10 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers", workspace(servers.Create))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/servers/{id}", workspace(servers.Delete))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/update", workspace(servers.UpdateAgent))
+	mux.HandleFunc("POST /app/{workspaceSlug}/servers/agent-updates", workspace(servers.AgentUpdates))
+	updates := handler.NewUpdateHandler(app.UpdateService)
+	mux.HandleFunc("GET /app/{workspaceSlug}/update", workspace(updates.Notice))
+	mux.HandleFunc("POST /app/{workspaceSlug}/update", workspace(updates.Start))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/install", workspace(servers.NewInstall))
 	apps := handler.NewAppsHandler(app.AppService, app.ServerService)
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps", workspace(apps.AppsPage))
@@ -258,6 +262,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Invitations: api.NewWorkspaceInvitationHandler(app.WorkspaceService),
 		Servers:     api.NewServersHandler(app.ServerService),
 		Apps:        api.NewAppsHandler(app.AppService),
+		Version:     api.NewVersionHandler(app.UpdateService, app.ServerService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -284,6 +289,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Invitations:   invitationLimiter,
 		Servers:       app.ServerService,
 		Apps:          app.AppService,
+		Updates:       app.UpdateService,
 		BillingOff:    !app.Cfg.Billing,
 	})
 	mux.Handle("/mcp", mcp.Handler(mcpServer))
