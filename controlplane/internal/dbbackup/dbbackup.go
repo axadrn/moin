@@ -89,11 +89,12 @@ func RestoreIfMissing(ctx context.Context, bucket Bucket, file string) error {
 func Start(ctx context.Context, bucket Bucket, file string) (stop func(), err error) {
 	store := litestream.NewStore(nil, litestream.DefaultCompactionLevels)
 	store.SnapshotRetention = retention
-	store.Logger = slog.Default().With("part", "database backup")
+	store.Logger = quiet()
 	if err := store.Open(ctx); err != nil {
 		return nil, fmt.Errorf("start the database backup: %w", err)
 	}
 	db := litestream.NewDB(file)
+	db.SetLogger(quiet())
 	db.Replica = litestream.NewReplicaWithClient(db, bucket.client())
 	if err := store.RegisterDB(db); err != nil {
 		_ = store.Close(context.Background())
@@ -101,4 +102,25 @@ func Start(ctx context.Context, bucket Bucket, file string) (stop func(), err er
 	}
 	slog.Info("database backup on", "bucket", bucket.Bucket, "folder", bucket.client().Path)
 	return func() { _ = store.Close(context.Background()) }, nil
+}
+
+// quiet is the logger Litestream gets: its warnings and errors, not a line
+// for every sync.
+func quiet() *slog.Logger {
+	return slog.New(warnings{slog.Default().Handler()}).With("part", "database backup")
+}
+
+// warnings passes on only records of level warn and up.
+type warnings struct{ slog.Handler }
+
+func (w warnings) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= slog.LevelWarn && w.Handler.Enabled(ctx, level)
+}
+
+func (w warnings) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return warnings{w.Handler.WithAttrs(attrs)}
+}
+
+func (w warnings) WithGroup(name string) slog.Handler {
+	return warnings{w.Handler.WithGroup(name)}
 }
