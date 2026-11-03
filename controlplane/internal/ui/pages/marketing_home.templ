@@ -2,6 +2,7 @@ package pages
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/axadrn/ops/controlplane/internal/ui/components/accordion"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
@@ -13,15 +14,20 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
-	"github.com/axadrn/ops/controlplane/internal/ui/icons"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
 const (
-	homeWrap    = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
-	homeDisplay = "font-display leading-[0.95]"
+	homeWrap = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
+	// The type scale of the home page: five sizes, two weights.
+	typeH1      = "font-semibold tracking-[-0.045em] leading-[1.02] text-[clamp(2.6rem,6vw,4.5rem)] text-balance"
+	typeH2      = "font-semibold tracking-[-0.04em] leading-[1.05] text-[clamp(2rem,4.5vw,3.25rem)] text-balance"
+	typeH3      = "text-xl font-semibold tracking-[-0.02em]"
+	typeLead    = "text-lg leading-8 text-muted-foreground"
+	typeText    = "text-base leading-7 text-muted-foreground"
+	typeNumber  = "font-semibold tracking-[-0.04em] text-5xl tabular-nums"
 	homeSurface = "rounded-4xl bg-card"
 )
 
@@ -39,16 +45,13 @@ templ Home(network model.Network) {
 			@HomeCommands()
 			@HomeBackups()
 			@HomeData()
-			@HomeNoDocker()
+			@HomeUptime()
 			@HomeWaysIn()
 			@HomeCompare()
-			@HomeGoilerplate()
 			if ctxkeys.RenderConfig(ctx).Billing {
 				@HomePricing()
 			}
-			@HomeStatement()
-			@HomeMaker()
-			@HomeRoadmap()
+			@HomeNext()
 			@HomeFAQ()
 			@HomeStart()
 		</main>
@@ -63,6 +66,9 @@ const homeCTA = "gap-2"
 // space between sections is their top margin, so the jump lands right at
 // the heading.
 const homeAnchor = "scroll-mt-23 sm:scroll-mt-25"
+
+// homeSection is the one gap between the sections of the home page.
+const homeSection = "mt-28 sm:mt-36"
 
 // homePrimary is the one main button of the page: the free trial, or sign
 // in while sign-up is closed and on a self-hosted ops.
@@ -93,18 +99,21 @@ templ HomeHero() {
 	<section class="pt-16 sm:pt-28">
 		<div class={ homeWrap, "grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
 			<div>
-				<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
-					<span class="block">Deploy.</span>
-					<span class="block">Back up.</span>
-					<span class="block">Edit live.</span>
+				@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"}) {
+					Any app. Any server. Best with Go and SQLite.
+				}
+				<h1 class={ typeH1, "mt-6" }>
+					<span class="block">Your servers.</span>
+					<span class="block text-live">Zero data loss.</span>
 				</h1>
-				<p class="mt-7 max-w-[32rem] text-lg leading-8 font-semibold sm:mt-9 sm:text-xl sm:leading-9" data-positioning>
-					<span class="block">Made for Go and SQLite.</span>
-					<span class="block">Runs any app with a Dockerfile.</span>
+				<p class="mt-7 max-w-[34rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
+					Deploy any app to servers you own. SQLite backed up every second, Postgres next. Every site checked every minute.
 				</p>
-				<p class="mt-3 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-					{ brand.Name } puts your apps on your own server, backs up every change of your database to your bucket, lets you fix the data live and checks your sites every minute. From the browser, the CLI, a terminal UI or your AI agent.
-				</p>
+				<ul class="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-base font-medium">
+					@heroProof("No SSH keys")
+					@heroProof("Backups every second")
+					@heroProof("Uptime built in")
+				</ul>
 				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
 					@homePrimary()
 					@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
@@ -120,10 +129,20 @@ templ HomeHero() {
 	</section>
 }
 
+// heroProof is one promise under the hero, with a check.
+templ heroProof(text string) {
+	<li class="inline-flex items-center gap-2">
+		<span class="flex size-5 items-center justify-center rounded-full bg-live text-background">
+			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
+		</span>
+		{ text }
+	</li>
+}
+
 // homeTerminal is a real session: a deploy that snapshots the database
 // first, a wrong query, and the restore to the second before it.
 templ homeTerminal() {
-	<div class="ops-term min-w-0 overflow-hidden rounded-4xl bg-terminal text-[13px] leading-[1.75] text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
+	<div class="ops-term min-w-0 overflow-hidden rounded-4xl bg-terminal text-sm leading-[1.75] text-terminal-foreground sm:text-sm" aria-label="A terminal session with ops">
 		<div class="flex items-center gap-2 border-b border-terminal-foreground/10 px-5 py-3.5">
 			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
 			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
@@ -176,7 +195,7 @@ templ homeStage() {
 templ homeStageTab(name, label string) {
 	@tabs.Trigger(tabs.TriggerProps{
 		Value:      name,
-		Class:      "h-auto flex-none cursor-pointer px-5 py-2 font-semibold text-muted-foreground hover:text-foreground data-active:bg-foreground data-active:text-background group-data-[variant=default]/tabs-list:data-active:shadow-none dark:text-muted-foreground dark:data-active:bg-foreground dark:data-active:text-background",
+		Class:      "h-auto flex-none cursor-pointer px-5 py-2 font-medium",
 		Attributes: templ.Attributes{"data-stage-tab": name},
 	}) {
 		{ label }
@@ -213,20 +232,20 @@ templ homeShot(name, alt string, first bool) {
 // homeChip is a status pill on a solid backing: the app name and its state.
 templ homeChip(app, kind, text string) {
 	@badge.Badge(badge.Props{Class: "h-auto leading-normal text-card-foreground text-base font-normal inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5 shadow-[0_10px_30px_-14px_rgb(0_0_0/0.45)]"}) {
-		<span class="font-mono text-[13px] font-medium">{ app }</span>
+		<span class="font-mono text-sm font-medium">{ app }</span>
 		switch kind {
 			case "live":
-				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3.5 py-1.5 text-[13px] font-medium text-live"}) {
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3.5 py-1.5 text-sm font-medium text-live"}) {
 					<span class="lp-pulse size-2 rounded-full bg-live"></span>
 					{ text }
 				}
 			case "running":
-				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running"}) {
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-sm font-medium text-running"}) {
 					<span class="ops-turn inline-block leading-none">◐</span>
 					{ text }
 				}
 			default:
-				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-failed/12 px-3.5 py-1.5 text-[13px] font-medium text-failed"}) {
+				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-failed/12 px-3.5 py-1.5 text-sm font-medium text-failed"}) {
 					<span class="leading-none">✗</span>
 					{ text }
 				}
@@ -239,7 +258,7 @@ templ homeChip(app, kind, text string) {
 // itself, self-hosted ones report every five minutes. Zero is fine: we say
 // what is true.
 templ HomeLive(network model.Network) {
-	<section id="live" class={ homeAnchor, "mt-24 sm:mt-32" } data-live>
+	<section id="live" class={ homeAnchor, homeSection } data-live>
 		<div class={ homeWrap }>
 			<p class="flex items-center gap-2.5 text-sm font-semibold text-muted-foreground">
 				<span class="lp-pulse size-2 rounded-full bg-live"></span>
@@ -260,7 +279,7 @@ templ homeLiveNumber(count int, label, name string) {
 	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "px-6 py-5")), Attributes: templ.Attributes{"data-live-number": name}}) {
 		<dt class="sr-only">{ label }</dt>
 		<dd>
-			<span class={ homeDisplay, "block text-[clamp(2rem,4vw,2.8rem)] tabular-nums" }>{ liveCount(count) }</span>
+			<span class={ typeNumber, "block text-4xl" }>{ liveCount(count) }</span>
 			<span class="mt-2 block text-sm text-muted-foreground">{ label }</span>
 		</dd>
 	}
@@ -268,23 +287,17 @@ templ homeLiveNumber(count int, label, name string) {
 
 // ---------------------------------------------------------------- commands
 templ HomeCommands() {
-	<section id="how" class={ homeAnchor, "mt-32 sm:mt-44" }>
+	<section id="how" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "text-[clamp(2.4rem,6.4vw,5rem)]" }>Three commands.</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">Getting an app online is the easy part. Keeping its data safe is the hard part.</span>
-				{ brand.Name } does both, on a server you rent for $5 a month.
+			<h2 class={ typeH2, "" }>Three commands.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
+				<span class="text-foreground">Node, Python, Ruby, PHP, Go, Rust: if it runs in Docker, it runs on { brand.Name }.</span>
+				No Dockerfile? For Go, { brand.Name } writes one. <a href="/docs/getting-started" class="text-foreground underline underline-offset-4 hover:text-foreground">Every step</a>
 			</p>
-			<p class="mt-4 max-w-2xl text-lg leading-8 sm:text-xl sm:leading-9">
-				<a href="/docs#how-ops-works-in-2-minutes" class="underline underline-offset-4 hover:text-foreground/80">New to servers? How { brand.Name } works in 2 minutes.</a>
-			</p>
-			<p class="mt-12 max-w-2xl text-lg leading-8 text-muted-foreground sm:mt-16 sm:text-xl sm:leading-9">
-				Sign up, add your bucket, then run these three. <a href="/docs/getting-started" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Getting Started</a> shows every step.
-			</p>
-			<div class="mt-6 grid grid-cols-1 gap-3">
-				@homeCommand("ops servers add web-1", "Prints one install line. Run it on any Linux server. Its agent dials out, so no port stays open.")
-				@homeCommand("ops deploy", "Sends your repo. Your server builds it, checks that it is healthy and puts it live.")
-				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Your database goes back to the second before. ops saves the current state first.")
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16">
+				@homeCommand("ops servers add web-1", "Paste one line on any Linux server. No open port, no SSH key.")
+				@homeCommand("ops deploy", "Your server builds the app and puts it live, if it is healthy.")
+				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Go back to 14:01.")
 			</div>
 		</div>
 	</section>
@@ -292,10 +305,10 @@ templ HomeCommands() {
 
 templ homeCommand(command, text string) {
 	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-4 p-7 sm:p-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-12"))}) {
-		<p class="font-mono text-[clamp(1.35rem,5.4vw,2.6rem)] leading-tight font-medium tracking-[-0.04em] break-words">
+		<p class="font-mono text-2xl leading-tight break-words sm:text-3xl">
 			<span class="text-muted-foreground/60">$ </span>{ command }
 		</p>
-		<p class="max-w-md text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+		<p class="max-w-md text-base leading-7 text-muted-foreground">{ text }</p>
 	}
 }
 
@@ -303,43 +316,43 @@ templ homeCommand(command, text string) {
 // HomeWaysIn is one rollback of shop, done four ways: each frame is what
 // that surface really shows.
 templ HomeWaysIn() {
-	<section id="ways" class={ homeAnchor, "mt-32 sm:mt-44" }>
+	<section id="ways" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>One tool. Four ways in.</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">Click it, type it, press a key or ask your agent.</span>
-				Every feature works in all four, with the same account and the same activity log. Here is one rollback of shop, four times.
+			<h2 class={ typeH2, "max-w-[16ch]" }>One tool. Four ways in.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
+				<span class="text-foreground">Click, type, press a key or ask your AI.</span>
+				Every feature works everywhere.
 			</p>
-			<p class="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Know who changed what, to the second.</a>
+			<p class="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
+				<a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground">Know who changed what, to the second.</a>
 				Your secrets and your data never.
 			</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeWay("Browser", "For a look around, and for your team.") {
+				@homeWay("Browser", "For you and your team.") {
 					@homeWayWeb()
 				}
-				@homeWay("CLI", "For your repo, scripts and CI.") {
-					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]">
+				@homeWay("CLI", "For scripts and CI.") {
+					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground sm:text-sm">
 						<p><span class="text-terminal-foreground/50">$ </span>ops rollback v12</p>
 						<p class="text-terminal-foreground/60">→ Rollback v14 of shop to v12 started</p>
 						<p class="text-live">✓ v14 of shop is live <span class="text-terminal-foreground/50">in 3s</span></p>
 					</div>
 				}
-				@homeWay("Terminal UI", "Everything live, one key away. Run ops.") {
+				@homeWay("Terminal UI", "Everything live, one key away.") {
 					@homeWayTUI()
 				}
-				@homeWay("AI agent", "Claude, Cursor or any MCP client.") {
-					<div class="flex flex-col gap-3 rounded-3xl bg-background p-5 text-[15px] leading-6">
+				@homeWay("AI agent", "Claude, Cursor and more.") {
+					<div class="flex flex-col gap-3 rounded-3xl bg-background p-5 text-base leading-6">
 						<p class="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background">shop is broken since the last deploy. Roll it back.</p>
-						<p class="self-start font-mono text-[12px] text-muted-foreground">rollback_app · shop</p>
+						<p class="self-start font-mono text-sm text-muted-foreground">rollback_app · shop</p>
 						<p class="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-card px-4 py-2.5">Rolled back. v14 of shop runs the release of v12, your data stays as it is.</p>
 					</div>
 				}
 			</div>
 			<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5">
 				@badge.Badge(badge.Props{Class: "h-auto leading-normal text-card-foreground text-base font-normal inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5"}) {
-					<span class="text-[14px] font-semibold">Desktop app</span>
-					@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-[13px] font-medium text-running"}) {
+					<span class="text-sm font-semibold">Desktop app</span>
+					@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-sm font-medium text-running"}) {
 						<span class="ops-turn inline-block leading-none">◐</span>
 						coming soon
 					}
@@ -352,8 +365,8 @@ templ HomeWaysIn() {
 templ homeWay(name, text string) {
 	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex min-w-0 flex-col gap-6 p-5 sm:p-8"))}) {
 		<div class="px-2 pt-2 sm:px-0 sm:pt-0">
-			<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ name }</p>
-			<p class="mt-2 text-[17px] leading-7 text-muted-foreground">{ text }</p>
+			<p class={ typeH3 }>{ name }</p>
+			<p class="mt-2 text-base leading-7 text-muted-foreground">{ text }</p>
 		</div>
 		<div class="mt-auto min-w-0">
 			{ children... }
@@ -363,7 +376,7 @@ templ homeWay(name, text string) {
 
 // homeWayWeb is the deploy list of the app page, the pointer on v12.
 templ homeWayWeb() {
-	<div class="rounded-3xl bg-background p-2 text-[14px]" aria-label="The deploy list of shop with a Roll back button on v12">
+	<div class="rounded-3xl bg-background p-2 text-sm" aria-label="The deploy list of shop with a Roll back button on v12">
 		@homeWayDeploy("v13", "live", "4m · 5s", false)
 		@homeWayDeploy("v12", "succeeded", "5m · 5s", true)
 		@homeWayDeploy("v11", "succeeded", "5m · 5s", false)
@@ -380,11 +393,11 @@ templ homeWayDeploy(number, status, when string, hover bool) {
 		<span class="w-10 font-mono font-semibold">{ number }</span>
 		<span class={ "font-semibold", templ.KV("text-live", status == "live") }>{ status }</span>
 		if hover {
-			@badge.Badge(badge.Props{Class: "h-auto leading-normal ml-auto rounded-full bg-card px-3 py-1 text-[13px] font-semibold text-card-foreground shadow-[0_6px_18px_-10px_rgb(0_0_0/0.5)]"}) {
+			@badge.Badge(badge.Props{Class: "h-auto leading-normal ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold text-card-foreground shadow-[0_6px_18px_-10px_rgb(0_0_0/0.5)]"}) {
 				Roll back
 			}
 		} else {
-			<span class="ml-auto text-[13px] text-muted-foreground tabular-nums">{ when }</span>
+			<span class="ml-auto text-sm text-muted-foreground tabular-nums">{ when }</span>
 		}
 	</div>
 }
@@ -392,7 +405,7 @@ templ homeWayDeploy(number, status, when string, hover bool) {
 // homeWayTUI is the app screen of the terminal UI asking before the
 // rollback, as ops draws it.
 templ homeWayTUI() {
-	<div class="ops-term overflow-x-auto rounded-3xl bg-terminal py-4 text-[12px] leading-[1.65] whitespace-pre text-terminal-foreground sm:text-[13px]" aria-label="The terminal UI asks before it rolls shop back">
+	<div class="ops-term overflow-x-auto rounded-3xl bg-terminal py-4 text-sm leading-[1.65] whitespace-pre text-terminal-foreground sm:text-sm" aria-label="The terminal UI asks before it rolls shop back">
 		<p class="px-5"><span class="font-semibold">ops</span>{ "   " }<span class="text-terminal-foreground/50">servers 1</span>{ "   apps › shop   " }<span class="text-terminal-foreground/50">activity</span></p>
 		<p class="mt-3 px-5">{ "  " }<span class="font-semibold">shop</span>{ "   " }<span class="text-live">● live v13</span></p>
 		<p class="mt-2 px-5 text-terminal-foreground/50">{ "  DEPLOY   STATUS        TOOK" }</p>
@@ -407,63 +420,48 @@ templ homeWayTUI() {
 
 // ---------------------------------------------------------------- backups
 templ HomeBackups() {
-	<section id="backups" class={ homeAnchor, "mt-32 sm:mt-44" }>
+	<section id="backups" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[14ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Every change, backed up.</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				Most apps lose data the boring way: a migration that goes wrong, an <code class="font-mono text-foreground">UPDATE</code> without <code class="font-mono text-foreground">WHERE</code>, a disk that dies. { brand.Name } makes all three a click to undo.
+			<h2 class={ typeH2, "max-w-[14ch]" }>Never lose a row.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
+				<span class="text-foreground">A bad migration, an <code class="font-mono">UPDATE</code> without <code class="font-mono">WHERE</code>, a dead disk.</span>
+				With { brand.Name }, each is a click to undo.
 			</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeFact("Every second", "Each change of every SQLite database streams to your own bucket with Litestream. Restore to any second of the last week.", "")
-				@homeFact("Before every change", "A full snapshot before every deploy, every restore and every edit made through "+brand.Name+". On by default.", "")
-				@homeFact("Proven every day", "The agent restores the newest state into a temp file and runs the integrity check. You see “verified by restore”, not “backup job ran”.", "live")
-				@homeFact("Your bucket", "R2, S3, B2, Hetzner or MinIO. Backups go from your server to your bucket and never through us. A snapshot is a plain gzipped SQLite file.", "")
+				@homeFact("Every second", "Every change goes to your bucket. Go back to any second of the last week.", "")
+				@homeFact("Before every change", "A full copy before every deploy and every edit.", "")
+				@homeFact("Proven every day", "Each backup is restored and checked, every day. Not just “job ran”.", "live")
+				@homeFact("Your bucket", "R2, S3, B2 or Hetzner. Your backups never pass through us.", "")
 			</div>
 		</div>
 	</section>
 }
 
-templ homeTrust(title, text, href, link string) {
-	@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-7 sm:p-10"))}) {
-		<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</p>
-		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
-		<div class="mt-auto pt-8">
-			@button.Button(button.Props{Href: href, Variant: button.VariantSecondary}) {
-				{ link }
-				@icon.ArrowRight(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-end"}})
-			}
-		</div>
-	}
-}
-
 templ homeFact(title, text, kind string) {
 	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-10"))}) {
-		<p class="flex items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
+		<p class={ typeH3, "flex items-center gap-3" }>
 			if kind == "live" {
 				<span class="lp-pulse size-2.5 rounded-full bg-live"></span>
 			}
 			{ title }
 		</p>
-		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+		<p class="mt-4 max-w-lg text-base leading-7 text-muted-foreground">{ text }</p>
 	}
 }
 
 // ---------------------------------------------------------------- data
 templ HomeData() {
-	<section id="data" class={ homeAnchor, "mt-3" }>
+	<section id="data" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
 			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
-					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Your data, live.</h2>
-					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+					<h2 class={ typeH2, "" }>Your data, live.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
 						<span class="text-foreground">Browse every table, edit a cell, run SQL.</span>
-						Read live from your server, from the browser, the terminal or your AI agent. Reads can never change a row; changes take a snapshot first.
-					</p>
-					<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground">
-						The schema stays in your code: your migrations run on deploy, and { brand.Name } shows which one ran last.
+						Live from your server. Every change takes a snapshot first.
 					</p>
 				</div>
-				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-[14px]">
+				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-sm">
 					<p><span class="text-terminal-foreground/50">$ </span>ops sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
 					<p class="mt-2 text-terminal-foreground/50">STATUS      COUNT(*)</p>
 					<p>delivered   38</p>
@@ -478,215 +476,189 @@ templ HomeData() {
 	</section>
 }
 
-// ---------------------------------------------------------------- no docker
-templ HomeNoDocker() {
-	<section class="pt-3">
+// ---------------------------------------------------------------- uptime
+// HomeUptime is the uptime check and its email, in the same card as the
+// data above it.
+templ HomeUptime() {
+	<section id="uptime" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16"))}) {
+			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16"))}) {
 				<div>
-					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Never touched Docker? Fine.</h2>
-					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-						<span class="text-foreground">Run ops deploy in your Go repo.</span>
-						{ brand.Name } writes the Dockerfile and the compose file, keeps your data and finds your SQLite database.
-					</p>
-					<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground">
-						Already have a Dockerfile or a compose.yml? It uses yours. Other languages bring their own Dockerfile.
+					<h2 class={ typeH2, "" }>Know before your customers do.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
+						<span class="text-foreground">Every domain, checked from outside, every minute.</span>
+						Down? You get an email with the reason. Nothing to set up, no second tool to pay for.
 					</p>
 				</div>
-				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1">
-					@homeFile("go.mod", "your code", "")
-					@homeFile("Dockerfile", "written by ops", "")
-					@homeFile("compose.yml", "written by ops", "")
-					@homeFile("/data/app.db", "found and kept", "live")
+				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1" aria-label="Two alert emails from ops">
+					@homeAlert("shop.example.com is down", "HTTP 502 · since 14:02", false)
+					@homeAlert("shop.example.com is back up", "down for 4 minutes", true)
 				</div>
 			}
 		</div>
 	</section>
 }
 
-templ homeFile(name, note, kind string) {
-	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-4">
-		<span class="font-mono text-[14px] font-medium">{ name }</span>
-		if kind == "live" {
-			@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-live/12 px-3 py-1 text-[13px] font-medium text-live"}) {
-				<span class="size-1.5 rounded-full bg-live"></span>
-				{ note }
-			}
-		} else {
-			<span class="text-[14px] text-muted-foreground">{ note }</span>
-		}
+templ homeAlert(subject, detail string, up bool) {
+	<div class="flex items-center gap-4 px-5 py-4">
+		<span class={ "size-2.5 shrink-0 rounded-full", templ.KV("bg-live", up), templ.KV("bg-destructive", !up) }></span>
+		<span class="min-w-0">
+			<span class="block text-base font-semibold">{ subject }</span>
+			<span class="block text-sm text-muted-foreground">{ detail }</span>
+		</span>
+		<span class="ml-auto shrink-0 text-sm text-muted-foreground">ops@</span>
 	</div>
-}
-
-// ---------------------------------------------------------------- maker
-templ HomeMaker() {
-	<section id="maker" class={ homeAnchor, "mt-32 sm:mt-44" }>
-		<div class={ homeWrap, "grid gap-10 md:grid-cols-[auto_minmax(0,1fr)] md:gap-16" }>
-			<a href="https://x.com/axadrn" target="_blank" rel="me noopener" aria-label="Axel Adrian on X" class="shrink-0">
-				<img src="https://github.com/axadrn.png?size=320" alt="Axel Adrian" width="320" height="320" loading="lazy" class="size-32 rounded-4xl object-cover sm:size-40"/>
-			</a>
-			<div class="max-w-3xl">
-				<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Built by the maker of shadcn-templ and goilerplate.</h2>
-				<p class="mt-5 text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">I'm Axel. I maintain shadcn-templ, the Go port of shadcn/ui, and goilerplate, the Go SaaS starter. ops is how I deploy and back up my own products, on my own servers.</p>
-				@blocks.MakerProjects("mt-8")
-				<div class="mt-6 flex items-center gap-1">
-					@button.Button(button.Props{Href: "https://x.com/axadrn", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Attributes: templ.Attributes{"rel": "me noopener", "aria-label": "Axel Adrian on X"}}) {
-						@icons.X(icons.Props{Class: "size-4"})
-					}
-					@button.Button(button.Props{Href: "https://github.com/axadrn", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Attributes: templ.Attributes{"rel": "me noopener", "aria-label": "Axel Adrian on GitHub"}}) {
-						@icons.Github(icons.Props{Class: "size-[18px]"})
-					}
-				</div>
-			</div>
-		</div>
-	</section>
-}
-
-// ---------------------------------------------------------------- statement
-
-// homeSecretStep is one step of where secrets live: now, next, then.
-templ homeSecretStep(when, title, body string) {
-	<li class="flex flex-col gap-2 bg-foreground p-6 sm:p-7">
-		@badge.Badge(badge.Props{Class: "h-auto self-start leading-normal rounded-full bg-background/15 px-3 py-0.5 text-[13px] font-semibold text-background"}) {
-			{ when }
-		}
-		<p class="mt-2 text-[17px] font-semibold text-background">{ title }</p>
-		<p class="text-[15px] leading-6 text-background/65">{ body }</p>
-	</li>
-}
-templ HomeStatement() {
-	<section class="pt-3">
-		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: "block gap-0 py-0 text-base overflow-visible text-background bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20"}) {
-				<p class={ homeDisplay, "text-[clamp(2.4rem,7.2vw,6rem)]" }>
-					<span class="block">Your servers.</span>
-					<span class="block">Your data.</span>
-					<span class="block">Nothing listens for&nbsp;us.</span>
-				</p>
-				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
-					We hold no SSH key to your servers: the agent dials out. Traffic comes through a Cloudflare Tunnel, SSH only over Tailscale, a firewall drops the rest. A rules file on your server decides what ops may do there, and all of it is open source.
-				</p>
-				<ol class="mt-12 grid grid-cols-1 gap-px overflow-hidden rounded-3xl bg-background/15 sm:grid-cols-3" data-secrets-roadmap>
-					@homeSecretStep("Now", "Encrypted with us", "Env vars and registry logins are sealed with AES-256-GCM in the control plane. Your code and your backups never pass through it.")
-					@homeSecretStep("Next", "Only on your servers", "Secrets move to the agent. Hosted ops keeps your login and nothing else.")
-					@homeSecretStep("Then", "End-to-end encrypted", "We can't read your secrets or your data. Not won't, can't.")
-				</ol>
-			}
-		</div>
-	</section>
 }
 
 // ---------------------------------------------------------------- compare
 // HomeCompare puts ops next to what people use instead, fact by fact, from
-// their own docs and pricing pages (compareRows). On a phone the table
-// scrolls inside its box.
+// their own docs and pricing pages (compareGroups), in three tabs: hosted
+// control planes, tools you run yourself, and platforms. Each cell carries a mark to read
+// at a glance; each column says how many facts it wins.
 templ HomeCompare() {
-	<section id="compare" class={ homeAnchor, "mt-32 sm:mt-44" }>
+	<section id="compare" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Why { brand.Name }</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">Good tools put your app online. { brand.Name } does that too, holds no key to your servers and looks after your data.</span>
-				One price. Unlimited servers, apps and teammates. No tiers, no per-server fees.
+			<h2 class={ typeH2, "max-w-[16ch]" }>Why { brand.Name }</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
+				<span class="text-foreground">Others put your app online. { brand.Name } also keeps your servers closed and your data safe.</span>
 			</p>
-			<div class={ utils.CN(homeSurface, "mt-12 overflow-x-auto sm:mt-16") } data-compare>
-				<table class="w-full min-w-[64rem] border-collapse text-left text-[15px] leading-6">
-					<thead>
-						<tr>
-							<th scope="col" class="sticky left-0 bg-card px-5 py-4 font-normal text-muted-foreground"><span class="sr-only">Fact</span></th>
-							for i, tool := range compareTools {
-								<th scope="col" class={ "px-4 py-4 font-semibold", templ.KV("text-live", i == 0) }>{ tool }</th>
-							}
-						</tr>
-					</thead>
-					<tbody>
-						for _, row := range compareRows {
-							<tr class="border-t border-border align-top">
-								<th scope="row" class="sticky left-0 bg-card px-5 py-3.5 font-medium">{ row.Label }</th>
-								for i, cell := range row.Cells {
-									<td class={ "px-4 py-3.5", templ.KV("font-semibold", i == 0), templ.KV("text-muted-foreground", i > 0) }>{ cell }</td>
-								}
-							</tr>
+			@tabs.Tabs(tabs.Props{DefaultValue: compareTabs[0].Value, Class: "mt-12 gap-6 sm:mt-16", Attributes: templ.Attributes{"data-compare": true}}) {
+				@tabs.List(tabs.ListProps{Class: "max-w-full w-fit gap-1 overflow-x-auto bg-card p-1 text-muted-foreground group-data-horizontal/tabs:h-auto", Attributes: templ.Attributes{"aria-label": "Compare with"}}) {
+					for _, tab := range compareTabs {
+						@tabs.Trigger(tabs.TriggerProps{Value: tab.Value, Class: "h-auto cursor-pointer px-4 py-2 font-medium"}) {
+							{ tab.Title }
 						}
-					</tbody>
-				</table>
-			</div>
-			<p class="mt-4 text-sm text-muted-foreground">From each tool's own docs and pricing pages, November 2026. A question mark means they do not say. Your server costs extra everywhere except on Heroku, Render, Railway and Fly.io, which run it for you.</p>
-			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeTrust("Your data stays yours", "We never store your code or your app's data. They live in your bucket and on your server, with no open port.", "/docs/guides/security", "Read the security guide")
-				@homeTrust("Even more control", "Run "+brand.Name+" yourself. Every feature, free, under AGPL. Nothing of yours ever touches us.", "/docs/self-hosting", "Self-host "+brand.Name)
-			</div>
-			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
-				@homePrimary()
-				if ctxkeys.RenderConfig(ctx).Billing {
-					@button.Button(button.Props{Href: "#pricing", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
-						See pricing
-					}
-				} else {
-					@button.Button(button.Props{Href: "/docs/getting-started", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
-						Getting started
 					}
 				}
+				for _, tab := range compareTabs {
+					@tabs.Content(tabs.ContentProps{Value: tab.Value}) {
+						@compareTable(tab)
+					}
+				}
+			}
+			<p class="mt-4 text-sm text-muted-foreground">* From their own docs, Nov 2026.</p>
+			<div class="mt-10">
+				@homePrimary()
 			</div>
 		</div>
 	</section>
 }
 
-// ---------------------------------------------------------------- goilerplate
-// HomeGoilerplate speaks to people who built their app with goilerplate,
-// the Go SaaS starter by the same maker.
-templ HomeGoilerplate() {
-	<section id="goilerplate" class="pt-3">
-		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16")), Attributes: templ.Attributes{"data-goilerplate-box": true}}) {
-				<div>
-					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Built with goilerplate?</h2>
-					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-						<span class="text-foreground"><code class="font-mono">ops deploy</code> and it's live. Backups included.</span>
-						Your app gets HTTPS on your domain, every change of its SQLite database in your bucket and a data browser.
-					</p>
-					<div class="mt-9 flex flex-col gap-3 sm:flex-row">
-						@button.Button(button.Props{Href: homeGoilerplateGuide, Target: "_blank", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA, Attributes: templ.Attributes{"rel": "noopener"}}) {
-							Read the guide
-							@icon.ArrowRight(icon.Props{Class: "size-4"})
-						}
-						@button.Button(button.Props{Href: blocks.RefURL(blocks.GoilerplateURL, "goilerplate-box"), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA, Attributes: templ.Attributes{"rel": "noopener"}}) {
-							goilerplate.com
-						}
-					</div>
-				</div>
-				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]" aria-label="Three commands that put a goilerplate app live">
-					<p class="text-terminal-foreground/45"># in your goilerplate project</p>
-					<p><span class="text-terminal-foreground/45">$ </span>ops servers add web-1</p>
-					<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
-					<p class="text-live">✓ v1 of acme is live</p>
-				</div>
+// compareTable is a tab of the comparison on a wide screen: the facts
+// down, ops and the tools across, each with how many facts it wins.
+templ compareTable(tab compareTab) {
+	<div class={ utils.CN(homeSurface, "max-h-[80svh] overflow-auto overscroll-x-contain ring-1 ring-border") }>
+		<table class="w-full border-separate border-spacing-0 text-left">
+			<thead>
+				<tr>
+					<th scope="col" class="sticky top-0 left-0 z-30 w-40 min-w-40 bg-card sm:w-64 sm:min-w-64"><span class="sr-only">Fact</span></th>
+					for c, column := range tab.Columns {
+						@compareHead(column, c == 0)
+					}
+				</tr>
+			</thead>
+			<tbody>
+				for g, group := range compareGroups {
+					<tr>
+						<th scope="colgroup" class={ "sticky left-0 z-10 bg-card px-3 pb-2 sm:px-4 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase", templ.KV("pt-4", g == 0), templ.KV("pt-8", g > 0) }>{ group.Title }</th>
+						<td class="bg-live/10"></td>
+						<td colspan={ strconv.Itoa(len(tab.Columns) - 1) }></td>
+					</tr>
+					for r, row := range group.Rows {
+						{{ last := g == len(compareGroups)-1 && r == len(group.Rows)-1 }}
+						<tr class="align-top">
+							<th scope="row" class="sticky left-0 z-10 border-t border-border bg-card px-3 py-4 text-sm font-medium sm:px-4 sm:text-base">{ row.Label }</th>
+							for c, column := range tab.Columns {
+								if c == 0 {
+									<td class={ "border-t border-live/20 bg-live/10 px-3 py-4 sm:px-4", templ.KV("rounded-b-3xl", last) }>
+										@compareCellView(cellFor(row, column), true)
+									</td>
+								} else {
+									<td class="border-t border-border px-3 py-4 sm:px-4">
+										@compareCellView(cellFor(row, column), false)
+									</td>
+								}
+							}
+						</tr>
+					}
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+// compareHead is a tool's column head: its name and its wins. ops wears
+// the tint that runs down its column.
+templ compareHead(column compareColumn, ops bool) {
+	<th scope="col" class={ "sticky top-0 z-20 min-w-36 px-3 pt-5 pb-4 align-bottom sm:px-4", templ.KV("bg-card", !ops), templ.KV("bg-[color-mix(in_oklab,var(--live)_10%,var(--card))]", ops) }>
+		<span class={ "block text-base font-semibold", templ.KV("text-live", ops) }>{ column.Name }</span>
+		<span class={ "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", templ.KV("bg-live text-background", ops), templ.KV("bg-muted text-muted-foreground", !ops) }>
+			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
+			{ strconv.Itoa(compareWins(column.Tool)) } of { strconv.Itoa(compareFacts(column.Tool)) }
+		</span>
+	</th>
+}
+
+// compareCellView is a cell of the comparison: its mark and its word or
+// two, with the detail below in small print.
+templ compareCellView(cell compareCell, ops bool) {
+	<span class="inline-flex items-start gap-2.5 text-left">
+		switch cell.Mark {
+			case markYes:
+				<span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-live text-background" aria-label="Yes" role="img">
+					@icon.Check(icon.Props{Class: "size-3 stroke-3"})
+				</span>
+			case markPart:
+				<span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-running/20 text-running" aria-label="Partly" role="img">
+					@icon.Minus(icon.Props{Class: "size-3 stroke-3"})
+				</span>
+			case markNo:
+				<span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-label="No" role="img">
+					@icon.X(icon.Props{Class: "size-3 stroke-3"})
+				</span>
+			case markUnknown:
+				<span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground" aria-label="Not said" role="img">?</span>
+		}
+		<span class="flex flex-col">
+			<span class={ "text-base leading-6 font-semibold whitespace-nowrap", templ.KV("text-foreground", ops), templ.KV("text-foreground", !ops) }>{ cell.Short }</span>
+			if cell.Detail != "" {
+				<span class="mt-0.5 text-xs leading-4 text-muted-foreground">{ cell.Detail }</span>
 			}
-		</div>
-	</section>
+		</span>
+	</span>
 }
 
 // ---------------------------------------------------------------- start
 // HomeStart is the last call to action, after the questions.
 templ HomeStart() {
-	<section id="start" class={ homeAnchor, "mt-32 pb-32 sm:mt-44 sm:pb-44" }>
+	<section id="start" class={ homeAnchor, homeSection, "pb-28 sm:pb-36" }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Deploy your app today.</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				if ctxkeys.RenderConfig(ctx).Billing {
-					<span class="text-foreground">30 days free, no card.</span>
-				} else {
-					<span class="text-foreground">Free and open source.</span>
-				}
-				One server, one command, and your data is backed up from the first second.
-			</p>
-			<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+			<h2 class={ typeH2, "max-w-[16ch]" }>Live in two minutes.</h2>
+			<ol class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
+				@homeStep("1", "Sign in", "With GitHub or your email.")
+				@homeStep("2", "Add a server", "One line on any Linux box.")
+				@homeStep("3", "Deploy", "ops deploy. Backed up from the first second.")
+			</ol>
+			<div class="mt-10 flex flex-col items-start gap-3">
 				@homePrimary()
-				@button.Button(button.Props{Href: "/docs/getting-started", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
-					Getting started
-				}
+				<p class="text-sm text-muted-foreground">
+					if ctxkeys.RenderConfig(ctx).Billing {
+						30 days free, no card. Or <a href="/docs/self-hosting" class="text-foreground underline underline-offset-4 hover:text-foreground">host it yourself</a>, free forever.
+					} else {
+						Free and open source.
+					}
+				</p>
 			</div>
 		</div>
 	</section>
+}
+
+templ homeStep(number, title, text string) {
+	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8"))}) {
+		<span class="flex size-9 items-center justify-center rounded-full bg-foreground text-base font-semibold text-background">{ number }</span>
+		<p class={ typeH3, "mt-6" }>{ title }</p>
+		<p class="mt-2 text-base leading-7 text-muted-foreground">{ text }</p>
+	}
 }
 
 // ---------------------------------------------------------------- pricing
@@ -694,162 +666,173 @@ templ HomeStart() {
 // product, so the rows say what running it takes. Both cards have the same
 // rows in the same order, short enough to stay on one line.
 templ HomePricing() {
-	<section id="pricing" class={ homeAnchor, "mt-32 pb-32 sm:mt-44 sm:pb-44" }>
+	<section id="pricing" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Free to run. Or we run it.</h2>
-			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-				<span class="text-foreground">Both get every feature, with unlimited servers, apps and members, all open source.</span>
-				The difference is the work around it.
-			</p>
+			<h2 class={ typeH2 }>Simple pricing.</h2>
+			<p class={ typeLead, "mt-6" }>Every feature in both. Unlimited servers, apps and teammates.</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-7 sm:p-10")), Attributes: templ.Attributes{"data-plan": "self-hosted"}}) {
-					<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">Self-hosted</p>
-					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
-						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$0</span>
-						<span class="text-lg text-muted-foreground">free forever</span>
-					</p>
-					<p class="mt-2 text-base text-muted-foreground">Every feature, on your own server. No card.</p>
-					<dl class="mt-8 divide-y divide-border border-y border-border">
-						@homePlanRow("Setup", "About an hour", false)
-						@homePlanRow("Control plane", "On your own server", false)
-						@homePlanRow("Updates", "One click", false)
-						@homePlanRow("GitHub App, email", "You set them up", false)
-						@homePlanRow("Control plane backups", "Yours to run", false)
-						@homePlanRow("Support", "GitHub issues", false)
-					</dl>
-					<div class="mt-auto pt-10">
-						@button.Button(button.Props{Href: "/docs/self-hosting", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
-							Host it yourself
-							@icon.ArrowRight(icon.Props{Class: "size-4"})
+				@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-8 sm:p-10")), Attributes: templ.Attributes{"data-plan": "hosted"}}) {
+					<div class="flex items-center justify-between gap-3">
+						<p class={ typeH3 }>Hosted</p>
+						@badge.Badge(badge.Props{Class: "h-auto rounded-full bg-live/15 px-3 py-1 text-sm font-medium text-live"}) {
+							30 days free · no card
 						}
 					</div>
-				}
-				@card.Card(card.Props{Class: "gap-0 py-0 text-base overflow-visible text-background flex flex-col bg-foreground p-7 text-background sm:p-10", Attributes: templ.Attributes{"data-plan": "hosted"}}) {
-					<p class="flex flex-wrap items-center gap-3 font-display text-[clamp(1.6rem,3vw,2.2rem)]">
-						Hosted
-						if !ctxkeys.RenderConfig(ctx).SignupsOpen {
-							@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-background/15 px-3 py-1 font-sans text-[13px] font-semibold text-background", Attributes: templ.Attributes{"data-private-beta": true}}) {
-								Private beta
-							}
-						}
+					<p class="mt-8 flex items-baseline gap-2">
+						<span class={ typeNumber }>$29</span>
+						<span class="text-base text-muted-foreground">/ month</span>
 					</p>
-					<p class="mt-6 flex flex-wrap items-baseline gap-x-3">
-						<span class={ homeDisplay, "text-[clamp(3rem,6vw,4.5rem)]" }>$29</span>
-						<span class="text-lg text-background/65">a month, per workspace</span>
-					</p>
-					<p class="mt-2 text-base text-background/65" data-yearly-deal>or $249 a year, save $99. 30 days free, no card.</p>
-					<dl class="mt-8 divide-y divide-background/15 border-y border-background/15">
-						@homePlanRow("Setup", "Two minutes", true)
-						@homePlanRow("Control plane", "Ours, nothing to run", true)
-						@homePlanRow("Updates", "The day they ship", true)
-						@homePlanRow("GitHub App, email", "Ready to use", true)
-						@homePlanRow("Control plane backups", "Every day, by us", true)
-						@homePlanRow("Support", "Email, from the team", true)
-					</dl>
-					<div class="mt-auto pt-10">
-						@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: homeCTA + " bg-background text-foreground hover:bg-background/85"}) {
+					<p class={ typeText, "mt-2" } data-yearly-deal>Per workspace. Or $249 a year.</p>
+					<div class="mt-8">
+						@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: "w-full gap-2"}) {
 							{ homeStartLabel(ctx) }
 							@icon.ArrowRight(icon.Props{Class: "size-4"})
 						}
 					</div>
+					<ul class="mt-8 flex flex-col gap-3 text-base">
+						@homePlanCheck("Ready in two minutes")
+						@homePlanCheck("We run and update it")
+						@homePlanCheck("GitHub and email set up")
+						@homePlanCheck("Support by email")
+					</ul>
+				}
+				@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "flex flex-col p-8 sm:p-10")), Attributes: templ.Attributes{"data-plan": "self-hosted"}}) {
+					<div class="flex items-center justify-between gap-3">
+						<p class={ typeH3 }>Self-hosted</p>
+						@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"}) {
+							Open source
+						}
+					</div>
+					<p class="mt-8 flex items-baseline gap-2">
+						<span class={ typeNumber }>$0</span>
+						<span class="text-base text-muted-foreground">/ forever</span>
+					</p>
+					<p class={ typeText, "mt-2" }>On your own server.</p>
+					<div class="mt-8">
+						@button.Button(button.Props{Href: "/docs/self-hosting", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "w-full gap-2"}) {
+							Host it yourself
+							@icon.ArrowRight(icon.Props{Class: "size-4"})
+						}
+					</div>
+					<ul class="mt-8 flex flex-col gap-3 text-base">
+						@homePlanCheck("Set up in about an hour")
+						@homePlanCheck("Update in one click")
+						@homePlanCheck("Your GitHub App and email")
+						@homePlanCheck("Help on GitHub")
+					</ul>
 				}
 			</div>
-			<div class="mt-10 flex flex-col items-center gap-2 text-center">
-				<p class="text-lg font-semibold" data-one-price>One price. Unlimited servers, apps and teammates. No tiers.</p>
-				<p class="max-w-2xl text-sm leading-6 text-muted-foreground" data-beta-price>{ brand.Name } is in beta and moves fast, so prices and plans may change. Join early: the price you start with is the price you keep. Plus sales tax or VAT where it applies.</p>
-				<p class="text-sm text-muted-foreground" data-goilerplate-offer>goilerplate buyers get 50% off, forever.</p>
-			</div>
+			<p class={ typeText, "mt-8 text-center" } data-one-price>No tiers, no per-server fees. Beta price, yours to keep. goilerplate buyers save 50%.</p>
 		</div>
 	</section>
 }
 
-templ homePlanRow(label, value string, dark bool) {
-	<div class="flex items-baseline justify-between gap-4 py-3.5">
-		<dt class={ "shrink-0 text-[15px]", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/60", dark) }>{ label }</dt>
-		<dd class="min-w-0 text-right text-[15px] font-semibold">{ value }</dd>
-	</div>
+// homePlanCheck is one line of a plan, with a check.
+templ homePlanCheck(text string) {
+	<li class="flex items-center gap-3">
+		<span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-live/15 text-live">
+			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
+		</span>
+		{ text }
+	</li>
 }
 
-// ---------------------------------------------------------------- roadmap
-// HomeRoadmap is the short roadmap: what ships, what comes next, what comes
-// later. No dates. The docs page has the links to the issues.
-templ HomeRoadmap() {
-	<section id="roadmap" class={ homeAnchor, "mt-32 sm:mt-44" }>
+// ---------------------------------------------------------------- next
+// HomeNext is what comes next, short: the big steps on the roadmap.
+templ HomeNext() {
+	<section id="next" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Where { brand.Name } is going.</h2>
-			<div class="mt-10 grid grid-cols-1 gap-3 lg:grid-cols-3">
-				@homeRoadmapStep("Now", "Deploys, backups, data, domains, uptime checks every minute, security, teams and the activity log. Updates in one click. On the web, the CLI, the terminal UI, the API and MCP.")
-				@homeRoadmapStep("Next", "Live metrics for every server and app, alerts to email, Slack, Discord and Telegram when a site goes down, more than one bucket.")
-				@homeRoadmapStep("Later", "Zero trust: bucket keys only on your servers, secrets encrypted end to end, and servers that only obey commands you signed.")
+			<h2 class={ typeH2 }>This is just the start.</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every alert. Nothing anyone else can read.</p>
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4">
+				@homeNextStep("Postgres and MySQL", "Backups every second, restore checks and the data browser.")
+				@homeNextStep("Alerts everywhere", "Slack, Discord, Telegram and webhooks.")
+				@homeNextStep("Live metrics", "CPU, memory, requests and errors, with every deploy marked.")
+				@homeNextStep("Zero trust", "Secrets only on your servers, end to end encrypted.")
 			</div>
 			<p class="mt-6">
-				<a href="/docs/roadmap" class="text-[17px] text-muted-foreground underline underline-offset-4 hover:text-foreground">The whole roadmap</a>
+				<a href="/docs/roadmap" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">The roadmap</a>
 			</p>
 		</div>
 	</section>
 }
 
-templ homeRoadmapStep(when, text string) {
-	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8")), Attributes: templ.Attributes{"data-roadmap": when}}) {
-		<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ when }</p>
-		<p class="mt-3 text-[17px] leading-7 text-muted-foreground">{ text }</p>
+templ homeNextStep(title, text string) {
+	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7"))}) {
+		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-2.5 py-0.5 text-xs font-medium text-muted-foreground"}) {
+			Next
+		}
+		<p class={ typeH3, "mt-5" }>{ title }</p>
+		<p class={ typeText, "mt-2" }>{ text }</p>
 	}
 }
 
 // ---------------------------------------------------------------- faq
 templ HomeFAQ() {
-	<section id="faq" class={ homeAnchor, "mt-32 sm:mt-44" }>
+	<section id="faq" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Questions.</h2>
+			<h2 class={ typeH2, "" }>Questions.</h2>
 			@accordion.Accordion(accordion.Props{Multiple: true, Class: utils.CN(homeSurface, "mt-10 px-2 sm:px-4")}) {
+				@homeQuestion("Is it secure?") {
+					We hold no key to your servers and need no open port. A file on your server decides what { brand.Name } may do there. <a href="/docs/guides/security" class="text-foreground underline underline-offset-4 hover:text-foreground">The security guide</a>
+				}
+				@homeQuestion("Do I need to know Docker?") {
+					No. For a Go app, { brand.Name } sets everything up. Have a Dockerfile already? It uses yours.
+				}
+				@homeQuestion("Built with goilerplate?") {
+					One command and it is live, with backups. And 50% off, forever. <a href={ templ.SafeURL(homeGoilerplateGuide) } target="_blank" rel="noopener" class="text-foreground underline underline-offset-4 hover:text-foreground">The guide</a>
+				}
 				@homeQuestion("What can I deploy?") {
-					Any repo with a compose.yml, a Dockerfile or a go.mod. ops builds it on your server, checks that it comes up healthy and starts the previous version again when it does not.
+					Any app with a Dockerfile, or any Go app. If a new version fails, the old one keeps running.
 				}
 				@homeQuestion("Which databases?") {
-					SQLite. That is the focus: ops finds your database, backs it up continuously, lets you browse and edit it and runs your migrations. Postgres or Redis still run as services from your compose.yml, without those tools.
+					SQLite gets everything: backups, the data browser, migrations. Postgres or Redis run too, without those extras.
 				}
 				@homeQuestion("Which servers?") {
-					Any Linux server you can log in to as root, at any provider. The install script sets up Docker and the agent. The agent only needs outbound HTTPS.
+					Any Linux server, at any provider. One line sets it up.
 				}
 				@homeQuestion("Where does my code go?") {
-					Into your own bucket, never to us. ops deploy puts it there through a link ops signs, your server picks it up and deletes it. Deploys from GitHub go from GitHub straight to your server. Your backups live in the same bucket.
+					Into your own bucket, then to your server. Never to us. From GitHub it goes straight to your server.
 				}
 				@homeQuestion("Can you see my data?") {
-					Only what you ask for: a table you open passes through to your browser and is never stored, and the activity never keeps your SQL or your values. Want even that gone? Write data: off and logs: off into /etc/ops/rules on your server. The agent then refuses every read, and nobody can change that through ops, not even us.
+					Only what you open, and we never store it. Want none at all? One line on your server turns data access off, even for us.
 				}
 				@homeQuestion("What happens if ops is down?") {
-					Your apps keep running. They live on your servers, not on ours. You only cannot deploy or change them through ops until it is back.
+					Your apps keep running. They live on your servers. You just cannot deploy until it is back.
 				}
 				@homeQuestion("Is it open source?") {
-					Yes, all of it: the agent, the CLI, the terminal UI and the control plane, under AGPL-3.0. Read exactly what runs on your server and what we run. Self-host it for free, or let us run it for you.
+					Yes, all of it, under AGPL-3.0. Host it yourself for free, or let us run it.
 				}
 				@homeQuestion("Why AGPL, and can I contribute?") {
-					AGPL keeps ops open: whoever runs a changed ops as a service has to share the changes. Open an issue first, then a pull request. On your first one a bot asks you to agree once that it comes in under Apache 2.0, which keeps the license of ops flexible. You keep your copyright.
+					AGPL keeps ops open: who runs a changed ops as a service shares the changes. Contributions welcome: open an issue first, then a pull request.
 				}
 				@homeQuestion("Can my AI agent use it?") {
-					Yes. ops has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground/80">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
+					Yes. ops has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
 				}
 				@homeQuestion("Where are my env vars?") {
-					Today in the control plane, sealed with AES-256-GCM, and handed to your server with each deploy. Next they move to your servers only, so hosted ops keeps your login and nothing else. After that, end-to-end encryption: we can't read them at all.
+					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
+				}
+				@homeQuestion("What comes next?") {
+					Alerts to Slack and Telegram, live metrics, more buckets. Then zero trust. <a href="/docs/roadmap" class="text-foreground underline underline-offset-4 hover:text-foreground">The roadmap</a>
 				}
 				@homeQuestion("Will the name change?") {
-					Maybe. If it does, your servers, the CLI and the agents move over by themselves, and the old address keeps working for a while. Nothing breaks.
+					Maybe. If so, everything moves over by itself. Nothing breaks.
 				}
 				@homeQuestion("Can my team use it?") {
-					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground/80">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground/80">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
+					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@homeQuestion("How does the trial work?") {
-						Sign up and you get 30 days with everything, no card. Afterwards ops turns read-only until you subscribe: your apps keep running, their backups too, and you can still stop and start them.
+						30 days with everything, no card. After that, ops is read-only until you subscribe. Your apps and backups keep running.
 					}
 					@homeQuestion("What is a workspace?") {
-						Your team in ops: its servers, apps, bucket, settings and people. Invite teammates and everyone works on the same servers. The plan, the trial and the activity belong to the workspace.
+						Your team in ops: its servers, apps and people. One plan per workspace.
 					}
 					@homeQuestion("Do I pay per workspace?") {
-						Yes. A plan covers one workspace with unlimited servers, apps and teammates. Most teams need one. A second workspace, say for a client, has its own plan; the free trial comes once, with your first.
+						Yes, with unlimited servers, apps and teammates. Most teams need one.
 					}
 					@homeQuestion("Can I cancel?") {
-						Any time, in the billing settings. Your plan runs until the end of the period you paid for, and your apps keep running on your servers.
+						Any time, in one click. Your apps keep running on your servers.
 					}
 				}
 			}
@@ -859,12 +842,12 @@ templ HomeFAQ() {
 
 templ homeQuestion(question string) {
 	@accordion.Item() {
-		@accordion.Trigger(accordion.TriggerProps{Class: "items-center gap-6 rounded-none px-4 py-5 text-[17px] font-semibold hover:no-underline sm:px-5 sm:py-6 sm:text-lg **:data-[slot=accordion-trigger-icon]:hidden"}) {
+		@accordion.Trigger(accordion.TriggerProps{Class: "items-center gap-6 rounded-none px-4 py-5 text-base font-semibold hover:no-underline sm:px-5 sm:py-6 **:data-[slot=accordion-trigger-icon]:hidden"}) {
 			{ question }
 			@icon.Plus(icon.Props{Class: "ml-auto size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-45"})
 		}
 		@accordion.Content(accordion.ContentProps{Class: "pb-0"}) {
-			<p class="max-w-2xl px-4 pb-6 text-[16px] leading-7 text-muted-foreground sm:px-5 sm:text-[17px]">
+			<p class="max-w-2xl px-4 pb-6 text-base leading-7 text-muted-foreground sm:px-5 sm:text-base">
 				{ children... }
 			</p>
 		}

@@ -56,7 +56,7 @@ templ AuthOnboarding(form OnboardingForm) {
 						hx-disable="find button[type='submit']"
 					>
 						@csrf.Token()
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
+						@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
 							Sign out 
 						}
 					</form>
@@ -85,7 +85,8 @@ templ AuthOnboardingForm(form OnboardingForm) {
 				@field.Label(field.LabelProps{For: "name"}) {
 					Your name 
 				}
-				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Value: form.Name, Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(nameError != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": "", "required": "", "maxlength": "100"}})
+				@input.Input(input.Props{
+					Class: "h-11 text-base", ID: "name", Name: "name", Type: "text", Value: form.Name, Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(nameError != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": "", "required": "", "maxlength": "100"}})
 				@fieldHint("name", nameError) {
 					if user != nil {
 						Continue as <strong>{ user.Email }</strong>.
@@ -97,13 +98,14 @@ templ AuthOnboardingForm(form OnboardingForm) {
 					@field.Label(field.LabelProps{For: "workspace"}) {
 						Workspace name 
 					}
-					@input.Input(input.Props{ID: "workspace", Name: "workspace", Type: "text", Value: form.Workspace, Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(workspaceError != ""), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": "", "minlength": "2", "maxlength": "80"}})
+					@input.Input(input.Props{
+						Class: "h-11 text-base", ID: "workspace", Name: "workspace", Type: "text", Value: form.Workspace, Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(workspaceError != ""), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": "", "minlength": "2", "maxlength": "80"}})
 					@fieldHint("workspace", workspaceError) {
 						Your servers and apps live here. Invite your team later.
 					}
 				}
 			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
+			@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
 				Continue 
 			}
 		}

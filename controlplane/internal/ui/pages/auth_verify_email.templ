@@ -34,7 +34,7 @@ templ VerifyEmailSuccess() {
 								window.location.href = '/app';
 							}, 3000);
 						</script>
-						@button.Button(button.Props{Href: "/app", Class: blocks.AuthPrimary}) {
+						@button.Button(button.Props{Size: button.SizeLg, Href: "/app", Class: blocks.AuthPrimary}) {
 							Go to settings 
 						}
 					}
@@ -68,7 +68,7 @@ templ VerifyEmailError(errorMessage string) {
 								{ errorMessage }
 							}
 						}
-						@button.Button(button.Props{Href: "/auth", Class: blocks.AuthPrimary}) {
+						@button.Button(button.Props{Size: button.SizeLg, Href: "/auth", Class: blocks.AuthPrimary}) {
 							Try again 
 						}
 					}

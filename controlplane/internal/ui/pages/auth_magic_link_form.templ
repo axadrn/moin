@@ -26,9 +26,9 @@ templ AuthMagicLinkForm(errorMsg string) {
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		@field.Group() {
-			@field.Field() {
-				@field.Label(field.LabelProps{For: "email"}) {
+		@field.Group(field.GroupProps{Class: "gap-3"}) {
+			@field.Field(field.Props{Class: "gap-2"}) {
+				@field.Label(field.LabelProps{For: "email", Class: "sr-only"}) {
 					Email
 				}
 				@input.Input(input.Props{
@@ -36,6 +36,7 @@ templ AuthMagicLinkForm(errorMsg string) {
 					Name:        "email",
 					Type:        "email",
 					Placeholder: "you@company.com",
+					Class:       "h-11 text-base",
 					Attributes: templ.Attributes{
 						"aria-invalid":     strconv.FormatBool(errorMsg != ""),
 						"aria-describedby": "email-hint",
@@ -46,7 +47,7 @@ templ AuthMagicLinkForm(errorMsg string) {
 				})
 				@fieldHint("email", errorMsg)
 			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: magicLinkVariant(second), Class: blocks.AuthPrimary}) {
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: magicLinkVariant(second), Size: button.SizeLg, Class: blocks.AuthPrimary}) {
 				Continue with email
 				@icon.ArrowRight(icon.Props{Class: "size-4"})
 			}

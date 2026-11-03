@@ -43,7 +43,7 @@ templ AuthMagicLinkResend(email string, sent bool) {
 		>
 			@csrf.Token()
 			<input type="hidden" name="email" value={ email }/>
-			@button.Button(button.Props{Variant: button.VariantSecondary, Class: blocks.AuthSecondary, Type: button.TypeSubmit}) {
+			@button.Button(button.Props{Size: button.SizeLg, Variant: button.VariantSecondary, Class: blocks.AuthSecondary, Type: button.TypeSubmit}) {
 				if sent {
 					Resend again
 				} else {

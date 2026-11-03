@@ -211,7 +211,7 @@ ops is away for about a minute. Your apps keep running. Before the database chan
 
 `ops version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
 
-**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
+**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. ops itself never touches Docker: someone who breaks into it can at most ask for an official ops release, never run their own code on your server. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
 
 To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh` when you like.
 

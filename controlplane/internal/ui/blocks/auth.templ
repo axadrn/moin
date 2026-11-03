@@ -2,9 +2,8 @@ package blocks
 
 import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
-	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
@@ -19,10 +18,10 @@ const AuthPrimary = "w-full"
 // AuthSecondary is the class of the other buttons on auth pages.
 const AuthSecondary = "w-full"
 
-// AuthShell is the split auth screen: the form on the left, what happens
-// after sign-up on the right.
+// AuthShell is the auth screen: the form in a quiet column on the left,
+// and on a wide screen what ops promises on the right.
 templ AuthShell(appName string) {
-	<div class="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+	<div class="grid min-h-svh bg-background lg:grid-cols-2">
 		<div class="flex min-h-svh flex-col px-5 sm:px-10">
 			<header class="flex h-20 items-center justify-between">
 				<a href="/" class="text-[22px] leading-none" aria-label={ appName + " home" }>
@@ -30,18 +29,16 @@ templ AuthShell(appName string) {
 				</a>
 				@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"})
 			</header>
-			<main class="flex flex-1 items-center justify-center py-10">
-				<div class="w-full max-w-[23rem]">
+			<main class="flex flex-1 items-center justify-center py-12">
+				<div class="w-full max-w-sm">
 					{ children... }
 				</div>
 			</main>
-			<footer class="flex h-16 items-center justify-between gap-4 text-xs text-muted-foreground">
+			<footer class="flex h-16 items-center justify-center gap-6 text-sm text-muted-foreground">
 				<a href="/docs" class="transition-colors hover:text-foreground">Docs</a>
 				if ctxkeys.RenderConfig(ctx).Billing {
-					<span class="flex gap-5">
-						<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
-						<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
-					</span>
+					<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
+					<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
 				}
 			</footer>
 		</div>
@@ -49,70 +46,47 @@ templ AuthShell(appName string) {
 	</div>
 }
 
-func authHost(appURL string) string {
-	if appURL == "" {
-		return "https://ops.example.com"
-	}
-	return strings.TrimRight(appURL, "/")
-}
-
-templ authStep(number, title string) {
-	<li class="flex gap-4 px-6 py-5">
-		<span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium tabular-nums">{ number }</span>
-		<div class="min-w-0 flex-1">
-			<p class="text-sm font-medium">{ title }</p>
-			{ children... }
-		</div>
-	</li>
-}
-
-templ authCmd(command string) {
-	<p class="mt-1.5 truncate font-mono text-xs text-muted-foreground"><span class="opacity-60">$</span>{ " " + command }</p>
-}
-
+// authAside is the promise of ops, as on the home page.
 templ authAside() {
-	{{ host := authHost(ctxkeys.RenderConfig(ctx).AppURL) }}
 	<aside class="hidden p-3 lg:flex">
-		@card.Card(card.Props{Class: "min-w-0 gap-0 py-0 text-base overflow-visible flex flex-1 items-center"}) {
-			<div class="mx-auto w-full max-w-xl px-12 py-16">
-				<h2 class="text-3xl font-bold tracking-tight text-balance">From a fresh server to a live app in five minutes.</h2>
-				<ol class="mt-10 divide-y divide-border rounded-3xl bg-background">
-					@authStep("1", "Install ops on your computer") {
-						@authCmd("go install github.com/axadrn/ops/cmd/ops@latest")
-					}
-					@authStep("2", "Log in with a personal API token") {
-						@authCmd("ops login")
-					}
-					@authStep("3", "Add a server, run what it prints") {
-						@authCmd("ops servers add web-1")
-						@authCmd("curl -fsSL " + host + "/install.sh | sh -s -- ins_…")
-					}
-					@authStep("4", "Deploy from your repo") {
-						@authCmd("ops deploy")
-						<div class="mt-3">
-							@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
-								v1 of blog is live
-							}
-						</div>
-					}
-				</ol>
+		@card.Card(card.Props{Class: "min-w-0 flex-1 justify-center gap-0 rounded-4xl py-0"}) {
+			<div class="mx-auto w-full max-w-md px-12 py-16">
+				<p class="text-[3.25rem] leading-[1.03] font-semibold tracking-[-0.045em]">
+					<span class="block">Your servers.</span>
+					<span class="block text-live">Zero data loss.</span>
+				</p>
+				<p class="mt-6 text-lg leading-8 text-muted-foreground">Deploy any app to servers you own. Every site checked every minute.</p>
+				<ul class="mt-10 flex flex-col gap-4 text-base font-medium">
+					@authProof("No SSH keys, no open ports")
+					@authProof("Backups every second")
+					@authProof("Uptime checks built in")
+				</ul>
 			</div>
 		}
 	</aside>
 }
 
+// authProof is one promise of ops, with a check.
+templ authProof(text string) {
+	<li class="flex items-center gap-3">
+		<span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-live text-background">
+			@icon.Check(icon.Props{Class: "size-3.5 stroke-3"})
+		</span>
+		{ text }
+	</li>
+}
+
 // AuthCard is the title, the description and the form of an auth page.
 templ AuthCard(title, description string) {
 	<div class="flex flex-col">
-		<h1 class="text-3xl font-bold tracking-tight text-balance">{ title }</h1>
-		<p class="mt-2 text-sm text-pretty text-muted-foreground">{ description }</p>
-		<div class="mt-8">
+		<h1 class="text-center text-3xl font-semibold tracking-[-0.04em] text-balance">{ title }</h1>
+		<p class="mt-3 text-center text-base text-pretty text-muted-foreground">{ description }</p>
+		<div class="mt-10">
 			{ children... }
 		</div>
 		if ctxkeys.RenderConfig(ctx).Billing {
-			<p class="mt-8 text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-foreground">
-				By continuing, you agree to the <a href="/legal/terms">Terms of Service</a>
-				and the <a href="/legal/privacy">Privacy Policy</a>.
+			<p class="mt-10 text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-foreground">
+				By continuing, you agree to the <a href="/legal/terms">Terms</a> and the <a href="/legal/privacy">Privacy Policy</a>.
 			</p>
 		}
 	</div>
@@ -120,7 +94,7 @@ templ AuthCard(title, description string) {
 
 // AuthOr separates two ways to sign in.
 templ AuthOr() {
-	<div class="flex items-center gap-3 text-xs text-muted-foreground">
+	<div class="my-1 flex items-center gap-4 text-sm text-muted-foreground">
 		@separator.Separator(separator.Props{Class: "w-auto flex-1", Attributes: templ.Attributes{"aria-hidden": "true"}})
 		or
 		@separator.Separator(separator.Props{Class: "w-auto flex-1", Attributes: templ.Attributes{"aria-hidden": "true"}})
