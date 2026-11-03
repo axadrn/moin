@@ -487,7 +487,7 @@ templ HomeUptime() {
 					<h2 class={ typeH2, "" }>Know before your customers do.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
 						<span class="text-foreground">Every domain, checked from outside, every minute.</span>
-						Down? You get an email with the reason. Nothing to set up, no second tool to pay for.
+						Down? You hear it by email, Slack, Discord or Telegram. Nothing to set up, no second tool to pay for.
 					</p>
 				</div>
 				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1" aria-label="Two alert emails from ops">
@@ -743,12 +743,12 @@ templ HomeNext() {
 	<section id="next" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
 			<h2 class={ typeH2 }>This is just the start.</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every alert. Nothing anyone else can read.</p>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every provider. Nothing anyone else can read.</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4">
 				@homeNextStep("Postgres and MySQL", "Backups every second, restore checks and the data browser.")
-				@homeNextStep("Alerts everywhere", "Slack, Discord, Telegram and webhooks.")
-				@homeNextStep("Live metrics", "CPU, memory, requests and errors, with every deploy marked.")
+				@homeNextStep("Servers in one click", "Create them at Hetzner, DigitalOcean and more, right from ops.")
 				@homeNextStep("Zero trust", "Secrets only on your servers, end to end encrypted.")
+				@homeNextStep("Signed commands", "Your servers only obey changes you signed.")
 			</div>
 			<p class="mt-6">
 				<a href="/docs/roadmap" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">The roadmap</a>
@@ -811,9 +811,6 @@ templ HomeFAQ() {
 				}
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
-				}
-				@homeQuestion("What comes next?") {
-					Alerts to Slack and Telegram, live metrics, more buckets. Then zero trust. <a href="/docs/roadmap" class="text-foreground underline underline-offset-4 hover:text-foreground">The roadmap</a>
 				}
 				@homeQuestion("Will the name change?") {
 					Maybe. If so, everything moves over by itself. Nothing breaks.
