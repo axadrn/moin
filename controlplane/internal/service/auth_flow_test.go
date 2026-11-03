@@ -352,4 +352,12 @@ func TestOAuthProvisioningAndExistingUserVerification(t *testing.T) {
 	if authenticated.ID != existing.User.ID || authenticated.EmailVerifiedAt == nil {
 		t.Fatalf("authenticated OAuth user = %#v", authenticated)
 	}
+
+	second, err := environment.auth.AuthenticateOAuth("new-primary@example.com", "github", "unknown@example.com", " Existing-OAuth@Example.com ")
+	if err != nil {
+		t.Fatalf("AuthenticateOAuth(second address) error = %v", err)
+	}
+	if second.ID != existing.User.ID {
+		t.Fatalf("AuthenticateOAuth(second address) = user %s, want the existing account %s", second.ID, existing.User.ID)
+	}
 }

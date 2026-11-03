@@ -752,8 +752,11 @@ func (s *AuthService) CompleteOnboarding(userID, name, workspaceName string, cre
 }
 
 // AuthenticateOAuth handles OAuth authentication (Google, GitHub, etc.)
-// It creates a new user if one doesn't exist, or returns existing user
-func (s *AuthService) AuthenticateOAuth(email, provider string) (*model.User, error) {
+// It returns the user of email, or of the first of others with an account:
+// more verified addresses of the same person, so signing in with GitHub
+// finds an account made with a second address. Without any account, it
+// creates one for email.
+func (s *AuthService) AuthenticateOAuth(email, provider string, others ...string) (*model.User, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 
 	// Validate email
@@ -764,6 +767,16 @@ func (s *AuthService) AuthenticateOAuth(email, provider string) (*model.User, er
 
 	// Check if user exists
 	user, err := s.userRepository.ByEmail(email)
+	for _, other := range others {
+		if !errors.Is(err, repository.ErrUserNotFound) {
+			break
+		}
+		other = strings.TrimSpace(strings.ToLower(other))
+		if other == email || validation.ValidateEmail(other) != nil {
+			continue
+		}
+		user, err = s.userRepository.ByEmail(other)
+	}
 	if err != nil {
 		if !errors.Is(err, repository.ErrUserNotFound) {
 			return nil, fmt.Errorf("failed to lookup user: %w", err)

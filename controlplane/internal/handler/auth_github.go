@@ -110,7 +110,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := h.githubOAuthConfig().Client(context.Background(), token)
-	email, name, err := githubAccount(client, h.githubAPI())
+	emails, name, err := githubAccount(client, h.githubAPI())
 	if errors.Is(err, errOAuthEmailMissing) || errors.Is(err, errOAuthEmailUnverified) {
 		slog.Warn("github oauth: no verified email", "error", err)
 		render(w, r, pages.Auth("GitHub did not share a verified email address. Verify your email on GitHub and try again."))
@@ -123,7 +123,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate or create user
-	user, err := h.authService.AuthenticateOAuth(email, "github")
+	user, err := h.authService.AuthenticateOAuth(emails[0], "github", emails[1:]...)
 	if errors.Is(err, service.ErrPrivate) {
 		render(w, r, pages.AuthPrivate())
 		return
@@ -157,9 +157,9 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// githubAccount returns the email and the name of the GitHub account: the
-// profile name, or the login without one.
-func githubAccount(client *http.Client, api string) (string, string, error) {
+// githubAccount returns the verified emails and the name of the GitHub
+// account: the profile name, or the login without one.
+func githubAccount(client *http.Client, api string) ([]string, string, error) {
 	var userInfo struct {
 		Email string `json:"email"`
 		Name  string `json:"name"`
@@ -167,23 +167,24 @@ func githubAccount(client *http.Client, api string) (string, string, error) {
 	}
 	err := getOAuthJSON(client, api+"/user", &userInfo)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
-	email, err := githubEmail(client, api, userInfo.Email)
+	emails, err := githubEmails(client, api, userInfo.Email)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	name := strings.TrimSpace(userInfo.Name)
 	if name == "" || validation.ValidateName(name) != nil {
 		name = strings.TrimSpace(userInfo.Login)
 	}
-	return email, name, nil
+	return emails, name, nil
 }
 
-// githubEmail returns the public email, or the primary address when the
-// public one is private. Either must be verified on GitHub, so nobody signs
-// in to an account by adding its address to GitHub without proving it.
-func githubEmail(client *http.Client, api, public string) (string, error) {
+// githubEmails returns the verified addresses of the account, first the
+// public email, or the primary address when the public one is private. Each
+// must be verified on GitHub, so nobody signs in to an account by adding its
+// address to GitHub without proving it.
+func githubEmails(client *http.Client, api, public string) ([]string, error) {
 	var emails []struct {
 		Email    string `json:"email"`
 		Primary  bool   `json:"primary"`
@@ -191,27 +192,36 @@ func githubEmail(client *http.Client, api, public string) (string, error) {
 	}
 	err := getOAuthJSON(client, api+"/user/emails", &emails)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	primary := ""
+	first, primary := "", ""
+	var others []string
 	for _, email := range emails {
 		if !email.Verified || email.Email == "" {
 			continue
 		}
-		if public != "" && strings.EqualFold(email.Email, public) {
-			return email.Email, nil
-		}
-		if email.Primary {
+		switch {
+		case public != "" && strings.EqualFold(email.Email, public):
+			first = email.Email
+		case email.Primary:
 			primary = email.Email
+		default:
+			others = append(others, email.Email)
 		}
+	}
+	if first == "" {
+		first, primary = primary, ""
+	}
+	if first == "" {
+		if len(emails) == 0 && public == "" {
+			return nil, errOAuthEmailMissing
+		}
+		return nil, errOAuthEmailUnverified
 	}
 	if primary != "" {
-		return primary, nil
+		others = append([]string{primary}, others...)
 	}
-	if len(emails) == 0 && public == "" {
-		return "", errOAuthEmailMissing
-	}
-	return "", errOAuthEmailUnverified
+	return append([]string{first}, others...), nil
 }
 
 func getOAuthJSON(client *http.Client, url string, value any) error {

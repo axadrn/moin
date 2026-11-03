@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,12 +74,13 @@ func TestGitHubEmailRequiresAVerifiedAddress(t *testing.T) {
 		name    string
 		user    string
 		emails  string
-		want    string
+		want    []string
 		wantErr error
 	}{
-		{name: "verified public email", user: `{"email":"Public@Example.com"}`, emails: `[{"email":"primary@example.com","primary":true,"verified":true},{"email":"public@example.com","verified":true}]`, want: "public@example.com"},
-		{name: "verified primary when private", user: `{"email":null}`, emails: `[{"email":"primary@example.com","primary":true,"verified":true}]`, want: "primary@example.com"},
-		{name: "unverified public falls back to verified primary", user: `{"email":"victim@example.com"}`, emails: `[{"email":"victim@example.com","verified":false},{"email":"primary@example.com","primary":true,"verified":true}]`, want: "primary@example.com"},
+		{name: "verified public email", user: `{"email":"Public@Example.com"}`, emails: `[{"email":"primary@example.com","primary":true,"verified":true},{"email":"public@example.com","verified":true}]`, want: []string{"public@example.com", "primary@example.com"}},
+		{name: "verified primary when private", user: `{"email":null}`, emails: `[{"email":"primary@example.com","primary":true,"verified":true}]`, want: []string{"primary@example.com"}},
+		{name: "unverified public falls back to verified primary", user: `{"email":"victim@example.com"}`, emails: `[{"email":"victim@example.com","verified":false},{"email":"primary@example.com","primary":true,"verified":true}]`, want: []string{"primary@example.com"}},
+		{name: "every verified address, primary first", user: `{"email":null}`, emails: `[{"email":"work@example.com","verified":true},{"email":"unproven@example.com","verified":false},{"email":"primary@example.com","primary":true,"verified":true}]`, want: []string{"primary@example.com", "work@example.com"}},
 		{name: "unverified primary", user: `{"email":null}`, emails: `[{"email":"victim@example.com","primary":true,"verified":false}]`, wantErr: errOAuthEmailUnverified},
 		{name: "unverified public only", user: `{"email":"victim@example.com"}`, emails: `[{"email":"victim@example.com","primary":true,"verified":false}]`, wantErr: errOAuthEmailUnverified},
 		{name: "no email", user: `{"email":null}`, emails: `[]`, wantErr: errOAuthEmailMissing},
@@ -89,10 +91,10 @@ func TestGitHubEmailRequiresAVerifiedAddress(t *testing.T) {
 				"https://api.github.com/user/emails": test.emails,
 			}}
 
-			email, _, err := githubAccount(client, "https://api.github.com")
+			emails, _, err := githubAccount(client, "https://api.github.com")
 
-			if !errors.Is(err, test.wantErr) || email != test.want {
-				t.Fatalf("githubAccount() = %q, %v, want %q, %v", email, err, test.want, test.wantErr)
+			if !errors.Is(err, test.wantErr) || !slices.Equal(emails, test.want) {
+				t.Fatalf("githubAccount() = %q, %v, want %q, %v", emails, err, test.want, test.wantErr)
 			}
 		})
 	}
@@ -101,9 +103,9 @@ func TestGitHubEmailRequiresAVerifiedAddress(t *testing.T) {
 func TestGitHubEmailFailsWhenTheEmailListIsUnavailable(t *testing.T) {
 	client := &http.Client{Transport: fakeGitHubAPI{"https://api.github.com/user": `{"email":"public@example.com"}`}}
 
-	email, _, err := githubAccount(client, "https://api.github.com")
+	emails, _, err := githubAccount(client, "https://api.github.com")
 
-	if err == nil || email != "" {
-		t.Fatalf("githubAccount() = %q, %v, want an error", email, err)
+	if err == nil || emails != nil {
+		t.Fatalf("githubAccount() = %q, %v, want an error", emails, err)
 	}
 }

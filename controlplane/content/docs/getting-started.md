@@ -16,7 +16,7 @@ Not sure what a word means? [How ops works in 2 minutes](/docs#how-ops-works-in-
 
 ## 1. Sign up
 
-Open the control plane in your browser and press **Continue with GitHub**. No GitHub account, or a self-hosted control plane without GitHub sign-in? Enter your email instead, and ops sends you a sign-in link.
+Open the control plane in your browser and press **Continue with GitHub**. No GitHub account, or a self-hosted control plane without GitHub sign-in? Enter your email instead, and ops sends you a sign-in link. GitHub finds your account by any verified email on your GitHub account, so an account made with your work address works too.
 
 The first time, ops asks for two things:
 
