@@ -28,6 +28,11 @@ var compareRows = []compareRow{
 	{"Stores your code and data", []string{"No", "No", "No", "No", "Yes", "Yes", "Yes", "Yes"}},
 	{"SQLite backups", []string{"Every second, restore to any second", "Scheduled", "Scheduled volume backups", "?", "Not possible, the disk resets daily", "Daily disk snapshot", "Daily volume backup", "Daily volume snapshot"}},
 	{"Restore checked every day", []string{"Yes", "No", "No", "?", "No", "No", "No", "No"}},
+	// Uptime sources: coolify.io/docs/knowledge-base/monitoring,
+	// docs.dokploy.com/docs/core/monitoring, kamal-deploy.org/docs/configuration/proxy,
+	// devcenter.heroku.com/articles/metrics, render.com/docs/uptime-best-practices,
+	// docs.railway.com/reference/healthchecks, docs.fly.io/reference/health-checks.
+	{"Uptime checks from outside", []string{"Every minute, built in", "No, container health only", "No, server metrics only", "No, deploy check only", "No, metric alerts only", "No, health checks only", "No, deploy check only", "No, health checks only"}},
 	{"Data browser and SQL", []string{"Yes, for SQLite", "Through pgAdmin or CloudBeaver", "?", "No", "Postgres only", "No", "Tables of its databases", "?"}},
 	{"Deploy from laptop, GitHub, CI image", []string{"All three", "GitHub, image", "GitHub, image, zip upload", "Laptop", "All three", "GitHub, image", "Laptop, others ?", "Laptop, image, GitHub ?"}},
 	{"CLI, terminal UI, API, MCP", []string{"All four", "CLI, API, MCP", "CLI, API, MCP", "CLI", "CLI, MCP, API ?", "CLI, API, MCP", "CLI, MCP, API ?", "CLI, MCP, API ?"}},

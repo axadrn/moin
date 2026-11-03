@@ -28,7 +28,7 @@ const (
 templ Home(network model.Network) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy to servers you own",
-		Description: brand.Name + " deploys your apps to servers you own, backs up every change of their SQLite database to your bucket and lets you edit the data live. From the web, the CLI, a terminal UI and MCP.",
+		Description: brand.Name + " deploys your apps to servers you own, backs up every change of their SQLite database to your bucket, lets you edit the data live and checks every domain every minute. From the web, the CLI, a terminal UI and MCP.",
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		<main>
@@ -103,7 +103,7 @@ templ HomeHero() {
 					<span class="block">Runs any app with a Dockerfile.</span>
 				</p>
 				<p class="mt-3 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-					{ brand.Name } puts your apps on your own server, backs up every change of your database to your bucket and lets you fix the data live. From the browser, the CLI, a terminal UI or your AI agent.
+					{ brand.Name } puts your apps on your own server, backs up every change of your database to your bucket, lets you fix the data live and checks your sites every minute. From the browser, the CLI, a terminal UI or your AI agent.
 				</p>
 				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
 					@homePrimary()
@@ -712,7 +712,7 @@ templ HomePricing() {
 					<dl class="mt-8 divide-y divide-border border-y border-border">
 						@homePlanRow("Setup", "About an hour", false)
 						@homePlanRow("Control plane", "On your own server", false)
-						@homePlanRow("Updates", "You pull and rebuild", false)
+						@homePlanRow("Updates", "One click", false)
 						@homePlanRow("GitHub App, email", "You set them up", false)
 						@homePlanRow("Control plane backups", "Yours to run", false)
 						@homePlanRow("Support", "GitHub issues", false)
@@ -778,8 +778,8 @@ templ HomeRoadmap() {
 		<div class={ homeWrap }>
 			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Where { brand.Name } is going.</h2>
 			<div class="mt-10 grid grid-cols-1 gap-3 lg:grid-cols-3">
-				@homeRoadmapStep("Now", "Deploys, backups, data, domains, security, teams and the activity log. On the web, the CLI, the terminal UI, the API and MCP.")
-				@homeRoadmapStep("Next", "Live metrics for every server and app, uptime checks for every domain, alerts to email, Slack, Discord and Telegram. Env vars as one .env text, vim keys in the terminal UI, more than one bucket.")
+				@homeRoadmapStep("Now", "Deploys, backups, data, domains, uptime checks every minute, security, teams and the activity log. Updates in one click. On the web, the CLI, the terminal UI, the API and MCP.")
+				@homeRoadmapStep("Next", "Live metrics for every server and app, alerts to email, Slack, Discord and Telegram when a site goes down, more than one bucket.")
 				@homeRoadmapStep("Later", "Zero trust: bucket keys only on your servers, secrets encrypted end to end, and servers that only obey commands you signed.")
 			</div>
 			<p class="mt-6">

@@ -3,6 +3,30 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.4
+
+November 3, 2026
+
+**In short:** ops watches your sites every minute, puts apps and servers in your order, and updates itself and its agents.
+
+### New
+- **Uptime checks, built in**: every domain of every app is checked from outside once a minute, from the first deploy on, with nothing to set up. The app's **Uptime** tab shows 24 hours, 7 and 30 days, the certificate and the last outages. Also `ops uptime`, the TUI (`u` on an app), API and MCP.
+- **Your own order**: drag apps and servers where you want them, or `ops apps move blog top`, `K` / `J` in the TUI. Everyone in the workspace sees the same order everywhere.
+- **List or grid**: switch how the Apps and Servers pages look; ops remembers it for you.
+- **Update now**: a self-hosted ops shows when a release is out, with its notes, and updates in one click. If the new version does not start, the old one comes back. Also `ops update`.
+- **Agents update themselves** to the control plane's version, one server at a time and never during a deploy. Turn it off with `ops servers auto-update off`.
+
+### Changed
+- **Activity**: a server going offline and coming back now shows up there, and so does every site that goes down and comes back.
+- **Self-hosted gets releases only**: `update.sh` takes the newest release, not every build in between.
+- **A copy of the database before every upgrade**: ops writes `backup-before-<version>.db` next to it before it changes the schema.
+
+### Fixed
+- **Signing in with GitHub finds your account** by any verified email on your GitHub account, not only the primary one, instead of making a new empty account.
+
+### Upgrade
+Self-hosted: `git pull` in the repo, then `sh update.sh` once, which also starts the updater. From then on: **Update now**.
+
 ## v1.0.0-beta.3
 
 November 3, 2026
