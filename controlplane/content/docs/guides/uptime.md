@@ -61,3 +61,5 @@ MCP: set_uptime_check
 The newest result of each domain lives in the control plane's memory. The database keeps, per domain and hour, how many checks ran, how many found it up and their response times, for 31 days, and every outage for 90 days. On the hosted control plane checks only reach public addresses.
 
 A self-hosted control plane checks in production; `UPTIME_CHECKS=false` turns the checks off, `UPTIME_CHECKS=true` turns them on in development.
+
+A small server checks about 100,000 domains a minute: each one at its own second, so they never all go at once.
