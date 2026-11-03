@@ -1,9 +1,10 @@
 # The ops control plane. update.sh starts it with the settings in
 # /etc/ops-controlplane/env; its SQLite database lives in
-# /var/lib/ops-controlplane.
+# /var/lib/ops-controlplane. stable is the newest release; a deploy of
+# ops.goilerplate.com between releases does not reach it.
 services:
   controlplane:
-    image: ${OPS_IMAGE:-ghcr.io/axadrn/ops-controlplane:latest}
+    image: ${OPS_IMAGE:-ghcr.io/axadrn/ops-controlplane:stable}
     restart: unless-stopped
     env_file: /etc/ops-controlplane/env
     volumes:

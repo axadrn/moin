@@ -195,7 +195,7 @@ When the control plane starts and finds no database, it restores the newest one 
 
 ## Updates
 
-Run `update.sh` again. It pulls the newest image and restarts; the database migrates itself on start.
+Run `update.sh` again. It pulls the newest release and restarts; the database migrates itself on start. You only get releases, with their notes in the [changelog](/changelog), never work in between.
 
 ## Move or rebuild
 
