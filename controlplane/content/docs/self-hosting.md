@@ -13,7 +13,7 @@ order: 3
 | Servers, apps, members | unlimited | unlimited |
 | Setup | about an hour | two minutes |
 | Control plane | on your own server | ours, nothing to run |
-| Updates | you pull and rebuild | the day they ship |
+| Updates | one click, when ops says a release is out | the day they ship, by us |
 | GitHub App, email | you set them up | ready to use |
 | Backups of the control plane | yours to run | every day, by us |
 | Support | GitHub issues | email, from the team |
@@ -54,6 +54,7 @@ Three files do the work. They are in the repo, in `controlplane/deploy/`:
 | `setup.sh` | Prepares the server once: Docker, security updates, and with `--tailscale` SSH on your tailnet |
 | `compose.yml` | Runs the control plane, and with a tunnel token also `cloudflared` |
 | `update.sh` | Starts the control plane, and later updates it to the newest version |
+| `updater.sh` | Runs next to it and does **Update now**, see [Updates](#updates) |
 
 **1. Prepare the server**, as root:
 
@@ -187,6 +188,8 @@ Turn it off with one setting:
 TELEMETRY=false
 ```
 
+Once a day it also asks GitHub for the newest release, see [Updates](#updates). That request carries nothing about you.
+
 ## Database backup
 
 The control plane keeps its own SQLite database safe the way it keeps your apps' databases: every change goes to its bucket within seconds (`S3_BUCKET`, folder `controlplane/litestream`), with Litestream. In production this is on by default; `BACKUP_DATABASE=false` turns it off.
@@ -199,7 +202,20 @@ When the control plane starts and finds no database, it restores the newest one 
 
 ## Updates
 
-Run `update.sh` again. It pulls the newest release and restarts; the database migrates itself on start. You only get releases, with their notes in the [changelog](/changelog), never work in between.
+**The control plane.** Once a day it asks GitHub for the newest release. When one is out, the admins in `ADMIN_EMAILS` see a note at the top of the web UI: the version, what is new in one line, and a link to the release notes. Then:
+
+- Click **Update now**. Or run `ops update` in the CLI, or `u` on the settings tab of the TUI.
+- Or run `sh update.sh` on the server, as before.
+
+ops is away for about a minute. Your apps keep running. Before the database changes, ops keeps a copy of it next to it, like `/var/lib/ops-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
+
+`ops version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
+
+**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
+
+To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh` when you like.
+
+**The agents** update themselves to the version of the control plane, one server at a time, never during a deploy. Your apps keep running. See [Servers](/docs/guides/servers#updates).
 
 ## Move or rebuild
 

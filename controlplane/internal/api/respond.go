@@ -266,5 +266,10 @@ var serviceErrors = []serviceError{
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Add a Cloudflare API token first."},
 	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Add a Tailscale auth key first."},
 	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it ops turns on Always Use HTTPS."},
+	{err: service.ErrUpdateNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this control plane, in ADMIN_EMAILS, update it."},
+	{err: service.ErrUpdateHosted, status: http.StatusConflict, code: "hosted", message: "The hosted control plane updates itself with every release. Nothing to do."},
+	{err: service.ErrNoUpdate, status: http.StatusConflict, code: "up_to_date", message: "This control plane runs the newest release."},
+	{err: service.ErrUpdaterMissing, status: http.StatusConflict, code: "no_updater", message: "The updater does not run next to this control plane. Update it on the server with sh update.sh, which also starts the updater."},
+	{err: service.ErrUpdateRunning, status: http.StatusConflict, code: "update_running", message: "An update is already under way."},
 	{err: service.ErrTailscaleKey, field: "tailscale_key", message: "A Tailscale auth key starts with tskey-."},
 }

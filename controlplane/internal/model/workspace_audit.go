@@ -268,6 +268,18 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "renamed the server " + d["from"] + " to " + target
 	case "server.agent_updated":
 		return "updated the agent of " + target + " from " + d["from"] + " to " + d["to"]
+	case "server.agent_update_failed":
+		return "could not update the agent of " + target + " from " + d["from"] + " to " + d["to"] + ", so agents of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
+	case "workspace.agent_updates":
+		return on("turned automatic agent updates %s")
+	case "controlplane.update_started":
+		return "started the update of the control plane from " + d["from"] + " to " + d["to"]
+	case "controlplane.updated":
+		return "updated the control plane from " + d["from"] + " to " + d["to"]
+	case "controlplane.rolled_back":
+		return "could not update the control plane to " + d["to"] + ", so it runs " + d["from"] + " again: " + d["reason"]
+	case "controlplane.update_failed":
+		return "could not update the control plane to " + d["to"] + ": " + d["reason"]
 	case "server.security_set":
 		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
 	case "server.reinstalled":

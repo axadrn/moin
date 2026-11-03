@@ -46,7 +46,8 @@ Servers
   servers rename     Rename a server: servers rename web-1 shop-1
   servers move       Change the order: servers move web-1 up|down|top|bottom|<position>
   servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
-  servers update     Update the agent to the control plane's version: servers update [web-1]
+  servers update     Update the agent to the control plane's version now: servers update [web-1]
+  servers auto-update  Agents update by themselves, on by default: servers auto-update [on|off]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for ops, from /etc/ops/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
@@ -127,7 +128,8 @@ Agent
   agent uninstall    Remove the agent from this server; the apps keep running: agent uninstall [--apps] [--yes]
   agent              Run the agent on this server
 
-  version            Show the version
+  version            Show the version of ops and the control plane, and a newer release
+  update             Update a self-hosted control plane to the newest release [--yes]
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
@@ -209,11 +211,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		printUsage(stdout)
 		return nil
 	case "version", "--version":
-		if err := noArguments(command, rest); err != nil {
-			return err
-		}
-		fmt.Fprintln(stdout, build.Name, build.Version)
-		return nil
+		return version(ctx, rest, stdout)
+	case "update":
+		return update(ctx, rest, stdin, stdout)
 	case "login":
 		return login(ctx, rest, stdin, stdout)
 	case "logout":
@@ -455,6 +455,8 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return printRules(ctx, api, flags.Arg(0), stdout)
 	case "update":
 		return updateAgents(ctx, args, stdout)
+	case "auto-update":
+		return agentUpdates(ctx, args, stdout)
 	case "install-command":
 		flags := newFlags("servers install-command", "servers install-command <server>")
 		if err := flags.parse(args); err != nil {

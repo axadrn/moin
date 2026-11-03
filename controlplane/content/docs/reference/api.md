@@ -15,6 +15,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | Endpoint | Does |
 | --- | --- |
 | `GET /api/v1/meta` | the name, version and support address of this control plane; needs no token |
+| `GET /api/v1/version` | the version and, on a self-hosted control plane, the newest release, its "In short" line, the notes and how the last update went |
+| `POST /api/v1/version/update` | updates a self-hosted control plane to the newest release (admins in `ADMIN_EMAILS`); follow it with `GET /api/v1/version` |
 | `GET /api/v1/account` · `PATCH /account/name` | the signed-in account; its name |
 | `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
 | `POST /api/v1/account/password/set` · `DELETE /account/password` | sets the first password; removes it (*session*) |
@@ -42,6 +44,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `PUT /api/v1/servers/order` | puts the servers in a new order `{"order": ["web-1", "db-1"]}`, every server once, by name or ID; answers the list in it |
 | `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there, empty when no agent ever connected, and the `apps` that went with an offline server |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
+| `GET /api/v1/agent-updates` · `PUT` | whether agents update by themselves `{"auto": true}`; on by default |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
 | `GET /api/v1/apps/events` | app list as server-sent events |
 | `PUT /api/v1/apps/order` | puts the apps in a new order `{"order": ["blog", "shop"]}`, every app once, by name or ID; answers the list in it |

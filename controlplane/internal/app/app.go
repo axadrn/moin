@@ -5,11 +5,13 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/access"
 	"github.com/axadrn/ops/internal/build"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
 	"github.com/axadrn/ops/controlplane/internal/config"
 	"github.com/axadrn/ops/controlplane/internal/content"
 	"github.com/axadrn/ops/controlplane/internal/db"
+	"github.com/axadrn/ops/controlplane/internal/dbbackup"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/secret"
 	"github.com/axadrn/ops/controlplane/internal/service"
@@ -33,6 +35,7 @@ type App struct {
 	BetaService         *service.BetaService
 	PaymentService      payment.Provider
 	TelemetryService    *service.TelemetryService
+	UpdateService       *service.UpdateService
 	WorkspaceService    *service.WorkspaceService
 	APITokenService     *service.APITokenService
 	ServerService       *service.ServerService
@@ -50,6 +53,15 @@ func New(cfg *config.Config) (*App, error) {
 			_ = database.Close()
 		}
 	}()
+	// The data directory holds the database, its snapshots from before
+	// migrations and the files the updater reads and writes.
+	dataDir := "data"
+	if file := dbbackup.File(cfg.DBConnection); file != "" {
+		dataDir = filepath.Dir(file)
+		if _, err := db.SnapshotBeforeMigrations(database.DB, dataDir, build.Version); err != nil {
+			return nil, err
+		}
+	}
 	err = db.RunMigrations(database.DB)
 	if err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
@@ -117,6 +129,9 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
+	// Agents older than the control plane update to its version by
+	// themselves, unless their workspace turned it off.
+	serverService.UpdateAgentsTo(build.Version)
 	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAppClientID, cfg.GitHubAppClientSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
 	if err != nil {
 		return nil, err
@@ -153,6 +168,9 @@ func New(cfg *config.Config) (*App, error) {
 		PaymentService:      paymentProvider,
 		// Only a self-hosted control plane reports; the hosted one counts.
 		TelemetryService: service.NewTelemetryService(repository.NewTelemetryRepository(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
+		// Only a self-hosted control plane offers updates; the Deploy
+		// workflow updates the hosted one.
+		UpdateService:    service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, workspaceAuditEvents),
 		WorkspaceService: workspaceService,
 		APITokenService:  apiTokenService,
 		ServerService:    serverService,

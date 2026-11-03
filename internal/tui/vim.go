@@ -483,8 +483,10 @@ var commandKeys = map[string]map[tab]string{
 	"start":    {tabApps: "S"},
 	"stop":     {tabApps: "S"},
 	"tunnel":   {tabServers: "t"},
-	"update":   {tabServers: "u"},
+	"update":   {tabServers: "u", tabSettings: "u"},
 	"uptime":   {tabApps: "u"},
+	// auto-update turns automatic agent updates on or off.
+	"auto-update": {tabSettings: "A"},
 }
 
 // tabNames are the tabs in their order, as commands.
@@ -676,6 +678,12 @@ var helpEntries = [][2]string{
 	{"i", "a new install command"},
 	{"u", "update the agent"},
 	{"K J", "move the server up, down; :move up, :move down"},
+	{"x", "remove"},
+	{"", "Settings"},
+	{"enter", "change the setting"},
+	{"u :update", "update a self-hosted control plane"},
+	{"A :auto-update", "agents update by themselves, on or off"},
+	{"a", "add a registry login"},
 	{"x", "remove"},
 	{"", "Inputs"},
 	{"ctrl+u", "clears the line"},

@@ -81,6 +81,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	}, Write(tools.revokeInvitation))
 	registerOpsTools(server, services)
 	registerUptimeTools(server, services)
+	registerUpdateTools(server, services)
 }
 
 func readOnly(title string) *mcpsdk.ToolAnnotations {

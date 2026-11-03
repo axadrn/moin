@@ -38,6 +38,8 @@ type Services struct {
 	Invitations *middleware.RateLimiter
 	Servers     *service.ServerService
 	Apps        *service.AppService
+	// Updates tells of new releases and updates a self-hosted control plane.
+	Updates *service.UpdateService
 	// BillingOff is set on a self-hosted control plane, BILLING=false:
 	// get_billing says so, like the JSON API.
 	BillingOff bool

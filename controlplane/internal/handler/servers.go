@@ -32,7 +32,12 @@ func (h *ServersHandler) ServersPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list servers failed", err)
 		return
 	}
-	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers)))
+	autoUpdate, err := h.servers.AutoUpdateAgents(workspace.ID)
+	if err != nil {
+		renderError(w, "read agent updates failed", err)
+		return
+	}
+	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers), autoUpdate))
 }
 
 // removed is the server Delete just removed, named in ?removed=, so the
@@ -121,4 +126,17 @@ func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	toastDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
+}
+
+// AgentUpdates turns automatic agent updates on or off. The switch shows
+// the new state already; a failed save flips it back.
+func (h *ServersHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
+	err := h.servers.SetAutoUpdateAgents(actor(r), r.FormValue("on") == "1")
+	if err == nil {
+		return
+	}
+	toastFailed(w, r, "Setting not saved", errorMessage(err))
+	if on, err := h.servers.AutoUpdateAgents(ctxkeys.Workspace(r.Context()).ID); err == nil {
+		renderOOB(w, r, pages.AgentUpdatesForm(on), "outerHTML:#agent-updates-form")
+	}
 }

@@ -39,8 +39,10 @@ type apiEnvironment struct {
 	storage    *testutil.MemoryStorage
 	admin      *service.AdminService
 	payments   *paymentStub
-	routes     []api.Route
-	handler    http.Handler
+	// updates is a hosted control plane's: no release, no update.
+	updates *service.UpdateService
+	routes  []api.Route
+	handler http.Handler
 }
 
 // testAdminEmail is the operator address of the API test environment.
@@ -93,7 +95,11 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	adminHandler := api.NewAdminHandler(environment.admin)
 
 	clientIPs := middleware.NewClientIPResolver(nil)
+	audit := repository.NewWorkspaceAuditRepository(database)
+	servers := service.NewServerService(repository.NewServerRepository(database), audit, "https://app.example.com")
+	environment.updates = service.NewUpdateService("v0.2.0", "http://127.0.0.1:1/releases", t.TempDir(), false, true, []string{testAdminEmail}, audit)
 	handlers := api.Handlers{
+		Version:     api.NewVersionHandler(environment.updates, servers),
 		Meta:        api.NewMetaHandler(testSupportEmail),
 		Auth:        authHandler,
 		Account:     accountHandler,

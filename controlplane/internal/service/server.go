@@ -56,6 +56,11 @@ type ServerService struct {
 	onMessage   func(serverID string, message protocol.Message)
 	onConnect   func(serverID, workspaceID string)
 	accessOf    func(workspaceID string) (access.Access, error)
+	// autoVersion is the version agents update to by themselves; "" is
+	// off. autoRunning and autoHalted are per workspace.
+	autoVersion string
+	autoRunning map[string]bool
+	autoHalted  map[string]bool
 }
 
 type agentSession struct {
@@ -75,6 +80,8 @@ func NewServerService(servers repository.ServerRepository, audit repository.Work
 		now:         time.Now,
 		sessions:    map[string]*agentSession{},
 		subscribers: map[string]map[chan struct{}]struct{}{},
+		autoRunning: map[string]bool{},
+		autoHalted:  map[string]bool{},
 	}
 }
 
@@ -305,6 +312,7 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	if onConnect != nil {
 		go onConnect(server.ID, server.WorkspaceID)
 	}
+	go s.autoUpdate(server.WorkspaceID)
 
 	return func() {
 		s.mu.Lock()

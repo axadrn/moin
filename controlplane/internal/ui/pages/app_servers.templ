@@ -33,7 +33,7 @@ type RemovedServer struct {
 	Command string
 }
 
-templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer) {
+templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool) {
 	@layouts.App("Servers") {
 		@panelPage() {
 			@pageHeader("Servers", "Every server runs the ops agent. It dials out to ops, so nothing on your server listens for us.") {
@@ -52,6 +52,9 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer) {
 			<div data-server-list-wrap>
 				@ServerList(servers)
 			</div>
+			@panel(panelProps{Title: "Agent updates", Docs: "/docs/guides/servers#updates"}) {
+				@AgentUpdatesForm(autoUpdate)
+			}
 		}
 		@serversScript()
 	}
