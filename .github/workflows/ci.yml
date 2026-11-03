@@ -1,10 +1,12 @@
 name: CI
 
 # Pushes to main run nothing: changes are tested locally first. CI checks
-# pull requests from others, and runs by hand (Actions, Run workflow).
+# pull requests from others, runs by hand (Actions, Run workflow) and before
+# every deploy.
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
