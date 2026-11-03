@@ -13,8 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/ops/internal/dotenv"
 	"github.com/axadrn/ops/internal/style"
 	"github.com/axadrn/ops/protocol"
 )
@@ -709,7 +711,7 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 
 // envCommands are the subcommands of env. Any other first argument is the
 // app whose env vars to list.
-var envCommands = []string{"ls", "list", "set", "rm", "remove", "unset", "pull"}
+var envCommands = []string{"ls", "list", "set", "rm", "remove", "unset", "pull", "push"}
 
 // env manages the env vars of an app: ls, set, rm and pull.
 func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -721,6 +723,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		"set":  "env set [--app <app>] [app] KEY=value ...",
 		"rm":   "env rm [--app <app>] KEY ... [--yes]",
 		"pull": "env pull [--app <app>] [file] [--yes]",
+		"push": "env push [--app <app>] [file] [--yes]",
 	}[command]
 	if usage == "" {
 		usage = "env [--show] [app]"
@@ -733,7 +736,7 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	if command == "ls" || command == "list" {
 		flags.BoolVar(show, "show", false, "show the values")
 	}
-	if slices.Contains([]string{"rm", "remove", "unset", "pull"}, command) {
+	if slices.Contains([]string{"rm", "remove", "unset", "pull", "push"}, command) {
 		flags.withYes()
 	}
 	if err := flags.parse(args); err != nil {
@@ -871,15 +874,67 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if err != nil {
 			return err
 		}
-		var out strings.Builder
-		for _, key := range sortedKeys(values) {
-			fmt.Fprintf(&out, "%s=%s\n", key, quoteEnv(values[key]))
-		}
-		err = os.WriteFile(path, []byte(out.String()), 0o600)
+		err = os.WriteFile(path, []byte(dotenv.Format(values)), 0o600)
 		if err != nil {
 			return err
 		}
 		done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
+		return nil
+	case "push":
+		if flags.NArg() > 1 {
+			return flags.wrong()
+		}
+		path := ".env"
+		if flags.NArg() == 1 {
+			path = flags.Arg(0)
+		}
+		name, err := flags.app("")
+		if err != nil {
+			return err
+		}
+		text, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		next, err := dotenv.Parse(string(text))
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		current, err := api.Env(ctx, name)
+		if err != nil {
+			return err
+		}
+		change := dotenv.Diff(current, next)
+		if change.None() {
+			fmt.Fprintf(stdout, "%s matches the env vars of %s. Nothing changes.\n", path, name)
+			return nil
+		}
+		// The keys only, never a value: the terminal may be shared or recorded.
+		for _, line := range []struct {
+			mark string
+			keys []string
+			tint lipgloss.Style
+		}{{"+", change.Added, style.Success}, {"~", change.Changed, style.Warning}, {"-", change.Removed, style.Danger}} {
+			for _, key := range line.keys {
+				fmt.Fprintln(stdout, "  "+line.tint.Render(line.mark)+" "+key)
+			}
+		}
+		question := fmt.Sprintf("Replace the env vars of %s with %s?", name, path)
+		if len(change.Removed) > 0 {
+			question = fmt.Sprintf("Replace the env vars of %s with %s? %s %s.", name, path, strings.Join(change.Removed, ", "), pluralWord(int64(len(change.Removed)), "is removed", "are removed"))
+		}
+		if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+			return err
+		}
+		change, err = api.ReplaceEnv(ctx, name, next)
+		if err != nil {
+			return err
+		}
+		done(stdout, "The env vars of %s: %s", style.Bold.Render(name), change)
+		hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
@@ -928,15 +983,6 @@ func sortedKeys(values map[string]string) []string {
 	}
 	slices.Sort(keys)
 	return keys
-}
-
-// quoteEnv quotes a value for a .env file when it needs it.
-func quoteEnv(value string) string {
-	if value != "" && !strings.ContainsAny(value, " \t\n\"'\\$#") {
-		return value
-	}
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "$", `\$`)
-	return `"` + replacer.Replace(value) + `"`
 }
 
 func size(bytes int) string {

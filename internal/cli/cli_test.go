@@ -320,6 +320,32 @@ func TestEnvPullAsksBeforeReplacing(t *testing.T) {
 	}
 }
 
+// env push shows the keys that change, asks, and replaces them all.
+func TestEnvPush(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile(".env", []byte("KEEP=1\nEDIT=new\nNEW=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"old","GONE":"secret"}}`,
+		"PUT /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"new","NEW":"1"},"added":["NEW"],"changed":["EDIT"],"removed":["GONE"]}`,
+	}}
+	code, stdout, stderr := runCLI(t, api, "env", "push", "--app", "shop")
+	if code != 1 || !strings.Contains(stderr, "--yes") || !strings.Contains(stdout, "- GONE") || strings.Contains(stdout, "secret") {
+		t.Errorf("without --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runCLI(t, api, "env", "push", "--app", "shop", "--yes")
+	if code != 0 || !strings.Contains(stdout, "removes GONE") || !strings.Contains(strings.Join(api.requests, "\n"), `PUT /api/v1/apps/shop/env {"env":{"EDIT":"new","KEEP":"1","NEW":"1"}}`) {
+		t.Errorf("with --yes: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	if err := os.WriteFile("bad.env", []byte("NOPE\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, api, "env", "push", "--app", "shop", "bad.env"); code != 1 || !strings.Contains(stderr, "line 1") {
+		t.Errorf("a broken file: code %d, stderr %q", code, stderr)
+	}
+}
+
 func TestLinkUnreadableRepo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)

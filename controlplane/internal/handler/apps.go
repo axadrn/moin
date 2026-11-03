@@ -15,6 +15,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/ops/internal/dotenv"
 )
 
 // AppsHandler is the apps pages of the web UI. Deploys come from `ops
@@ -314,9 +315,57 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AppLogs(lines, ""))
 }
 
-// Env answers the env table; with show=1 the values are visible.
+// Env answers the env table; with show=1 the values are visible, with
+// text=1 they are one .env text to edit.
 func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("text") == "1" {
+		name := r.PathValue("app")
+		env, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+		if err != nil {
+			renderError(w, "load env failed", err)
+			return
+		}
+		render(w, r, pages.AppEnvText(name, dotenv.Format(env), ""))
+		return
+	}
 	h.renderEnv(w, r, r.URL.Query().Get("show") == "1")
+}
+
+// EnvText takes the env vars as one .env text: first it shows what changes,
+// with confirm=1 it replaces them, with back=1 it goes back to the text.
+func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
+	name, text := r.PathValue("app"), r.FormValue("text")
+	next, err := dotenv.Parse(text)
+	if err != nil || r.FormValue("back") == "1" {
+		problem := ""
+		if err != nil {
+			problem = strings.ToUpper(err.Error()[:1]) + err.Error()[1:] + ". Nothing changed."
+		}
+		render(w, r, pages.AppEnvText(name, text, problem))
+		return
+	}
+	if r.FormValue("confirm") != "1" {
+		current, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+		if err != nil {
+			renderError(w, "load env failed", err)
+			return
+		}
+		change := dotenv.Diff(current, next)
+		if change.None() {
+			h.renderEnv(w, r, false)
+			toastDone(w, r, "Nothing changed", "The text has the env vars there are.")
+			return
+		}
+		render(w, r, pages.AppEnvReview(name, text, change))
+		return
+	}
+	change, err := h.apps.ReplaceEnv(actor(r), name, next)
+	if err != nil {
+		render(w, r, pages.AppEnvText(name, text, errorMessage(err)+" Nothing changed."))
+		return
+	}
+	h.renderEnv(w, r, false)
+	toastDone(w, r, "Env vars replaced", "It "+change.String()+". The next deploy or restart hands them to the app.")
 }
 
 // SetEnv sets one env var from the add form.

@@ -77,6 +77,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `start_app` | runs a stopped app again | write |
 | `get_env` | env vars in plain text | write |
 | `set_env` | sets and removes env vars | write |
+| `replace_env` | replaces all env vars at once, like one `.env` file; keys not sent are removed; returns the keys added, changed and removed | write, destructive |
 | `get_github` | GitHub installations and the install link | read |
 | `list_branches` | the branches of a repo, the default first | read |
 | `list_repos` | repos ops may read, and where on GitHub to give it more | read |

@@ -19,6 +19,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/secret"
+	"github.com/axadrn/ops/internal/dotenv"
 	"github.com/axadrn/ops/protocol"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -1089,6 +1090,28 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	}
 	s.notify(actor.WorkspaceID)
 	return removed, nil
+}
+
+// ReplaceEnv makes env the app's env vars: it sets what is new or changed
+// and removes the keys env does not have. It returns what changed.
+func (s *AppService) ReplaceEnv(actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
+	current, err := s.Env(actor.WorkspaceID, idOrName)
+	if err != nil {
+		return dotenv.Change{}, err
+	}
+	if len(env) > maxEnvVars {
+		return dotenv.Change{}, ErrEnvLimit
+	}
+	change := dotenv.Diff(current, env)
+	if change.None() {
+		return change, nil
+	}
+	set := make(map[string]string, len(change.Added)+len(change.Changed))
+	for _, key := range append(slices.Clone(change.Added), change.Changed...) {
+		set[key] = env[key]
+	}
+	_, err = s.SetEnv(actor, idOrName, set, change.Removed)
+	return change, err
 }
 
 // Subscribe returns a channel that receives a value whenever an app of the

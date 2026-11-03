@@ -111,6 +111,7 @@ Env
   env set            Set env vars: env set [app] KEY=value ...
   env rm             Remove env vars: env rm KEY ... [--yes]
   env pull           Write the env vars to .env: env pull [file] [--yes]
+  env push           Replace all env vars with a .env, after a yes: env push [file] [--yes]
   run                Run a command with the env vars: run -- go run .
 
 Agent

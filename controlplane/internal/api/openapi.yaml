@@ -2625,6 +2625,44 @@ paths:
           description: '`validation_failed` with `fields.set`.'
         '500':
           $ref: '#/components/responses/Internal'
+    put:
+      tags: [Apps]
+      operationId: replaceAppEnv
+      summary: Replace all env vars
+      description: Makes the sent env vars the app's, all at once, like one .env file. What is new or changed is set, keys not sent are removed. Answers what changed. They take effect with the next deploy.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceEnvRequest'
+      responses:
+        '200':
+          description: All env vars after the change, and what changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplacedEnv'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.set`.'
+        '500':
+          $ref: '#/components/responses/Internal'
 
   /api/v1/workspaces:
     get:
@@ -4513,6 +4551,38 @@ components:
           type: object
           additionalProperties:
             type: string
+    ReplaceEnvRequest:
+      type: object
+      required: [env]
+      properties:
+        env:
+          type: object
+          description: Every env var the app keeps, by key. An empty object removes them all.
+          additionalProperties:
+            type: string
+    ReplacedEnv:
+      type: object
+      required: [items, added, changed, removed]
+      properties:
+        items:
+          type: object
+          additionalProperties:
+            type: string
+        added:
+          type: array
+          items:
+            type: string
+          description: The keys that are new.
+        changed:
+          type: array
+          items:
+            type: string
+          description: The keys whose value changed.
+        removed:
+          type: array
+          items:
+            type: string
+          description: The keys that are gone.
     EnvRequest:
       type: object
       properties:

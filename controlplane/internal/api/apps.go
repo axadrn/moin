@@ -12,6 +12,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/internal/dotenv"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -423,6 +424,41 @@ func (h *AppsHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, Env{Items: env})
+}
+
+// replaceEnvRequest is every env var of an app, by key.
+type replaceEnvRequest struct {
+	Env map[string]string `json:"env"`
+}
+
+// ReplacedEnv is the env vars after a replace and what changed.
+type ReplacedEnv struct {
+	Items map[string]string `json:"items"`
+	dotenv.Change
+}
+
+// ReplaceEnv makes the sent env vars the app's, all at once: keys not sent
+// are removed. The next deploy gets them.
+func (h *AppsHandler) ReplaceEnv(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	var request replaceEnvRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	if request.Env == nil {
+		request.Env = map[string]string{}
+	}
+	change, err := h.apps.ReplaceEnv(actor(r), r.PathValue("app"), request.Env)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, ReplacedEnv{Items: env, Change: change})
 }
 
 // Events streams the app list: once on connect and again after every change.

@@ -77,7 +77,7 @@ The TUI moves like vim, and `?` shows every key.
 | `p` | apps | password: type `user:password`, or `off` (asks first) |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
 | `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |
-| `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, then `enter` |
+| `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, or `edit` for all of them as one `.env` in `$EDITOR`, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
 | `b` | apps | shows the backups; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `on` or `off` turns the snapshot before every change on or off |
 | `f` | activity | filters by app, server or member; empty fields keep everything |

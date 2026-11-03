@@ -355,6 +355,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.outputNote = style.Danger.Render(style.SymbolFailed+" failed") + took
 		}
+	case editMsg:
+		return m, m.openEditor(msg)
+	case editedMsg:
+		return m.edited(msg)
 	case noticeMsg:
 		m.notice = string(msg)
 	case stoppedMsg:
@@ -456,6 +460,9 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if input == "show" || input == "hide" {
 				m.envShown = input == "show"
 				return m, m.showEnv(app.Name, m.envShown)
+			}
+			if input == "edit" {
+				return m, m.editEnv(app.Name)
 			}
 			if key, ok := strings.CutPrefix(input, "-"); ok {
 				return m.confirmFirst("Remove "+key+" from "+app.Name+"?", "The next deploy or restart drops it.", "remove", true, m.changeEnv(app.Name, input, m.envShown)), nil

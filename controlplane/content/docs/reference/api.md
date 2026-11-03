@@ -71,4 +71,4 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/restart` | starts the live release again with the current settings |
 | `POST /api/v1/apps/{app}/stop` | takes the app offline; its data stays |
 | `POST /api/v1/apps/{app}/start` | runs a stopped app again |
-| `GET` · `PATCH /api/v1/apps/{app}/env` | env vars |
+| `GET` · `PATCH` · `PUT /api/v1/apps/{app}/env` | env vars; `PUT` replaces them all at once and answers the keys `added`, `changed` and `removed` |

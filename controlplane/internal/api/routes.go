@@ -163,6 +163,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"DELETE /api/v1/backup-storage", m.InWorkspace(h.Apps.DeleteBackupStorage), TokenWrite},
 		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), TokenWrite},
 		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), TokenWrite},
+		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), TokenWrite},
 		{"GET /api/v1/admin/users", m.RequireOnboarded(m.RequireAdmin(h.Admin.Users)), TokenDenied},
 		{"POST /api/v1/admin/users/{userID}/sessions/revoke", m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions)), TokenDenied},
 	}

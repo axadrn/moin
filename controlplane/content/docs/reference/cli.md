@@ -68,6 +68,7 @@ order: 1
 | `ops env set [app] KEY=value …` | sets env vars |
 | `ops env rm KEY … [--yes]` | removes env vars |
 | `ops env pull [--app <app>] [--yes] [file]` | writes them to `.env`; asks before it replaces a file |
+| `ops env push [--app <app>] [--yes] [file]` | replaces all env vars with a `.env` (default `.env`); shows the keys that change and asks first |
 | `ops run [--app <app>] -- <command>` | runs a command with them |
 | `ops agent register --url <url> --token <install token>` | connects a server, done by the install script |
 | `ops agent` | runs the agent |
@@ -83,7 +84,7 @@ ops asks before it removes or replaces something. How it asks depends on how big
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `backups bucket rm`, `restore` | type the name: `Type <app-name> to confirm:` |
-| Small or reversible | `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over an existing file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup`, adding and setting things | nothing |
 
 `--yes` skips the question, the typed name too. Without a terminal, as in CI, they refuse unless `--yes` is there, so a script never removes something by accident. The web, the TUI and agents ask the same way; the API never asks.

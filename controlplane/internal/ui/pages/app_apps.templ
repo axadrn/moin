@@ -685,10 +685,10 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ envPath := basePath + "/apps/" + appName + "/env" }}
 	<div id="app-env" class="flex flex-col gap-3">
-		if len(keys) > 0 {
-			<div class="flex items-center justify-between gap-2 pl-3">
-				<span class="text-xs text-muted-foreground tabular-nums">{ plural(len(keys), "variable", "variables") }</span>
-				if len(values) == 0 {
+		<div class="flex items-center justify-between gap-2 pl-3">
+			<span class="text-xs text-muted-foreground tabular-nums">{ plural(len(keys), "variable", "variables") }</span>
+			<div class="flex items-center gap-2">
+				if len(keys) > 0 && len(values) == 0 {
 					@button.Button(button.Props{
 						Variant:    button.VariantGhost,
 						Size:       button.SizeXs,
@@ -697,7 +697,7 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 						@icon.Eye()
 						Show values
 					}
-				} else {
+				} else if len(keys) > 0 {
 					@button.Button(button.Props{
 						Variant:    button.VariantGhost,
 						Size:       button.SizeXs,
@@ -707,7 +707,10 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 						Hide values
 					}
 				}
+				@envModes(appName, false)
 			</div>
+		</div>
+		if len(keys) > 0 {
 			<ul class="flex flex-col" role="list">
 				for _, key := range keys {
 					<li data-env={ key }>

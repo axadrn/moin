@@ -437,7 +437,7 @@ func (m model) prompt() ([]string, [][2]string) {
 		if m.envShown {
 			toggle = [2]string{"hide", "values"}
 		}
-		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, toggle, {"enter", "apply"}, {"esc", "close"}}
+		return bar(style.Accent, style.Bold.Render("Env: ")+m.input+cursor), [][2]string{{"KEY=value", "set"}, {"-KEY", "remove"}, toggle, {"edit", "all in $EDITOR"}, {"enter", "apply"}, {"esc", "close"}}
 	case modeImage:
 		return bar(style.Accent, style.Bold.Render("Image: ")+m.input+cursor), [][2]string{{"enter", "deploy"}, {"esc", "cancel"}}
 	case modeSQL:

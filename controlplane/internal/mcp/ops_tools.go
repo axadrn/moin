@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/internal/dotenv"
 	"github.com/axadrn/ops/protocol"
 	"slices"
 	"strconv"
@@ -143,6 +144,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("set_env", "Set env vars",
 		"Sets and removes env vars of an app. They are stored encrypted and reach the app with its next restart_app or deploy. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setEnv)))
+	mcpsdk.AddTool(server, add("replace_env", "Replace all env vars",
+		"Makes env every env var of an app, all at once, like one .env file: new and changed keys are set, keys not in env are removed. Show the user what changes first: get_env, then compare. Returns the keys added, changed and removed. They reach the app with its next restart_app or deploy. Needs a token with read and write access.",
+		change(true, true)), Write(changes(services, tools.replaceEnv)))
 	mcpsdk.AddTool(server, add("list_tables", "List database tables",
 		"Lists the tables and views of an app's SQLite database with their columns and row counts, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listTables)))
@@ -427,6 +431,12 @@ type SetEnvInput struct {
 	App   string            `json:"app" jsonschema:"the app name or ID"`
 	Set   map[string]string `json:"set,omitempty" jsonschema:"env vars to set"`
 	Unset []string          `json:"unset,omitempty" jsonschema:"env var keys to remove"`
+}
+
+// ReplaceEnvInput is the input of replace_env.
+type ReplaceEnvInput struct {
+	App string            `json:"app" jsonschema:"the app name or ID"`
+	Env map[string]string `json:"env" jsonschema:"every env var the app keeps, by key; keys not here are removed"`
 }
 
 // ServerList is the output of list_servers.
@@ -1000,6 +1010,28 @@ func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (E
 	}
 	env, err := t.getEnv(context.Background(), caller, AppInput{App: input.App})
 	return EnvSet{Env: env, set: len(input.Set), removed: len(removed), missing: missing}, err
+}
+
+// EnvReplaced is the output of replace_env.
+type EnvReplaced struct {
+	Env
+	dotenv.Change
+}
+
+func (e EnvReplaced) Summary() string {
+	return "Replaced the env vars: " + e.Change.String() + ". " + e.Env.Summary()
+}
+
+func (t opsTools) replaceEnv(_ context.Context, caller Caller, input ReplaceEnvInput) (EnvReplaced, error) {
+	if input.Env == nil {
+		input.Env = map[string]string{}
+	}
+	change, err := t.services.Apps.ReplaceEnv(caller.actor(), input.App, input.Env)
+	if err != nil {
+		return EnvReplaced{}, err
+	}
+	env, err := t.getEnv(context.Background(), caller, AppInput{App: input.App})
+	return EnvReplaced{Env: env, Change: change}, err
 }
 
 func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {

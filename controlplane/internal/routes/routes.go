@@ -187,6 +187,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/remove", workspace(apps.RemoveBucket))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/env", workspace(apps.Env))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/env", workspace(apps.SetEnv))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/env/text", workspace(apps.EnvText))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/apps/{app}/env/{key}", workspace(apps.UnsetEnv))
 	mux.HandleFunc("GET /install.sh", agent.InstallScript)
 	mux.HandleFunc("GET /cli.sh", agent.CLIScript)

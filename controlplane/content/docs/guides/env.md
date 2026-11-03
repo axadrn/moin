@@ -30,7 +30,7 @@ API: GET /api/v1/apps/{app}/env
 MCP: get_env
 ```
 
-Reading values needs an API token with write access: reading a secret is as strong as writing it.
+Reading values needs an API token with write access: reading a secret is as strong as writing it. An AI agent that reads or sets values over MCP sees them, and so does the provider of its model: give it the secrets it needs, not all of them.
 
 ## Set an env var
 
@@ -59,6 +59,22 @@ MCP: set_env
 ```
 
 In the API and MCP, send the names as `unset`.
+
+## Edit them all as one text
+
+Shows every env var as one `.env` file, `KEY=value` per line, so you can paste a whole file. Saving it replaces all env vars: a key that is not in the text is removed. So ops first shows which keys it adds, changes and removes, by name only, and asks.
+
+```surfaces
+Web: the app page, **Environment**, switch **Fields** to **Text**, then **Review changes**
+CLI: ops env push [file]
+TUI: on the app, `e`, then type `edit`: the text opens in `$EDITOR`
+API: PUT /api/v1/apps/{app}/env
+MCP: replace_env
+```
+
+`ops env push` reads `.env` unless you name another file, and `--yes` skips the question. The TUI opens `$VISUAL` or `$EDITOR`, else `vi`, with a file only you can read; ops deletes it as soon as the editor closes. In the API and MCP, send every env var as `env`; the answer names the keys `added`, `changed` and `removed`.
+
+The text takes `#` comments, `export KEY=value`, and values in quotes: in double quotes `\n` is a line break, in single quotes everything stays as it is. Then restart the app, as after every change.
 
 ## Use them on your computer
 

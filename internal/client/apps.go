@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/axadrn/ops/internal/dotenv"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -205,6 +206,14 @@ func (c *Client) SetEnv(ctx context.Context, app string, set map[string]string, 
 	}
 	err := c.do(ctx, http.MethodPatch, appPath(app, "env"), map[string]any{"set": set, "unset": unset}, &response)
 	return response.Items, err
+}
+
+// ReplaceEnv makes env every env var of the app, like one .env file: keys
+// not in env are removed. It answers what changed. The next deploy gets them.
+func (c *Client) ReplaceEnv(ctx context.Context, app string, env map[string]string) (dotenv.Change, error) {
+	var response dotenv.Change
+	err := c.do(ctx, http.MethodPut, appPath(app, "env"), map[string]any{"env": env}, &response)
+	return response, err
 }
 
 // WatchApps calls fn with the full app list on connect and on every change.
