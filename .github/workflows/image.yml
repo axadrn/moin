@@ -1,11 +1,13 @@
 name: Image
 
 # The control plane image for self-hosting: ghcr.io/axadrn/ops-controlplane,
-# tagged latest on main and with the version on tags.
+# tagged latest for main and with the version on tags.
+# Built for a release tag, and by hand for a deploy of main (Actions, Run
+# workflow), not on every push.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read

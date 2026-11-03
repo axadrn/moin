@@ -3,21 +3,6 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
-## v1.0.0-beta.4
-
-November 3, 2026
-
-**In short:** A changelog page, so you see what ships, and the beta badge sits straight next to the logo.
-
-### New
-- **Changelog**: every release, newest first, at [/changelog](/changelog), linked from the navbar and the footer.
-
-### Fixed
-- **The beta badge sits in line with the logo**, in the navbar, the docs, the app and Admin.
-
-### Upgrade
-Self-hosted: pull the new image and restart. Agents need no update.
-
 ## v1.0.0-beta.3
 
 November 3, 2026
