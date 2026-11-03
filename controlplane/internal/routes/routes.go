@@ -220,6 +220,11 @@ func SetupRoutes(app *app.App) http.Handler {
 	limitInvitations := middleware.RateLimitWorkspaceInvitations(invitationLimiter)
 	mux.HandleFunc("GET /app/{workspaceSlug}/workspace", workspace(workspaceHandler.Page))
 	mux.HandleFunc("GET /app/{workspaceSlug}/activity", workspace(workspaceHandler.ActivityPage))
+	alerts := handler.NewAlertsHandler(app.AlertService)
+	mux.HandleFunc("GET /app/{workspaceSlug}/alerts", workspace(alerts.Page))
+	mux.HandleFunc("POST /app/{workspaceSlug}/alerts/destinations", workspace(alerts.Add))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/alerts/destinations/{destination}", workspace(alerts.Remove))
+	mux.HandleFunc("POST /app/{workspaceSlug}/alerts/destinations/{destination}/test", workspace(alerts.Test))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/name", workspace(workspaceHandler.UpdateName))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/invitations", workspace(limitInvitations(workspaceHandler.Invite)))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/invitations/{invitationID}/resend", workspace(limitInvitations(workspaceHandler.ResendInvitation)))
@@ -270,6 +275,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Servers:     api.NewServersHandler(app.ServerService),
 		Apps:        api.NewAppsHandler(app.AppService),
 		Version:     api.NewVersionHandler(app.UpdateService, app.ServerService),
+		Alerts:      api.NewAlertsHandler(app.AlertService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -297,6 +303,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Servers:       app.ServerService,
 		Apps:          app.AppService,
 		Updates:       app.UpdateService,
+		Alerts:        app.AlertService,
 		BillingOff:    !app.Cfg.Billing,
 	})
 	mux.Handle("/mcp", mcp.Handler(mcpServer))

@@ -17,7 +17,7 @@ import (
 
 // Version is the version the server reports to MCP clients. Raise it when the
 // tools change.
-const Version = "1.6.0"
+const Version = "1.7.0"
 
 // instructions tell the agent how the tools behave as a whole. Clients pass
 // them to the model when they connect.
@@ -40,6 +40,8 @@ type Services struct {
 	Apps        *service.AppService
 	// Updates tells of new releases and updates a self-hosted control plane.
 	Updates *service.UpdateService
+	// Alerts manages where alerts go besides email.
+	Alerts *service.AlertService
 	// BillingOff is set on a self-hosted control plane, BILLING=false:
 	// get_billing says so, like the JSON API.
 	BillingOff bool

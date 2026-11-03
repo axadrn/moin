@@ -40,6 +40,7 @@ type App struct {
 	APITokenService     *service.APITokenService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
+	AlertService        *service.AlertService
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -129,7 +130,12 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
-	serverService.SendAlerts(service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database)))
+	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
+	// The hosted plane posts alerts only to public addresses.
+	if cfg.Billing && !cfg.IsDevelopment() {
+		alertService.AllowOnlyPublicTargets()
+	}
+	serverService.SendAlerts(alertService)
 	// Agents older than the control plane update to its version by
 	// themselves, unless their workspace turned it off.
 	serverService.UpdateAgentsTo(build.Version)
@@ -176,6 +182,7 @@ func New(cfg *config.Config) (*App, error) {
 		APITokenService:  apiTokenService,
 		ServerService:    serverService,
 		AppService:       appService,
+		AlertService:     alertService,
 	}
 	initialized = true
 	return application, nil

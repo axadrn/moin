@@ -34,6 +34,7 @@ templ AppSidebarNavigation() {
 	})
 	{{ manage := []navItem{
 		{Title: "Team", URL: basePath + "/workspace", Icon: icon.Users, Active: path == basePath+"/workspace", Key: "T"},
+		{Title: "Alerts", URL: basePath + "/alerts", Icon: icon.Bell, Active: strings.HasPrefix(path, basePath+"/alerts"), Key: "L"},
 		{Title: "Settings", URL: basePath + "/settings", Icon: icon.Settings, Active: strings.HasPrefix(path, basePath+"/settings"), Key: ","},
 	} }}
 	if member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(ctx).Billing {

@@ -3,6 +3,7 @@ package tui
 import (
 	"cmp"
 	"errors"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,8 +14,9 @@ import (
 
 // The settings tab holds what belongs to the workspace rather than to one
 // app: the version of the control plane and its update, automatic agent
-// updates, the user's own email alerts, the GitHub App, the bucket, the Cloudflare token, the Tailscale
-// key and the registry logins.
+// updates, the user's own email alerts, the alert destinations of the
+// workspace, the GitHub App, the bucket, the Cloudflare token, the
+// Tailscale key and the registry logins.
 
 // settings is what the settings tab shows. A part that failed to load
 // keeps its error and the rest still shows.
@@ -34,6 +36,8 @@ type settings struct {
 	autoUpdateErr   error
 	account         client.Account
 	accountErr      error
+	destinations    []client.AlertDestination
+	destinationsErr error
 }
 
 // settingRow is one line of the settings tab.
@@ -42,6 +46,8 @@ type settingRow struct {
 	// set says there is something to remove with x.
 	set  bool
 	host string
+	// destination is the alert destination of the row, by name.
+	destination string
 }
 
 // loadSettings fetches every part of the settings tab.
@@ -63,6 +69,7 @@ func (m model) loadSettings() tea.Cmd {
 		loaded.version, loaded.versionErr = m.api.Version(m.ctx)
 		loaded.autoUpdate, loaded.autoUpdateErr = m.api.AgentUpdates(m.ctx)
 		loaded.account, loaded.accountErr = m.api.Account(m.ctx)
+		loaded.destinations, loaded.destinationsErr = m.api.AlertDestinations(m.ctx)
 		return settingsMsg(loaded)
 	}
 }
@@ -144,11 +151,27 @@ func (m model) settingRows() []settingRow {
 		{kind: "controlplane", name: "Control plane", value: controlPlane},
 		{kind: "agentupdates", name: "Agent updates", value: agentUpdates},
 		{kind: "alerts", name: "Email me alerts", value: alerts},
+	}
+	if s.destinationsErr != nil {
+		rows = append(rows, settingRow{kind: "destinations", name: "Alert destinations", value: failed(s.destinationsErr)})
+	}
+	for _, destination := range s.destinations {
+		state := off(" · enter or T sends a test")
+		if destination.Failing {
+			state = style.Danger.Render(" · failing: " + destination.LastError)
+		}
+		events := "every alert"
+		if len(destination.Events) < 5 {
+			events = strings.Join(destination.Events, ", ")
+		}
+		rows = append(rows, settingRow{kind: "destination", name: "Alerts to " + destination.Name, value: destination.Kind + off(" "+destination.Hint+" · "+events) + state, set: true, destination: destination.Name})
+	}
+	rows = append(rows, []settingRow{
 		{kind: "github", name: "GitHub", value: github},
 		{kind: "bucket", name: "Bucket", value: bucket, set: s.storage != nil},
 		{kind: "cloudflare", name: "Cloudflare token", value: cloudflare, set: s.integrations.Cloudflare},
 		{kind: "tailscale", name: "Tailscale key", value: tailscale, set: s.integrations.Tailscale},
-	}
+	}...)
 	if s.registriesErr != nil {
 		rows = append(rows, settingRow{kind: "registries", name: "Registries", value: failed(s.registriesErr)})
 	}
@@ -173,6 +196,8 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 		return m, m.setAgentUpdates(!m.settings.autoUpdate)
 	case "E":
 		return m, m.setEmailAlerts(!m.settings.account.EmailAlerts)
+	case "C":
+		return m.askDestination(), nil
 	}
 	if m.settingSelected >= len(rows) {
 		return m, nil
@@ -184,6 +209,10 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 	case "x":
 		if row.set {
 			return m.removeSetting(row), nil
+		}
+	case "T":
+		if row.kind == "destination" {
+			return m, m.testDestination(row.destination)
 		}
 	}
 	return m, nil
@@ -198,6 +227,8 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 		return m, m.setAgentUpdates(!m.settings.autoUpdate)
 	case "alerts":
 		return m, m.setEmailAlerts(!m.settings.account.EmailAlerts)
+	case "destination":
+		return m, m.testDestination(row.destination)
 	case "github":
 		if !m.settings.github.Enabled {
 			m.err = errors.New("the GitHub App is not set up on this control plane")
@@ -248,6 +279,9 @@ func (m model) removeSetting(row settingRow) model {
 		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it ops cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
 	case "tailscale":
 		return m.confirmFirst("Remove the Tailscale key?", "The next security change of a server opens SSH on every interface again.", "remove", true, m.setKeys(nil, &blank))
+	case "destination":
+		name := row.destination
+		return m.confirmFirst("Remove the alert destination "+name+"?", "Its alerts stop.", "remove", true, m.done(func() error { return m.api.RemoveAlertDestination(m.ctx, name) }, "Removed "+name))
 	case "registry":
 		host := row.host
 		return m.confirmFirst("Remove the login for "+host+"?", "Private images from there no longer pull.", "remove", true, m.done(func() error { return m.api.RemoveRegistry(m.ctx, host) }, "Removed the login for "+host))
@@ -355,4 +389,60 @@ func (m model) setEmailAlerts(on bool) tea.Cmd {
 		notice = "Email alerts off"
 	}
 	return m.done(func() error { return m.api.SetEmailAlerts(m.ctx, on) }, notice)
+}
+
+// askDestination asks for a new alert destination: Slack, Discord or a
+// webhook take the URL, Telegram the bot token and the chat.
+func (m model) askDestination() model {
+	kinds := []string{"slack", "discord", "telegram", "webhook"}
+	return m.ask("New alert destination", func(values []string) tea.Cmd {
+		destination := client.NewAlertDestination{Kind: strings.ToLower(values[0]), Name: values[1], ChatID: values[3]}
+		if destination.Kind == "telegram" {
+			destination.BotToken = values[2]
+		} else {
+			destination.URL = values[2]
+		}
+		if values[4] != "" {
+			for _, event := range strings.Split(values[4], ",") {
+				destination.Events = append(destination.Events, strings.TrimSpace(event))
+			}
+		}
+		return m.addDestination(destination)
+	},
+		formField{label: "Kind", hint: "slack, discord, telegram or webhook", check: func(value string) error {
+			if !slices.Contains(kinds, strings.ToLower(value)) {
+				return errors.New("choose slack, discord, telegram or webhook")
+			}
+			return nil
+		}},
+		formField{label: "Name", hint: "like team-ops"},
+		formField{label: "URL or bot token", secret: true, hint: "the incoming webhook URL; for Telegram the bot token from @BotFather"},
+		formField{label: "Chat ID", optional: true, hint: "Telegram only: like -1001234567890, or @channel"},
+		formField{label: "Events", optional: true, hint: "empty for all; or uptime.down,uptime.up,server.down,server.up,deploy.failed"},
+	)
+}
+
+// addDestination adds an alert destination; a webhook's signing secret
+// shows this once.
+func (m model) addDestination(destination client.NewAlertDestination) tea.Cmd {
+	return func() tea.Msg {
+		added, err := m.api.AddAlertDestination(m.ctx, destination)
+		if err != nil {
+			return errMsg{err}
+		}
+		notice := "Added " + added.Name + "; T sends it a test"
+		if added.SigningSecret != "" {
+			notice = "Added " + added.Name + ". Signing secret, shown this once: " + added.SigningSecret
+		}
+		m.shared.program.Send(noticeMsg(notice))
+		return m.loadSettings()()
+	}
+}
+
+// testDestination sends a test alert to a destination.
+func (m model) testDestination(name string) tea.Cmd {
+	return m.done(func() error {
+		_, err := m.api.TestAlertDestination(m.ctx, name)
+		return err
+	}, "Sent a test to "+name+"; it took it")
 }

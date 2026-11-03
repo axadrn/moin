@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/api"
 	"github.com/axadrn/ops/controlplane/internal/middleware"
 	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/ops/controlplane/internal/secret"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/testutil"
 	"github.com/jmoiron/sqlx"
@@ -98,6 +100,11 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	audit := repository.NewWorkspaceAuditRepository(database)
 	servers := service.NewServerService(repository.NewServerRepository(database), audit, "https://app.example.com")
 	environment.updates = service.NewUpdateService("v0.2.0", "http://127.0.0.1:1/releases", t.TempDir(), false, true, []string{testAdminEmail}, audit)
+	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	alerts := service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database), repository.NewAlertDestinations(database), audit, box)
 	handlers := api.Handlers{
 		Version:     api.NewVersionHandler(environment.updates, servers),
 		Meta:        api.NewMetaHandler(testSupportEmail),
@@ -109,6 +116,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Admin:       adminHandler,
 		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
 		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces),
+		Alerts:      api.NewAlertsHandler(alerts),
 	}
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,

@@ -60,6 +60,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/rollback` | starts an earlier release again |
 | `GET /api/v1/apps/{app}/logs` | container logs |
 | `PUT /api/v1/servers/{id}/security` | Cloudflare Tunnel, SSH on Tailscale, firewall |
+| `GET /api/v1/alert-destinations` · `POST` · `DELETE /{name}` | where [alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) go besides email: Slack, Discord, Telegram or a webhook; `POST` takes `{"kind", "name", "url"}`, or `bot_token` and `chat_id` for Telegram, and `events`; a webhook answers with its `signing_secret` once (owner or admin to change) |
+| `POST /api/v1/alert-destinations/{name}/test` | sends a test alert; `424` with `alert_send_failed` and the reason when the destination refuses it (owner or admin) |
 | `GET` · `PUT /api/v1/integrations` | the Cloudflare API token and the Tailscale auth key |
 | `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; repos ops reads |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | the branches of a repo, the default first |

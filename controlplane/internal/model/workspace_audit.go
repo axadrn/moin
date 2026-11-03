@@ -197,6 +197,27 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "set " + d["keys"] + " in the env of " + target
 	case "env.removed":
 		return "removed " + d["keys"] + " from the env of " + target
+	case "alert.added":
+		events := "every alert"
+		if d["events"] != "" && d["events"] != strings.Join(AlertEvents, ",") {
+			labels := []string{}
+			for _, event := range strings.Split(d["events"], ",") {
+				labels = append(labels, AlertEventLabel(event))
+			}
+			events = strings.Join(labels, ", ")
+		}
+		return "added the " + AlertKindLabel(d["kind"]) + " alert destination " + target + " for " + events
+	case "alert.removed":
+		return "removed the " + AlertKindLabel(d["kind"]) + " alert destination " + target
+	case "alert.tested":
+		if d["result"] != "" && d["result"] != "ok" {
+			return "sent a test alert to " + target + ", which failed: " + d["result"]
+		}
+		return "sent a test alert to " + target
+	case "alert.failed":
+		return "could not send an alert to " + target + ": " + d["error"]
+	case "alert.recovered":
+		return "sends alerts to " + target + " again"
 	case "registry.set":
 		return "saved the registry login for " + target
 	case "registry.removed":

@@ -10,6 +10,9 @@ order: 1
 | `ops login [--url <url>] [--token <token>]` | saves a personal API token; without `--token` it asks, or reads it from stdin: `echo "$TOKEN" \| ops login`. `--url` defaults to the saved control plane, else `https://ops.goilerplate.com`. It must be https; plain http works only for localhost and your tailnet (`100.x` addresses, `*.ts.net`) |
 | `ops logout` | forgets it |
 | `ops alerts [on\|off]` | shows or sets whether you get a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in the workspaces you own or run as admin; on by default. See [Alerts](/docs/guides/alerts) |
+| `ops alerts add slack\|discord\|telegram\|webhook <name> [--chat <id>] [--events <events>]` | sends alerts to Slack, Discord, Telegram or a webhook too; the URL, or the bot token for Telegram, comes on stdin, `--chat` is the Telegram chat, `--events` a comma list like `uptime.down,deploy.failed` (default all). A webhook prints its signing secret once. `ops alerts` lists the destinations. Owners and admins. See [Alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) |
+| `ops alerts test <name>` | sends a test alert to a destination |
+| `ops alerts rm <name> [--yes]` | removes a destination |
 | `ops activity [--app <app>] [--server <server>] [--user <email>] [--limit 30] [--cursor <cursor>]` | who deployed, restored or changed what, newest first, to the second in your time zone; the hint at the end pages back |
 | `ops team` | members and open invitations of your workspace |
 | `ops team invite <email> [--admin]` | invites someone by email |

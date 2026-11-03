@@ -15,7 +15,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **Data**: browse tables, edit rows and run SQL on the live database. [Data](/docs/guides/data)
 - **Domains** with HTTPS, and a password in front if you like. [Domains](/docs/guides/domains)
 - **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
-- **Email alerts**: owners and admins get a mail when a site goes down or comes back, a server goes offline or a deploy fails. [Alerts](/docs/guides/alerts)
+- **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline or a deploy fails, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
 - **Updates in one click**: a self-hosted ops tells you when a release is out and updates itself; agents update themselves. [Self-hosting](/docs/self-hosting#updates)
 - **Env vars as one text**: switch between fields and a whole `.env` file. [Env vars](/docs/guides/env)
 - **Your own order, list or grid**: drag apps and servers where you want them. [Servers](/docs/guides/servers#order-your-servers)
@@ -27,7 +27,6 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 ## Next
 
 - **Postgres and MySQL**: backups every second, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
-- **Alerts to Slack, Discord, Telegram and webhooks**: where your team is, when an app goes down, a deploy fails or a server goes offline. [#19](https://github.com/axadrn/ops/issues/19)
 - **Live metrics, built in**: CPU, RAM, disk and network for every server; requests, errors, response time and crashes for every app, with every deploy marked on the graphs. [#20](https://github.com/axadrn/ops/issues/20)
 - **More than one bucket**: pick per app where its uploads and backups go. [#15](https://github.com/axadrn/ops/issues/15)
 

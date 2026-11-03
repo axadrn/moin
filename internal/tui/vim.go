@@ -489,6 +489,9 @@ var commandKeys = map[string]map[tab]string{
 	"auto-update": {tabSettings: "A"},
 	// alerts turns the user's email alerts on or off.
 	"alerts": {tabSettings: "E"},
+	// alert adds an alert destination; test sends the selected one a test.
+	"alert": {tabSettings: "C"},
+	"test":  {tabSettings: "T"},
 }
 
 // tabNames are the tabs in their order, as commands.
@@ -686,6 +689,8 @@ var helpEntries = [][2]string{
 	{"u :update", "update a self-hosted control plane"},
 	{"A :auto-update", "agents update by themselves, on or off"},
 	{"E :alerts", "email me alerts, on or off"},
+	{"C :alert", "add an alert destination: Slack, Discord, Telegram, webhook"},
+	{"T :test enter", "send a test to the selected alert destination"},
 	{"a", "add a registry login"},
 	{"x", "remove"},
 	{"", "Inputs"},

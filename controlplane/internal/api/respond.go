@@ -81,6 +81,10 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &agentErr) {
 		return http.StatusFailedDependency, ErrorDetail{Code: "agent_error", Message: agentErr.Message}, true
 	}
+	var sendErr *service.AlertSendError
+	if errors.As(err, &sendErr) {
+		return http.StatusFailedDependency, ErrorDetail{Code: "alert_send_failed", Message: "The destination did not take the alert: " + sendErr.Message}, true
+	}
 	for _, known := range serviceErrors {
 		if !errors.Is(err, known.err) {
 			continue
@@ -222,6 +226,15 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRegistryHost, field: "host", message: "Use a registry host name like ghcr.io."},
 	{err: service.ErrRegistryLogin, field: "password", message: "Enter the username and the password or token."},
 	{err: repository.ErrRegistryNotFound, status: http.StatusNotFound, code: "not_found", message: "No login for this registry."},
+	{err: service.ErrAlertKind, field: "kind", message: "Choose slack, discord, telegram or webhook."},
+	{err: service.ErrAlertName, field: "name", message: "Use 1 to 63 lowercase letters, digits or dashes, starting and ending with a letter or digit."},
+	{err: service.ErrAlertURL, field: "url", message: "Use the incoming webhook URL: https://hooks.slack.com/services/… for Slack, https://discord.com/api/webhooks/… for Discord, an http or https URL for a webhook."},
+	{err: service.ErrAlertBotToken, field: "bot_token", message: "Use the token @BotFather gave the bot, like 123456:ABC-DEF…"},
+	{err: service.ErrAlertChatID, field: "chat_id", message: "Use the chat ID, a number like -1001234567890, or @channelname."},
+	{err: service.ErrAlertEvents, field: "events", message: "Choose from uptime.down, uptime.up, server.down, server.up and deploy.failed."},
+	{err: service.ErrAlertLimit, status: http.StatusConflict, code: "alert_limit", message: "A workspace has at most 20 alert destinations. Remove one first."},
+	{err: repository.ErrDuplicateAlertDestination, field: "name", message: "An alert destination with this name already exists."},
+	{err: repository.ErrAlertDestinationNotFound, status: http.StatusNotFound, code: "not_found", message: "The alert destination was not found."},
 	{err: service.ErrDomain, field: "domains", message: "Use host names like blog.de."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},

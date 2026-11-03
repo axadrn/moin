@@ -229,7 +229,7 @@ templ appShellScript() {
 			document.addEventListener("htmx:after:swap", (event) => {
 				if (event.detail.ctx.request.headers["HX-Boosted"] === "true") window.templ.sidebar.setOpenMobile(false);
 			});
-			const places = { a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", ",": "/settings" };
+			const places = { a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
 			let leader = 0;
 			document.addEventListener("keydown", (event) => {
 				if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;

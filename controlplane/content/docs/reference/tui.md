@@ -4,7 +4,7 @@ description: "Every key of ops without a command"
 order: 2
 ---
 
-Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
+Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Stop <app-name>?" waits
@@ -93,8 +93,10 @@ The TUI moves like vim, and `?` shows every key.
 | `u` or `:update` | settings | updates a self-hosted control plane to the newest release, after `y`; for its admins |
 | `A` or `:auto-update` | settings | turns automatic agent updates on or off; `enter` on **Agent updates** does the same |
 | `E` or `:alerts` | settings | turns your [email alerts](/docs/guides/alerts) on or off; `enter` on **Email me alerts** does the same |
+| `C` or `:alert` | settings | adds an [alert destination](/docs/guides/alerts#slack-discord-telegram-and-webhooks): the kind, a name, the URL or Telegram bot token, the Telegram chat and the events |
+| `T`, `:test` or `enter` | settings | sends a test alert to the selected destination |
 | `a` | settings | adds a registry login |
-| `x`, then `y` | settings | removes a key or a registry login; the bucket asks for its name |
+| `x`, then `y` | settings | removes a key, an alert destination or a registry login; the bucket asks for its name |
 | `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
 | `ctrl+w` | inputs | deletes the last word |
 | `enter` | protect, GitHub, domains | sends what you typed; if ops refuses it, the input stays open with your text and the reason, to fix and send again |

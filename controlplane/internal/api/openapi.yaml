@@ -66,6 +66,8 @@ tags:
     description: Continuous backups and snapshots of every SQLite database into your own S3-compatible bucket, with restore and daily restore drills.
   - name: Uptime
     description: The control plane checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
+  - name: Alerts
+    description: Where the alerts of a workspace go besides email, when a site goes down or comes back, a server goes offline or comes back, or a deploy fails. Slack and Discord incoming webhooks, a Telegram bot, or a webhook of your own, signed with HMAC-SHA256. Every member sees them; owners and admins add, test and remove them.
   - name: GitHub
     description: The ops GitHub App connects repos. Link a repo and branch to an app, deploy a ref without a checkout, deploy every push, and get the result as a commit status.
   - name: Servers
@@ -2478,6 +2480,131 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/alert-destinations:
+    get:
+      tags: [Alerts]
+      operationId: listAlertDestinations
+      summary: List alert destinations
+      description: Every alert destination of the workspace, without its URL, bot token or signing secret. `hint` shows the host and the last characters. `failing` says sends to it fail since `failing_since`, with `last_error`. Every member may list them.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The alert destinations by name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDestinationList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags: [Alerts]
+      operationId: createAlertDestination
+      summary: Add an alert destination
+      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up and deploy.failed; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertDestinationRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '201':
+          description: The new destination, with `signing_secret` for a webhook.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAlertDestination'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`forbidden` for members: only owners and admins add destinations.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`alert_limit` at 20 destinations.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.kind`, `fields.name`, `fields.url`, `fields.bot_token`, `fields.chat_id` or `fields.events`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/alert-destinations/{destination}:
+    parameters:
+      - $ref: '#/components/parameters/AlertDestination'
+    delete:
+      tags: [Alerts]
+      operationId: deleteAlertDestination
+      summary: Remove an alert destination
+      description: Only owners and admins.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The destination is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`forbidden` for members.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No destination with this ID or name.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/alert-destinations/{destination}/test:
+    parameters:
+      - $ref: '#/components/parameters/AlertDestination'
+    post:
+      tags: [Alerts]
+      operationId: testAlertDestination
+      summary: Send a test alert
+      description: Sends a test alert to the destination and waits up to 10 seconds for it to take it. A webhook gets `"event":"test"`. Only owners and admins.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The destination took the test.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDestination'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`forbidden` for members.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No destination with this ID or name.'
+        '424':
+          description: '`alert_send_failed`. The destination did not take the test; the message says why, without its URL or token.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/github:
     get:
       tags: [GitHub]
@@ -3666,6 +3793,13 @@ components:
       description: 'A personal API token from `POST /api/v1/account/tokens`, sent as `Authorization: Bearer pat_...`. The role in the security entry of an operation is the scope it needs.'
 
   parameters:
+    AlertDestination:
+      name: destination
+      in: path
+      required: true
+      description: The ID or the name of the alert destination.
+      schema:
+        type: string
     SessionMode:
       name: session
       in: query
@@ -4593,6 +4727,83 @@ components:
         url:
           type: string
           description: Shown once. Anyone with it can deploy images to the app.
+    AlertDestination:
+      type: object
+      required: [id, name, kind, hint, chat_id, events, failing, failing_since, last_error, last_sent_at, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: 1 to 63 lowercase letters, digits or dashes, unique in the workspace.
+        kind:
+          type: string
+          enum: [slack, discord, telegram, webhook]
+        hint:
+          type: string
+          description: The host and the last characters of the URL, or the Telegram chat. Never the whole URL or token.
+          examples: [hooks.slack.com/…WXYZ]
+        chat_id:
+          type: string
+          description: The Telegram chat, empty for the other kinds.
+        events:
+          type: array
+          items:
+            type: string
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed]
+        failing:
+          type: boolean
+        failing_since:
+          type: [string, 'null']
+          format: date-time
+        last_error:
+          type: string
+        last_sent_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    AlertDestinationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertDestination'
+    CreatedAlertDestination:
+      allOf:
+        - $ref: '#/components/schemas/AlertDestination'
+        - type: object
+          properties:
+            signing_secret:
+              type: string
+              description: Only for a webhook, only in this answer. Check `X-Ops-Signature` with it.
+    AlertDestinationRequest:
+      type: object
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+          enum: [slack, discord, telegram, webhook]
+        name:
+          type: string
+        url:
+          type: string
+          description: The incoming webhook of Slack or Discord, or the webhook. Not for telegram.
+        bot_token:
+          type: string
+          description: Telegram only, from @BotFather.
+        chat_id:
+          type: string
+          description: Telegram only, like -1001234567890 or @channel.
+        events:
+          type: array
+          description: Empty for all five.
+          items:
+            type: string
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed]
     Registry:
       type: object
       required: [host, username, created_at]

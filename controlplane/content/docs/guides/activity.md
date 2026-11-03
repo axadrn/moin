@@ -29,7 +29,7 @@ That is the real format. Each row holds the exact second, who did it, how it cam
 - **What.** The action and what it touched: the app, the server, the member, the token.
 - **Before and after.** Names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
 
-It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, the bucket, snapshots, restores, restore drills, SQL writes, row edits, servers, their security, agent updates, uptime checks, domains that went down or came back, servers that went offline, API tokens, plan changes and every change of the team.
+It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, the bucket, snapshots, restores, restore drills, SQL writes, row edits, servers, their security, agent updates, uptime checks, domains that went down or came back, servers that went offline, alert destinations, their tests and a destination that began to fail, API tokens, plan changes and every change of the team.
 
 ## What we never log
 

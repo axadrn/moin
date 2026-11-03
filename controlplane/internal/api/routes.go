@@ -29,6 +29,7 @@ type Handlers struct {
 	Servers     *ServersHandler
 	Apps        *AppsHandler
 	Version     *VersionHandler
+	Alerts      *AlertsHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -163,6 +164,10 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/apps/{app}/restore", m.InWorkspace(h.Apps.Restore), TokenWrite},
 		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), TokenRead},
 		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptimeCheck), TokenWrite},
+		{"GET /api/v1/alert-destinations", m.InWorkspace(h.Alerts.List), TokenRead},
+		{"POST /api/v1/alert-destinations", m.InWorkspace(h.Alerts.Create), TokenWrite},
+		{"DELETE /api/v1/alert-destinations/{destination}", m.InWorkspace(h.Alerts.Delete), TokenWrite},
+		{"POST /api/v1/alert-destinations/{destination}/test", m.InWorkspace(h.Alerts.Test), TokenWrite},
 		{"GET /api/v1/github", m.InWorkspace(h.Apps.GetGitHub), TokenRead},
 		{"GET /api/v1/github/repos", m.InWorkspace(h.Apps.GetGitHubRepos), TokenRead},
 		{"GET /api/v1/github/repos/{owner}/{repo}/branches", m.InWorkspace(h.Apps.GetGitHubBranches), TokenRead},

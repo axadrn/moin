@@ -521,7 +521,10 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabTeam:
 		return nil, m.teamKeys()
 	case m.tab == tabSettings:
-		keys := [][2]string{{"tab", "servers"}, {"j k", "select"}, {"enter", "set"}, {"a", "add a registry"}}
+		keys := [][2]string{{"tab", "servers"}, {"j k", "select"}, {"enter", "set"}, {"a", "add a registry"}, {"C", "add an alert destination"}}
+		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].kind == "destination" {
+			keys = append(keys, [2]string{"T", "test"})
+		}
 		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].set {
 			keys = append(keys, [2]string{"x", "remove"})
 		}
