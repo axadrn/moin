@@ -16,6 +16,7 @@ Every docs page is also available as Markdown: add .md to its URL.
 - [API](/docs/reference/api): The JSON API under /api/v1
 - [FAQ](/docs/faq): Common questions
 - [Roadmap](/docs/roadmap): Now, next and later
+- [Changelog](/changelog): What shipped, newest first
 
 ## Public pages
 

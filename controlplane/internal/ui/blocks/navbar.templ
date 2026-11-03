@@ -55,6 +55,7 @@ templ Navbar() {
 					@navLink("/#roadmap", "Roadmap")
 					@NavbarBlogDesktop()
 					@NavbarDocsDesktop()
+					@navLink("/changelog", "Changelog")
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
@@ -115,6 +116,7 @@ templ MobileNav() {
 			@MobileLink("/#roadmap", "Roadmap")
 			@NavbarBlogMobile()
 			@NavbarDocsMobile()
+			@MobileLink("/changelog", "Changelog")
 			@MobileLink(GitHubURL, "GitHub")
 		</div>
 		<div class="space-y-2.5 border-t p-6">

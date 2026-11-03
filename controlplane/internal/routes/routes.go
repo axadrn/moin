@@ -85,6 +85,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
+	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
 	// The legal pages describe the hosted service; a self-hosted control
 	// plane answers them with not found.
 	if app.Cfg.Billing {
