@@ -54,9 +54,9 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 		subject, body  string
 	}{
 		{"uptime.down", "shop", map[string]string{"domain": "shop.example.com", "reason": "HTTP 502"}, "🔴 shop.example.com is down", "Reason: HTTP 502"},
-		{"uptime.up", "shop", map[string]string{"domain": "shop.example.com", "duration": "4m30s"}, "🟢 shop.example.com is back up", "It was down for 4m30s."},
+		{"uptime.up", "shop", map[string]string{"domain": "shop.example.com", "duration": "4m30s"}, "🟢 shop.example.com is back up", "It was down for 4 minutes 30 seconds."},
 		{"server.down", "web-1", map[string]string{"since": "2026-11-03 14:00 UTC"}, "🔴 Server web-1 is offline", "Apps on it: shop."},
-		{"server.up", "web-1", map[string]string{"duration": "12m0s"}, "🟢 Server web-1 is back online", "It was offline for 12m0s."},
+		{"server.up", "web-1", map[string]string{"duration": "12m0s"}, "🟢 Server web-1 is back online", "It was offline for 12 minutes."},
 		{"deploy.failed", "shop", map[string]string{"number": "4", "error": "build: exit status 1"}, "🔴 Deploy of shop failed", "Error: build: exit status 1"},
 		{"deploy.succeeded", "shop", map[string]string{"number": "5"}, "", ""},
 		{"app.restarted", "shop", nil, "", ""},
@@ -87,5 +87,22 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 	last := mails.Messages()[len(mails.Messages())-1]
 	if !strings.Contains(last.Text, "Open in ops: https://ops.example.com/app/owner-workspace/apps/shop") || !strings.Contains(last.Text, "The app has no live version yet.") {
 		t.Errorf("deploy.failed text = %q", last.Text)
+	}
+}
+
+func TestSpokenDuration(t *testing.T) {
+	for value, want := range map[string]string{
+		"4m30s":      "4 minutes 30 seconds",
+		"12m0s":      "12 minutes",
+		"1h0m5s":     "1 hour",
+		"26h3m0s":    "1 day 2 hours",
+		"1s":         "1 second",
+		"300ms":      "less than a second",
+		"not a time": "not a time",
+		"":           "-",
+	} {
+		if got := spokenDuration(value); got != want {
+			t.Errorf("spokenDuration(%q) = %q, want %q", value, got, want)
+		}
 	}
 }

@@ -71,7 +71,7 @@ func (s *AlertService) Send(workspaceID, action, target string, details map[stri
 		content.Heading = domain + " is back up"
 		content.Intro = []string{
 			"App: " + target,
-			"It was down for " + orDash(details["duration"]) + ".",
+			"It was down for " + spokenDuration(details["duration"]) + ".",
 		}
 		content.ActionURL = base + "/apps/" + target + "/uptime"
 	case "server.down":
@@ -85,7 +85,7 @@ func (s *AlertService) Send(workspaceID, action, target string, details map[stri
 	case "server.up":
 		content.Subject = "🟢 Server " + target + " is back online"
 		content.Heading = "Server " + target + " is back online"
-		content.Intro = []string{"It was offline for " + orDash(details["duration"]) + "."}
+		content.Intro = []string{"It was offline for " + spokenDuration(details["duration"]) + "."}
 		content.ActionURL = base + "/servers"
 	case "deploy.failed":
 		content.Subject = "🔴 Deploy of " + target + " failed"
@@ -126,8 +126,8 @@ func (s *AlertService) appsOn(workspaceID, server string) string {
 	return "Apps on it: " + strings.Join(names, ", ") + "."
 }
 
-// stillLive says what runs after a failed deploy: a failed build leaves the
-// live release as it is, and a failed start starts it again.
+// stillLive says which release is live after a failed deploy: a failed
+// build leaves it as it is, and a failed start starts it again.
 func (s *AlertService) stillLive(workspaceID, appName string) string {
 	app, err := s.apps.ByIDOrNameForWorkspace(appName, workspaceID)
 	switch {
@@ -138,7 +138,37 @@ func (s *AlertService) stillLive(workspaceID, appName string) string {
 	case app.LiveNumber == 0:
 		return "The app has no live version yet."
 	}
-	return fmt.Sprintf("The old version, v%d, keeps running.", app.LiveNumber)
+	return fmt.Sprintf("The live version is still v%d.", app.LiveNumber)
+}
+
+// spokenDuration reads a duration of the activity, such as "4m30s", as
+// "4 minutes 30 seconds": its two largest units.
+func spokenDuration(value string) string {
+	d, err := time.ParseDuration(value)
+	if err != nil || d < 0 {
+		return orDash(value)
+	}
+	units := []struct {
+		size time.Duration
+		name string
+	}{{24 * time.Hour, "day"}, {time.Hour, "hour"}, {time.Minute, "minute"}, {time.Second, "second"}}
+	parts := []string{}
+	for _, unit := range units {
+		if n := d / unit.size; n > 0 && len(parts) < 2 {
+			d -= n * unit.size
+			name := unit.name
+			if n != 1 {
+				name += "s"
+			}
+			parts = append(parts, fmt.Sprintf("%d %s", n, name))
+		} else if len(parts) > 0 {
+			break
+		}
+	}
+	if len(parts) == 0 {
+		return "less than a second"
+	}
+	return strings.Join(parts, " ")
 }
 
 func nonEmpty(paragraphs []string) []string {
