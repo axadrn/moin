@@ -293,8 +293,9 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	if _, err := apps.Get(owner.WorkspaceID, "blog"); err != nil {
 		t.Fatalf("a failed delete removed the app: %v", err)
 	}
-	if _, err := servers.Delete(owner, server.ID); !errors.Is(err, repository.ErrServerHasApps) {
-		t.Fatalf("delete a server with apps: err = %v", err)
+	// It is online: its apps go first, so nothing runs on unseen.
+	if _, _, err := servers.Delete(owner, server.ID); !errors.Is(err, repository.ErrServerHasApps) {
+		t.Fatalf("delete an online server with apps: err = %v", err)
 	}
 
 	agent.mu.Lock()
@@ -320,8 +321,44 @@ func TestDeleteOnAServerThatNeverConnected(t *testing.T) {
 		t.Fatalf("delete on a server that never connected: %v", err)
 	}
 	// No agent ever connected, so none is left to uninstall.
-	if uninstall, err := servers.Delete(owner, server.ID); err != nil || uninstall != "" {
-		t.Fatalf("delete the empty server = %q, %v", uninstall, err)
+	if uninstall, gone, err := servers.Delete(owner, server.ID); err != nil || uninstall != "" || len(gone) != 0 {
+		t.Fatalf("delete the empty server = %q, %v, %v", uninstall, gone, err)
+	}
+}
+
+// An offline server can't remove its apps, so they go with it.
+func TestDeleteAnOfflineServerTakesItsApps(t *testing.T) {
+	apps, servers, _, _ := newAppService(t)
+	server, _, err := servers.Create(owner, "dead-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"shop", "blog"} {
+		if _, err := apps.Create(owner, name, server.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, gone, err := servers.Delete(owner, server.ID)
+	if err != nil || strings.Join(gone, ",") != "blog,shop" {
+		t.Fatalf("delete the offline server = %v, %v", gone, err)
+	}
+	for _, name := range []string{"shop", "blog"} {
+		if _, err := apps.Get(owner.WorkspaceID, name); !errors.Is(err, repository.ErrAppNotFound) {
+			t.Errorf("%s is still there: %v", name, err)
+		}
+	}
+	events, err := servers.audit.ListByWorkspace(owner.WorkspaceID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted := 0
+	for _, event := range events {
+		if event.Action == "app.deleted" {
+			deleted++
+		}
+	}
+	if deleted != 2 {
+		t.Errorf("the activity names %d of the 2 apps", deleted)
 	}
 }
 

@@ -26,6 +26,7 @@ type ServerRepository interface {
 	UpdateHello(id string, hello model.Server) error
 	TouchLastSeen(id string, at time.Time) error
 	DeleteForWorkspace(id, workspaceID string) error
+	DeleteWithApps(id, workspaceID string) (apps []string, err error)
 	Rename(id, workspaceID, name string) error
 	SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error
 	SetSecurity(server model.Server) error
@@ -127,6 +128,33 @@ func (r *serverRepository) DeleteForWorkspace(id, workspaceID string) error {
 		return ErrServerNotFound
 	}
 	return nil
+}
+
+// DeleteWithApps deletes a server and its apps in one go and returns the
+// names of the apps. Another user's server is not found.
+func (r *serverRepository) DeleteWithApps(id, workspaceID string) ([]string, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var apps []string
+	err = tx.Select(&apps, `SELECT name FROM apps WHERE server_id = $1 AND workspace_id = $2 ORDER BY name`, id, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(`DELETE FROM apps WHERE server_id = $1 AND workspace_id = $2`, id, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := tx.Exec(`DELETE FROM servers WHERE id = $1 AND workspace_id = $2`, id, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return nil, ErrServerNotFound
+	}
+	return apps, tx.Commit()
 }
 
 // Rename gives a server a new name, unique in its workspace.

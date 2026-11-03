@@ -39,7 +39,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET /api/v1/servers/events` | server list as server-sent events |
 | `POST /api/v1/servers/{id}/install` | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | renames a server `{"name": "…"}` |
-| `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there, empty when no agent ever connected |
+| `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there, empty when no agent ever connected, and the `apps` that went with an offline server |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
 | `GET /api/v1/apps/events` | app list as server-sent events |

@@ -149,12 +149,12 @@ func TestSessionsMarkServersOnline(t *testing.T) {
 	}
 
 	servers.Connect(authenticated, testHello, "203.0.113.5", func() { kicked++ }, func(protocol.Message) error { return nil })
-	_, err := servers.Delete(other, server.ID)
+	_, _, err := servers.Delete(other, server.ID)
 	if !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another user deleted the server: %v", err)
 	}
 	// The agent connected, so it is installed there.
-	uninstall, err := servers.Delete(owner, "prod")
+	uninstall, _, err := servers.Delete(owner, "prod")
 	if err != nil || uninstall != "ops agent uninstall" {
 		t.Fatalf("delete = %q, %v", uninstall, err)
 	}

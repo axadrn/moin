@@ -905,7 +905,7 @@ paths:
           description: '`not_found`. No server with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_has_apps`. Remove its apps first.'
+          description: '`server_has_apps`. The server is online and has apps: remove them first. An offline server goes with its apps.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3933,8 +3933,13 @@ components:
           format: date-time
     RemovedServer:
       type: object
-      required: [uninstall_command]
+      required: [uninstall_command, apps]
       properties:
+        apps:
+          type: array
+          items:
+            type: string
+          description: The apps that went with the server, because it was offline and could not remove them. They stay on the machine with their data if it comes back. Empty for an online server.
         uninstall_command:
           type: string
           description: Run it on the server as root, or with sudo in front, to remove the agent, its binary and state. The apps keep running with their data; add `--apps` to remove them too. Empty when no agent ever connected, so nothing is installed there.

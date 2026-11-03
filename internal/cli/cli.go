@@ -498,9 +498,14 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		uninstall, err := api.RemoveServer(ctx, name)
+		removed, err := api.RemoveServer(ctx, name)
 		if err != nil {
 			return err
+		}
+		uninstall := removed.UninstallCommand
+		if len(removed.Apps) > 0 {
+			done(stdout, "It was offline, so its apps went with it: %s", strings.Join(removed.Apps, ", "))
+			fmt.Fprintln(stdout, "  "+style.Muted.Render("They stay on the server if it comes back. Remove them there with "+protocol.UninstallCommand(build.Name)+" --apps."))
 		}
 		if uninstall == "" {
 			done(stdout, "Removed %s. Its agent never connected, so nothing is installed there", style.Bold.Render(name))

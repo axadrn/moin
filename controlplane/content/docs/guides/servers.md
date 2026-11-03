@@ -78,7 +78,10 @@ MCP: update_agent
 
 ## Remove a server
 
-Disconnects the agent and makes its token stop working. A server with apps cannot be removed: [remove the apps](/docs/guides/deploy#remove-an-app) first.
+Disconnects the agent and makes its token stop working.
+
+- **An online server with apps** cannot be removed: [remove the apps](/docs/guides/deploy#remove-an-app) first, so nothing keeps running unseen.
+- **An offline server** goes with its apps: a server that died, or whose agent moved elsewhere, can't remove them itself. Every surface names the apps that went, and the activity notes each one. The apps stay on the machine with their data if it comes back; remove them there with `ops agent uninstall --apps`.
 
 You cannot undo it, so ops asks you to type the server's name first: in the web dialog (the copy button next to the name helps), in the CLI and in the TUI. `--yes` skips it in scripts. An agent passes the name as `confirm`.
 

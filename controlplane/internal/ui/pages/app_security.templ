@@ -103,14 +103,14 @@ templ ServerSecurity(view SecurityView) {
 					}
 				</form>
 			}
-			@dangerPanel("Remove this server", "Remove its apps first. Then ops disconnects its agent, and the agent's token stops working. The next page shows the command that removes the agent there.", "/docs/guides/servers#remove-a-server") {
+			@dangerPanel("Remove this server", utils.IfElse(view.Server.Online, "Remove its apps first. Then ops disconnects its agent, and the agent's token stops working. The next page shows the command that removes the agent there.", "It is offline, so its apps go with it. They stay on the server with their data if it comes back; remove them there with ops agent uninstall --apps. The agent's token stops working."), "/docs/guides/servers#remove-a-server") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{
 						"hx-delete":          basePath + "/servers/" + view.Server.ID,
 						"hx-swap":            "none",
 						"hx-disable":         "this",
-						"hx-confirm":         "Remove " + view.Server.Name + "? Its agent is disconnected.",
+						"hx-confirm":         utils.IfElse(view.Server.Online, "Remove "+view.Server.Name+"? Its agent is disconnected.", "Remove "+view.Server.Name+" and its apps? It is offline: the apps stay on the server if it comes back."),
 						"data-confirm-name":  view.Server.Name,
 						"data-remove-server": view.Server.Name,
 					},

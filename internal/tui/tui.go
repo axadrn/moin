@@ -759,7 +759,17 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 	case "x":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
-			return m.confirmName("Remove "+server.Name+"?", "Its agent is disconnected; the agent stays on the machine until you uninstall it.", server.Name, m.removeServer(server.ID, server.Name)), nil
+			detail := "Its agent is disconnected; the agent stays on the machine until you uninstall it."
+			var apps []string
+			for _, app := range m.apps {
+				if app.ServerName == server.Name {
+					apps = append(apps, app.Name)
+				}
+			}
+			if len(apps) > 0 && !server.Online {
+				detail = "It is offline, so its apps go with it: " + strings.Join(apps, ", ") + ". They stay on the server if it comes back."
+			}
+			return m.confirmName("Remove "+server.Name+"?", detail, server.Name, m.removeServer(server.ID, server.Name)), nil
 		}
 	case "i":
 		if m.selected < len(m.servers) {
@@ -1095,18 +1105,24 @@ func (m model) addServer(name string) tea.Cmd {
 type removedServer struct {
 	name      string
 	uninstall string
+	// apps went with the server: it was offline.
+	apps []string
 }
 
 func (m model) removeServer(id, name string) tea.Cmd {
 	return func() tea.Msg {
-		uninstall, err := m.api.RemoveServer(m.ctx, id)
+		removed, err := m.api.RemoveServer(m.ctx, id)
 		if err != nil {
 			return errMsg{err}
 		}
-		if uninstall == "" {
-			return noticeMsg(name + " removed. Its agent never connected, so nothing is installed there")
+		with := ""
+		if len(removed.Apps) > 0 {
+			with = ". It was offline, so its apps went with it: " + strings.Join(removed.Apps, ", ")
 		}
-		return removedMsg{name: name, uninstall: uninstall}
+		if removed.UninstallCommand == "" {
+			return noticeMsg(name + " removed" + with + ". Its agent never connected, so nothing is installed there")
+		}
+		return removedMsg{name: name, uninstall: removed.UninstallCommand, apps: removed.Apps}
 	}
 }
 

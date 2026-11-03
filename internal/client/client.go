@@ -265,22 +265,30 @@ func (s Server) Outdated(version string) bool {
 	return version != "" && version != "dev" && s.AgentVersion != "" && s.AgentVersion != version
 }
 
+// RemovedServer is a server just removed: the command that removes its
+// agent on the machine, empty when no agent ever connected there, and the
+// apps that went with it because it was offline.
+type RemovedServer struct {
+	UninstallCommand string
+	Apps             []string
+}
+
 // RemoveServer deletes a server by ID or name. Its agent is disconnected
-// and stays installed: it answers the command that removes it on the server,
-// empty when no agent ever connected there.
-func (c *Client) RemoveServer(ctx context.Context, idOrName string) (string, error) {
+// and stays installed. An offline server goes with its apps.
+func (c *Client) RemoveServer(ctx context.Context, idOrName string) (RemovedServer, error) {
 	var removed struct {
-		UninstallCommand *string `json:"uninstall_command"`
+		UninstallCommand *string  `json:"uninstall_command"`
+		Apps             []string `json:"apps"`
 	}
 	err := c.do(ctx, http.MethodDelete, "/api/v1/servers/"+url.PathEscape(idOrName), nil, &removed)
 	if err != nil {
-		return "", err
+		return RemovedServer{}, err
 	}
 	// A control plane from before uninstall_command answers none.
 	if removed.UninstallCommand == nil {
-		return protocol.UninstallCommand(build.Name), nil
+		return RemovedServer{UninstallCommand: protocol.UninstallCommand(build.Name), Apps: removed.Apps}, nil
 	}
-	return *removed.UninstallCommand, nil
+	return RemovedServer{UninstallCommand: *removed.UninstallCommand, Apps: removed.Apps}, nil
 }
 
 // WatchServers calls fn with the full server list on connect and on every

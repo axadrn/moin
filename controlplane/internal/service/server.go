@@ -191,15 +191,23 @@ func (s *ServerService) List(workspaceID string) ([]model.Server, error) {
 
 // Delete removes a server by ID or name and disconnects its agent. The agent
 // token stops working. It returns the command that removes the agent on the
-// machine, empty when no agent ever connected, so none is installed there.
-func (s *ServerService) Delete(actor Actor, idOrName string) (uninstall string, err error) {
+// machine, empty when no agent ever connected, so none is installed there,
+// and the apps that went with an offline server.
+func (s *ServerService) Delete(actor Actor, idOrName string) (uninstall string, apps []string, err error) {
 	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	err = s.servers.DeleteForWorkspace(server.ID, actor.WorkspaceID)
+	// An online server keeps its apps until they are removed there, so
+	// nothing runs on unseen. An offline one can't remove them, so they go
+	// with it; they stay on the machine if it comes back.
+	if s.Online(server.ID) {
+		err = s.servers.DeleteForWorkspace(server.ID, actor.WorkspaceID)
+	} else {
+		apps, err = s.servers.DeleteWithApps(server.ID, actor.WorkspaceID)
+	}
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	s.mu.Lock()
 	session := s.sessions[server.ID]
@@ -207,12 +215,15 @@ func (s *ServerService) Delete(actor Actor, idOrName string) (uninstall string, 
 	if session != nil {
 		session.kick()
 	}
+	for _, app := range apps {
+		s.record(actor, "app.deleted", "app", app, map[string]string{"server": server.Name, "with": "server"})
+	}
 	s.record(actor, "server.removed", "server", server.Name, nil)
 	s.notify(actor.WorkspaceID)
 	if server.LastSeenAt == nil {
-		return "", nil
+		return "", apps, nil
 	}
-	return s.UninstallCommand(), nil
+	return s.UninstallCommand(), apps, nil
 }
 
 // Register trades a raw install token for an agent token. The install token

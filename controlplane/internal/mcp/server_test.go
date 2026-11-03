@@ -429,7 +429,10 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box-3"})); removed.UninstallCommand != "" || !strings.Contains(removed.Message, "never connected") {
 		t.Fatalf("removed a server that never connected = %+v", removed)
 	}
-	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"}), "server_has_apps")
 	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "validation_failed")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
+	// box-1 is offline: its apps go with it.
+	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"})); strings.Join(removed.Apps, ",") != "blog,shop" || !strings.Contains(removed.Message, "apps went with it") {
+		t.Fatalf("removed an offline server with apps = %+v", removed)
+	}
 }

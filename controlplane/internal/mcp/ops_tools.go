@@ -63,7 +63,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Adds a server and returns its one-time install command. The user runs it as root on the machine within an hour; the agent then connects. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.addServer)))
 	mcpsdk.AddTool(server, add("remove_server", "Remove a server",
-		"Removes a server and disconnects its agent. Fails with server_has_apps while apps run on it. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it, empty when no agent ever connected; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
+		"Removes a server and disconnects its agent. Fails with server_has_apps while it is online and has apps; an offline server goes with its apps, listed in apps, which stay on the machine if it comes back. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it, empty when no agent ever connected; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
 	mcpsdk.AddTool(server, add("new_install_command", "New install command",
 		"Makes a new one-time install command for a server and returns it, for a lost command or to move the agent to another machine. It works once within an hour; ops stores only a fingerprint, so it is shown this once. The old install command stops working, and an agent that registers with the new one takes over from the old agent. Needs a token with read and write access.",
@@ -515,8 +515,9 @@ func (d Done) Summary() string { return d.Message }
 
 // RemovedServer is the output of remove_server.
 type RemovedServer struct {
-	Message          string `json:"message"`
-	UninstallCommand string `json:"uninstall_command"`
+	Message          string   `json:"message"`
+	UninstallCommand string   `json:"uninstall_command"`
+	Apps             []string `json:"apps"`
 }
 
 func (r RemovedServer) Summary() string { return r.Message }
@@ -529,17 +530,24 @@ func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveSer
 	if err := confirmed(input.Confirm, server.Name); err != nil {
 		return RemovedServer{}, err
 	}
-	command, err := t.services.Servers.Delete(caller.actor(), server.ID)
+	command, apps, err := t.services.Servers.Delete(caller.actor(), server.ID)
 	if err != nil {
 		return RemovedServer{}, err
 	}
-	if command == "" {
-		return RemovedServer{Message: "Removed server " + server.Name + ". Its agent never connected, so there is nothing to remove on the machine."}, nil
+	removed := RemovedServer{UninstallCommand: command, Apps: apps}
+	if removed.Apps == nil {
+		removed.Apps = []string{}
 	}
-	return RemovedServer{
-		Message:          "Removed server " + server.Name + ". Its agent is still installed: run " + command + " on the server as root (or with sudo in front) to remove it.",
-		UninstallCommand: command,
-	}, nil
+	with := ""
+	if len(apps) > 0 {
+		with = " It was offline, so its apps went with it: " + strings.Join(apps, ", ") + ". They stay on the machine if it comes back."
+	}
+	if command == "" {
+		removed.Message = "Removed server " + server.Name + "." + with + " Its agent never connected, so there is nothing to remove on the machine."
+		return removed, nil
+	}
+	removed.Message = "Removed server " + server.Name + "." + with + " Its agent is still installed: run " + command + " on the server as root (or with sudo in front) to remove it."
+	return removed, nil
 }
 
 func (t opsTools) renameServer(_ context.Context, caller Caller, input RenameServerInput) (ServerOutput, error) {

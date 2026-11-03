@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/ops/internal/build"
 )
 
 // ServersHandler is the servers page of the web UI.
@@ -89,9 +91,9 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id")); err == nil {
 		name = server.Name
 	}
-	uninstall, err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if errors.Is(err, repository.ErrServerHasApps) {
-		toastFailed(w, r, "Server not removed", "Remove the apps on this server first.")
+		toastFailed(w, r, "Server not removed", "It is online: remove its apps first, so nothing keeps running unseen.")
 		return
 	}
 	if err != nil && !errors.Is(err, repository.ErrServerNotFound) {
@@ -102,6 +104,9 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// the agent there.
 	if uninstall != "" && name != "" {
 		location += "?removed=" + url.QueryEscape(name)
+	}
+	if len(apps) > 0 {
+		toastDone(w, r, "Removed "+name+" and its apps", strings.Join(apps, ", ")+". They stay on the server if it comes back; remove them there with "+build.Name+" agent uninstall --apps.")
 	}
 	redirect(w, r, location, http.StatusSeeOther)
 }

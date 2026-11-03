@@ -147,7 +147,11 @@ func (m model) serversView(width, room int) []string {
 		for _, line := range wrapCommand(m.removed.uninstall, width-len(pad)-1) {
 			added = append(added, pad+style.Accent.Render(line))
 		}
-		added = append(added, "", pad+style.Muted.Render("The apps keep running with their data. Add --apps to remove them too."))
+		kept := "The apps keep running with their data. Add --apps to remove them too."
+		if len(m.removed.apps) > 0 {
+			kept = "It was offline, so its apps went with it: " + strings.Join(m.removed.apps, ", ") + ". They stay on the server with their data if it comes back; add --apps to remove them too."
+		}
+		added = append(added, "", pad+style.Muted.Render(kept))
 	}
 	switch {
 	case m.loading && m.offline == nil:

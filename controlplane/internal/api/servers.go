@@ -68,6 +68,9 @@ type CreatedServer struct {
 // that removes the agent from the server too.
 type RemovedServer struct {
 	UninstallCommand string `json:"uninstall_command"`
+	// Apps went with the server: it was offline, so it could not remove
+	// them. They stay on the machine if it comes back.
+	Apps []string `json:"apps"`
 }
 
 type createServerRequest struct {
@@ -172,12 +175,15 @@ func (h *ServersHandler) Rename(w http.ResponseWriter, r *http.Request) {
 
 // Delete removes a server by ID or name and disconnects its agent.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	uninstall, err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, RemovedServer{UninstallCommand: uninstall})
+	if apps == nil {
+		apps = []string{}
+	}
+	JSON(w, http.StatusOK, RemovedServer{UninstallCommand: uninstall, Apps: apps})
 }
 
 // Update has the server's agent swap its binary for the control plane's and
