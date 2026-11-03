@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What the hosted ops service stores, why, where it lives and how to get rid of it
-lastUpdated: November 2, 2026
+lastUpdated: November 3, 2026
 ---
 
 Short version: ops stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
@@ -34,12 +34,6 @@ ops sets only cookies it needs to work, so there is no cookie banner:
 - **pending_invitation** remembers an invitation you opened, for up to 7 days.
 
 Your light or dark theme and a few view choices stay in your browser's local storage and are never sent to us.
-
-## Waitlist
-
-While sign-up is closed, we store your email address and the date when you join the waitlist, and later when we let you in. We use it only to invite you. It stays on the list until you ask us to remove it.
-
-Legal basis: your request (Art. 6(1)(b) GDPR).
 
 ## Your account
 
@@ -119,7 +113,6 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 - **Activity log**: as long as its workspace. Your email stays on your entries in the workspaces that remain after you delete your account.
 - **Invitations**: deleted 180 days after they were sent.
 - **Support log**: 180 days.
-- **Waitlist**: until you ask us to remove you.
 - **Server logs**: a short time, for security and troubleshooting.
 - **Our database backup**: a copy of the control plane's database goes to our bucket within seconds, so we can restore ops after a failure. Deleted data drops out of that copy within 7 days.
 - **Payment records**: Stripe keeps them as long as tax law requires.

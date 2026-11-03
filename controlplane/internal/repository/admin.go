@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -15,6 +17,9 @@ type AdminRepository interface {
 	StopImpersonationSession(sessionID, targetUserID, operatorUserID string, event *model.AdminAuditEvent) error
 	ListAuditEvents(limit int) ([]model.AdminAuditEvent, error)
 	DeleteAuditEventsBefore(cutoff time.Time) error
+	// FirstWorkspace returns the first workspace the user created, nil when
+	// there is none.
+	FirstWorkspace(userID string) (*model.Workspace, error)
 }
 
 type adminRepository struct {
@@ -148,4 +153,16 @@ func (r *adminRepository) ListAuditEvents(limit int) ([]model.AdminAuditEvent, e
 func (r *adminRepository) DeleteAuditEventsBefore(cutoff time.Time) error {
 	_, err := r.db.Exec(`DELETE FROM admin_audit_events WHERE created_at < $1`, cutoff)
 	return err
+}
+
+func (r *adminRepository) FirstWorkspace(userID string) (*model.Workspace, error) {
+	var workspace model.Workspace
+	err := r.db.Get(&workspace, `SELECT * FROM workspaces WHERE created_by = $1 ORDER BY created_at, id LIMIT 1`, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &workspace, nil
 }

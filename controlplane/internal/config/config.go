@@ -76,9 +76,8 @@ type Config struct {
 	// Billing off runs a self-hosted control plane: no Stripe, no prices,
 	// every workspace gets everything.
 	Billing bool
-	// SignupsOpen false closes sign-up: new accounts only for admins,
-	// invited people and, on the hosted control plane, people let in from
-	// the waitlist. A self-hosted control plane is closed by default.
+	// SignupsOpen false closes sign-up: new accounts only for admins and
+	// invited people. A self-hosted control plane is closed by default.
 	SignupsOpen bool
 	// BackupDatabase sends every change of the control plane's own SQLite
 	// database to its bucket and restores it on start when it is missing.

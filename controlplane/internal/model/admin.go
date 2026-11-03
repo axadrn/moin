@@ -21,7 +21,20 @@ type AdminUser struct {
 	WorkspaceCount     int        `db:"workspace_count"`
 	ActiveSessionCount int        `db:"active_session_count"`
 	IsAdmin            bool       `db:"-"`
+	// Plan is what the first workspace the user created is on, and
+	// TrialEndsAt when its trial ends.
+	Plan        string     `db:"-"`
+	TrialEndsAt *time.Time `db:"-"`
 }
+
+// The plans the admin list shows per user.
+const (
+	AdminPlanNoWorkspace = "no workspace"
+	AdminPlanTrial       = "trial"
+	AdminPlanTrialEnded  = "trial ended"
+	AdminPlanFreeForever = "free forever"
+	AdminPlanPaying      = "paying"
+)
 
 type AdminUserPage struct {
 	Users      []AdminUser
@@ -57,6 +70,10 @@ func AdminAuditActionLabel(action string) string {
 		return "Impersonation stopped"
 	case "admin.sessions_revoked":
 		return "User sessions revoked"
+	case "admin.free_forever_started":
+		return "Free forever started"
+	case "admin.free_forever_ended":
+		return "Free forever ended"
 	case "workspace.deleted":
 		return "Workspace deleted"
 	case "subscription.updated":

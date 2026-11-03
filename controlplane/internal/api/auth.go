@@ -163,10 +163,6 @@ func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.authService.SendMagicLink(email)
-	if errors.Is(err, service.ErrWaitlisted) {
-		Error(w, http.StatusForbidden, "waitlisted", err.Error())
-		return
-	}
 	if errors.Is(err, service.ErrPrivate) {
 		Error(w, http.StatusForbidden, "private", err.Error())
 		return

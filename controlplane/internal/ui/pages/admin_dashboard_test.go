@@ -60,3 +60,31 @@ func TestAdminDashboardRendersOperatorDataAndProtectedActions(t *testing.T) {
 		t.Fatal("admin dashboard omitted protected target action")
 	}
 }
+
+func TestAdminFreeForeverAsksForTheEmail(t *testing.T) {
+	trialEnds := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
+	data := &model.AdminDashboard{Users: model.AdminUserPage{Page: 1, TotalPages: 1, Users: []model.AdminUser{
+		{ID: "trial", Email: "trial@example.com", Plan: model.AdminPlanTrial, TrialEndsAt: &trialEnds},
+		{ID: "free", Email: "free@example.com", Plan: model.AdminPlanFreeForever},
+		{ID: "payer", Email: "payer@example.com", Plan: model.AdminPlanPaying},
+	}}}
+	ctx := ctxkeys.WithCSRFToken(context.Background(), "csrf-token")
+	ctx = ctxkeys.WithUser(ctx, &model.User{ID: "operator", Email: "operator@example.com"})
+	var page bytes.Buffer
+	if err := AdminDashboardContent(data).Render(ctx, &page); err != nil {
+		t.Fatal(err)
+	}
+	html := page.String()
+	for _, want := range []string{
+		"trial until 2026-12-02", "paying",
+		`data-confirm-name="trial@example.com"`, "Make free forever",
+		`data-confirm-name="free@example.com"`, "End free forever",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("the page does not show %q", want)
+		}
+	}
+	if strings.Contains(html, `data-confirm-name="payer@example.com"`) {
+		t.Error("a paying user can be made free forever")
+	}
+}

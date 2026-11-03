@@ -64,8 +64,8 @@ const homeCTA = "gap-2"
 // the heading.
 const homeAnchor = "scroll-mt-23 sm:scroll-mt-25"
 
-// homePrimary is the one main button of the page: the free trial, the
-// waitlist while signups are closed, or sign in on a self-hosted ops.
+// homePrimary is the one main button of the page: the free trial, or sign
+// in while sign-up is closed and on a self-hosted ops.
 templ homePrimary() {
 	@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA}) {
 		{ homeStartLabel(ctx) }
@@ -81,7 +81,7 @@ func homeStartLabel(ctx context.Context) string {
 	case cfg.SignupsOpen:
 		return "Start free trial"
 	default:
-		return "Join the waitlist"
+		return "Sign in"
 	}
 }
 

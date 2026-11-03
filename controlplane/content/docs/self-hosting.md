@@ -30,7 +30,7 @@ Billing, and who gets in. With `BILLING=false` there are no prices, no checkout 
 And it is private:
 
 - No landing page. Your `APP_URL` opens the sign-in page, or your workspace when you are signed in.
-- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This ops is private. Ask its admin for an invitation." There is no waitlist.
+- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This ops is private. Ask its admin for an invitation."
 - The docs stay at `/docs`. The terms and privacy pages of our hosted service are not there, and search engines are asked to stay away (`ROBOTS_NOINDEX` is on).
 
 ## Where to run it

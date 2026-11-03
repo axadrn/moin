@@ -156,10 +156,6 @@ func (h *authHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.authService.SendMagicLink(email)
-	if errors.Is(err, service.ErrWaitlisted) {
-		renderAuthPage(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
-		return
-	}
 	if errors.Is(err, service.ErrPrivate) {
 		renderAuthPage(w, r, pages.AuthPrivate())
 		return

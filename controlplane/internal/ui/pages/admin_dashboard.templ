@@ -26,11 +26,7 @@ templ AdminDashboard(data *model.AdminDashboard) {
 templ AdminDashboardContent(data *model.AdminDashboard) {
 	{{ currentUser := ctxkeys.User(ctx) }}
 	<div id="admin-content" class="flex flex-col gap-6" hx-swap-oob="true">
-		@pageHeader("Admin", "Users, workspaces, sessions and operator activity.") {
-			@button.Button(button.Props{Href: "/admin/waitlist", Variant: button.VariantSecondary}) {
-				Waitlist
-			}
-		}
+		@pageHeader("Admin", "Users, workspaces, sessions and operator activity.")
 		<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
 			@statCard("Users", strconv.Itoa(data.Metrics.Users), "")
 			@statCard("Verified", strconv.Itoa(data.Metrics.VerifiedUsers), "")
@@ -99,6 +95,11 @@ templ AdminDashboardContent(data *model.AdminDashboard) {
 													Operator 
 												}
 											}
+											if user.Plan != "" {
+												@badge.Badge(badge.Props{Variant: adminPlanVariant(user.Plan)}) {
+													{ adminPlanLabel(user) }
+												}
+											}
 										</div>
 									}
 									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
@@ -125,6 +126,9 @@ templ AdminDashboardContent(data *model.AdminDashboard) {
 														Revoke sessions 
 													}
 												</form>
+											}
+											if user.Plan != "" && user.Plan != model.AdminPlanNoWorkspace && user.Plan != model.AdminPlanPaying {
+												@adminForeverFree(user, data.Users)
 											}
 											if currentUser.ID != user.ID && !user.IsAdmin {
 												<form
@@ -204,4 +208,54 @@ func adminPageURL(query string, page int) string {
 	}
 	values.Set("page", strconv.Itoa(page))
 	return "/admin?" + values.Encode()
+}
+
+// adminForeverFree makes the first workspace of a user free forever, or
+// ends it. Both ask first and want the email typed out.
+templ adminForeverFree(user model.AdminUser, users model.AdminUserPage) {
+	{{ on := user.Plan != model.AdminPlanFreeForever }}
+	<form
+		method="POST"
+		action={ templ.SafeURL("/admin/users/" + user.ID + "/forever-free") }
+		hx-post={ "/admin/users/" + user.ID + "/forever-free" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+		if on {
+			hx-confirm={ "Make " + user.Email + " free forever? Their first workspace gets everything, forever, without paying." }
+			data-confirm-action="Make free forever"
+		} else {
+			hx-confirm={ "End free forever for " + user.Email + "? They get the rest of their trial, or read-only once it is over, until they pay." }
+			data-confirm-action="End free forever"
+		}
+		data-confirm-name={ user.Email }
+	>
+		@csrf.Token()
+		<input type="hidden" name="forever_free" value={ strconv.FormatBool(on) }/>
+		<input type="hidden" name="q" value={ users.Query }/>
+		<input type="hidden" name="page" value={ strconv.Itoa(users.Page) }/>
+		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+			if on {
+				Make free forever
+			} else {
+				End free forever
+			}
+		}
+	</form>
+}
+
+// adminPlanLabel is the plan of a user: "trial until 2026-12-02", "free
+// forever", "paying".
+func adminPlanLabel(user model.AdminUser) string {
+	if user.Plan == model.AdminPlanTrial && user.TrialEndsAt != nil {
+		return "trial until " + user.TrialEndsAt.Format("2006-01-02")
+	}
+	return user.Plan
+}
+
+func adminPlanVariant(plan string) badge.Variant {
+	switch plan {
+	case model.AdminPlanFreeForever, model.AdminPlanPaying:
+		return badge.VariantSecondary
+	}
+	return badge.VariantOutline
 }

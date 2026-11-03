@@ -63,7 +63,7 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 		{name: "self-hosted lets the admin sign up", email: "admin@example.com", want: "/auth/magic-link-sent"},
 		{name: "self-hosted lets an invited teammate sign up", email: "mate@example.com", want: "/auth/magic-link-sent"},
 		{name: "self-hosted with SIGNUPS_OPEN=true is open", open: true, email: "stranger@example.com", want: "/auth/magic-link-sent"},
-		{name: "hosted puts a stranger on the waitlist", billing: true, email: "stranger@example.com", want: "on the waitlist"},
+		{name: "hosted with sign-up closed refuses a stranger", billing: true, email: "stranger@example.com", want: "is private"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
@@ -76,7 +76,7 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 				users, repository.NewTokenRepository(database), repository.NewSessionRepository(database), workspaces, email,
 				false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 			)
-			auth.SetBeta(service.NewBetaService(test.open, test.billing, []string{"admin@example.com"}, repository.NewWaitlistRepository(database), repository.NewSubscriptionRepository(database), email))
+			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitationRepository(database), repository.NewSubscriptionRepository(database)))
 			form := url.Values{"email": {test.email}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/magic-link", strings.NewReader(form.Encode()))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")

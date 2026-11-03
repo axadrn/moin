@@ -49,19 +49,6 @@ func welcomeEmailTemplate(name, dashboardURL, appName string) emailContent {
 	}
 }
 
-func betaInviteEmailTemplate(signInURL, appName string) emailContent {
-	return emailContent{
-		Subject:     fmt.Sprintf("You're in: %s private beta", appName),
-		Preheader:   "Your spot in the private beta is ready.",
-		Heading:     "You're in",
-		Intro:       []string{fmt.Sprintf("Your spot in the private beta of %s is ready. Sign in with this email address and add your first server.", appName)},
-		ActionLabel: "Sign in",
-		ActionURL:   signInURL,
-		Outro:       []string{"Tell us what breaks or annoys you: just reply to this email."},
-		AppName:     appName,
-	}
-}
-
 func workspaceInvitationEmailTemplate(invitationURL, workspaceName, inviterName, appName string) emailContent {
 	return emailContent{
 		Subject:     fmt.Sprintf("Join %s on %s", workspaceName, appName),

@@ -25,6 +25,9 @@ type WorkspaceInvitationRepository interface {
 	Create(invitation *model.WorkspaceInvitation, event *model.WorkspaceAuditEvent) error
 	ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceInvitation, error)
 	ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error)
+	// HasPending reports whether a workspace invited the address and the
+	// invitation is still open.
+	HasPending(email string, now time.Time) (bool, error)
 	ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error)
 	Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error
 	// Accept makes the user a member. event is the activity of it; Accept fills
@@ -259,4 +262,13 @@ func (r *workspaceInvitationRepository) Accept(
 		return nil, err
 	}
 	return member, nil
+}
+
+func (r *workspaceInvitationRepository) HasPending(email string, now time.Time) (bool, error) {
+	var count int
+	err := r.db.Get(&count, `
+		SELECT COUNT(*) FROM workspace_invitations
+		WHERE LOWER(email) = $1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > $2
+	`, email, now)
+	return count > 0, err
 }

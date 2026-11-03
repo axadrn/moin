@@ -99,8 +99,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
 		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
 	)
-	beta := service.NewBetaService(cfg.SignupsOpen, cfg.Billing, cfg.AdminEmails, repository.NewWaitlistRepository(database), subscriptions, email)
-	beta.UseActivity(workspaceAuditEvents)
+	beta := service.NewBetaService(cfg.SignupsOpen, cfg.AdminEmails, invitations, subscriptions)
 	auth.SetBeta(beta)
 	if !cfg.SignupsOpen && len(cfg.AdminEmails) == 0 {
 		slog.Warn("sign-up is closed and ADMIN_EMAILS is empty: only invited people can create an account. Set ADMIN_EMAILS to your email and sign up with it to become the first admin")
@@ -132,6 +131,10 @@ func New(cfg *config.Config) (*App, error) {
 		appService.AllowOnlyPublicBuckets()
 	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
+	adminService := service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails)
+	if cfg.Billing {
+		adminService.UsePlans(subscriptions, workspaceAuditEvents)
+	}
 	application := &App{
 		Cfg: cfg, DB: database, AuthService: auth, UserService: userService,
 		EmailService:        email,
@@ -139,7 +142,7 @@ func New(cfg *config.Config) (*App, error) {
 		DocsService:         service.NewDocsService(content.Root, cfg.AppURL),
 		FileService:         fileService,
 		SubscriptionService: subscriptionService,
-		AdminService:        service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails),
+		AdminService:        adminService,
 		BetaService:         beta,
 		PaymentService:      paymentProvider,
 		// Only a self-hosted control plane reports; the hosted one counts.

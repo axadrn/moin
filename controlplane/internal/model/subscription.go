@@ -87,6 +87,34 @@ func (s *Subscription) BlocksWorkspaceDeletion(now time.Time) bool {
 	return s.HasProviderSubscription() || paid || pendingCheckout
 }
 
+// IsForeverFree says whether the workspace has everything without paying:
+// the paid plan, active, with no end and no subscription at the provider.
+func (s *Subscription) IsForeverFree() bool {
+	return s.PlanID == SubscriptionPlanPro && s.Status == SubscriptionStatusActive &&
+		s.CurrentPeriodEnd == nil && !s.HasProviderSubscription()
+}
+
+// MakeForeverFree gives the workspace everything, forever, without paying.
+func (s *Subscription) MakeForeverFree(now time.Time) {
+	s.PlanID = SubscriptionPlanPro
+	s.Status = SubscriptionStatusActive
+	s.CurrentPeriodEnd = nil
+	s.UpdatedAt = now
+}
+
+// EndForeverFree puts a forever free workspace back on what it would have
+// without it: the rest of the trial it started with, or the free plan once
+// that is over.
+func (s *Subscription) EndForeverFree(workspaceCreatedAt, now time.Time) {
+	initial := access.Initial(workspaceCreatedAt)
+	if initial.Status == access.StatusTrialing && initial.CurrentPeriodEnd != nil && now.Before(*initial.CurrentPeriodEnd) {
+		s.PlanID, s.Status, s.CurrentPeriodEnd = initial.PlanID, initial.Status, initial.CurrentPeriodEnd
+	} else {
+		s.PlanID, s.Status, s.CurrentPeriodEnd = SubscriptionPlanFree, SubscriptionStatusActive, nil
+	}
+	s.UpdatedAt = now
+}
+
 func (s *Subscription) ClearCheckout() {
 	s.CheckoutAttemptID = nil
 	s.CheckoutProvider = ""

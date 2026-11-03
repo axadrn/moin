@@ -124,10 +124,6 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Authenticate or create user
 	user, err := h.authService.AuthenticateOAuth(email, "github")
-	if errors.Is(err, service.ErrWaitlisted) {
-		render(w, r, pages.AuthWaitlisted(strings.ToLower(email)))
-		return
-	}
 	if errors.Is(err, service.ErrPrivate) {
 		render(w, r, pages.AuthPrivate())
 		return
