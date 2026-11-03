@@ -1,9 +1,9 @@
 name: Image
 
-# The control plane image for self-hosting: ghcr.io/axadrn/ops-controlplane,
-# tagged latest for main and with the version on tags.
-# Built for a release tag, and by hand for a deploy of main (Actions, Run
-# workflow), not on every push.
+# The box: ghcr.io/axadrn/ops-controlplane. ops-01 and self-hosters run it.
+# A release tag builds it as the version, stable and latest; a run by hand
+# (Actions, Run workflow) builds main as latest. latest is always the newest
+# box, which ops-01 runs.
 on:
   push:
     tags: ["v*"]
@@ -31,7 +31,7 @@ jobs:
           image=ghcr.io/axadrn/ops-controlplane
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:${GITHUB_REF_NAME},${image}:stable" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:${GITHUB_REF_NAME},${image}:stable,${image}:latest" >> "$GITHUB_OUTPUT"
           else
             echo "version=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
             echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
