@@ -7,7 +7,7 @@ description: What shipped in ops, newest first.
 
 November 3, 2026
 
-**In short:** ops watches your sites every minute, puts apps and servers in your order, and updates itself and its agents.
+**In short:** ops watches your sites every minute and mails you when one goes down, puts apps and servers in your order, and updates itself and its agents.
 
 ### New
 - **Uptime checks, built in**: every domain of every app is checked from outside once a minute, from the first deploy on, with nothing to set up. The app's **Uptime** tab shows 24 hours, 7 and 30 days, the certificate and the last outages. Also `ops uptime`, the TUI (`u` on an app), API and MCP.
