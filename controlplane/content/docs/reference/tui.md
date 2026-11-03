@@ -21,36 +21,62 @@ The team tab does what an API token may, like `ops team`: inviting,
 resending and revoking invitations and renaming need an admin or the owner. Changing roles,
 removing members, leaving and deleting the workspace are web only.
 
-`esc` closes what is open and goes back; it never quits. Only `q` and
-`ctrl+c` quit.
+`esc` closes what is open and goes back; it never quits. Only `q`, `ZZ`,
+`:q` and `ctrl+c` quit.
+
+## Vim keys
+
+The TUI moves like vim, and `?` shows every key.
+
+- **Move.** `j` `k` select, with a count like `5j`. `gg` and `G` go to the
+  first and the last row, `5G` or `:5` to row 5. `ctrl+d` `ctrl+u` move half
+  a page, `ctrl+f` `ctrl+b` a page. `l` goes into an app or a deploy's log,
+  `h` back out.
+- **Tabs.** `gt` and `tab` go to the next tab, `gT` and `shift+tab` to the
+  one before, `3gt` to the third.
+- **Search.** `/word`, then `enter`, finds a row, or a line in the logs. Case
+  counts only when the word has a capital letter. `n` and `N` find the next
+  and the one before, around the end; `:noh` forgets the search.
+- **Command line.** `:` runs any key by its name, on the place you are:
+  `:deploy`, `:restart`, `:logs`, `:hook off`, `:rename new-name`. `:e shop`
+  opens an app, `:apps` and the other tab names switch the tab. `tab`
+  completes a command.
+- **Logs.** `L` opens the logs, ready to scroll: `j` `k`, `ctrl+d` `ctrl+u`,
+  `gg` for the top. New lines keep coming without moving what you read; the
+  panel says how many are below, and `G` follows the end again. `ctrl+w`
+  moves between the list and the logs, `esc` back to the list.
+- **Inputs.** `ctrl+u` clears the line, `ctrl+w` deletes the last word.
 
 | Key | Where | Does |
 | --- | --- | --- |
-| `tab` | everywhere | switches between servers, apps, activity, team and settings |
-| `↑` `↓` or `k` `j` | lists | selects |
+| `tab` or `gt` | everywhere | switches between servers, apps, activity, team and settings; `shift+tab` or `gT` goes back |
+| `↑` `↓` or `k` `j` | lists | selects; `gg` `G` the first and last, `ctrl+d` `ctrl+u` half a page |
+| `/`, then `n` `N` | lists, logs | searches |
+| `:` | everywhere | the command line: `:q`, `:5`, `:e <app>`, `:<key name>` |
+| `?` | everywhere | shows every key |
 | `a` | servers | adds a server and shows its install command |
 | `t`, then `y` | servers | turns the Cloudflare Tunnel on or off |
 | `s`, then `y` | servers | turns SSH only on Tailscale on or off |
-| `n` | servers | renames the selected server |
+| `cw` or `:rename` | servers | renames the selected server |
 | `i` | servers | shows a new one-time install command for the selected server; the old one stops working |
 | `u` | servers | updates the server's agent to the control plane's version |
 | `f`, then `y` | servers | turns the firewall on or off |
 | `x`, then the name | servers, apps | removes the selected one; for a server, shows the command that removes its agent there |
 | `a` | apps | creates an app: its name, then its server |
-| `enter` | apps | opens the app with its deploys and databases |
-| `↑` `↓` | app | picks a deploy; `enter` shows its log |
+| `enter` or `l` | apps | opens the app with its deploys and databases |
+| `j` `k` | app | picks a deploy; `enter` or `l` shows its log |
 | `d` | apps | deploys the directory `ops` started in, when its app exists |
-| `g` | apps | GitHub: shows the repo and the repos ops may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `branches owner/repo` lists its branches, `unlink` stops |
+| `gh` | apps | GitHub: shows the repo and the repos ops may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `branches owner/repo` lists its branches, `unlink` stops |
 | `R` | apps | redeploys the newest source or image |
 | `t` | apps | restarts the app with the current env and domains |
 | `S` | apps | stops the app, after `y`; starts a stopped one |
 | `i` | apps | deploys an image built in CI; type the image, then `enter` |
-| `h` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
-| `H`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
+| `:hook` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
+| `:hook off`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
 | `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first) or `=<domain>` for the canonical one |
 | `p` | apps | password: type `user:password`, or `off` (asks first) |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
-| `l` | apps | shows the logs |
+| `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |
 | `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
 | `b` | apps | shows the backups; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `on` or `off` turns the snapshot before every change on or off |
@@ -60,11 +86,12 @@ removing members, leaving and deleting the workspace are web only.
 | `a` | team | invites someone: the email, then `member` or `admin` |
 | `enter` | team | sends the selected invitation again |
 | `x`, then `y` | team | revokes the selected invitation |
-| `n` | team | renames the workspace |
+| `cw` or `:rename` | team | renames the workspace |
 | `enter` | settings | sets the selected one: the bucket, a key or a registry login; on GitHub it shows the install link |
 | `a` | settings | adds a registry login |
 | `x`, then `y` | settings | removes a key or a registry login; the bucket asks for its name |
 | `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
+| `ctrl+w` | inputs | deletes the last word |
 | `enter` | protect, GitHub, domains | sends what you typed; if ops refuses it, the input stays open with your text and the reason, to fix and send again |
-| `esc` | app | drops the pick, then back to the list |
-| `q` | everywhere | quits |
+| `esc` or `h` | app | drops the pick, then back to the list |
+| `q`, `ZZ` or `:q` | everywhere | quits |

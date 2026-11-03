@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -105,6 +106,8 @@ func rule(width int) string {
 
 func (m model) body(width, room int) []string {
 	switch {
+	case m.mode == modeHelp:
+		return m.helpView(room)
 	case m.tab == tabServers:
 		return m.serversView(width, room)
 	case m.tab == tabActivity:
@@ -208,7 +211,7 @@ func (m model) detailView(width, room int) []string {
 	lines = append(lines, "")
 
 	if len(m.detail.Deploys) == 0 {
-		next := "No deploys yet. Press i to deploy an image or g to deploy from GitHub, or run " + build.Name + " deploy in its repo."
+		next := "No deploys yet. Press i to deploy an image or gh to deploy from GitHub, or run " + build.Name + " deploy in its repo."
 		if app.Name == client.AppName("", m.dir) {
 			next = "No deploys yet. Press d to deploy " + m.dir + "."
 		}
@@ -270,43 +273,74 @@ func (m model) deployRow(deploy client.Deploy, liveNumber int) []string {
 }
 
 // panel is the output pane: a title with its state on the right, a hairline
-// and the newest lines that fit, like a terminal.
+// and the newest lines that fit, like a terminal. Scrolled up, it shows how
+// many lines are below; the line the search found has the accent bar.
 func (m model) panel(width, room int) []string {
+	output, _ := m.panelLines()
+	if m.running && len(output) == 0 {
+		output = append(output, pad+style.Muted.Render("waiting for the server…"))
+	}
+	scroll := 0
+	if room >= 0 {
+		keep := max(room-2, 1)
+		if m.shared != nil {
+			m.shared.panelKeep = keep
+		}
+		scroll = min(m.outputScroll, max(len(output)-keep, 0))
+		end := len(output) - scroll
+		start := max(end-keep, 0)
+		if match := m.panelMatch - 1; m.search != "" && match >= start && match < end {
+			output = slices.Clone(output)
+			output[match] = " " + style.Accent.Render(style.SymbolSelected) + " " + strings.TrimPrefix(output[match], pad)
+		}
+		output = output[start:end]
+	}
+
 	right := m.outputNote
 	if m.running {
 		frame := style.Spinner[m.frame%len(style.Spinner)]
 		elapsed := style.Muted.Render(" · " + duration(time.Since(m.runStarted)))
 		right = style.Warning.Render(frame) + " " + clip(m.runStep, max(width/3, 12)) + elapsed
 	}
-	title := pad + style.Bold.Render(m.outputTitle)
+	if scroll > 0 {
+		more := style.Muted.Render(fmt.Sprintf("%d more below · G follows", scroll))
+		if right == "" {
+			right = more
+		} else {
+			right = more + style.Dim.Render("  ·  ") + right
+		}
+	}
+	titleStyle := style.Bold
+	if m.panelFocused() {
+		titleStyle = style.Accent.Bold(true)
+	}
+	title := pad + titleStyle.Render(m.outputTitle)
 	if gap := width - lipgloss.Width(title) - lipgloss.Width(right) - 2; right != "" && gap >= 2 {
 		title += strings.Repeat(" ", gap) + right
 	}
-	lines := []string{title, pad + rule(width-len(pad)-2)}
+	return append([]string{title, pad + rule(width-len(pad)-2)}, output...)
+}
 
-	var output []string
-	for _, line := range m.output {
+// panelLines are the lines the output panel draws, each with the index of
+// the output line it comes from.
+func (m model) panelLines() ([]string, []int) {
+	var lines []string
+	var raw []int
+	for index, line := range m.output {
 		text, step := style.LogLine(line)
 		switch {
 		case !m.isDeployOutput():
-			output = append(output, pad+outputLine(line))
+			lines = append(lines, pad+outputLine(line))
 		case text == "":
+			continue
 		case step:
-			output = append(output, pad+style.Step(text))
+			lines = append(lines, pad+style.Step(text))
 		default:
-			output = append(output, pad+"  "+style.Noise(text))
+			lines = append(lines, pad+"  "+style.Noise(text))
 		}
+		raw = append(raw, index)
 	}
-	if m.running && len(output) == 0 {
-		output = append(output, pad+style.Muted.Render("waiting for the server…"))
-	}
-	if room >= 0 {
-		keep := max(room-len(lines), 1)
-		if len(output) > keep {
-			output = output[len(output)-keep:]
-		}
-	}
-	return append(lines, output...)
+	return lines, raw
 }
 
 // isDeployOutput reports whether the panel shows a deploy log rather than
@@ -336,6 +370,16 @@ func outputLine(line string) string {
 func (m model) footer(width int) []string {
 	lines := []string{rule(width)}
 	prompt, keys := m.prompt()
+	// Like vim's showcmd: the count and the first key of a pair, waiting.
+	if waiting := m.pending; m.count > 0 || waiting != "" {
+		if m.count > 0 {
+			waiting = fmt.Sprint(m.count) + waiting
+		}
+		keys = append([][2]string{{waiting, "…"}}, keys...)
+	}
+	if m.mode == modeList && len(keys) > 0 && keys[len(keys)-1] == [2]string{"q", "quit"} {
+		keys = append(keys[:len(keys)-1:len(keys)-1], [2]string{"?", "help"}, [2]string{"q", "quit"})
+	}
 	// A message wraps rather than lose its end; lines after the first
 	// line up under its text.
 	message := func(symbol string, color lipgloss.Style, text string) {
@@ -376,6 +420,12 @@ func (m model) prompt() ([]string, [][2]string) {
 	cursor := style.Accent.Render("█")
 	cancel := [2]string{"any other key", "cancels"}
 	switch m.mode {
+	case modeSearch:
+		return bar(style.Accent, style.Bold.Render("/")+m.input+cursor), [][2]string{{"enter", "search"}, {"esc", "cancel"}}
+	case modeCommand:
+		return bar(style.Accent, style.Bold.Render(":")+m.input+cursor), [][2]string{{"enter", "run"}, {"tab", "complete"}, {"esc", "cancel"}}
+	case modeHelp:
+		return nil, [][2]string{{"j k", "scroll"}, {"ctrl+d ctrl+u", "half a page"}, {"gg G", "top, end"}, {"esc", "close"}}
 	case modeAdd:
 		return bar(style.Accent, style.Bold.Render("Name: ")+m.input+cursor), [][2]string{{"enter", "add, empty for a name like brave-otter"}, {"esc", "cancel"}}
 	case modeEnv:
@@ -454,16 +504,18 @@ func (m model) prompt() ([]string, [][2]string) {
 	if app, ok := m.currentApp(); ok && app.Stopped {
 		power = [2]string{"S", "start"}
 	}
-	appKeys = append(appKeys, [][2]string{{"g", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"l", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, {"h", "hook"}, {"H", "hook off"}, rollback, {"x", "remove"}}...)
+	appKeys = append(appKeys, [][2]string{{"gh", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"L", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, rollback, {"x", "remove"}}...)
 	switch {
+	case m.panelFocused():
+		return nil, [][2]string{{"j k", "scroll"}, {"ctrl+d ctrl+u", "half a page"}, {"gg G", "top, follow"}, {"/", "search"}, {"n N", "next, previous"}, {"ctrl+w", "the list"}, {"esc", "back"}, {"q", "quit"}}
 	case m.tab == tabServers && (m.added != nil || m.removed != nil):
-		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"esc", "close"}, {"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"x", "remove"}, {"q", "quit"}}
 	case m.tab == tabActivity:
 		return nil, m.activityKeys()
 	case m.tab == tabTeam:
 		return nil, m.teamKeys()
 	case m.tab == tabSettings:
-		keys := [][2]string{{"tab", "servers"}, {"↑↓", "select"}, {"enter", "set"}, {"a", "add a registry"}}
+		keys := [][2]string{{"tab", "servers"}, {"j k", "select"}, {"enter", "set"}, {"a", "add a registry"}}
 		if rows := m.settingRows(); m.settingSelected < len(rows) && rows[m.settingSelected].set {
 			keys = append(keys, [2]string{"x", "remove"})
 		}
@@ -471,20 +523,20 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && len(m.servers) == 0:
 		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"↑↓", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"n", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"cw", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		var keys [][2]string
 		if len(m.detail.Deploys) > 0 {
-			keys = append(keys, [2]string{"↑↓", "pick a deploy"})
+			keys = append(keys, [2]string{"j k", "pick a deploy"})
 		}
 		if m.deployPick != 0 {
-			keys = append(keys, [2]string{"enter", "its log"})
+			keys = append(keys, [2]string{"l", "its log"})
 		}
 		return nil, append(append(keys, appKeys...), [2]string{"esc", "back"}, [2]string{"q", "quit"})
 	case len(m.apps) == 0:
 		return nil, [][2]string{{"tab", "activity"}, {"a", "create an app"}, {"q", "quit"}}
 	}
-	keys := [][2]string{{"tab", "activity"}, {"↑↓", "select"}, {"enter", "open"}, {"a", "create"}}
+	keys := [][2]string{{"tab", "activity"}, {"j k", "select"}, {"enter", "open"}, {"a", "create"}}
 	return nil, append(append(keys, appKeys...), [2]string{"q", "quit"})
 }
 

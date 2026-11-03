@@ -59,7 +59,7 @@ Gives you a secret URL that deploys an image when CI calls it.
 ```surfaces
 Web: the app page, **Deploy hook**, **New deploy hook**
 CLI: ops hook <app-name>
-TUI: on the app, `h`, then `y` to replace a hook
+TUI: on the app, `:hook`, then `y` to replace a hook
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
@@ -73,7 +73,7 @@ Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop
 ```surfaces
 Web: the app page, **Deploy hook**, **Turn off**
 CLI: ops hook off <app-name>
-TUI: on the app, `H`, then `y`
+TUI: on the app, `:hook off`, then `y`
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
 ```

@@ -119,12 +119,6 @@ func (m model) settingRows() []settingRow {
 func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 	rows := m.settingRows()
 	switch key {
-	case "up", "k":
-		m.settingSelected = max(m.settingSelected-1, 0)
-		return m, nil
-	case "down", "j":
-		m.settingSelected = min(m.settingSelected+1, len(rows)-1)
-		return m, nil
 	case "a":
 		return m.ask("New registry login", func(values []string) tea.Cmd { return m.setRegistry(values[0], values[1], values[2]) },
 			formField{label: "Host", hint: "like ghcr.io"},

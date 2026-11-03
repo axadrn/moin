@@ -51,11 +51,7 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 	rows := m.teamRows()
 	slug := m.team.Workspace.Slug
 	switch key {
-	case "up", "k":
-		m.teamSelected = max(m.teamSelected-1, 0)
-	case "down", "j":
-		m.teamSelected = min(m.teamSelected+1, max(len(rows)-1, 0))
-	case "a", "n", "enter", "x":
+	case "a", "cw", "enter", "x":
 		if !m.team.Permissions.ManageMembers && !m.team.Permissions.ManageWorkspace {
 			m.err = fmt.Errorf("only admins and owners change the team; you are %s", m.team.Role)
 			return m, nil
@@ -67,7 +63,7 @@ func (m model) teamKey(key string) (tea.Model, tea.Cmd) {
 			formField{label: "Email", check: checkEmail},
 			formField{label: "Role", value: "member", hint: "member or admin, enter takes member", check: checkRole},
 		), nil
-	case "n":
+	case "cw":
 		name := m.team.Workspace.Name
 		return m.ask("Workspace", func(values []string) tea.Cmd {
 			return m.teamChange(func() error { return m.api.RenameWorkspace(m.ctx, slug, values[0]) }, "Renamed the workspace to "+values[0])
@@ -137,10 +133,10 @@ func (m model) teamView(room int) []string {
 
 // teamKeys are the keys of the team tab; the selected row decides some.
 func (m model) teamKeys() [][2]string {
-	keys := [][2]string{{"tab", "settings"}, {"↑↓", "select"}}
+	keys := [][2]string{{"tab", "settings"}, {"j k", "select"}}
 	admin := m.team.Permissions.ManageMembers || m.team.Permissions.ManageWorkspace
 	if admin {
-		keys = append(keys, [2]string{"a", "invite"}, [2]string{"n", "rename"})
+		keys = append(keys, [2]string{"a", "invite"}, [2]string{"cw", "rename"})
 	}
 	rows := m.teamRows()
 	if admin && m.teamSelected < len(rows) && rows[m.teamSelected].invitation != "" {

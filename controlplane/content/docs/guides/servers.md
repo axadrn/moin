@@ -57,7 +57,7 @@ Gives a server a new name. The rules are those of adding one: lowercase letters,
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**
 CLI: ops servers rename <server-name> <new-name>
-TUI: on the server, `n`
+TUI: on the server, `cw` or `:rename`
 API: PATCH /api/v1/servers/{id}
 MCP: rename_server
 ```

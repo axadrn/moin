@@ -11,7 +11,7 @@ Shows the last lines your app printed, from every container of the app. Use it w
 ```surfaces
 Web: the app page, **Container logs**, **Load logs**
 CLI: ops logs <app-name>
-TUI: on the app, `l`
+TUI: on the app, `L`; `j` `k` scroll, `G` follows the end, `/` searches
 API: GET /api/v1/apps/{app}/logs
 MCP: get_logs
 ```

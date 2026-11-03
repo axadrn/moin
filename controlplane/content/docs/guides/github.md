@@ -33,7 +33,7 @@ Lists the repos ops may read, and where on GitHub you give it another one.
 ```surfaces
 Web: the app page, **GitHub**
 CLI: ops github repos
-TUI: on the app, `g`
+TUI: on the app, `gh`
 API: GET /api/v1/github/repos
 MCP: list_repos
 ```
@@ -47,7 +47,7 @@ The branches of a repo, the default branch first:
 ```surfaces
 Web: the app page, **GitHub**, the **Branch** select after you choose the repo
 CLI: ops github branches <owner>/<repo>
-TUI: on the app, `g`, then type `branches <owner>/<repo>`
+TUI: on the app, `gh`, then type `branches <owner>/<repo>`
 API: GET /api/v1/github/repos/{owner}/{repo}/branches
 MCP: list_branches
 ```
@@ -59,7 +59,7 @@ Makes an app follow a repo and a branch. Deploy every push is on by default. A b
 ```surfaces
 Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**
 CLI: ops link <owner>/<repo> --branch main
-TUI: on the app, `g`, then type `link <owner>/<repo> main`
+TUI: on the app, `gh`, then type `link <owner>/<repo> main`
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
@@ -73,7 +73,7 @@ Deploys the linked branch, or any branch, tag or commit, without a checkout on y
 ```surfaces
 Web: the app page, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
 CLI: ops deploy --ref <ref>
-TUI: on the app, `g`, type a branch, tag or commit or nothing, then `enter`
+TUI: on the app, `gh`, type a branch, tag or commit or nothing, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_ref
 ```
@@ -87,7 +87,7 @@ Deploys each push to the linked branch by itself.
 ```surfaces
 Web: the app page, **GitHub**, **Deploy every push**
 CLI: ops link <owner>/<repo> --auto=false
-TUI: on the app, `g`, then type `link <owner>/<repo> main manual`
+TUI: on the app, `gh`, then type `link <owner>/<repo> main manual`
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
@@ -103,7 +103,7 @@ Stops the app from following the repo. The app keeps running.
 ```surfaces
 Web: the app page, **GitHub**, **Unlink**
 CLI: ops unlink
-TUI: on the app, `g`, then type `unlink`
+TUI: on the app, `gh`, then type `unlink`
 API: DELETE /api/v1/apps/{app}/repo
 MCP: unlink_repo
 ```

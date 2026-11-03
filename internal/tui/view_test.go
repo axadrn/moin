@@ -71,6 +71,15 @@ func frames() map[string]model {
 	})
 	add("servers-offline", func(m *model) { m.offline = errors.New("eof") })
 	add("apps", func(m *model) { m.tab = tabApps; m.notice = "v42 of hello is live" })
+	add("help", func(m *model) { m.tab, m.mode = tabApps, modeHelp })
+	add("command", func(m *model) { m.tab, m.mode, m.input = tabApps, modeCommand, "hook off" })
+	add("search", func(m *model) { m.tab, m.mode, m.input = tabApps, modeSearch, "error" })
+	add("logs-scrolled", func(m *model) {
+		m.tab, m.panelFocus, m.outputTitle, m.outputScroll, m.search, m.panelMatch = tabApps, true, "logs of hello", 5, "line 3", 4
+		for index := range 40 {
+			m.output = append(m.output, fmt.Sprintf("web-1  | line %d", index))
+		}
+	})
 	add("activity", func(m *model) {
 		m.tab = tabActivity
 		now := time.Now()
@@ -196,12 +205,14 @@ func press(m model, keys ...string) model {
 			msg = tea.KeyPressMsg{Code: tea.KeyEscape}
 		case "enter":
 			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
+		case "tab":
+			msg = tea.KeyPressMsg{Code: tea.KeyTab}
 		case "down":
 			msg = tea.KeyPressMsg{Code: tea.KeyDown}
 		case "up":
 			msg = tea.KeyPressMsg{Code: tea.KeyUp}
-		case "ctrl+u":
-			msg = tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}
+		case "ctrl+u", "ctrl+d", "ctrl+w":
+			msg = tea.KeyPressMsg{Code: rune(key[5]), Mod: tea.ModCtrl}
 		}
 		next, _ := m.Update(msg)
 		m = next.(model)
@@ -498,21 +509,30 @@ func TestRestoreTargetCheckedFirst(t *testing.T) {
 	}
 }
 
-// h asks first only when a hook exists to replace; H without one says so.
+// :hook asks first only when a hook exists to replace; :hook off without
+// one says so.
 func TestHookKeysWithoutAHook(t *testing.T) {
 	m := frames()["apps"]
-	if m = press(m, "h"); m.mode == modeConfirm {
-		t.Errorf("h without a hook asks to replace one")
+	if m = command(m, "hook"); m.mode == modeConfirm {
+		t.Errorf(":hook without a hook asks to replace one")
 	}
 	m = frames()["apps"]
-	if m = press(m, "H"); m.mode == modeConfirm || !strings.Contains(m.notice, "has no deploy hook") {
-		t.Errorf("H without a hook: mode %v, notice %q", m.mode, m.notice)
+	if m = command(m, "hook off"); m.mode == modeConfirm || !strings.Contains(m.notice, "has no deploy hook") {
+		t.Errorf(":hook off without a hook: mode %v, notice %q", m.mode, m.notice)
 	}
 	m = frames()["apps"]
+	m.apps = slices.Clone(m.apps)
 	m.apps[0].Hook = true
-	if m = press(m, "h"); m.mode != modeConfirm {
-		t.Errorf("h with a hook does not ask: mode %v", m.mode)
+	if m = command(m, "hook"); m.mode != modeConfirm {
+		t.Errorf(":hook with a hook does not ask: mode %v", m.mode)
 	}
+}
+
+// command types a command on the command line and runs it.
+func command(m model, line string) model {
+	m = press(m, ":")
+	m.input = line
+	return press(m, "enter")
 }
 
 // The new app form asks the name or the server again when it is wrong,
@@ -548,7 +568,7 @@ func TestRenameServerChecksName(t *testing.T) {
 	m := frames()["servers"]
 	m.servers = slices.Clone(m.servers)
 	m.servers[0].Name = "Old Box"
-	m = press(m, "n")
+	m = press(m, "c", "w")
 	m.input = "New Box"
 	if m = press(m, "enter"); m.mode != modeForm || m.err == nil || m.input != "New Box" {
 		t.Fatalf("bad name: mode %d, input %q, err %v", m.mode, m.input, m.err)

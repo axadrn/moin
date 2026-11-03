@@ -135,6 +135,11 @@ const (
 	// before something big that cannot be undone.
 	modeConfirmName
 	modeGitHub
+	// modeSearch types a search after /, modeCommand a command after :.
+	modeSearch
+	modeCommand
+	// modeHelp shows every key.
+	modeHelp
 )
 
 // form asks for a few values in turn and hands them to submit.
@@ -174,6 +179,9 @@ type shared struct {
 	// outputs numbers the output panels, so the lines of a deploy never land
 	// in the logs opened after it.
 	outputs atomic.Int64
+	// panelKeep is how many lines the output panel showed last, so the
+	// keys scroll it by pages of its size.
+	panelKeep int
 }
 
 type model struct {
@@ -242,6 +250,20 @@ type model struct {
 	team         client.Team
 	teamErr      error
 	teamSelected int
+
+	// The vim keys: a count like the 5 of 5j, a first key waiting for its
+	// second like the g of gg, the last search and where it matched in the
+	// panel (1 + the line, 0 for none), the output panel having the keys
+	// and how many of its lines are below what it shows, the selected
+	// event and the top line of help.
+	count            int
+	pending          string
+	search           string
+	panelMatch       int
+	panelFocus       bool
+	outputScroll     int
+	activitySelected int
+	helpTop          int
 }
 
 func (m model) Init() tea.Cmd {
@@ -288,6 +310,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case eventsMsg:
 		m.events, m.activityNext = msg.Items, msg.Next
+		m.activitySelected = min(m.activitySelected, max(len(m.events)-1, 0))
 	case olderEventsMsg:
 		m.events, m.activityNext = append(slices.Clone(m.events), msg.Items...), msg.Next
 	case activityFilterMsg:
@@ -304,6 +327,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail = &detail
 	case outputMsg:
 		m.outputID, m.outputTitle, m.outputNote, m.output = msg.id, msg.title, msg.note, msg.lines
+		m.outputScroll, m.panelMatch = 0, 0
 		m.running, m.runStep = msg.follow, "waiting for the server"
 		if msg.follow {
 			m.runStarted = time.Now()
@@ -311,6 +335,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case lineMsg:
 		if msg.id == m.outputID {
 			m.output = append(m.output, msg.line)
+			// Scrolled up, the panel stays on the lines it shows.
+			if text, _ := style.LogLine(msg.line); m.outputScroll > 0 && (text != "" || !m.isDeployOutput()) {
+				m.outputScroll++
+			}
 			if text, step := style.LogLine(msg.line); step {
 				m.runStep = text
 			}
@@ -385,7 +413,13 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.input = ""
 		return m, nil
 	}
+	if key == "ctrl+w" && m.typing() {
+		m.input = dropWord(m.input)
+		return m, nil
+	}
 	switch m.mode {
+	case modeSearch, modeCommand:
+		return m.lineKey(msg)
 	case modeAdd:
 		switch key {
 		case "esc":
@@ -572,6 +606,15 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	m, cmd, key := m.vim(key)
+	if key == "" {
+		return m, cmd
+	}
+	return m.tabKey(key)
+}
+
+// tabKey is a key of the place in view, after the vim keys had theirs.
+func (m model) tabKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "q":
 		return m, tea.Quit
@@ -590,17 +633,7 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "tab":
-		m.tab = (m.tab + 1) % tabs
-		m.added, m.removed = nil, nil
-		switch m.tab {
-		case tabActivity:
-			return m, m.loadActivity()
-		case tabTeam:
-			return m, m.loadTeam()
-		case tabSettings:
-			return m, m.loadSettings()
-		}
-		return m, nil
+		return m.toTab((m.tab + 1) % tabs)
 	}
 	switch m.tab {
 	case tabServers:
@@ -698,7 +731,7 @@ func (m model) confirmName(question, detail, name string, run tea.Cmd) model {
 // typing reports whether the footer holds a text input.
 func (m model) typing() bool {
 	switch m.mode {
-	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub, modeConfirmName:
+	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub, modeConfirmName, modeSearch, modeCommand:
 		return true
 	}
 	return false
@@ -707,6 +740,7 @@ func (m model) typing() bool {
 // closePanel empties the output panel.
 func (m model) closePanel() model {
 	m.output, m.outputTitle, m.outputNote, m.outputID, m.running = nil, "", "", 0, false
+	m.panelFocus, m.outputScroll, m.panelMatch = false, 0, 0
 	return m
 }
 
@@ -720,10 +754,6 @@ func dropLast(text string) string {
 
 func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
-	case "up", "k":
-		m.selected = max(m.selected-1, 0)
-	case "down", "j":
-		m.selected = min(m.selected+1, max(len(m.servers)-1, 0))
 	case "a":
 		m.mode, m.added, m.removed = modeAdd, nil, nil
 	case "x":
@@ -736,7 +766,7 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			server := m.servers[m.selected]
 			return m, m.newInstallCommand(server.ID)
 		}
-	case "n":
+	case "cw":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
 			return m.ask("Rename "+server.Name, func(values []string) tea.Cmd {
@@ -823,19 +853,6 @@ func (m model) updateAgent(server client.Server) tea.Cmd {
 func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 	if m.detail == nil {
 		switch key {
-		case "up", "k", "down", "j":
-			// The panel belongs to the app it was opened for; a deploy
-			// streams on.
-			selected := m.appSelected
-			if key == "up" || key == "k" {
-				m.appSelected = max(m.appSelected-1, 0)
-			} else {
-				m.appSelected = min(m.appSelected+1, max(len(m.apps)-1, 0))
-			}
-			if m.appSelected != selected && !m.running {
-				m = m.closePanel()
-			}
-			return m, nil
 		case "enter":
 			if app, ok := m.currentApp(); ok {
 				m = m.closePanel()
@@ -848,11 +865,9 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		}
 	} else {
 		switch key {
-		case "up", "k", "down", "j":
-			m.deployPick = m.pickDeploy(key == "down" || key == "j")
-			return m, nil
 		case "enter":
 			if m.deployPick != 0 {
+				m.panelFocus = true
 				return m, m.deployLog(m.detail.App.Name, m.deployPick)
 			}
 			return m, nil
@@ -864,8 +879,9 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if m.hasApp(client.AppName("", m.dir)) {
 			return m, m.deploy()
 		}
-	case "l":
+	case "L":
 		if ok {
+			m.panelFocus = true
 			return m, m.logs(app.Name)
 		}
 	case "r":
@@ -903,7 +919,7 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.mode, m.input = modeImage, ""
 		}
-	case "H":
+	case "hook off":
 		if ok && app.Hook {
 			name := app.Name
 			return m.confirmFirst("Turn off the deploy hook of "+name+"?", "Its URL stops working; CI can no longer deploy it.", "turn off", true, func() tea.Msg {
@@ -916,7 +932,7 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.notice = "Nothing changed: " + app.Name + " has no deploy hook."
 		}
-	case "h":
+	case "hook":
 		// The first hook replaces nothing, so it asks nothing.
 		if ok && !app.Hook {
 			return m, m.newHook(app.Name)
@@ -943,7 +959,7 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 			m.mode, m.input = modeBackups, ""
 			return m, m.showBackups(app.Name, "")
 		}
-	case "g":
+	case "gh":
 		if ok {
 			m.mode, m.input = modeGitHub, ""
 			return m, m.showGitHub(app)
@@ -960,22 +976,6 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 // hasApp reports whether the workspace has an app of that name.
 func (m model) hasApp(name string) bool {
 	return slices.ContainsFunc(m.apps, func(app client.App) bool { return app.Name == name })
-}
-
-// pickDeploy moves the pick in the open app's history one row down or up;
-// up from the newest one picks none.
-func (m model) pickDeploy(down bool) int {
-	deploys := m.detail.Deploys[:min(len(m.detail.Deploys), historyRows)]
-	index := slices.IndexFunc(deploys, func(deploy client.Deploy) bool { return deploy.Number == m.deployPick })
-	switch {
-	case len(deploys) == 0:
-		return 0
-	case down:
-		return deploys[min(index+1, len(deploys)-1)].Number
-	case index <= 0:
-		return 0
-	}
-	return deploys[index-1].Number
 }
 
 // addAppForm asks for the name and the server of a new app. The name
@@ -1036,7 +1036,7 @@ func (m model) addApp(name, server string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		next := "Deploy it with i (an image), g (GitHub) or " + build.Name + " deploy in its repo."
+		next := "Deploy it with i (an image), gh (GitHub) or " + build.Name + " deploy in its repo."
 		if app.Name == client.AppName("", m.dir) {
 			next = "Press d to deploy " + m.dir + "."
 		}

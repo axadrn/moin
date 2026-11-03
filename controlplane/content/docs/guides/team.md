@@ -94,7 +94,7 @@ Changes the name everyone in the workspace sees.
 ```surfaces
 Web: **Team**, **Workspace name**, **Save**
 CLI: ops team rename "<workspace-name>"
-TUI: on the team tab, `n`
+TUI: on the team tab, `cw` or `:rename`
 API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
 ```

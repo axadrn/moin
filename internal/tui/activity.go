@@ -96,7 +96,7 @@ func (m model) activityView(room int) []string {
 	for _, event := range m.events {
 		rows = append(rows, []string{style.Muted.Render(event.CreatedAt.Local().Format("2006-01-02 15:04:05 MST")), event.Actor, style.Muted.Render(viaName(event.Via, event.Token)), event.Summary})
 	}
-	return append(lines, table([]string{"WHEN", "WHO", "VIA", "WHAT"}, rows, -1, room)...)
+	return append(lines, table([]string{"WHEN", "WHO", "VIA", "WHAT"}, rows, m.activitySelected, room)...)
 }
 
 // activityFilterText says what the filter keeps: "app blog, member ada@…".
