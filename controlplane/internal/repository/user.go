@@ -21,6 +21,7 @@ type UserRepository interface {
 	ByEmail(email string) (*model.User, error)
 	Update(user *model.User) error
 	UpdateName(userID, name string, updatedAt time.Time) error
+	SetView(userID, page, view string) error
 	Delete(id string) error
 }
 
@@ -96,6 +97,22 @@ func (r *userRepository) UpdateName(userID, name string, updatedAt time.Time) er
 		return err
 	}
 	if rows == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// SetView stores how the user sees the "apps" or the "servers" page.
+func (r *userRepository) SetView(userID, page, view string) error {
+	column := "apps_view"
+	if page == "servers" {
+		column = "servers_view"
+	}
+	result, err := r.db.Exec(`UPDATE users SET `+column+` = $1 WHERE id = $2`, view, userID)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
 		return ErrUserNotFound
 	}
 	return nil

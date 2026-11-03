@@ -210,6 +210,8 @@ var serviceErrors = []serviceError{
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to ops under Billing to add servers."},
 	{err: service.ErrNoAgentBinary, status: http.StatusConflict, code: "no_agent_binary", message: "This control plane serves no agent binary for the server's system. Update the agent on the server instead."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its agent and try again."},
+	{err: repository.ErrOrder, field: "order", message: "Name every app or server of the workspace once, in the new order."},
+	{err: service.ErrView, field: "view", message: "Choose list or grid."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
 	{err: repository.ErrDuplicateApp, field: "name", message: "An app with this name already exists."},
 	{err: service.ErrAppName, field: "name", message: "Use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit."},

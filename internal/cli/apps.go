@@ -70,6 +70,8 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		done(stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
 		hint(stdout, "Deploy it with", build.Name+" deploy "+app.Name)
 		return nil
+	case "move":
+		return moveApp(ctx, api, apiErr, args, stdout)
 	case "rm", "remove":
 		flags := newFlags("apps rm", "apps rm <app> [--yes]").withApp().withYes()
 		if err := flags.parse(args); err != nil {

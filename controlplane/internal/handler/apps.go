@@ -23,10 +23,11 @@ import (
 type AppsHandler struct {
 	apps    *service.AppService
 	servers *service.ServerService
+	users   *service.UserService
 }
 
-func NewAppsHandler(apps *service.AppService, servers *service.ServerService) *AppsHandler {
-	return &AppsHandler{apps: apps, servers: servers}
+func NewAppsHandler(apps *service.AppService, servers *service.ServerService, users *service.UserService) *AppsHandler {
+	return &AppsHandler{apps: apps, servers: servers, users: users}
 }
 
 func (h *AppsHandler) AppsPage(w http.ResponseWriter, r *http.Request) {

@@ -761,6 +761,8 @@ func dropLast(text string) string {
 
 func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
+	case "K", "J":
+		return m.moveServer(key == "K")
 	case "a":
 		m.mode, m.added, m.removed = modeAdd, nil, nil
 	case "x":
@@ -879,6 +881,8 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "a":
 			return m.addAppForm(), nil
+		case "K", "J":
+			return m.moveApp(key == "K")
 		}
 	} else {
 		switch key {

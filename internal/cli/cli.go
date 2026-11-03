@@ -44,6 +44,7 @@ Servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
   servers rename     Rename a server: servers rename web-1 shop-1
+  servers move       Change the order: servers move web-1 up|down|top|bottom|<position>
   servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
   servers update     Update the agent to the control plane's version: servers update [web-1]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
@@ -55,6 +56,7 @@ Apps
   apps               List apps; one app with its domains and deploys: apps <app>
   apps add           Add an app: apps add --server <server> <name>
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
+  apps move          Change the order: apps move blog up|down|top|bottom|<position>
 
 Deploys
   deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
@@ -483,6 +485,8 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		}
 		done(stdout, "Renamed %s to %s", flags.Arg(0), style.Bold.Render(renamed.Name))
 		return nil
+	case "move":
+		return moveServer(ctx, api, apiErr, args, stdout)
 	case "rm", "remove":
 		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
 		if err := flags.parse(args); err != nil {

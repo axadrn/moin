@@ -32,7 +32,9 @@ type Server struct {
 	Security     string `db:"security"`
 	// Rules are the server's own rules for ops, as JSON; see
 	// service.ServerRules.
-	Rules     string    `db:"rules"`
+	Rules string `db:"rules"`
+	// Position is the place of the server in the workspace's order, from 0.
+	Position  int       `db:"position"`
 	CreatedAt time.Time `db:"created_at"`
 	Online    bool      `db:"-"`
 }

@@ -15,10 +15,33 @@ type User struct {
 	Name            string     `db:"name"`
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at"`
+	// AppsView and ServersView are how the user sees the Apps and Servers
+	// pages: ViewList, ViewGrid, or empty for the page's default.
+	AppsView    string `db:"apps_view"`
+	ServersView string `db:"servers_view"`
 
 	// Computed fields (not in database)
 	AvatarURL   string `db:"-"`
 	PasswordSet bool   `db:"-"`
+}
+
+// The ways the Apps and Servers pages show their items.
+const (
+	ViewList = "list"
+	ViewGrid = "grid"
+)
+
+// View is how the user sees the "apps" or the "servers" page: apps as a
+// list and servers as a grid, unless they picked the other.
+func (u *User) View(page string) string {
+	view, fallback := u.AppsView, ViewList
+	if page == "servers" {
+		view, fallback = u.ServersView, ViewGrid
+	}
+	if view == ViewList || view == ViewGrid {
+		return view
+	}
+	return fallback
 }
 
 func (u *User) HasPassword() bool {

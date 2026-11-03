@@ -527,7 +527,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && len(m.servers) == 0:
 		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"cw", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"cw", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"K J", "move"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		var keys [][2]string
 		if len(m.detail.Deploys) > 0 {
@@ -540,7 +540,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case len(m.apps) == 0:
 		return nil, [][2]string{{"tab", "activity"}, {"a", "create an app"}, {"q", "quit"}}
 	}
-	keys := [][2]string{{"tab", "activity"}, {"j k", "select"}, {"enter", "open"}, {"a", "create"}}
+	keys := [][2]string{{"tab", "activity"}, {"j k", "select"}, {"enter", "open"}, {"a", "create"}, {"K J", "move"}}
 	return nil, append(append(keys, appKeys...), [2]string{"q", "quit"})
 }
 

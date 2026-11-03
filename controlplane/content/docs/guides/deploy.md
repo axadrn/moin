@@ -203,6 +203,22 @@ MCP: remove_app
 
 You cannot undo it, so ops asks you to type the app's name first. `ops apps rm <app-name> --yes` skips that in scripts. An agent passes the name as `confirm`.
 
+## Order your apps
+
+Apps show in the order you give them, the same for everyone in the workspace and everywhere: the apps page and the sidebar, the CLI, the TUI, the API and MCP. A new app goes to the end.
+
+```surfaces
+Web: **Apps**, drag an app by its handle, or use its up and down arrows
+CLI: ops apps move <app-name> up|down|top|bottom|<position>
+TUI: on the app list, `K` or `J`, or `:move up` and `:move down`
+API: PUT /api/v1/apps/order
+MCP: reorder_apps
+```
+
+The arrows work with the keyboard and screen readers, and dragging works with a mouse and on touch screens. The API and MCP take every app once, by name or ID, in the new order: `{"order": ["blog", "shop"]}`. The activity records each new order once.
+
+**List** and **Grid** above the apps switch how the page shows them: one row each, or cards side by side. ops remembers your choice for you on every device; the rest of the team keeps theirs.
+
 ## Push to deploy with GitHub Actions
 
 This workflow deploys every push to `main`. The [GitHub](/docs/guides/github) guide shows a way without CI, and [Build in CI](/docs/guides/ci) builds the image in CI.

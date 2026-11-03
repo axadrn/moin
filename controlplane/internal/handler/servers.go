@@ -18,10 +18,11 @@ import (
 // ServersHandler is the servers page of the web UI.
 type ServersHandler struct {
 	servers *service.ServerService
+	users   *service.UserService
 }
 
-func NewServersHandler(servers *service.ServerService) *ServersHandler {
-	return &ServersHandler{servers: servers}
+func NewServersHandler(servers *service.ServerService, users *service.UserService) *ServersHandler {
+	return &ServersHandler{servers: servers, users: users}
 }
 
 func (h *ServersHandler) ServersPage(w http.ResponseWriter, r *http.Request) {

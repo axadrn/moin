@@ -254,6 +254,10 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return on("turned the Cloudflare token %s")
 	case "integration.tailscale":
 		return on("turned the Tailscale key %s")
+	case "apps.reordered":
+		return "put the apps in the order " + d["order"]
+	case "servers.reordered":
+		return "put the servers in the order " + d["order"]
 	case "server.added":
 		return "added the server " + target
 	case "server.removed":

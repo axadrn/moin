@@ -470,6 +470,7 @@ var commandKeys = map[string]map[tab]string{
 	"install":  {tabServers: "i"},
 	"invite":   {tabTeam: "a"},
 	"logs":     {tabApps: "L"},
+	"move":     {tabServers: "J", tabApps: "J"},
 	"older":    {tabActivity: "m"},
 	"protect":  {tabApps: "p"},
 	"redeploy": {tabApps: "R"},
@@ -584,6 +585,16 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 		m.err = fmt.Errorf(":%s works on the %s tab", name, strings.Join(where, " and "))
 		return m, nil
 	}
+	// :move up is K, :move down J.
+	if name == "move" {
+		switch {
+		case len(args) > 0 && args[0] == "up":
+			key = "K"
+		case len(args) > 0 && args[0] != "down":
+			m.err = errors.New("move it up or down: :move up, :move down")
+			return m, nil
+		}
+	}
 	if app, ok := m.currentApp(); ok && m.tab == tabApps {
 		switch {
 		case name == "stop" && app.Stopped:
@@ -652,6 +663,7 @@ var helpEntries = [][2]string{
 	{"o", "domains"},
 	{"p", "password"},
 	{":hook", "a new deploy hook; :hook off turns it off"},
+	{"K J", "move the app up, down; :move up, :move down"},
 	{"x", "remove"},
 	{"", "Servers"},
 	{"a", "add a server"},
@@ -661,6 +673,7 @@ var helpEntries = [][2]string{
 	{"s", "SSH only on Tailscale"},
 	{"i", "a new install command"},
 	{"u", "update the agent"},
+	{"K J", "move the server up, down; :move up, :move down"},
 	{"x", "remove"},
 	{"", "Inputs"},
 	{"ctrl+u", "clears the line"},

@@ -58,6 +58,7 @@ The TUI moves like vim, and `?` shows every key.
 | `t`, then `y` | servers | turns the Cloudflare Tunnel on or off |
 | `s`, then `y` | servers | turns SSH only on Tailscale on or off |
 | `cw` or `:rename` | servers | renames the selected server |
+| `K` `J` or `:move up` `:move down` | servers, apps | moves the selected server or app up or down in the order every list shows |
 | `i` | servers | shows a new one-time install command for the selected server; the old one stops working |
 | `u` | servers | updates the server's agent to the control plane's version |
 | `f`, then `y` | servers | turns the firewall on or off |

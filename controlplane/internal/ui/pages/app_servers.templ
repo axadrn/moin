@@ -3,9 +3,9 @@ package pages
 import (
 	"fmt"
 	"github.com/axadrn/ops/controlplane/internal/access"
-	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -13,6 +13,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/status"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
@@ -149,24 +150,70 @@ templ ServerList(servers []model.Server) {
 				@docsLink("/docs/getting-started", "Getting started")
 			}
 		} else {
-			<div class="flex items-baseline justify-between gap-3">
-				@sectionTitle("Your servers")
-				<p class="text-xs text-muted-foreground tabular-nums">{ serversSummary(servers) }</p>
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<h2 id="servers-heading" class="text-base font-semibold">Your servers</h2>
+				<div class="flex items-center gap-3">
+					<p class="text-xs text-muted-foreground tabular-nums">{ serversSummary(servers) }</p>
+					@viewSwitch("servers")
+				</div>
 			</div>
-			<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list">
-				for _, server := range servers {
-					<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
-						@serverCard(server, basePath, now)
-					</li>
+			@orderForm("servers") {
+				if pageView(ctx, "servers") == model.ViewList {
+					@card.Card(card.Props{Class: "min-w-0 p-3"}) {
+						<ul class="flex flex-col gap-1" role="list" aria-labelledby="servers-heading" data-sortable-list>
+							for index, server := range servers {
+								<li data-server={ server.Name } data-online?={ server.Online } class="group/row flex min-w-0 items-center gap-1">
+									@serverRow(server, basePath, now)
+									@orderControls("server", server.Name, index == 0, index == len(servers)-1, orderRowClasses)
+								</li>
+							}
+						</ul>
+					}
+				} else {
+					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="servers-heading" data-sortable-list>
+						for index, server := range servers {
+							<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
+								@serverCard(server, basePath, now, index == 0, index == len(servers)-1)
+							</li>
+						}
+					</ul>
 				}
-			</ul>
+			}
 		}
 	</div>
 }
 
+// serverRow is a server in the list: its name, system and agent, when it
+// was last seen and its state, linking to its page.
+templ serverRow(server model.Server, basePath string, now time.Time) {
+	@item.Item(item.Props{Href: basePath + "/servers/" + server.ID + "/security", Size: item.SizeSm, Class: "group/server grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_8rem_7rem_1rem]"}) {
+		@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
+			@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
+				{ server.Name }
+			}
+			@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
+				if system := serverSystem(server); system != "" {
+					{ system }
+					<span aria-hidden="true">·</span>
+				}
+				if server.AgentVersion != "" {
+					agent { server.AgentVersion }
+					<span aria-hidden="true">·</span>
+				}
+				{ serverReach(server) }
+			}
+		}
+		<span class="flex min-w-0 justify-end md:justify-start">
+			@serverStatus(server)
+		</span>
+		<span class="hidden text-xs text-muted-foreground tabular-nums md:block" title={ serverLastSeenTitle(server) }>{ serverLastSeen(server, now) }</span>
+		@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/server:translate-x-0.5 group-hover/server:text-foreground md:block"})
+	}
+}
+
 // serverCard is one server: its name and state, three facts, how it is
-// reached, and the way to its page.
-templ serverCard(server model.Server, basePath string, now time.Time) {
+// reached, the way to its page and the order controls.
+templ serverCard(server model.Server, basePath string, now time.Time, first, last bool) {
 	{{ serverPath := basePath + "/servers/" + server.ID + "/security" }}
 	@card.Card(card.Props{Class: "h-full min-w-0"}) {
 		@card.Header() {
@@ -214,6 +261,7 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 					Update agent
 				}
 			}
+			@orderControls("server", server.Name, first, last, "ml-auto")
 		}
 	}
 }
@@ -279,6 +327,21 @@ func serversSummary(servers []model.Server) string {
 		}
 	}
 	return fmt.Sprintf("%s · %d online", plural(len(servers), "server", "servers"), online)
+}
+
+// serverReach says in a few words how apps on the server are reached.
+func serverReach(server model.Server) string {
+	reach := "ports 80, 443"
+	if server.Tunnel {
+		reach = "Cloudflare Tunnel"
+	}
+	if server.Firewall {
+		reach += ", firewall"
+	}
+	if server.SSHTailscale {
+		reach += ", SSH on Tailscale"
+	}
+	return reach
 }
 
 func serverSystem(server model.Server) string {

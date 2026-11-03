@@ -69,6 +69,18 @@ func (s *UserService) UpdateName(userID, name string) (*model.User, error) {
 	return s.ByID(userID)
 }
 
+// ErrView is a page or a view the Apps and Servers pages do not have.
+var ErrView = errors.New("view must be list or grid, for apps or servers")
+
+// SetView remembers how the user sees the "apps" or the "servers" page:
+// model.ViewList or model.ViewGrid.
+func (s *UserService) SetView(userID, page, view string) error {
+	if (page != "apps" && page != "servers") || (view != model.ViewList && view != model.ViewGrid) {
+		return ErrView
+	}
+	return s.userRepository.SetView(userID, page, view)
+}
+
 func (s *UserService) DeleteAccount(userID string) error {
 	if err := s.validateAccountDeletion(userID); err != nil {
 		return err

@@ -26,6 +26,8 @@ type AppRepository interface {
 	ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.App, error)
 	ByID(id string) (*model.App, error)
 	ListByWorkspaceID(workspaceID string) ([]model.App, error)
+	// SetOrder puts the apps of a workspace in the order of ids, every one once.
+	SetOrder(workspaceID string, ids []string) error
 	DeleteForWorkspace(id, workspaceID string) error
 
 	// CreateDeploy numbers the deploy after the newest one of its app.
@@ -83,7 +85,8 @@ const appSelect = `
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *appRepository) Create(app *model.App) error {
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, created_at) VALUES ($1, $2, $3, $4, $5)`,
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, position, created_at)
+		VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), -1) + 1 FROM apps WHERE workspace_id = $2), $5)`,
 		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
@@ -113,7 +116,7 @@ func (r *appRepository) ByID(id string) (*model.App, error) {
 
 func (r *appRepository) ListByWorkspaceID(workspaceID string) ([]model.App, error) {
 	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
+	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.position, a.name, a.id`, workspaceID)
 	return apps, err
 }
 

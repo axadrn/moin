@@ -764,7 +764,7 @@ paths:
       tags: [Servers]
       operationId: listServers
       summary: List servers
-      description: Sorted by name.
+      description: In the order of the workspace, set with `PUT /api/v1/servers/order`. New servers go to the end.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -815,6 +815,43 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/servers/order:
+    put:
+      tags: [Servers]
+      operationId: reorderServers
+      summary: Order the servers
+      description: Puts the servers of the workspace in a new order, which every list shows. `order` names every server once. The activity records it once.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '200':
+          description: The servers in their new order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerList'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.order`: it misses a server, names one twice or names one the workspace does not have.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -977,7 +1014,7 @@ paths:
       tags: [Apps]
       operationId: listApps
       summary: List apps
-      description: Sorted by name, with the newest and the live deploy of each.
+      description: In the order of the workspace, set with `PUT /api/v1/apps/order`, with the newest and the live deploy of each. New apps go to the end.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1031,6 +1068,43 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/order:
+    put:
+      tags: [Apps]
+      operationId: reorderApps
+      summary: Order the apps
+      description: Puts the apps of the workspace in a new order, which every list and the sidebar show. `order` names every app once. The activity records it once.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '200':
+          description: The apps in their new order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppList'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.order`: it misses an app, names one twice or names one the workspace does not have.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3946,6 +4020,15 @@ components:
           type: string
           maxLength: 64
           description: Empty or left out gets a name like `brave-otter`.
+    OrderRequest:
+      type: object
+      required: [order]
+      properties:
+        order:
+          type: array
+          description: Every app or server of the workspace once, by name or ID, in the new order.
+          items:
+            type: string
     RenameServerRequest:
       type: object
       required: [name]

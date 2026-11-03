@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
@@ -132,50 +133,124 @@ templ AppList(view AppsView) {
 				@statCard("Failed", strconv.Itoa(failed), failedNote(failed))
 				@statCard("Servers online", strconv.Itoa(onlineServers(view.Servers)), "of "+strconv.Itoa(len(view.Servers)))
 			}
-			@panel(panelProps{Heading: "apps-heading", Title: "All apps", Action: appCount(len(view.Apps)), Body: panelBodyRows}) {
-				<div class="hidden grid-cols-[minmax(0,1fr)_10rem_8rem_1rem] gap-4 px-3 pb-2 text-xs text-muted-foreground md:grid" aria-hidden="true">
-					<span>App</span>
-					<span>Status</span>
-					<span>Last deploy</span>
+			if pageView(ctx, "apps") == model.ViewGrid {
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<h2 id="apps-heading" class="text-base font-semibold">All apps</h2>
+					@appListActions(len(view.Apps))
 				</div>
-				<ul class="flex flex-col gap-1" role="list">
-					for _, app := range view.Apps {
-						{{ newest, hasNewest := view.Newest[app.ID] }}
-						<li data-app={ app.Name }>
-							@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
-								@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
-									@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
-										{ app.Name }
-									}
-									@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
-										if hasNewest && newest.Detected != nil {
-											<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
-											<span aria-hidden="true">·</span>
-											{ newest.Detected.Kind }
-											<span aria-hidden="true">·</span>
-										}
-										on { app.ServerName }
-									}
-								}
-								<span class="flex min-w-0 justify-end md:justify-start">
-									@appStatus(app)
-								</span>
-								<span class="hidden text-xs text-muted-foreground tabular-nums md:block">
-									if hasNewest {
-										<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
-									} else {
-										never deployed
-									}
-								</span>
-								@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
-							}
-						</li>
-					}
-				</ul>
+				@orderForm("apps") {
+					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="apps-heading" data-sortable-list>
+						for index, app := range view.Apps {
+							{{ newest, hasNewest := view.Newest[app.ID] }}
+							<li data-app={ app.Name } class="min-w-0">
+								@appCard(app, newest, hasNewest, now, index == 0, index == len(view.Apps)-1)
+							</li>
+						}
+					</ul>
+				}
+			} else {
+				@appRows(view, now)
 			}
 		}
 	</div>
 }
+
+// appListActions is the number of apps and the view switch right of the
+// list title.
+templ appListActions(n int) {
+	<div class="flex items-center gap-3">
+		@appCount(n)
+		@viewSwitch("apps")
+	</div>
+}
+
+// appCard is an app in the grid: its name and state, where it runs, its
+// last deploy, the way to its page and the order controls.
+templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time, first, last bool) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	@card.Card(card.Props{Class: "h-full min-w-0"}) {
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "min-w-0 truncate text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
+				<a href={ templ.SafeURL(appPath) } class="hover:underline hover:underline-offset-4">{ app.Name }</a>
+			}
+			@card.Action() {
+				@appStatus(app)
+			}
+		}
+		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col gap-4"}) {
+			<dl class="flex flex-wrap gap-x-8 gap-y-3">
+				@serverFact("Server", app.ServerName, app.ServerName)
+				if hasNewest && newest.Detected != nil {
+					@serverFact("Service", newest.Detected.Service+":"+strconv.Itoa(newest.Detected.Port), newest.Detected.Kind)
+				}
+				if hasNewest {
+					@serverFact("Last deploy", ago(newest.CreatedAt, now), stamp(newest.CreatedAt))
+				} else {
+					@serverFact("Last deploy", "never", "Never deployed")
+				}
+			</dl>
+		}
+		@card.Footer(card.FooterProps{Class: "mt-auto gap-2"}) {
+			@button.Button(button.Props{Href: appPath, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+				Open
+			}
+			@orderControls("app", app.Name, first, last, "ml-auto")
+		}
+	}
+}
+
+// appRows is the apps as a list in a panel.
+templ appRows(view AppsView, now time.Time) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@panel(panelProps{Heading: "apps-heading", Title: "All apps", Action: appListActions(len(view.Apps)), Body: panelBodyRows}) {
+		<div class="hidden grid-cols-[minmax(0,1fr)_10rem_8rem_1rem] gap-4 pr-[5.5rem] pl-3 pb-2 text-xs text-muted-foreground md:grid" aria-hidden="true">
+			<span>App</span>
+			<span>Status</span>
+			<span>Last deploy</span>
+		</div>
+		@orderForm("apps") {
+			<ul class="flex flex-col gap-1" role="list" data-sortable-list>
+				for index, app := range view.Apps {
+					{{ newest, hasNewest := view.Newest[app.ID] }}
+					<li data-app={ app.Name } class="group/row flex min-w-0 items-center gap-1">
+						@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
+							@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
+								@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
+									{ app.Name }
+								}
+								@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
+									if hasNewest && newest.Detected != nil {
+										<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
+										<span aria-hidden="true">·</span>
+										{ newest.Detected.Kind }
+										<span aria-hidden="true">·</span>
+									}
+									on { app.ServerName }
+								}
+							}
+							<span class="flex min-w-0 justify-end md:justify-start">
+								@appStatus(app)
+							</span>
+							<span class="hidden text-xs text-muted-foreground tabular-nums md:block">
+								if hasNewest {
+									<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
+								} else {
+									never deployed
+								}
+							</span>
+							@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
+						}
+						@orderControls("app", app.Name, index == 0, index == len(view.Apps)-1, orderRowClasses)
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+// orderRowClasses shows the order controls of a list row on hover and
+// focus, and always on touch screens, where nothing hovers.
+const orderRowClasses = "md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100 pointer-coarse:opacity-100"
 
 // appCount is the number of apps right of the list title.
 templ appCount(n int) {
@@ -339,12 +414,12 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{
-						"hx-delete":       appPath,
-						"hx-swap":         "none",
-						"hx-disable":      "this",
-						"hx-confirm":      "Remove " + app.Name + "? Its containers stop and are removed. Its data stays on the server.",
+						"hx-delete":         appPath,
+						"hx-swap":           "none",
+						"hx-disable":        "this",
+						"hx-confirm":        "Remove " + app.Name + "? Its containers stop and are removed. Its data stays on the server.",
 						"data-confirm-name": app.Name,
-						"data-remove-app": true,
+						"data-remove-app":   true,
 					},
 				}) {
 					Remove app
