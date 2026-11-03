@@ -66,7 +66,9 @@ update() {
 	# Keep the running image, to start it again if the new one fails.
 	container=$(docker compose -f "$deploy/compose.yml" ps -q controlplane)
 	image=$(docker inspect -f '{{.Config.Image}}' "$container")
-	repo=${image%:*}
+	# The repository without its tag; a registry port has a colon too.
+	repo=$image
+	case "${image##*/}" in *:*) repo=${image%:*} ;; esac
 	docker tag "$(docker inspect -f '{{.Image}}' "$container")" "$repo:rollback"
 	echo "$(date -u) update from $from to $version" >"$data/log"
 	if ! OPS_IMAGE="$repo:$version" sh "$deploy/update.sh" controlplane >>"$data/log" 2>&1; then
