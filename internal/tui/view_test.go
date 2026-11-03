@@ -601,3 +601,26 @@ func TestOneShotInputKeepsTextOnError(t *testing.T) {
 		t.Fatalf("after it worked: mode %d, input %q, notice %q", m.mode, m.input, m.notice)
 	}
 }
+
+// TestEmailAlertsRow: the settings tab shows the user's email alerts, and
+// enter on the row or E turns them off.
+func TestEmailAlertsRow(t *testing.T) {
+	m := frames()["settings"]
+	m.settings.account = client.Account{Email: "ada@example.com", EmailAlerts: true}
+	rows := m.settingRows()
+	index := slices.IndexFunc(rows, func(row settingRow) bool { return row.kind == "alerts" })
+	if index < 0 || rows[index].name != "Email me alerts" || !strings.HasPrefix(strip(rows[index].value), "on · a mail to ada@example.com") {
+		t.Fatalf("rows %+v", rows)
+	}
+	m.settingSelected = index
+	if _, cmd := m.settingKey("enter"); cmd == nil {
+		t.Error("enter on Email me alerts does nothing")
+	}
+	if _, cmd := m.settingKey("E"); cmd == nil {
+		t.Error("E does nothing")
+	}
+	m.settings.account.EmailAlerts = false
+	if value := strip(m.settingRows()[index].value); !strings.HasPrefix(value, "off") {
+		t.Errorf("off shows %q", value)
+	}
+}

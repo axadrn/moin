@@ -11,6 +11,7 @@ import (
 	field "github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
@@ -53,6 +54,9 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 						@SettingsNameSection(user)
 						@SettingsAvatarSection(user)
 						@SettingsEmailSection(user)
+						@panel(panelProps{Title: "Alerts", Docs: "/docs/guides/alerts"}) {
+							@EmailAlertsForm(user.EmailAlerts)
+						}
 				}
 			</div>
 		}
@@ -190,6 +194,25 @@ templ SettingsEmailSection(user *model.User) {
 			}
 		</form>
 	}
+}
+
+// EmailAlertsForm is the switch for the user's email alerts. A change
+// saves itself; a failed save answers the form as stored, so it flips back.
+templ EmailAlertsForm(on bool) {
+	<form id="email-alerts-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/profile/email-alerts" } hx-trigger="change" hx-swap="none">
+		@csrf.Token()
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+			@field.Content() {
+				@field.Label(field.LabelProps{For: "email-alerts"}) {
+					Email me alerts
+				}
+				@field.Description() {
+					A mail when a site goes down or comes back, a server goes offline or a deploy fails, in the workspaces you own or run as admin.
+				}
+			}
+			@switchcomp.Switch(switchcomp.Props{ID: "email-alerts", Name: "on", Value: "1", DefaultChecked: on})
+		}
+	</form>
 }
 
 templ SettingsPasswordSection() {

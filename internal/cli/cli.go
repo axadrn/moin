@@ -33,6 +33,7 @@ Account
   login              Sign in with a personal API token: login [--url <url>], token asked or on stdin
   logout             Forget the token on this machine
   activity           Who deployed, restored or changed what: activity [--limit 30]
+  alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]
   team               Members and open invitations of your workspace
   team invite        Invite someone: team invite ada@example.com [--admin]
   team resend        Send an invitation again: team resend ada@example.com
@@ -228,6 +229,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return nil
 	case "activity":
 		return activity(ctx, rest, stdout)
+	case "alerts":
+		return alerts(ctx, rest, stdout)
 	case "team":
 		return team(ctx, rest, stdin, stdout)
 	case "servers":

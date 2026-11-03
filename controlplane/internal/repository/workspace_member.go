@@ -21,6 +21,7 @@ type WorkspaceMemberRepository interface {
 	ByWorkspaceAndUser(workspaceID, userID string) (*model.WorkspaceMember, error)
 	ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceMember, error)
 	ListByWorkspace(workspaceID string) ([]model.WorkspaceMember, error)
+	AlertEmails(workspaceID string) ([]string, error)
 	CountByWorkspace(workspaceID string) (int, error)
 	CountOwners(workspaceID string) (int, error)
 	UpdateRole(workspaceID, actorUserID, memberID, role string, event *model.WorkspaceAuditEvent) error
@@ -52,6 +53,17 @@ func (r *workspaceMemberRepository) ByWorkspaceAndUser(workspaceID, userID strin
 		return nil, ErrWorkspaceMemberNotFound
 	}
 	return member, err
+}
+
+// AlertEmails returns the addresses that get the email alerts of a
+// workspace: its owners and admins with the switch on and a verified address.
+func (r *workspaceMemberRepository) AlertEmails(workspaceID string) ([]string, error) {
+	emails := []string{}
+	err := r.db.Select(&emails, `
+		SELECT u.email FROM workspace_members m JOIN users u ON u.id = m.user_id
+		WHERE m.workspace_id = $1 AND m.role IN ($2, $3) AND u.email_alerts = 1 AND u.email_verified_at IS NOT NULL
+		ORDER BY u.email`, workspaceID, model.WorkspaceRoleOwner, model.WorkspaceRoleAdmin)
+	return emails, err
 }
 
 func (r *workspaceMemberRepository) ListByWorkspace(workspaceID string) ([]model.WorkspaceMember, error) {

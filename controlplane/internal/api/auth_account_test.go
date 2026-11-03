@@ -14,7 +14,7 @@ func TestPaidAccountShape(t *testing.T) {
 	expectStatus(t, recorder, http.StatusOK)
 	body := decodeBody[map[string]any](t, recorder)
 	account := body["user"].(map[string]any)
-	if account["id"] != "paid" || account["password_set"] != true || len(account) != 5 {
+	if account["id"] != "paid" || account["password_set"] != true || account["email_alerts"] != true || len(account) != 6 {
 		t.Fatalf("user = %#v", account)
 	}
 	if body["onboarding_required"] != false {

@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,5 +203,30 @@ func TestAccountRoutesRequireOnboarding(t *testing.T) {
 			route.bearer = token
 			expectError(t, environment.send(t, route), http.StatusForbidden, "onboarding_required")
 		})
+	}
+}
+
+// TestEmailAlerts: the account says the alerts are on until the user turns
+// them off.
+func TestEmailAlerts(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
+	token := environment.signIn(t, user.User.ID)
+
+	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	if account.Code != http.StatusOK || !strings.Contains(account.Body.String(), `"email_alerts":true`) {
+		t.Fatalf("GET account = %d %s", account.Code, account.Body)
+	}
+	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{"on":false}`, bearer: token})
+	if off.Code != http.StatusOK || off.Body.String() != "{\"on\":false}\n" {
+		t.Fatalf("PUT email-alerts = %d %s", off.Code, off.Body)
+	}
+	account = environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	if !strings.Contains(account.Body.String(), `"email_alerts":false`) {
+		t.Fatalf("GET account after off = %s", account.Body)
+	}
+	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{}`, bearer: token})
+	if invalid.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("PUT email-alerts {} = %d %s", invalid.Code, invalid.Body)
 	}
 }

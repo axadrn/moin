@@ -129,6 +129,7 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
+	serverService.SendAlerts(service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database)))
 	// Agents older than the control plane update to its version by
 	// themselves, unless their workspace turned it off.
 	serverService.UpdateAgentsTo(build.Version)

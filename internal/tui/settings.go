@@ -13,7 +13,7 @@ import (
 
 // The settings tab holds what belongs to the workspace rather than to one
 // app: the version of the control plane and its update, automatic agent
-// updates, the GitHub App, the bucket, the Cloudflare token, the Tailscale
+// updates, the user's own email alerts, the GitHub App, the bucket, the Cloudflare token, the Tailscale
 // key and the registry logins.
 
 // settings is what the settings tab shows. A part that failed to load
@@ -32,6 +32,8 @@ type settings struct {
 	versionErr      error
 	autoUpdate      bool
 	autoUpdateErr   error
+	account         client.Account
+	accountErr      error
 }
 
 // settingRow is one line of the settings tab.
@@ -60,6 +62,7 @@ func (m model) loadSettings() tea.Cmd {
 		loaded.registries, loaded.registriesErr = m.api.Registries(m.ctx)
 		loaded.version, loaded.versionErr = m.api.Version(m.ctx)
 		loaded.autoUpdate, loaded.autoUpdateErr = m.api.AgentUpdates(m.ctx)
+		loaded.account, loaded.accountErr = m.api.Account(m.ctx)
 		return settingsMsg(loaded)
 	}
 }
@@ -129,9 +132,18 @@ func (m model) settingRows() []settingRow {
 		agentUpdates = "off" + off(" · enter turns it on; u on a server updates its agent")
 	}
 
+	alerts := "on" + off(" · a mail to "+s.account.Email+" when a site or server goes down or a deploy fails · enter turns it off")
+	switch {
+	case s.accountErr != nil:
+		alerts = failed(s.accountErr)
+	case !s.account.EmailAlerts:
+		alerts = "off" + off(" · enter turns it on")
+	}
+
 	rows := []settingRow{
 		{kind: "controlplane", name: "Control plane", value: controlPlane},
 		{kind: "agentupdates", name: "Agent updates", value: agentUpdates},
+		{kind: "alerts", name: "Email me alerts", value: alerts},
 		{kind: "github", name: "GitHub", value: github},
 		{kind: "bucket", name: "Bucket", value: bucket, set: s.storage != nil},
 		{kind: "cloudflare", name: "Cloudflare token", value: cloudflare, set: s.integrations.Cloudflare},
@@ -159,6 +171,8 @@ func (m model) settingKey(key string) (tea.Model, tea.Cmd) {
 		return m.updateControlPlane()
 	case "A":
 		return m, m.setAgentUpdates(!m.settings.autoUpdate)
+	case "E":
+		return m, m.setEmailAlerts(!m.settings.account.EmailAlerts)
 	}
 	if m.settingSelected >= len(rows) {
 		return m, nil
@@ -182,6 +196,8 @@ func (m model) editSetting(row settingRow) (tea.Model, tea.Cmd) {
 		return m.updateControlPlane()
 	case "agentupdates":
 		return m, m.setAgentUpdates(!m.settings.autoUpdate)
+	case "alerts":
+		return m, m.setEmailAlerts(!m.settings.account.EmailAlerts)
 	case "github":
 		if !m.settings.github.Enabled {
 			m.err = errors.New("the GitHub App is not set up on this control plane")
@@ -330,4 +346,13 @@ func (m model) setAgentUpdates(on bool) tea.Cmd {
 		notice = "Agents no longer update by themselves; u on a server updates its agent"
 	}
 	return m.done(func() error { return m.api.SetAgentUpdates(m.ctx, on) }, notice)
+}
+
+// setEmailAlerts turns the user's email alerts on or off.
+func (m model) setEmailAlerts(on bool) tea.Cmd {
+	notice := "Email alerts on: a mail when a site or server goes down or a deploy fails"
+	if !on {
+		notice = "Email alerts off"
+	}
+	return m.done(func() error { return m.api.SetEmailAlerts(m.ctx, on) }, notice)
 }

@@ -37,7 +37,8 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 
 | Tool | Does | Scope |
 | --- | --- | --- |
-| `whoami` | the account and token | read |
+| `whoami` | the account and token, with `email_alerts` | read |
+| `set_email_alerts` | turns your [email alerts](/docs/guides/alerts) on or off | write |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
 | `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no agent ever connected, and the `apps` that went with an offline server | write, destructive |

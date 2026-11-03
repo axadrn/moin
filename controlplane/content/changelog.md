@@ -15,6 +15,7 @@ November 3, 2026
 - **List or grid**: switch how the Apps and Servers pages look; ops remembers it for you.
 - **Update now**: a self-hosted ops shows when a release is out, with its notes, and updates in one click. If the new version does not start, the old one comes back. Also `ops update`.
 - **Agents update themselves** to the control plane's version, one server at a time and never during a deploy. Turn it off with `ops servers auto-update off`.
+- **Email alerts**: owners and admins get a mail when a site goes down or comes back, a server goes offline or a deploy fails. Turn it off for you with `ops alerts off`.
 
 ### Changed
 - **Activity**: a server going offline and coming back now shows up there, and so does every site that goes down and comes back.

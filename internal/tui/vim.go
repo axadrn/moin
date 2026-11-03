@@ -487,6 +487,8 @@ var commandKeys = map[string]map[tab]string{
 	"uptime":   {tabApps: "u"},
 	// auto-update turns automatic agent updates on or off.
 	"auto-update": {tabSettings: "A"},
+	// alerts turns the user's email alerts on or off.
+	"alerts": {tabSettings: "E"},
 }
 
 // tabNames are the tabs in their order, as commands.
@@ -683,6 +685,7 @@ var helpEntries = [][2]string{
 	{"enter", "change the setting"},
 	{"u :update", "update a self-hosted control plane"},
 	{"A :auto-update", "agents update by themselves, on or off"},
+	{"E :alerts", "email me alerts, on or off"},
 	{"a", "add a registry login"},
 	{"x", "remove"},
 	{"", "Inputs"},

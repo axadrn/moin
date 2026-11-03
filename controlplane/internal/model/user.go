@@ -19,6 +19,10 @@ type User struct {
 	// pages: ViewList, ViewGrid, or empty for the page's default.
 	AppsView    string `db:"apps_view"`
 	ServersView string `db:"servers_view"`
+	// EmailAlerts sends the user a mail when a site goes down or comes
+	// back, a server goes offline or comes back, or a deploy fails, in the
+	// workspaces they own or run as admin. On by default.
+	EmailAlerts bool `db:"email_alerts"`
 
 	// Computed fields (not in database)
 	AvatarURL   string `db:"-"`

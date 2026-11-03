@@ -44,6 +44,31 @@ func (h *AccountHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, UserResponse{User: NewUser(updatedUser)})
 }
 
+// EmailAlerts is the body and the answer of PUT /api/v1/account/email-alerts.
+type EmailAlerts struct {
+	On bool `json:"on"`
+}
+
+// SetEmailAlerts turns the email alerts of the signed-in user on or off.
+func (h *AccountHandler) SetEmailAlerts(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	var body struct {
+		On *bool `json:"on"`
+	}
+	if !Decode(w, r, &body) {
+		return
+	}
+	if body.On == nil {
+		ValidationError(w, map[string]string{"on": "Say true or false."})
+		return
+	}
+	if err := h.userService.SetEmailAlerts(user.ID, *body.On); err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, EmailAlerts{On: *body.On})
+}
+
 // ChangeEmail sends a verification link to the new address. The address
 // changes once the link is verified.
 func (h *AccountHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {

@@ -61,6 +61,9 @@ type ServerService struct {
 	autoVersion string
 	autoRunning map[string]bool
 	autoHalted  map[string]bool
+	// alerts mails the owners and admins when a site or a server goes down
+	// or comes back, or a deploy fails; nil sends nothing.
+	alerts *AlertService
 }
 
 type agentSession struct {

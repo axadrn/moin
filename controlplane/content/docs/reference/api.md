@@ -18,6 +18,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET /api/v1/version` | the version and, on a self-hosted control plane, the newest release, its "In short" line, the notes and how the last update went |
 | `POST /api/v1/version/update` | updates a self-hosted control plane to the newest release (admins in `ADMIN_EMAILS`); follow it with `GET /api/v1/version` |
 | `GET /api/v1/account` · `PATCH /account/name` | the signed-in account; its name |
+| `PUT /api/v1/account/email-alerts` | turns your [email alerts](/docs/guides/alerts) on or off `{"on": false}`; `GET /api/v1/account` has them as `email_alerts` |
 | `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
 | `POST /api/v1/account/password/set` · `DELETE /account/password` | sets the first password; removes it (*session*) |
 | `POST` · `DELETE /api/v1/account/avatar` | the profile picture |

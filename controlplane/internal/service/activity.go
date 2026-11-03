@@ -125,9 +125,20 @@ func recordActivity(audit repository.WorkspaceAuditRepository, at time.Time, act
 	}
 }
 
-// record writes what an actor did to the activity of the workspace.
+// record writes what an actor did to the activity of the workspace. A site
+// or a server that went down or came back and a failed deploy also send an
+// email alert, in the background so no check or deploy waits on mail.
 func (s *ServerService) record(actor Actor, action, targetType, target string, details map[string]string) {
-	recordActivity(s.audit, s.now(), actor, action, targetType, target, details)
+	at := s.now()
+	recordActivity(s.audit, at, actor, action, targetType, target, details)
+	if s.alerts != nil && actor.WorkspaceID != "" && alerted(action) {
+		go s.alerts.Send(actor.WorkspaceID, action, target, details, at)
+	}
+}
+
+// SendAlerts has record mail the alerts with alerts.
+func (s *ServerService) SendAlerts(alerts *AlertService) {
+	s.alerts = alerts
 }
 
 // record writes what an actor did to the activity of the workspace.

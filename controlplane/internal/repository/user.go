@@ -22,6 +22,7 @@ type UserRepository interface {
 	Update(user *model.User) error
 	UpdateName(userID, name string, updatedAt time.Time) error
 	SetView(userID, page, view string) error
+	SetEmailAlerts(userID string, on bool) error
 	Delete(id string) error
 }
 
@@ -109,6 +110,18 @@ func (r *userRepository) SetView(userID, page, view string) error {
 		column = "servers_view"
 	}
 	result, err := r.db.Exec(`UPDATE users SET `+column+` = $1 WHERE id = $2`, view, userID)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// SetEmailAlerts turns the email alerts of the user on or off.
+func (r *userRepository) SetEmailAlerts(userID string, on bool) error {
+	result, err := r.db.Exec(`UPDATE users SET email_alerts = $1 WHERE id = $2`, on, userID)
 	if err != nil {
 		return err
 	}

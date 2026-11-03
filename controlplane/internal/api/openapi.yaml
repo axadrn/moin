@@ -502,6 +502,43 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/account/email-alerts:
+    put:
+      tags: [Account]
+      operationId: setEmailAlerts
+      summary: Turn email alerts on or off
+      description: With `on`, the signed-in user gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; `email_alerts` in `GET /api/v1/account` says how it is set.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailAlerts'
+      responses:
+        '200':
+          description: The setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailAlerts'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.on`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/account/email:
     patch:
       tags: [Account]
@@ -3963,6 +4000,13 @@ components:
         auto:
           type: boolean
           description: Agents older than the control plane update by themselves.
+    EmailAlerts:
+      type: object
+      required: [on]
+      properties:
+        on:
+          type: boolean
+          description: Mail the user when a site or a server goes down or comes back, or a deploy fails.
     EmailRequest:
       type: object
       additionalProperties: false
@@ -4043,7 +4087,7 @@ components:
           description: The account email address, compared without case.
     User:
       type: object
-      required: [id, email, name, password_set, created_at]
+      required: [id, email, name, password_set, email_alerts, created_at]
       properties:
         id:
           type: string
@@ -4055,6 +4099,9 @@ components:
           description: Empty until onboarding.
         password_set:
           type: boolean
+        email_alerts:
+          type: boolean
+          description: Mails when a site or a server goes down or comes back, or a deploy fails, in the workspaces the user owns or runs as admin. Set it with `PUT /api/v1/account/email-alerts`.
         created_at:
           type: string
           format: date-time

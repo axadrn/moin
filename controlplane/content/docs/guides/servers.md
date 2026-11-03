@@ -24,6 +24,8 @@ A server shows **waiting** until its agent connects, **online** while it is conn
 
 If a server stays **waiting**, the install command did not finish. If it is **offline**, the agent cannot reach ops. In both cases, look at the agent on the server: see [On the server](#on-the-server).
 
+A server offline for two minutes, and back online, sends the owners and admins of the workspace a mail, see [Alerts](/docs/guides/alerts).
+
 ## Add a server
 
 Gives you one install command for a new server. The name is yours to pick, such as `web-1`: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, like an app name. Leave it empty and ops picks one like `brave-otter`.

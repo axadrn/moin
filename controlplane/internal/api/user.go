@@ -12,10 +12,14 @@ import (
 // User is the public JSON shape of an account. It never carries the password
 // hash or any token.
 type User struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	PasswordSet bool      `json:"password_set"`
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+	PasswordSet bool   `json:"password_set"`
+	// EmailAlerts mails the user when a site or a server goes down or
+	// comes back, or a deploy fails, in the workspaces they own or run as
+	// admin.
+	EmailAlerts bool      `json:"email_alerts"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -26,6 +30,7 @@ func NewUser(user *model.User) User {
 		Email:       user.Email,
 		Name:        user.Name,
 		PasswordSet: user.HasPassword(),
+		EmailAlerts: user.EmailAlerts,
 		CreatedAt:   user.CreatedAt.UTC(),
 	}
 }

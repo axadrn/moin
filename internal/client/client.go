@@ -171,6 +171,9 @@ type NewServer struct {
 type Account struct {
 	Email string `json:"email"`
 	Name  string `json:"name"`
+	// EmailAlerts mails the user when a site or a server goes down or
+	// comes back, or a deploy fails.
+	EmailAlerts bool `json:"email_alerts"`
 }
 
 // Client calls the control plane with a personal API token.
@@ -202,6 +205,13 @@ func (c *Client) Account(ctx context.Context) (Account, error) {
 	}
 	err := c.do(ctx, http.MethodGet, "/api/v1/account", nil, &response)
 	return response.User, err
+}
+
+// SetEmailAlerts turns the email alerts of the signed-in user on or off.
+func (c *Client) SetEmailAlerts(ctx context.Context, on bool) error {
+	return c.do(ctx, http.MethodPut, "/api/v1/account/email-alerts", struct {
+		On bool `json:"on"`
+	}{on}, nil)
 }
 
 // Servers lists the servers of the account.

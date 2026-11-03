@@ -79,6 +79,12 @@ func registerTools(server *mcpsdk.Server, services Services) {
 		Description: "Takes back a pending invitation; the link in the email stops working. Name it by its email or its ID from get_workspace. Only owners and admins may revoke. Needs a token with read and write access.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Revoke an invitation", DestructiveHint: boolPointer(true), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, Write(tools.revokeInvitation))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "set_email_alerts",
+		Title:       "Turn email alerts on or off",
+		Description: "With on true, the user this token acts for gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; whoami returns the setting as user.email_alerts. Needs a token with read and write access.",
+		Annotations: &mcpsdk.ToolAnnotations{Title: "Turn email alerts on or off", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
+	}, Write(tools.setEmailAlerts))
 	registerOpsTools(server, services)
 	registerUptimeTools(server, services)
 	registerUpdateTools(server, services)
@@ -115,6 +121,11 @@ type WhoAmI struct {
 
 func (w WhoAmI) Summary() string {
 	summary := fmt.Sprintf("Signed in as %s (%s) with the token %q and the scopes %s.", w.User.Name, w.User.Email, w.Token.Name, strings.Join(w.Token.Scopes, " and "))
+	if w.User.EmailAlerts {
+		summary += " Email alerts are on."
+	} else {
+		summary += " Email alerts are off."
+	}
 	if w.Workspace == nil {
 		return summary + " The user is no longer a member of the token's workspace, so workspace tools find nothing."
 	}
@@ -122,9 +133,41 @@ func (w WhoAmI) Summary() string {
 	return summary
 }
 
+// EmailAlertsInput turns the email alerts of the user on or off.
+type EmailAlertsInput struct {
+	On bool `json:"on" jsonschema:"true mails the user when a site or a server goes down or comes back, or a deploy fails"`
+}
+
+// EmailAlertsOutput is the output of set_email_alerts.
+type EmailAlertsOutput struct {
+	api.EmailAlerts
+}
+
+func (o EmailAlertsOutput) Summary() string {
+	if o.On {
+		return "Email alerts are on: a mail when a site or a server goes down or comes back, or a deploy fails."
+	}
+	return "Email alerts are off."
+}
+
+func (t builtinTools) setEmailAlerts(_ context.Context, caller Caller, input EmailAlertsInput) (EmailAlertsOutput, error) {
+	if err := t.services.Users.SetEmailAlerts(caller.User.ID, input.On); err != nil {
+		return EmailAlertsOutput{}, err
+	}
+	return EmailAlertsOutput{api.EmailAlerts{On: input.On}}, nil
+}
+
 func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAmI, error) {
+	// The user as stored now, so email_alerts shows a change made in the
+	// same session.
+	user := caller.User
+	if t.services.Users != nil {
+		if fresh, err := t.services.Users.ByID(caller.User.ID); err == nil {
+			user = fresh
+		}
+	}
 	output := WhoAmI{
-		User: api.NewUser(caller.User),
+		User: api.NewUser(user),
 		Token: TokenInfo{
 			Name:      caller.Token.Name,
 			Scopes:    caller.Token.ScopeList(),

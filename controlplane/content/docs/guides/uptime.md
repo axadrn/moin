@@ -32,6 +32,8 @@ When a domain goes down and when it comes back, ops writes it to the [activity l
 
 A dead server cannot warn anyone itself, so the control plane watches the agents too: an agent that has not answered for two minutes puts `lost web-1` in the activity, and `has web-1 back` when it connects again. The uptime of its apps' domains shows the outage from the outside.
 
+The owners and admins of the workspace get a mail for each of these, see [Alerts](/docs/guides/alerts).
+
 ## Change the path
 
 Checks a path like `/health` instead of the health path or `/`. `default` goes back.

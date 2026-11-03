@@ -4,7 +4,7 @@ description: "Your name, email, password, sessions and API tokens"
 order: 16
 ---
 
-**The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token. A token with write access can change your name and picture, never your email, password, sessions or tokens.
+**The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token. A token with write access can change your name, picture and email alerts, never your email, password, sessions or tokens.
 
 ## Sign up and sign in
 
@@ -34,6 +34,10 @@ API: POST /api/v1/account/avatar
 ```
 
 `DELETE /api/v1/account/avatar` takes it away again.
+
+## Email alerts
+
+A mail when a site goes down, a server goes offline or a deploy fails, in the workspaces you own or run as admin. On by default; see [Alerts](/docs/guides/alerts) to turn it off.
 
 ## Change your email
 

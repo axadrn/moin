@@ -9,6 +9,7 @@ order: 1
 | `ops` | opens the terminal UI |
 | `ops login [--url <url>] [--token <token>]` | saves a personal API token; without `--token` it asks, or reads it from stdin: `echo "$TOKEN" \| ops login`. `--url` defaults to the saved control plane, else `https://ops.goilerplate.com`. It must be https; plain http works only for localhost and your tailnet (`100.x` addresses, `*.ts.net`) |
 | `ops logout` | forgets it |
+| `ops alerts [on\|off]` | shows or sets whether you get a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in the workspaces you own or run as admin; on by default. See [Alerts](/docs/guides/alerts) |
 | `ops activity [--app <app>] [--server <server>] [--user <email>] [--limit 30] [--cursor <cursor>]` | who deployed, restored or changed what, newest first, to the second in your time zone; the hint at the end pages back |
 | `ops team` | members and open invitations of your workspace |
 | `ops team invite <email> [--admin]` | invites someone by email |

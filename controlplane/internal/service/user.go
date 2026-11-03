@@ -81,6 +81,13 @@ func (s *UserService) SetView(userID, page, view string) error {
 	return s.userRepository.SetView(userID, page, view)
 }
 
+// SetEmailAlerts turns the email alerts of the user on or off: a mail
+// when a site goes down or comes back, a server goes offline or comes back,
+// or a deploy fails, in the workspaces they own or run as admin.
+func (s *UserService) SetEmailAlerts(userID string, on bool) error {
+	return s.userRepository.SetEmailAlerts(userID, on)
+}
+
 func (s *UserService) DeleteAccount(userID string) error {
 	if err := s.validateAccountDeletion(userID); err != nil {
 		return err

@@ -130,6 +130,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/api-tokens/{id}", workspace(apiTokens.Revoke))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
+	mux.HandleFunc("POST /app/{workspaceSlug}/profile/email-alerts", workspace(profile.EmailAlerts))
 	servers := handler.NewServersHandler(app.ServerService, app.UserService)
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers", workspace(servers.ServersPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/list", workspace(servers.List))
