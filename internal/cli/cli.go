@@ -89,6 +89,10 @@ Uptime
   uptime pause       Pause the check of a domain: uptime pause blog.de
   uptime resume      Check it every minute again: uptime resume blog.de
 
+Metrics
+  metrics            CPU, memory and network of an app now, with a sparkline: metrics [app] [--range 1h|24h|7d|30d]
+  metrics --server   A server: CPU, memory, disk, network and its apps by memory: metrics --server web-1
+
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
   github repos       Repos ops may read, and where to give it more
@@ -278,6 +282,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return protect(ctx, rest, stdin, stdout)
 	case "uptime":
 		return uptime(ctx, rest, stdout)
+	case "metrics":
+		return metrics(ctx, rest, stdout)
 	case "restart", "start":
 		return restart(ctx, command, rest, stdout)
 	case "stop":

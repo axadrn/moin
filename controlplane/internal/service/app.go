@@ -77,6 +77,7 @@ type AppService struct {
 	// publicBucketsOnly refuses buckets on private or local addresses.
 	publicBucketsOnly bool
 	uptime            *uptimeChecker
+	metrics           *metricsStore
 
 	mu          sync.Mutex
 	live        map[string]*liveDeploy
@@ -100,6 +101,7 @@ func NewAppService(apps repository.AppRepository, servers *ServerService, box *s
 		now:         time.Now,
 		live:        map[string]*liveDeploy{},
 		uptime:      newUptimeChecker(),
+		metrics:     newMetricsStore(),
 		subscribers: map[string]map[chan struct{}]struct{}{},
 	}
 	servers.OnAgentMessage(service.receive)
@@ -846,6 +848,11 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			}
 		}
 		s.mu.Unlock()
+	case protocol.TypeMetrics:
+		var sample protocol.Metrics
+		if message.Decode(&sample) == nil {
+			s.receiveMetrics(serverID, sample)
+		}
 	case protocol.TypeBackupStatus:
 		var backups protocol.Backups
 		if message.Decode(&backups) == nil {

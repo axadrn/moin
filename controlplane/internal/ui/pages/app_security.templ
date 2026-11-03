@@ -63,7 +63,10 @@ templ ServerSecurity(view SecurityView) {
 	{{ securityPath := basePath + "/servers/" + view.Server.ID + "/security" }}
 	@layouts.AppShell(layouts.AppProps{Title: view.Server.Name + " security", Crumbs: []layouts.Crumb{{Label: "Servers", Href: basePath + "/servers"}, {Label: view.Server.Name}, {Label: "Security"}}}) {
 		@panelPage(templ.Attributes{"data-server-security": view.Server.Name}) {
-			@statusHeader(view.Server.Name, serverStatus(view.Server), "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.")
+			<div class="flex flex-col gap-6">
+				@statusHeader(view.Server.Name, serverStatus(view.Server), "Close the ports, keep SSH on your tailnet, drop the rest. Flip the switches, then press Apply.")
+				@serverTabs(view.Server, "security")
+			</div>
 			<div id="server-added" class="empty:hidden"></div>
 			<div id="server-security" class="flex flex-col gap-6">
 				@securityState(view, securityPath)

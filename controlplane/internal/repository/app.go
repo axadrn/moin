@@ -69,6 +69,7 @@ type AppRepository interface {
 	DeleteRegistry(workspaceID, host string) error
 
 	UptimeRepository
+	MetricsRepository
 }
 
 type appRepository struct {

@@ -1,0 +1,295 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/chart"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/table"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// AppMetricsPage is the metrics tab of an app: CPU, memory and network of
+// its containers now and over a range, with its deploys marked.
+templ AppMetricsPage(view AppMetricsView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ path := basePath + "/apps/" + view.App.Name + "/metrics" }}
+	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " metrics", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Metrics"}}}) {
+		@panelPage(templ.Attributes{"data-app-metrics": view.App.Name}) {
+			@appHeader(view.App, "metrics", "CPU, memory and network of the app's containers, sampled every 15 seconds by the agent. A dot on the line is a deploy that went live.")
+			@appMetricsPanel(view, path)
+		}
+	}
+}
+
+templ appMetricsPanel(view AppMetricsView, path string) {
+	{{ m := view.Metrics }}
+	{{ rows := metricsRows(m.Points, m.Deploys, true) }}
+	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
+		if !m.ServerOnline && m.Server != "" {
+			@stateAlert(templ.Attributes{"data-server-offline": true}) {
+				The server { m.Server } is offline: its agent sends no metrics.
+			}
+		}
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			@sectionTitle(rangeTitle(m.Range))
+			@metricsRanges(path, m.Range.Name)
+		</div>
+		@statGrid(templ.Attributes{"data-metrics-now": true}) {
+			if now := m.Now; now != nil {
+				@statCard("CPU", percentText(now.CPU), "of the whole server")
+				@statCard("Memory", bytesText(float64(now.MemoryUsed)), appLimitNote(now))
+				@statCard("Network in", rateText(now.NetRx), "")
+				@statCard("Network out", rateText(now.NetTx), containersNote(now.Containers))
+			} else {
+				@statCard("CPU", "", "no sample in the last two minutes")
+				@statCard("Memory", "", "")
+				@statCard("Network in", "", "")
+				@statCard("Network out", "", "")
+			}
+		}
+		if len(rows) == 0 {
+			@emptyState("No metrics yet", "The agent sends them every 15 seconds while the app runs. An agent from before metrics sends none: update it on the Servers page.", "ops metrics "+view.App.Name)
+		} else {
+			<div class="grid gap-6 lg:grid-cols-2">
+				@metricsPanel("CPU", "The app's share of the whole server.", metricsChartProps{ID: "app-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Deploys: true})
+				@metricsPanel("Memory", "Without the page cache the kernel can take back.", metricsChartProps{ID: "app-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Deploys: true})
+				@metricsPanel("Network", "Bytes per second in and out of its containers.", metricsChartProps{ID: "app-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText, Deploys: true})
+			</div>
+		}
+	</div>
+}
+
+func appLimitNote(now *service.MetricsNow) string {
+	if now.MemoryLimit == 0 {
+		return "no limit"
+	}
+	return "of " + bytesText(float64(now.MemoryLimit)) + ", " + shareOf(now.MemoryUsed, now.MemoryLimit)
+}
+
+func containersNote(n int) string {
+	if n == 1 {
+		return "1 container"
+	}
+	return strconv.Itoa(n) + " containers"
+}
+
+func rangeTitle(r service.MetricsRange) string {
+	switch r.Name {
+	case "24h":
+		return "Last 24 hours, 5 minute averages"
+	case "7d":
+		return "Last 7 days, hourly averages"
+	case "30d":
+		return "Last 30 days, 4 hour averages"
+	}
+	return "Last hour, every 15 seconds, live"
+}
+
+// metricsRanges switches the range: plain links, as a segmented control.
+templ metricsRanges(path, active string) {
+	@tabNav("Range") {
+		for _, r := range service.MetricsRanges {
+			@tabLink(path+"?range="+r.Name, r.Name, r.Name == active, templ.Attributes{"data-metrics-range-link": r.Name})
+		}
+	}
+}
+
+// metricsPanel is a card with one chart.
+templ metricsPanel(title, description string, p metricsChartProps) {
+	@panel(panelProps{Title: title, Description: description, Attrs: templ.Attributes{"data-metrics-chart": p.ID}}) {
+		@metricsChart(p)
+	}
+}
+
+templ metricsChart(p metricsChartProps) {
+	@chart.Container(chart.ContainerProps{ID: p.ID, Config: p.Config, Class: "aspect-auto h-[200px] w-full"}) {
+		@chart.LineChart(chart.LineChartProps{AccessibilityLayer: true, Data: p.Rows, Margin: &chart.Margin{Top: 12, Right: 12, Bottom: 0, Left: 0}}) {
+			@chart.CartesianGrid(chart.CartesianGridProps{Vertical: chart.Bool(false)})
+			@chart.XAxis(chart.XAxisProps{DataKey: "t", TickMargin: 8, MinTickGap: 32, TickFormatter: metricsTick(p.Range)})
+			@chart.YAxis(chart.YAxisProps{Width: 64, TickCount: 4, TickFormatter: axisValue(p.Value), Domain: p.Domain})
+			@chart.Tooltip(chart.TooltipProps{Content: chart.TooltipContentProps{Indicator: "line", LabelFormatter: metricsLabel, Formatter: metricsTooltip(p.Config, p.Value)}})
+			for index, series := range p.Config {
+				@chart.Line(chart.LineProps{DataKey: series.Key, Type: chart.CurveMonotone, Stroke: "var(--color-" + series.Key + ")", StrokeWidth: 2, Dot: deployDot(p.Deploys && index == 0, series.Key)})
+			}
+		}
+	}
+}
+
+// deployDot marks the points where a deploy went live, nil for none.
+func deployDot(on bool, key string) *chart.DotProps {
+	if !on {
+		return nil
+	}
+	return &chart.DotProps{
+		Icon: icon.GitCommitVertical(icon.Props{Class: "fill-background stroke-(--color-" + key + ")"}),
+		Size: 20,
+		Show: func(_ int, row chart.Datum) bool {
+			_, ok := row["deploy"]
+			return ok
+		},
+	}
+}
+
+templ metricsTooltipRow(label, value, deploy string) {
+	<div class="flex min-w-[140px] flex-col gap-1 text-xs">
+		<div class="flex items-center gap-2 text-muted-foreground">
+			{ label }
+			<span class="ml-auto font-mono font-medium text-foreground tabular-nums">{ value }</span>
+		</div>
+		if deploy != "" {
+			<div class="flex items-center gap-1 font-medium text-foreground">
+				@icon.GitCommitVertical(icon.Props{Class: "size-3.5"})
+				{ deploy } went live
+			</div>
+		}
+	</div>
+}
+
+// ServerMetricsPage is the metrics of a server: CPU, memory, the data
+// disk, network and load now and over a range, and its apps by memory.
+templ ServerMetricsPage(view ServerMetricsView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ path := basePath + "/servers/" + view.Server.ID + "/metrics" }}
+	@layouts.AppShell(layouts.AppProps{Title: view.Server.Name + " metrics", Crumbs: []layouts.Crumb{{Label: "Servers", Href: basePath + "/servers"}, {Label: view.Server.Name}, {Label: "Metrics"}}}) {
+		@panelPage(templ.Attributes{"data-server-metrics": view.Server.Name}) {
+			<div class="flex flex-col gap-6">
+				@statusHeader(view.Server.Name, serverStatus(view.Server), "CPU, memory, disk and network of the server and its apps, sampled every 15 seconds by the agent.")
+				@serverTabs(view.Server, "metrics")
+			</div>
+			@serverMetricsPanel(view, path)
+		}
+	}
+}
+
+// serverTabs switches between the pages of a server.
+templ serverTabs(server model.Server, active string) {
+	{{ serverPath := ctxkeys.AppBasePath(ctx) + "/servers/" + server.ID }}
+	@tabNav("Server") {
+		@tabLink(serverPath+"/metrics", "Metrics", active == "metrics", nil)
+		@tabLink(serverPath+"/security", "Security", active == "security", nil)
+	}
+}
+
+templ serverMetricsPanel(view ServerMetricsView, path string) {
+	{{ m := view.Metrics }}
+	{{ rows := metricsRows(m.Points, nil, false) }}
+	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
+		if !m.Online {
+			@stateAlert(templ.Attributes{"data-server-offline": true}) {
+				The server is offline: its agent sends no metrics.
+			}
+		}
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			@sectionTitle(rangeTitle(m.Range))
+			@metricsRanges(path, m.Range.Name)
+		</div>
+		@statGrid(templ.Attributes{"data-metrics-now": true}) {
+			if now := m.Now; now != nil {
+				@statCard("CPU", percentText(now.CPU), cpuNote(now))
+				@statCard("Memory", usedOf(now.MemoryUsed, now.MemoryTotal), shareOf(now.MemoryUsed, now.MemoryTotal))
+				@statCard("Disk", usedOf(now.DiskUsed, now.DiskTotal), shareOf(now.DiskUsed, now.DiskTotal))
+				@statCard("Network", rateText(now.NetRx)+" in", rateText(now.NetTx)+" out")
+			} else {
+				@statCard("CPU", "", "no sample in the last two minutes")
+				@statCard("Memory", "", "")
+				@statCard("Disk", "", "")
+				@statCard("Network", "", "")
+			}
+		}
+		if len(rows) == 0 {
+			@emptyState("No metrics yet", "The agent sends them every 15 seconds. An agent from before metrics sends none: update it on the Servers page.", "ops metrics --server "+view.Server.Name)
+		} else {
+			<div class="grid gap-6 lg:grid-cols-2">
+				@metricsPanel("CPU", "The busy share of all cores.", metricsChartProps{ID: "server-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Domain: []any{0, 100}})
+				@metricsPanel("Memory", "Without the page cache the kernel can take back.", metricsChartProps{ID: "server-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Domain: totalDomain(m.Now, false)})
+				@metricsPanel("Disk", "The disk that holds the apps' data.", metricsChartProps{ID: "server-disk", Config: diskConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Domain: totalDomain(m.Now, true)})
+				@metricsPanel("Network", "Bytes per second in and out, without Docker's bridges.", metricsChartProps{ID: "server-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText})
+			</div>
+		}
+		@serverAppsMetrics(m.Apps)
+	</div>
+}
+
+func cpuNote(now *service.MetricsNow) string {
+	note := "load " + loadText(now.Load)
+	if now.Cores > 0 {
+		note = fmt.Sprintf("%d cores, %s", now.Cores, note)
+	}
+	return note
+}
+
+// totalDomain lets a chart of memory or disk reach up to the total.
+func totalDomain(now *service.MetricsNow, disk bool) []any {
+	if now == nil {
+		return nil
+	}
+	total := now.MemoryTotal
+	if disk {
+		total = now.DiskTotal
+	}
+	if total == 0 {
+		return nil
+	}
+	return []any{0, float64(total)}
+}
+
+// serverAppsMetrics lists the apps of the server, the one with the most
+// memory first.
+templ serverAppsMetrics(apps []service.AppMetricsNow) {
+	@panel(panelProps{Title: "Apps", Description: "What each app takes now, the most memory first.", Body: panelBodyFlush, Attrs: templ.Attributes{"data-server-apps-metrics": true}}) {
+		if len(apps) == 0 {
+			<p class="px-6 text-sm text-muted-foreground">No apps on this server yet.</p>
+		} else {
+			@table.Table() {
+				@table.Header() {
+					@table.Row() {
+						@table.Head(table.HeadProps{Class: "pl-6"}) {
+							App
+						}
+						@table.Head(table.HeadProps{Class: "text-right"}) {
+							CPU
+						}
+						@table.Head(table.HeadProps{Class: "text-right"}) {
+							Memory
+						}
+						@table.Head(table.HeadProps{Class: "pr-6 text-right"}) {
+							Network
+						}
+					}
+				}
+				@table.Body() {
+					for _, app := range apps {
+						@table.Row(table.RowProps{Attributes: templ.Attributes{"data-app-metrics-row": app.Name}}) {
+							@table.Cell(table.CellProps{Class: "pl-6"}) {
+								@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/metrics", Variant: button.VariantLink, Class: "h-auto p-0"}) {
+									{ app.Name }
+								}
+							}
+							if now := app.Now; now != nil {
+								@table.Cell(table.CellProps{Class: "text-right tabular-nums"}) {
+									{ percentText(now.CPU) }
+								}
+								@table.Cell(table.CellProps{Class: "text-right tabular-nums"}) {
+									{ bytesText(float64(now.MemoryUsed)) }
+								}
+								@table.Cell(table.CellProps{Class: "pr-6 text-right tabular-nums"}) {
+									{ rateText(now.NetRx + now.NetTx) }
+								}
+							} else {
+								@table.Cell(table.CellProps{Class: "pr-6 text-right text-muted-foreground", Attributes: templ.Attributes{"colspan": "3"}}) {
+									not running
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

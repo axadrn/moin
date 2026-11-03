@@ -89,6 +89,17 @@ func run(cfg *config.Config) error {
 			<-stopped
 		}()
 	}
+	// Metrics write their last minutes before the database closes, too.
+	metrics, stopMetrics := context.WithCancel(context.Background())
+	metricsStopped := make(chan struct{})
+	go func() {
+		application.AppService.RunMetrics(metrics)
+		close(metricsStopped)
+	}()
+	defer func() {
+		stopMetrics()
+		<-metricsStopped
+	}()
 	server := &http.Server{
 		Addr: ":" + cfg.Port, Handler: routes.SetupRoutes(application),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,

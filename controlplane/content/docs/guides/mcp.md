@@ -81,6 +81,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
 | `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |
+| `get_metrics` | CPU, memory, disk and network of an app or a server, now and over 1h, 24h, 7d or 30d; for an app the deploys that went live, for a server its apps by memory | read |
 | `set_domains` | domains and the canonical one | write |
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |

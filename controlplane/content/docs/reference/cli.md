@@ -57,6 +57,8 @@ order: 1
 | `ops uptime [app]` | uptime of every domain over 24 hours, 7 and 30 days, the newest check and the last outages |
 | `ops uptime path <domain> <path\|default>` | where the check of a domain goes; `default` is the health path or `/` |
 | `ops uptime pause <domain>` · `ops uptime resume <domain>` | pauses the check of a domain, checks it every minute again |
+| `ops metrics [app\|server] [--range 1h\|24h\|7d\|30d]` | CPU, memory and network of an app now, with a sparkline of the range and the deploys that went live; a name that is no app is a server |
+| `ops metrics --server <server>` | CPU, memory, disk, network and load of a server, and its apps by memory |
 | `ops db [--db <path>] [app]` | tables, row counts and migration of the database |
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |

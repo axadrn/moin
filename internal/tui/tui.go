@@ -333,6 +333,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case detailMsg:
 		detail := client.AppDetail(msg)
 		m.detail = &detail
+	case metricsLoadedMsg, metricsRefreshMsg:
+		return m.metricsUpdate(msg)
 	case outputMsg:
 		m.outputID, m.outputTitle, m.outputNote, m.output = msg.id, msg.title, msg.note, msg.lines
 		m.outputScroll, m.panelMatch = 0, 0
@@ -830,6 +832,10 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			m.notice = "updating the agent of " + server.Name + "…"
 			return m, m.updateAgent(server)
 		}
+	case "m":
+		if m.selected < len(m.servers) {
+			return m, m.showMetrics("", m.servers[m.selected].ID)
+		}
 	case "t", "f", "s":
 		if m.selected < len(m.servers) {
 			server := m.servers[m.selected]
@@ -1010,6 +1016,10 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.mode, m.input = modeUptime, ""
 			return m, m.showUptime(app.Name)
+		}
+	case "m":
+		if ok {
+			return m, m.showMetrics(app.Name, "")
 		}
 	case "gh":
 		if ok {

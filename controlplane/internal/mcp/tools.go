@@ -87,6 +87,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	}, Write(tools.setEmailAlerts))
 	registerOpsTools(server, services)
 	registerUptimeTools(server, services)
+	registerMetricsTools(server, services)
 	registerUpdateTools(server, services)
 	registerAlertTools(server, services)
 }

@@ -61,6 +61,7 @@ The TUI moves like vim, and `?` shows every key.
 | `K` `J` or `:move up` `:move down` | servers, apps | moves the selected server or app up or down in the order every list shows |
 | `i` | servers | shows a new one-time install command for the selected server; the old one stops working |
 | `u` | servers | updates the server's agent to the control plane's version |
+| `m` or `:metrics` | servers, apps | shows CPU, memory, disk and network now with a sparkline of the last hour, and for a server its apps by memory; the panel loads them again every 15 seconds while it shows them |
 | `f`, then `y` | servers | turns the firewall on or off |
 | `x`, then the name | servers, apps | removes the selected one; for a server, shows the command that removes its agent there |
 | `a` | apps | creates an app: its name, then its server |
