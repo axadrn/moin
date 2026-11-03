@@ -26,6 +26,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 ## Next
 
+- **Postgres and MySQL**: backups every second, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
 - **Alerts to Slack, Discord, Telegram and webhooks**: where your team is, when an app goes down, a deploy fails or a server goes offline. [#19](https://github.com/axadrn/ops/issues/19)
 - **Live metrics, built in**: CPU, RAM, disk and network for every server; requests, errors, response time and crashes for every app, with every deploy marked on the graphs. [#20](https://github.com/axadrn/ops/issues/20)
 - **More than one bucket**: pick per app where its uploads and backups go. [#15](https://github.com/axadrn/ops/issues/15)
