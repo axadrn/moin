@@ -17,6 +17,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
 - **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline or a deploy fails, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
 - **Live metrics, built in**: CPU, memory, disk and network for every server and app, live for the last hour and up to 30 days back, with every deploy marked on the charts. [Metrics](/docs/guides/metrics)
+- **More than one bucket**: give each app its own bucket for uploads and backups, say one per client. [Bucket](/docs/guides/bucket)
 - **Updates in one click**: a self-hosted ops tells you when a release is out and updates itself; agents update themselves. [Self-hosting](/docs/self-hosting#updates)
 - **Env vars as one text**: switch between fields and a whole `.env` file. [Env vars](/docs/guides/env)
 - **Your own order, list or grid**: drag apps and servers where you want them. [Servers](/docs/guides/servers#order-your-servers)
@@ -28,7 +29,6 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 ## Next
 
 - **Postgres and MySQL**: backups every second, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
-- **More than one bucket**: pick per app where its uploads and backups go. [#15](https://github.com/axadrn/ops/issues/15)
 
 ## Later
 

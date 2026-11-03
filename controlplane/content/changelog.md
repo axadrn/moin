@@ -3,6 +3,24 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.5
+
+November 4, 2026
+
+**In short:** alerts go to Slack, Discord, Telegram and webhooks, every server and app has live charts, and each app can back up to its own bucket.
+
+### New
+- **Alerts where your team is**: send alerts to Slack, Discord, Telegram or a signed webhook, as well as email, with a test for each. Web: **Alerts**. CLI: `ops alerts add slack <name>`. Also the TUI settings, API and MCP.
+- **Live metrics**: CPU, memory, disk and network of every server and app, live for the last hour and back 30 days, with each deploy marked. Web: the **Metrics** tab. CLI: `ops metrics shop`. TUI: `m`. API and MCP too.
+- **More than one bucket**: give each app its own bucket for uploads and backups, say one per client. Web: **Buckets**. CLI: `ops buckets add`, `ops buckets use`.
+
+### Changed
+- **Buckets**: the bucket you had is now the default one. Older backups stay where they were and restore from there when an app moves.
+- **Request and error counts** per app are not in the metrics yet; response times are on the Uptime tab.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; until then, metrics and per-app buckets wait for the new agent.
+
 ## v1.0.0-beta.4
 
 November 3, 2026
