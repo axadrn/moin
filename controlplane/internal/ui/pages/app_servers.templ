@@ -244,6 +244,15 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 		}
 		@card.Footer(card.FooterProps{Class: "mt-auto gap-2"}) {
 			@button.Button(button.Props{
+				Href:       basePath + "/servers/" + server.ID + "/metrics",
+				Variant:    button.VariantSecondary,
+				Size:       button.SizeSm,
+				Attributes: templ.Attributes{"data-metrics-link": true},
+			}) {
+				@icon.ChartLine()
+				Metrics
+			}
+			@button.Button(button.Props{
 				Href:       serverPath,
 				Variant:    button.VariantSecondary,
 				Size:       button.SizeSm,

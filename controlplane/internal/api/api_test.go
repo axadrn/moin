@@ -116,6 +116,7 @@ func TestServiceErrorMapsKnownErrors(t *testing.T) {
 		{repository.ErrFileNotFound, http.StatusNotFound, "not_found", ""},
 		{service.ErrUptimeDomain, http.StatusUnprocessableEntity, "validation_failed", "domain"},
 		{service.ErrUptimePath, http.StatusUnprocessableEntity, "validation_failed", "path"},
+		{service.ErrMetricsRange, http.StatusUnprocessableEntity, "validation_failed", "range"},
 	}
 	for _, test := range tests {
 		t.Run(test.err.Error(), func(t *testing.T) {

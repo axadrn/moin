@@ -510,7 +510,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	if app, ok := m.currentApp(); ok && app.Stopped {
 		power = [2]string{"S", "start"}
 	}
-	appKeys = append(appKeys, [][2]string{{"gh", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"L", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"u", "uptime"}, {"o", "domains"}, {"p", "protect"}, rollback, {"x", "remove"}}...)
+	appKeys = append(appKeys, [][2]string{{"gh", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"L", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"u", "uptime"}, {"m", "metrics"}, {"o", "domains"}, {"p", "protect"}, rollback, {"x", "remove"}}...)
 	switch {
 	case m.panelFocused():
 		return nil, [][2]string{{"j k", "scroll"}, {"ctrl+d ctrl+u", "half a page"}, {"gg G", "top, follow"}, {"/", "search"}, {"n N", "next, previous"}, {"ctrl+w", "the list"}, {"esc", "back"}, {"q", "quit"}}
@@ -529,7 +529,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case m.tab == tabServers && len(m.servers) == 0:
 		return nil, [][2]string{{"tab", "apps"}, {"a", "add"}, {"q", "quit"}}
 	case m.tab == tabServers:
-		return nil, [][2]string{{"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"cw", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"K J", "move"}, {"x", "remove"}, {"q", "quit"}}
+		return nil, [][2]string{{"tab", "apps"}, {"j k", "select"}, {"a", "add"}, {"t", "tunnel"}, {"f", "firewall"}, {"s", "ssh on tailnet"}, {"cw", "rename"}, {"i", "install command"}, {"u", "update agent"}, {"m", "metrics"}, {"K J", "move"}, {"x", "remove"}, {"q", "quit"}}
 	case m.detail != nil:
 		var keys [][2]string
 		if len(m.detail.Deploys) > 0 {

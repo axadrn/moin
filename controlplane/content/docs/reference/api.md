@@ -44,6 +44,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `PUT /api/v1/servers/order` | puts the servers in a new order `{"order": ["web-1", "db-1"]}`, every server once, by name or ID; answers the list in it |
 | `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there, empty when no agent ever connected, and the `apps` that went with an offline server |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
+| `GET /api/v1/servers/{id}/metrics?range=1h` | CPU, memory, disk, network and load of the server now and over a range, and its apps now, the most memory first |
 | `GET /api/v1/agent-updates` · `PUT` | whether agents update by themselves `{"auto": true}`; on by default |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
 | `GET /api/v1/apps/events` | app list as server-sent events |
@@ -72,6 +73,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/restore` | restores a snapshot or a point in time |
 | `GET /api/v1/apps/{app}/uptime` | uptime per domain: state, 24 hours, 7 and 30 days, the newest check and the last outages |
 | `PUT /api/v1/apps/{app}/uptime/{domain}` | the path of a domain's check `{"path": "/health"}`, or pauses it `{"paused": true}` |
+| `GET /api/v1/apps/{app}/metrics?range=1h` | CPU, memory and network of the app now and over `1h`, `24h`, `7d` or `30d`, with the deploys that went live |
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the bucket backups go to |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |

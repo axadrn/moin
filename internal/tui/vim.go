@@ -485,6 +485,7 @@ var commandKeys = map[string]map[tab]string{
 	"tunnel":   {tabServers: "t"},
 	"update":   {tabServers: "u", tabSettings: "u"},
 	"uptime":   {tabApps: "u"},
+	"metrics":  {tabServers: "m", tabApps: "m"},
 	// auto-update turns automatic agent updates on or off.
 	"auto-update": {tabSettings: "A"},
 }
@@ -664,6 +665,7 @@ var helpEntries = [][2]string{
 	{"s", "SQL"},
 	{"b", "backups and restores"},
 	{"u", "uptime: pause, resume, a path per domain"},
+	{"m", "metrics: CPU, memory and network, live"},
 	{"o", "domains"},
 	{"p", "password"},
 	{":hook", "a new deploy hook; :hook off turns it off"},
@@ -677,6 +679,7 @@ var helpEntries = [][2]string{
 	{"s", "SSH only on Tailscale"},
 	{"i", "a new install command"},
 	{"u", "update the agent"},
+	{"m", "metrics: CPU, memory, disk, network, the apps by memory, live"},
 	{"K J", "move the server up, down; :move up, :move down"},
 	{"x", "remove"},
 	{"", "Settings"},

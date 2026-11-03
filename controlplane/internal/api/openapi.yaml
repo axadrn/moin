@@ -66,6 +66,8 @@ tags:
     description: Continuous backups and snapshots of every SQLite database into your own S3-compatible bucket, with restore and daily restore drills.
   - name: Uptime
     description: The control plane checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
+  - name: Metrics
+    description: Every agent samples its server and the containers of its apps every 15 seconds. The control plane keeps the last hour of samples, minutes for 24 hours and hours for 30 days.
   - name: GitHub
     description: The ops GitHub App connects repos. Link a repo and branch to an app, deploy a ref without a checkout, deploy every push, and get the result as a commit status.
   - name: Servers
@@ -2323,6 +2325,39 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/apps/{app}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+      - $ref: '#/components/parameters/MetricsRange'
+    get:
+      tags: [Metrics]
+      operationId: getAppMetrics
+      summary: Get app metrics
+      description: 'CPU, memory and network of the app''s running containers added up: the newest sample, the points over the range, and the deploys that went live in it, to mark on a chart. CPU is the app''s share of the whole server in percent. `now` is null when the agent sent nothing for two minutes, such as for a stopped app or an agent before metrics.'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `range` when it is not 1h, 24h, 7d or 30d.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/apps/{app}/restore:
     parameters:
       - $ref: '#/components/parameters/AppName'
@@ -2695,6 +2730,44 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_cloudflare` or `no_tailscale` when the key is missing.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/servers/{id}/metrics:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The server's ID or name.
+        schema:
+          type: string
+      - $ref: '#/components/parameters/MetricsRange'
+    get:
+      tags: [Metrics]
+      operationId: getServerMetrics
+      summary: Get server metrics
+      description: 'CPU, memory, the disk that holds the apps'' data, network and load of a server: the newest sample, the points over the range, and every app on it with its newest sample, the one with the most memory first. `now` is null when the agent sent nothing for two minutes.'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No server with this ID or name belongs to the account.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `range` when it is not 1h, 24h, 7d or 30d.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3629,6 +3702,14 @@ components:
       description: 'A personal API token from `POST /api/v1/account/tokens`, sent as `Authorization: Bearer pat_...`. The role in the security entry of an operation is the scope it needs.'
 
   parameters:
+    MetricsRange:
+      name: range
+      in: query
+      required: false
+      description: 'How far back: `1h` (the default) has every sample, 15 seconds apart; `24h` averages 5 minutes, `7d` an hour and `30d` 4 hours per point.'
+      schema:
+        type: string
+        enum: ['1h', '24h', '7d', '30d']
     SessionMode:
       name: session
       in: query
@@ -4803,6 +4884,155 @@ components:
           type: string
           format: date-time
           description: A point in time inside the database's window.
+    ServerMetrics:
+      type: object
+      required: [server, online, range, step_seconds, now, points, apps]
+      properties:
+        server:
+          type: string
+        online:
+          type: boolean
+        range:
+          type: string
+          enum: ['1h', '24h', '7d', '30d']
+        step_seconds:
+          type: integer
+          description: How far apart the points are.
+        now:
+          $ref: '#/components/schemas/ServerMetricsNow'
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerPoint'
+        apps:
+          type: array
+          description: The apps on the server, the one with the most memory first.
+          items:
+            type: object
+            required: [app, now]
+            properties:
+              app:
+                type: string
+              now:
+                $ref: '#/components/schemas/AppMetricsNow'
+    ServerMetricsNow:
+      type: [object, 'null']
+      required: [at, cpu, cores, memory_used, memory_total, disk_used, disk_total, net_rx, net_tx, load]
+      properties:
+        at:
+          type: string
+          format: date-time
+        cpu:
+          type: number
+          description: The busy share of all cores in percent, 0 to 100.
+        cores:
+          type: integer
+        memory_used:
+          type: integer
+          description: Bytes in use, without the page cache the kernel gives back.
+        memory_total:
+          type: integer
+        disk_used:
+          type: integer
+          description: Bytes in use on the disk that holds the apps' data.
+        disk_total:
+          type: integer
+        net_rx:
+          type: number
+          description: Bytes per second in.
+        net_tx:
+          type: number
+          description: Bytes per second out.
+        load:
+          type: number
+          description: The load average over one minute.
+    ServerPoint:
+      type: object
+      required: [at, cpu, memory, disk, net_rx, net_tx, load]
+      properties:
+        at:
+          type: string
+          format: date-time
+        cpu:
+          type: number
+        memory:
+          type: integer
+        disk:
+          type: integer
+        net_rx:
+          type: number
+        net_tx:
+          type: number
+        load:
+          type: number
+    AppMetrics:
+      type: object
+      required: [app, server, server_online, range, step_seconds, now, points, deploys]
+      properties:
+        app:
+          type: string
+        server:
+          type: string
+        server_online:
+          type: boolean
+        range:
+          type: string
+          enum: ['1h', '24h', '7d', '30d']
+        step_seconds:
+          type: integer
+        now:
+          $ref: '#/components/schemas/AppMetricsNow'
+        points:
+          type: array
+          items:
+            type: object
+            required: [at, cpu, memory, net_rx, net_tx]
+            properties:
+              at:
+                type: string
+                format: date-time
+              cpu:
+                type: number
+              memory:
+                type: integer
+              net_rx:
+                type: number
+              net_tx:
+                type: number
+        deploys:
+          type: array
+          description: The deploys that went live in the range, oldest first.
+          items:
+            type: object
+            required: [number, at]
+            properties:
+              number:
+                type: integer
+              at:
+                type: string
+                format: date-time
+    AppMetricsNow:
+      type: [object, 'null']
+      required: [at, cpu, memory_used, memory_limit, net_rx, net_tx, containers]
+      properties:
+        at:
+          type: string
+          format: date-time
+        cpu:
+          type: number
+          description: The app's share of the whole server in percent.
+        memory_used:
+          type: integer
+        memory_limit:
+          type: integer
+          description: The sum of the containers' memory limits; 0 is none.
+        net_rx:
+          type: number
+        net_tx:
+          type: number
+        containers:
+          type: integer
+          description: The running containers.
     Uptime:
       type: object
       required: [app, state, server, server_online, domains]

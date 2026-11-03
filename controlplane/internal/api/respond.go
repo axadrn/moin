@@ -226,6 +226,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},
 	{err: service.ErrUptimePath, field: "path", message: "Use a path that starts with /, like /health, without spaces."},
+	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},
 	{err: service.ErrComposeDomains, status: http.StatusConflict, code: "domains_from_compose", message: "The domains of this app come from x-ops.domains in compose.yml. Change them there and deploy."},
 	{err: service.ErrProtectUser, field: "username", message: "Use a username without spaces or colons."},
 	{err: service.ErrProtect, field: "password", message: "Use a password of 8 to 72 characters."},
