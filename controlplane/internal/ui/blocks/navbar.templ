@@ -21,14 +21,19 @@ const GitHubURL = "https://github.com/" + githubstars.Repo
 const GoilerplateURL = "https://goilerplate.com"
 
 // Wordmark is the brand name in the display face with a terminal cursor.
+// Its box is trimmed to the
+// lowercase letters, from the baseline to the x-height (text-box), so a
+// label centered next to it sits on the middle of the letters the eye sees,
+// not on the empty room the font keeps above them.
 templ Wordmark(class ...string) {
-	<span class={ "inline-flex items-baseline gap-[0.12em] font-display text-foreground", class }>
+	<span class={ "inline-flex items-baseline gap-[0.12em] font-display text-foreground [text-box:trim-both_ex_alphabetic]", class }>
 		{ brand.Name }
 		<span aria-hidden="true" class="inline-block h-[1ex] w-[0.34em] rounded-[1.5px] bg-foreground"></span>
 	</span>
 }
 
-// BetaBadge says ops is in beta, next to the wordmark.
+// BetaBadge says ops is in beta, next to the wordmark, centered on it with
+// items-center: Wordmark trims its box to its lowercase letters.
 templ BetaBadge(class string) {
 	@badge.Badge(badge.Props{Class: utils.CN("h-auto leading-normal rounded-full bg-secondary px-2 py-0.5 font-sans text-[11px] font-semibold text-muted-foreground", class)}) {
 		Beta
@@ -105,9 +110,11 @@ templ MobileLink(href, label string) {
 templ MobileNav() {
 	{{ user := ctxkeys.User(ctx) }}
 	<div class="flex h-full flex-col">
-		<div class="flex h-16 shrink-0 items-center gap-2 border-b px-6 text-[22px] leading-none">
-			@Wordmark()
-			@BetaBadge("")
+		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[22px] leading-none">
+			<span class="flex items-center gap-2">
+				@Wordmark()
+				@BetaBadge("")
+			</span>
 		</div>
 		<div class="flex-1 overflow-y-auto px-6 pt-1">
 			@MobileLink("/#how", "How it works")

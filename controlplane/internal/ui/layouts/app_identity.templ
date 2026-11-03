@@ -17,8 +17,10 @@ templ AppSidebarIdentity() {
 			aria-label={ brand.Name + " apps" }
 			class="flex h-8 items-center gap-2 rounded-lg px-2 ring-sidebar-ring outline-hidden transition-[padding] focus-visible:ring-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 		>
-			@blocks.Wordmark("text-xl leading-none transition-[font-size] duration-200 ease-linear group-data-[collapsible=icon]:text-base")
-			@blocks.BetaBadge("group-data-[collapsible=icon]:hidden")
+			<span class="flex items-center gap-2">
+				@blocks.Wordmark("text-xl leading-none transition-[font-size] duration-200 ease-linear group-data-[collapsible=icon]:text-base")
+				@blocks.BetaBadge("group-data-[collapsible=icon]:hidden")
+			</span>
 		</a>
 		@sidebar.Menu() {
 			@sidebar.MenuItem() {
