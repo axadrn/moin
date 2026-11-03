@@ -113,7 +113,6 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /workspaces/new", middleware.RequireAuth(workspaceHandler.NewPage))
 	mux.HandleFunc("POST /workspaces/new", middleware.RequireAuth(workspaceHandler.Create))
 	mux.HandleFunc("POST /auth/logout", auth.Logout)
-	mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
 	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
 	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
 	workspace := func(next http.HandlerFunc) http.HandlerFunc {
@@ -217,13 +216,18 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/members/{memberID}/remove", workspace(workspaceHandler.RemoveMember))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/leave", workspace(workspaceHandler.Leave))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/delete", workspace(workspaceHandler.Delete))
-	adminRoute := func(next http.HandlerFunc) http.HandlerFunc {
-		return middleware.RequireAuth(middleware.RequireAdmin(next))
+	// Admin is for running ops as a service: only the hosted control plane
+	// has it. A self-hosted one manages its people under Team.
+	if app.Cfg.Billing {
+		adminRoute := func(next http.HandlerFunc) http.HandlerFunc {
+			return middleware.RequireAuth(middleware.RequireAdmin(next))
+		}
+		mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
+		mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
+		mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
+		mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
+		mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
 	}
-	mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
-	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
-	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
-	mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
 	// Agents get their own budget: many servers behind one NAT must not lock
 	// out sign-ins, and install tokens are too long to guess.
 	registerLimiter := middleware.RateLimit(clientIPs, 30, time.Minute)

@@ -157,8 +157,6 @@ If `ADMIN_EMAILS` is empty, nobody can create the first account, and the control
 
 If you do want anyone to sign up, set `SIGNUPS_OPEN=true`. Keep it off on a control plane the internet can reach.
 
-An admin can view the app as another user from **Admin**, to see what they see. That view is read-only and keeps their secrets: it does not show env values, database data or app logs.
-
 ### Analytics
 
 Off by default. To count visitors with your own Umami, set `UMAMI_WEBSITE_ID` and, for a self-hosted Umami, `UMAMI_HOST` (like `umami.example.com`). The page then loads its script, and the content security policy allows it.

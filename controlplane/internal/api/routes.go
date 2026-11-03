@@ -164,13 +164,24 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), TokenWrite},
 		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), TokenWrite},
 		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), TokenWrite},
-		{"GET /api/v1/admin/users", m.RequireOnboarded(m.RequireAdmin(h.Admin.Users)), TokenDenied},
-		{"POST /api/v1/admin/users/{userID}/sessions/revoke", m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions)), TokenDenied},
+		{"GET /api/v1/admin/users", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.Users))), TokenDenied},
+		{"POST /api/v1/admin/users/{userID}/sessions/revoke", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions))), TokenDenied},
 	}
 	for index := range routes {
 		routes[index].Handler = routes[index].Tokens.wrap(routes[index].Handler)
 	}
 	return routes
+}
+
+// hostedOnly answers 404 on a self-hosted control plane (billing off), for
+// what only running ops as a service needs.
+func hostedOnly(billing *BillingHandler, next http.HandlerFunc) http.HandlerFunc {
+	if billing != nil {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		Error(w, http.StatusNotFound, "not_found", "Not found.")
+	}
 }
 
 // billingOn answers 404 on a control plane with billing off.

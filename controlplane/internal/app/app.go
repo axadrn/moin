@@ -131,7 +131,13 @@ func New(cfg *config.Config) (*App, error) {
 		appService.AllowOnlyPublicBuckets()
 	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
-	adminService := service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails)
+	// Operators run ops as a service: only the hosted control plane has
+	// them. On a self-hosted one, ADMIN_EMAILS only says who may sign up.
+	var operators []string
+	if cfg.Billing {
+		operators = cfg.AdminEmails
+	}
+	adminService := service.NewAdminService(adminEvents, users, auth, operators)
 	if cfg.Billing {
 		adminService.UsePlans(subscriptions, workspaceAuditEvents)
 	}

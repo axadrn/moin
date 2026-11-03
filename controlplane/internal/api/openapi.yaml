@@ -3789,7 +3789,7 @@ components:
             $ref: '#/components/schemas/Membership'
         is_admin:
           type: boolean
-          description: True when the signed-in session belongs to an operator listed in `ADMIN_EMAILS` with a verified email. False for API tokens and during impersonation. The admin endpoints answer 403 when it is false.
+          description: True when the signed-in session belongs to an operator listed in `ADMIN_EMAILS` with a verified email, on the hosted control plane. False for API tokens, during impersonation and on a self-hosted control plane. The admin endpoints answer 403 when it is false, and 404 on a self-hosted control plane.
         avatar_url:
           type: [string, 'null']
           format: uri
