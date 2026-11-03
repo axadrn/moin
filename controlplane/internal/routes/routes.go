@@ -182,6 +182,8 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/now", workspace(apps.BackupNow))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/restore", workspace(apps.BackupRestore))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/settings", workspace(apps.BackupSettings))
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/uptime", workspace(apps.Uptime))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/uptime/check", workspace(apps.UptimeCheck))
 	mux.HandleFunc("GET /app/{workspaceSlug}/bucket", workspace(apps.Bucket))
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket", workspace(apps.SaveBucket))
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/remove", workspace(apps.RemoveBucket))

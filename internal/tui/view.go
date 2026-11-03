@@ -444,6 +444,8 @@ func (m model) prompt() ([]string, [][2]string) {
 		return bar(style.Accent, style.Bold.Render("SQL: ")+m.input+cursor), [][2]string{{"enter", "run"}, {"esc", "close"}}
 	case modeBackups:
 		return bar(style.Accent, style.Bold.Render("Backups: ")+m.input+cursor), [][2]string{{"enter", "back up now"}, {"snapshot or 14:02", "restore"}, {"on/off", "snapshot before changes"}, {"esc", "close"}}
+	case modeUptime:
+		return bar(style.Accent, style.Bold.Render("Uptime: ")+m.input+cursor), [][2]string{{"enter", "check again"}, {"pause blog.de", "pause"}, {"resume blog.de", "resume"}, {"blog.de /health", "path"}, {"esc", "close"}}
 	case modeGitHub:
 		return bar(style.Accent, style.Bold.Render("GitHub: ")+m.input+cursor), [][2]string{{"enter", "deploy the branch"}, {"branch, tag or commit", "deploy it"}, {"link owner/repo", "follow"}, {"unlink", "stop"}, {"esc", "close"}}
 	case modeForm:
@@ -508,7 +510,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	if app, ok := m.currentApp(); ok && app.Stopped {
 		power = [2]string{"S", "start"}
 	}
-	appKeys = append(appKeys, [][2]string{{"gh", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"L", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"o", "domains"}, {"p", "protect"}, rollback, {"x", "remove"}}...)
+	appKeys = append(appKeys, [][2]string{{"gh", "GitHub"}, {"i", "image"}, {"R", "redeploy"}, {"t", "restart"}, power, {"L", "logs"}, {"e", "env"}, {"s", "sql"}, {"b", "backups"}, {"u", "uptime"}, {"o", "domains"}, {"p", "protect"}, rollback, {"x", "remove"}}...)
 	switch {
 	case m.panelFocused():
 		return nil, [][2]string{{"j k", "scroll"}, {"ctrl+d ctrl+u", "half a page"}, {"gg G", "top, follow"}, {"/", "search"}, {"n N", "next, previous"}, {"ctrl+w", "the list"}, {"esc", "back"}, {"q", "quit"}}

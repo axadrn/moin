@@ -76,6 +76,12 @@ Domains
   protect            Ask for a password: protect [--user ops], password on stdin
   protect off        Make the app public again: protect off [app] [--yes]
 
+Uptime
+  uptime             Uptime of every domain, 24 hours, 7 and 30 days, and the last outages: uptime [app]
+  uptime path        Where the check of a domain goes: uptime path blog.de /health, or default
+  uptime pause       Pause the check of a domain: uptime pause blog.de
+  uptime resume      Check it every minute again: uptime resume blog.de
+
 GitHub
   github             Where the ops GitHub App is installed, and the link to install it
   github repos       Repos ops may read, and where to give it more
@@ -262,6 +268,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return domains(ctx, rest, stdin, stdout)
 	case "protect":
 		return protect(ctx, rest, stdin, stdout)
+	case "uptime":
+		return uptime(ctx, rest, stdout)
 	case "restart", "start":
 		return restart(ctx, command, rest, stdout)
 	case "stop":

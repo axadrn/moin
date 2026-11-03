@@ -379,7 +379,7 @@ func TestListPanel(t *testing.T) {
 
 // TestCtrlU clears the input of every prompt.
 func TestCtrlU(t *testing.T) {
-	for _, mode := range []mode{modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeGitHub} {
+	for _, mode := range []mode{modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeUptime, modeGitHub} {
 		m := frames()["apps"]
 		m.mode, m.input = mode, "SELECT 1"
 		if m = press(m, "ctrl+u"); m.input != "" || m.mode != mode {

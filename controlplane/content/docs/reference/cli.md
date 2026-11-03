@@ -47,6 +47,9 @@ order: 1
 | `ops domains canonical <domain\|none>` | the domain the others redirect to |
 | `ops protect [--user ops] [app]` | asks for a password; the password comes from stdin |
 | `ops protect off [app] [--yes]` | makes the app public again |
+| `ops uptime [app]` | uptime of every domain over 24 hours, 7 and 30 days, the newest check and the last outages |
+| `ops uptime path <domain> <path\|default>` | where the check of a domain goes; `default` is the health path or `/` |
+| `ops uptime pause <domain>` · `ops uptime resume <domain>` | pauses the check of a domain, checks it every minute again |
 | `ops db [--db <path>] [app]` | tables, row counts and migration of the database |
 | `ops db rows <table> [--limit 20] [--offset 0]` | a page of a table, newest first |
 | `ops db schema [table]` | the CREATE statements |

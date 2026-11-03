@@ -87,6 +87,10 @@ type Config struct {
 	// to TelemetryURL every five minutes. The hosted one never sends.
 	Telemetry    bool
 	TelemetryURL string
+	// UptimeChecks has the control plane check every domain of every live
+	// app once a minute. On by default in production, so development and
+	// tests never call real domains.
+	UptimeChecks bool
 	// Payment, Stripe
 	StripeSecretKey         string
 	StripeWebhookSecret     string
@@ -190,6 +194,7 @@ func Load() (*Config, error) {
 	cfg.SignupsOpen = r.boolean("SIGNUPS_OPEN", cfg.Billing)
 	cfg.RobotsNoIndex = r.boolean("ROBOTS_NOINDEX", !cfg.Billing)
 	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction())
+	cfg.UptimeChecks = r.boolean("UPTIME_CHECKS", cfg.IsProduction())
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
 	cfg.GitHubClientSecret = r.string("GITHUB_CLIENT_SECRET", "")

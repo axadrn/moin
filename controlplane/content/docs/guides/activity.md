@@ -23,13 +23,13 @@ That is the real format. Each row holds the exact second, who did it, how it cam
 ## What we log
 
 - **When.** The exact time, stored in UTC to the fraction of a second. The web shows UTC with seconds, the CLI and the TUI your local time with its zone, the API and MCP RFC 3339.
-- **Who.** The member, by email. The API token, by name. A deploy hook. A GitHub push, with its branch and commit. Or ops itself, for a deploy that ended, a server that connected or a restore drill.
+- **Who.** The member, by email. The API token, by name. A deploy hook. A GitHub push, with its branch and commit. Or ops itself, for a deploy that ended, a server that connected or went offline, a domain that went down or came back, or a restore drill.
 - **How.** The web, the CLI, the TUI, the API, an agent over MCP, a deploy hook or GitHub.
 - **Where from.** The IP address and browser or program of the request. Only admins and owners see them.
 - **What.** The action and what it touched: the app, the server, the member, the token.
 - **Before and after.** Names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
 
-It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, the bucket, snapshots, restores, restore drills, SQL writes, row edits, servers, their security, agent updates, API tokens, plan changes and every change of the team.
+It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, the bucket, snapshots, restores, restore drills, SQL writes, row edits, servers, their security, agent updates, uptime checks, domains that went down or came back, servers that went offline, API tokens, plan changes and every change of the team.
 
 ## What we never log
 

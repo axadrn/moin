@@ -76,6 +76,7 @@ type AppService struct {
 	now        func() time.Time
 	// publicBucketsOnly refuses buckets on private or local addresses.
 	publicBucketsOnly bool
+	uptime            *uptimeChecker
 
 	mu          sync.Mutex
 	live        map[string]*liveDeploy
@@ -98,6 +99,7 @@ func NewAppService(apps repository.AppRepository, servers *ServerService, box *s
 		cloudflare:  NewCloudflare(""),
 		now:         time.Now,
 		live:        map[string]*liveDeploy{},
+		uptime:      newUptimeChecker(),
 		subscribers: map[string]map[chan struct{}]struct{}{},
 	}
 	servers.OnAgentMessage(service.receive)

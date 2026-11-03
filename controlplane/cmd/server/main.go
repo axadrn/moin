@@ -74,6 +74,20 @@ func run(cfg *config.Config) error {
 			slog.Error("failed to close app", "error", closeErr)
 		}
 	}()
+	// The uptime checks stop before the database closes: this defer runs
+	// first.
+	if cfg.UptimeChecks {
+		uptime, stopUptime := context.WithCancel(context.Background())
+		stopped := make(chan struct{})
+		go func() {
+			application.AppService.RunUptime(uptime)
+			close(stopped)
+		}()
+		defer func() {
+			stopUptime()
+			<-stopped
+		}()
+	}
 	server := &http.Server{
 		Addr: ":" + cfg.Port, Handler: routes.SetupRoutes(application),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,

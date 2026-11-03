@@ -69,6 +69,8 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `set_backup_storage` | sets the bucket | write |
 | `remove_backup_storage` | stops backups; `confirm` is the bucket's name | write, destructive |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
+| `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
+| `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |
 | `set_domains` | domains and the canonical one | write |
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |

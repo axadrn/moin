@@ -270,6 +270,23 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "installed the agent of " + target + " again, and the old agent's token stopped working: " + strings.Join(nonEmpty(d["hostname"], d["os"]+"/"+d["arch"], d["version"]), ", ")
 	case "server.installed":
 		return "connected " + target + " for the first time: " + strings.Join(nonEmpty(d["hostname"], d["os"]+"/"+d["arch"], d["version"]), ", ")
+	case "server.down":
+		return "lost " + target + ": its agent has not answered since " + d["since"]
+	case "server.up":
+		return "has " + target + " back after " + d["duration"]
+	case "uptime.down":
+		return "found " + d["domain"] + " of " + target + " down: " + d["reason"]
+	case "uptime.up":
+		return "found " + d["domain"] + " of " + target + " up again after " + d["duration"]
+	case "uptime.paused":
+		return "paused the uptime check of " + d["domain"] + " of " + target
+	case "uptime.resumed":
+		return "resumed the uptime check of " + d["domain"] + " of " + target
+	case "uptime.path_set":
+		if d["path"] == "" {
+			return "set the uptime check of " + d["domain"] + " of " + target + " back to the health path or /"
+		}
+		return "set the uptime check of " + d["domain"] + " of " + target + " to " + d["path"]
 	case "deploy.succeeded":
 		return "made" + version + " of " + target + " live after " + d["duration"]
 	case "deploy.failed":

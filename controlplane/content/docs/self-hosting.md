@@ -191,6 +191,10 @@ TELEMETRY=false
 
 The control plane keeps its own SQLite database safe the way it keeps your apps' databases: every change goes to its bucket within seconds (`S3_BUCKET`, folder `controlplane/litestream`), with Litestream. In production this is on by default; `BACKUP_DATABASE=false` turns it off.
 
+## Uptime checks
+
+The control plane checks every domain of every app once a minute, like the hosted one ([Uptime](/docs/guides/uptime)). In production this is on by default; `UPTIME_CHECKS=false` turns it off. In development it is off, so no real domain gets called, and `UPTIME_CHECKS=true` turns it on.
+
 When the control plane starts and finds no database, it restores the newest one from the bucket by itself. An empty bucket means a fresh start.
 
 ## Updates
