@@ -1,6 +1,8 @@
 # The control plane image. Build from the repo root:
 #   docker build --build-arg VERSION=v0.1.0 .
-FROM golang:1.26 AS build
+# The build runs on the builder's own CPU and cross-compiles for the
+# target, so the arm64 box is built at full speed, not emulated.
+FROM --platform=$BUILDPLATFORM golang:1.26 AS build
 WORKDIR /app
 
 # Copy Go dependency files first so Docker can cache module downloads.
@@ -32,16 +34,11 @@ RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 # Generate Go files from .templ files.
 RUN go tool templ generate
 
-# Build the application as a static binary. It knows its version, the one
-# agents update to.
-ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux go build \
-      -ldflags "-X github.com/axadrn/ops/internal/build.Version=$VERSION" \
-      -o main ./cmd/server/main.go
-
 # The ops binary that install.sh, cli.sh, CI and agent updates download from
 # /download, built from the same commit as the control plane, with
-# SHA256SUMS for checking a download by hand.
+# SHA256SUMS for checking a download by hand. It is the same in both boxes,
+# so it comes before anything of the target and is built once.
+ARG VERSION=dev
 RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os="${target%/*}" arch="${target#*/}" && \
@@ -50,6 +47,13 @@ RUN mkdir -p downloads && \
         -o "downloads/ops-$os-$arch" ../cmd/ops; \
     done && \
     (cd downloads && sha256sum ops-* > SHA256SUMS)
+
+# The server, a static binary for the CPU of the box being built. It knows
+# its version, the one agents update to.
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
+      -ldflags "-X github.com/axadrn/ops/internal/build.Version=$VERSION" \
+      -o main ./cmd/server/main.go
 
 # Deploy-Stage
 FROM alpine:3.24

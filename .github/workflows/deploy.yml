@@ -66,6 +66,8 @@ jobs:
           push: true
           build-args: VERSION=${{ steps.tags.outputs.version }}
           tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   release:
     needs: box
