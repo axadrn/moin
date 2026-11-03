@@ -7,10 +7,12 @@ Read `PLAN.md` for what we build and `DESIGN.md` for how it looks. Product docs 
 ## Develop
 
 ```bash
-cp .env.example .env
-task dev            # app on a free port, with a local S3 in tmp/devs3.db
-task dev S3=remote  # use the S3 settings of .env instead
+cp .env.example .env   # then fill in your own development bucket
+task dev               # the app on a free port
 ```
+
+Development uses a real bucket of its own, such as `ops-development` on R2, so
+it runs the same storage code as production.
 
 Without Cloudflare credentials, emails go to the log. The control plane and the `ops` binary are one Go module: a change to the agent, the CLI or the protocol shows up here right away.
 
