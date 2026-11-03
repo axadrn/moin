@@ -33,7 +33,10 @@ func (h *AppsHandler) UptimeCheck(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Check of "+domain+" not saved", err, nil)
 		return
 	}
-	h.renderUptime(w, r)
+	// The switch shows its state itself; only a new path redraws the panel.
+	if paused == nil {
+		h.renderUptime(w, r)
+	}
 	switch {
 	case paused != nil && *paused:
 		toastDone(w, r, "Check of "+domain+" paused", "Turn it on again to check every minute.")

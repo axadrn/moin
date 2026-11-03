@@ -49,7 +49,7 @@ MCP: set_uptime_check
 For maintenance, or a domain whose DNS is not set yet. A paused check counts neither as up nor as down, and starts over when it resumes.
 
 ```surfaces
-Web: the app, **Uptime**, the domain's **Check every minute** switch
+Web: the app, **Uptime**, the domain's **Uptime check** switch
 CLI: ops uptime pause blog.de, then ops uptime resume blog.de
 TUI: on the app, `u`, then `pause blog.de` or `resume blog.de`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"paused": true}

@@ -141,17 +141,19 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 				Save path
 			}
 		</form>
-		<form hx-post={ action } hx-trigger="change" hx-target="#app-uptime" hx-select="#app-uptime" hx-swap="outerHTML">
+		// The switch shows its new state itself; swapping the panel would put
+		// the old one back while it still has focus.
+		<form hx-post={ action } hx-trigger="change" hx-swap="none">
 			@csrf.Token()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
 			<input type="hidden" name="pause" value="1"/>
 			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 				@field.Content() {
 					@field.Label(field.LabelProps{For: id + "-on"}) {
-						Check every minute
+						Uptime check
 					}
 					@field.Description() {
-						Off pauses the check, for maintenance or a domain you do not serve yet.
+						Checked from outside every minute. Off pauses it, for maintenance or a domain you do not serve yet.
 					}
 				}
 				@switchcomp.Switch(switchcomp.Props{ID: id + "-on", Name: "on", Value: "1", DefaultChecked: !domain.Paused})
