@@ -173,6 +173,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrAdminSelfAction, status: http.StatusConflict, code: "admin_self_action", message: "This action is not available for your own account."},
 	{err: service.ErrAdminTargetIsOperator, status: http.StatusForbidden, code: "forbidden", message: "This action is not available for operator accounts."},
 	{err: service.ErrActiveSubscription, status: http.StatusConflict, code: "active_subscription", message: "End paid access before deleting."},
+	{err: service.ErrPaying, status: http.StatusConflict, code: "active_subscription", message: "This workspace pays for its plan. Cancel the subscription before making it free forever."},
 	{err: repository.ErrSubscriptionNotFound, status: http.StatusNotFound, code: "not_found", message: "The subscription was not found."},
 	{err: access.ErrProductAccess, status: http.StatusForbidden, code: "feature_unavailable", message: "Your plan does not include this feature."},
 	{err: access.ErrFeatureUnavailable, status: http.StatusForbidden, code: "feature_unavailable", message: "Your plan does not include this feature."},

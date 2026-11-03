@@ -223,6 +223,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	waitlist := handler.NewWaitlistHandler(app.BetaService)
 	mux.HandleFunc("GET /admin/waitlist", adminRoute(waitlist.Page))
 	mux.HandleFunc("POST /admin/waitlist", adminRoute(waitlist.LetIn))
+	mux.HandleFunc("POST /admin/waitlist/forever-free", adminRoute(waitlist.ForeverFree))
 	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 	// Agents get their own budget: many servers behind one NAT must not lock

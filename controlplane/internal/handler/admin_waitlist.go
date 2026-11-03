@@ -43,6 +43,27 @@ func (h *WaitlistHandler) LetIn(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, email+" is in", "They got the sign-in email.")
 }
 
+// ForeverFree makes someone who is in free forever, or puts them back on the
+// normal plan.
+func (h *WaitlistHandler) ForeverFree(w http.ResponseWriter, r *http.Request) {
+	email := strings.TrimSpace(r.FormValue("email"))
+	foreverFree := r.FormValue("forever_free") == "true"
+	if err := h.beta.LetIn(email, foreverFree); err != nil {
+		toastFailed(w, r, email+" not changed", errorMessage(err))
+		return
+	}
+	if !isAction(r) {
+		redirect(w, r, "/admin/waitlist", http.StatusSeeOther)
+		return
+	}
+	h.render(w, r)
+	if foreverFree {
+		toastDone(w, r, email+" is free forever", "Their first workspace has everything, without a payment.")
+		return
+	}
+	toastDone(w, r, email+" is on the normal plan", "The rest of their trial, then they pay to make changes.")
+}
+
 func (h *WaitlistHandler) render(w http.ResponseWriter, r *http.Request) {
 	entries, err := h.beta.Waitlist()
 	if err != nil {

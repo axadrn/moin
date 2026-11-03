@@ -20,6 +20,9 @@ type WaitlistRepository interface {
 	// HasPendingInvitation reports whether a workspace invited the address
 	// and the invitation is still open.
 	HasPendingInvitation(email string, now time.Time) (bool, error)
+	// FirstWorkspace returns the first workspace the address created, nil
+	// when it has no account or no workspace of its own.
+	FirstWorkspace(email string) (*model.Workspace, error)
 }
 
 type waitlistRepository struct {
@@ -68,4 +71,19 @@ func (r *waitlistRepository) HasPendingInvitation(email string, now time.Time) (
 		WHERE LOWER(email) = $1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > $2
 	`, email, now)
 	return count > 0, err
+}
+
+func (r *waitlistRepository) FirstWorkspace(email string) (*model.Workspace, error) {
+	var workspace model.Workspace
+	err := r.db.Get(&workspace, `
+		SELECT w.* FROM workspaces w JOIN users u ON u.id = w.created_by
+		WHERE LOWER(u.email) = $1 ORDER BY w.created_at, w.id LIMIT 1
+	`, email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &workspace, nil
 }

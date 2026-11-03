@@ -10,9 +10,10 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
 )
 
-// AdminWaitlist lists who waits for hosted ops and who is in. Letting
-// someone in sends them a sign-in email; their first workspace gets
-// everything without a payment.
+// AdminWaitlist lists who waits for hosted ops and who is in, and what
+// everyone who is in is on. Letting someone in sends them a sign-in email;
+// their first workspace gets the trial, or everything forever when they are
+// free forever.
 templ AdminWaitlist(entries []model.WaitlistEntry) {
 	@layouts.Admin("Waitlist") {
 		<div class="flex flex-col gap-6" data-waitlist-page>
@@ -46,9 +47,6 @@ templ AdminWaitlist(entries []model.WaitlistEntry) {
 											if entry.LetInAt != nil {
 												· in since { entry.LetInAt.Format("2006-01-02") }
 											}
-											if entry.ForeverFree {
-												· free forever
-											}
 										</p>
 									</div>
 									if entry.LetInAt == nil {
@@ -64,9 +62,26 @@ templ AdminWaitlist(entries []model.WaitlistEntry) {
 											}
 										</form>
 									} else {
-										@status.Status(status.Props{Kind: status.KindLive}) {
-											in
-										}
+										<div class="flex flex-wrap items-center gap-3">
+											@status.Status(status.Props{Kind: waitlistPlanKind(entry.Plan)}) {
+												{ waitlistPlanLabel(entry) }
+											}
+											<form method="POST" action="/admin/waitlist/forever-free" hx-post="/admin/waitlist/forever-free" hx-target="[data-waitlist-page]" hx-select="[data-waitlist-page]" hx-swap="outerHTML" hx-disable="find button[type='submit']">
+												@csrf.Token()
+												<input type="hidden" name="email" value={ entry.Email }/>
+												if entry.ForeverFree {
+													<input type="hidden" name="forever_free" value="false"/>
+													@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+														End free forever
+													}
+												} else {
+													<input type="hidden" name="forever_free" value="true"/>
+													@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
+														Make free forever
+													}
+												}
+											</form>
+										</div>
 									}
 							</li>
 						}
@@ -77,4 +92,25 @@ templ AdminWaitlist(entries []model.WaitlistEntry) {
 			}
 		</div>
 	}
+}
+
+// waitlistPlanLabel is the plan of someone who is in: "trial until
+// 2026-12-02", "free forever", "paying".
+func waitlistPlanLabel(entry model.WaitlistEntry) string {
+	if entry.Plan == model.WaitlistTrial && entry.TrialEndsAt != nil {
+		return "trial until " + entry.TrialEndsAt.Format("2006-01-02")
+	}
+	return entry.Plan
+}
+
+func waitlistPlanKind(plan string) status.Kind {
+	switch plan {
+	case model.WaitlistFreeForever, model.WaitlistPaying:
+		return status.KindLive
+	case model.WaitlistTrial:
+		return status.KindRunning
+	case model.WaitlistTrialEnded:
+		return status.KindFailed
+	}
+	return status.KindWaiting
 }
