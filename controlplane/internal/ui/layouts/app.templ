@@ -85,15 +85,17 @@ templ AppShell(p AppProps) {
 // sortableScript lets [data-sortable-list] be ordered by drag and drop, as
 // in the htmx drag-to-reorder pattern: Sortable.js moves the items, and its
 // end event, which bubbles, sends the form around the list, whose hidden
-// inputs carry the new order. The list waits while the form is out and
-// starts again on the list the answer swaps in. After an arrow button moved
-// an item, the focus stays on that button of the item.
+// inputs carry the new order. With a mouse the whole item drags; on a touch
+// screen only its grip, so the page still scrolls. On the keyboard, Alt and
+// an arrow key move the focused item. The list waits while the form is out
+// and starts again on the list the answer swaps in.
 templ sortableScript() {
 	<script src="/assets/js/sortable-1.15.6.6d0a831f.min.js"></script>
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
 			if (window.opsSortable) return;
 			window.opsSortable = true;
+			const touch = window.matchMedia("(pointer: coarse)").matches;
 			const start = (root) => {
 				if (!root.querySelectorAll) return;
 				const lists = [...root.querySelectorAll("[data-sortable-list]")];
@@ -102,7 +104,7 @@ templ sortableScript() {
 					if (Sortable.get(list)) continue;
 					new Sortable(list, {
 						animation: 150,
-						handle: "[data-drag-handle]",
+						handle: touch ? "[data-drag-handle]" : null,
 						ghostClass: "opacity-40",
 						onEnd() {
 							this.option("disabled", true);
@@ -112,24 +114,22 @@ templ sortableScript() {
 			};
 			start(document);
 			document.addEventListener("htmx:after:process", (event) => start(event.target));
-			let moved = null;
-			document.addEventListener("htmx:before:request", (event) => {
-				const active = document.activeElement;
-				moved = event.target.matches?.("[data-order-form]") && active?.form === event.target && (active.name === "up" || active.name === "down") ? { name: active.name, value: active.value } : null;
+			document.addEventListener("keydown", (event) => {
+				if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+				const item = event.target.closest?.("[data-sortable-list] > *");
+				const form = item?.closest("[data-order-form]");
+				if (!form) return;
+				const other = event.key === "ArrowUp" ? item.previousElementSibling : item.nextElementSibling;
+				event.preventDefault();
+				if (!other) return;
+				other.insertAdjacentElement(event.key === "ArrowUp" ? "beforebegin" : "afterend", item);
+				event.target.focus();
+				form.requestSubmit();
 			});
-			const refocus = () => {
-				if (!moved) return;
-				const buttons = [...document.querySelectorAll("[data-order-form] button")].filter((button) => button.value === moved.value);
-				const button = buttons.find((button) => button.name === moved.name && !button.disabled) || buttons.find((button) => !button.disabled);
-				moved = null;
-				button?.focus();
-			};
-			document.addEventListener("htmx:after:settle", refocus);
 			document.addEventListener("htmx:finally:request", (event) => {
 				// A list the answer did not replace takes drags again.
 				const list = event.target.querySelector?.("[data-sortable-list]");
 				if (list?.isConnected) Sortable.get(list)?.option("disabled", false);
-				refocus();
 			});
 		})();
 	</script>

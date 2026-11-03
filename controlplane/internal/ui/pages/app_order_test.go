@@ -21,8 +21,7 @@ func renderWithView(t *testing.T, component templ.Component, apps, servers strin
 }
 
 // Both views of both pages keep the order they are given, carry it in the
-// form that saves a new one, and move the first item only down and the
-// last only up.
+// form that saves a new one, and give each item a grip.
 func TestOrderedListsInBothViews(t *testing.T) {
 	apps := AppsView{Apps: []model.App{{ID: "a1", Name: "shop"}, {ID: "a2", Name: "blog"}}}
 	servers := []model.Server{{ID: "s1", Name: "web"}, {ID: "s2", Name: "db"}}
@@ -52,11 +51,8 @@ func TestOrderedListsInBothViews(t *testing.T) {
 		if first < 0 || second < first {
 			t.Errorf("%s: order inputs at %d and %d", test.name, first, second)
 		}
-		for _, disabled := range []string{`name="up" value="` + test.first + `"`, `name="down" value="` + test.second + `"`} {
-			at := strings.Index(page, disabled)
-			if at < 0 || !strings.Contains(page[at:at+400], "disabled") {
-				t.Errorf("%s: %s is not disabled", test.name, disabled)
-			}
+		if strings.Count(page, "data-drag-handle") != 2 {
+			t.Errorf("%s: %d grips, want 2", test.name, strings.Count(page, "data-drag-handle"))
 		}
 	}
 }

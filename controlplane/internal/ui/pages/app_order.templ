@@ -7,15 +7,13 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
-	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 )
 
 // The Apps and Servers pages show their items as a list or a grid, as each
 // member likes, in the order of the workspace. Sortable.js, started by the
 // panel layout (layouts.sortableScript), drags them into a new order: its
 // end event sends the form, whose hidden inputs carry the names in their
-// new order. The arrow buttons move one item up or down without a drag,
-// for the keyboard and screen readers.
+// new order. On the keyboard, Alt and an arrow key move the focused item.
 
 // pageView is how the signed-in member sees the "apps" or "servers" page.
 func pageView(ctx context.Context, page string) string {
@@ -41,41 +39,20 @@ templ orderForm(page string) {
 	</form>
 }
 
-// orderControls is what an item of an ordered list carries: its name as a hidden
-// input, so the form sends the order of the page, and the handle and arrows
-// that move it. kind names it for screen readers: "app" or "server".
-templ orderControls(kind, name string, first, last bool, class string) {
+// orderHandle is what an item of an ordered list carries: its name as a
+// hidden input, so the form sends the order of the page, and a grip at its
+// left that shows it can be dragged. With a mouse the whole item drags; on a touch
+// screen the grip does, so the page still scrolls.
+templ orderHandle(name string) {
 	<input type="hidden" name="order" value={ name }/>
-	<div class={ utils.CN("flex shrink-0 items-center gap-0.5 text-muted-foreground", class) } data-order-controls>
-		<span
-			class="flex size-7 cursor-grab touch-none items-center justify-center rounded-md hover:bg-muted hover:text-foreground active:cursor-grabbing"
-			title="Drag to reorder"
-			aria-hidden="true"
-			data-drag-handle
-		>
-			@icon.GripVertical(icon.Props{Class: "size-4"})
-		</span>
-		@orderButton("up", kind, name, first) {
-			@icon.ArrowUp(icon.Props{Class: "size-4"})
-		}
-		@orderButton("down", kind, name, last) {
-			@icon.ArrowDown(icon.Props{Class: "size-4"})
-		}
-	</div>
-}
-
-templ orderButton(direction, kind, name string, disabled bool) {
-	<button
-		type="submit"
-		name={ direction }
-		value={ name }
-		class="flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-30"
-		aria-label={ "Move " + kind + " " + name + " " + direction }
-		title={ "Move " + direction }
-		disabled?={ disabled }
+	<span
+		class="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+		title="Drag to reorder"
+		aria-hidden="true"
+		data-drag-handle
 	>
-		{ children... }
-	</button>
+		@icon.GripVertical(icon.Props{Class: "size-4"})
+	</span>
 }
 
 // viewSwitch picks a list or a grid for page, remembered for the member.

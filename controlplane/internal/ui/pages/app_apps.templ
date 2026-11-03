@@ -140,10 +140,10 @@ templ AppList(view AppsView) {
 				</div>
 				@orderForm("apps") {
 					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="apps-heading" data-sortable-list>
-						for index, app := range view.Apps {
+						for _, app := range view.Apps {
 							{{ newest, hasNewest := view.Newest[app.ID] }}
 							<li data-app={ app.Name } class="min-w-0">
-								@appCard(app, newest, hasNewest, now, index == 0, index == len(view.Apps)-1)
+								@appCard(app, newest, hasNewest, now)
 							</li>
 						}
 					</ul>
@@ -165,13 +165,14 @@ templ appListActions(n int) {
 }
 
 // appCard is an app in the grid: its name and state, where it runs, its
-// last deploy, the way to its page and the order controls.
-templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time, first, last bool) {
+// last deploy, and the way to its page. Its grip drags it.
+templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	@card.Card(card.Props{Class: "h-full min-w-0"}) {
 		@card.Header() {
-			@card.Title(card.TitleProps{Class: "min-w-0 truncate text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
-				<a href={ templ.SafeURL(appPath) } class="hover:underline hover:underline-offset-4">{ app.Name }</a>
+			@card.Title(card.TitleProps{Class: "-ml-2 flex min-w-0 items-center gap-1 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
+				@orderHandle(app.Name)
+				<a href={ templ.SafeURL(appPath) } class="truncate hover:underline hover:underline-offset-4">{ app.Name }</a>
 			}
 			@card.Action() {
 				@appStatus(app)
@@ -194,7 +195,6 @@ templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time, f
 			@button.Button(button.Props{Href: appPath, Variant: button.VariantSecondary, Size: button.SizeSm}) {
 				Open
 			}
-			@orderControls("app", app.Name, first, last, "ml-auto")
 		}
 	}
 }
@@ -203,16 +203,17 @@ templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time, f
 templ appRows(view AppsView, now time.Time) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@panel(panelProps{Heading: "apps-heading", Title: "All apps", Action: appListActions(len(view.Apps)), Body: panelBodyRows}) {
-		<div class="hidden grid-cols-[minmax(0,1fr)_10rem_8rem_1rem] gap-4 pr-[5.5rem] pl-3 pb-2 text-xs text-muted-foreground md:grid" aria-hidden="true">
+		<div class="hidden grid-cols-[minmax(0,1fr)_10rem_8rem_1rem] gap-4 pr-3 pl-[2.75rem] pb-2 text-xs text-muted-foreground md:grid" aria-hidden="true">
 			<span>App</span>
 			<span>Status</span>
 			<span>Last deploy</span>
 		</div>
 		@orderForm("apps") {
 			<ul class="flex flex-col gap-1" role="list" data-sortable-list>
-				for index, app := range view.Apps {
+				for _, app := range view.Apps {
 					{{ newest, hasNewest := view.Newest[app.ID] }}
-					<li data-app={ app.Name } class="group/row flex min-w-0 items-center gap-1">
+					<li data-app={ app.Name } class="flex min-w-0 items-center gap-1">
+						@orderHandle(app.Name)
 						@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
 							@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
 								@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
@@ -240,17 +241,12 @@ templ appRows(view AppsView, now time.Time) {
 							</span>
 							@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
 						}
-						@orderControls("app", app.Name, index == 0, index == len(view.Apps)-1, orderRowClasses)
 					</li>
 				}
 			</ul>
 		}
 	}
 }
-
-// orderRowClasses shows the order controls of a list row on hover and
-// focus, and always on touch screens, where nothing hovers.
-const orderRowClasses = "md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100 pointer-coarse:opacity-100"
 
 // appCount is the number of apps right of the list title.
 templ appCount(n int) {

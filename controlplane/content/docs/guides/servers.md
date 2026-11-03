@@ -67,14 +67,14 @@ MCP: rename_server
 Servers show in the order you give them, the same for everyone in the workspace and everywhere: the web, the CLI, the TUI, the API and MCP. A new server goes to the end.
 
 ```surfaces
-Web: **Servers**, drag a server by its handle, or use its up and down arrows
+Web: **Servers**, drag a server to its place
 CLI: ops servers move <server-name> up|down|top|bottom|<position>
 TUI: on the server, `K` or `J`, or `:move up` and `:move down`
 API: PUT /api/v1/servers/order
 MCP: reorder_servers
 ```
 
-The arrows work with the keyboard and screen readers, and dragging works with a mouse and on touch screens. The API and MCP take every server once, by name or ID, in the new order: `{"order": ["web-1", "db-1"]}`. The activity records each new order once.
+With a mouse you drag the whole server; on a phone you drag the grip at its left, so the page still scrolls. On the keyboard, Alt and the up or down arrow move the server in focus. The API and MCP take every server once, by name or ID, in the new order: `{"order": ["web-1", "db-1"]}`. The activity records each new order once.
 
 **List** and **Grid** above the servers switch how the page shows them: cards side by side, or one row each. ops remembers your choice for you on every device; the rest of the team keeps theirs.
 

@@ -2,25 +2,16 @@ package handler
 
 import (
 	"net/http"
-	"slices"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/service"
 )
 
 // formOrder is the order the list form sends: the names in their order on
-// the page, after a drag, with the one an arrow button named moved up or
-// down by one.
+// the page.
 func formOrder(r *http.Request) []string {
 	_ = r.ParseForm()
-	order := r.Form["order"]
-	if name := r.PostForm.Get("up"); name != "" {
-		order = service.Moved(order, name, slices.Index(order, name)-1)
-	}
-	if name := r.PostForm.Get("down"); name != "" {
-		order = service.Moved(order, name, slices.Index(order, name)+1)
-	}
-	return order
+	return r.Form["order"]
 }
 
 // withView remembers how the member sees page and answers the request as

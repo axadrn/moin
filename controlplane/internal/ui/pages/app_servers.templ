@@ -161,19 +161,19 @@ templ ServerList(servers []model.Server) {
 				if pageView(ctx, "servers") == model.ViewList {
 					@card.Card(card.Props{Class: "min-w-0 p-3"}) {
 						<ul class="flex flex-col gap-1" role="list" aria-labelledby="servers-heading" data-sortable-list>
-							for index, server := range servers {
-								<li data-server={ server.Name } data-online?={ server.Online } class="group/row flex min-w-0 items-center gap-1">
+							for _, server := range servers {
+								<li data-server={ server.Name } data-online?={ server.Online } class="flex min-w-0 items-center gap-1">
+									@orderHandle(server.Name)
 									@serverRow(server, basePath, now)
-									@orderControls("server", server.Name, index == 0, index == len(servers)-1, orderRowClasses)
 								</li>
 							}
 						</ul>
 					}
 				} else {
 					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="servers-heading" data-sortable-list>
-						for index, server := range servers {
+						for _, server := range servers {
 							<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
-								@serverCard(server, basePath, now, index == 0, index == len(servers)-1)
+								@serverCard(server, basePath, now)
 							</li>
 						}
 					</ul>
@@ -212,13 +212,14 @@ templ serverRow(server model.Server, basePath string, now time.Time) {
 }
 
 // serverCard is one server: its name and state, three facts, how it is
-// reached, the way to its page and the order controls.
-templ serverCard(server model.Server, basePath string, now time.Time, first, last bool) {
+// reached, and the way to its page. Its grip drags it.
+templ serverCard(server model.Server, basePath string, now time.Time) {
 	{{ serverPath := basePath + "/servers/" + server.ID + "/security" }}
 	@card.Card(card.Props{Class: "h-full min-w-0"}) {
 		@card.Header() {
-			@card.Title(card.TitleProps{Class: "min-w-0 truncate text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
-				<a href={ templ.SafeURL(serverPath) } class="hover:underline hover:underline-offset-4">{ server.Name }</a>
+			@card.Title(card.TitleProps{Class: "-ml-2 flex min-w-0 items-center gap-1 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
+				@orderHandle(server.Name)
+				<a href={ templ.SafeURL(serverPath) } class="truncate hover:underline hover:underline-offset-4">{ server.Name }</a>
 			}
 			@card.Action() {
 				@serverStatus(server)
@@ -261,7 +262,6 @@ templ serverCard(server model.Server, basePath string, now time.Time, first, las
 					Update agent
 				}
 			}
-			@orderControls("server", server.Name, first, last, "ml-auto")
 		}
 	}
 }
