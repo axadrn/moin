@@ -67,6 +67,8 @@ type AppRepository interface {
 	Registries(workspaceID string) ([]model.Registry, error)
 	SetRegistry(registry model.Registry) error
 	DeleteRegistry(workspaceID, host string) error
+
+	UptimeRepository
 }
 
 type appRepository struct {

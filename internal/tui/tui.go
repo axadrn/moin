@@ -126,6 +126,7 @@ const (
 	modeSQL
 	modeConfirmWrite
 	modeBackups
+	modeUptime
 	modeConfirmSecurity
 	// modeForm asks the fields of m.form one after the other.
 	modeForm
@@ -542,6 +543,24 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.input += msg.Text
 		}
 		return m, nil
+	case modeUptime:
+		switch key {
+		case "esc":
+			m.mode, m.input = modeList, ""
+		case "enter":
+			app, _ := m.currentApp()
+			input := strings.TrimSpace(m.input)
+			m.input = ""
+			if input == "" {
+				return m, m.showUptime(app.Name)
+			}
+			return m, m.changeUptime(app.Name, input)
+		case "backspace":
+			m.input = dropLast(m.input)
+		default:
+			m.input += msg.Text
+		}
+		return m, nil
 	case modeConfirmSecurity:
 		m.mode = modeList
 		if key == "y" {
@@ -738,7 +757,7 @@ func (m model) confirmName(question, detail, name string, run tea.Cmd) model {
 // typing reports whether the footer holds a text input.
 func (m model) typing() bool {
 	switch m.mode {
-	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeForm, modeGitHub, modeConfirmName, modeSearch, modeCommand:
+	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeUptime, modeForm, modeGitHub, modeConfirmName, modeSearch, modeCommand:
 		return true
 	}
 	return false
@@ -979,6 +998,11 @@ func (m model) appKey(key string) (tea.Model, tea.Cmd) {
 		if ok {
 			m.mode, m.input = modeBackups, ""
 			return m, m.showBackups(app.Name, "")
+		}
+	case "u":
+		if ok {
+			m.mode, m.input = modeUptime, ""
+			return m, m.showUptime(app.Name)
 		}
 	case "gh":
 		if ok {

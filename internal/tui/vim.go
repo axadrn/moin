@@ -484,6 +484,7 @@ var commandKeys = map[string]map[tab]string{
 	"stop":     {tabApps: "S"},
 	"tunnel":   {tabServers: "t"},
 	"update":   {tabServers: "u"},
+	"uptime":   {tabApps: "u"},
 }
 
 // tabNames are the tabs in their order, as commands.
@@ -660,6 +661,7 @@ var helpEntries = [][2]string{
 	{"e", "env vars"},
 	{"s", "SQL"},
 	{"b", "backups and restores"},
+	{"u", "uptime: pause, resume, a path per domain"},
 	{"o", "domains"},
 	{"p", "password"},
 	{":hook", "a new deploy hook; :hook off turns it off"},

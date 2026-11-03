@@ -64,6 +64,8 @@ tags:
     description: Browse, edit and query the SQLite databases of an app on its server.
   - name: Backups
     description: Continuous backups and snapshots of every SQLite database into your own S3-compatible bucket, with restore and daily restore drills.
+  - name: Uptime
+    description: The control plane checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: GitHub
     description: The ops GitHub App connects repos. Link a repo and branch to an app, deploy a ref without a checkout, deploy every push, and get the result as a commit status.
   - name: Servers
@@ -2195,6 +2197,79 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No app with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/uptime:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    get:
+      tags: [Uptime]
+      operationId: getAppUptime
+      summary: Get uptime
+      description: The state of the app as a whole and, per domain, where the check goes, its state, the newest check with the HTTP status, response time and certificate expiry, uptime over 24 hours, 7 and 30 days, the average response time and the last outages.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The uptime.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Uptime'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/uptime/{domain}:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+      - name: domain
+        in: path
+        required: true
+        description: One of the app's domains.
+        schema:
+          type: string
+    put:
+      tags: [Uptime]
+      operationId: setUptimeCheck
+      summary: Set an uptime check
+      description: Changes the path the check of a domain goes to, or pauses and resumes it. A missing field keeps its setting; an empty path goes back to the app's health path, or /. A paused check starts over when it resumes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UptimeCheckRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The domain with its new settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UptimeDomain'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `domain` when the app has no such domain, or `path` when it does not start with /.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4564,6 +4639,97 @@ components:
           type: string
           format: date-time
           description: A point in time inside the database's window.
+    Uptime:
+      type: object
+      required: [app, state, server, server_online, domains]
+      properties:
+        app:
+          type: string
+        state:
+          type: string
+          enum: [up, down, pending, paused, stopped, no_domains]
+          description: down when a domain is down, pending before the first check, paused when every check is.
+        server:
+          type: string
+        server_online:
+          type: boolean
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/UptimeDomain'
+    UptimeDomain:
+      type: object
+      required: [domain, path, custom_path, paused, state, since, checked_at, status_code, response_ms, error, cert_expires_at, uptime_24h, uptime_7d, uptime_30d, average_ms, outages]
+      properties:
+        domain:
+          type: string
+        path:
+          type: string
+          description: Where the check goes. The app's health path from `x-ops.health`, or /, unless set.
+        custom_path:
+          type: boolean
+        paused:
+          type: boolean
+        state:
+          type: string
+          enum: [up, down, pending, paused]
+        since:
+          type: string
+          format: date-time
+          nullable: true
+        checked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The newest check since the control plane started.
+        status_code:
+          type: integer
+        response_ms:
+          type: integer
+        error:
+          type: string
+          description: Why the newest check failed, such as `HTTP 502` or `no answer within 10s`.
+        cert_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        uptime_24h:
+          type: number
+          nullable: true
+          description: Percent of the checks that found it up; null without a check in that time.
+        uptime_7d:
+          type: number
+          nullable: true
+        uptime_30d:
+          type: number
+          nullable: true
+        average_ms:
+          type: integer
+          description: Mean response time of the last 24 hours.
+        outages:
+          type: array
+          description: The last 10, newest first.
+          items:
+            type: object
+            required: [started_at, ended_at, reason]
+            properties:
+              started_at:
+                type: string
+                format: date-time
+              ended_at:
+                type: string
+                format: date-time
+                nullable: true
+              reason:
+                type: string
+    UptimeCheckRequest:
+      type: object
+      properties:
+        path:
+          type: string
+          description: A path like /health; empty goes back to the health path or /.
+        paused:
+          type: boolean
     AppBackups:
       type: object
       required: [snapshot_before_changes, databases]

@@ -80,6 +80,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Revoke an invitation", DestructiveHint: boolPointer(true), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, Write(tools.revokeInvitation))
 	registerOpsTools(server, services)
+	registerUptimeTools(server, services)
 }
 
 func readOnly(title string) *mcpsdk.ToolAnnotations {

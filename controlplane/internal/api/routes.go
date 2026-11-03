@@ -155,6 +155,8 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.BackUp), TokenWrite},
 		{"PUT /api/v1/apps/{app}/backups/settings", m.InWorkspace(h.Apps.SetBackupSettings), TokenWrite},
 		{"POST /api/v1/apps/{app}/restore", m.InWorkspace(h.Apps.Restore), TokenWrite},
+		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), TokenRead},
+		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptimeCheck), TokenWrite},
 		{"GET /api/v1/github", m.InWorkspace(h.Apps.GetGitHub), TokenRead},
 		{"GET /api/v1/github/repos", m.InWorkspace(h.Apps.GetGitHubRepos), TokenRead},
 		{"GET /api/v1/github/repos/{owner}/{repo}/branches", m.InWorkspace(h.Apps.GetGitHubBranches), TokenRead},

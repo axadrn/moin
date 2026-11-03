@@ -67,6 +67,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET` · `POST /api/v1/apps/{app}/backups` | backups; a snapshot now |
 | `PUT /api/v1/apps/{app}/backups/settings` | snapshot before every change |
 | `POST /api/v1/apps/{app}/restore` | restores a snapshot or a point in time |
+| `GET /api/v1/apps/{app}/uptime` | uptime per domain: state, 24 hours, 7 and 30 days, the newest check and the last outages |
+| `PUT /api/v1/apps/{app}/uptime/{domain}` | the path of a domain's check `{"path": "/health"}`, or pauses it `{"paused": true}` |
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the bucket backups go to |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |

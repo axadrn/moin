@@ -14,13 +14,13 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **Backups** of every SQLite change into your own bucket, a snapshot before every change ops makes and a restore check every day. [Backups](/docs/guides/backups)
 - **Data**: browse tables, edit rows and run SQL on the live database. [Data](/docs/guides/data)
 - **Domains** with HTTPS, and a password in front if you like. [Domains](/docs/guides/domains)
+- **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
 - **Security**: a Cloudflare Tunnel instead of open ports, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
 - **Teams and the activity log**: who changed what, to the second. [Activity log](/docs/guides/activity)
 - **Self-hosting**, free, with every feature. [Self-hosting](/docs/self-hosting)
 
 ## Next
 
-- **Uptime checks, built in**: every domain is watched from the outside from the first deploy on, nothing to set up. [#18](https://github.com/axadrn/ops/issues/18)
 - **Alerts where your team is**: email, Slack, Discord, Telegram or a webhook, when an app goes down, a deploy fails or a server goes offline. [#19](https://github.com/axadrn/ops/issues/19)
 - **Live metrics, built in**: CPU, RAM, disk and network for every server; requests, errors, response time and crashes for every app, with every deploy marked on the graphs. [#20](https://github.com/axadrn/ops/issues/20)
 - **Env vars as one text**: switch between fields and a whole `.env` file you can paste. [#9](https://github.com/axadrn/ops/issues/9)
