@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -23,7 +22,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -39,117 +37,9 @@ var (
 	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: ops only reaches buckets on the public internet")
 	ErrNoBackups      = errors.New("backups are not set up: add a bucket first")
 	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
+	ErrRestoreOlder   = errors.New("a point in time restore reads from the app's bucket: pick a snapshot to restore from an older bucket")
 	ErrSnapshotID     = errors.New("this is not a snapshot ID: copy one from the backups list")
 )
-
-// BackupStorage is an account's bucket without its secret key. Folder is
-// where the workspace's files go in it: <path>/<workspace ID>/.
-type BackupStorage struct {
-	Endpoint  string
-	Region    string
-	Bucket    string
-	Path      string
-	Folder    string
-	AccessKey string
-	CreatedAt time.Time
-}
-
-// AppFolder is where an app's uploads and backups go in the bucket:
-// <path>/<workspace ID>/<app>/<app ID>/.
-func (s BackupStorage) AppFolder(app *model.App) string {
-	return s.Folder + app.Name + "/" + app.ID + "/"
-}
-
-// BackupStorageInput is a bucket as people enter it.
-type BackupStorageInput struct {
-	Endpoint  string
-	Region    string
-	Bucket    string
-	Path      string
-	AccessKey string
-	SecretKey string
-}
-
-// BackupStorage returns the account's bucket, or ErrNoBackups.
-func (s *AppService) BackupStorage(workspaceID string) (*BackupStorage, error) {
-	storage, err := s.apps.BackupStorage(workspaceID)
-	if errors.Is(err, repository.ErrNoBackupStorage) {
-		return nil, ErrNoBackups
-	}
-	if err != nil {
-		return nil, err
-	}
-	folder := strings.TrimLeft(path.Join(storage.Path, workspaceID), "/") + "/"
-	return &BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}, nil
-}
-
-// SetBackupStorage checks that ops can write to the bucket, stores it and
-// tells the user's online agents to back up there.
-func (s *AppService) SetBackupStorage(ctx context.Context, actor Actor, input BackupStorageInput) error {
-	storage := protocol.BackupStorage{
-		Endpoint:  strings.TrimRight(strings.TrimSpace(input.Endpoint), "/"),
-		Region:    strings.TrimSpace(input.Region),
-		Bucket:    strings.TrimSpace(input.Bucket),
-		Path:      strings.Trim(strings.TrimSpace(input.Path), "/"),
-		Workspace: actor.WorkspaceID,
-		AccessKey: strings.TrimSpace(input.AccessKey),
-		SecretKey: strings.TrimSpace(input.SecretKey),
-	}
-	if storage.Endpoint != "" {
-		parsed, err := url.Parse(storage.Endpoint)
-		local := parsed != nil && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1")
-		if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && !(parsed.Scheme == "http" && local)) {
-			return ErrBackupEndpoint
-		}
-	}
-	if storage.Bucket == "" || storage.AccessKey == "" || storage.SecretKey == "" {
-		return ErrBackupBucket
-	}
-	if storage.Region == "" {
-		storage.Region = "auto"
-	}
-	err := checkBucket(ctx, storage, s.publicBucketsOnly)
-	if errors.Is(err, ErrBucketPrivate) {
-		return ErrBucketPrivate
-	}
-	if err != nil {
-		slog.Info("backup bucket check failed", "workspace_id", actor.WorkspaceID, "error", err)
-		return ErrBackupAccess
-	}
-	err = s.apps.SetBackupStorage(model.BackupStorage{
-		WorkspaceID: actor.WorkspaceID,
-		Endpoint:    storage.Endpoint,
-		Region:      storage.Region,
-		Bucket:      storage.Bucket,
-		Path:        storage.Path,
-		AccessKey:   storage.AccessKey,
-		SecretKey:   s.box.Seal(storage.SecretKey, actor.WorkspaceID+"/backups"),
-		CreatedAt:   s.now().UTC(),
-	})
-	if err != nil {
-		return err
-	}
-	s.configureAgents(actor.WorkspaceID)
-	s.servers.record(actor, "bucket.set", "bucket", storage.Bucket, map[string]string{"endpoint": storage.Endpoint, "path": storage.Path})
-	s.notify(actor.WorkspaceID)
-	return nil
-}
-
-// RemoveBackupStorage forgets the bucket; agents stop backing up. What is
-// in the bucket stays.
-func (s *AppService) RemoveBackupStorage(actor Actor) error {
-	err := s.apps.DeleteBackupStorage(actor.WorkspaceID)
-	if errors.Is(err, repository.ErrNoBackupStorage) {
-		return ErrNoBackups
-	}
-	if err != nil {
-		return err
-	}
-	s.configureAgents(actor.WorkspaceID)
-	s.servers.record(actor, "bucket.removed", "bucket", "", nil)
-	s.notify(actor.WorkspaceID)
-	return nil
-}
 
 // AllowOnlyPublicBuckets makes the bucket check refuse private and local
 // addresses. The hosted control plane turns it on: otherwise a user could
@@ -238,27 +128,38 @@ func bucketClient(storage protocol.BackupStorage) *s3.Client {
 	})
 }
 
-// backupConfig is what the agents of a user get: the bucket in plain
-// text, or nothing.
-func (s *AppService) backupConfig(workspaceID string) protocol.BackupConfig {
-	storage, err := s.apps.BackupStorage(workspaceID)
+// backupConfig is what the agent of a server gets: the default bucket in
+// plain text, and the bucket of each of its apps that uses another one,
+// or nothing.
+func (s *AppService) backupConfig(workspaceID, serverID string) protocol.BackupConfig {
+	bucket, err := s.apps.DefaultBucket(workspaceID)
 	if err != nil {
 		return protocol.BackupConfig{}
 	}
-	secretKey, err := s.box.Open(storage.SecretKey, workspaceID+"/backups")
+	storage, err := s.openBucket(bucket)
 	if err != nil {
-		slog.Error("open backup secret failed", "workspace_id", workspaceID, "error", err)
 		return protocol.BackupConfig{}
 	}
-	return protocol.BackupConfig{Storage: &protocol.BackupStorage{
-		Endpoint:  storage.Endpoint,
-		Region:    storage.Region,
-		Bucket:    storage.Bucket,
-		Path:      storage.Path,
-		Workspace: workspaceID,
-		AccessKey: storage.AccessKey,
-		SecretKey: secretKey,
-	}}
+	config := protocol.BackupConfig{Storage: storage}
+	apps, err := s.apps.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		slog.Error("list apps for backups failed", "workspace_id", workspaceID, "error", err)
+		return config
+	}
+	for _, app := range apps {
+		if app.ServerID != serverID || app.BucketID == nil || *app.BucketID == bucket.ID {
+			continue
+		}
+		own, err := s.appStorage(&app)
+		if err != nil {
+			continue
+		}
+		if config.AppStorage == nil {
+			config.AppStorage = map[string]*protocol.BackupStorage{}
+		}
+		config.AppStorage[app.Name] = own
+	}
+	return config
 }
 
 // configureAgents sends the backup config to every online server of the
@@ -282,7 +183,7 @@ func (s *AppService) configureAgents(workspaceID string) {
 func (s *AppService) configureAgent(serverID, workspaceID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	config := s.backupConfig(workspaceID)
+	config := s.backupConfig(workspaceID, serverID)
 	config.Apps = s.appIDs(serverID, workspaceID)
 	err := s.servers.Request(ctx, serverID, protocol.TypeBackupConfig, config, nil)
 	if err != nil {
@@ -326,14 +227,15 @@ func (s *AppService) backupRequest(ctx context.Context, workspaceID, idOrName st
 	if err != nil {
 		return nil, protocol.Backups{}, err
 	}
-	_, err = s.BackupStorage(workspaceID)
+	_, err = s.AppBucket(app)
 	if err != nil {
 		return app, protocol.Backups{}, err
 	}
+	request := protocol.BackupRequest{App: app.Name, Reason: reason, Older: s.olderStorage(app)}
 	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
 	defer cancel()
 	var backups protocol.Backups
-	err = s.servers.Request(ctx, app.ServerID, messageType, protocol.BackupRequest{App: app.Name, Reason: reason}, &backups)
+	err = s.servers.Request(ctx, app.ServerID, messageType, request, &backups)
 	if err != nil {
 		return app, backups, err
 	}
@@ -342,8 +244,10 @@ func (s *AppService) backupRequest(ctx context.Context, workspaceID, idOrName st
 }
 
 // Restore puts a database of an app back from a snapshot or to a point in
-// time. The agent takes a snapshot of the current state first.
-func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, database, snapshot string, at *time.Time) error {
+// time. The agent takes a snapshot of the current state first. bucket names
+// the bucket the snapshot is in, when it is one the app left; empty is the
+// app's bucket. A point in time comes from the app's bucket.
+func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, database, snapshot, bucket string, at *time.Time) error {
 	if snapshot == "" && at == nil {
 		return ErrRestoreTarget
 	}
@@ -355,18 +259,35 @@ func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, databas
 	if err != nil {
 		return err
 	}
-	_, err = s.BackupStorage(actor.WorkspaceID)
+	current, err := s.AppBucket(app)
 	if err != nil {
 		return err
 	}
+	request := protocol.BackupRestore{App: app.Name, Database: database, Snapshot: snapshot, At: at}
+	if bucket != "" && bucket != current.Name {
+		if snapshot == "" {
+			return ErrRestoreOlder
+		}
+		older, err := s.olderBucket(app, bucket)
+		if err != nil {
+			return err
+		}
+		request.Storage, err = s.openBucket(older)
+		if err != nil {
+			return err
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, restoreTimeout)
 	defer cancel()
-	err = s.servers.Request(ctx, app.ServerID, protocol.TypeBackupRestore, protocol.BackupRestore{App: app.Name, Database: database, Snapshot: snapshot, At: at}, nil)
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeBackupRestore, request, nil)
 	if err != nil {
 		return err
 	}
 	slog.Info("database restored", "app_id", app.ID, "database", database, "snapshot", snapshot, "at", at)
 	details := map[string]string{"database": database, "snapshot": snapshot}
+	if request.Storage != nil {
+		details["bucket"] = bucket
+	}
 	if at != nil {
 		details["at"] = at.UTC().Format(time.RFC3339)
 	}
@@ -406,7 +327,7 @@ func (s *AppService) snapshotBeforeWrite(app *model.App) bool {
 	if !app.SnapshotBeforeChanges {
 		return false
 	}
-	_, err := s.apps.BackupStorage(app.WorkspaceID)
+	_, err := s.AppBucket(app)
 	return err == nil
 }
 

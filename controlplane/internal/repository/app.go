@@ -48,9 +48,7 @@ type AppRepository interface {
 	SetDeployHookHash(appID, hash string) error
 	RemoveDeployHook(appID string) error
 
-	BackupStorage(workspaceID string) (*model.BackupStorage, error)
-	SetBackupStorage(storage model.BackupStorage) error
-	DeleteBackupStorage(workspaceID string) error
+	BucketRepository
 	SetSnapshotBeforeChanges(appID string, on bool) error
 	BackupStatus(appID string) ([]model.BackupStatus, error)
 	SetBackupStatus(status model.BackupStatus) error
@@ -82,6 +80,7 @@ func NewAppRepository(db *sqlx.DB) AppRepository {
 
 const appSelect = `
 	SELECT a.*, s.name AS server_name, w.slug AS workspace_slug,
+		COALESCE((SELECT name FROM buckets WHERE id = a.bucket_id), '') AS bucket_name,
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), 0) AS latest_number,
 		COALESCE((SELECT status FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), '') AS latest_status,
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), 0) AS live_number
@@ -279,36 +278,6 @@ func (r *appRepository) SetProtect(appID, protect string) error {
 func (r *appRepository) SetStopped(appID string, stopped bool) error {
 	_, err := r.db.Exec(`UPDATE apps SET stopped = $1 WHERE id = $2`, stopped, appID)
 	return err
-}
-
-func (r *appRepository) BackupStorage(workspaceID string) (*model.BackupStorage, error) {
-	var storage model.BackupStorage
-	err := r.db.Get(&storage, `SELECT * FROM backup_storage WHERE workspace_id = $1`, workspaceID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNoBackupStorage
-	}
-	return &storage, err
-}
-
-func (r *appRepository) SetBackupStorage(storage model.BackupStorage) error {
-	_, err := r.db.Exec(`
-		INSERT INTO backup_storage (workspace_id, endpoint, region, bucket, path, access_key, secret_key, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (workspace_id) DO UPDATE SET endpoint = excluded.endpoint, region = excluded.region, bucket = excluded.bucket,
-			path = excluded.path, access_key = excluded.access_key, secret_key = excluded.secret_key, created_at = excluded.created_at
-	`, storage.WorkspaceID, storage.Endpoint, storage.Region, storage.Bucket, storage.Path, storage.AccessKey, storage.SecretKey, storage.CreatedAt)
-	return err
-}
-
-func (r *appRepository) DeleteBackupStorage(workspaceID string) error {
-	result, err := r.db.Exec(`DELETE FROM backup_storage WHERE workspace_id = $1`, workspaceID)
-	if err != nil {
-		return err
-	}
-	if count, _ := result.RowsAffected(); count == 0 {
-		return ErrNoBackupStorage
-	}
-	return nil
 }
 
 func (r *appRepository) SetSnapshotBeforeChanges(appID string, on bool) error {

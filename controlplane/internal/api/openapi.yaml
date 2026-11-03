@@ -2440,8 +2440,8 @@ paths:
     get:
       tags: [Backups]
       operationId: getBackupStorage
-      summary: Get the bucket
-      description: The S3-compatible bucket backups go to, without its secret key.
+      summary: Get the default bucket
+      description: The workspace's default bucket, without its secret key. The single-bucket form of listBuckets, for older clients.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2465,8 +2465,8 @@ paths:
     put:
       tags: [Backups]
       operationId: setBackupStorage
-      summary: Set the bucket
-      description: Checks that ops can write to the bucket, stores it with the secret key encrypted and tells every online server to back up there. Empty endpoint means AWS S3; Cloudflare R2, Backblaze B2, Hetzner and other S3-compatible stores take their endpoint.
+      summary: Set the default bucket
+      description: Changes the workspace's default bucket, or adds the first one, named default. ops checks that it can write to the bucket first and stores the secret key encrypted. Empty endpoint means AWS S3; Cloudflare R2, Backblaze B2, Hetzner and other S3-compatible stores take their endpoint. Use addBucket and editBucket for more than one bucket.
       requestBody:
         required: true
         content:
@@ -2496,8 +2496,8 @@ paths:
     delete:
       tags: [Backups]
       operationId: deleteBackupStorage
-      summary: Remove the bucket
-      description: Agents stop backing up. What is in the bucket stays.
+      summary: Remove the default bucket
+      description: Removes the workspace's default bucket, like deleteBucket. A bucket that apps use or that keeps older backups of an app is refused. What is in the bucket stays.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2511,7 +2511,187 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`no_backups` when no bucket is set up.'
+          description: '`no_backups` when no bucket is set up, `bucket_in_use` when apps use it or it keeps older backups; the message names the apps.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/buckets:
+    get:
+      tags: [Backups]
+      operationId: listBuckets
+      summary: List buckets
+      description: The workspace's buckets, the default first, without their secret keys, each with the apps that use it.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The buckets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BucketList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags: [Backups]
+      operationId: addBucket
+      summary: Add a bucket
+      description: Checks that ops can write to the bucket and stores it under a name, with the secret key encrypted. The first bucket is the default; `default` makes a later one the default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BucketRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '201':
+          description: The new bucket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bucket'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket` or `fields.secret_key`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/buckets/{name}:
+    parameters:
+      - $ref: '#/components/parameters/BucketName'
+    get:
+      tags: [Backups]
+      operationId: getBucket
+      summary: Get a bucket
+      description: One bucket, without its secret key.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The bucket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bucket'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. The workspace has no bucket by this name.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags: [Backups]
+      operationId: editBucket
+      summary: Change a bucket
+      description: Sets every field of a bucket. An empty `name` keeps the name, an empty `secret_key` keeps the stored key, `default` makes it the default. A new place or new keys are checked first; its apps then start there with a full copy and the old place keeps what it has.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BucketRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The bucket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bucket'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. The workspace has no bucket by this name.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket` or `fields.secret_key`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Backups]
+      operationId: deleteBucket
+      summary: Remove a bucket
+      description: Forgets a bucket. A bucket that apps use, or that keeps older backups of an app, is refused. What is in the bucket stays.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The bucket is forgotten.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. The workspace has no bucket by this name.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`bucket_in_use` when apps use it or it keeps older backups; the message names the apps.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/bucket:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    put:
+      tags: [Backups]
+      operationId: setAppBucket
+      summary: Choose the app's bucket
+      description: Moves the app's uploads and new backups to a bucket of the workspace; an empty `bucket` follows the default. Its older backups stay in the old bucket, getAppBackups still lists them, and restoreApp reads them from there.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppBucketRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app or no bucket by this name.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`no_backups` when the workspace has no bucket.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3917,6 +4097,13 @@ components:
       description: The app ID or name from `GET /api/v1/apps`.
       schema:
         type: string
+    BucketName:
+      name: name
+      in: path
+      required: true
+      description: The bucket's name in ops from `GET /api/v1/buckets`.
+      schema:
+        type: string
     DeployNumber:
       name: number
       in: path
@@ -4613,6 +4800,9 @@ components:
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
+        bucket:
+          type: string
+          description: The bucket the app uploads and backs up to, by name. Empty follows the workspace's default bucket.
         created_at:
           type: string
           format: date-time
@@ -5123,6 +5313,82 @@ components:
           type: string
         secret_key:
           type: string
+    Bucket:
+      type: object
+      required: [name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at]
+      properties:
+        name:
+          type: string
+          description: The bucket's name in ops, like default or client-a.
+        default:
+          type: boolean
+          description: Apps without a bucket of their own use it.
+        endpoint:
+          type: string
+        region:
+          type: string
+        bucket:
+          type: string
+          description: The bucket's name at the storage provider.
+        path:
+          type: string
+        folder:
+          type: string
+          description: Where this workspace's files are in the bucket, path then the workspace ID.
+        access_key:
+          type: string
+        apps:
+          type: array
+          description: The apps that upload and back up there now.
+          items:
+            type: string
+        older_backups:
+          type: array
+          description: Apps that moved to another bucket and keep their older backups here.
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+    BucketList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bucket'
+    BucketRequest:
+      type: object
+      required: [bucket, access_key]
+      properties:
+        name:
+          type: string
+          description: 1 to 63 lowercase letters, digits or dashes. Needed to add a bucket; on a change, empty keeps the name.
+        endpoint:
+          type: string
+          description: https:// URL of an S3-compatible store; empty for AWS S3.
+        region:
+          type: string
+        bucket:
+          type: string
+        path:
+          type: string
+          description: An optional folder inside the bucket, only for a bucket that holds other files too.
+        access_key:
+          type: string
+        secret_key:
+          type: string
+          description: Needed to add a bucket; on a change, empty keeps the stored one.
+        default:
+          type: boolean
+          description: Make it the workspace's default bucket.
+    AppBucketRequest:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: A bucket's name; empty follows the workspace's default bucket.
     BackupSettings:
       type: object
       required: [snapshot_before_changes]
@@ -5138,6 +5404,9 @@ components:
         snapshot:
           type: string
           description: A snapshot ID from getAppBackups.
+        bucket:
+          type: string
+          description: The bucket of the snapshot from getAppBackups when it is an older bucket the app left. Empty is the app's bucket. A point in time always comes from the app's bucket.
         at:
           type: string
           format: date-time
@@ -5384,10 +5653,18 @@ components:
           type: boolean
     AppBackups:
       type: object
-      required: [snapshot_before_changes, databases]
+      required: [snapshot_before_changes, bucket, older_buckets, databases]
       properties:
         snapshot_before_changes:
           type: boolean
+        bucket:
+          type: string
+          description: The bucket new backups of the app go to.
+        older_buckets:
+          type: array
+          description: Buckets the app left. They keep its older backups; the snapshots there are listed too.
+          items:
+            type: string
         databases:
           type: array
           items:
@@ -5412,6 +5689,9 @@ components:
                     created_at:
                       type: string
                       format: date-time
+                    bucket:
+                      type: string
+                      description: The bucket the snapshot is in. Empty from older agents.
               since:
                 type: string
                 format: date-time

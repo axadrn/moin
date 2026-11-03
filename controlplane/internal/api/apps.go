@@ -46,6 +46,9 @@ type App struct {
 	Branch                string `json:"branch"`
 	AutoDeploy            bool   `json:"auto_deploy"`
 	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
+	// Bucket is the bucket the app uploads and backs up to; empty uses
+	// the workspace's default bucket.
+	Bucket string `json:"bucket"`
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook      bool      `json:"hook"`
@@ -137,6 +140,7 @@ func NewApp(app model.App) App {
 		AutoDeploy:            app.AutoDeploy,
 		SnapshotBeforeChanges: app.SnapshotBeforeChanges,
 		Hook:                  app.DeployHookHash != nil,
+		Bucket:                app.BucketName,
 		CreatedAt:             app.CreatedAt.UTC(),
 	}
 }

@@ -11,7 +11,7 @@ import (
 func TestBadNamesStopBeforeTheServer(t *testing.T) {
 	s := &AppService{}
 	ctx := context.Background()
-	if err := s.Restore(ctx, Actor{}, "blog", "app.db", "../../other/20261031T140200Z", nil); !errors.Is(err, ErrSnapshotID) {
+	if err := s.Restore(ctx, Actor{}, "blog", "app.db", "../../other/20261031T140200Z", "", nil); !errors.Is(err, ErrSnapshotID) {
 		t.Errorf("Restore: err = %v, want ErrSnapshotID", err)
 	}
 	if _, err := s.DeployRef(ctx, Actor{}, "blog", "--upload-pack=x"); !errors.Is(err, ErrRefName) {

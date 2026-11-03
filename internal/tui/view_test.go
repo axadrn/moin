@@ -162,7 +162,10 @@ func frames() map[string]model {
 		*m = m.addAppForm()
 		m.tab, m.input = tabApps, "shop"
 	})
-	stored := settings{loaded: true, storage: &client.BackupStorage{Endpoint: "https://abc.r2.cloudflarestorage.com", Region: "auto", Bucket: "ops-backups", AccessKey: "AKIA123"},
+	stored := settings{loaded: true, buckets: []client.Bucket{
+		{Name: "default", Default: true, Endpoint: "https://abc.r2.cloudflarestorage.com", Region: "auto", Bucket: "ops-backups", Folder: "ws/", AccessKey: "AKIA123", Apps: []string{"hello"}},
+		{Name: "client-a", Endpoint: "https://s3.eu-central-1.amazonaws.com", Region: "eu-central-1", Bucket: "client-a-backups", Folder: "ws/", AccessKey: "AKIA456", OlderBackups: []string{"shop"}},
+	},
 		integrations: client.Integrations{Cloudflare: true, CloudflareAccount: "Acme"},
 		registries:   []client.Registry{{Host: "ghcr.io", Username: "acme"}}}
 	stored.github.Enabled = true
@@ -184,10 +187,10 @@ func frames() map[string]model {
 	add("settings", func(m *model) { m.tab, m.settings = tabSettings, stored })
 	add("settings-empty", func(m *model) { m.tab, m.settings = tabSettings, settings{loaded: true} })
 	add("settings-bucket", func(m *model) {
-		m.tab, m.settings, m.settingSelected = tabSettings, stored, 1
-		next, _ := m.editSetting(m.settingRows()[1])
+		m.tab, m.settings, m.settingSelected = tabSettings, stored, 3
+		next, _ := m.editSetting(m.settingRows()[3])
 		*m = next.(model)
-		m.form.step, m.form.values, m.input = 5, []string{"", "", "", "", ""}, "secret"
+		m.form.step, m.form.values, m.input = 6, []string{"", "", "", "", "", ""}, "secret"
 	})
 	add("settings-remove", func(m *model) {
 		m.tab, m.settings, m.settingSelected = tabSettings, stored, 4

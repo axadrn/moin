@@ -1,10 +1,10 @@
 ---
-title: "Your bucket"
+title: "Your buckets"
 description: "Your code and your backups live in your own storage, never with us"
 order: 2
 ---
 
-**The short version:** you bring one storage bucket. A bucket is a folder in an online storage service such as Cloudflare R2 or AWS S3. Your code and your backups go in there, and nothing of yours is ever stored by ops. ops only signs short-lived links into it.
+**The short version:** you bring a storage bucket, or several. A bucket is a folder in an online storage service such as Cloudflare R2 or AWS S3. Your code and your backups go in there, and nothing of yours is ever stored by ops. One bucket serves every app; [more than one](#more-than-one-bucket) keeps a client's data in the client's bucket. ops only signs short-lived links into it.
 
 ## Why a bucket
 
@@ -29,17 +29,17 @@ ops keeps the bucket's secret key encrypted and uses it for one thing: to sign l
 
 ## Add it
 
-Tells ops which bucket to use. Do it once per workspace: one bucket serves all your servers and apps.
+Tells ops which bucket to use. Do it once per workspace: one bucket serves all your servers and apps. The first bucket is the workspace's default.
 
 ```surfaces
-Web: **Bucket** in the sidebar, then **Save bucket**
-CLI: ops backups bucket set \
+Web: **Buckets** in the sidebar, then **Add bucket**
+CLI: ops buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, **Bucket**, then `enter`
-API: PUT /api/v1/backup-storage
-MCP: set_backup_storage
+TUI: settings tab, `b`, or `enter` on the **Bucket** row while there is none
+API: POST /api/v1/buckets
+MCP: add_bucket
 ```
 
 Any S3-compatible storage works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale, MinIO. Pick one in the country your data should stay in.
@@ -54,6 +54,7 @@ What ops needs:
 
 | Field | What to type |
 | --- | --- |
+| Name | Your name for it in ops, like `default` or `client-a`: lowercase letters, digits and dashes. The CLI takes it as the first argument. |
 | Endpoint | The endpoint. It must start with `https://`. Only `http://localhost` and `http://127.0.0.1` may use plain `http://`, on a self-hosted control plane. For AWS S3, leave it empty. |
 | Bucket | The name of the bucket. |
 | Folder | Usually empty. See [The folder field](#the-folder-field). |
@@ -99,7 +100,7 @@ What each folder holds:
 - **litestream:** every change as it happens, so you can go back to any second of the last 7 days.
 - **snapshots:** full copies before every deploy and change, the last 50. Each one is a plain gzipped SQLite file.
 
-The **Bucket** page shows your workspace's folder. The **Backups** tab of an app shows the app's folder.
+The **Buckets** page shows your workspace's folder in each bucket. The **Backups** tab of an app shows the app's folder and its bucket.
 
 ## How long things stay
 
@@ -110,13 +111,95 @@ The **Bucket** page shows your workspace's folder. The **Backups** tab of an app
 | `snapshots/` | the newest 50 per database | the ops agent on your server: after each new snapshot it deletes the oldest beyond 50 |
 | an app you removed | until you delete it | you: delete its `<app-id>/` folder in your storage provider's dashboard or with any S3 tool |
 | a bucket or folder you changed | until you delete it | you: ops starts in the new place with a full copy and leaves the old place as it is |
-| a bucket you removed from ops | until you delete it | you: backups stop and ops deletes nothing |
+| a bucket you removed from ops | until you delete it | you: ops deletes nothing |
+| an app you moved to another bucket | until you delete it | you: its older backups stay in the old bucket, and ops still lists and restores them from there |
 
 Remove an app and create a new one with the same name, and the new app starts with an empty folder: old backups never mix with new ones. The old app's backups stay in its own `<app-id>/` folder. To get its data back, download a snapshot from there, `gunzip` it and open it with `sqlite3`.
 
+## More than one bucket
+
+A workspace can keep several buckets, each with its own name. Reasons to add another one:
+
+- a client's data in the client's own bucket,
+- a bucket in another region, near the server,
+- separate costs per project,
+- production backups apart from test apps.
+
+One bucket is the **default**: every app without a bucket of its own uploads and backs up there, and so does every new app. The first bucket you add is the default; a bucket from before ops had more than one is the default, named `default`.
+
+### See your buckets
+
+Lists every bucket, the default first, with the apps that use it and the apps that keep older backups in it. Secret keys never show.
+
+```surfaces
+Web: **Buckets** in the sidebar
+CLI: ops buckets
+TUI: settings tab, a **Bucket** row per bucket
+API: GET /api/v1/buckets
+MCP: list_buckets
+```
+
+### Choose the bucket of an app
+
+Moves the uploads and the new backups of one app to another bucket. Without a choice an app follows the default.
+
+```surfaces
+Web: the app page, **Backups** tab, **Use another bucket**, then **Move**
+CLI: ops buckets use client-a [app]
+CLI: ops buckets use --default [app]
+TUI: on the app, `b`, type `bucket client-a` or `bucket -` for the default, `enter`; or `:bucket client-a`
+API: PUT /api/v1/apps/{app}/bucket
+MCP: set_app_bucket
+```
+
+What happens to the backups of the app:
+
+- **New backups** go to the new bucket. It starts with a full copy of every database, then every change, so a point in time restore reaches back to the move and no further.
+- **Older backups stay in the old bucket.** ops moves and deletes nothing. The backups list of the app shows the older snapshots too, with the bucket they are in.
+- **Restores read from where a backup lives.** Restoring an older snapshot downloads it from the old bucket: on the web **Restore** on the snapshot, in the CLI `ops restore <snapshot> --bucket <old bucket>`. A point in time restore always reads from the app's bucket now.
+- **Uploads** of `ops deploy` go to the new bucket right away.
+
+Making another bucket the default moves every app that follows the default the same way. The rule [`backups-to`](/docs/guides/security#rules) of a server allows one bucket: an app on that server in another bucket is refused there.
+
+A server's agent needs this release or newer to back up an app to its own bucket. Older agents back up every app to the default bucket; [agents update themselves](/docs/guides/servers) unless you turned that off.
+
+### Change a bucket
+
+Renames a bucket, points it at another place, gives it new keys or makes it the default. Leave the secret key empty to keep the stored one. A new place starts with a full copy, and the old place keeps what it has.
+
+```surfaces
+Web: **Buckets** in the sidebar, **Change** on the bucket, then **Save bucket**; **Make default**
+CLI: ops buckets edit client-a --name client-b
+CLI: ops buckets edit client-a --access-key <access-key>
+CLI: ops buckets default client-a
+TUI: settings tab, `enter` on the bucket; `D` or `:default` makes it the default
+API: PUT /api/v1/buckets/{name}
+MCP: edit_bucket
+MCP: set_default_bucket
+```
+
+### Remove a bucket
+
+Removes a bucket from ops. What is in it stays there.
+
+```surfaces
+Web: **Buckets** in the sidebar, **Remove** on the bucket, then type its name
+CLI: ops buckets rm client-a
+TUI: settings tab, `x` on the bucket, then type its name
+API: DELETE /api/v1/buckets/{name}
+MCP: remove_bucket
+```
+
+ops refuses to remove a bucket that is still in use, and names the apps:
+
+- **Apps use it**: their uploads and backups go there, the default's also for every app without a bucket of its own. Move them to another bucket first.
+- **It keeps older backups** of an app that moved away. Restores of those read from there, so the bucket stays while the app exists.
+
+A workspace without apps can remove its last bucket. ops asks you to type the bucket's name first; `--yes` skips it in scripts.
+
 ## The folder field
 
-The **Folder** field on the Bucket page is `--path` in the CLI and `path` in the API and MCP. Most people leave it empty. Fill it in when the bucket holds other files too, such as a bucket you already use for something else. Everything of ops then stays inside that one folder, like `ops/`, and the rest of the bucket is left alone.
+The **Folder** field on the Buckets page is `--path` in the CLI and `path` in the API and MCP. Most people leave it empty. Fill it in when the bucket holds other files too, such as a bucket you already use for something else. Everything of ops then stays inside that one folder, like `ops/`, and the rest of the bucket is left alone.
 
 You do not need it to share one bucket between workspaces: each workspace gets its own folder anyway.
 
@@ -124,4 +207,4 @@ You do not need it to share one bucket between workspaces: each workspace gets i
 
 - [Backups](/docs/guides/backups): what ops keeps in the bucket and how to restore it.
 - [Deploy](/docs/guides/deploy#deploy-from-a-repo): how `ops deploy` puts your code into it.
-- [Stop backups](/docs/guides/backups#stop-backups): remove the bucket from ops.
+- [Remove a bucket](#remove-a-bucket): what ops refuses, and why.

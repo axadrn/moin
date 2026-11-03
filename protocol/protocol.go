@@ -407,7 +407,8 @@ type DBResult struct {
 //	<Path>/<Workspace>/<app>/<app ID>/<database>/snapshots/
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
-// sharing one bucket never touch each other's files.
+// sharing one bucket never touch each other's files. Name is the bucket's
+// name in ops, which snapshots carry; older control planes send none.
 type BackupStorage struct {
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
@@ -416,23 +417,29 @@ type BackupStorage struct {
 	Workspace string `json:"workspace"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
+	Name      string `json:"name,omitempty"`
 }
 
-// BackupConfig is where backups go. Without Storage the agent stops
-// replicating. Apps are the IDs of the server's apps by name: an app
-// deployed before deploys brought its ID gets it here, so its backups
-// start without another deploy.
+// BackupConfig is where backups go. Storage is the workspace's default
+// bucket; without it the agent stops replicating. AppStorage is the bucket
+// of each app, by name, that uses another one than the default; older
+// agents ignore it and back up every app to Storage. Apps are the IDs of
+// the server's apps by name: an app deployed before deploys brought its ID
+// gets it here, so its backups start without another deploy.
 type BackupConfig struct {
-	Storage *BackupStorage    `json:"storage,omitempty"`
-	Apps    map[string]string `json:"apps,omitempty"`
+	Storage    *BackupStorage            `json:"storage,omitempty"`
+	AppStorage map[string]*BackupStorage `json:"app_storage,omitempty"`
+	Apps       map[string]string         `json:"apps,omitempty"`
 }
 
 // BackupRequest names an app; Database narrows it to one database. Reason
-// names a snapshot, such as "manual".
+// names a snapshot, such as "manual". Older are the buckets the app left:
+// a list also shows the snapshots it keeps there.
 type BackupRequest struct {
-	App      string `json:"app"`
-	Database string `json:"database,omitempty"`
-	Reason   string `json:"reason,omitempty"`
+	App      string          `json:"app"`
+	Database string          `json:"database,omitempty"`
+	Reason   string          `json:"reason,omitempty"`
+	Older    []BackupStorage `json:"older,omitempty"`
 }
 
 // Backups are the backups of an app's databases.
@@ -453,21 +460,26 @@ type DatabaseBackup struct {
 	Error        string     `json:"error,omitempty"`
 }
 
-// Snapshot is a full copy of a database, gzipped in the bucket.
+// Snapshot is a full copy of a database, gzipped in the bucket. Bucket is
+// the name of the bucket it is in, empty from older agents.
 type Snapshot struct {
 	ID        string    `json:"id"`
 	Reason    string    `json:"reason"`
 	Size      int64     `json:"size"`
 	CreatedAt time.Time `json:"created_at"`
+	Bucket    string    `json:"bucket,omitempty"`
 }
 
 // BackupRestore puts one database back: from a snapshot, or to a point in
-// time. The app stops for the swap and starts again.
+// time. The app stops for the swap and starts again. Storage is the bucket
+// the snapshot is in when it is not the app's bucket: a bucket the app
+// left, which keeps its older backups.
 type BackupRestore struct {
-	App      string     `json:"app"`
-	Database string     `json:"database,omitempty"`
-	Snapshot string     `json:"snapshot,omitempty"`
-	At       *time.Time `json:"at,omitempty"`
+	App      string         `json:"app"`
+	Database string         `json:"database,omitempty"`
+	Snapshot string         `json:"snapshot,omitempty"`
+	At       *time.Time     `json:"at,omitempty"`
+	Storage  *BackupStorage `json:"storage,omitempty"`
 }
 
 // ServerConfig is how a server is reached and locked down.

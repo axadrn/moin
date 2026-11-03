@@ -459,6 +459,8 @@ func (m model) lineKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 var commandKeys = map[string]map[tab]string{
 	"add":      {tabServers: "a", tabApps: "a", tabSettings: "a"},
 	"backups":  {tabApps: "b"},
+	"bucket":   {tabApps: "b", tabSettings: "b"},
+	"default":  {tabSettings: "D"},
 	"deploy":   {tabApps: "d"},
 	"domains":  {tabApps: "o"},
 	"env":      {tabApps: "e"},
@@ -622,6 +624,11 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 		opened.input = strings.Join(args, " ")
 		return opened, cmd
 	}
+	// :bucket client-a on an app opens its backups with the move typed in.
+	if opened := next.(model); name == "bucket" && m.tab == tabApps && opened.mode == modeBackups {
+		opened.input = strings.TrimSpace("bucket " + strings.Join(args, " "))
+		return opened, cmd
+	}
 	return next, cmd
 }
 
@@ -668,7 +675,8 @@ var helpEntries = [][2]string{
 	{"r", "roll back"},
 	{"e", "env vars"},
 	{"s", "SQL"},
-	{"b", "backups and restores"},
+	{"b", "backups and restores; in it bucket <name> moves the app's uploads and new backups"},
+	{":bucket <name>", "moves the app to a bucket; :bucket - to the default"},
 	{"u", "uptime: pause, resume, a path per domain"},
 	{"m", "metrics: CPU, memory and network, live"},
 	{"o", "domains"},
@@ -695,6 +703,8 @@ var helpEntries = [][2]string{
 	{"C :alert", "add an alert destination: Slack, Discord, Telegram, webhook"},
 	{"T :test enter", "send a test to the selected alert destination"},
 	{"a", "add a registry login"},
+	{"b :bucket", "add a bucket"},
+	{"D :default", "make the picked bucket the default"},
 	{"x", "remove"},
 	{"", "Inputs"},
 	{"ctrl+u", "clears the line"},

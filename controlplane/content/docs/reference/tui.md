@@ -4,13 +4,13 @@ description: "Every key of ops without a command"
 order: 2
 ---
 
-Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, the bucket, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
+Run `ops` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, a row per bucket with the apps that use it, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Stop <app-name>?" waits
-there for `y`; any other key cancels. Removing a server, an app or the
+there for `y`; any other key cancels. Removing a server, an app or a
 bucket and a restore cannot be undone, so they ask you to type the name
-first, then `enter`; you can paste it. A form, such as a new app or the
+first, then `enter`; you can paste it. A form, such as a new app or a
 bucket, asks its fields one after the other: `enter` takes the answer or
 the value it names, `esc` cancels. An open app shows its deploys, what the
 agent detected and a panel with a deploy log, the logs or the env vars. The
@@ -82,7 +82,8 @@ The TUI moves like vim, and `?` shows every key.
 | `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |
 | `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, or `edit` for all of them as one `.env` in `$EDITOR`, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
-| `b` | apps | shows the backups; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `on` or `off` turns the snapshot before every change on or off |
+| `b` | apps | shows the backups with the bucket of each snapshot; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `<snapshot> <bucket>` restores a snapshot from an older bucket, `bucket <name>` moves the app's uploads and new backups to a bucket after `y` (`bucket -` to the default), `on` or `off` turns the snapshot before every change on or off |
+| `:bucket <name>` | apps | opens the backups with `bucket <name>` typed in, to send with `enter` |
 | `f` | activity | filters by app, server or member; empty fields keep everything |
 | `c` | activity | clears the filter |
 | `m` | activity | loads older events |
@@ -90,14 +91,16 @@ The TUI moves like vim, and `?` shows every key.
 | `enter` | team | sends the selected invitation again |
 | `x`, then `y` | team | revokes the selected invitation |
 | `cw` or `:rename` | team | renames the workspace |
-| `enter` | settings | sets the selected one: the bucket, a key or a registry login; on GitHub it shows the install link |
+| `enter` | settings | sets the selected one: a bucket (the secret key may stay empty to keep it), a key or a registry login; on GitHub it shows the install link |
+| `b` or `:bucket` | settings | adds a bucket: name, endpoint, region, bucket, folder, access key, secret key |
+| `D` or `:default` | settings | makes the selected bucket the default, after `y` |
 | `u` or `:update` | settings | updates a self-hosted control plane to the newest release, after `y`; for its admins |
 | `A` or `:auto-update` | settings | turns automatic agent updates on or off; `enter` on **Agent updates** does the same |
 | `E` or `:alerts` | settings | turns your [email alerts](/docs/guides/alerts) on or off; `enter` on **Email me alerts** does the same |
 | `C` or `:alert` | settings | adds an [alert destination](/docs/guides/alerts#slack-discord-telegram-and-webhooks): the kind, a name, the URL or Telegram bot token, the Telegram chat and the events |
 | `T`, `:test` or `enter` | settings | sends a test alert to the selected destination |
 | `a` | settings | adds a registry login |
-| `x`, then `y` | settings | removes a key, an alert destination or a registry login; the bucket asks for its name |
+| `x`, then `y` | settings | removes a key, an alert destination or a registry login; a bucket asks for its name, and ops refuses one that apps use or that keeps older backups |
 | `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
 | `ctrl+w` | inputs | deletes the last word |
 | `enter` | protect, GitHub, domains | sends what you typed; if ops refuses it, the input stays open with your text and the reason, to fix and send again |

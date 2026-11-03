@@ -42,8 +42,8 @@ func (s *AppService) Upload(ctx context.Context, workspaceID, idOrName string) (
 	if err != nil {
 		return Upload{}, err
 	}
-	storage := s.backupConfig(workspaceID).Storage
-	if storage == nil {
+	storage, err := s.appStorage(app)
+	if err != nil {
 		return Upload{}, ErrUploadBucket
 	}
 	id := "up_" + randomToken()
@@ -67,8 +67,8 @@ func (s *AppService) DeployUpload(ctx context.Context, actor Actor, idOrName, up
 	if err != nil {
 		return nil, err
 	}
-	storage := s.backupConfig(actor.WorkspaceID).Storage
-	if storage == nil {
+	storage, err := s.appStorage(app)
+	if err != nil {
 		return nil, ErrUploadBucket
 	}
 	presign := s3.NewPresignClient(bucketClient(*storage))

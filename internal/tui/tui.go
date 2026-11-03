@@ -539,13 +539,30 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if target == "on" || target == "off" {
 				return m, m.setSnapshots(app.Name, target == "on")
 			}
+			if bucket, ok := strings.CutPrefix(target, "bucket "); ok {
+				bucket = strings.TrimSpace(bucket)
+				to := "the bucket " + bucket
+				if bucket == "-" {
+					bucket, to = "", "the default bucket"
+				}
+				return m.confirmFirst("Move the uploads and new backups of "+app.Name+" to "+to+"?", "Its older backups stay where they are; the backups list keeps them and a restore reads them from there.", "move", false, m.setAppBucket(app.Name, bucket)), nil
+			}
+			// A snapshot in an older bucket comes with the bucket's name.
+			from := ""
+			if snapshot, bucket, found := strings.Cut(target, " "); found && protocol.ValidSnapshotID(snapshot) {
+				target, from = snapshot, strings.TrimSpace(bucket)
+			}
 			// Ask for the name only for something that can be restored.
 			if _, _, ok := restoreTarget(target); !ok {
 				m.input = target
 				m.err = fmt.Errorf("%q is neither a snapshot ID nor a time like 14:02", target)
 				return m, nil
 			}
-			return m.confirmName("Restore "+app.Name+" to "+target+"?", "It replaces the data there now; "+build.Name+" takes a snapshot of it first.", app.Name, m.restore(app.Name, target)), nil
+			where := ""
+			if from != "" {
+				where = " from the bucket " + from
+			}
+			return m.confirmName("Restore "+app.Name+" to "+target+where+"?", "It replaces the data there now; "+build.Name+" takes a snapshot of it first.", app.Name, m.restore(app.Name, target, from)), nil
 		case "backspace":
 			m.input = dropLast(m.input)
 		default:
@@ -1759,15 +1776,22 @@ func backupsOutput(id int64, name string, list client.AppBackups) outputMsg {
 		}
 		rows := [][]any{}
 		for _, snapshot := range database.Snapshots {
-			rows = append(rows, []any{snapshot.ID, snapshot.Reason, duration(now.Sub(snapshot.CreatedAt)) + " ago"})
+			rows = append(rows, []any{snapshot.ID, snapshot.Reason, duration(now.Sub(snapshot.CreatedAt)) + " ago", snapshot.Bucket})
 		}
-		lines = append(lines, resultLines([]string{"snapshot", "reason", "taken"}, rows)...)
+		lines = append(lines, resultLines([]string{"snapshot", "reason", "taken", "bucket"}, rows)...)
 		lines = append(lines, "")
 	}
-	note := style.Muted.Render("snapshot before every change: on")
-	if !list.SnapshotBeforeChanges {
-		note = style.Muted.Render("snapshot before every change: off")
+	if len(list.OlderBuckets) > 0 {
+		lines = append(lines, style.Muted.Render("older backups in "+strings.Join(list.OlderBuckets, ", ")+": restore one with <snapshot> <bucket>"))
 	}
+	text := "snapshot before every change: on"
+	if !list.SnapshotBeforeChanges {
+		text = "snapshot before every change: off"
+	}
+	if list.Bucket != "" {
+		text = "bucket " + list.Bucket + " · " + text
+	}
+	note := style.Muted.Render(text)
 	return outputMsg{id: id, title: "backups of " + name, note: note, lines: lines}
 }
 
@@ -1823,10 +1847,31 @@ func restoreTarget(target string) (snapshot string, at *time.Time, ok bool) {
 	return target, nil, protocol.ValidSnapshotID(target)
 }
 
-func (m model) restore(name, target string) tea.Cmd {
+// setAppBucket moves an app's uploads and new backups to a bucket, ""
+// for the default, and shows the backups again.
+func (m model) setAppBucket(name, bucket string) tea.Cmd {
+	return func() tea.Msg {
+		app, err := m.api.SetAppBucket(m.ctx, name, bucket)
+		if err != nil {
+			return errMsg{err}
+		}
+		to := "the default bucket"
+		if app.Bucket != "" {
+			to = app.Bucket
+		}
+		m.shared.program.Send(noticeMsg("uploads and new backups of " + name + " go to " + to + "; older backups stay where they are"))
+		list, err := m.api.Backups(m.ctx, name)
+		if err != nil {
+			return nil
+		}
+		return backupsOutput(m.shared.outputs.Add(1), name, list)
+	}
+}
+
+func (m model) restore(name, target, bucket string) tea.Cmd {
 	return func() tea.Msg {
 		snapshot, at, _ := restoreTarget(target)
-		err := m.api.Restore(m.ctx, name, "", snapshot, at)
+		err := m.api.Restore(m.ctx, name, "", snapshot, bucket, at)
 		if err != nil {
 			return errMsg{err}
 		}

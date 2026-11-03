@@ -35,7 +35,10 @@ type App struct {
 	AutoDeploy            bool   `json:"auto_deploy"`
 	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
 	// Hook says the app has a deploy hook URL.
-	Hook      bool      `json:"hook"`
+	Hook bool `json:"hook"`
+	// Bucket is the bucket the app uploads and backs up to; empty follows
+	// the workspace's default.
+	Bucket    string    `json:"bucket"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

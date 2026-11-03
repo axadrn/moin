@@ -106,7 +106,7 @@ func NewAppService(apps repository.AppRepository, servers *ServerService, box *s
 	}
 	servers.OnAgentMessage(service.receive)
 	servers.OnAgentConnect(func(serverID, workspaceID string) {
-		_, err := apps.BackupStorage(workspaceID)
+		_, err := apps.DefaultBucket(workspaceID)
 		if err == nil {
 			service.configureAgent(serverID, workspaceID)
 		}

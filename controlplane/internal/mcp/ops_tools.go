@@ -174,15 +174,24 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("set_backup_settings", "Snapshot before changes",
 		"Turns the snapshot before every deploy, restore and data change made through ops on or off for an app. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setBackupSettings)))
-	mcpsdk.AddTool(server, add("get_backup_storage", "Get the backup bucket",
-		"Returns the S3-compatible bucket uploads and backups go to, without its secret key. folder is where this workspace's files are in it: path, then the workspace ID. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getBackupStorage)))
-	mcpsdk.AddTool(server, add("set_backup_storage", "Set the backup bucket",
-		"Checks and stores the S3-compatible bucket uploads and backups go to; every online server starts backing up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Each workspace gets its own folder in it either way. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setBackupStorage)))
-	mcpsdk.AddTool(server, add("remove_backup_storage", "Remove the backup bucket",
-		"Stops backups. What is in the bucket stays. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeBackupStorage)))
+	mcpsdk.AddTool(server, add("list_buckets", "List buckets",
+		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that upload and back up there now) and older_backups (apps that moved to another bucket and keep their older backups there). Needs the read scope.",
+		readOnly("")), Read(member(services, tools.listBuckets)))
+	mcpsdk.AddTool(server, add("add_bucket", "Add a bucket",
+		"Checks and stores a new S3-compatible bucket under a name (lowercase letters, digits, dashes). The first bucket is the default; default true makes this one the default, so every app without a bucket of its own uploads and backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
+		change(false, false)), Write(changes(services, tools.addBucket)))
+	mcpsdk.AddTool(server, add("edit_bucket", "Change a bucket",
+		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, an empty secret_key keeps the stored one, default true makes it the default. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.editBucket)))
+	mcpsdk.AddTool(server, add("set_default_bucket", "Make a bucket the default",
+		"Makes a bucket the workspace's default: apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default, and restores of them read from there. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
+	mcpsdk.AddTool(server, add("remove_bucket", "Remove a bucket",
+		"Removes a bucket from ops; what is in it stays. A bucket that apps use, or that keeps older backups of an app, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
+		change(true, true)), Write(changes(services, tools.removeBucket)))
+	mcpsdk.AddTool(server, add("set_app_bucket", "Choose an app's bucket",
+		"Moves an app's uploads and new backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its older backups stay in the old bucket: get_backups still lists them with their bucket, and restore_app reads them from there. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.setAppBucket)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
 		"Returns where the ops GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getGitHub)))
@@ -250,9 +259,56 @@ type RemoveServerInput struct {
 	Confirm string `json:"confirm" jsonschema:"the server's name, typed out, after the user agreed"`
 }
 
-// ConfirmInput is the input of remove_backup_storage.
-type ConfirmInput struct {
+// RemoveBucketInput is the input of remove_bucket.
+type RemoveBucketInput struct {
+	Bucket  string `json:"bucket" jsonschema:"the bucket's name in ops"`
 	Confirm string `json:"confirm" jsonschema:"the bucket's name, typed out, after the user agreed"`
+}
+
+// BucketNameInput names one bucket.
+type BucketNameInput struct {
+	Bucket string `json:"bucket" jsonschema:"the bucket's name in ops"`
+}
+
+// AddBucketInput is the input of add_bucket.
+type AddBucketInput struct {
+	Name      string `json:"name" jsonschema:"a name for the bucket in ops: lowercase letters, digits, dashes"`
+	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
+	Region    string `json:"region,omitempty" jsonschema:"the region; auto for Cloudflare R2, the default"`
+	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the storage provider"`
+	Path      string `json:"path,omitempty" jsonschema:"a folder inside the bucket, only if it holds other files too"`
+	AccessKey string `json:"access_key" jsonschema:"the access key ID"`
+	SecretKey string `json:"secret_key" jsonschema:"the secret key"`
+	Default   bool   `json:"default,omitempty" jsonschema:"make it the workspace's default bucket"`
+}
+
+// EditBucketInput is the input of edit_bucket.
+type EditBucketInput struct {
+	Name      string `json:"name" jsonschema:"the bucket's current name in ops"`
+	Rename    string `json:"rename,omitempty" jsonschema:"a new name in ops; empty keeps it"`
+	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
+	Region    string `json:"region,omitempty" jsonschema:"the region; auto for Cloudflare R2"`
+	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the storage provider"`
+	Path      string `json:"path,omitempty" jsonschema:"a folder inside the bucket; empty for none"`
+	AccessKey string `json:"access_key" jsonschema:"the access key ID"`
+	SecretKey string `json:"secret_key,omitempty" jsonschema:"a new secret key; empty keeps the stored one"`
+	Default   bool   `json:"default,omitempty" jsonschema:"make it the workspace's default bucket"`
+}
+
+// AppBucketInput is the input of set_app_bucket.
+type AppBucketInput struct {
+	App    string `json:"app" jsonschema:"the app name or ID"`
+	Bucket string `json:"bucket" jsonschema:"the bucket's name in ops; empty follows the workspace's default"`
+}
+
+// BucketList is the output of list_buckets.
+type BucketList struct {
+	api.BucketList
+}
+
+// Bucket is the output of add_bucket, edit_bucket and set_default_bucket.
+type Bucket struct {
+	api.Bucket
 }
 
 // ServerInput names one server. name is the old spelling of server, still
@@ -407,6 +463,7 @@ type RestoreInput struct {
 	App      string  `json:"app" jsonschema:"the app name or ID"`
 	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
 	Snapshot string  `json:"snapshot,omitempty" jsonschema:"a snapshot ID from get_backups"`
+	Bucket   string  `json:"bucket,omitempty" jsonschema:"the bucket of the snapshot from get_backups, when it is an older bucket the app left; empty is the app's bucket"`
 	At       *string `json:"at,omitempty" jsonschema:"a point in time inside the database's window, RFC 3339"`
 	Confirm  string  `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
 }
@@ -417,19 +474,9 @@ type BackupSettingsInput struct {
 	SnapshotBeforeChanges bool   `json:"snapshot_before_changes" jsonschema:"take a snapshot before every change made through ops"`
 }
 
-// BackupStorageInput is the input of set_backup_storage.
-type BackupStorageInput struct {
-	api.BackupStorageRequest
-}
-
 // Backups is the output of get_backups and back_up_app.
 type Backups struct {
 	api.AppBackups
-}
-
-// BackupStorage is the output of get_backup_storage and set_backup_storage.
-type BackupStorage struct {
-	api.BackupStorage
 }
 
 // SetEnvInput is the input of set_env.
@@ -1112,7 +1159,7 @@ func (t opsTools) getBackups(ctx context.Context, caller Caller, input AppInput)
 	if err != nil {
 		return Backups{}, err
 	}
-	return Backups{api.AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, Databases: backups.Databases}}, nil
+	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
 }
 
 func (t opsTools) backUpApp(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
@@ -1120,7 +1167,7 @@ func (t opsTools) backUpApp(ctx context.Context, caller Caller, input AppInput) 
 	if err != nil {
 		return Backups{}, err
 	}
-	return Backups{api.AppBackups{SnapshotBeforeChanges: app.SnapshotBeforeChanges, Databases: backups.Databases}}, nil
+	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
 }
 
 func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (Done, error) {
@@ -1139,7 +1186,7 @@ func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreIn
 	if err := confirmed(input.Confirm, app.Name); err != nil {
 		return Done{}, err
 	}
-	err = t.services.Apps.Restore(ctx, caller.actor(), app.ID, input.Database, input.Snapshot, at)
+	err = t.services.Apps.Restore(ctx, caller.actor(), app.ID, input.Database, input.Snapshot, input.Bucket, at)
 	if err != nil {
 		return Done{}, err
 	}
@@ -1154,35 +1201,66 @@ func (t opsTools) setBackupSettings(_ context.Context, caller Caller, input Back
 	return api.BackupSettings{SnapshotBeforeChanges: app.SnapshotBeforeChanges}, nil
 }
 
-func (t opsTools) getBackupStorage(_ context.Context, caller Caller, _ struct{}) (BackupStorage, error) {
-	storage, err := t.services.Apps.BackupStorage(caller.Token.WorkspaceID)
+func (t opsTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {
+	buckets, err := t.services.Apps.Buckets(caller.Token.WorkspaceID)
 	if err != nil {
-		return BackupStorage{}, err
+		return BucketList{}, err
 	}
-	return BackupStorage{api.BackupStorage{Endpoint: storage.Endpoint, Region: storage.Region, Bucket: storage.Bucket, Path: storage.Path, Folder: storage.Folder, AccessKey: storage.AccessKey, CreatedAt: storage.CreatedAt}}, nil
+	list := api.BucketList{Items: make([]api.Bucket, 0, len(buckets))}
+	for _, bucket := range buckets {
+		list.Items = append(list.Items, api.NewBucket(bucket))
+	}
+	return BucketList{list}, nil
 }
 
-func (t opsTools) setBackupStorage(ctx context.Context, caller Caller, input BackupStorageInput) (BackupStorage, error) {
-	err := t.services.Apps.SetBackupStorage(ctx, caller.actor(), service.BackupStorageInput(input.BackupStorageRequest))
+func (t opsTools) addBucket(ctx context.Context, caller Caller, input AddBucketInput) (Bucket, error) {
+	bucket, err := t.services.Apps.AddBucket(ctx, caller.actor(), service.BucketInput(input))
 	if err != nil {
-		return BackupStorage{}, err
+		return Bucket{}, err
 	}
-	return t.getBackupStorage(ctx, caller, struct{}{})
+	return Bucket{api.NewBucket(*bucket)}, nil
 }
 
-func (t opsTools) removeBackupStorage(_ context.Context, caller Caller, input ConfirmInput) (Done, error) {
-	storage, err := t.services.Apps.BackupStorage(caller.Token.WorkspaceID)
+func (t opsTools) editBucket(ctx context.Context, caller Caller, input EditBucketInput) (Bucket, error) {
+	bucket, err := t.services.Apps.EditBucket(ctx, caller.actor(), input.Name, service.BucketInput{
+		Name: input.Rename, Endpoint: input.Endpoint, Region: input.Region, Bucket: input.Bucket, Path: input.Path,
+		AccessKey: input.AccessKey, SecretKey: input.SecretKey, Default: input.Default,
+	})
+	if err != nil {
+		return Bucket{}, err
+	}
+	return Bucket{api.NewBucket(*bucket)}, nil
+}
+
+func (t opsTools) setDefaultBucket(ctx context.Context, caller Caller, input BucketNameInput) (Bucket, error) {
+	bucket, err := t.services.Apps.MakeDefaultBucket(ctx, caller.actor(), input.Bucket)
+	if err != nil {
+		return Bucket{}, err
+	}
+	return Bucket{api.NewBucket(*bucket)}, nil
+}
+
+func (t opsTools) removeBucket(_ context.Context, caller Caller, input RemoveBucketInput) (Done, error) {
+	bucket, err := t.services.Apps.Bucket(caller.Token.WorkspaceID, input.Bucket)
 	if err != nil {
 		return Done{}, err
 	}
-	if err := confirmed(input.Confirm, storage.Bucket); err != nil {
+	if err := confirmed(input.Confirm, bucket.Name); err != nil {
 		return Done{}, err
 	}
-	err = t.services.Apps.RemoveBackupStorage(caller.actor())
+	err = t.services.Apps.RemoveBucket(caller.actor(), bucket.Name)
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Backups stopped. What is in the bucket stays."}, nil
+	return Done{Message: "Removed the bucket " + bucket.Name + ". What is in it stays."}, nil
+}
+
+func (t opsTools) setAppBucket(_ context.Context, caller Caller, input AppBucketInput) (App, error) {
+	app, err := t.services.Apps.SetAppBucket(caller.actor(), input.App, input.Bucket)
+	if err != nil {
+		return App{}, err
+	}
+	return App{api.NewApp(*app)}, nil
 }
 
 func (t opsTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHub, error) {

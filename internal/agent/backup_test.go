@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,11 +62,11 @@ func TestBackups(t *testing.T) {
 		t.Fatal("a snapshot without storage worked")
 	}
 	storage := &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: "test", Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	err = b.configure(ctx, storage)
+	err = b.configure(ctx, storage, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer b.configure(ctx, nil)
+	defer b.configure(ctx, nil, nil)
 	if len(b.watched) != 1 {
 		t.Fatalf("watched = %v", b.watched)
 	}
@@ -149,7 +150,7 @@ func TestBackups(t *testing.T) {
 		t.Fatalf("restore before the window: %v", err)
 	}
 	snapshotFile := filepath.Join(dir, "snapshot.db")
-	err = b.download(ctx, app, "/data/app.db", snapshot.ID, snapshotFile)
+	err = b.download(ctx, nil, app, "/data/app.db", snapshot.ID, snapshotFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +171,7 @@ func TestBackups(t *testing.T) {
 	// A new folder in the bucket starts over and replicates again.
 	moved := *storage
 	moved.Path = "test-moved"
-	err = b.configure(ctx, &moved)
+	err = b.configure(ctx, &moved, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,12 +189,49 @@ func TestBackups(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("no drill report after the move")
 	}
-	err = b.configure(ctx, storage)
+	err = b.configure(ctx, storage, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := b.s3Client()
+	// The app moves to a bucket of its own: changes and new snapshots go
+	// there, the older snapshots stay in the default bucket, list with it
+	// and restore from it.
+	own := *storage
+	own.Path, own.Name = "test-own", "own"
+	err = b.configure(ctx, storage, map[string]*protocol.BackupStorage{app: &own})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.watched[file].storage != own {
+		t.Fatalf("the app replicates to %+v, want its own bucket", b.watched[file].storage)
+	}
+	_, err = db.Exec(`INSERT INTO notes (body) VALUES ('own bucket')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replicated(time.Now().Add(-time.Second))
+	listed, err := b.snapshot(ctx, protocol.BackupRequest{App: app, Reason: "own", Older: []protocol.BackupStorage{*storage}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshots := listed.Databases[0].Snapshots
+	if len(snapshots) < 2 || snapshots[0].Bucket != "own" || !slices.ContainsFunc(snapshots, func(s protocol.Snapshot) bool { return s.ID == snapshot.ID && s.Bucket == "" }) {
+		t.Fatalf("snapshots after the move = %+v", snapshots)
+	}
+	err = b.download(ctx, storage, app, "/data/app.db", snapshot.ID, filepath.Join(dir, "older.db"))
+	if err != nil {
+		t.Fatalf("download from the older bucket: %v", err)
+	}
+	if err := b.download(ctx, nil, app, "/data/app.db", snapshot.ID, filepath.Join(dir, "missing.db")); err == nil {
+		t.Fatal("the older snapshot is in the new bucket too")
+	}
+	err = b.configure(ctx, storage, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := s3Client(b.storage)
 	list, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String("test/ws-one/" + app + "/app-one/data-app.db/")})
 	if len(list.Contents) < 2 {
 		t.Fatalf("bucket has %d objects for the app", len(list.Contents))
@@ -203,7 +241,7 @@ func TestBackups(t *testing.T) {
 	// replicates into a new, empty folder, and the old backups stay apart.
 	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("app-two"), 0o600)
 	b.reconcile()
-	snapshots, err := b.snapshots(ctx, app, "/data/app.db")
+	snapshots, err = b.snapshots(ctx, app, "/data/app.db")
 	if err != nil || len(snapshots) != 0 {
 		t.Fatalf("the new app sees snapshots %v, %v", snapshots, err)
 	}
@@ -294,9 +332,36 @@ func TestBucketLayout(t *testing.T) {
 			prefixes[workspace+folder] = prefix
 		}
 	}
-	err := newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.BackupStorage{Bucket: "shared"})
+	err := newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.BackupStorage{Bucket: "shared"}, nil)
 	if err == nil {
 		t.Error("a bucket without a workspace folder was accepted")
+	}
+	err = newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.BackupStorage{Bucket: "shared", Workspace: "ws"}, map[string]*protocol.BackupStorage{"shop": {Bucket: "own"}})
+	if err == nil {
+		t.Error("an app's bucket without a workspace folder was accepted")
+	}
+}
+
+// TestAppBucket: an app with a bucket of its own backs up there, the
+// others to the default bucket.
+func TestAppBucket(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	for _, app := range []string{"shop", "blog"} {
+		os.MkdirAll(a.appDir(app), 0o700)
+		os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("id-"+app), 0o600)
+	}
+	b := newBackups(a, nil)
+	b.storage = &protocol.BackupStorage{Bucket: "shared", Workspace: "ws", Name: "default"}
+	b.appStorage = map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "ops", Workspace: "ws", Name: "client"}}
+	if b.storageFor("shop").Bucket != "client" || b.storageFor("blog").Bucket != "shared" {
+		t.Fatalf("buckets = %s, %s", b.storageFor("shop").Bucket, b.storageFor("blog").Bucket)
+	}
+	prefix, _ := b.prefix("shop", "/data/app.db")
+	if prefix != "ops/ws/shop/id-shop/data-app.db" {
+		t.Errorf("prefix in the app's own bucket = %s", prefix)
+	}
+	if sameStorage(b.appStorage, nil) || !sameStorage(b.appStorage, map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "ops", Workspace: "ws", Name: "client"}}) {
+		t.Error("sameStorage compares wrong")
 	}
 }
 
@@ -315,7 +380,7 @@ func TestSweepUploads(t *testing.T) {
 	folder := fmt.Sprintf("sweep-%d", time.Now().UnixNano())
 	b := newBackups(newApps(t.TempDir(), nil), nil)
 	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: folder, Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	client := b.s3Client()
+	client := s3Client(b.storage)
 	keys := []string{
 		folder + "/ws-one/shop/app-1/uploads/up_old.tar.gz",
 		folder + "/ws-one/gone/app-2/uploads/up_old.tar.gz",
@@ -370,7 +435,7 @@ func TestDrillBeforeReplication(t *testing.T) {
 	})
 	b.storage = &protocol.BackupStorage{Endpoint: endpoint, Region: "us-east-1", Bucket: bucket, Path: fmt.Sprintf("empty-%d", time.Now().UnixNano()), Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
 	database := protocol.Database{Path: "/data/app.db", HostPath: filepath.Join(t.TempDir(), "app.db")}
-	b.watched[database.HostPath] = watched{app: "fresh", prefix: path.Join(b.storage.Path, "ws-one/fresh/app-1/data-app.db"), database: database}
+	b.watched[database.HostPath] = watched{app: "fresh", storage: *b.storage, prefix: path.Join(b.storage.Path, "ws-one/fresh/app-1/data-app.db"), database: database}
 	if !b.drillAll(context.Background()) {
 		t.Error("a drill before the first replication does not try again soon")
 	}

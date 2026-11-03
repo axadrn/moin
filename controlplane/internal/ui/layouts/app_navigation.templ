@@ -29,7 +29,7 @@ templ AppSidebarNavigation() {
 	@navGroup("Platform", []navItem{
 		{Title: "Apps", URL: basePath + "/apps", Icon: icon.Boxes, Active: path == basePath+"/apps", Key: "A"},
 		{Title: "Servers", URL: basePath + "/servers", Icon: icon.Server, Active: strings.HasPrefix(path, basePath+"/servers"), Key: "S"},
-		{Title: "Bucket", URL: basePath + "/bucket", Icon: icon.Archive, Active: strings.HasPrefix(path, basePath+"/bucket"), Key: "B"},
+		{Title: "Buckets", URL: basePath + "/bucket", Icon: icon.Archive, Active: strings.HasPrefix(path, basePath+"/bucket"), Key: "B"},
 		{Title: "Activity", URL: basePath + "/activity", Icon: icon.Activity, Active: strings.HasPrefix(path, basePath+"/activity"), Key: "Y"},
 	})
 	{{ manage := []navItem{
