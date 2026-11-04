@@ -44,8 +44,11 @@ func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	query := r.URL.Query()
 	// The user said no on GitHub, or asked an organization owner to
-	// install the app: nothing to connect yet.
-	if query.Get("error") != "" || query.Get("setup_action") == "request" {
+	// install the app: nothing to connect yet. A change of the repos made on
+	// github.com, not started in ops, comes back without a state: GitHub
+	// saved it already and the repos list shows it.
+	if query.Get("error") != "" || query.Get("setup_action") == "request" ||
+		(query.Get("setup_action") == "update" && query.Get("state") == "") {
 		http.Redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
