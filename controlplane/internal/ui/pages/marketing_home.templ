@@ -96,7 +96,7 @@ func homeStartLabel(ctx context.Context) string {
 const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-ops?ref=ops-landing"
 
 // ---------------------------------------------------------------- hero
-// HomeHero is the promise in three lines, one line under it, two buttons,
+// HomeHero is the promise in two lines, one line under it, two buttons,
 // and the product below. Nothing else.
 templ HomeHero() {
 	<section class="pt-20 sm:pt-32">
@@ -104,7 +104,6 @@ templ HomeHero() {
 			<h1 class="text-[clamp(3rem,8.5vw,6.75rem)] leading-[0.98] font-semibold tracking-[-0.055em]">
 				<span class="block">Deploy anything.</span>
 				<span class="block">Lose nothing.</span>
-				<span class="block text-muted-foreground/60">Open source.</span>
 			</h1>
 			<p class="mt-8 text-xl text-muted-foreground sm:mt-10 sm:text-2xl">Any app. Any server.</p>
 			<p class="mt-3 text-base text-muted-foreground/70">Every SQLite and Postgres change backed up, checked every day.</p>
