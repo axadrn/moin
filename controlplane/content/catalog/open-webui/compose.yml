@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /health
+
+services:
+  web:
+    image: ghcr.io/open-webui/open-webui:${VERSION}
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+    volumes:
+      - ./data:/app/backend/data

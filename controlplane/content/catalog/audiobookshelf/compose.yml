@@ -1,0 +1,13 @@
+x-ops:
+  service: web
+  port: 80
+  health: /healthcheck
+
+services:
+  web:
+    image: ghcr.io/advplyr/audiobookshelf:${VERSION}
+    volumes:
+      - ./data/config:/config
+      - ./data/metadata:/metadata
+      - ./data/audiobooks:/audiobooks
+      - ./data/podcasts:/podcasts

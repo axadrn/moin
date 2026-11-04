@@ -1,0 +1,35 @@
+x-ops:
+  service: web
+  port: 8000
+  health: /
+
+services:
+  web:
+    image: healthchecks/healthchecks:${VERSION}
+    environment:
+      SITE_ROOT: ${APP_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOWED_HOSTS: "*"
+      DB: postgres
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: healthchecks
+      DB_USER: healthchecks
+      DB_PASSWORD: ${DB_PASSWORD}
+      REGISTRATION_OPEN: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthchecks -d healthchecks"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: healthchecks
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: healthchecks
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

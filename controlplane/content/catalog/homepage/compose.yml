@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /
+
+services:
+  web:
+    image: ghcr.io/gethomepage/homepage:${VERSION}
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: ${APP_DOMAIN}
+    volumes:
+      - ./data:/app/config

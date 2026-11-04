@@ -1,0 +1,51 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /healthz
+
+services:
+  web:
+    image: twentycrm/twenty:${VERSION}
+    environment: &env
+      NODE_PORT: "3000"
+      SERVER_URL: ${APP_URL}
+      APP_SECRET: ${APP_SECRET}
+      PG_DATABASE_URL: postgres://twenty:${DB_PASSWORD}@db:5432/twenty
+      REDIS_URL: redis://redis:6379
+      STORAGE_TYPE: local
+    volumes:
+      - ./data/storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  worker:
+    image: twentycrm/twenty:${VERSION}
+    command: ["yarn", "worker:prod"]
+    environment:
+      <<: *env
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    volumes:
+      - ./data/storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twenty -d twenty"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: twenty
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: twenty
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

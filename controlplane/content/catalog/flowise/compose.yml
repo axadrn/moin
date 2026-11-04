@@ -1,0 +1,42 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /api/v1/ping
+
+services:
+  web:
+    image: flowiseai/flowise:${VERSION}
+    # The image's user cannot write to the data folder ops mounts.
+    user: root
+    environment:
+      PORT: "3000"
+      APP_URL: ${APP_URL}
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_USER: flowise
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      DATABASE_NAME: flowise
+      SECRETKEY_PATH: /root/.flowise
+      JWT_AUTH_TOKEN_SECRET: ${JWT_AUTH_TOKEN_SECRET}
+      JWT_REFRESH_TOKEN_SECRET: ${JWT_REFRESH_TOKEN_SECRET}
+      EXPRESS_SESSION_SECRET: ${EXPRESS_SESSION_SECRET}
+      TOKEN_HASH_SECRET: ${TOKEN_HASH_SECRET}
+    volumes:
+      - ./data/flowise:/root/.flowise
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowise -d flowise"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: flowise
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: flowise
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

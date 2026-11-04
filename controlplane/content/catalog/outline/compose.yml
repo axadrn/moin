@@ -1,0 +1,41 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /_health
+
+services:
+  web:
+    image: outlinewiki/outline:${VERSION}
+    environment:
+      URL: ${APP_URL}
+      SECRET_KEY: ${SECRET_KEY_HEX}
+      UTILS_SECRET: ${UTILS_SECRET_HEX}
+      DATABASE_URL: postgres://outline:${DB_PASSWORD}@db:5432/outline
+      PGSSLMODE: disable
+      REDIS_URL: redis://redis:6379
+      FILE_STORAGE: local
+      FILE_STORAGE_LOCAL_ROOT_DIR: /var/lib/outline/data
+      FORCE_HTTPS: "false"
+    user: root
+    volumes:
+      - ./data/files:/var/lib/outline/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outline -d outline"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: outline
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: outline
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

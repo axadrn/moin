@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /
+
+services:
+  web:
+    image: ghcr.io/triliumnext/trilium:${VERSION}
+    volumes:
+      - ./data:/home/node/trilium-data

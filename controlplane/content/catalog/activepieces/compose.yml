@@ -1,0 +1,46 @@
+x-ops:
+  service: web
+  port: 80
+  health: /
+
+services:
+  web:
+    image: activepieces/activepieces:${VERSION}
+    environment:
+      AP_FRONTEND_URL: ${APP_URL}
+      AP_ENCRYPTION_KEY: ${ENCRYPTION_KEY_HEX16}
+      AP_JWT_SECRET: ${JWT_SECRET}
+      AP_ENVIRONMENT: prod
+      AP_EXECUTION_MODE: UNSANDBOXED
+      AP_ENGINE_EXECUTABLE_PATH: dist/packages/engine/main.js
+      AP_DB_TYPE: POSTGRES
+      AP_POSTGRES_HOST: db
+      AP_POSTGRES_PORT: "5432"
+      AP_POSTGRES_DATABASE: activepieces
+      AP_POSTGRES_USERNAME: activepieces
+      AP_POSTGRES_PASSWORD: ${DB_PASSWORD}
+      AP_REDIS_HOST: redis
+      AP_REDIS_PORT: "6379"
+      AP_TELEMETRY_ENABLED: "false"
+    volumes:
+      - ./data/cache:/usr/src/app/cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U activepieces -d activepieces"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: activepieces
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: activepieces
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /
+
+services:
+  web:
+    image: privatebin/nginx-fpm-alpine:${VERSION}
+    volumes:
+      - ./data:/srv/data

@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 11434
+  health: /
+
+services:
+  web:
+    image: ollama/ollama:${VERSION}
+    volumes:
+      - ./data:/root/.ollama

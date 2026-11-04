@@ -1,0 +1,48 @@
+x-ops:
+  service: web
+  port: 80
+  health: /
+
+services:
+  web:
+    image: seafileltd/seafile-mc:${VERSION}
+    environment:
+      SEAFILE_SERVER_HOSTNAME: ${APP_DOMAIN}
+      SEAFILE_SERVER_PROTOCOL: https
+      SEAFILE_MYSQL_DB_HOST: db
+      SEAFILE_MYSQL_DB_PORT: "3306"
+      SEAFILE_MYSQL_DB_USER: seafile
+      SEAFILE_MYSQL_DB_PASSWORD: ${DB_PASSWORD}
+      INIT_SEAFILE_MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      SEAFILE_MYSQL_DB_CCNET_DB_NAME: ccnet_db
+      SEAFILE_MYSQL_DB_SEAFILE_DB_NAME: seafile_db
+      SEAFILE_MYSQL_DB_SEAHUB_DB_NAME: seahub_db
+      INIT_SEAFILE_ADMIN_EMAIL: admin@example.com
+      INIT_SEAFILE_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      CACHE_PROVIDER: redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      ENABLE_SEADOC: "false"
+      TIME_ZONE: UTC
+    volumes:
+      - ./data/seafile:/shared
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: mariadb:11
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - ./data/mysql:/var/lib/mysql

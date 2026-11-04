@@ -1,0 +1,16 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /rest/health
+
+services:
+  web:
+    image: shlinkio/shlink:${VERSION}
+    # The image's user cannot write to the data folder ops mounts.
+    user: root
+    environment:
+      DEFAULT_DOMAIN: ${APP_DOMAIN}
+      IS_HTTPS_ENABLED: "true"
+      INITIAL_API_KEY: ${INITIAL_API_KEY}
+    volumes:
+      - ./data:/etc/shlink/data

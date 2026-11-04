@@ -1,0 +1,26 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /health
+
+services:
+  web:
+    image: twinproduction/gatus:${VERSION}
+    configs:
+      - source: gatus
+        target: /config/config.yaml
+    volumes:
+      - ./data:/data
+
+configs:
+  gatus:
+    content: |
+      storage:
+        type: sqlite
+        path: /data/data.db
+      endpoints:
+        - name: example
+          url: https://example.org
+          interval: 5m
+          conditions:
+            - "[STATUS] == 200"
