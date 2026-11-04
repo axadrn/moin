@@ -80,9 +80,7 @@ templ Navbar() {
 						@icon.ArrowRight(icon.Props{Class: "size-3.5"})
 					}
 				} else {
-					@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "hidden sm:inline-flex"}) {
-						Sign in
-					}
+					// One way in: /auth signs in and signs up alike.
 					@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1"}) {
 						Get started
 					}
@@ -134,9 +132,6 @@ templ MobileNav() {
 			} else {
 				@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
 					Get started
-				}
-				@button.Button(button.Props{Href: "/auth", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "flex w-full"}) {
-					Sign in
 				}
 			}
 			<div class="flex items-center justify-between pt-3">
