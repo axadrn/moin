@@ -49,9 +49,15 @@ Yes. One price per workspace, with unlimited servers, apps and teammates. No tie
 
 Your first workspace gets 30 days with everything, without a card. Afterwards the workspace is read-only until you subscribe: your apps keep running, their backups too, and you can still see everything, stop and start apps and manage your account and team.
 
-## Will the name change?
+## Why moin?
 
-Maybe. If it does, your servers, the CLI and the agents move over by themselves, and the old address keeps working for a while. Nothing breaks.
+**moin** /mɔɪn/ *interjection, northern German.* Hello. Said in Hamburg at any hour, in one word, by people who don't waste words.
+
+Hamburg is a port, full of containers: stacked, moved, shipped around the world, and nothing gets lost. That's what moin does for your apps.
+
+## I used it when it was called ops. What changes?
+
+Nothing on your side. Your servers, the CLI and the agents move over by themselves, and `ops` keeps working as a second name for `moin` until December 4, 2026.
 
 ## Can I see and change everything from an AI agent?
 

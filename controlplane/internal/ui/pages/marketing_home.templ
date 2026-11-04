@@ -338,7 +338,7 @@ templ HomeWaysIn() {
 					<div class="moin-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground sm:text-sm">
 						<p><span class="text-terminal-foreground/50">$ </span>moin rollback v12</p>
 						<p class="text-terminal-foreground/60">→ Rollback v14 of shop to v12 started</p>
-						<p class="text-live">✓ v14 of shop is live <span class="text-terminal-foreground/50">in 3s</span></p>
+						<p class="text-live">✓ moin. shop is live <span class="text-terminal-foreground/50">v14 in 3s</span></p>
 					</div>
 				}
 				@homeWay("Terminal UI", "Everything live, one key away.") {
@@ -849,8 +849,9 @@ templ HomeFAQ() {
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
 				}
-				@homeQuestion("Is moin the final name?") {
-					Not yet. moin is a working name while we're in beta, and may change with 1.0. Your account, servers and data move with it. Nothing to do on your side.
+				@homeQuestion("Why moin?") {
+					<span class="block"><strong class="font-semibold text-foreground">moin</strong> /mɔɪn/ <em>interjection, northern German.</em> Hello. Said in Hamburg at any hour, in one word, by people who don't waste words.</span>
+					<span class="mt-4 block">I grew up in Hamburg. The port is full of containers, stacked, moved, shipped around the world, and nothing gets lost. That's what moin does for your apps.</span>
 				}
 				@homeQuestion("Can my team use it?") {
 					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.

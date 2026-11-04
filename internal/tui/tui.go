@@ -1725,7 +1725,7 @@ func (m model) follow(name string, started client.Deploy, title string) tea.Msg 
 		case done.Status != "succeeded":
 			program.Send(followDoneMsg{id: id, err: fmt.Errorf("v%d of %s failed: %s", done.Number, name, done.Error)})
 		default:
-			program.Send(followDoneMsg{id: id, notice: fmt.Sprintf("v%d of %s is live", done.Number, name)})
+			program.Send(followDoneMsg{id: id, notice: fmt.Sprintf("moin. %s is live, v%d", name, done.Number)})
 		}
 	}()
 	return outputMsg{id: id, title: title, lines: []string{}, follow: true}

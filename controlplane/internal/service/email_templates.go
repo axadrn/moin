@@ -21,7 +21,7 @@ func forgotPasswordEmailTemplate(signInURL, appName string) emailContent {
 
 func magicLinkEmailTemplate(magicURL, appName string) emailContent {
 	return emailContent{
-		Subject:     fmt.Sprintf("Sign in to %s", appName),
+		Subject:     "Moin, here is your sign-in link",
 		Preheader:   fmt.Sprintf("Use this secure link to sign in to %s.", appName),
 		Heading:     fmt.Sprintf("Sign in to %s", appName),
 		Intro:       []string{"Use the button below to sign in to your account."},

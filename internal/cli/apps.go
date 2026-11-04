@@ -341,18 +341,22 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 		}
 		return errReported
 	}
-	fmt.Fprintln(stdout, style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(fmt.Sprintf("v%d of %s is live", result.Number, name))+style.Muted.Render(" in "+progress.elapsed()))
-	if app, err := api.App(ctx, name); err == nil {
+	took := style.Muted.Render(fmt.Sprintf(" v%d in %s", result.Number, progress.elapsed()))
+	app, err := api.App(ctx, name)
+	if err != nil {
+		fmt.Fprintln(stdout, style.Success.Render(style.SymbolDone)+" "+style.Bold.Render("moin. "+name+" is live")+took)
+	} else {
 		checks, _ := api.CheckDomains(ctx, name)
-		printLiveAt(app.App, checks, stdout)
+		printLive(app.App, checks, took, stdout)
 	}
 	hint(stdout, "See it run with", build.Name+" logs "+name)
 	return nil
 }
 
-// printLiveAt says where an app answers: the domains of every service and
-// its instant address, with how to get past its password.
-func printLiveAt(app client.App, checks []client.DomainCheck, stdout io.Writer) {
+// printLive is the moin moment after a deploy: ✓ moin. and where the app
+// answers, its domains and its instant address, with how to get past its
+// password.
+func printLive(app client.App, checks []client.DomainCheck, took string, stdout io.Writer) {
 	urls := []string{}
 	for _, check := range checks {
 		urls = append(urls, "https://"+check.Domain)
@@ -360,10 +364,14 @@ func printLiveAt(app client.App, checks []client.DomainCheck, stdout io.Writer) 
 	if app.Instant != "" {
 		urls = append(urls, app.Instant)
 	}
-	if len(urls) == 0 {
-		return
+	line := "moin. " + app.Name + " is live"
+	if len(urls) > 0 {
+		line += " at " + urls[0]
 	}
-	fmt.Fprintln(stdout, "  live at "+strings.Join(urls, ", "))
+	fmt.Fprintln(stdout, style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(line)+took)
+	if len(urls) > 1 {
+		fmt.Fprintln(stdout, "  also at "+strings.Join(urls[1:], ", "))
+	}
 	if app.Instant != "" && !app.InstantOpen && !app.Protected {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+": see it with "+build.Name+" instant --show "+app.Name))
 	}

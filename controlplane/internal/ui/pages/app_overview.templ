@@ -1,7 +1,9 @@
 package pages
 
 import (
+	"context"
 	"strconv"
+	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -20,12 +22,22 @@ type OverviewView struct {
 	SeeActivity bool
 }
 
+// overviewTitle greets the member by first name, the moin moment of the
+// panel: Moin, Ada. Without a name it is the page's name.
+func overviewTitle(ctx context.Context) string {
+	user := ctxkeys.User(ctx)
+	if user == nil || strings.TrimSpace(user.Name) == "" {
+		return "Overview"
+	}
+	return "Moin, " + strings.Fields(user.Name)[0]
+}
+
 // Overview answers one question: is everything OK? What needs you first,
 // then what could be newer, then what happened.
 templ Overview(view OverviewView) {
 	@layouts.App("Overview") {
 		@panelPage() {
-			@pageHeader("Overview", "Is everything OK? What needs you, what could be newer and what happened last.")
+			@pageHeader(overviewTitle(ctx), "Is everything OK? What needs you, what could be newer and what happened last.")
 			if view.Status.OK() {
 				@overviewAllGood(view.Status)
 			} else {

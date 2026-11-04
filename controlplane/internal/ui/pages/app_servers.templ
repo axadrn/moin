@@ -93,31 +93,38 @@ templ ServerAddForm() {
 // do, the command, and that the page notices the agent by itself.
 templ ServerAdded(added AddedServer) {
 	<div id="server-added" hx-swap-oob="true" data-server-added={ added.Name }>
-		@panel(panelProps{
-			Heading:     "server-added-heading",
-			Title:       "Install the agent on " + added.Name,
-			Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: moin stores just a fingerprint of it.",
-			Docs:        "/docs/guides/servers#add-a-server",
-		}) {
-			<div class="flex flex-col gap-4">
-				<div class="flex items-start gap-2 rounded-2xl bg-muted py-2 pr-2 pl-4 font-mono text-xs">
-					<span class="pt-2 text-muted-foreground select-none" aria-hidden="true">$</span>
-					<code id="install-command" class="min-w-0 flex-1 py-2 leading-relaxed break-all whitespace-pre-wrap" data-install-command>{ added.Command }</code>
-					@button.Button(button.Props{
-						Size:       button.SizeSm,
-						Class:      "group/copy font-sans",
-						Attributes: templ.Attributes{"data-copy-target": "#install-command", "data-copy": ""},
-					}) {
-						@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
-						@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
-						Copy
+		<div data-server-greeting hidden>
+			@status.Status(status.Props{Kind: status.KindLive}) {
+				moin from { added.Name }. It is online; deploy an app to it.
+			}
+		</div>
+		<div data-server-install>
+			@panel(panelProps{
+				Heading:     "server-added-heading",
+				Title:       "Install the agent on " + added.Name,
+				Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: moin stores just a fingerprint of it.",
+				Docs:        "/docs/guides/servers#add-a-server",
+			}) {
+				<div class="flex flex-col gap-4">
+					<div class="flex items-start gap-2 rounded-2xl bg-muted py-2 pr-2 pl-4 font-mono text-xs">
+						<span class="pt-2 text-muted-foreground select-none" aria-hidden="true">$</span>
+						<code id="install-command" class="min-w-0 flex-1 py-2 leading-relaxed break-all whitespace-pre-wrap" data-install-command>{ added.Command }</code>
+						@button.Button(button.Props{
+							Size:       button.SizeSm,
+							Class:      "group/copy font-sans",
+							Attributes: templ.Attributes{"data-copy-target": "#install-command", "data-copy": ""},
+						}) {
+							@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
+							@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
+							Copy
+						}
+					</div>
+					@status.Status(status.Props{Kind: status.KindWaiting}) {
+						Waiting for the agent. This page shows the server online when it connects.
 					}
 				</div>
-				@status.Status(status.Props{Kind: status.KindWaiting}) {
-					Waiting for the agent. This page shows the server online when it connects.
-				}
-			</div>
-		}
+			}
+		</div>
 	</div>
 }
 
@@ -330,11 +337,15 @@ templ serversScript() {
 			const events = new EventSource(`/api/v1/servers/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			events.addEventListener("servers", () => document.body.dispatchEvent(new Event("servers-changed")));
 			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
-			// The install command works once: it goes when its agent is online.
+			// The install command works once: when its agent is online it
+			// goes, the server says moin, and after a while that goes too.
 			const hideUsedCommand = () => {
 				const added = document.querySelector("[data-server-added]");
-				if (added && document.querySelector(`[data-server="${CSS.escape(added.dataset.serverAdded)}"][data-online]`)) {
-					added.replaceWith(Object.assign(document.createElement("div"), { id: "server-added", className: "empty:hidden" }));
+				const install = added?.querySelector("[data-server-install]");
+				if (install && document.querySelector(`[data-server="${CSS.escape(added.dataset.serverAdded)}"][data-online]`)) {
+					install.remove();
+					added.querySelector("[data-server-greeting]").hidden = false;
+					setTimeout(() => added.isConnected && added.replaceWith(Object.assign(document.createElement("div"), { id: "server-added", className: "empty:hidden" })), 15000);
 				}
 			};
 			const wrap = document.querySelector("[data-server-list-wrap]");

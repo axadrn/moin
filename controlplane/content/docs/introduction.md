@@ -66,3 +66,5 @@ backups      web-1, web-2 ──▶ your bucket          (every change, plus sna
 Builds run on **your** server. `moin deploy` puts the source into your bucket and the agent fetches it from there; a GitHub deploy goes from GitHub straight to your server. The control plane only relays messages: it never stores or runs your code, and your backups go from your server straight to your bucket.
 
 Start with [Getting Started](/docs/getting-started).
+
+Why the name? moin is how Hamburg says hello: short, friendly, at any hour. Hamburg is a port, and ports run on containers.

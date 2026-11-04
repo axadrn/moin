@@ -125,7 +125,10 @@ func (m model) body(width, room int) []string {
 
 func (m model) serversView(width, room int) []string {
 	var added []string
-	if m.added != nil {
+	if m.added != nil && m.online(m.added.Server.ID) {
+		added = append(added, "",
+			pad+style.Success.Render(style.SymbolDone)+" "+style.Bold.Render("moin from "+m.added.Server.Name)+". It is online; deploy an app to it.")
+	} else if m.added != nil {
 		lead := " added. Run this on the server as root (or put sudo before sh) within the next hour:"
 		if m.again {
 			lead = ": a new install command. Run it on the server as root (or put sudo before sh) within the next hour; the old one stops working:"
@@ -716,4 +719,15 @@ func plural(count int, word string) string {
 		return "1 " + word
 	}
 	return fmt.Sprintf("%d %ss", count, word)
+}
+
+// online reports whether the server with this ID is online: an added
+// server that connected says moin instead of its install command.
+func (m model) online(id string) bool {
+	for _, server := range m.servers {
+		if server.ID == id {
+			return server.Online
+		}
+	}
+	return false
 }
