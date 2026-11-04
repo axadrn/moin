@@ -3,6 +3,20 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.12
+
+November 4, 2026
+
+**In short:** deploy any app without a Dockerfile: ops reads your repo and builds Node, Bun, Python, Ruby, PHP and more.
+
+### New
+- **No Dockerfile needed**: a repo without `compose.yml`, Dockerfile or Go module now builds with Railpack. ops finds the language, its version and the start command, and runs it on `PORT` 8080. The deploy log says what it found, such as `Railpack: Node 22, start: npm run start`.
+- **Build secrets stay secret**: your env vars reach the build as secrets, never in the image.
+- **Start command of your own**: set `RAILPACK_START_CMD` with `ops env set`.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.11
 
 November 4, 2026
