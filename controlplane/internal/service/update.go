@@ -19,6 +19,7 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 )
 
 const (
@@ -144,7 +145,7 @@ func (s *UpdateService) Check(ctx context.Context) error {
 		return err
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "moin-controlplane/"+s.version)
+	request.Header.Set("User-Agent", build.Name+"-controlplane/"+s.version)
 	s.mu.Lock()
 	if s.etag != "" {
 		request.Header.Set("If-None-Match", s.etag)

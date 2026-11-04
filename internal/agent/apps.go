@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -79,8 +80,6 @@ func (a *apps) lock(app string) func() {
 	lock.Lock()
 	return lock.Unlock
 }
-
-func project(app string) string { return "ops-" + app }
 
 func (a *apps) appDir(app string) string { return filepath.Join(a.dir, app) }
 
@@ -492,12 +491,14 @@ func (a *apps) resolve(ctx context.Context, app, src string, env map[string]stri
 	if len(services) == 0 {
 		return nil, detected, errors.New("compose.yml has no services")
 	}
-	if block, ok := config["x-ops"]; ok {
+	if block, key, err := configBlock(config); err != nil {
+		return nil, detected, err
+	} else if block != nil {
 		detected.Config = &protocol.Config{}
 		body, _ := json.Marshal(block)
 		err = json.Unmarshal(body, detected.Config)
 		if err != nil {
-			return nil, detected, fmt.Errorf("x-ops: %w", err)
+			return nil, detected, fmt.Errorf("%s: %w", key, err)
 		}
 	}
 	detected.Service = mainService(services, detected.Config)
@@ -767,7 +768,7 @@ func (a *apps) pull(ctx context.Context, start protocol.DeployStart, composeFile
 	if start.Registry == nil {
 		return a.run(ctx, logf, nil, args...)
 	}
-	dir, err := os.MkdirTemp("", "ops-docker-")
+	dir, err := os.MkdirTemp("", tempName("docker-"))
 	if err != nil {
 		return err
 	}
@@ -1146,7 +1147,8 @@ func (a *apps) prune(ctx context.Context, app string) {
 			used[image[1]] = true
 		}
 	}
-	images, err := a.output(ctx, "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}", "--filter", "reference="+project(app)+"-*")
+	// Images built under the old name keep their old tags.
+	images, err := a.output(ctx, "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}", "--filter", "reference="+project(app)+"-*", "--filter", "reference="+legacyProject(app)+"-*")
 	if err != nil {
 		return
 	}
@@ -1400,4 +1402,23 @@ func saveJSON(path string, value any) {
 	if err == nil {
 		_ = os.WriteFile(path, body, 0o600)
 	}
+}
+
+// configBlock is the agent's block of compose.yml: x-moin, or x-ops of the
+// old name while it works. x-moin wins when both are there. After the old
+// name stops working an x-ops block is an error, never quietly ignored: it
+// may hold the domains.
+func configBlock(config map[string]any) (any, string, error) {
+	key, legacyKey := "x-"+ourName, "x-"+legacy
+	if block, ok := config[key]; ok {
+		return block, key, nil
+	}
+	block, ok := config[legacyKey]
+	if !ok {
+		return nil, key, nil
+	}
+	if !build.Legacy() {
+		return nil, legacyKey, fmt.Errorf("compose.yml has an %s block: rename it to %s", legacyKey, key)
+	}
+	return block, legacyKey, nil
 }

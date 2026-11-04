@@ -181,7 +181,7 @@ func TestAlertDestinationsGetTheExactMessages(t *testing.T) {
 	}
 	mac := hmac.New(sha256.New, []byte(signingSecret))
 	mac.Write(hook.body)
-	if got := hook.header.Get("X-Ops-Signature"); got != "sha256="+hex.EncodeToString(mac.Sum(nil)) {
+	if got := hook.header.Get("X-Moin-Signature"); got != "sha256="+hex.EncodeToString(mac.Sum(nil)) {
 		t.Errorf("signature = %q", got)
 	}
 	if hook.header.Get("Content-Type") != "application/json" {
@@ -338,7 +338,7 @@ func TestAlertDestinationRules(t *testing.T) {
 	if body := string(sent.body); body != `{"event":"test","workspace":"owner-workspace","app":"","server":"","domain":"","reason":"","since":"","duration":"","url":"https://moin.example.com/app/owner-workspace/alerts"}` {
 		t.Errorf("test body = %s", body)
 	}
-	if sent.header.Get("X-Ops-Signature") != Signature(signingSecret, sent.body) {
+	if sent.header.Get("X-Moin-Signature") != Signature(signingSecret, sent.body) {
 		t.Error("the test is not signed with the secret")
 	}
 	f.chat.fail["/hook/token123"] = true

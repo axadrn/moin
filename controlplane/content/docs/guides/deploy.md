@@ -241,7 +241,7 @@ With a mouse you drag the whole app; on a phone you drag the grip at its left, s
 
 This workflow deploys every push to `main`. The [GitHub](/docs/guides/github) guide shows a way without CI, and [Build in CI](/docs/guides/ci) builds the image in CI.
 
-It needs a [bucket](/docs/guides/bucket) and an API token with **Read and write** access. [Create the token](/docs/guides/account#create-an-api-token) and save it in your GitHub repo under **Settings**, **Secrets and variables**, **Actions**, as `OPS_TOKEN`.
+It needs a [bucket](/docs/guides/bucket) and an API token with **Read and write** access. [Create the token](/docs/guides/account#create-an-api-token) and save it in your GitHub repo under **Settings**, **Secrets and variables**, **Actions**, as `MOIN_TOKEN`.
 
 ```yaml
 name: deploy
@@ -254,9 +254,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-      - run: go install github.com/axadrn/moin/cmd/ops@latest
+      - run: go install github.com/axadrn/moin/cmd/moin@latest
       - run: moin deploy
         env:
-          OPS_URL: https://moin.example.com
-          OPS_TOKEN: ${{ secrets.OPS_TOKEN }}
+          MOIN_URL: https://moin.example.com
+          MOIN_TOKEN: ${{ secrets.MOIN_TOKEN }}
 ```

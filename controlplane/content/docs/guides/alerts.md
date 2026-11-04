@@ -130,7 +130,7 @@ A webhook gets each alert as a JSON `POST`. Fields that do not belong to the eve
 
 `event` is one of the five above, or `test`. `reason` is why a site is down or the error of a failed deploy. `since` is when a site or server went down, `duration` how long it was down, like `4m30s`.
 
-A new webhook comes with a **signing secret**, shown this once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body with it. Check it before you trust a post:
+A new webhook comes with a **signing secret**, shown this once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body with it. Until December 4, 2026 it carries the same as `X-Ops-Signature` too, the header's old name. Check it before you trust a post:
 
 ```go
 mac := hmac.New(sha256.New, []byte(secret))

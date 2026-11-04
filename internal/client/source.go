@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Pack writes dir as a gzipped tar. In a git repo it takes the files git
@@ -103,7 +105,8 @@ type LocalConfig struct {
 }
 
 var (
-	xOpsBlock = regexp.MustCompile(`(?m)^x-ops:[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)`)
+	// The x-moin block, or x-ops of the old name.
+	xOpsBlock = regexp.MustCompile(`(?m)^x-(?:` + build.Name + `|` + build.LegacyName + `):[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)`)
 	xOpsField = regexp.MustCompile(`(?m)^[ \t]+(app|server):[ \t]*["']?([A-Za-z0-9._-]+)["']?[ \t]*(?:#.*)?$`)
 )
 

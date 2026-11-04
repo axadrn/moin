@@ -1,0 +1,54 @@
+package middleware
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+// On an old address a browser goes on to the new one; machines are
+// answered where they are and told the new address; every request counts
+// by kind. The new address passes untouched.
+func TestOldAddress(t *testing.T) {
+	counted := map[string]int{}
+	handler := OldAddress([]string{"ops.example.com"}, "https://moin.example.com/", func(host, kind string) { counted[host+" "+kind]++ })(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	for _, test := range []struct {
+		method, host, path string
+		status             int
+		location, header   string
+	}{
+		{"GET", "ops.example.com", "/app/acme?x=1", http.StatusMovedPermanently, "https://moin.example.com/app/acme?x=1", ""},
+		{"GET", "OPS.example.com:443", "/docs", http.StatusMovedPermanently, "https://moin.example.com/docs", ""},
+		{"GET", "ops.example.com", "/api/v1/apps", http.StatusTeapot, "", "https://moin.example.com"},
+		{"GET", "ops.example.com", "/agent/session", http.StatusTeapot, "", "https://moin.example.com"},
+		{"GET", "ops.example.com", "/download/ops-linux-arm64", http.StatusTeapot, "", "https://moin.example.com"},
+		{"POST", "ops.example.com", "/webhooks/github", http.StatusTeapot, "", "https://moin.example.com"},
+		{"POST", "ops.example.com", "/auth/magic-link", http.StatusTeapot, "", "https://moin.example.com"},
+		{"GET", "moin.example.com", "/app/acme", http.StatusTeapot, "", ""},
+	} {
+		request := httptest.NewRequest(test.method, "http://"+test.host+test.path, nil)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != test.status || recorder.Header().Get("Location") != test.location || recorder.Header().Get(OldAddressHeader) != test.header {
+			t.Errorf("%s %s%s = %d %q %q", test.method, test.host, test.path, recorder.Code, recorder.Header().Get("Location"), recorder.Header().Get(OldAddressHeader))
+		}
+	}
+	want := map[string]int{"ops.example.com web": 2, "ops.example.com api": 1, "ops.example.com agent": 1, "ops.example.com download": 1, "ops.example.com webhook": 1, "ops.example.com form": 1}
+	for key, count := range want {
+		if counted[key] != count {
+			t.Errorf("counted[%s] = %d, want %d (all: %v)", key, counted[key], count, counted)
+		}
+	}
+	if len(counted) != len(want) {
+		t.Errorf("counted = %v", counted)
+	}
+}
+
+// Without old addresses the middleware is not there.
+func TestOldAddressOff(t *testing.T) {
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	if handler := OldAddress(nil, "https://moin.example.com", nil)(next); handler == nil {
+		t.Fatal("no handler")
+	}
+}

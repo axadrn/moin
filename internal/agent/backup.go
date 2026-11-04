@@ -508,7 +508,7 @@ func cleanReason(reason string) string {
 func quoteText(text string) string { return `'` + strings.ReplaceAll(text, `'`, `''`) + `'` }
 
 // snapshotFolderPrefix starts the folder a snapshot copies a database to.
-const snapshotFolderPrefix = ".ops-snapshot-"
+const snapshotFolderPrefix = "." + ourName + "-snapshot-"
 
 // gzippedCopy copies a database with VACUUM INTO and gzips the copy. Each
 // copy gets its own folder next to the database, so two snapshots of one
@@ -725,7 +725,7 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	}
 	defer b.apps.lock(request.App)()
 
-	restored := database.HostPath + ".ops-restore"
+	restored := database.HostPath + "." + ourName + "-restore"
 	removeDatabase(restored)
 	defer removeDatabase(restored)
 	if request.Snapshot != "" {
@@ -948,7 +948,7 @@ func (b *backups) drillAll(ctx context.Context) (waiting bool) {
 }
 
 func (b *backups) drillOne(ctx context.Context, item watched) error {
-	target := filepath.Join(os.TempDir(), "ops-drill-"+item.app+"-"+databaseKey(item.database.Path))
+	target := filepath.Join(os.TempDir(), tempName("drill-")+item.app+"-"+databaseKey(item.database.Path))
 	removeDatabase(target)
 	defer removeDatabase(target)
 	b.mu.Lock()

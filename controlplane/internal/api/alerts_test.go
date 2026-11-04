@@ -27,7 +27,7 @@ func (f *fakeWebhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.body, f.signature = string(body), r.Header.Get("X-Ops-Signature")
+	f.body, f.signature = string(body), r.Header.Get("X-Moin-Signature")
 	if f.fail {
 		http.Error(w, "nope", http.StatusBadGateway)
 	}

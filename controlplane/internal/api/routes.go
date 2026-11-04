@@ -57,7 +57,7 @@ type Middleware struct {
 	RateLimitInvitations Wrap
 	// InWorkspace requires onboarding and scopes a moin route to the
 	// workspace of the API token, or for a session to the workspace its
-	// Ops-Workspace header names.
+	// Moin-Workspace header names.
 	InWorkspace Wrap
 }
 
@@ -198,6 +198,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), TokenWrite},
 		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), TokenWrite},
 		{"GET /api/v1/admin/users", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.Users))), TokenDenied},
+		{"GET /api/v1/admin/old-address", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.OldAddress))), TokenDenied},
 		{"POST /api/v1/admin/users/{userID}/sessions/revoke", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions))), TokenDenied},
 	}
 	for index := range routes {

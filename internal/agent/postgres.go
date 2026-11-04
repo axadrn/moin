@@ -657,7 +657,7 @@ func (t pgTarget) restoreDump(ctx context.Context, file string) error {
 // pgDrill restores a dump into a throwaway container of the same image, on
 // no network, and checks that it holds as many tables as the dump lists.
 func (a *apps) pgDrill(ctx context.Context, image, file string) error {
-	out, err := a.output(ctx, "docker", "run", "-d", "--rm", "--network", "none", "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "-e", "POSTGRES_PASSWORD=drill", "--label", "ops.drill=true", image)
+	out, err := a.output(ctx, "docker", "run", "-d", "--rm", "--network", "none", "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "-e", "POSTGRES_PASSWORD=drill", "--label", labelDrill+"=true", image)
 	if err != nil {
 		return fmt.Errorf("start a drill container: %w", err)
 	}

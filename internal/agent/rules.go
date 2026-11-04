@@ -8,17 +8,25 @@ import (
 	"path"
 	"strings"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
-// DefaultRulesFile is where the owner of a server writes what ops may do
-// there. OPS_RULES overrides it. ops never writes this file.
-const DefaultRulesFile = "/etc/ops/rules"
+// DefaultRulesFile is where the owner of a server writes what the agent
+// may do there. MOIN_RULES overrides it. The agent never writes this file.
+const DefaultRulesFile = "/etc/" + build.Name + "/rules"
 
-// RulesFile returns OPS_RULES or DefaultRulesFile.
+// RulesFile returns MOIN_RULES, else DefaultRulesFile, else the rules file
+// of the old name when only that one exists: the agent never moves the
+// owner's rules, and never drops them either.
 func RulesFile() string {
-	if file := os.Getenv("OPS_RULES"); file != "" {
+	if file := build.Getenv("RULES"); file != "" {
 		return file
+	}
+	if _, err := os.Stat(DefaultRulesFile); err != nil {
+		if _, err := os.Stat(legacyRulesFile); err == nil {
+			return legacyRulesFile
+		}
 	}
 	return DefaultRulesFile
 }

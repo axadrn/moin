@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -138,7 +139,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		if err != nil {
 			return nil, err
 		}
-		tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, "moin-"+server.Name+"-"+server.ID[:8])
+		tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, build.Name+"-"+server.Name+"-"+server.ID[:8])
 		if err != nil {
 			return nil, fmt.Errorf("create the tunnel: %w", err)
 		}

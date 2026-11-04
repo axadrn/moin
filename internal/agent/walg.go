@@ -50,7 +50,6 @@ const (
 	walgVersion   = "v3.0.9"
 	walgTick      = time.Minute
 	walgBaseEvery = 24 * time.Hour
-	walgSlot      = "ops_walg"
 	// walgSlotCap is how much WAL Postgres keeps for a WAL-G that is down.
 	// Past it Postgres drops the slot instead of filling the disk.
 	walgSlotCap = "4GB"
@@ -263,8 +262,8 @@ func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget) (f
 		// wal-receive keeps its own files under $PGDATA/pg_wal, and the
 		// image's PGDATA is the data, which the companion mounts read-only:
 		// point it elsewhere. backup-push gets the data folder as argument.
-		"PGDATA=/tmp/ops-walg",
-		"SSL_CERT_FILE=/etc/ssl/certs/ops-ca.crt",
+		"PGDATA=/tmp/" + tempName("walg"),
+		"SSL_CERT_FILE=/etc/ssl/certs/" + tempName("ca.crt"),
 	}
 	if storage.Endpoint != "" {
 		lines = append(lines, "AWS_ENDPOINT="+storage.Endpoint, "AWS_S3_FORCE_PATH_STYLE=true")
@@ -274,7 +273,7 @@ func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget) (f
 			return "", nil, errors.New("a bucket setting holds a line break")
 		}
 	}
-	out, err := os.CreateTemp("", "ops-walg-*.env")
+	out, err := os.CreateTemp("", tempName("walg-*.env"))
 	if err != nil {
 		return "", nil, err
 	}
@@ -294,13 +293,13 @@ func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget) (f
 func walgRunArgs(binary, envFile string) []string {
 	args := []string{"-v", binary + ":/usr/local/bin/wal-g:ro", "--env-file", envFile}
 	if bundle := caBundle(); bundle != "" {
-		args = append(args, "-v", bundle+":/etc/ssl/certs/ops-ca.crt:ro")
+		args = append(args, "-v", bundle+":/etc/ssl/certs/"+tempName("ca.crt")+":ro")
 	}
 	return args
 }
 
 // companionName is the companion container of a Postgres service.
-func companionName(app, service string) string { return "ops-walg-" + app + "-" + service }
+func companionName(app, service string) string { return ourName + "-walg-" + app + "-" + service }
 
 // walgTarget is where a companion sends to: the bucket, folder and keys,
 // hashed, so a change of bucket starts a new companion.
@@ -325,7 +324,7 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	}
 	name := companionName(app, database.Service)
 	want := walgTarget(storage, prefix, target.container)
-	running, _ := b.apps.output(ctx, "docker", "inspect", "-f", `{{.State.Running}} {{index .Config.Labels "ops.walg.target"}}`, name)
+	running, _ := b.apps.output(ctx, "docker", "inspect", "-f", `{{.State.Running}} {{index .Config.Labels "`+labelWalgTarget+`"}}`, name)
 	if strings.TrimSpace(running) == "true "+want {
 		return nil
 	}
@@ -346,8 +345,18 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	if err := capSlot(ctx, target); err != nil {
 		return fmt.Errorf("cap the WAL the slot keeps: %w", err)
 	}
+	// The slot of the old name is no one's now; unread it would keep WAL
+	// until the cap.
+	if _, err := target.psql(ctx, `SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = :'slot' AND NOT active;`, map[string]string{"slot": legacyWalgSlot}, false); err != nil {
+		slog.Warn("backup: drop the WAL-G slot of the old name", "app", app, "database", database.Path, "error", err)
+	}
 	// The slot keeps the log from its creation on: wal-receive starts
 	// where it stands, never in a part Postgres already removed.
+	existing, err := target.psql(ctx, `SELECT count(*) FROM pg_replication_slots WHERE slot_name = :'slot';`, map[string]string{"slot": walgSlot}, false)
+	if err != nil {
+		return fmt.Errorf("find the slot: %w", err)
+	}
+	created := strings.TrimSpace(existing) == "0"
 	if _, err := target.psql(ctx, `SELECT pg_create_physical_replication_slot(:'slot', true) WHERE NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = :'slot');`, map[string]string{"slot": walgSlot}, false); err != nil {
 		return fmt.Errorf("create the slot: %w", err)
 	}
@@ -361,7 +370,7 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	}
 	defer remove()
 	args := []string{"run", "-d", "--name", name,
-		"--label", "ops.walg=" + app + "/" + database.Service, "--label", "ops.walg.target=" + want,
+		"--label", labelWalg + "=" + app + "/" + database.Service, "--label", labelWalgTarget + "=" + want,
 		"--network", "container:" + target.container,
 		"--entrypoint", "/usr/local/bin/wal-g",
 		"-v", data.mount + ":ro"}
@@ -372,7 +381,11 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	}
 	slog.Info("backup: continuous Postgres backup", "app", app, "database", database.Path)
 	newest, err := b.walgBaseBackups(ctx, app, database)
-	if err == nil && len(newest) == 0 {
+	// A new slot starts the log where Postgres stands now: whatever came
+	// between the last log in the bucket and now is not there, so the
+	// window starts again from a new base backup. That is the first one,
+	// or the one after the agent moved to its new name.
+	if err == nil && (len(newest) == 0 || created) {
 		return b.walgBase(ctx, app, database)
 	}
 	if err == nil && len(newest) > 0 {
@@ -560,7 +573,7 @@ func (b *backups) walgOnce(ctx context.Context) {
 // still runs, it drops the replication slot too: an unread slot keeps
 // every WAL file and would fill the disk.
 func (b *backups) walgStopAll(ctx context.Context, keep map[string]bool) {
-	out, err := b.apps.output(ctx, "docker", "ps", "-a", "--filter", "label=ops.walg", "--format", `{{.Names}} {{.Label "ops.walg"}}`)
+	out, err := b.apps.output(ctx, "docker", "ps", "-a", "--filter", "label="+labelWalg, "--format", `{{.Names}} {{.Label "`+labelWalg+`"}}`)
 	if err != nil {
 		return
 	}
@@ -760,7 +773,7 @@ func (b *backups) pgRestorePoint(ctx context.Context, request protocol.BackupRes
 	defer remove()
 
 	// Recover into a new volume while the app keeps running.
-	volume := "ops-restore-" + request.App + "-" + database.Service + "-" + time.Now().UTC().Format("20060102t150405")
+	volume := ourName + "-restore-" + request.App + "-" + database.Service + "-" + time.Now().UTC().Format("20060102t150405")
 	if _, err := b.apps.output(ctx, "docker", "volume", "create", volume); err != nil {
 		return err
 	}

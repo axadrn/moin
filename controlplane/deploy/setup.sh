@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prepares a fresh Ubuntu or Debian server for the ops control plane: Docker,
+# Prepares a fresh Ubuntu or Debian server for the moin control plane: Docker,
 # security updates and, with --tailscale, Tailscale with SSH on your tailnet.
 # Run it once as root.
 set -eu
@@ -16,6 +16,6 @@ if [ "${1:-}" = "--tailscale" ]; then
 	tailscale set --auto-update
 fi
 
-mkdir -p -m 700 /etc/ops-controlplane
-mkdir -p /var/lib/ops-controlplane
-echo "Ready. Write /etc/ops-controlplane/env, then run update.sh."
+mkdir -p -m 700 /etc/moin-controlplane
+mkdir -p /var/lib/moin-controlplane
+echo "Ready. Write /etc/moin-controlplane/env, then run update.sh."

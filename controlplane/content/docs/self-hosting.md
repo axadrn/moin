@@ -264,6 +264,24 @@ To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh`
 
 **The agents** update themselves to the version of the control plane, one server at a time, never during a deploy. Your apps keep running. See [Servers](/docs/guides/servers#updates).
 
+## From ops to moin
+
+A control plane installed as ops moves once, the next time you run the new `update.sh`. Get the new deploy files, then run it:
+
+```bash
+mkdir -p /opt/moin && cd /opt/moin
+for file in setup.sh compose.yml compose.same-server.yml update.sh updater.sh; do
+  curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/$file -o $file
+done
+sh update.sh
+```
+
+It stops the old control plane, copies `/etc/ops-controlplane` to `/etc/moin-controlplane` and `/var/lib/ops-controlplane` to `/var/lib/moin-controlplane`, and starts it from there with the image `ghcr.io/axadrn/moin`. The control plane is away for the copy. The old folders stay as they were: remove them once moin runs. The agent on the same server moves by itself, see [Servers](/docs/guides/servers#from-ops-to-moin).
+
+Until December 4, 2026 the old install keeps working without the move: `ghcr.io/axadrn/ops-controlplane` gets every release, `OPS_IMAGE` and `OPS_PULL` still work, and settings that point to `/run/ops-controlplane` still find their files.
+
+**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://ops.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old address**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
+
 ## Move or rebuild
 
 When the server dies or you move: prepare a new server with `setup.sh`, put your settings in `/etc/ops-controlplane/` again and run `update.sh`. The database comes back from the bucket by itself. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.

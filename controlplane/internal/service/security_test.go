@@ -209,7 +209,7 @@ func TestServerSecurity(t *testing.T) {
 		}
 	}
 	ingress := fake.body["PUT /accounts/acc1/cfd_tunnel/tun1/configurations"]
-	if !strings.Contains(ingress, `"hostname":"blog.de"`) || !strings.Contains(ingress, "http://ops-traefik:8080") || !strings.Contains(ingress, "http_status:404") {
+	if !strings.Contains(ingress, `"hostname":"blog.de"`) || !strings.Contains(ingress, "http://moin-traefik:8080") || !strings.Contains(ingress, "http_status:404") {
 		t.Fatalf("ingress = %s", ingress)
 	}
 	if !strings.Contains(fake.body["POST /zones/zone1/dns_records"], `"content":"tun1.cfargotunnel.com"`) {

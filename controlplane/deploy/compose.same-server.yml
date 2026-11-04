@@ -2,18 +2,21 @@
 # when the settings say SAME_SERVER=true and the agent's proxy runs: the
 # control plane joins the proxy's network, and Traefik serves it on the
 # domain of APP_URL with a certificate from Let's Encrypt, like any app.
-# OPS_DOMAIN comes from update.sh. The router name has an underscore, which
-# no app name has, so an app can never take it over.
+# MOIN_DOMAIN and MOIN_PROXY_NETWORK come from update.sh: the network is
+# moin-proxy, or ops-proxy while the agent has not moved to its new name.
+# The router name has an underscore, which no app name has, so an app can
+# never take it over.
 services:
   controlplane:
-    networks: [default, ops-proxy]
+    networks: [default, proxy]
     labels:
       traefik.enable: "true"
-      traefik.docker.network: ops-proxy
-      traefik.http.routers.ops_controlplane.rule: "Host(`${OPS_DOMAIN:?set APP_URL}`)"
-      traefik.http.routers.ops_controlplane.entrypoints: websecure
-      traefik.http.services.ops_controlplane.loadbalancer.server.port: "8090"
+      traefik.docker.network: ${MOIN_PROXY_NETWORK:-moin-proxy}
+      traefik.http.routers.moin_controlplane.rule: "Host(`${MOIN_DOMAIN:?set APP_URL}`)"
+      traefik.http.routers.moin_controlplane.entrypoints: websecure
+      traefik.http.services.moin_controlplane.loadbalancer.server.port: "8090"
 
 networks:
-  ops-proxy:
+  proxy:
+    name: ${MOIN_PROXY_NETWORK:-moin-proxy}
     external: true

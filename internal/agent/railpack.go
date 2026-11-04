@@ -20,6 +20,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Railpack builds a repo that brings no compose.yml, Dockerfile or Go
@@ -52,7 +54,7 @@ var railpackArch = map[string]string{"arm64": "arm64", "amd64": "x86_64"}
 // bin folder and checked against its sha256. OPS_RAILPACK_BINARY names one
 // already on disk, as the tests do.
 func (a *apps) railpackBinary(ctx context.Context) (string, error) {
-	if path := os.Getenv("OPS_RAILPACK_BINARY"); path != "" {
+	if path := build.Getenv("RAILPACK_BINARY"); path != "" {
 		return path, nil
 	}
 	sum, ok := railpackSums[runtime.GOARCH]
