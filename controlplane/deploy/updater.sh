@@ -1,5 +1,5 @@
 #!/bin/sh
-# The updater: "Update now" in ops. It runs next to the control plane in
+# The updater: "Update now" in moin. It runs next to the control plane in
 # compose.yml, the one part with access to Docker; the control plane has
 # none. It waits for the file update/request in the data directory, which
 # the control plane writes, then runs update.sh with the requested version.
@@ -7,8 +7,8 @@
 # again. It reports in update/status and touches update/updater every few
 # seconds, so the control plane knows it runs.
 set -u
-data=${OPS_UPDATE_DIR:-/var/lib/ops-controlplane/update}
-deploy=${OPS_DEPLOY_DIR:-/deploy}
+data=${MOIN_UPDATE_DIR:-/var/lib/moin-controlplane/update}
+deploy=${MOIN_DEPLOY_DIR:-/deploy}
 mkdir -p "$data"
 
 # The compose project of the control plane, from this container's label, so
@@ -71,7 +71,7 @@ update() {
 	case "${image##*/}" in *:*) repo=${image%:*} ;; esac
 	docker tag "$(docker inspect -f '{{.Image}}' "$container")" "$repo:rollback"
 	echo "$(date -u) update from $from to $version" >"$data/log"
-	if ! OPS_IMAGE="$repo:$version" sh "$deploy/update.sh" controlplane >>"$data/log" 2>&1; then
+	if ! MOIN_IMAGE="$repo:$version" sh "$deploy/update.sh" controlplane >>"$data/log" 2>&1; then
 		reason="$version did not start: $(tail -n 1 "$data/log")"
 	elif ! answers "$version"; then
 		reason="$version did not answer within two minutes"
@@ -80,7 +80,7 @@ update() {
 		mv "$data/running" "$data/finished"
 		return
 	fi
-	if OPS_IMAGE="$repo:rollback" OPS_PULL=never sh "$deploy/update.sh" controlplane >>"$data/log" 2>&1; then
+	if MOIN_IMAGE="$repo:rollback" MOIN_PULL=never sh "$deploy/update.sh" controlplane >>"$data/log" 2>&1; then
 		status rolled_back "$version" "$from" "$reason"
 	else
 		status failed "$version" "$from" "$reason, and $from did not start again: run sh update.sh on the server"
