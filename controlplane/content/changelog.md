@@ -3,6 +3,22 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.14
+
+November 4, 2026
+
+**In short:** self-host ops on one server with one command: the control plane and your apps together, with HTTPS.
+
+### New
+- **One server, one command**: `curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com` installs Docker, the control plane and the agent, and serves it on your domain with a Let's Encrypt certificate. It prints your sign-in link.
+- **Three ways to run ops**: hosted, one server, or two servers. The [self-hosting guide](/docs/self-hosting) says when to pick which.
+
+### Changed
+- **Self-hosted without email or a bucket**: a self-hosted control plane starts without them. Sign-in links go to its log, and `docker compose -f /opt/ops/compose.yml exec controlplane ./main sign-in-link` prints one. Add email and a bucket any time.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Nothing changes for a control plane on its own server.
+
 ## v1.0.0-beta.13
 
 November 4, 2026
