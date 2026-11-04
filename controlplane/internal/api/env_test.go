@@ -173,7 +173,7 @@ func (e *apiEnvironment) send(t *testing.T, request apiRequest) *httptest.Respon
 		httpRequest = httptest.NewRequest(request.method, request.path, strings.NewReader(request.body))
 		httpRequest.Header.Set("Content-Type", "application/json")
 	}
-	httpRequest.Header.Set("User-Agent", "goilerplate-test/1.0")
+	httpRequest.Header.Set("User-Agent", "moin-test/1.0")
 	if request.bearer != "" {
 		httpRequest.Header.Set("Authorization", "Bearer "+request.bearer)
 	}

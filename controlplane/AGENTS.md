@@ -2,7 +2,7 @@
 
 ## Custom rules
 
-Add project-specific rules here. Keep generated defaults below this section easy to merge with future goilerplate releases.
+Add project-specific rules here. Keep generated defaults below this section easy to merge with future releases of the starter template.
 
 - This is the moin control plane. Read `PLAN.md` first: pieces, words, connection, slices.
 - The agent, CLI, TUI and the protocol package live at the root of this repo, one Go module for all. The repo is public: never commit secrets, `.env` files or anything private.

@@ -243,11 +243,11 @@
     border: 2px solid var(--muted-foreground);
     border-top-color: var(--foreground);
     border-radius: 9999px;
-    animation: goilerplate-spin 0.7s linear infinite;
+    animation: moin-spin 0.7s linear infinite;
   }
 }
 
-@keyframes goilerplate-spin {
+@keyframes moin-spin {
   to {
     transform: rotate(360deg);
   }
@@ -257,7 +257,7 @@
 @layer components {
   /* The running symbol turns (the landing page uses it too). */
   .moin-turn {
-    animation: goilerplate-spin 1.6s linear infinite;
+    animation: moin-spin 1.6s linear infinite;
     transform-origin: center;
   }
 

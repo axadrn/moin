@@ -16,7 +16,7 @@ func cookieSignIn(t *testing.T, environment *apiEnvironment, path, body string, 
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPost, path+"?session=cookie", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "goilerplate-test/1.0")
+	request.Header.Set("User-Agent", "moin-test/1.0")
 	request.AddCookie(&http.Cookie{Name: "csrf_token", Value: testCSRFToken})
 	if withHeader {
 		request.Header.Set("X-CSRF-Token", testCSRFToken)

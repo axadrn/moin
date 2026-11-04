@@ -13,7 +13,7 @@ import (
 func TestGzip(t *testing.T) {
 	t.Parallel()
 
-	script := strings.Repeat("console.log('goilerplate');\n", 200)
+	script := strings.Repeat("console.log('moin');\n", 200)
 	files := http.FileServer(http.FS(fstest.MapFS{
 		"app.js":     {Data: []byte(script)},
 		"font.woff2": {Data: []byte("wOF2 font bytes")},

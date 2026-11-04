@@ -47,7 +47,7 @@ Kept from baselite.
 - `hello` is the first agent message: agent version, protocol version, OS, arch, hostname.
 
 Clients (web, TUI, CLI) never talk to an agent. They call the control plane API
-(`/api/v1`, personal API tokens from goilerplate) and get live updates over SSE.
+(`/api/v1`, personal API tokens) and get live updates over SSE.
 
 ## Deploys
 
@@ -240,26 +240,8 @@ Decided 2026-11-01, after research:
   registration for now; register the name at the paid launch or at its
   first misuse.
 
-## Renaming later
+## The name
 
-moin launches as "moin by goilerplate" at moin.run with the
-command `moin`. When a distinct name comes, it is one clean breaking change:
-afterwards nothing carries the old name, no aliases and no mixed paths.
-
-- **One release moves everything.** The agent finds the old names on its
-  server and moves itself: `/etc/moin/rules`, `/var/lib/moin`, the `moin-agent`
-  service, the `moin-` containers and the nftables table, then connects to
-  the new host. Nobody logs in to a server by hand.
-- **A short window, about four weeks.** The old host keeps answering only so
-  agents can still fetch that release: a WebSocket does not follow
-  redirects, and an agent that loses its control plane cannot be updated.
-  The web pages and docs redirect.
-- **A migration guide** in the docs and the CHANGELOG: what changes, why (the
-  project grew and has its own name), what users do themselves (the command
-  in scripts and CI, the GitHub Action, `moin login` with the new URL), and
-  what to do if a server did not move.
-- **Then the old name is gone:** host, command, paths and code. The product
-  name lives only in `internal/build.Name`, so the code change is small;
-  the paths on servers move with the release above.
-- GitHub redirects a renamed repo and its Action, which covers links in old
-  posts.
+The product is moin, at moin.run, with the command `moin`. It was called ops
+until v1.0.0-beta.20; the old names (`ops`, `x-ops`, `OPS_*`, the old
+download paths and image) keep working until December 4, 2026.
