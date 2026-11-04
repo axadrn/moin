@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -59,6 +60,28 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 	_ = json.Unmarshal([]byte(envJSON), &env)
 	user, name := pgNames(env)
 	return pgTarget{container: container, image: strings.TrimSpace(image), user: user, database: name}, nil
+}
+
+// serviceImage is the image of a service in the app's live release, or ""
+// when there is none.
+func (a *apps) serviceImage(app, service string) string {
+	current := a.current(app)
+	if current == 0 {
+		return ""
+	}
+	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, current), "compose.json"))
+	if err != nil {
+		return ""
+	}
+	var config struct {
+		Services map[string]struct {
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+	if json.Unmarshal(body, &config) != nil {
+		return ""
+	}
+	return config.Services[service].Image
 }
 
 // errPostgresDown is a Postgres service that is not running, such as one

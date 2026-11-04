@@ -210,3 +210,26 @@ func TestPgError(t *testing.T) {
 		t.Errorf("pgError = %q", got)
 	}
 }
+
+// TestServiceImage: the drill of a Postgres that is down takes the image
+// of its service from the live release.
+func TestServiceImage(t *testing.T) {
+	dir := t.TempDir()
+	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	release := a.releaseDir("shop", 3)
+	if err := os.MkdirAll(release, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(release, "compose.json"), []byte(`{"services":{"db":{"image":"postgres:17"},"web":{"image":"ops-shop-web:3"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("3"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.serviceImage("shop", "db"); got != "postgres:17" {
+		t.Errorf("serviceImage = %q", got)
+	}
+	if got := a.serviceImage("shop", "none"); got != "" {
+		t.Errorf("missing service = %q", got)
+	}
+}

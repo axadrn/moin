@@ -234,8 +234,20 @@ func (b *backups) pgDrillOne(ctx context.Context, app string, database protocol.
 	if len(snapshots) == 0 {
 		return errNoSnapshot
 	}
+	// The drill restores into a throwaway container of the same image, so a
+	// Postgres that is down does not fail it: the image comes from the live
+	// release then.
+	image := ""
 	target, err := b.apps.postgres(ctx, app, database)
-	if err != nil {
+	switch {
+	case err == nil:
+		image = target.image
+	case errors.Is(err, errPostgresDown):
+		image = b.apps.serviceImage(app, database.Service)
+		if image == "" {
+			return err
+		}
+	default:
 		return err
 	}
 	file, err := b.downloadDump(ctx, nil, app, database, snapshots[0].ID)
@@ -243,7 +255,7 @@ func (b *backups) pgDrillOne(ctx context.Context, app string, database protocol.
 		return err
 	}
 	defer os.Remove(file)
-	return b.apps.pgDrill(ctx, target.image, file)
+	return b.apps.pgDrill(ctx, image, file)
 }
 
 // pgSnapshots takes a snapshot of every Postgres database once an hour,
