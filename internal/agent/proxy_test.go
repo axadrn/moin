@@ -3,6 +3,8 @@ package agent
 import (
 	"slices"
 	"strings"
+
+	"github.com/axadrn/ops/protocol"
 	"testing"
 )
 
@@ -23,5 +25,22 @@ func TestProxyFlags(t *testing.T) {
 	}
 	if !slices.Contains(tunnel, "--entrypoints."+tunnelEntrypoint+".address=:"+tunnelPort) {
 		t.Errorf("tunnel flags miss the tunnel entrypoint: %v", tunnel)
+	}
+}
+
+// TestRoutingLeavesTLSToTheEntrypoint: a router with a TLS section of its
+// own ignores the entrypoint's, certresolver included, so Let's Encrypt was
+// never asked for a new domain. The router sets none.
+func TestRoutingLeavesTLSToTheEntrypoint(t *testing.T) {
+	service := map[string]any{}
+	addRouting(map[string]any{}, service, "shop", protocol.Detected{Port: 8080, Domains: []string{"shop.example.com"}}, "")
+	labels, _ := service["labels"].(map[string]any)
+	if len(labels) == 0 {
+		t.Fatalf("no labels: %v", service)
+	}
+	for key := range labels {
+		if strings.Contains(key, ".tls") {
+			t.Errorf("router label %s: it hides the entrypoint's certresolver", key)
+		}
 	}
 }

@@ -82,7 +82,6 @@ func addRouting(config, service map[string]any, app string, detected protocol.De
 		"traefik.docker.network":                                      proxyNetwork,
 		"traefik.http.routers." + name + ".rule":                      strings.Join(hosts, " || "),
 		"traefik.http.routers." + name + ".entrypoints":               "websecure",
-		"traefik.http.routers." + name + ".tls":                       "true",
 		"traefik.http.services." + name + ".loadbalancer.server.port": fmt.Sprint(detected.Port),
 	}
 	middlewares := []string{}

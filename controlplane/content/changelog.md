@@ -3,6 +3,18 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.9
+
+November 4, 2026
+
+**In short:** a new domain on a server without a Cloudflare Tunnel gets its HTTPS certificate again; update if you add domains.
+
+### Fixed
+- **HTTPS for new domains**: since beta.1, a domain added on a server that serves ports 80 and 443 itself got no Let's Encrypt certificate and showed a browser warning. It gets one again on the next deploy. Servers behind a Cloudflare Tunnel were never affected.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; then deploy each app with a new domain once.
+
 ## v1.0.0-beta.8
 
 November 4, 2026
