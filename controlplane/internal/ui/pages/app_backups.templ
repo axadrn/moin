@@ -18,7 +18,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/popover"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/controlplane/internal/ui/utils"
@@ -36,7 +35,7 @@ type BackupsView struct {
 	Backups protocol.Backups
 	// Error says why the server could not report its backups.
 	Error string
-	Now    time.Time
+	Now   time.Time
 }
 
 // AppBackups is the backups page: per database the continuous backup with
@@ -296,26 +295,24 @@ templ backupSettings(view BackupsView) {
 	}
 }
 
-// BackupSettingsForm is the switch that saves itself. A change that failed
-// answers it as stored, so it flips back. It is no out-of-band part: the
-// backups panel swaps in whole after Back up now and a restore, and an
-// out-of-band form in it would leave the page without the switch.
+// BackupSettingsForm is the switch for the snapshot before every change.
+// It is no out-of-band part: the backups panel swaps in whole after Back up
+// now and a restore, and an out-of-band form in it would leave the page
+// without the switch.
 templ BackupSettingsForm(app model.App) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	<form id="backup-settings-form" hx-post={ appPath + "/backups/settings" } hx-trigger="change" hx-swap="none">
-			@csrf.Token()
-			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-				@field.Content() {
-					@field.Label(field.LabelProps{For: "snapshot-before-changes"}) {
-						Snapshot before every change
-					}
-					@field.Description() {
-						Before every deploy, restore, cell edit and SQL change made through moin. Undoes a bad migration or a wrong UPDATE.
-					}
+	@switchForm("backup-settings-form", ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/backups/settings") {
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+			@field.Content() {
+				@field.Label(field.LabelProps{For: "snapshot-before-changes"}) {
+					Snapshot before every change
 				}
-				@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: app.SnapshotBeforeChanges})
+				@field.Description() {
+					Before every deploy, restore, cell edit and SQL change made through moin. Undoes a bad migration or a wrong UPDATE.
+				}
 			}
-		</form>
+			@savedSwitch("snapshot-before-changes", app.SnapshotBeforeChanges)
+		}
+	}
 }
 
 // bucketSummary is where this app's uploads and backups go, and the

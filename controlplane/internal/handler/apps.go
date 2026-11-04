@@ -504,20 +504,27 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	h.routingChanged(w, r, done, deploy, changed)
 }
 
-// SetInstantPassword puts the password in front of the instant address, or
-// takes it away.
+// SetInstantPassword is the switch that puts the password in front of the
+// instant address, or takes it away. It answers the panel as stored, so a
+// failed save flips the switch back.
 func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request) {
 	open := r.FormValue("on") != "1"
 	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
-	if err != nil {
-		failed(w, r, "Password not changed", err, nil)
-		return
-	}
 	done := "Password on the instant address"
 	if open {
 		done = "Instant address open to everyone"
 	}
-	h.routingChanged(w, r, done, deploy, changed)
+	switch {
+	case err != nil && changed:
+		// Saved, but the deploy that applies it did not start.
+		h.renderRouting(w, r)
+		toastWarning(w, r, done, "Not applied yet: "+errorMessage(err))
+	case err != nil:
+		h.renderRouting(w, r)
+		toastError(w, r, "Password not changed", errorMessage(err))
+	default:
+		h.routingChanged(w, r, done, deploy, changed)
+	}
 }
 
 // Protect puts a password in front of the app. A wrong field says the

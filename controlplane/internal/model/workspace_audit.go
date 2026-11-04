@@ -285,6 +285,8 @@ func (e WorkspaceAuditEvent) Summary() string {
 			return linked + ", deploys only by hand"
 		}
 		return linked
+	case "repo.auto_deploy":
+		return on("turned deploy on push %s for " + target)
 	case "repo.unlinked":
 		return "unlinked " + target + " from " + d["repo"]
 	case "app.deleted":

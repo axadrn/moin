@@ -11,6 +11,8 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
+	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
 // The parts every page of the control panel is built from.
@@ -109,9 +111,9 @@ type panelProps struct {
 	// Docs is the docs page, with its anchor, that explains the panel: a
 	// "How it works" link right of the title, before the Action.
 	Docs  string
-	Body   panelBody
-	Class  string
-	Attrs  templ.Attributes
+	Body  panelBody
+	Class string
+	Attrs templ.Attributes
 }
 
 // panel is a card with a title: one topic of a page.
@@ -274,6 +276,23 @@ templ stateAlert(attrs templ.Attributes) {
 			{ children... }
 		}
 	}
+}
+
+// switchForm is a switch that saves itself (DESIGN.md, Feedback): a change
+// posts the switch, as "on", to action, which saves only that and answers
+// this form as stored. The switch is disabled while it saves, so a second
+// click cannot overtake the first.
+templ switchForm(id, action string) {
+	<form id={ id } hx-post={ action } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+		@csrf.Token()
+		{ children... }
+	</form>
+}
+
+// savedSwitch is the switch of a switchForm. Its root carries an id too,
+// so the focus stays on it when the answer swaps the form.
+templ savedSwitch(id string, on bool) {
+	@switchcomp.Switch(switchcomp.Props{ID: id, Name: "on", Value: "1", DefaultChecked: on, Attributes: templ.Attributes{"id": id + "-switch"}})
 }
 
 // docsLink is the quiet link from a card to its guide.
