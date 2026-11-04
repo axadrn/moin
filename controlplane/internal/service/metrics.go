@@ -161,6 +161,9 @@ func newMetricsStore() *metricsStore {
 // receiveMetrics takes a sample of an agent. The control plane's clock
 // dates it, not the server's.
 func (s *AppService) receiveMetrics(serverID string, sample protocol.Metrics) {
+	if sample.Server != nil {
+		s.servers.checkDisk(serverID, sample.Server.DiskUsed, sample.Server.DiskTotal)
+	}
 	now := s.now()
 	store := s.metrics
 	store.mu.Lock()

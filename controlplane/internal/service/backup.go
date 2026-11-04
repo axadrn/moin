@@ -345,9 +345,11 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 	s.notify(workspaceID)
 }
 
-// storeBackupStatus stores the backup status of each database. A restore
-// drill that passed, and backups that start failing or work again, go into
-// the activity as ops itself.
+// storeBackupStatus stores the backup status of each database. Backups
+// that start failing or work again, a restore check that fails or passes
+// again, and each passed check go into the activity as ops itself; the
+// changes alert. The backups' own error and the check's are apart: an
+// agent from before drill_error sends the check's failure as Error alone.
 func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups) {
 	appID := app.ID
 	before := map[string]model.BackupStatus{}
@@ -358,29 +360,64 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 	}
 	for _, database := range backups.Databases {
 		previous, known := before[database.Database]
-		details := map[string]string{"database": database.Database}
-		switch {
-		case database.Error != "" && (!known || previous.Error == ""):
-			details["error"] = clipText(database.Error, 300)
-			s.servers.record(System(app.WorkspaceID), "backup.failed", "app", app.Name, details)
-		case database.Error == "" && known && previous.Error != "":
-			s.servers.record(System(app.WorkspaceID), "backup.recovered", "app", app.Name, details)
-		}
-		if database.VerifiedAt != nil && (!known || previous.VerifiedAt == nil || database.VerifiedAt.After(*previous.VerifiedAt)) {
-			details := map[string]string{"database": database.Database, "verified_at": database.VerifiedAt.UTC().Format(time.RFC3339)}
-			s.servers.record(System(app.WorkspaceID), "backup.drill_passed", "app", app.Name, details)
-		}
-		err := s.apps.SetBackupStatus(model.BackupStatus{
+		status := model.BackupStatus{
 			AppID:        appID,
 			Database:     database.Database,
 			Since:        database.Since,
 			ReplicatedAt: database.ReplicatedAt,
 			VerifiedAt:   database.VerifiedAt,
 			Error:        clipText(database.Error, 2000),
+			DrillError:   clipText(database.DrillError, 2000),
 			UpdatedAt:    s.now().UTC(),
-		})
+		}
+		if database.VerifiedAt == nil {
+			// No check since the agent started: the last one still stands.
+			status.DrillError = previous.DrillError
+		}
+		for _, change := range backupChanges(previous, known, status) {
+			s.servers.record(System(app.WorkspaceID), change.action, "app", app.Name, change.details)
+		}
+		err := s.apps.SetBackupStatus(status)
 		if err != nil {
 			slog.Error("store backup status failed", "app_id", appID, "error", fmt.Sprint(err))
 		}
 	}
+}
+
+// backupChange is one action of the activity a backup status brings.
+type backupChange struct {
+	action  string
+	details map[string]string
+}
+
+// backupChanges compares a database's backup status with the one before
+// and says what changed: backups that fail or work again, a restore check
+// that fails or passes again, and a passed check. Only a change counts, so
+// an agent that tells the same failure every minute alerts once.
+func backupChanges(previous model.BackupStatus, known bool, now model.BackupStatus) []backupChange {
+	changes := []backupChange{}
+	add := func(action string, details map[string]string) {
+		details["database"] = now.Database
+		changes = append(changes, backupChange{action: action, details: details})
+	}
+	backupError, before := now.BackupError(), previous.BackupError()
+	switch {
+	case backupError != "" && (!known || before == ""):
+		add("backup.failed", map[string]string{"error": clipText(backupError, 300)})
+	case backupError == "" && known && before != "":
+		add("backup.recovered", map[string]string{})
+	}
+	if now.VerifiedAt == nil {
+		return changes
+	}
+	switch {
+	case now.DrillError != "" && (!known || previous.DrillError == ""):
+		add("drill.failed", map[string]string{"error": clipText(now.DrillError, 300)})
+	case now.DrillError == "" && known && previous.DrillError != "":
+		add("drill.recovered", map[string]string{})
+	}
+	if now.DrillError == "" && (!known || previous.VerifiedAt == nil || now.VerifiedAt.After(*previous.VerifiedAt)) {
+		add("backup.drill_passed", map[string]string{"verified_at": now.VerifiedAt.UTC().Format(time.RFC3339)})
+	}
+	return changes
 }

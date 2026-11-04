@@ -93,9 +93,16 @@ func showAlerts(ctx context.Context, api *client.Client, stdout io.Writer) error
 	return nil
 }
 
+// allAlertEvents are the events a destination can get, as the control
+// plane lists them.
+var allAlertEvents = []string{
+	"uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed",
+	"backup.failed", "backup.recovered", "drill.failed", "drill.recovered", "disk.full", "disk.ok",
+}
+
 // alertEvents is the events of a destination, short.
 func alertEvents(events []string) string {
-	if len(events) == 5 {
+	if len(events) == len(allAlertEvents) {
 		return "all"
 	}
 	return strings.Join(events, ",")
@@ -106,7 +113,7 @@ func alertEvents(events []string) string {
 func addAlertDestination(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("alerts add", "alerts add slack|discord|telegram|webhook <name> [--chat <id>] [--events uptime.down,deploy.failed], then the URL or bot token on stdin")
 	chat := flags.String("chat", "", "Telegram: the chat ID, like -1001234567890, or @channel")
-	events := flags.String("events", "", "comma list of uptime.down, uptime.up, server.down, server.up, deploy.failed; default all")
+	events := flags.String("events", "", "comma list of uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok; default all")
 	if err := flags.parse(args); err != nil {
 		return err
 	}

@@ -166,6 +166,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	go agent.backups.drills(ctx)
 	go agent.backups.pgSnapshots(ctx)
 	go agent.backups.walgLoop(ctx)
+	go agent.backups.health(ctx)
 	go agent.backups.sweepUploads(ctx)
 	go agent.metrics(ctx)
 	defer agent.backups.configure(context.Background(), nil, nil)

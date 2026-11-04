@@ -64,6 +64,9 @@ type ServerService struct {
 	// alerts mails the owners and admins when a site or a server goes down
 	// or comes back, or a deploy fails; nil sends nothing.
 	alerts *AlertService
+	// diskFull caches per server whether its disk is over the alert line,
+	// read from the database the first time a sample comes.
+	diskFull map[string]bool
 }
 
 type agentSession struct {

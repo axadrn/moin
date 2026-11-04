@@ -349,6 +349,14 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "backs up " + d["database"] + " of " + target + " again"
 	case "backup.drill_passed":
 		return "restored " + d["database"] + " of " + target + " in a restore drill and checked it"
+	case "drill.failed":
+		return "could not restore " + d["database"] + " of " + target + " in the restore check: " + d["error"]
+	case "drill.recovered":
+		return "restores " + d["database"] + " of " + target + " in the restore check again"
+	case "disk.full":
+		return "found the disk of " + target + " " + d["used_percent"] + "% full"
+	case "disk.ok":
+		return "found room on the disk of " + target + " again, " + d["used_percent"] + "% full"
 	case "github.disconnected":
 		return "uninstalled the ops GitHub App from " + target
 	case "api_token.created":

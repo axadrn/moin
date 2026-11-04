@@ -462,7 +462,7 @@ func (m model) askDestination() model {
 		formField{label: "Name", hint: "like team-ops"},
 		formField{label: "URL or bot token", secret: true, hint: "the incoming webhook URL; for Telegram the bot token from @BotFather"},
 		formField{label: "Chat ID", optional: true, hint: "Telegram only: like -1001234567890, or @channel"},
-		formField{label: "Events", optional: true, hint: "empty for all; or uptime.down,uptime.up,server.down,server.up,deploy.failed"},
+		formField{label: "Events", optional: true, hint: "empty for all; or a comma list, e.g. uptime.down,backup.failed,disk.full"},
 	)
 }
 

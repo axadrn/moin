@@ -19,7 +19,10 @@ var AlertKinds = []string{AlertSlack, AlertDiscord, AlertTelegram, AlertWebhook}
 
 // AlertEvents are the actions of the activity that send an alert, in the
 // order the forms offer them.
-var AlertEvents = []string{"uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed"}
+var AlertEvents = []string{
+	"uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed",
+	"backup.failed", "backup.recovered", "drill.failed", "drill.recovered", "disk.full", "disk.ok",
+}
 
 // AlertEventLabel names an alert event for people.
 func AlertEventLabel(event string) string {
@@ -34,6 +37,18 @@ func AlertEventLabel(event string) string {
 		return "Server back online"
 	case "deploy.failed":
 		return "Deploy failed"
+	case "backup.failed":
+		return "Backup failed"
+	case "backup.recovered":
+		return "Backups work again"
+	case "drill.failed":
+		return "Restore check failed"
+	case "drill.recovered":
+		return "Restore check passes again"
+	case "disk.full":
+		return "Disk almost full"
+	case "disk.ok":
+		return "Disk has room again"
 	}
 	return event
 }

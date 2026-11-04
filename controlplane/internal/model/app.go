@@ -114,6 +114,17 @@ type BackupStatus struct {
 	VerifiedAt   *time.Time `db:"verified_at"`
 	Error        string     `db:"error"`
 	UpdatedAt    time.Time  `db:"updated_at"`
+	// DrillError is why the newest restore check failed.
+	DrillError string `db:"drill_error"`
+}
+
+// BackupError is why the backups themselves fail, without a failed restore
+// check, which older agents report in Error too.
+func (s BackupStatus) BackupError() string {
+	if s.Error == s.DrillError {
+		return ""
+	}
+	return s.Error
 }
 
 // GitHubInstallation is the ops GitHub App on one account or organization.

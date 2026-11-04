@@ -273,8 +273,14 @@ func (b *backups) pgSnapshotAll(ctx context.Context) {
 				continue
 			}
 			_, err = b.snapshotOne(ctx, app, database, "hourly")
-			if err != nil {
+			switch {
+			case errors.Is(err, errPostgresDown):
+				// A database that does not run has nothing new to copy.
+			case err != nil:
 				slog.Error("backup: hourly snapshot failed", "app", app, "database", database.Path, "error", err)
+				b.fail(drillKey(app, database), "snapshot", "hourly snapshot: "+err.Error())
+			default:
+				b.fail(drillKey(app, database), "snapshot", "")
 			}
 		}
 	}

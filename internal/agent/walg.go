@@ -530,8 +530,10 @@ func (b *backups) walgOnce(ctx context.Context) {
 					slog.Warn("backup: start WAL-G over", "app", app, "database", database.Path, "error", err)
 				}
 			}
+			key := drillKey(app, database)
 			if err := b.walgEnsure(ctx, app, database); err != nil {
 				slog.Warn("backup: continuous Postgres backup", "app", app, "database", database.Path, "error", err)
+				b.fail(key, "continuous", "continuous backup: "+err.Error())
 				continue
 			}
 			if err := b.walgSwitch(ctx, app, database); err != nil {
@@ -544,8 +546,11 @@ func (b *backups) walgOnce(ctx context.Context) {
 			if due {
 				if err := b.walgBase(ctx, app, database); err != nil {
 					slog.Error("backup: base backup failed", "app", app, "database", database.Path, "error", err)
+					b.fail(key, "continuous", "base backup: "+err.Error())
+					continue
 				}
 			}
+			b.fail(key, "continuous", "")
 		}
 	}
 	b.walgStopAll(ctx, wanted)

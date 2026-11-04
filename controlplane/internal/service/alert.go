@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -38,11 +39,7 @@ func NewAlertService(email *EmailService, workspaces repository.WorkspaceReposit
 
 // alerted says whether an action of the activity sends an alert.
 func alerted(action string) bool {
-	switch action {
-	case "uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed":
-		return true
-	}
-	return false
+	return slices.Contains(model.AlertEvents, action)
 }
 
 // alertMessage is one alert as every destination says it: the symbol and
@@ -139,6 +136,48 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		}
 		message.URL = base + "/apps/" + target
 		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
+	case "backup.failed":
+		database := details["database"]
+		message.Symbol, message.Heading = "🔴", "Backups of "+target+" stopped"
+		message.Lines = []string{
+			"Database: " + database + ", app " + target + ".",
+			"Error: " + orDash(clipText(details["error"], 300)),
+			"New changes are not in your bucket until this is fixed. What is there stays. See: ops backups " + target,
+		}
+		message.URL = base + "/apps/" + target + "/backups"
+		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
+	case "backup.recovered":
+		message.Symbol, message.Heading = "🟢", "Backups of "+target+" work again"
+		message.Lines = []string{"Database: " + details["database"] + ", app " + target + ". Every change goes to your bucket again."}
+		message.URL = base + "/apps/" + target + "/backups"
+		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)
+	case "drill.failed":
+		message.Symbol, message.Heading = "🔴", "Restore check of "+target+" failed"
+		message.Lines = []string{
+			"Database: " + details["database"] + ", app " + target + ".",
+			"Error: " + orDash(clipText(details["error"], 300)),
+			"The newest backup did not restore cleanly. Take a snapshot now and look: ops backups " + target,
+		}
+		message.URL = base + "/apps/" + target + "/backups"
+		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
+	case "drill.recovered":
+		message.Symbol, message.Heading = "🟢", "Restore check of "+target+" passes again"
+		message.Lines = []string{"Database: " + details["database"] + ", app " + target + ". The newest backup restores cleanly."}
+		message.URL = base + "/apps/" + target + "/backups"
+		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)
+	case "disk.full":
+		message.Symbol, message.Heading = "🟠", "Disk of "+target+" is "+details["used_percent"]+"% full"
+		message.Lines = []string{
+			details["used"] + " of " + details["total"] + " used.",
+			"A full disk stops databases from writing. Free space or grow the disk. " + s.appsOn(workspace.ID, target),
+		}
+		message.URL = base + "/servers"
+		message.Payload.Server, message.Payload.Reason = target, details["used_percent"]+"% used"
+	case "disk.ok":
+		message.Symbol, message.Heading = "🟢", "Disk of "+target+" has room again"
+		message.Lines = []string{details["used"] + " of " + details["total"] + " used, " + details["used_percent"] + "%."}
+		message.URL = base + "/servers"
+		message.Payload.Server, message.Payload.Reason = target, details["used_percent"]+"% used"
 	}
 	message.Lines = nonEmpty(message.Lines)
 	message.Payload.URL = message.URL

@@ -487,6 +487,10 @@ type DatabaseBackup struct {
 	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
 	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
 	Error        string     `json:"error,omitempty"`
+	// DrillError is why the newest restore check failed. Error holds it
+	// too when nothing else is wrong, for control planes that know no
+	// DrillError.
+	DrillError string `json:"drill_error,omitempty"`
 	// Note says what a database lacks, such as a point in time window for
 	// a Postgres image WAL-G does not run in.
 	Note string `json:"note,omitempty"`

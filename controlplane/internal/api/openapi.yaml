@@ -2725,7 +2725,7 @@ paths:
       tags: [Alerts]
       operationId: createAlertDestination
       summary: Add an alert destination
-      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up and deploy.failed; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
+      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full and disk.ok; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
       requestBody:
         required: true
         content:
@@ -5036,7 +5036,7 @@ components:
           type: array
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok]
         failing:
           type: boolean
         failing_since:
@@ -5089,7 +5089,7 @@ components:
           description: Empty for all five.
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok]
     Registry:
       type: object
       required: [host, username, created_at]

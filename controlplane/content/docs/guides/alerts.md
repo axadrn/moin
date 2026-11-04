@@ -1,6 +1,6 @@
 ---
 title: "Alerts"
-description: "A mail, a Slack or Discord message, a Telegram message or a webhook when a site goes down, a server goes offline or a deploy fails"
+description: "A mail, a Slack or Discord message, a Telegram message or a webhook when a site goes down, a server goes offline, a deploy fails, backups stop or a disk fills up"
 order: 11
 ---
 
@@ -13,8 +13,11 @@ One alert per event, never one per minute:
 - **A site goes down**, with the app, since when and the reason, such as `HTTP 502` or `no answer within 10s`. And one when it is **back up**, with how long it was down. See [Uptime](/docs/guides/uptime#down-and-back-up).
 - **A server goes offline**: its agent has not answered for two minutes. The alert names the apps on it. And one when it is **back online**, with how long it was offline. See [Servers](/docs/guides/servers).
 - **A deploy fails**, with its number and the error. A failed deploy leaves the live version running, or starts it again; the alert says which version that is. See [What a deploy does](/docs/guides/deploy#what-a-deploy-does).
+- **Backups stop**: the continuous backup of a SQLite or Postgres database fails for three minutes, a snapshot cannot be uploaded, or WAL-G lost its place in the log. What is in your bucket stays; new changes are not there until it works again. And one when it does. See [Backups](/docs/guides/backups).
+- **The daily restore check fails**: the newest backup did not restore cleanly. And one when a check passes again.
+- **A disk is almost full**: the disk that holds the apps' data is over 90%. A full disk stops databases from writing. And one when it is under 85% again, so a disk at 88% does not alert back and forth.
 
-Every alert links to the page in ops: the uptime of the app, the servers, or the app with its deploys. Mails and messages say the same:
+Every alert links to the page in ops: the uptime of the app, the servers, the app with its deploys, or its backups. Mails and messages say the same:
 
 ```text
 🔴 shop.example.com is down
@@ -44,7 +47,18 @@ MCP: set_email_alerts
 
 ## Slack, Discord, Telegram and webhooks
 
-Besides the mails, a workspace sends its alerts to up to 20 destinations. Each gets the events it is set for, all five by default: a site down (`uptime.down`), back up (`uptime.up`), a server offline (`server.down`), back online (`server.up`) and a failed deploy (`deploy.failed`).
+Besides the mails, a workspace sends its alerts to up to 20 destinations. Each gets the events it is set for, all of them by default:
+
+| Event | When |
+| --- | --- |
+| `uptime.down`, `uptime.up` | a site goes down, and is back up |
+| `server.down`, `server.up` | a server goes offline, and is back online |
+| `deploy.failed` | a deploy fails |
+| `backup.failed`, `backup.recovered` | backups of a database stop, and work again |
+| `drill.failed`, `drill.recovered` | the daily restore check fails, and passes again |
+| `disk.full`, `disk.ok` | a server's disk is over 90%, and under 85% again |
+
+A destination that got every event before backup and disk alerts came gets the new ones too.
 
 Every member sees the destinations. Only **owners** and **admins** add, test and remove them.
 

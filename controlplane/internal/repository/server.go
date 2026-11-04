@@ -37,6 +37,26 @@ type ServerRepository interface {
 	SetIntegrations(integrations model.Integrations) error
 	AutoUpdateAgents(workspaceID string) (bool, error)
 	SetAutoUpdateAgents(workspaceID string, on bool) error
+	// DiskFull reports whether the server's disk was over the alert line
+	// when it last crossed it; SetDiskFull stores a crossing.
+	DiskFull(id string) (bool, error)
+	SetDiskFull(id string, full bool, at time.Time) error
+}
+
+func (r *serverRepository) DiskFull(id string) (bool, error) {
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM disk_alerts WHERE server_id = $1`, id)
+	return count > 0, err
+}
+
+func (r *serverRepository) SetDiskFull(id string, full bool, at time.Time) error {
+	if !full {
+		_, err := r.db.Exec(`DELETE FROM disk_alerts WHERE server_id = $1`, id)
+		return err
+	}
+	_, err := r.db.Exec(`INSERT INTO disk_alerts (server_id, since) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM servers WHERE id = $1)
+		ON CONFLICT (server_id) DO NOTHING`, id, at.UTC())
+	return err
 }
 
 type serverRepository struct {

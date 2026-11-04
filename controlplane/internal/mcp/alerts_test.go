@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/axadrn/ops/controlplane/internal/mcp"
+	"github.com/axadrn/ops/controlplane/internal/model"
 	"github.com/axadrn/ops/controlplane/internal/service"
 )
 
@@ -57,7 +58,7 @@ func TestAlertDestinationTools(t *testing.T) {
 	defer hook.Close()
 
 	added := output[mcp.CreatedAlertDestination](t, call(t, session, "add_alert_destination", map[string]any{"kind": "webhook", "name": "ci", "url": hook.URL + "/secret-path"}))
-	if added.Name != "ci" || len(added.SigningSecret) != 64 || len(added.Events) != 5 {
+	if added.Name != "ci" || len(added.SigningSecret) != 64 || len(added.Events) != len(model.AlertEvents) {
 		t.Fatalf("add_alert_destination = %+v", added)
 	}
 	if fields := toolError(t, call(t, session, "add_alert_destination", map[string]any{"kind": "telegram", "name": "phone", "bot_token": "nope", "chat_id": "1"}), "validation_failed").Fields; fields["bot_token"] == "" {

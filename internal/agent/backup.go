@@ -63,6 +63,11 @@ type backups struct {
 	store      *litestream.Store
 	watched    map[string]watched
 	verified   map[string]drill
+	// failures are the backups that do not work, and reported what the
+	// agent last told the control plane about each database; see
+	// backup_health.go.
+	failures map[string]failure
+	reported map[string]string
 	// walg runs the continuous Postgres backups.
 	walg walg
 }
@@ -73,6 +78,8 @@ type watched struct {
 	storage  protocol.BackupStorage
 	prefix   string
 	database protocol.Database
+	// db is Litestream's database, for its sync errors.
+	db *litestream.DB
 }
 
 // drill is the newest restore drill of a database.
@@ -212,9 +219,10 @@ func (b *backups) reconcileLocked() (gone []string) {
 		if known && old.prefix == item.prefix && old.storage == item.storage {
 			continue
 		}
-		b.watched[hostPath] = item
 		moved := b.moved(hostPath, item.storage, item.prefix)
 		db := litestream.NewDB(hostPath)
+		item.db = db
+		b.watched[hostPath] = item
 		replica := litestream.NewReplicaWithClient(db, replicaClientAt(&item.storage, item.prefix))
 		db.Replica = replica
 		go func() {
@@ -641,9 +649,10 @@ func (b *backups) list(ctx context.Context, request protocol.BackupRequest) (pro
 // snapshots, which reads the bucket.
 func (b *backups) status(ctx context.Context, app string, database protocol.Database, withSnapshots bool) protocol.DatabaseBackup {
 	backup := protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind, Snapshots: []protocol.Snapshot{}}
+	backup.Error = b.problem(app, database, time.Now())
 	if withSnapshots {
 		snapshots, err := b.snapshots(ctx, app, database.Path)
-		if err != nil {
+		if err != nil && backup.Error == "" {
 			backup.Error = "list snapshots: " + err.Error()
 		}
 		if snapshots != nil {
@@ -663,6 +672,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		if !last.at.IsZero() {
 			at := last.at
 			backup.VerifiedAt = &at
+			backup.DrillError = last.err
 			if last.err != "" && backup.Error == "" {
 				backup.Error = last.err
 			}
@@ -684,6 +694,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	if !last.at.IsZero() {
 		at := last.at
 		backup.VerifiedAt = &at
+		backup.DrillError = last.err
 		if last.err != "" && backup.Error == "" {
 			backup.Error = last.err
 		}
