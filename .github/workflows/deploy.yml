@@ -103,7 +103,7 @@ jobs:
     if: github.repository == 'axadrn/moin' || github.repository == 'axadrn/ops'
     runs-on: ubuntu-24.04
     env:
-      HOST: ops-01
+      HOST: moin-01
       # Tailscale lets only workflows of this repo in with it, as tag:ci.
       TS_CLIENT_ID: TA5fRdgvFU11CNTRL-kW36unrgMk11CNTRL
     steps:
