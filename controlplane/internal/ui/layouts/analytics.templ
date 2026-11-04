@@ -2,8 +2,10 @@ package layouts
 
 import "github.com/axadrn/moin/controlplane/internal/ctxkeys"
 
-// Analytics renders all enabled analytics providers
-// Multiple providers can be used simultaneously
+// Analytics renders the enabled analytics providers. Only the public
+// layouts ask for it (SEOProps.Public): the app, the admin and the sign-in
+// pages never count, so no customer's names and no token in an address
+// reach a page counter.
 templ Analytics() {
 	{{ cfg := ctxkeys.RenderConfig(ctx) }}
 	// Umami Analytics (recommended)

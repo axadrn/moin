@@ -19,6 +19,9 @@ type SEOProps struct {
 	// of the page: the control panel swaps only its content (DESIGN.md,
 	// Navigation).
 	Boost string
+	// Public pages (home, docs, changelog, catalog, legal) carry the page
+	// counter; the app, the admin and sign-in never do.
+	Public bool
 }
 
 templ Base(props ...SEOProps) {
@@ -51,8 +54,9 @@ templ Base(props ...SEOProps) {
 			// Site-wide enhancements
 			@themeScript()
 			@feedbackScript()
-			// Analytics
-			@Analytics()
+			if len(props) > 0 && props[0].Public {
+				@Analytics()
+			}
 		</head>
 		<body
 			class="style-nova min-h-screen"
