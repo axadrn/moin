@@ -84,7 +84,7 @@ With a mouse you drag the whole server; on a phone you drag the grip at its left
 
 **The control plane.** On our hosted control plane we update it, you do nothing. On your own, ops tells you when a release is out and updates with one click, see [Self-hosting](/docs/self-hosting#updates).
 
-**The agents** update themselves to the version of the control plane. When an agent is older, ops updates it: one server at a time, never during a deploy. Your apps keep running while the agent restarts. If an agent does not come back, ops stops there and says so in the activity.
+**The agents** update themselves to the version of the control plane. When an agent is older, ops updates it: one server at a time, never during a deploy. Your apps keep running while the agent restarts. If an agent does not come back, ops stops there and says so in the activity. Until an agent has updated, the servers list shows **update pending** next to its version; the control plane's own version is at the bottom of the sidebar.
 
 Switch it off for your workspace with **Update agents automatically**:
 

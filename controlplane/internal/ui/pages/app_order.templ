@@ -39,6 +39,10 @@ templ orderForm(page string) {
 	</form>
 }
 
+// listCard is one item of a list of apps or servers: a slim card of its
+// own, the grip on its left, so it lifts as a whole when dragged.
+const listCard = "min-w-0 flex-row items-center gap-1 rounded-3xl py-1.5 pr-1.5 pl-2"
+
 // orderHandle is what an item of an ordered list carries: its name as a
 // hidden input, so the form sends the order of the page, and a grip at its
 // left that shows it can be dragged. With a mouse the whole item drags; on a touch
@@ -76,15 +80,18 @@ templ viewSwitch(page string) {
 	</form>
 }
 
+// viewButton is one icon of the view switch; label names it for screen
+// readers and on hover.
 templ viewButton(pressed bool, value, label string) {
 	<button
 		type="submit"
 		name="view"
 		value={ value }
 		aria-pressed={ boolString(pressed) }
-		class="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+		aria-label={ label }
+		title={ label }
+		class="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
 	>
 		{ children... }
-		{ label }
 	</button>
 }

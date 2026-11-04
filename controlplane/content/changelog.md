@@ -3,6 +3,26 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.7
+
+November 4, 2026
+
+**In short:** apps and servers are slim cards you drag as a whole, the version of ops is always in sight, and changing repos on github.com no longer ends on an error.
+
+### New
+- **Version in the sidebar**: the control plane's version sits at the bottom of the sidebar and opens the changelog.
+- **Update pending**: a server whose agent is behind says so next to its version; it updates itself on its next connect.
+
+### Changed
+- **Apps and servers lists**: every app and server is a slim card of its own, with its grip on the left, the same on both pages.
+- **List and grid switch**: icons only.
+
+### Fixed
+- **GitHub repos changed on github.com**: coming back to ops no longer shows "GitHub is not connected"; the change was saved all along.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.6
 
 November 4, 2026

@@ -162,16 +162,16 @@ templ ServerList(servers []model.Server) {
 			</div>
 			@orderForm("servers") {
 				if pageView(ctx, "servers") == model.ViewList {
-					@card.Card(card.Props{Class: "min-w-0 p-3"}) {
-						<ul class="flex flex-col gap-1" role="list" aria-labelledby="servers-heading" data-sortable-list>
-							for _, server := range servers {
-								<li data-server={ server.Name } data-online?={ server.Online } class="flex min-w-0 items-center gap-1">
+					<ul class="flex flex-col gap-2" role="list" aria-labelledby="servers-heading" data-sortable-list>
+						for _, server := range servers {
+							<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
+								@card.Card(card.Props{Class: listCard}) {
 									@orderHandle(server.Name)
 									@serverRow(server, basePath, now)
-								</li>
-							}
-						</ul>
-					}
+								}
+							</li>
+						}
+					</ul>
 				} else {
 					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="servers-heading" data-sortable-list>
 						for _, server := range servers {
@@ -184,6 +184,14 @@ templ ServerList(servers []model.Server) {
 			}
 		}
 	</div>
+}
+
+// agentPending marks an agent behind the control plane; it updates itself
+// on its next connect.
+templ agentPending() {
+	@badge.Badge(badge.Props{Class: "h-auto rounded-full bg-amber-500/15 px-2 py-0 text-[11px] font-medium text-amber-600 dark:text-amber-400", Attributes: templ.Attributes{"data-agent-outdated": true, "title": "Updates to " + build.Version + " by itself"}}) {
+		update pending
+	}
 }
 
 // serverRow is a server in the list: its name, system and agent, when it
@@ -201,6 +209,9 @@ templ serverRow(server model.Server, basePath string, now time.Time) {
 				}
 				if server.AgentVersion != "" {
 					agent { server.AgentVersion }
+					if server.Online && agentOutdated(server) {
+						@agentPending()
+					}
 					<span aria-hidden="true">·</span>
 				}
 				{ serverReach(server) }
@@ -239,7 +250,10 @@ templ serverCard(server model.Server, basePath string, now time.Time) {
 				<p class="text-xs text-muted-foreground">Its agent never connected. Run the install command on the server. Lost it? Remove the server on its page and add it again.</p>
 			}
 			if server.Online && agentOutdated(server) {
-				<p class="text-xs text-muted-foreground" data-agent-outdated>The control plane runs { build.Version }.</p>
+				<p class="flex items-center gap-2 text-xs text-muted-foreground">
+					@agentPending()
+					The control plane runs { build.Version }.
+				</p>
 			}
 		}
 		@card.Footer(card.FooterProps{Class: "mt-auto gap-2"}) {

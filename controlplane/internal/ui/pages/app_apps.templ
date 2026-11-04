@@ -133,12 +133,12 @@ templ AppList(view AppsView) {
 				@statCard("Failed", strconv.Itoa(failed), failedNote(failed))
 				@statCard("Servers online", strconv.Itoa(onlineServers(view.Servers)), "of "+strconv.Itoa(len(view.Servers)))
 			}
-			if pageView(ctx, "apps") == model.ViewGrid {
-				<div class="flex flex-wrap items-center justify-between gap-3">
-					<h2 id="apps-heading" class="text-base font-semibold">All apps</h2>
-					@appListActions(len(view.Apps))
-				</div>
-				@orderForm("apps") {
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<h2 id="apps-heading" class="text-base font-semibold">All apps</h2>
+				@appListActions(len(view.Apps))
+			</div>
+			@orderForm("apps") {
+				if pageView(ctx, "apps") == model.ViewGrid {
 					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="apps-heading" data-sortable-list>
 						for _, app := range view.Apps {
 							{{ newest, hasNewest := view.Newest[app.ID] }}
@@ -147,9 +147,19 @@ templ AppList(view AppsView) {
 							</li>
 						}
 					</ul>
+				} else {
+					<ul class="flex flex-col gap-2" role="list" aria-labelledby="apps-heading" data-sortable-list>
+						for _, app := range view.Apps {
+							{{ newest, hasNewest := view.Newest[app.ID] }}
+							<li data-app={ app.Name } class="min-w-0">
+								@card.Card(card.Props{Class: listCard}) {
+									@orderHandle(app.Name)
+									@appRow(app, newest, hasNewest, now)
+								}
+							</li>
+						}
+					</ul>
 				}
-			} else {
-				@appRows(view, now)
 			}
 		}
 	</div>
@@ -199,52 +209,35 @@ templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
 	}
 }
 
-// appRows is the apps as a list in a panel.
-templ appRows(view AppsView, now time.Time) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Heading: "apps-heading", Title: "All apps", Action: appListActions(len(view.Apps)), Body: panelBodyRows}) {
-		<div class="hidden grid-cols-[minmax(0,1fr)_10rem_8rem_1rem] gap-4 pr-3 pl-[2.75rem] pb-2 text-xs text-muted-foreground md:grid" aria-hidden="true">
-			<span>App</span>
-			<span>Status</span>
-			<span>Last deploy</span>
-		</div>
-		@orderForm("apps") {
-			<ul class="flex flex-col gap-1" role="list" data-sortable-list>
-				for _, app := range view.Apps {
-					{{ newest, hasNewest := view.Newest[app.ID] }}
-					<li data-app={ app.Name } class="flex min-w-0 items-center gap-1">
-						@orderHandle(app.Name)
-						@item.Item(item.Props{Href: basePath + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_10rem_8rem_1rem]"}) {
-							@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
-								@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
-									{ app.Name }
-								}
-								@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
-									if hasNewest && newest.Detected != nil {
-										<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
-										<span aria-hidden="true">·</span>
-										{ newest.Detected.Kind }
-										<span aria-hidden="true">·</span>
-									}
-									on { app.ServerName }
-								}
-							}
-							<span class="flex min-w-0 justify-end md:justify-start">
-								@appStatus(app)
-							</span>
-							<span class="hidden text-xs text-muted-foreground tabular-nums md:block">
-								if hasNewest {
-									<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
-								} else {
-									never deployed
-								}
-							</span>
-							@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
-						}
-					</li>
+// appRow is an app in the list, like a server in its list: its name, what
+// runs and where, its state and last deploy, linking to its page.
+templ appRow(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
+	@item.Item(item.Props{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_8rem_7rem_1rem]"}) {
+		@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
+			@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
+				{ app.Name }
+			}
+			@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
+				if hasNewest && newest.Detected != nil {
+					<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
+					<span aria-hidden="true">·</span>
+					{ newest.Detected.Kind }
+					<span aria-hidden="true">·</span>
 				}
-			</ul>
+				on { app.ServerName }
+			}
 		}
+		<span class="flex min-w-0 justify-end md:justify-start">
+			@appStatus(app)
+		</span>
+		<span class="hidden text-xs text-muted-foreground tabular-nums md:block">
+			if hasNewest {
+				<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
+			} else {
+				never deployed
+			}
+		</span>
+		@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
 	}
 }
 

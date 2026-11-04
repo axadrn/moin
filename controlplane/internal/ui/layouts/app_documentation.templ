@@ -1,12 +1,14 @@
 package layouts
 
 import (
+	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
-// AppSidebarHelp is the quiet links above the user: the docs and support.
+// AppSidebarHelp is the quiet links above the user: the docs, support and
+// the version of the control plane, which opens the changelog.
 templ AppSidebarHelp() {
 	@sidebar.Menu() {
 		@sidebar.MenuItem() {
@@ -30,6 +32,18 @@ templ AppSidebarHelp() {
 			}) {
 				@icon.LifeBuoy()
 				<span>Support</span>
+			}
+		}
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Href:       "/changelog",
+				Size:       sidebar.MenuButtonSizeSm,
+				Tooltip:    build.Name + " " + build.Version,
+				Class:      "text-sidebar-foreground/70",
+				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-version": build.Version},
+			}) {
+				@icon.Tag()
+				<span>{ build.Name } <span class="font-mono text-xs">{ build.Version }</span></span>
 			}
 		}
 	}
