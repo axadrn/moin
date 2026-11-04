@@ -30,7 +30,7 @@ A server offline for two minutes, and back online, sends the owners and admins o
 
 Gives you one install command for a new server. The name is yours to pick, such as `web-1`: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, like an app name. Leave it empty and ops picks one like `brave-otter`.
 
-Log in to the server as root, for example with `ssh root@<server-ip>`, and run the command there within one hour. Not root? Put `sudo` before `sh`. The command works once. The server needs Linux with systemd, the program that starts services; Ubuntu and Debian have it. If the install stops halfway, get [a new install command](#a-new-install-command).
+Log in to the server as root, for example with `ssh root@<server-ip>`, and run the command there within one hour. Not root? Put `sudo` before `sh`. The command works once. The server needs Linux with systemd, the program that starts services; Ubuntu and Debian have it. If the install stops halfway, get [a new install command](#a-new-install-command). The agent dials the control plane at its `APP_URL`; `OPS_URL=http://127.0.0.1:8090` before `sh` dials another address, as on a server that runs the control plane too ([one server](/docs/self-hosting#one-server)).
 
 ```surfaces
 Web: **Servers**, **Add server**

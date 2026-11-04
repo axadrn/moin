@@ -33,9 +33,46 @@ And it is private:
 - Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This ops is private. Ask its admin for an invitation."
 - The docs stay at `/docs`. The terms and privacy pages of our hosted service are not there, and search engines are asked to stay away (`ROBOTS_NOINDEX` is on).
 
+## Three ways to run ops
+
+- **Hosted.** We run the control plane. Your servers keep your apps and data, with no open port for us.
+- **One server.** The control plane and your apps on one machine, in one command. The way to start.
+- **Two servers.** The control plane on its own small server. Recommended once it matters: an app that is broken into cannot reach the control plane, and you can still restore, roll back and see what happened.
+
+## One server
+
+Point a domain at the server with an A record, then run this as root on a fresh Ubuntu or Debian server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com
+```
+
+It takes a few minutes and does it all:
+
+1. Installs Docker and security updates.
+2. Writes the settings to `/etc/ops-controlplane/env`, with a new `SECRETS_KEY`. Keep a copy of that key: it seals the secrets of your apps.
+3. Starts the control plane, and makes your account, a workspace and this server in it.
+4. Installs the agent, which reaches the control plane on this machine and starts the proxy for ports 80 and 443.
+5. Serves the control plane on your domain, with a certificate from Let's Encrypt, like any app.
+
+At the end it prints a sign-in link. Email and a bucket can come later: until email is set up, sign-in links go to the control plane's log, and this prints a new one:
+
+```bash
+docker compose -f /opt/ops/compose.yml exec controlplane ./main sign-in-link
+```
+
+Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the control plane's own backup, then run `sh /opt/ops/update.sh`. Run the install command again any time: it keeps your settings and data.
+
+### Move from one server to two
+
+1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/ops/update.sh`.
+2. On the old server, stop it: `docker compose -f /opt/ops/compose.yml down`. Your apps keep running.
+3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The control plane restores its database from the bucket on its first start. Point the domain at the new server.
+4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `ops servers install-command <server>` and run it on the old server: the agent now dials your domain. Your apps keep running.
+
 ## Where to run it
 
-On its own small server, not on a server with your apps. The agent on an app server takes ports 80 and 443 for your apps, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers, since their agents dial out to it.
+On its own small server, not on a server with your apps, once it matters. The agent on an app server takes ports 80 and 443 for your apps, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers, since their agents dial out to it.
 
 ## What you need
 
