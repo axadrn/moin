@@ -271,6 +271,10 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		if err != nil {
 			return detected, err
 		}
+		err = a.backups.walgBefore(ctx, start.App, logf)
+		if err != nil {
+			return detected, err
+		}
 	}
 	logf("starting")
 	// A restart brings nothing new, so compose would leave the containers
@@ -305,6 +309,12 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	}
 	if a.backups != nil {
 		a.backups.reconcile()
+		// A recreated Postgres container needs its WAL-G companion again.
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			a.backups.walgOnce(ctx)
+		}()
 	}
 	a.prune(ctx, start.App)
 	return detected, nil

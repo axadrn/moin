@@ -63,6 +63,8 @@ type backups struct {
 	store      *litestream.Store
 	watched    map[string]watched
 	verified   map[string]drill
+	// walg runs the continuous Postgres backups.
+	walg walg
 }
 
 // watched is one replicated database; prefix is its folder in the bucket.
@@ -641,7 +643,12 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		}
 	}
 	if database.Postgres() {
-		// No point in time window yet: snapshots only.
+		// The point in time window comes from WAL-G's backups.
+		since, until, err := b.walgWindow(ctx, app, database)
+		if err == nil && !since.IsZero() {
+			backup.Since, backup.ReplicatedAt = &since, &until
+		}
+		backup.Note = b.walgUnsupported(app, database)
 		b.mu.Lock()
 		last := b.verified[drillKey(app, database)]
 		b.mu.Unlock()

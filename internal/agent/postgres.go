@@ -127,7 +127,7 @@ func pgError(stderr string) string {
 // only, stopping at the first error. vars become psql variables the script
 // reads as :'name', which psql quotes as literals.
 func (t pgTarget) psql(ctx context.Context, script string, vars map[string]string, tags bool) (string, error) {
-	args := []string{"psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-U", t.user, "-d", t.database}
+	args := []string{"psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-h", pgSocket, "-U", t.user, "-d", t.database}
 	if !tags {
 		args = append(args, "-q")
 	}
@@ -138,6 +138,11 @@ func (t pgTarget) psql(ctx context.Context, script string, vars map[string]strin
 	err := t.exec(ctx, strings.NewReader(script), &stdout, args...)
 	return stdout.String(), err
 }
+
+// pgSocket is the folder of the unix socket in the official image. Naming
+// it keeps a PGHOST in the container's environment from sending the tools
+// over TCP, where the image asks for a password.
+const pgSocket = "/var/run/postgresql"
 
 // pgStatementTimeout bounds each statement the browser runs.
 const pgStatementTimeout = "SET statement_timeout = '25s';\n"
@@ -526,7 +531,7 @@ func pgMultiple(sql string) bool {
 // pgDump writes a pg_dump of the database in its custom format, which is
 // compressed, to file.
 func (t pgTarget) dump(ctx context.Context, file *os.File) error {
-	return t.exec(ctx, nil, file, "pg_dump", "-Fc", "-U", t.user, "-d", t.database)
+	return t.exec(ctx, nil, file, "pg_dump", "-Fc", "-h", pgSocket, "-U", t.user, "-d", t.database)
 }
 
 // restoreDump puts a dump back into the database in one transaction: it
@@ -537,7 +542,7 @@ func (t pgTarget) restoreDump(ctx context.Context, file string) error {
 		return err
 	}
 	defer in.Close()
-	return t.exec(ctx, in, io.Discard, "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error", "-U", t.user, "-d", t.database)
+	return t.exec(ctx, in, io.Discard, "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error", "-h", pgSocket, "-U", t.user, "-d", t.database)
 }
 
 // pgDrill restores a dump into a throwaway container of the same image, on
@@ -576,7 +581,7 @@ func (a *apps) pgDrill(ctx context.Context, image, file string) error {
 		return fmt.Errorf("read the snapshot: %w", err)
 	}
 	want := pgDumpTables(list.String())
-	err = container.exec(ctx, nil, io.Discard, "pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "-U", "postgres", "-d", "postgres", "/tmp/drill.dump")
+	err = container.exec(ctx, nil, io.Discard, "pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "-h", pgSocket, "-U", "postgres", "-d", "postgres", "/tmp/drill.dump")
 	if err != nil {
 		return fmt.Errorf("restore: %w", err)
 	}

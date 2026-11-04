@@ -119,7 +119,10 @@ func (b *backups) downloadDump(ctx context.Context, older *protocol.BackupStorag
 // while pg_restore runs in one transaction: it changes all or nothing.
 func (b *backups) pgRestore(ctx context.Context, request protocol.BackupRestore, database protocol.Database) error {
 	if request.At != nil {
-		return errors.New(protocol.PostgresPointInTime + " Pick a snapshot.")
+		if note := b.walgUnsupported(request.App, database); note != "" {
+			return errors.New(note)
+		}
+		return b.pgRestorePoint(ctx, request, database)
 	}
 	defer b.apps.lock(request.App)()
 	file, err := b.downloadDump(ctx, request.Storage, request.App, database, request.Snapshot)

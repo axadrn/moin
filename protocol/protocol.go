@@ -312,10 +312,6 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
 
-// PostgresPointInTime says, on every surface, what Postgres backups do and
-// do not do yet.
-const PostgresPointInTime = "Point in time: SQLite only for now; Postgres has hourly snapshots and one before every change."
-
 // Config is the x-ops block of compose.yml. Every field is optional.
 type Config struct {
 	App       string   `json:"app,omitempty"`
@@ -478,6 +474,9 @@ type DatabaseBackup struct {
 	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
 	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
 	Error        string     `json:"error,omitempty"`
+	// Note says what a database lacks, such as a point in time window for
+	// a Postgres image WAL-G does not run in.
+	Note string `json:"note,omitempty"`
 }
 
 // Snapshot is a full copy of a database in the bucket: a gzipped SQLite
