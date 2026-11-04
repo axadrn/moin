@@ -187,6 +187,10 @@ func (b *backups) reconcileLocked() (gone []string) {
 	entries, _ := os.ReadDir(b.apps.dir)
 	for _, entry := range entries {
 		for _, database := range b.apps.runningDatabases(entry.Name()) {
+			if database.Postgres() {
+				// Postgres has snapshots, no Litestream.
+				continue
+			}
 			prefix, err := b.prefix(entry.Name(), database.Path)
 			if err != nil {
 				slog.Warn("backup: not replicated", "app", entry.Name(), "database", database.Path, "error", err)
@@ -356,7 +360,7 @@ func (b *backups) databases(app, database string) ([]protocol.Database, error) {
 	all := b.apps.runningDatabases(app)
 	if database == "" {
 		if len(all) == 0 {
-			return nil, fmt.Errorf("no SQLite database on a volume of %s", app)
+			return nil, fmt.Errorf("no database in %s: no SQLite file on a volume, no Postgres service", app)
 		}
 		return all, nil
 	}
@@ -395,12 +399,19 @@ func (b *backups) snapshot(ctx context.Context, request protocol.BackupRequest) 
 func (b *backups) snapshotOne(ctx context.Context, app string, database protocol.Database, reason string) (protocol.Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, snapshotTimeout)
 	defer cancel()
-	gzipped, cleanup, err := gzippedCopy(ctx, database.HostPath)
+	var copied string
+	var cleanup func()
+	var err error
+	if database.Postgres() {
+		copied, cleanup, err = b.pgCopy(ctx, app, database)
+	} else {
+		copied, cleanup, err = gzippedCopy(ctx, database.HostPath)
+	}
 	if err != nil {
 		return protocol.Snapshot{}, err
 	}
 	defer cleanup()
-	file, err := os.Open(gzipped)
+	file, err := os.Open(copied)
 	if err != nil {
 		return protocol.Snapshot{}, err
 	}
@@ -430,7 +441,7 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 	if err != nil {
 		return protocol.Snapshot{}, err
 	}
-	key := prefix + "/snapshots/" + snapshot.ID + ".db.gz"
+	key := prefix + "/snapshots/" + snapshot.ID + snapshotExt(database)
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), Body: file, ContentLength: aws.Int64(info.Size())})
 	if err != nil {
 		return protocol.Snapshot{}, fmt.Errorf("upload: %w", err)
@@ -438,7 +449,7 @@ func (b *backups) snapshotOne(ctx context.Context, app string, database protocol
 	snapshots = append([]protocol.Snapshot{snapshot}, snapshots...)
 	if listErr == nil && len(snapshots) > keepSnapshots {
 		for _, old := range snapshots[keepSnapshots:] {
-			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(prefix + "/snapshots/" + old.ID + ".db.gz")})
+			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(prefix + "/snapshots/" + old.ID + snapshotExt(database))})
 		}
 	}
 	slog.Info("backup: snapshot", "app", app, "database", database.Path, "id", snapshot.ID, "size", snapshot.Size)
@@ -566,7 +577,7 @@ func (b *backups) snapshotsIn(ctx context.Context, storage *protocol.BackupStora
 			return nil, err
 		}
 		for _, object := range page.Contents {
-			id := strings.TrimSuffix(strings.TrimPrefix(aws.ToString(object.Key), prefix), ".db.gz")
+			id := strings.TrimSuffix(strings.TrimSuffix(strings.TrimPrefix(aws.ToString(object.Key), prefix), ".db.gz"), pgSnapshotExt)
 			stamp, reason, _ := strings.Cut(id, "-")
 			created, err := time.Parse(snapshotIDLayout, stamp)
 			if err != nil {
@@ -619,7 +630,7 @@ func (b *backups) list(ctx context.Context, request protocol.BackupRequest) (pro
 // status is how one database is backed up. withSnapshots also lists its
 // snapshots, which reads the bucket.
 func (b *backups) status(ctx context.Context, app string, database protocol.Database, withSnapshots bool) protocol.DatabaseBackup {
-	backup := protocol.DatabaseBackup{Database: database.Path, Snapshots: []protocol.Snapshot{}}
+	backup := protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind, Snapshots: []protocol.Snapshot{}}
 	if withSnapshots {
 		snapshots, err := b.snapshots(ctx, app, database.Path)
 		if err != nil {
@@ -628,6 +639,20 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		if snapshots != nil {
 			backup.Snapshots = snapshots
 		}
+	}
+	if database.Postgres() {
+		// No point in time window yet: snapshots only.
+		b.mu.Lock()
+		last := b.verified[drillKey(app, database)]
+		b.mu.Unlock()
+		if !last.at.IsZero() {
+			at := last.at
+			backup.VerifiedAt = &at
+			if last.err != "" && backup.Error == "" {
+				backup.Error = last.err
+			}
+		}
+		return backup
 	}
 	b.mu.Lock()
 	client, err := b.replicaClient(app, database.Path)
@@ -668,6 +693,9 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	database := databases[0]
 	if request.Snapshot == "" && request.At == nil {
 		return errors.New("choose a snapshot or a point in time")
+	}
+	if database.Postgres() {
+		return b.pgRestore(ctx, request, database)
 	}
 	defer b.apps.lock(request.App)()
 
@@ -883,6 +911,9 @@ func (b *backups) drillAll(ctx context.Context) (waiting bool) {
 		b.mu.Unlock()
 		matchOwner(item.database.HostPath)
 		reports[item.app] = append(reports[item.app], b.status(ctx, item.app, item.database, false))
+	}
+	if b.pgDrills(ctx, reports) {
+		waiting = true
 	}
 	for app, databases := range reports {
 		b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: databases})

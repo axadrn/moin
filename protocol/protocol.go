@@ -291,11 +291,30 @@ type Detected struct {
 	Config    *Config    `json:"config,omitempty"`
 }
 
-// Database is a SQLite file the agent found on one of the app's mounts.
+// Database is a database of an app: a SQLite file the agent found on one
+// of the app's mounts, or, with Kind "postgres", a compose service that runs
+// Postgres. Path names a SQLite file in the container; for Postgres it is
+// postgres-<service>, and HostPath is empty. Older agents send no Kind.
 type Database struct {
 	Path     string `json:"path"`
 	HostPath string `json:"host_path"`
+	Kind     string `json:"kind,omitempty"`
+	Service  string `json:"service,omitempty"`
 }
+
+// DatabasePostgres is the Kind of a Postgres service.
+const DatabasePostgres = "postgres"
+
+// Postgres reports whether the database is a Postgres service.
+func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
+
+// PostgresKey is the name of a Postgres service's database in ops: in the
+// bucket, the API and on every surface.
+func PostgresKey(service string) string { return "postgres-" + service }
+
+// PostgresPointInTime says, on every surface, what Postgres backups do and
+// do not do yet.
+const PostgresPointInTime = "Point in time: SQLite only for now; Postgres has hourly snapshots and one before every change."
 
 // Config is the x-ops block of compose.yml. Every field is optional.
 type Config struct {
@@ -453,6 +472,7 @@ type Backups struct {
 // the newest restore drill that passed the integrity check.
 type DatabaseBackup struct {
 	Database     string     `json:"database"`
+	Kind         string     `json:"kind,omitempty"`
 	Snapshots    []Snapshot `json:"snapshots"`
 	Since        *time.Time `json:"since,omitempty"`
 	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
@@ -460,7 +480,8 @@ type DatabaseBackup struct {
 	Error        string     `json:"error,omitempty"`
 }
 
-// Snapshot is a full copy of a database, gzipped in the bucket. Bucket is
+// Snapshot is a full copy of a database in the bucket: a gzipped SQLite
+// file, or for Postgres a pg_dump in its custom format. Bucket is
 // the name of the bucket it is in, empty from older agents.
 type Snapshot struct {
 	ID        string    `json:"id"`

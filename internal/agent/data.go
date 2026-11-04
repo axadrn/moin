@@ -46,7 +46,7 @@ func (a *apps) database(request protocol.DBRequest) (protocol.Database, error) {
 		}
 	}
 	if request.Database == "" {
-		return protocol.Database{}, fmt.Errorf("no SQLite database on a volume of %s", request.App)
+		return protocol.Database{}, fmt.Errorf("no database in %s: no SQLite file on a volume, no Postgres service", request.App)
 	}
 	return protocol.Database{}, fmt.Errorf("no database %s in %s", request.Database, request.App)
 }
@@ -116,6 +116,9 @@ func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
+	if database.Postgres() {
+		return a.pgTables(ctx, request.App, database)
+	}
 	db, closeDB, err := openDatabase(ctx, database.HostPath, false)
 	if err != nil {
 		return protocol.DBTables{}, err
@@ -223,6 +226,9 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
+	if database.Postgres() {
+		return a.pgQuery(ctx, request, database)
+	}
 	db, closeDB, err := openDatabase(ctx, database.HostPath, request.Write)
 	if err != nil {
 		return protocol.DBResult{}, err

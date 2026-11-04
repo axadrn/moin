@@ -297,6 +297,10 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		saveJSON(filepath.Join(release, "detected.json"), detected)
 	}
 	for _, database := range detected.Databases {
+		if database.Postgres() {
+			logf("database %s (Postgres, service %s)", database.Path, database.Service)
+			continue
+		}
 		logf("database %s (%s)", database.Path, database.HostPath)
 	}
 	if a.backups != nil {
@@ -909,10 +913,44 @@ func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *pro
 			}
 		}
 	}
+	// A service that runs Postgres is a database too, after the SQLite
+	// files, in the order of the service names.
+	names := make([]string, 0, len(services))
+	for name := range services {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		fields, _ := services[name].(map[string]any)
+		image, _ := fields["image"].(string)
+		if !postgresImage(image) {
+			continue
+		}
+		found = append(found, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
+		if named == protocol.PostgresKey(name) {
+			namedOnMount = true
+		}
+	}
 	if !namedOnMount {
 		return found, fmt.Errorf("x-ops.database %s is on no volume: it would be lost on the next deploy", named)
 	}
 	return found, nil
+}
+
+// postgresImage reports whether an image runs Postgres: the official one
+// or a known image built on it, from Docker Hub, with any tag or digest.
+func postgresImage(image string) bool {
+	image, _, _ = strings.Cut(image, "@")
+	if slash := strings.LastIndex(image, "/"); strings.LastIndex(image, ":") > slash {
+		image = image[:strings.LastIndex(image, ":")]
+	}
+	image = strings.TrimPrefix(strings.TrimPrefix(image, "docker.io/"), "index.docker.io/")
+	image = strings.TrimPrefix(image, "library/")
+	switch image {
+	case "postgres", "postgis/postgis", "pgvector/pgvector":
+		return true
+	}
+	return strings.HasPrefix(image, "timescale/timescaledb")
 }
 
 // sqliteFiles returns the files under dir, three levels deep, that are

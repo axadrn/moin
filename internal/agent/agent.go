@@ -164,6 +164,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.apps.proxyMode = agent.security.proxyMode
 	agent.updater = newUpdater(state.URL)
 	go agent.backups.drills(ctx)
+	go agent.backups.pgSnapshots(ctx)
 	go agent.backups.sweepUploads(ctx)
 	go agent.metrics(ctx)
 	defer agent.backups.configure(context.Background(), nil, nil)
