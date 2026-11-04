@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/axadrn/moin/internal/build"
 	"io"
 	"net/http"
 	"net/url"
@@ -94,7 +95,7 @@ func (c *Cloudflare) DeleteTunnel(ctx context.Context, token, account, tunnelID 
 func (c *Cloudflare) RouteTunnel(ctx context.Context, token, account, tunnelID string, hosts []string) error {
 	ingress := []map[string]string{}
 	for _, host := range hosts {
-		ingress = append(ingress, map[string]string{"hostname": host, "service": "http://ops-traefik:8080"})
+		ingress = append(ingress, map[string]string{"hostname": host, "service": "http://" + build.Name + "-traefik:8080"})
 	}
 	ingress = append(ingress, map[string]string{"service": "http_status:404"})
 	body := map[string]any{"config": map[string]any{"ingress": ingress}}

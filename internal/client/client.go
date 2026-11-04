@@ -17,13 +17,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
 )
 
 // DefaultURL is the hosted control plane.
-const DefaultURL = "https://ops.goilerplate.com"
+const DefaultURL = "https://moin.run"
 
 // ErrNotLoggedIn means there is no token in the environment or config file.
 var ErrNotLoggedIn = errors.New("not logged in: run `" + build.Name + " login`")
@@ -32,8 +33,9 @@ var ErrNotLoggedIn = errors.New("not logged in: run `" + build.Name + " login`")
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
-	// TokenFromEnv is true when the token came from OPS_TOKEN.
+	// TokenFromEnv is true when the token came from MOIN_TOKEN.
 	TokenFromEnv bool `json:"-"`
+	urlFromEnv   bool
 }
 
 func configPath() (string, error) {
@@ -44,7 +46,18 @@ func configPath() (string, error) {
 	return filepath.Join(dir, build.Name, "config.json"), nil
 }
 
-// LoadConfig reads the config file. OPS_URL and OPS_TOKEN override it.
+// legacyConfigPath is where the CLI of the old name kept its config: read
+// while there is no new one, never written.
+func legacyConfigPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, build.LegacyName, "config.json"), nil
+}
+
+// LoadConfig reads the config file, or the one of the old name while there
+// is none. MOIN_URL and MOIN_TOKEN override it.
 func LoadConfig() (Config, error) {
 	var config Config
 	path, err := configPath()
@@ -52,6 +65,13 @@ func LoadConfig() (Config, error) {
 		return Config{}, err
 	}
 	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) && build.Legacy() {
+		if legacy, legacyErr := legacyConfigPath(); legacyErr == nil {
+			if legacyBody, legacyErr := os.ReadFile(legacy); legacyErr == nil {
+				path, body, err = legacy, legacyBody, nil
+			}
+		}
+	}
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, err
 	}
@@ -61,16 +81,37 @@ func LoadConfig() (Config, error) {
 			return Config{}, fmt.Errorf("read %s: %w", path, err)
 		}
 	}
-	if value := os.Getenv("OPS_URL"); value != "" {
+	if value := build.Getenv("URL"); value != "" {
 		config.URL = value
+		config.urlFromEnv = true
 	}
-	if value := os.Getenv("OPS_TOKEN"); value != "" {
+	if value := build.Getenv("TOKEN"); value != "" {
 		config.Token, config.TokenFromEnv = value, true
 	}
 	if config.URL == "" {
 		config.URL = DefaultURL
 	}
 	config.URL = strings.TrimRight(config.URL, "/")
+	return config, nil
+}
+
+// loadSaved reads the saved config alone, without the environment.
+func loadSaved() (Config, error) {
+	var config Config
+	for _, find := range []func() (string, error){configPath, legacyConfigPath} {
+		path, err := find()
+		if err != nil {
+			return Config{}, err
+		}
+		body, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return Config{}, err
+		}
+		return config, json.Unmarshal(body, &config)
+	}
 	return config, nil
 }
 
@@ -181,7 +222,11 @@ type Client struct {
 	url          string
 	token        string
 	tokenFromEnv bool
-	http         *http.Client
+	// config is the config the client came from; moved keeps a move to a
+	// new address to once.
+	config Config
+	moved  sync.Once
+	http   *http.Client
 	// surface is "cli" or "tui". It goes in the user agent, so the activity
 	// says where a change came from.
 	surface string
@@ -195,7 +240,7 @@ func New(config Config) (*Client, error) {
 	if config.Token == "" {
 		return nil, ErrNotLoggedIn
 	}
-	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, http: &http.Client{}, surface: "cli"}, nil
+	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, config: config, http: &http.Client{}, surface: "cli"}, nil
 }
 
 // Account returns the user the token belongs to.
@@ -385,7 +430,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 		return nil, err
 	}
 	request.Header.Set("Authorization", "Bearer "+c.token)
-	request.Header.Set("User-Agent", "ops-"+c.surface+"/"+build.Version)
+	request.Header.Set("User-Agent", build.Name+"-"+c.surface+"/"+build.Version)
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
@@ -402,6 +447,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 		return err
 	}
 	defer response.Body.Close()
+	c.follow(response)
 	if response.StatusCode >= 300 {
 		return c.responseError(response)
 	}
@@ -409,6 +455,28 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 		return nil
 	}
 	return json.NewDecoder(response.Body).Decode(target)
+}
+
+// MovedHeader names the control plane's address in an answer to a request
+// that came on an old one.
+const MovedHeader = "X-Control-Plane-URL"
+
+// follow moves the saved config to the control plane's new address when an
+// answer names one: the next command dials it. A URL from the environment
+// is the user's and stays.
+func (c *Client) follow(response *http.Response) {
+	to := strings.TrimRight(response.Header.Get(MovedHeader), "/")
+	if to == "" || to == c.url || c.config.urlFromEnv || !strings.HasPrefix(to, "https://") {
+		return
+	}
+	c.moved.Do(func() {
+		saved, err := loadSaved()
+		if err != nil || saved.Token == "" {
+			return
+		}
+		saved.URL = to
+		_ = SaveConfig(saved)
+	})
 }
 
 // Error is an error answer of the API.

@@ -50,7 +50,7 @@ func TestAlertDestinationTools(t *testing.T) {
 		got, _ := io.ReadAll(r.Body)
 		mu.Lock()
 		defer mu.Unlock()
-		body, signature = string(got), r.Header.Get("X-Ops-Signature")
+		body, signature = string(got), r.Header.Get("X-Moin-Signature")
 		if fail {
 			w.WriteHeader(http.StatusNotFound)
 		}

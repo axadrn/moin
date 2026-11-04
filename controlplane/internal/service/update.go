@@ -19,12 +19,13 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 )
 
 const (
 	// ReleasesURL is where a self-hosted control plane learns of the newest
 	// release. GitHub answers it without a token.
-	ReleasesURL = "https://api.github.com/repos/axadrn/moin/releases/latest"
+	ReleasesURL = "https://api.github.com/repos/axadrn/ops/releases/latest"
 	// updateCheckEvery is how often it asks.
 	updateCheckEvery = 24 * time.Hour
 	// updaterAlive is how old the updater's heartbeat may be for "Update
@@ -127,7 +128,7 @@ func (s *UpdateService) Run(ctx context.Context) {
 	}
 }
 
-// githubRelease is the part of GitHub's release that moin reads.
+// githubRelease is the part of GitHub's release that ops reads.
 type githubRelease struct {
 	TagName     string    `json:"tag_name"`
 	HTMLURL     string    `json:"html_url"`
@@ -144,7 +145,7 @@ func (s *UpdateService) Check(ctx context.Context) error {
 		return err
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "moin-controlplane/"+s.version)
+	request.Header.Set("User-Agent", build.Name+"-controlplane/"+s.version)
 	s.mu.Lock()
 	if s.etag != "" {
 		request.Header.Set("If-None-Match", s.etag)
