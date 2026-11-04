@@ -97,7 +97,7 @@ func sourceFiles(dir string) ([]string, error) {
 }
 
 // LocalConfig is what `ops deploy` reads from the repo before it uploads:
-// the app and server names of the x-ops block. The agent reads the whole
+// the app and server names of the x-moin block. The agent reads the whole
 // block on the server.
 type LocalConfig struct {
 	App    string
@@ -110,7 +110,7 @@ var (
 	xOpsField = regexp.MustCompile(`(?m)^[ \t]+(app|server):[ \t]*["']?([A-Za-z0-9._-]+)["']?[ \t]*(?:#.*)?$`)
 )
 
-// ReadLocalConfig looks for x-ops.app and x-ops.server in the compose file of dir.
+// ReadLocalConfig looks for x-moin.app and x-moin.server (or x-ops) in the compose file of dir.
 func ReadLocalConfig(dir string) LocalConfig {
 	config := LocalConfig{}
 	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
@@ -137,7 +137,7 @@ func ReadLocalConfig(dir string) LocalConfig {
 
 var unsafeName = regexp.MustCompile(`[^a-z0-9-]+`)
 
-// AppName picks the app: the flag, x-ops.app in compose.yml, or the name of
+// AppName picks the app: the flag, x-moin.app in compose.yml, or the name of
 // the directory.
 func AppName(flagValue, dir string) string {
 	name, _ := PickApp(flagValue, dir)
@@ -145,13 +145,13 @@ func AppName(flagValue, dir string) string {
 }
 
 // PickApp is AppName that also says where the name came from: "--app",
-// "x-ops.app in compose.yml" or "the directory name".
+// "x-moin.app in compose.yml" or "the directory name".
 func PickApp(flagValue, dir string) (name, from string) {
 	if flagValue != "" {
 		return flagValue, "--app"
 	}
 	if config := ReadLocalConfig(dir); config.App != "" {
-		return config.App, "x-ops.app in compose.yml"
+		return config.App, "x-moin.app in compose.yml"
 	}
 	absolute, err := filepath.Abs(dir)
 	if err != nil {

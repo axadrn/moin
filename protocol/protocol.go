@@ -265,7 +265,7 @@ type DeployStart struct {
 }
 
 // Routing is how visitors reach the main service, as set in web, CLI, TUI
-// or MCP. The x-ops block of compose.yml wins for every field it sets.
+// or MCP. The x-moin block of compose.yml wins for every field it sets.
 // Protect is an htpasswd line ("user:bcrypt hash") when password protection
 // is on.
 type Routing struct {
@@ -319,7 +319,7 @@ type DeployDone struct {
 }
 
 // Detected is what the agent learned about an app from its repo and its
-// running containers. Config holds the x-ops block of compose.yml, if any.
+// running containers. Config holds the x-moin block of compose.yml, if any.
 type Detected struct {
 	// Kind is "compose", "dockerfile", "go" or "railpack": what the repo
 	// brought, and for railpack that ops built it with Railpack. Builder
@@ -374,7 +374,7 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
 
-// Config is the x-ops block of compose.yml. Every field is optional.
+// Config is the x-moin block (or the old x-ops) of compose.yml. Every field is optional.
 type Config struct {
 	App       string   `json:"app,omitempty"`
 	Server    string   `json:"server,omitempty"`
@@ -413,7 +413,7 @@ func (c *Config) UnmarshalJSON(body []byte) error {
 	case domains[0] == '{':
 		byService := map[string][]string{}
 		if err := json.Unmarshal(domains, &byService); err != nil {
-			return fmt.Errorf("x-ops domains: %w", err)
+			return fmt.Errorf("x-moin domains: %w", err)
 		}
 		if c.ServiceDomains == nil {
 			c.ServiceDomains = map[string][]string{}
@@ -423,7 +423,7 @@ func (c *Config) UnmarshalJSON(body []byte) error {
 		}
 	default:
 		if err := json.Unmarshal(domains, &c.Domains); err != nil {
-			return fmt.Errorf("x-ops domains: %w", err)
+			return fmt.Errorf("x-moin domains: %w", err)
 		}
 	}
 	return nil

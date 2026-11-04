@@ -211,7 +211,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			// release and its images; an image replaces the main one.
 			current := a.current(start.App)
 			if current == 0 {
-				return detected, errors.New("no release to take the compose file from: deploy the repo once with ops deploy")
+				return detected, errors.New("no release to take the compose file from: deploy the repo once with moin deploy")
 			}
 			config, detected, running, err = loadBase(a.releaseDir(start.App, current))
 			if err == nil && start.Image == "" {
@@ -503,7 +503,7 @@ func (a *apps) resolve(ctx context.Context, app, src string, env map[string]stri
 	}
 	detected.Service = mainService(services, detected.Config)
 	if detected.Service == "" {
-		return nil, detected, errors.New("cannot tell which service gets the traffic: set x-ops.service")
+		return nil, detected, errors.New("cannot tell which service gets the traffic: set x-moin.service")
 	}
 	detected.Port = mainPort(src, services[detected.Service], detected.Config)
 
@@ -622,7 +622,7 @@ func loadBase(release string) (map[string]any, protocol.Detected, map[string]str
 		err = json.Unmarshal(body, &config)
 	}
 	if err != nil {
-		return nil, detected, nil, errors.New("the running release has no compose file to reuse: deploy the repo once with ops deploy")
+		return nil, detected, nil, errors.New("the running release has no compose file to reuse: deploy the repo once with moin deploy")
 	}
 	body, _ = os.ReadFile(filepath.Join(release, "detected.json"))
 	_ = json.Unmarshal(body, &detected)
@@ -740,7 +740,7 @@ func (a *apps) rebuildMissing(ctx context.Context, base map[string]any, running 
 		}
 		source, _ := build["context"].(string)
 		if _, err := os.Stat(source); source == "" || err != nil {
-			return fmt.Errorf("image %s of service %s is gone from the server, and so is the source to build it: deploy again with ops deploy", image, name)
+			return fmt.Errorf("image %s of service %s is gone from the server, and so is the source to build it: deploy again with moin deploy", image, name)
 		}
 		logf("image %s of service %s is gone from the server: building it again from the kept source", image, name)
 		delete(running, name)
@@ -752,7 +752,7 @@ func (a *apps) rebuildMissing(ctx context.Context, base map[string]any, running 
 func (a *apps) copySource(ctx context.Context, app string, number int, target string) error {
 	source := filepath.Join(a.releaseDir(app, number), "src")
 	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("the source of v%d is no longer on the server: deploy again with ops deploy", number)
+		return fmt.Errorf("the source of v%d is no longer on the server: deploy again with moin deploy", number)
 	}
 	output, err := exec.CommandContext(ctx, "cp", "-a", source, target).CombinedOutput()
 	if err != nil {
@@ -899,7 +899,7 @@ func exposedPort(src string) int {
 	return port
 }
 
-// mainService is the service that gets the traffic: the one x-ops names, the
+// mainService is the service that gets the traffic: the one x-moin names, the
 // only one, or the only one ops builds.
 func mainService(services map[string]any, config *protocol.Config) string {
 	if config != nil && config.Service != "" {
@@ -929,7 +929,7 @@ func mainService(services map[string]any, config *protocol.Config) string {
 }
 
 // servicePort is the port a service other than the main one listens on:
-// the one x-ops.ports names, else what its compose entry says, else 8080.
+// the one x-moin.ports names, else what its compose entry says, else 8080.
 func servicePort(name string, service map[string]any, config *protocol.Config) int {
 	if config != nil && config.Ports[name] > 0 {
 		return config.Ports[name]
@@ -969,7 +969,7 @@ func mainPort(src string, service any, config *protocol.Config) int {
 
 // databases finds the SQLite files on the mounts of every service. Named
 // volumes exist only after the first start, so deploy asks again then. A
-// database that x-ops names but no mount holds fails the deploy: it would be
+// database that x-moin names but no mount holds fails the deploy: it would be
 // lost with the container.
 func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *protocol.Config) ([]protocol.Database, error) {
 	var config map[string]any
@@ -1042,7 +1042,7 @@ func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *pro
 		}
 	}
 	if !namedOnMount {
-		return found, fmt.Errorf("x-ops.database %s is on no volume: it would be lost on the next deploy", named)
+		return found, fmt.Errorf("x-moin.database %s is on no volume: it would be lost on the next deploy", named)
 	}
 	return found, nil
 }
