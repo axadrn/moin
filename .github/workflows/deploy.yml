@@ -3,15 +3,19 @@ name: Deploy
 # One way to ship, for a release tag and by hand (Actions, Deploy, Run
 # workflow):
 #   1. test: the same checks as CI.
-#   2. box: build the control plane image, ghcr.io/axadrn/ops-controlplane,
-#      which ops-01 and every self-hoster runs.
+#   2. box: build the control plane image, ghcr.io/axadrn/moin, which
+#      ops-01 and every self-hoster runs. Until 2026-12-04 the same image
+#      goes out as ghcr.io/axadrn/ops-controlplane too, for installs of the
+#      old name.
 #   3. release: for a tag, the GitHub release with its notes from
 #      controlplane/content/changelog.md.
-#   4. deploy: through Tailscale, ops-01 runs update.sh with the new box.
-#      update.sh takes the passwords from 1Password on the server itself,
-#      so they never pass through GitHub.
+#   4. deploy: through Tailscale, ops-01 gets the deploy files of this
+#      commit in /opt/moin and runs update.sh with the new box. update.sh
+#      takes the passwords from 1Password on the server itself, so they
+#      never pass through GitHub; the first run moves the old layout
+#      (/opt/ops-controlplane, /etc/ops-controlplane) over.
 # A push to main runs nothing. Forks only build: the deploy runs in
-# axadrn/ops alone. Nothing here is a secret; the passwords live in
+# axadrn/moin alone (axadrn/ops before the rename). Nothing here is a secret; the passwords live in
 # 1Password and reach the server through update.sh.
 on:
   push:
@@ -49,15 +53,21 @@ jobs:
       - name: Tags
         id: tags
         run: |
-          image=ghcr.io/axadrn/ops-controlplane
+          image=ghcr.io/axadrn/moin
+          # The old name's image, until 2026-12-04.
+          legacy=ghcr.io/axadrn/ops-controlplane
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:${GITHUB_REF_NAME},${image}:stable,${image}:latest" >> "$GITHUB_OUTPUT"
+            tags=""
+            for name in "$image" "$legacy"; do
+              tags="${tags:+$tags,}${name}:${GITHUB_REF_NAME},${name}:stable,${name}:latest"
+            done
+            echo "tags=$tags" >> "$GITHUB_OUTPUT"
           else
             echo "version=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7},${legacy}:latest,${legacy}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -90,11 +100,10 @@ jobs:
 
   deploy:
     needs: box
-    if: github.repository == 'axadrn/ops'
+    if: github.repository == 'axadrn/moin' || github.repository == 'axadrn/ops'
     runs-on: ubuntu-24.04
     env:
       HOST: ops-01
-      URL: https://ops.goilerplate.com
       # Tailscale lets only workflows of this repo in with it, as tag:ci.
       TS_CLIENT_ID: TA5fRdgvFU11CNTRL-kW36unrgMk11CNTRL
     steps:
@@ -105,15 +114,21 @@ jobs:
           audience: api.tailscale.com/${{ env.TS_CLIENT_ID }}
           tags: tag:ci
           ping: ${{ env.HOST }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Update the server
         env:
           IMAGE: ${{ needs.box.outputs.image }}
-        run: tailscale ssh "root@$HOST" "cd /opt/ops-controlplane && OPS_IMAGE='$IMAGE' sh update.sh"
+        run: |
+          tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
+          for file in compose.yml compose.same-server.yml update.sh updater.sh setup.sh; do
+            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "controlplane/deploy/$file"
+          done
+          tailscale ssh "root@$HOST" "cd /opt/moin && MOIN_IMAGE='$IMAGE' sh update.sh"
       - name: Wait until it answers
         run: |
           for attempt in $(seq 30); do
-            curl --fail --silent --output /dev/null "$URL/healthz" && exit 0
+            tailscale ssh "root@$HOST" "curl --fail --silent --output /dev/null http://127.0.0.1:8090/healthz" && exit 0
             sleep 5
           done
-          echo "$URL/healthz does not answer" >&2
+          echo "the control plane on $HOST does not answer" >&2
           exit 1
