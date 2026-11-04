@@ -17,7 +17,7 @@ var tailnet = netip.MustParsePrefix("100.64.0.0/10")
 func CheckURL(raw string) error {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return fmt.Errorf("%q is not a URL. Use one like https://ops.example.com", raw)
+		return fmt.Errorf("%q is not a URL. Use one like https://moin.example.com", raw)
 	}
 	switch parsed.Scheme {
 	case "https":
@@ -28,7 +28,7 @@ func CheckURL(raw string) error {
 		}
 		return fmt.Errorf("plain http sends your token unencrypted to %s. Use https://%s, or http only on localhost or your tailnet", parsed.Host, parsed.Host)
 	default:
-		return fmt.Errorf("%q is not an http or https URL. Use one like https://ops.example.com", raw)
+		return fmt.Errorf("%q is not an http or https URL. Use one like https://moin.example.com", raw)
 	}
 }
 

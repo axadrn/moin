@@ -56,7 +56,7 @@ func (b *backups) problem(app string, database protocol.Database, now time.Time)
 		if broke {
 			// Lost its place in the log: it counts at once, a new base
 			// backup is on its way.
-			return "continuous backup broke: " + why + "; ops is taking a new base backup"
+			return "continuous backup broke: " + why + "; moin is taking a new base backup"
 		}
 	} else {
 		b.mu.Lock()

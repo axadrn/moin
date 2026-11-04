@@ -1,5 +1,5 @@
 -- +goose Up
--- Where on github.com the owner of an installation chooses the repos ops
+-- Where on github.com the owner of an installation chooses the repos moin
 -- may read: the account's or the organization's settings page for it.
 ALTER TABLE github_installations ADD COLUMN settings_url TEXT NOT NULL DEFAULT '';
 

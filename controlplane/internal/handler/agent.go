@@ -110,7 +110,7 @@ esac
 echo "Next: %[2]s login --url $url"
 `
 
-// CLIScript answers the script that installs the ops command.
+// CLIScript answers the script that installs the moin command.
 func (h *AgentHandler) CLIScript(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -121,7 +121,7 @@ func (h *AgentHandler) CLIScript(w http.ResponseWriter, _ *http.Request) {
 func (h *AgentHandler) InstallScript(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = fmt.Fprintf(w, installScript, h.appURL, build.Name, protocol.AgentUnit(build.Name, ""), strings.ToUpper(build.Name))
+	_, _ = fmt.Fprintf(w, installScript, h.appURL, build.Name, protocol.AgentUnit(build.Name), strings.ToUpper(build.Name))
 }
 
 // Register trades the install token in the Authorization header for an agent token.

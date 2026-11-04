@@ -63,10 +63,6 @@ Your first workspace gets 30 days with everything, without a card. Afterwards th
 
 I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing. Your apps are containers too. moin ships them to your servers and keeps every change to their data. Deploy anything. Lose nothing.
 
-## I used it when it was called ops. What changes?
-
-Nothing on your side. Your servers, the CLI and the agents move over by themselves, and `ops` keeps working as a second name for `moin` until December 4, 2026.
-
 ## Can I see and change everything from an AI agent?
 
 Almost everything. Every action on servers, apps, data, backups, domains and invitations is an [MCP tool](/docs/guides/mcp). Your account, roles and deleting a workspace stay on the web, so a leaked token can never take them over.

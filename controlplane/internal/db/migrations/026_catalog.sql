@@ -2,7 +2,7 @@
 -- ============================================================================
 -- CATALOG
 -- An app installed from the catalog keeps the slug of its entry, such as
--- umami, so ops can offer its newer versions. Its version is the env var
+-- umami, so moin can offer its newer versions. Its version is the env var
 -- VERSION; empty is an app of your own. catalog_notified is the newest
 -- release an update.available alert went out for, so each version alerts
 -- once, also across restarts.

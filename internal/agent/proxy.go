@@ -121,7 +121,7 @@ func protectHash(routing *protocol.Routing) string {
 // addRouting puts a service of app on the proxy network and labels its routes:
 // every domain over HTTPS, the other domains redirecting to the canonical
 // one, and basic auth when a password is set. name names its router, such
-// as ops-shop for the main service; instant, when set, is the instant
+// as moin-shop for the main service; instant, when set, is the instant
 // address on a router of its own, with instantProtect in front of it.
 func addRouting(config, service map[string]any, app, name string, domains []string, canonical string, port int, protect, instant, instantProtect string) {
 	labels := map[string]any{
@@ -231,8 +231,6 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	if err == nil {
 		_, _ = a.output(ctx, "docker", "rm", "-f", proxyName)
 	}
-	// The proxy of the old name holds 80 and 443.
-	_, _ = a.output(ctx, "docker", "rm", "-f", legacyProxyName)
 	data := filepath.Join(filepath.Dir(a.dir), "traefik")
 	err = os.MkdirAll(data, 0o700)
 	if err != nil {
@@ -240,11 +238,6 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	}
 	args := []string{"run", "-d", "--name", proxyName, "--restart", "unless-stopped",
 		"--network", proxyNetwork, "--label", labelMode + "=" + mode, "--label", labelSetup + "=" + setup}
-	if build.Legacy() {
-		// A Cloudflare Tunnel set up under the old name sends to the old
-		// container name.
-		args = append(args, "--network-alias", legacyProxyName)
-	}
 	if mode == "direct" {
 		httpPort, httpsPort := envOr("HTTP_PORT", "80"), envOr("HTTPS_PORT", "443")
 		logf("starting the proxy on ports %s and %s", httpPort, httpsPort)
@@ -259,24 +252,7 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	)
 	args = append(args, flags...)
 	_, err = a.output(ctx, "docker", args...)
-	if err != nil {
-		return err
-	}
-	a.joinLegacyNetwork(ctx)
-	return nil
-}
-
-// joinLegacyNetwork puts the proxy on the network of the old name too,
-// while something still runs there: an app whose move failed, or a
-// control plane on the same server that has not moved yet.
-func (a *apps) joinLegacyNetwork(ctx context.Context) {
-	if !build.Legacy() {
-		return
-	}
-	if _, err := a.output(ctx, "docker", "network", "inspect", legacyProxyNetwork); err != nil {
-		return
-	}
-	_, _ = a.output(ctx, "docker", "network", "connect", "--alias", legacyProxyName, legacyProxyNetwork, proxyName)
+	return err
 }
 
 // proxyFlags configures Traefik for the mode. In direct mode the HTTPS

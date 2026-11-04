@@ -89,8 +89,8 @@ templ sortableScript() {
 	<script src="/assets/js/sortable-1.15.6.6d0a831f.min.js"></script>
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			if (window.opsSortable) return;
-			window.opsSortable = true;
+			if (window.moinSortable) return;
+			window.moinSortable = true;
 			const touch = window.matchMedia("(pointer: coarse)").matches;
 			const start = (root) => {
 				if (!root.querySelectorAll) return;
@@ -172,8 +172,8 @@ const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML","selectO
 templ appShellScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			if (window.opsShell) return;
-			window.opsShell = true;
+			if (window.moinShell) return;
+			window.moinShell = true;
 			// The changelog dot: a version the member has not opened the
 			// changelog for yet shows a dot on the account menu and its
 			// Changelog item; opening it clears both, in this browser.

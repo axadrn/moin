@@ -3,6 +3,28 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.23
+
+November 4, 2026
+
+**In short:** the old name ops is gone: only `moin` and its names work now, so update scripts, CI and compose files that still say ops.
+
+### Changed
+- **`x-ops` stops a deploy**: a compose.yml with an `x-ops` block fails with a message to rename it to `x-moin`, instead of counting.
+- **Instant address user**: the user in front of a protected instant address is `moin`, and `moin protect` asks for `moin` by default; it takes effect with the app's next deploy.
+- **Rules file**: the agent reads only `/etc/moin/rules`. Move `/etc/ops/rules` there if you still have one.
+
+### Removed
+- **The `ops` command**: use `moin`. An agent still installed as ops no longer updates itself; install moin on that server again.
+- **`OPS_*` variables**: use `MOIN_URL`, `MOIN_TOKEN`, `MOIN_STATE_DIR`, `MOIN_RULES`, `MOIN_IMAGE` and `MOIN_PULL`.
+- **The old CLI config folder**: run `moin login` once if the CLI says you are not logged in.
+- **Old downloads and image**: `/download/ops-*` and `ghcr.io/axadrn/ops-controlplane` get no new releases; use `/download/moin-*` and `ghcr.io/axadrn/moin`.
+- **`X-Ops-Signature`**: webhooks carry only `X-Moin-Signature`.
+- **The move from ops**: `update.sh` no longer copies `/etc/ops-controlplane`, and settings that point to `/run/ops-controlplane` need `/run/moin-controlplane`.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`; agents update themselves. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
+
 ## v1.0.0-beta.22
 
 November 4, 2026

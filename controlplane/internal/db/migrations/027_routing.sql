@@ -6,7 +6,7 @@
 -- instant is the provider of the app's instant address, such as sslip.io,
 -- or off; instant_host the address the last deploy served it at, empty
 -- when none. A password guards it unless instant_open: the app's own one
--- when it has one, else instant_password, made by ops and sealed.
+-- when it has one, else instant_password, made by moin and sealed.
 -- ============================================================================
 ALTER TABLE apps ADD COLUMN service_domains TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE apps ADD COLUMN instant TEXT NOT NULL DEFAULT 'sslip.io';

@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -69,7 +70,7 @@ func checkBucket(ctx context.Context, storage protocol.BackupStorage, publicOnly
 			})
 		})
 	}
-	key := strings.TrimLeft(path.Join(storage.Path, storage.Workspace, ".ops-check"), "/")
+	key := strings.TrimLeft(path.Join(storage.Path, storage.Workspace, "."+build.Name+"-check"), "/")
 	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("moin"))})
 	if err != nil {
 		return err

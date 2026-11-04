@@ -46,18 +46,10 @@ func configPath() (string, error) {
 	return filepath.Join(dir, build.Name, "config.json"), nil
 }
 
-// legacyConfigPath is where the CLI of the old name kept its config: read
-// while there is no new one, never written.
-func legacyConfigPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, build.LegacyName, "config.json"), nil
-}
+// TokenVariable overrides the saved token, for CI.
+var TokenVariable = strings.ToUpper(build.Name) + "_TOKEN"
 
-// LoadConfig reads the config file, or the one of the old name while there
-// is none. MOIN_URL and MOIN_TOKEN override it.
+// LoadConfig reads the config file. MOIN_URL and MOIN_TOKEN override it.
 func LoadConfig() (Config, error) {
 	var config Config
 	path, err := configPath()
@@ -65,13 +57,6 @@ func LoadConfig() (Config, error) {
 		return Config{}, err
 	}
 	body, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) && build.Legacy() {
-		if legacy, legacyErr := legacyConfigPath(); legacyErr == nil {
-			if legacyBody, legacyErr := os.ReadFile(legacy); legacyErr == nil {
-				path, body, err = legacy, legacyBody, nil
-			}
-		}
-	}
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, err
 	}
@@ -98,21 +83,18 @@ func LoadConfig() (Config, error) {
 // loadSaved reads the saved config alone, without the environment.
 func loadSaved() (Config, error) {
 	var config Config
-	for _, find := range []func() (string, error){configPath, legacyConfigPath} {
-		path, err := find()
-		if err != nil {
-			return Config{}, err
-		}
-		body, err := os.ReadFile(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return Config{}, err
-		}
-		return config, json.Unmarshal(body, &config)
+	path, err := configPath()
+	if err != nil {
+		return Config{}, err
 	}
-	return config, nil
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return config, nil
+	}
+	if err != nil {
+		return Config{}, err
+	}
+	return config, json.Unmarshal(body, &config)
 }
 
 // SaveConfig writes the config file, readable only by the user.
@@ -161,8 +143,8 @@ type Server struct {
 	SSHTailscale bool                         `json:"ssh_tailscale"`
 	Firewall     bool                         `json:"firewall"`
 	Security     *protocol.ServerConfigResult `json:"security"`
-	// Rules are what the owner allows ops to do on the server, from
-	// /etc/ops/rules there. Nil without rules.
+	// Rules are what the owner allows moin to do on the server, from
+	// /etc/moin/rules there. Nil without rules.
 	Rules     *protocol.Rules `json:"rules"`
 	CreatedAt time.Time       `json:"created_at"`
 }
@@ -290,7 +272,7 @@ func (c *Client) RenameServer(ctx context.Context, idOrName, name string) (Serve
 	return response, err
 }
 
-// UpdateAgent has the agent of a server download the control plane's ops
+// UpdateAgent has the agent of a server download the control plane's moin
 // binary, swap it in and restart. It returns the server once the new agent
 // is back.
 func (c *Client) UpdateAgent(ctx context.Context, idOrName string) (Server, error) {
@@ -302,7 +284,7 @@ func (c *Client) UpdateAgent(ctx context.Context, idOrName string) (Server, erro
 // Meta is what the control plane says about itself.
 type Meta struct {
 	Name string `json:"name"`
-	// Version is the version of the control plane and of the ops binary
+	// Version is the version of the control plane and of the moin binary
 	// it serves; "dev" for a build without one.
 	Version string `json:"version"`
 }
@@ -533,7 +515,7 @@ func (c *Client) responseError(response *http.Response) error {
 // rejected says what to do about a token the control plane does not take.
 func (c *Client) rejected() string {
 	if c.tokenFromEnv {
-		return "The control plane rejected the token in OPS_TOKEN: it is wrong, expired or revoked. Set OPS_TOKEN to a valid token, or unset it to use the one from `" + build.Name + " login`"
+		return "The control plane rejected the token in " + TokenVariable + ": it is wrong, expired or revoked. Set " + TokenVariable + " to a valid token, or unset it to use the one from `" + build.Name + " login`"
 	}
 	return "The control plane rejected your token: it is wrong, expired or revoked. Run `" + build.Name + " login` for a new one"
 }

@@ -17,16 +17,16 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestBackups needs an S3 endpoint with the bucket in OPS_TEST_S3_BUCKET,
-// such as gofakes3: OPS_TEST_S3=http://127.0.0.1:19000.
+// TestBackups needs an S3 endpoint with the bucket in MOIN_TEST_S3_BUCKET,
+// such as gofakes3: MOIN_TEST_S3=http://127.0.0.1:19000.
 func TestBackups(t *testing.T) {
-	endpoint := os.Getenv("OPS_TEST_S3")
+	endpoint := os.Getenv("MOIN_TEST_S3")
 	if endpoint == "" {
-		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+		t.Skip("set MOIN_TEST_S3 to an S3 endpoint")
 	}
-	bucket := os.Getenv("OPS_TEST_S3_BUCKET")
+	bucket := os.Getenv("MOIN_TEST_S3_BUCKET")
 	if bucket == "" {
-		bucket = "ops-dev"
+		bucket = "moin-dev"
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -310,7 +310,7 @@ func TestKeepIDs(t *testing.T) {
 func TestBucketLayout(t *testing.T) {
 	prefixes := map[string]string{}
 	for _, workspace := range []string{"0b6c1f8e-1111-4c1a-9a7e-5d2b3c4d5e6f", "7a9e2d4c-2222-4b8f-8c3d-1e2f3a4b5c6d"} {
-		for _, folder := range []string{"", "ops"} {
+		for _, folder := range []string{"", "moin"} {
 			a := newApps(t.TempDir(), nil)
 			os.MkdirAll(a.appDir("shop"), 0o700)
 			os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-"+workspace[:8]), 0o600)
@@ -352,15 +352,15 @@ func TestAppBucket(t *testing.T) {
 	}
 	b := newBackups(a, nil)
 	b.storage = &protocol.BackupStorage{Bucket: "shared", Workspace: "ws", Name: "default"}
-	b.appStorage = map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "ops", Workspace: "ws", Name: "client"}}
+	b.appStorage = map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "moin", Workspace: "ws", Name: "client"}}
 	if b.storageFor("shop").Bucket != "client" || b.storageFor("blog").Bucket != "shared" {
 		t.Fatalf("buckets = %s, %s", b.storageFor("shop").Bucket, b.storageFor("blog").Bucket)
 	}
 	prefix, _ := b.prefix("shop", "/data/app.db")
-	if prefix != "ops/ws/shop/id-shop/data-app.db" {
+	if prefix != "moin/ws/shop/id-shop/data-app.db" {
 		t.Errorf("prefix in the app's own bucket = %s", prefix)
 	}
-	if sameStorage(b.appStorage, nil) || !sameStorage(b.appStorage, map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "ops", Workspace: "ws", Name: "client"}}) {
+	if sameStorage(b.appStorage, nil) || !sameStorage(b.appStorage, map[string]*protocol.BackupStorage{"shop": {Bucket: "client", Path: "moin", Workspace: "ws", Name: "client"}}) {
 		t.Error("sameStorage compares wrong")
 	}
 }
@@ -368,13 +368,13 @@ func TestAppBucket(t *testing.T) {
 // TestSweepUploads: uploads older than a day go, newer ones and backups
 // stay, and another workspace's uploads are never touched.
 func TestSweepUploads(t *testing.T) {
-	endpoint := os.Getenv("OPS_TEST_S3")
+	endpoint := os.Getenv("MOIN_TEST_S3")
 	if endpoint == "" {
-		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+		t.Skip("set MOIN_TEST_S3 to an S3 endpoint")
 	}
-	bucket := os.Getenv("OPS_TEST_S3_BUCKET")
+	bucket := os.Getenv("MOIN_TEST_S3_BUCKET")
 	if bucket == "" {
-		bucket = "ops-dev"
+		bucket = "moin-dev"
 	}
 	ctx := context.Background()
 	folder := fmt.Sprintf("sweep-%d", time.Now().UnixNano())
@@ -416,13 +416,13 @@ func TestSweepUploads(t *testing.T) {
 // TestDrillBeforeReplication: a drill with nothing in the bucket yet is
 // neither passed nor failed, and asks to try again soon.
 func TestDrillBeforeReplication(t *testing.T) {
-	endpoint := os.Getenv("OPS_TEST_S3")
+	endpoint := os.Getenv("MOIN_TEST_S3")
 	if endpoint == "" {
-		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+		t.Skip("set MOIN_TEST_S3 to an S3 endpoint")
 	}
-	bucket := os.Getenv("OPS_TEST_S3_BUCKET")
+	bucket := os.Getenv("MOIN_TEST_S3_BUCKET")
 	if bucket == "" {
-		bucket = "ops-dev"
+		bucket = "moin-dev"
 	}
 	reports := make(chan protocol.Backups, 1)
 	apps := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})

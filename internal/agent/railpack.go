@@ -35,7 +35,7 @@ const (
 	// never lands in the image.
 	railpackPlan = "railpack-plan.json"
 	railpackInfo = "railpack-info.json"
-	// railpackPort is the port a Railpack app listens on: ops sets PORT to it,
+	// railpackPort is the port a Railpack app listens on: moin sets PORT to it,
 	// as Railway does, since Railpack sets neither PORT nor EXPOSE.
 	railpackPort = 8080
 )
@@ -51,7 +51,7 @@ var railpackSums = map[string]string{
 var railpackArch = map[string]string{"arm64": "arm64", "amd64": "x86_64"}
 
 // railpackBinary returns the railpack CLI, downloaded once into the agent's
-// bin folder and checked against its sha256. OPS_RAILPACK_BINARY names one
+// bin folder and checked against its sha256. MOIN_RAILPACK_BINARY names one
 // already on disk, as the tests do.
 func (a *apps) railpackBinary(ctx context.Context) (string, error) {
 	if path := build.Getenv("RAILPACK_BINARY"); path != "" {
@@ -123,7 +123,7 @@ func untarFile(archive []byte, name string) ([]byte, error) {
 	}
 }
 
-// railpackCompose is the compose.yml ops writes for a Railpack app: one
+// railpackCompose is the compose.yml moin writes for a Railpack app: one
 // service built from the plan through the Railpack frontend, listening on
 // PORT, with its data in ./data. The cache key keeps each app's build caches
 // apart.
@@ -187,7 +187,7 @@ type railpackInfoFile struct {
 	} `json:"logs"`
 }
 
-// railpackPlanFile is the part of the plan ops reads.
+// railpackPlanFile is the part of the plan moin reads.
 type railpackPlanFile struct {
 	Deploy struct {
 		StartCommand string `json:"startCommand"`
@@ -270,7 +270,7 @@ func (a *apps) railpackPrepare(ctx context.Context, src, release string, env map
 		if reason == "" && err != nil {
 			reason = err.Error()
 		}
-		return "", fmt.Errorf("Railpack cannot build this repo: %s. Add a Dockerfile, or a compose.yml, to tell ops how", strings.TrimSuffix(reason, "."))
+		return "", fmt.Errorf("Railpack cannot build this repo: %s. Add a Dockerfile, or a compose.yml, to tell moin how", strings.TrimSuffix(reason, "."))
 	}
 	var plan railpackPlanFile
 	body, err = os.ReadFile(filepath.Join(release, railpackPlan))

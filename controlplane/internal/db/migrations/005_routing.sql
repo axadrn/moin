@@ -3,7 +3,7 @@
 -- ROUTING
 -- How visitors reach an app: its domains (a JSON array), the canonical one
 -- the others redirect to, and an htpasswd line ("user:bcrypt hash") when a
--- password protects it. The x-ops block of compose.yml wins for every field
+-- password protects it. The x-moin block of compose.yml wins for every field
 -- it sets. servers.address is the IP the agent connected from, for the DNS
 -- check.
 -- ============================================================================

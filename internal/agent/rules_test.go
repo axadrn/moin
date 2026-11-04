@@ -11,9 +11,9 @@ import (
 
 func TestRulesReadEveryRule(t *testing.T) {
 	rules, err := parseRules(`
-# what ops may do here
+# what moin may do here
 data: off
-logs: off   # no logs through ops
+logs: off   # no logs through moin
 network: locked
 deploy-from: github.com/acme/*, ghcr.io/acme/*, upload
 backups-to: s3.eu-central-1.amazonaws.com/acme-backups
@@ -100,8 +100,18 @@ func TestBackupsTo(t *testing.T) {
 func TestHelloCarriesTheRules(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "rules")
 	os.WriteFile(file, []byte("data: off\n"), 0o600)
-	t.Setenv("OPS_RULES", file)
+	t.Setenv("MOIN_RULES", file)
 	if hello := Hello(); hello.Rules == nil || !hello.Rules.DataOff {
 		t.Fatalf("hello = %+v", hello)
+	}
+}
+
+// OPS_RULES of the old name counts for nothing: only MOIN_RULES, else
+// /etc/moin/rules.
+func TestRulesFileOldNameIgnored(t *testing.T) {
+	t.Setenv("MOIN_RULES", "")
+	t.Setenv("OPS_RULES", filepath.Join(t.TempDir(), "rules"))
+	if got := RulesFile(); got != "/etc/moin/rules" {
+		t.Fatalf("RulesFile = %q", got)
 	}
 }

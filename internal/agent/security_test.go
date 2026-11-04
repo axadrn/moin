@@ -34,10 +34,10 @@ func TestFirewallRules(t *testing.T) {
 			t.Errorf("SSH on Tailscale rules miss %q:\n%s", want, ssh)
 		}
 	}
-	if path := os.Getenv("OPS_WRITE_RULES"); path != "" {
-		os.WriteFile(path+"-ssh.nft", []byte("table inet ops\ndelete table inet ops\n"+ssh), 0o644)
-		os.WriteFile(path+"-direct.nft", []byte("table inet ops\ndelete table inet ops\n"+direct), 0o644)
-		os.WriteFile(path+"-tunnel.nft", []byte("table inet ops\ndelete table inet ops\n"+tunnel), 0o644)
+	if path := os.Getenv("MOIN_WRITE_RULES"); path != "" {
+		os.WriteFile(path+"-ssh.nft", []byte("table inet moin\ndelete table inet moin\n"+ssh), 0o644)
+		os.WriteFile(path+"-direct.nft", []byte("table inet moin\ndelete table inet moin\n"+direct), 0o644)
+		os.WriteFile(path+"-tunnel.nft", []byte("table inet moin\ndelete table inet moin\n"+tunnel), 0o644)
 	}
 }
 

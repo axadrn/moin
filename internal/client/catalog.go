@@ -14,7 +14,7 @@ type CatalogVersion struct {
 	Date *time.Time `json:"date"`
 }
 
-// CatalogEntry is an open source app ops installs in one click. Versions
+// CatalogEntry is an open source app moin installs in one click. Versions
 // is only set by CatalogApp.
 type CatalogEntry struct {
 	Slug     string `json:"slug"`
@@ -26,7 +26,7 @@ type CatalogEntry struct {
 	License  string `json:"license"`
 	Image    string `json:"image"`
 	Database string `json:"database"`
-	// DatabaseNote says when ops does not back up the app's database.
+	// DatabaseNote says when moin does not back up the app's database.
 	DatabaseNote string `json:"database_note"`
 	Port         int    `json:"port"`
 	Login        string `json:"login"`

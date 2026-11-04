@@ -16,22 +16,15 @@ import (
 // may do there. MOIN_RULES overrides it. The agent never writes this file.
 const DefaultRulesFile = "/etc/" + build.Name + "/rules"
 
-// RulesFile returns MOIN_RULES, else DefaultRulesFile, else the rules file
-// of the old name when only that one exists: the agent never moves the
-// owner's rules, and never drops them either.
+// RulesFile returns MOIN_RULES, else DefaultRulesFile.
 func RulesFile() string {
 	if file := build.Getenv("RULES"); file != "" {
 		return file
 	}
-	if _, err := os.Stat(DefaultRulesFile); err != nil {
-		if _, err := os.Stat(legacyRulesFile); err == nil {
-			return legacyRulesFile
-		}
-	}
 	return DefaultRulesFile
 }
 
-// LoadRules reads the rules file. Without one, ops may do everything. A file
+// LoadRules reads the rules file. Without one, moin may do everything. A file
 // with a mistake is an error, so a typo never allows what it meant to stop.
 func LoadRules(file string) (*protocol.Rules, error) {
 	body, err := os.ReadFile(file)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestConfigDomainForms: x-ops domains as a list is the main service's; as
+// TestConfigDomainForms: x-moin domains as a list is the main service's; as
 // a map, domains by service.
 func TestConfigDomainForms(t *testing.T) {
 	var list, byService Config

@@ -1,7 +1,7 @@
 -- +goose Up
 -- ============================================================================
 -- SERVERS
--- A machine with an ops agent. The install token connects the agent once and
+-- A machine with a moin agent. The install token connects the agent once and
 -- is cleared then; the agent token authorizes every session after that. Only
 -- SHA-256 hashes of both are stored.
 -- ============================================================================

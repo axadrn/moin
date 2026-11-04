@@ -96,7 +96,7 @@ func sourceFiles(dir string) ([]string, error) {
 	return paths, err
 }
 
-// LocalConfig is what `ops deploy` reads from the repo before it uploads:
+// LocalConfig is what `moin deploy` reads from the repo before it uploads:
 // the app and server names of the x-moin block. The agent reads the whole
 // block on the server.
 type LocalConfig struct {
@@ -105,12 +105,12 @@ type LocalConfig struct {
 }
 
 var (
-	// The x-moin block, or x-ops of the old name.
-	xOpsBlock = regexp.MustCompile(`(?m)^x-(?:` + build.Name + `|` + build.LegacyName + `):[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)`)
-	xOpsField = regexp.MustCompile(`(?m)^[ \t]+(app|server):[ \t]*["']?([A-Za-z0-9._-]+)["']?[ \t]*(?:#.*)?$`)
+	// The x-moin block.
+	configBlock = regexp.MustCompile(`(?m)^x-` + build.Name + `:[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)`)
+	configField = regexp.MustCompile(`(?m)^[ \t]+(app|server):[ \t]*["']?([A-Za-z0-9._-]+)["']?[ \t]*(?:#.*)?$`)
 )
 
-// ReadLocalConfig looks for x-moin.app and x-moin.server (or x-ops) in the compose file of dir.
+// ReadLocalConfig looks for x-moin.app and x-moin.server in the compose file of dir.
 func ReadLocalConfig(dir string) LocalConfig {
 	config := LocalConfig{}
 	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
@@ -118,11 +118,11 @@ func ReadLocalConfig(dir string) LocalConfig {
 		if err != nil {
 			continue
 		}
-		block := xOpsBlock.FindSubmatch(body)
+		block := configBlock.FindSubmatch(body)
 		if block == nil {
 			return config
 		}
-		for _, field := range xOpsField.FindAllSubmatch(block[1], -1) {
+		for _, field := range configField.FindAllSubmatch(block[1], -1) {
 			switch string(field[1]) {
 			case "app":
 				config.App = string(field[2])

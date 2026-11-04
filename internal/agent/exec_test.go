@@ -13,8 +13,8 @@ import (
 // nothing in it reaches a shell, and a word that looks like a flag of
 // compose is the command's.
 func TestExecArgs(t *testing.T) {
-	got := execArgs("shop", "/var/lib/ops/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
-	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/ops/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
+	got := execArgs("shop", "/var/lib/moin/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
+	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/moin/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
 	}
@@ -76,11 +76,11 @@ func TestExecRefused(t *testing.T) {
 
 // TestExecRule: exec: off is a rule like logs: off.
 func TestExecRule(t *testing.T) {
-	rules, err := parseRules("exec: off\n", "/etc/ops/rules")
+	rules, err := parseRules("exec: off\n", "/etc/moin/rules")
 	if err != nil || !rules.ExecOff || strings.Join(rules.Lines(), ",") != "exec: off" {
 		t.Errorf("exec: off = %+v, %v", rules, err)
 	}
-	if _, err := parseRules("exec: maybe\n", "/etc/ops/rules"); err == nil {
+	if _, err := parseRules("exec: maybe\n", "/etc/moin/rules"); err == nil {
 		t.Error("exec: maybe passed")
 	}
 }

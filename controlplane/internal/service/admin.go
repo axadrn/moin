@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/google/uuid"
 )
 
@@ -258,7 +259,7 @@ func (s *AdminService) SetForeverFree(actor *model.User, actorSession *model.Ses
 		return err
 	}
 	recordActivity(s.activity, now, System(workspace.ID), "billing.plan_changed", "subscription", workspace.ID, map[string]string{
-		"from": before.PlanID, "to": subscription.PlanID, "status_from": before.Status, "status": subscription.Status, "provider": "ops",
+		"from": before.PlanID, "to": subscription.PlanID, "status_from": before.Status, "status": subscription.Status, "provider": build.Name,
 	})
 	return s.recordAdminAction(actor.ID, action, "workspace", workspace.ID)
 }

@@ -54,8 +54,8 @@ func fakeDocker(t *testing.T) *http.Client {
 				t.Errorf("filters = %q", r.URL.Query().Get("filters"))
 			}
 			_, _ = w.Write([]byte(`[
-				{"Id":"a1","Labels":{"com.docker.compose.project":"ops-shop"}},
-				{"Id":"a2","Labels":{"com.docker.compose.project":"ops-shop"}},
+				{"Id":"a1","Labels":{"com.docker.compose.project":"moin-shop"}},
+				{"Id":"a2","Labels":{"com.docker.compose.project":"moin-shop"}},
 				{"Id":"b1","Labels":{"com.docker.compose.project":"someone-else"}}]`))
 		case strings.HasPrefix(r.URL.Path, "/containers/a") && strings.HasSuffix(r.URL.Path, "/stats"):
 			if r.URL.Query().Get("one-shot") != "true" || r.URL.Query().Get("stream") != "false" {

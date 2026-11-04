@@ -33,8 +33,8 @@ type compareTab struct {
 
 var (
 	free     = plain("Free", "you run it")
-	opsFree  = plain("Free", "every feature")
-	selfHost = []compareColumn{{"moin", 0, opsFree}, {"Coolify", 1, free}, {"Dokploy", 2, free}, {"Kamal", 3, compareCell{}}, {"Uncloud", 8, compareCell{}}}
+	moinFree = plain("Free", "every feature")
+	selfHost = []compareColumn{{"moin", 0, moinFree}, {"Coolify", 1, free}, {"Dokploy", 2, free}, {"Kamal", 3, compareCell{}}, {"Uncloud", 8, compareCell{}}}
 )
 
 var compareTabs = []compareTab{
