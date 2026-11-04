@@ -3,6 +3,19 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.22
+
+November 4, 2026
+
+**In short:** every app in the catalog speaks moin now, so installs keep working after the old name goes on December 4.
+
+### Fixed
+- **Catalog after December 4**: the 47 apps still used the old `x-ops` block in their compose files and would have stopped installing then. They use `x-moin` now.
+- **Messages**: the last hints that still said `ops deploy` say `moin deploy`.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.21
 
 November 4, 2026
