@@ -35,7 +35,7 @@ const (
 templ Home(network model.Network) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy to servers you own",
-		Description: brand.Name + " deploys your apps to servers you own, backs up every change of their SQLite database to your bucket, lets you edit the data live and checks every domain every minute. From the web, the CLI, a terminal UI and MCP.",
+		Description: brand.Name + " deploys any app to servers you own, backs up every change of its SQLite or Postgres database to your bucket, checks the restore every day and lets you edit the data live. 47 open-source apps in one click, HTTPS before you have a domain, uptime checks built in. Web, CLI, terminal UI and MCP.",
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		<main>
@@ -305,6 +305,11 @@ templ HomeCommands() {
 				@homeCommand("moin deploy", "Your server builds the app and puts it live, if it is healthy.")
 				@homeCommand("moin restore --at 14:01", "Deleted the wrong rows at 14:02? Go back to 14:01.")
 			</div>
+			<ul class="mt-8 grid grid-cols-1 gap-3 text-base text-muted-foreground lg:grid-cols-3 lg:gap-10">
+				<li><span class="text-foreground">No domain yet?</span> Every app is live at once, with HTTPS and a password in front.</li>
+				<li><span class="text-foreground">No code at all?</span> <a href="/apps" class="text-foreground underline underline-offset-4 hover:text-foreground">47 open-source apps</a> in one click: n8n, Umami, Open WebUI.</li>
+				<li><span class="text-foreground">No SSH either.</span> <span class="font-mono text-sm">moin exec</span> runs a command in your container.</li>
+			</ul>
 		</div>
 	</section>
 }
@@ -430,7 +435,7 @@ templ HomeBackups() {
 		<div class={ homeWrap }>
 			<h2 class={ typeH2, "max-w-[14ch]" }>Never lose a row.</h2>
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
-				<span class="text-foreground">Every change is in your bucket within a second.</span>
+				<span class="text-foreground">Every SQLite change is in your bucket within a second, every Postgres change within a minute.</span>
 				Every day, { brand.Name } restores it and checks it works.
 			</p>
 			// Sources, read November 4, 2026:
@@ -467,6 +472,7 @@ templ HomeBackups() {
 			<ul class="mt-8 flex flex-col gap-3 text-base text-muted-foreground sm:flex-row sm:gap-10">
 				<li><span class="text-foreground">A full copy</span> before every deploy and every edit.</li>
 				<li><span class="text-foreground">Your bucket:</span> R2, S3, B2 or Hetzner. Never through us.</li>
+				<li><span class="text-foreground">A backup stops?</span> You hear it.</li>
 			</ul>
 		</div>
 	</section>
@@ -498,7 +504,7 @@ templ HomeData() {
 				<div>
 					<h2 class={ typeH2, "" }>Your data, live.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
-						<span class="text-foreground">Browse every table, edit a cell, run SQL.</span>
+						<span class="text-foreground">Browse every table, edit a cell, run SQL. SQLite or Postgres.</span>
 						Live from your server. Every change takes a snapshot first.
 					</p>
 				</div>
@@ -528,7 +534,7 @@ templ HomeUptime() {
 					<h2 class={ typeH2, "" }>Know before your customers do.</h2>
 					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
 						<span class="text-foreground">Every domain, checked from outside, every minute.</span>
-						Down? You hear it by email, Slack, Discord or Telegram. Nothing to set up, no second tool to pay for.
+						Down, a deploy failed, a disk full? You hear it by email, Slack, Discord, Telegram or webhook. Nothing to set up, no second tool to pay for.
 					</p>
 				</div>
 				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1" aria-label="Two alert emails from moin">
@@ -779,9 +785,9 @@ templ HomePricing() {
 						}
 					</div>
 					<ul class="mt-8 flex flex-col gap-3 text-base">
-						@homePlanCheck("Set up in about an hour")
+						@homePlanCheck("One command on one server")
 						@homePlanCheck("Update in one click")
-						@homePlanCheck("Your GitHub App and email")
+						@homePlanCheck("Your GitHub App, email optional")
 						@homePlanCheck("Help on GitHub")
 					</ul>
 				}
@@ -810,8 +816,8 @@ templ HomeNext() {
 			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every provider. Nothing anyone else can read.</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
 				@homeNextStep("Servers in one click", "Create them at Hetzner, DigitalOcean and more, right from moin.")
-				@homeNextStep("Zero trust", "Secrets only on your servers, end to end encrypted.")
-				@homeNextStep("Signed commands", "Your servers only obey changes you signed.")
+				@homeNextStep("MySQL backups", "Every change backed up and checked daily, like Postgres.")
+				@homeNextStep("Zero trust", "Secrets only on your servers, and they obey only changes you signed.")
 			</div>
 			<p class="mt-6">
 				<a href="/docs/roadmap" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">The roadmap</a>
@@ -840,13 +846,19 @@ templ HomeFAQ() {
 					We hold no key to your servers and need no open port. A file on your server decides what { brand.Name } may do there. <a href="/docs/guides/security" class="text-foreground underline underline-offset-4 hover:text-foreground">The security guide</a>
 				}
 				@homeQuestion("Do I need to know Docker?") {
-					No. For a Go app, { brand.Name } sets everything up. Have a Dockerfile already? It uses yours.
+					No. { brand.Name } reads your repo and builds it: Node, Bun, Python, Ruby, PHP, Go and more. Have a Dockerfile or a compose.yml? It uses yours.
 				}
 				@homeQuestion("What can I deploy?") {
-					Any app with a Dockerfile, or any Go app. If a new version fails, the old one keeps running.
+					Any repo, with or without a Dockerfile, a compose.yml with its databases, or an image from CI. If a new version fails, the old one keeps running.
 				}
 				@homeQuestion("Which databases?") {
-					SQLite and Postgres get everything: both backups, the daily check, the data browser. MySQL, Redis and the rest run too, without those extras.
+					SQLite and Postgres get everything: every change backed up, restore to any second of 7 days, a full copy before every deploy, the daily check, the data browser. MySQL, Redis and the rest run too, without those extras.
+				}
+				@homeQuestion("Can I install n8n, Umami or Open WebUI?") {
+					Yes, and 44 more from the <a href="/apps" class="text-foreground underline underline-offset-4 hover:text-foreground">catalog</a>, in one click. { brand.Name } makes the secrets and backs up the database. When a new release is out, you hear it, and an update takes a snapshot first.
+				}
+				@homeQuestion("Do I need a domain?") {
+					Not to start. After its first deploy every app is live at its own address with HTTPS, guarded by a password until you open it. It needs ports 80 and 443, so not behind a Cloudflare Tunnel. Add your domain when you are ready, one per service if you like. <a href="/docs/guides/domains#instant-address" class="text-foreground underline underline-offset-4 hover:text-foreground">Instant address</a>
 				}
 				@homeQuestion("Which servers?") {
 					Any Linux server, at any provider. One line sets it up.
@@ -861,13 +873,13 @@ templ HomeFAQ() {
 					Your apps keep running. They live on your servers. You just cannot deploy until it is back.
 				}
 				@homeQuestion("Is it open source?") {
-					Yes, all of it, under AGPL-3.0. Host it yourself for free, or let us run it.
+					Yes, all of it, under AGPL-3.0. Host it yourself for free, on one server with one command, or let us run it.
 				}
 				@homeQuestion("Why AGPL, and can I contribute?") {
 					AGPL keeps moin open: who runs a changed moin as a service shares the changes. Contributions welcome: open an issue first, then a pull request.
 				}
 				@homeQuestion("Can my AI agent use it?") {
-					Yes. moin has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
+					Yes. moin has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs, run commands and set env vars with a personal API token.
 				}
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
@@ -886,7 +898,7 @@ templ HomeFAQ() {
 						Yes, with unlimited servers, apps and teammates. Most teams need one.
 					}
 					@homeQuestion("Can I cancel?") {
-						Any time, in one click. Your apps keep running on your servers.
+						Any time, in one click. Your apps keep running on your servers, your backups stay in your bucket.
 					}
 				}
 			}

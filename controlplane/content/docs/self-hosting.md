@@ -11,7 +11,7 @@ order: 3
 | Price | free forever | $249 a year (save $99) or $29 a month, per workspace |
 | Features | all | all |
 | Servers, apps, members | unlimited | unlimited |
-| Setup | about an hour | two minutes |
+| Setup | one command on one server, about an hour on two | two minutes |
 | Control plane | on your own server | ours, nothing to run |
 | Updates | one click, when moin says a release is out | the day they ship, by us |
 | GitHub App, email | you set them up | ready to use |
@@ -44,7 +44,7 @@ And it is private:
 Point a domain at the server with an A record, then run this as root on a fresh Ubuntu or Debian server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
+curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
 It takes a few minutes and does it all:
@@ -97,7 +97,7 @@ Three files do the work. They are in the repo, in `controlplane/deploy/`:
 **1. Prepare the server**, as root:
 
 ```bash
-git clone https://github.com/axadrn/ops
+git clone https://github.com/axadrn/moin
 cd moin/controlplane/deploy
 sh setup.sh
 ```

@@ -127,13 +127,16 @@ Deploy v1 of <app-name> started
   building
   …
   v1 is live
+✓ moin. <app-name> is live at https://<app-name>.<server-ip-with-dashes>.sslip.io
 ```
 
 If the deploy fails, the log ends with the reason. Read it again any time with `moin deploys v1`. [Deploy](/docs/guides/deploy) explains what moin detects and how to change it.
 
 ## 8. Open it
 
-Your app runs, but nobody can reach it yet. Give it a domain:
+Your app is already online at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password in front: `moin instant --show` prints both. On a server behind a Cloudflare Tunnel there is none, since it needs ports 80 and 443.
+
+For your visitors, give it a domain:
 
 ```surfaces
 Web: the app page, **Domains**, **Add domain**
@@ -147,8 +150,11 @@ moin shows the address of your server and the DNS record to set. Set it where yo
 
 ## What next
 
+- No code of your own? Install n8n, Umami, Open WebUI and 44 more in one click: [Catalog](/docs/guides/catalog).
 - Settings and secrets for your app: [Env vars](/docs/guides/env).
 - Your database, SQLite or Postgres, every change backed up and checked daily: [Backups](/docs/guides/backups).
 - Close every port of the server: [Security](/docs/guides/security).
 - Deploy every push to GitHub: [GitHub](/docs/guides/github).
+- Run a migration or make the first admin: [Run a command](/docs/guides/exec).
+- Hear when a site goes down, a backup stops or a disk fills up: [Alerts](/docs/guides/alerts).
 - Bring your team: [Team and activity](/docs/guides/team).
