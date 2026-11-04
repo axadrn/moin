@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/ops/internal/dotenv"
+	"github.com/axadrn/moin/internal/dotenv"
 )
 
 type (

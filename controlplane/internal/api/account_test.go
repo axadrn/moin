@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 func TestUpdateName(t *testing.T) {

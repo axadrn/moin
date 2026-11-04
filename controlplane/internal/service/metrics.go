@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Every agent sends a sample of its server and apps every 15 seconds. The

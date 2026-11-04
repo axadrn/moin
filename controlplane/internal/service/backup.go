@@ -21,8 +21,8 @@ import (
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 const (

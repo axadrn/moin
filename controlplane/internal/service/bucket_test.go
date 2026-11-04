@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/protocol"
 )
 
 // answerBackupConfigs answers every backup config the agent gets, so a

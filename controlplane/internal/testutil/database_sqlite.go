@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/db"
+	"github.com/axadrn/moin/controlplane/internal/db"
 	"github.com/jmoiron/sqlx"
 )
 

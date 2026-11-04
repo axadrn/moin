@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // showStatus runs :status: whether everything is OK, in the output panel.

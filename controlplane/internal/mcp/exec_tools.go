@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/protocol"
 )
 
 // execOutputLimit is how much of a command's output exec_command returns:

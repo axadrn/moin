@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
 

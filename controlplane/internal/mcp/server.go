@@ -7,11 +7,11 @@ package mcp
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/brand"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/middleware"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/middleware"
+	"github.com/axadrn/moin/controlplane/internal/service"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

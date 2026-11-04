@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/axadrn/ops/controlplane/internal/service/mailer"
+	"github.com/axadrn/moin/controlplane/internal/service/mailer"
 )
 
 type EmailService struct {

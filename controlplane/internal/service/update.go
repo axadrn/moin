@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 )
 
 const (

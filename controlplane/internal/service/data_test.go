@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 func TestReadOnlyError(t *testing.T) {

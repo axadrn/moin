@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // RateLimiter tracks request counts per IP address

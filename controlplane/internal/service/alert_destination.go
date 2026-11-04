@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/brand"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/google/uuid"
 )
 

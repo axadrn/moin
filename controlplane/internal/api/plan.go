@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/access"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 // Plan is a purchasable plan of the product catalog with its prices.

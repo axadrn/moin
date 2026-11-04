@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestProxyOnFirstConnect: a server without security settings gets no

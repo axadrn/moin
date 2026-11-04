@@ -1,21 +1,21 @@
 package routes
 
 import (
-	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/moin/internal/build"
 	"io/fs"
 	"net/http"
 	"regexp"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/assets"
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/app"
-	"github.com/axadrn/ops/controlplane/internal/content"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/handler"
-	"github.com/axadrn/ops/controlplane/internal/mcp"
-	"github.com/axadrn/ops/controlplane/internal/middleware"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/assets"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/app"
+	"github.com/axadrn/moin/controlplane/internal/content"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/handler"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/middleware"
+	"github.com/axadrn/moin/protocol"
 )
 
 var immutableAssetPathPattern = regexp.MustCompile(`^/?js/(?:.+\.[0-9a-f]{8}(?:\.min)?|shadcn-templ-[0-9a-f]{16})\.js$`)

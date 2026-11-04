@@ -3,7 +3,7 @@ package ctxkeys
 import (
 	"context"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 const APITokenKey contextKey = "api_token"

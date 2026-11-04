@@ -57,7 +57,7 @@ Each app is a folder in the ops repo, `controlplane/content/catalog/<app>`: an `
 
 ## Add an app
 
-Missing one? Open an [issue](https://github.com/axadrn/ops/issues) and we add it, or add it yourself with a pull request: one folder, two files.
+Missing one? Open an [issue](https://github.com/axadrn/moin/issues) and we add it, or add it yourself with a pull request: one folder, two files.
 
 `app.md` says what the app is:
 

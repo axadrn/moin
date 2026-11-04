@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // activity prints what the team did, newest first, to the second in the

@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/catalog"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
 // CatalogHandler serves the catalog: its public pages, the install in a

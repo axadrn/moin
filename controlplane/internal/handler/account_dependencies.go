@@ -1,6 +1,6 @@
 package handler
 
-import "github.com/axadrn/ops/controlplane/internal/service"
+import "github.com/axadrn/moin/controlplane/internal/service"
 
 type AccountHandler struct {
 	authService *service.AuthService

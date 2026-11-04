@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // TestGitHubAuthNeedsClient: without a client ID and secret, GitHub would

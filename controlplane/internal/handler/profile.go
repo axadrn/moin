@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
-	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
 type ProfileHandler struct {

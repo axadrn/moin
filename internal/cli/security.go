@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // secure sets how a server is reached; flags it does not get keep their

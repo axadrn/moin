@@ -1,6 +1,6 @@
 package api
 
-import "github.com/axadrn/ops/controlplane/internal/model"
+import "github.com/axadrn/moin/controlplane/internal/model"
 
 // Workspace is the public JSON shape of a workspace.
 type Workspace struct {

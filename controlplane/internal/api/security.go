@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // Integrations is the answer of GET /api/v1/integrations: which keys are

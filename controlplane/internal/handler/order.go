@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // formOrder is the order the list form sends: the names in their order on

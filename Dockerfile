@@ -43,7 +43,7 @@ RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os="${target%/*}" arch="${target#*/}" && \
       CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
-        -ldflags "-s -w -X github.com/axadrn/ops/internal/build.Version=$VERSION" \
+        -ldflags "-s -w -X github.com/axadrn/moin/internal/build.Version=$VERSION" \
         -o "downloads/ops-$os-$arch" ../cmd/ops; \
     done && \
     (cd downloads && sha256sum ops-* > SHA256SUMS)
@@ -52,7 +52,7 @@ RUN mkdir -p downloads && \
 # its version, the one agents update to.
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
-      -ldflags "-X github.com/axadrn/ops/internal/build.Version=$VERSION" \
+      -ldflags "-X github.com/axadrn/moin/internal/build.Version=$VERSION" \
       -o main ./cmd/server
 
 # Deploy-Stage

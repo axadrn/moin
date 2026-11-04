@@ -2,16 +2,16 @@ package service
 
 import (
 	"errors"
-	"github.com/axadrn/ops/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/access"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
+	"github.com/axadrn/moin/protocol"
 )
 
 func newServerService(t *testing.T) *ServerService {

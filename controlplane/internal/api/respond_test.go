@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 func TestErrorForReadOnlyQuery(t *testing.T) {

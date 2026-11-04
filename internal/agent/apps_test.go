@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 func tarball(t *testing.T, files map[string]string) []byte {

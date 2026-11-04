@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // RequireAdminAPI answers 401 unauthenticated without a session and 403

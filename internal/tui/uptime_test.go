@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // u and :uptime open the uptime prompt of the selected app.

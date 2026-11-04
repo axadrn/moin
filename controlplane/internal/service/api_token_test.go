@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 )
 
 // memoryAPITokens is an in-memory APITokenRepository that counts writes.

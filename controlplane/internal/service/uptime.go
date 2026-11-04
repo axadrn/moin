@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Uptime checks. Every domain of every live app gets one GET a minute, like

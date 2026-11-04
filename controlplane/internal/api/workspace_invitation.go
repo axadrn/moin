@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // WorkspaceInvitationHandler shows and accepts workspace invitations by

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestBootstrap: the first run makes the account, one workspace and the

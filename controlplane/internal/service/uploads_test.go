@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestUploadKeys: two workspaces share one bucket and folder, each with an

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 func TestEmailServiceBuildsMagicLinkMessage(t *testing.T) {

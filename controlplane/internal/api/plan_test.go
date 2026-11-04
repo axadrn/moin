@@ -3,8 +3,8 @@ package api_test
 import (
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 func TestNewPlansMarksTheCurrentPlan(t *testing.T) {

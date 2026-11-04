@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Continuous Postgres backups wrap WAL-G, the way SQLite's wrap Litestream:

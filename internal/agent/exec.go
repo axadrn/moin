@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // execArgs is docker's argv for a run: compose exec in the app's live

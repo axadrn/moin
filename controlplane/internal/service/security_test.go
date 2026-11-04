@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // fakeCloudflare answers the Cloudflare API calls ops makes and records

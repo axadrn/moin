@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 func renderNotice(t *testing.T, info model.VersionInfo) string {
@@ -18,7 +18,7 @@ func renderNotice(t *testing.T, info model.VersionInfo) string {
 }
 
 func TestUpdateNotice(t *testing.T) {
-	out := model.VersionInfo{Version: "v0.2.0", SelfHosted: true, Latest: "v0.3.0", UpdateAvailable: true, Summary: "One-click updates.", NotesURL: "https://github.com/axadrn/ops/releases/tag/v0.3.0", Admin: true, Updater: true, CanUpdate: true}
+	out := model.VersionInfo{Version: "v0.2.0", SelfHosted: true, Latest: "v0.3.0", UpdateAvailable: true, Summary: "One-click updates.", NotesURL: "https://github.com/axadrn/moin/releases/tag/v0.3.0", Admin: true, Updater: true, CanUpdate: true}
 	html := renderNotice(t, out)
 	for _, want := range []string{"v0.3.0 is out", "One-click updates.", "Update now", "releases/tag/v0.3.0"} {
 		if !strings.Contains(html, want) {

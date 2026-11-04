@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestAgentsUpdateThemselves: an agent older than the control plane gets

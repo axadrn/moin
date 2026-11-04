@@ -17,8 +17,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 // A deploy from a laptop goes into the user's own bucket: the CLI uploads

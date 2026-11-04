@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // HooksHandler serves deploy hooks: secret URLs that CI calls after it

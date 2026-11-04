@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/axadrn/ops/controlplane/internal/app"
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/app"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // command runs a one-off task of the operator, such as from install.sh:

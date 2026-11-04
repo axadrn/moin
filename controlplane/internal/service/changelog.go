@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/markdown"
+	"github.com/axadrn/moin/controlplane/internal/markdown"
 )
 
 // Changelog renders <contentDir>/changelog.md, the release notes of every

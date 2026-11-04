@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // moveUsage is where move puts an app or a server.

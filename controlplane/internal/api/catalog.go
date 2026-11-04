@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/catalog"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // CatalogHandler lists the catalog, installs its apps and updates them.

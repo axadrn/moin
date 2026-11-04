@@ -11,9 +11,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // The screen: a header with the brand mark, the tabs and the control plane,

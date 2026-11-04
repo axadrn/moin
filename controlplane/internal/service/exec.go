@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 // ExecInput is one command to run in a container of an app. Service is

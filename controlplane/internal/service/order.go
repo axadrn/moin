@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 )
 
 // The order of apps and servers is per workspace and shows everywhere: the

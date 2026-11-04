@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
+	"github.com/axadrn/moin/protocol"
 )
 
 func TestMetricsTool(t *testing.T) {

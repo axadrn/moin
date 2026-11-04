@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // TestEmailAlertsTool: whoami says the alerts are on until set_email_alerts

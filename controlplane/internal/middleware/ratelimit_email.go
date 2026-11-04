@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/api"
 )
 
 // requestEmail returns the normalized email address of a form or JSON request

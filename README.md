@@ -20,7 +20,7 @@ Everything else is in the docs, under `/docs` in the control plane: [ops.goilerp
 ## Build
 
 ```bash
-go install github.com/axadrn/ops/cmd/ops@latest
+go install github.com/axadrn/moin/cmd/ops@latest
 ```
 
 The control plane is in [`controlplane`](controlplane).

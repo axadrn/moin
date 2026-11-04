@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // DefaultRulesFile is where the owner of a server writes what ops may do

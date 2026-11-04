@@ -21,8 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )

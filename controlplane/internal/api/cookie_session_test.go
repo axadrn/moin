@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/api"
 )
 
 // cookieSignIn sends a sign-in with ?session=cookie like the browser app:

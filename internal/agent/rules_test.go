@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 func TestRulesReadEveryRule(t *testing.T) {

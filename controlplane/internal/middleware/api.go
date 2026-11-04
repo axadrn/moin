@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // isAPIRequest reports whether a middleware error must be answered with the

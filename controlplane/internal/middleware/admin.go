@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 func AdminContext(adminService *service.AdminService) func(http.Handler) http.Handler {

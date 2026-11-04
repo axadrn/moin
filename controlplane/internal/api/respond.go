@@ -5,9 +5,9 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"github.com/axadrn/ops/controlplane/internal/access"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
 	"log/slog"
 	"net/http"
 )

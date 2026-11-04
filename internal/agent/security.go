@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // How a server is reached and locked down. The control plane decides, the

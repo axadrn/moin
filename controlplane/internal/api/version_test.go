@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 // TestVersionOnTheHostedControlPlane: the hosted control plane answers its

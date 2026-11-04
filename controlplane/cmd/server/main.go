@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/dbbackup"
+	"github.com/axadrn/moin/controlplane/internal/dbbackup"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/app"
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/logger"
-	"github.com/axadrn/ops/controlplane/internal/routes"
+	"github.com/axadrn/moin/controlplane/internal/app"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/logger"
+	"github.com/axadrn/moin/controlplane/internal/routes"
 	"github.com/joho/godotenv"
 )
 

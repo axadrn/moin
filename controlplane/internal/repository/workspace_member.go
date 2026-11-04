@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )

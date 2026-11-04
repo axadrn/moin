@@ -254,7 +254,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-      - run: go install github.com/axadrn/ops/cmd/ops@latest
+      - run: go install github.com/axadrn/moin/cmd/ops@latest
       - run: ops deploy
         env:
           OPS_URL: https://ops.example.com

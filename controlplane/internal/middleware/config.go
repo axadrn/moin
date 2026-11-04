@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 func RenderConfig(cfg config.RenderConfig) func(http.Handler) http.Handler {

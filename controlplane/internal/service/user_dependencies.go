@@ -1,6 +1,6 @@
 package service
 
-import "github.com/axadrn/ops/controlplane/internal/repository"
+import "github.com/axadrn/moin/controlplane/internal/repository"
 
 type UserService struct {
 	userRepository   repository.UserRepository

@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Every server runs one Traefik container for all apps. It takes 80 and

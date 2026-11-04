@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // healthEvery is how often the agent looks whether a backup broke or works

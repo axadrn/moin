@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
 // Changelog shows what shipped, newest first. It reads the file on every

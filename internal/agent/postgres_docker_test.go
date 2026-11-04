@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestPostgresDocker runs the browser, a dump, a restore and a drill

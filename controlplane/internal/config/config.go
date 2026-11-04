@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 	"net/mail"
 	"net/netip"
 	"net/url"

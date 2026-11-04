@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 func accountDeletionError(w http.ResponseWriter, r *http.Request, userID string, err error) {

@@ -29,7 +29,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 ## Next
 
-- **Servers in one click**: create them at Hetzner, DigitalOcean, Vultr and UpCloud, right from ops. [#1](https://github.com/axadrn/ops/issues/1)
+- **Servers in one click**: create them at Hetzner, DigitalOcean, Vultr and UpCloud, right from ops. [#1](https://github.com/axadrn/moin/issues/1)
 
 - **MySQL backups**: every change backed up and checked daily, like Postgres, so WordPress and the other MySQL apps of the catalog lose nothing either.
 
@@ -37,7 +37,7 @@ MongoDB, ClickHouse and the rest run like any service; ops backups for them come
 
 ## Later
 
-Zero trust: even someone in full control of ops can't read your data or command your servers. [#16](https://github.com/axadrn/ops/issues/16)
+Zero trust: even someone in full control of ops can't read your data or command your servers. [#16](https://github.com/axadrn/moin/issues/16)
 
 - **Bucket keys only on your servers**: ops knows the bucket's name, never its key.
 - **Secrets encrypted end to end**: only your servers can read your env vars.

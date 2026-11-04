@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 // TestEmailAlertsAreOnByDefault turns the email alerts of a new user off

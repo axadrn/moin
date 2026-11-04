@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/access"
-	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 )
 
 // ErrPrivate is the answer to a new address while sign-up is closed: only

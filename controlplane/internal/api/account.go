@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/validation"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/validation"
 )
 
 type changePasswordRequest struct {

@@ -2,17 +2,17 @@ package blocks
 
 import (
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
-	"github.com/axadrn/ops/controlplane/internal/ui/utils"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
+	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 
-	"github.com/axadrn/ops/controlplane/internal/brand"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/githubstars"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/sheet"
-	"github.com/axadrn/ops/controlplane/internal/ui/icons"
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/githubstars"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/separator"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/sheet"
+	"github.com/axadrn/moin/controlplane/internal/ui/icons"
 )
 
 // GitHubURL is the open source repository of ops.
@@ -21,15 +21,16 @@ const GitHubURL = "https://github.com/" + githubstars.Repo
 // GoilerplateURL is goilerplate, the Go SaaS starter by the same author.
 const GoilerplateURL = "https://goilerplate.com"
 
-// Wordmark is the brand name in the display face with a terminal cursor.
-// Its box is trimmed to the
+// Wordmark is the brand name in the display face with its full stop drawn
+// as a container, a rounded block a little wider than tall: moin, the
+// Hamburg hello, and the containers in the port. Its box is trimmed to the
 // lowercase letters, from the baseline to the x-height (text-box), so a
 // label centered next to it sits on the middle of the letters the eye sees,
 // not on the empty room the font keeps above them.
 templ Wordmark(class ...string) {
-	<span class={ "inline-flex items-baseline gap-[0.12em] font-display text-foreground [text-box:trim-both_ex_alphabetic]", class }>
+	<span class={ "inline-flex items-baseline gap-[0.03em] font-display text-foreground [text-box:trim-both_ex_alphabetic]", class }>
 		{ brand.Name }
-		<span aria-hidden="true" class="inline-block h-[1ex] w-[0.34em] rounded-[1.5px] bg-foreground"></span>
+		<span aria-hidden="true" class="inline-block h-[0.125em] w-[0.17em] rounded-[0.022em] bg-foreground"></span>
 	</span>
 }
 

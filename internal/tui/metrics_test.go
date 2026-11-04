@@ -6,7 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // m and :metrics load the metrics of the selected app or server.

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/jmoiron/sqlx"
 )
 

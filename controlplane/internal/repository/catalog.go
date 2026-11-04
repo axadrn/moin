@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/catalog"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/jmoiron/sqlx"
 )
 

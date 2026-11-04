@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/access"
 )
 
 type Subscription struct {

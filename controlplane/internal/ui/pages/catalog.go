@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/catalog"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 )
 
 // CatalogEntryView is a catalog app with its releases, newest first.

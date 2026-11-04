@@ -3,9 +3,9 @@ package api
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/protocol"
 )
 
 // ExecRequest is the body of POST /api/v1/apps/{app}/exec: the command as

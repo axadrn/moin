@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/axadrn/ops/controlplane/internal/service/mailer"
+	"github.com/axadrn/moin/controlplane/internal/service/mailer"
 )
 
 type MemoryMailer struct {

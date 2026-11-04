@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
 )
 
 // TestUpdateTools: get_version tells of the newest release, only the admin

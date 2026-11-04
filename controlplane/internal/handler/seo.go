@@ -2,8 +2,8 @@ package handler
 
 import (
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/catalog"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
+	"github.com/axadrn/moin/controlplane/internal/service"
 	"net/http"
 	"os"
 	"path/filepath"

@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/protocol"
 )
 
 // BackupStorage is the account's bucket, without its secret key. Folder

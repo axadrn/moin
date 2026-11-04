@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/middleware"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/middleware"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/protocol"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )

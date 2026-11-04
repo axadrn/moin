@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/chart"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/chart"
 )
 
 // ServerMetricsView is the metrics page of a server.

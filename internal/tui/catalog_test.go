@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // TestCatalogCommands: :catalog install needs an app and a server, and

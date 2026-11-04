@@ -1,4 +1,4 @@
-module github.com/axadrn/ops
+module github.com/axadrn/moin
 
 go 1.26.8
 

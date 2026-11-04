@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestRailpackPrepareArgs: prepare learns the env names but never their

@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
-	"github.com/axadrn/ops/controlplane/internal/ui/pages"
-	"github.com/axadrn/ops/controlplane/internal/validation"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/controlplane/internal/validation"
 	"log/slog"
 	"net/http"
 	"strings"

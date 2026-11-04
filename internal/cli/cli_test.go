@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // fakeAPI answers the paths a test gives and records every request.

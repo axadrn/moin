@@ -12,8 +12,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/protocol"
 	"regexp"
 )
 

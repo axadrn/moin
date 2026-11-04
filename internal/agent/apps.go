@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Every app lives in <state dir>/apps/<app>:

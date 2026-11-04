@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // TestStatusOutput: all good says so with the counts; trouble lists each

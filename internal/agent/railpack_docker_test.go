@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestRailpackDocker builds tiny Node and Python apps without a Dockerfile

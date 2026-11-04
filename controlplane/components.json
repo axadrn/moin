@@ -15,7 +15,7 @@
   "menuColor": "default",
   "menuAccent": "subtle",
   "aliases": {
-    "components": "github.com/axadrn/ops/controlplane/internal/ui/components",
-    "utils": "github.com/axadrn/ops/controlplane/internal/ui/utils"
+    "components": "github.com/axadrn/moin/controlplane/internal/ui/components",
+    "utils": "github.com/axadrn/moin/controlplane/internal/ui/utils"
   }
 }

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"log/slog"
 )
 

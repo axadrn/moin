@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/toast"
-	"github.com/axadrn/ops/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/toast"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 	"log/slog"
 	"net/http"
 )

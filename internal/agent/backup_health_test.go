@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestBackupHealth: a failure counts only after failGrace, so a database

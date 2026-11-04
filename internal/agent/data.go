@@ -15,7 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )

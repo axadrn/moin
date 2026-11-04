@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 var rawAPITokenPattern = regexp.MustCompile(`^pat_[a-z2-7]{52}$`)

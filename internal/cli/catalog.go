@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // catalog lists the catalog, shows one app with its releases, or installs

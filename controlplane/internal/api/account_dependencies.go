@@ -1,6 +1,6 @@
 package api
 
-import "github.com/axadrn/ops/controlplane/internal/service"
+import "github.com/axadrn/moin/controlplane/internal/service"
 
 // AccountHandler serves profile, email, password, avatar and account deletion.
 type AccountHandler struct {

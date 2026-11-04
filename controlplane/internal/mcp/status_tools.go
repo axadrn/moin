@@ -7,7 +7,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/api"
 )
 
 func registerStatusTools(server *mcpsdk.Server, services Services) {

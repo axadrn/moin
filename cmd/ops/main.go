@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/axadrn/ops/internal/cli"
+	"github.com/axadrn/moin/internal/cli"
 )
 
 func main() {

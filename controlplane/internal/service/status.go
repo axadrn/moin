@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/internal/build"
 )
 
 // The kinds of trouble the overview shows, most urgent first.

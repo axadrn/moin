@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/axadrn/ops/internal/dotenv"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/protocol"
 )
 
 // App is a compose project on a server, as the API answers it.

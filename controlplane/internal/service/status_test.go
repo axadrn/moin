@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 // TestStatusAllGood: a workspace with an online server and an app that

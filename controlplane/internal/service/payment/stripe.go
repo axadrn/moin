@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/stripe/stripe-go/v85"
 	portalsession "github.com/stripe/stripe-go/v85/billingportal/session"
 	checkoutsession "github.com/stripe/stripe-go/v85/checkout/session"

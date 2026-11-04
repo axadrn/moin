@@ -3,8 +3,8 @@ package api
 import (
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/access"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 // Subscription is the public JSON shape of a subscription. Provider

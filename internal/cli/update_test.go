@@ -7,7 +7,7 @@ import (
 
 func TestVersionSaysANewerReleaseIsOut(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/version": `{"version":"v0.2.0","self_hosted":true,"latest":"v0.3.0","update_available":true,"notes_url":"https://github.com/axadrn/ops/releases/tag/v0.3.0","summary":"One-click updates.","can_update":true,"updater":true,"update":null}`,
+		"GET /api/v1/version": `{"version":"v0.2.0","self_hosted":true,"latest":"v0.3.0","update_available":true,"notes_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","summary":"One-click updates.","can_update":true,"updater":true,"update":null}`,
 	}}
 	code, stdout, stderr := runCLI(t, api, "version")
 	if code != 0 || stderr != "" {

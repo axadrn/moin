@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
 )
 
 func TestReorderAppsAndServers(t *testing.T) {

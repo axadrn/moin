@@ -13,9 +13,9 @@ import (
 	"unicode"
 
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 	"github.com/charmbracelet/colorprofile"
 	"golang.org/x/term"
 )

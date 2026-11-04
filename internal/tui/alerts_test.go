@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // TestAlertDestinationRows: the settings tab lists the alert destinations

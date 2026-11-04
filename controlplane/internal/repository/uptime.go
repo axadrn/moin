@@ -3,7 +3,7 @@ package repository
 import (
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 // UptimeRepository stores the uptime checks of domains and the outages of

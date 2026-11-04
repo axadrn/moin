@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 func TestCSRFProtectionIssuesTokenOnSafeRequest(t *testing.T) {

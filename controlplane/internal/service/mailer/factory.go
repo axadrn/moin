@@ -1,6 +1,6 @@
 package mailer
 
-import "github.com/axadrn/ops/controlplane/internal/config"
+import "github.com/axadrn/moin/controlplane/internal/config"
 
 // NewProvider sends through Cloudflare Email Sending. Config validation only
 // allows missing credentials in development, where mail goes to the log.

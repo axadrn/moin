@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // maxStreamsPerUser caps the live-update streams one user holds open. A

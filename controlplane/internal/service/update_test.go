@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 func TestNewerVersion(t *testing.T) {
@@ -46,7 +46,7 @@ func TestNewerVersion(t *testing.T) {
 	}
 }
 
-const testReleaseBody = `{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/ops/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z",
+const testReleaseBody = `{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z",
 "body":"**In short:** One-click updates for self-hosters.\n\n### New\n\n- **Update now**: one click.\n"}`
 
 // TestUpdateCheck reads the newest release from GitHub, asks again with
@@ -71,7 +71,7 @@ func TestUpdateCheck(t *testing.T) {
 	}
 	info := updates.Info(nil)
 	if info.Latest != "v0.3.0" || !info.UpdateAvailable || info.Summary != "One-click updates for self-hosters." ||
-		info.NotesURL != "https://github.com/axadrn/ops/releases/tag/v0.3.0" || info.PublishedAt == nil || !strings.Contains(info.Notes, "### New") {
+		info.NotesURL != "https://github.com/axadrn/moin/releases/tag/v0.3.0" || info.PublishedAt == nil || !strings.Contains(info.Notes, "### New") {
 		t.Fatalf("info = %+v", info)
 	}
 	if info.CanUpdate || info.Admin {

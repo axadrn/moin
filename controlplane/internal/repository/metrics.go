@@ -3,7 +3,7 @@ package repository
 import (
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 // MetricsRepository stores the metrics of servers and apps: a row per

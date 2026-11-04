@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // status says whether everything is OK in the workspace. It exits 1 when

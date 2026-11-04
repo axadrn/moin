@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 	"io"
 	"maps"
 	"net/http"
@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/moin/internal/build"
 )
 
 // DefaultURL is the hosted control plane.

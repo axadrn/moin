@@ -14,8 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/catalog"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/catalog"
+	"github.com/axadrn/moin/protocol"
 )
 
 // putBucket is an S3 endpoint that keeps what is put into it.

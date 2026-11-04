@@ -3,7 +3,7 @@ package mcp
 import (
 	"context"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/api"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -3,8 +3,8 @@ package payment
 import (
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/config"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/config"
+	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
 func TestNewProviderBuildsSelectedProvider(t *testing.T) {

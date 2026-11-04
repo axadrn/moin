@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // buckets lists, adds, changes and removes the workspace's buckets, and

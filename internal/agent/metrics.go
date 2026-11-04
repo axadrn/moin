@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // The agent samples its server and the containers of its apps every

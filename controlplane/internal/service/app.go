@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/secret"
-	"github.com/axadrn/ops/internal/dotenv"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/secret"
+	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/protocol"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )

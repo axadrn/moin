@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 func decodeErrorBody(t *testing.T, recorder *httptest.ResponseRecorder) ErrorDetail {

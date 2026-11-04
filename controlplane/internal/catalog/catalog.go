@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/markdown"
+	"github.com/axadrn/moin/controlplane/internal/markdown"
 )
 
 // Entry is one app of the catalog.
@@ -217,7 +217,7 @@ func (e Entry) BackupRequestURL() string {
 	if e.Database == "" || e.BackedUp() || e.Database == "mysql" {
 		return ""
 	}
-	return "https://github.com/axadrn/ops/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want ops to back up its "+e.DatabaseName()+".")
+	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want ops to back up its "+e.DatabaseName()+".")
 }
 
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a

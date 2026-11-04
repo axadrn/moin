@@ -8,8 +8,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // execArgs splits `exec [app] [flags] -- <command…>` at the first "--":

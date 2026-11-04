@@ -25,7 +25,7 @@ import (
 	"github.com/benbjohnson/litestream"
 	lss3 "github.com/benbjohnson/litestream/s3"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Backups run inside the agent, two ways, into the user's bucket:

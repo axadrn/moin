@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/brand"
-	"github.com/axadrn/ops/internal/build"
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/internal/build"
 )
 
 func TestMetaNamesTheProjectTheSupportAddressAndTheVersion(t *testing.T) {

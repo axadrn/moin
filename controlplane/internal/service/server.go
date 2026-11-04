@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/access"
+	"github.com/axadrn/moin/controlplane/internal/access"
 	"log/slog"
 	"net/netip"
 	"strings"
@@ -14,10 +14,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 	"github.com/google/uuid"
 )
 

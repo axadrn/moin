@@ -3,7 +3,7 @@ package mcp_test
 import (
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
 )
 
 func TestUptimeTools(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/api"
 )
 
 func TestEnvSetSummary(t *testing.T) {

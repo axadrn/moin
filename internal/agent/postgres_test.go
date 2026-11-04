@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestWalgNote: a lost slot shows for a day, first with the base backup

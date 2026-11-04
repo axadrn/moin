@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // AppBackups are the backups of an app's databases. Bucket is where new

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Postgres runs as a service of the app. The agent reaches it only through

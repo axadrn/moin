@@ -4,17 +4,17 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/internal/dotenv"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/protocol"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

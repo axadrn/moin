@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
 )
 
 // TestStatusTool: get_status answers with a read token; a new app counts,

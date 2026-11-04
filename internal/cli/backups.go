@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/ops/internal/build"
-	"github.com/axadrn/ops/internal/client"
-	"github.com/axadrn/ops/internal/style"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/style"
+	"github.com/axadrn/moin/protocol"
 )
 
 // backups lists an app's backups, or manages the bucket and the snapshot

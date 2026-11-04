@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/protocol"
 	"golang.org/x/crypto/bcrypt"
 )
 

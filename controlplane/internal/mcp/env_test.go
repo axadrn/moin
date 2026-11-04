@@ -5,20 +5,20 @@ import (
 
 	"context"
 	"encoding/json"
-	"github.com/axadrn/ops/controlplane/internal/secret"
+	"github.com/axadrn/moin/controlplane/internal/secret"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
-	"github.com/axadrn/ops/controlplane/internal/mcp"
-	"github.com/axadrn/ops/controlplane/internal/middleware"
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
-	"github.com/axadrn/ops/controlplane/internal/service"
-	"github.com/axadrn/ops/controlplane/internal/testutil"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/middleware"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 	"github.com/jmoiron/sqlx"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -67,7 +67,7 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	env.services.Apps = service.NewAppService(repository.NewAppRepository(database, database), env.services.Servers, box)
 	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/ops/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** Updates in one click."}`))
+		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** Updates in one click."}`))
 	}))
 	t.Cleanup(releases.Close)
 	env.updates = t.TempDir()

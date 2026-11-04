@@ -3,8 +3,8 @@ package pages
 import (
 	"time"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 )
 
 // APITokensView is the data of the API tokens card in account settings.

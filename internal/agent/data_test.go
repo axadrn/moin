@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 func TestTablesAndQueries(t *testing.T) {

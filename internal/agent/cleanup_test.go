@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestUnusedImages: only an image ops named, that no release on disk

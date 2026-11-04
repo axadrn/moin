@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/ops/internal/client"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // Colors carry status only; the brand is monochrome, like the web UI. The

@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 )
 
 // WithSidebarState reads the sidebar_state cookie the sidebar script writes

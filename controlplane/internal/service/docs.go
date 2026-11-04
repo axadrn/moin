@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/axadrn/ops/controlplane/internal/markdown"
-	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/markdown"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )

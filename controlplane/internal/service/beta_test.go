@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/model"
-	"github.com/axadrn/ops/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 )
 
 // signUpOpen signs a non-admin up once sign-up is open and makes their first

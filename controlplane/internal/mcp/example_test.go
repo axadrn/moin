@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/axadrn/ops/controlplane/internal/api"
-	"github.com/axadrn/ops/controlplane/internal/mcp"
-	"github.com/axadrn/ops/controlplane/internal/validation"
+	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/controlplane/internal/mcp"
+	"github.com/axadrn/moin/controlplane/internal/validation"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

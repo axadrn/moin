@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/axadrn/ops/protocol"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestRouteServices: domains per service from the control plane and from
