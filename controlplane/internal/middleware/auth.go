@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"cmp"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -103,9 +102,9 @@ func RequireChanges(next http.HandlerFunc) http.HandlerFunc {
 
 // WithTokenWorkspace scopes a moin API route, whose path names no
 // workspace, to the workspace of the personal API token. A session names
-// the workspace in the Moin-Workspace header (Ops-Workspace of the old
-// name works too), or an EventSource, which sends
-// no headers, in the workspace query parameter; otherwise it gets its first.
+// the workspace in the Moin-Workspace header, or an EventSource, which
+// sends no headers, in the workspace query parameter; otherwise it gets
+// its first.
 func WithTokenWorkspace(workspaceService *service.WorkspaceService, subscriptionService *service.SubscriptionService) func(http.HandlerFunc) http.HandlerFunc {
 	withWorkspace := withWorkspaceOf(func(r *http.Request) string {
 		user := ctxkeys.User(r.Context())
@@ -115,7 +114,7 @@ func WithTokenWorkspace(workspaceService *service.WorkspaceService, subscription
 		}
 		token := ctxkeys.APIToken(r.Context())
 		if token == nil {
-			if slug := cmp.Or(r.Header.Get("Moin-Workspace"), r.Header.Get("Ops-Workspace")); slug != "" {
+			if slug := r.Header.Get("Moin-Workspace"); slug != "" {
 				return slug
 			}
 			if slug := r.URL.Query().Get("workspace"); slug != "" {

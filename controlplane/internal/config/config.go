@@ -33,7 +33,7 @@ type Config struct {
 	AdminEmails   []string
 	RobotsNoIndex bool
 	// OldURLs are addresses the control plane had before APP_URL, such as
-	// https://ops.goilerplate.com. It still answers on them: browsers go
+	// https://old.example.com. It still answers on them: browsers go
 	// on to APP_URL, agents and the CLI move there by themselves, and
 	// admins see how much still arrives on them.
 	OldURLs []string
@@ -298,7 +298,7 @@ func (c *Config) validate() []error {
 		errs = append(errs, errors.New("email delivery requires both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN"))
 	} else if c.CloudflareAccountID == "" && !c.IsDevelopment() && c.Billing {
 		// A self-hosted control plane may start without email: sign-in links
-		// go to its log, and ops-server sign-in-link prints one.
+		// go to its log, and moin-server sign-in-link prints one.
 		errs = append(errs, errors.New("CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required for email delivery outside development"))
 	}
 

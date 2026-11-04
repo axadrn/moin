@@ -8,7 +8,7 @@ import (
 )
 
 // TestRouteServices: domains per service from the control plane and from
-// the map form of x-ops, x-ops winning per service; the main service's
+// the map form of x-moin, x-moin winning per service; the main service's
 // entry of the map is its domains; a domain on two services fails.
 func TestRouteServices(t *testing.T) {
 	routing := &protocol.Routing{Domains: []string{"shop.com"}, Services: map[string][]string{"api": {"API.shop.com"}, "admin": {"admin.shop.com"}}}
@@ -32,7 +32,7 @@ func TestRouteServices(t *testing.T) {
 	}
 }
 
-// TestRouteInstant: the control plane's provider, x-ops picking another or
+// TestRouteInstant: the control plane's provider, x-moin picking another or
 // off, an unknown provider failing, and nothing without a public IPv4.
 func TestRouteInstant(t *testing.T) {
 	for _, test := range []struct {
@@ -60,14 +60,14 @@ func TestRouteInstant(t *testing.T) {
 func TestRoutingByService(t *testing.T) {
 	config := map[string]any{}
 	web := map[string]any{}
-	addRouting(config, web, "shop", project("shop"), []string{"shop.com"}, "", 3000, "", "shop.203-0-113-7.sslip.io", "ops:$2y$05$abc")
+	addRouting(config, web, "shop", project("shop"), []string{"shop.com"}, "", 3000, "", "shop.203-0-113-7.sslip.io", "moin:$2y$05$abc")
 	labels := web["labels"].(map[string]any)
 	for key, want := range map[string]string{
 		"traefik.http.routers.moin-shop.rule":                             "Host(`shop.com`)",
 		"traefik.http.routers.moin-shop-instant.rule":                     "Host(`shop.203-0-113-7.sslip.io`)",
 		"traefik.http.routers.moin-shop-instant.service":                  "moin-shop",
 		"traefik.http.routers.moin-shop-instant.middlewares":              "moin-shop-instant-auth",
-		"traefik.http.middlewares.moin-shop-instant-auth.basicauth.users": "ops:$$2y$$05$$abc",
+		"traefik.http.middlewares.moin-shop-instant-auth.basicauth.users": "moin:$$2y$$05$$abc",
 		"traefik.http.services.moin-shop.loadbalancer.server.port":        "3000",
 	} {
 		if labels[key] != want {
@@ -97,6 +97,6 @@ func TestRoutingByService(t *testing.T) {
 		t.Errorf("service port from expose: %d", port)
 	}
 	if port := servicePort("api", map[string]any{}, &protocol.Config{Ports: map[string]int{"api": 7000}}); port != 7000 {
-		t.Errorf("service port from x-ops: %d", port)
+		t.Errorf("service port from x-moin: %d", port)
 	}
 }

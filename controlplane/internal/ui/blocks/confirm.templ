@@ -55,8 +55,8 @@ templ ConfirmDialog() {
 templ confirmScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			if (window.opsConfirm) return;
-			window.opsConfirm = true;
+			if (window.moinConfirm) return;
+			window.moinConfirm = true;
 			let pending = null;
 			const popup = () => document.getElementById("confirm-dialog");
 			const part = (name) => popup().querySelector("[data-confirm-" + name + "]");

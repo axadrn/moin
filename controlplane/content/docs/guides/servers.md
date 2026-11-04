@@ -30,7 +30,7 @@ A server offline for two minutes, and back online, sends the owners and admins o
 
 Gives you one install command for a new server. The name is yours to pick, such as `web-1`: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, like an app name. Leave it empty and moin picks one like `brave-otter`.
 
-Log in to the server as root, for example with `ssh root@<server-ip>`, and run the command there within one hour. Not root? Put `sudo` before `sh`. The command works once. The server needs Linux with systemd, the program that starts services; Ubuntu and Debian have it. If the install stops halfway, get [a new install command](#a-new-install-command). The agent dials the control plane at its `APP_URL`; `OPS_URL=http://127.0.0.1:8090` before `sh` dials another address, as on a server that runs the control plane too ([one server](/docs/self-hosting#one-server)).
+Log in to the server as root, for example with `ssh root@<server-ip>`, and run the command there within one hour. Not root? Put `sudo` before `sh`. The command works once. The server needs Linux with systemd, the program that starts services; Ubuntu and Debian have it. If the install stops halfway, get [a new install command](#a-new-install-command). The agent dials the control plane at its `APP_URL`; `MOIN_URL=http://127.0.0.1:8090` before `sh` dials another address, as on a server that runs the control plane too ([one server](/docs/self-hosting#one-server)).
 
 ```surfaces
 Web: **Servers**, **Add server**
@@ -143,19 +143,7 @@ If you want the apps gone too, add `--apps`. It takes every app down with its co
 moin agent uninstall --apps
 ```
 
-## From ops to moin
-
-ops is called moin now. Your servers move by themselves, with no data lost: when the agent updates to a moin release, it moves itself and everything it set up, once.
-
-1. **The agent.** The binary goes to `/usr/local/bin/moin` and runs as `moin-agent`. The old `ops-agent` stops first, so two never run at once.
-2. **Its state.** `/var/lib/ops` becomes `/var/lib/moin`.
-3. **Your apps,** one at a time. Each stops for a moment, its Docker volumes are copied to their new names and checked file by file, and it starts again under its new name. The proxy keeps serving the others while one moves. An app that does not come up under its new name goes back to how it ran before and keeps running; the agent tries again at its next start.
-4. **The proxy, the tunnel and the firewall** take their new names last. Certificates stay.
-5. **Postgres** gets a new base backup right after the move, so point in time restores reach back to it. Older snapshots and backups stay in your bucket and restore as before.
-
-The agent's log says each step: `journalctl -u moin-agent`. Run it twice and nothing happens the second time.
-
-Until December 4, 2026 the old names keep working: `ops` on the server is a link to `moin`, `x-ops` in your compose.yml still counts (`x-moin` wins when both are there), `OPS_*` variables still work, and the old volumes stay as they were. After that the agent removes the old volumes and links by itself, and `x-ops` stops with an error that says to rename it. Your rules stay where they are: the agent reads `/etc/moin/rules`, or `/etc/ops/rules` while there is no new one.
+## A new address
 
 Agents and the CLI that still talk to an old address of the control plane move to the new one by themselves, once it answers.
 

@@ -39,7 +39,7 @@ func TestRailpackPrepareArgs(t *testing.T) {
 func TestRailpackSecrets(t *testing.T) {
 	build := func(env map[string]string) (map[string]any, string) {
 		config := map[string]any{}
-		service := map[string]any{"build": map[string]any{"args": map[string]any{"cache-key": "ops-shop"}}}
+		service := map[string]any{"build": map[string]any{"args": map[string]any{"cache-key": "moin-shop"}}}
 		railpackSecrets(config, service, env)
 		config["services"] = map[string]any{"web": service}
 		body, _ := json.Marshal(config)
@@ -51,7 +51,7 @@ func TestRailpackSecrets(t *testing.T) {
 	if strings.Contains(one, "first-value") {
 		t.Fatalf("compose holds a value: %s", one)
 	}
-	for _, want := range []string{`"API_KEY":{"environment":"API_KEY"}`, `"secrets":["API_KEY","MODE"]`, `"cache-key":"ops-shop"`} {
+	for _, want := range []string{`"API_KEY":{"environment":"API_KEY"}`, `"secrets":["API_KEY","MODE"]`, `"cache-key":"moin-shop"`} {
 		if !strings.Contains(one, want) {
 			t.Errorf("compose lacks %s: %s", want, one)
 		}
@@ -61,7 +61,7 @@ func TestRailpackSecrets(t *testing.T) {
 		t.Error("secrets-hash must change with a value")
 	}
 	config := map[string]any{}
-	service := map[string]any{"image": "ops-shop-web:2"}
+	service := map[string]any{"image": "moin-shop-web:2"}
 	railpackSecrets(config, service, map[string]string{"A": "b"})
 	if len(config) != 0 || service["build"] != nil {
 		t.Errorf("a service not built gets no secrets: %v %v", config, service)
@@ -94,7 +94,7 @@ func TestRailpackSummary(t *testing.T) {
 // TestFinishGivesRailpackItsSecrets: finish hands the env to a Railpack
 // build and to the running container, and leaves other kinds alone.
 func TestFinishGivesRailpackItsSecrets(t *testing.T) {
-	base := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": "/src", "args": map[string]any{"cache-key": "ops-shop"}}}}}
+	base := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": "/src", "args": map[string]any{"cache-key": "moin-shop"}}}}}
 	file := t.TempDir() + "/compose.json"
 	start := protocol.DeployStart{App: "shop", Number: 3, Env: map[string]string{"TOKEN": "abc"}}
 	for kind, wantSecrets := range map[string]bool{"railpack": true, "dockerfile": false} {

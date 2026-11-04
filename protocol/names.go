@@ -34,11 +34,11 @@ func ValidSnapshotID(id string) bool {
 	return snapshotSuffix.MatchString(id[len(SnapshotIDLayout):])
 }
 
-// MaxRefLength is the longest branch, tag or commit name ops accepts.
+// MaxRefLength is the longest branch, tag or commit name moin accepts.
 const MaxRefLength = 255
 
 // ValidRefName reports whether name is a branch, tag or commit name by
-// git's rules (git check-ref-format), plus two of ops: at most 255 bytes,
+// git's rules (git check-ref-format), plus two of moin: at most 255 bytes,
 // and no leading dash, so a name is never read as a command line flag.
 func ValidRefName(name string) bool {
 	if name == "" || len(name) > MaxRefLength || name == "@" {

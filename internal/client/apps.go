@@ -120,7 +120,7 @@ func (c *Client) Deploy(ctx context.Context, app string, source []byte) (Deploy,
 	if err != nil {
 		return Deploy{}, err
 	}
-	// The source goes straight into the user's bucket; ops only signed the
+	// The source goes straight into the user's bucket; moin only signed the
 	// link.
 	request, err := http.NewRequestWithContext(ctx, http.MethodPut, upload.URL, bytes.NewReader(source))
 	if err != nil {
@@ -375,7 +375,7 @@ type Instant struct {
 }
 
 // Instant reports the app's instant address; show includes the password
-// ops made for it.
+// moin made for it.
 func (c *Client) Instant(ctx context.Context, app string, show bool) (Instant, error) {
 	var response Instant
 	path := appPath(app, "instant")

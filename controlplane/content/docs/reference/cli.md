@@ -121,10 +121,10 @@ moin asks before it removes or replaces something. How it asks depends on how bi
 Agents update themselves to the control plane's version, unless `moin servers auto-update off`. `moin servers` shows each agent's version and marks one that differs from the control plane's. `moin servers update` has the agent download the `moin` binary the control plane serves, from the control plane URL it already uses, check its SHA-256, swap it in and restart through systemd. It waits until the new agent is back. The agent refuses while a deploy runs, and on a server with rules in `/etc/moin/rules`, since a new binary could allow what they stop. There, and for agents older than the update, update it on the server as root:
 
 ```bash
-curl -fsSL https://moin.example.com/download/ops-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-agent
+curl -fsSL https://moin.example.com/download/moin-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-agent
 ```
 
-Use `ops-linux-arm64` on an ARM server. The error of a refused update prints the command for that server.
+Use `moin-linux-arm64` on an ARM server. The error of a refused update prints the command for that server.
 
 `/download/SHA256SUMS` lists the checksums of every binary.
 
@@ -136,6 +136,6 @@ On a terminal the CLI shows colors, status symbols (`● online`, `◐ deploying
 
 | Variable | Does |
 | --- | --- |
-| `OPS_URL`, `OPS_TOKEN` | override the saved login, for CI |
-| `OPS_STATE_DIR` | where the agent keeps its state, default `/var/lib/moin` |
+| `MOIN_URL`, `MOIN_TOKEN` | override the saved login, for CI |
+| `MOIN_STATE_DIR` | where the agent keeps its state, default `/var/lib/moin` |
 | `NO_COLOR` | turns colors off on a terminal too |

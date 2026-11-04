@@ -14,8 +14,8 @@ func runWithStdin(t *testing.T, api *fakeAPI, stdin string, args ...string) (cod
 	t.Cleanup(server.Close)
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("OPS_URL", server.URL)
-	t.Setenv("OPS_TOKEN", "ops_test")
+	t.Setenv("MOIN_URL", server.URL)
+	t.Setenv("MOIN_TOKEN", "pat_test")
 	t.Setenv("NO_COLOR", "1")
 	var out, errOut strings.Builder
 	code = Run(args, strings.NewReader(stdin), &out, &errOut)

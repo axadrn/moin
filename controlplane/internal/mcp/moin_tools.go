@@ -52,7 +52,7 @@ func changes[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In
 }
 
 func registerOpsTools(server *mcpsdk.Server, services Services) {
-	tools := opsTools{services: services}
+	tools := moinTools{services: services}
 	add := func(name, title, description string, annotations *mcpsdk.ToolAnnotations) *mcpsdk.Tool {
 		annotations.Title = title
 		return &mcpsdk.Tool{Name: name, Title: title, Description: description, Annotations: annotations}
@@ -235,7 +235,7 @@ func change(destructive, idempotent bool) *mcpsdk.ToolAnnotations {
 	return &mcpsdk.ToolAnnotations{DestructiveHint: boolPointer(destructive), IdempotentHint: idempotent, OpenWorldHint: boolPointer(false)}
 }
 
-type opsTools struct {
+type moinTools struct {
 	services Services
 }
 
@@ -522,7 +522,7 @@ func (l ServerList) Summary() string {
 	return summary
 }
 
-func (t opsTools) listServers(_ context.Context, caller Caller, _ NoInput) (ServerList, error) {
+func (t moinTools) listServers(_ context.Context, caller Caller, _ NoInput) (ServerList, error) {
 	servers, err := t.services.Servers.List(caller.Token.WorkspaceID)
 	if err != nil {
 		return ServerList{}, err
@@ -552,7 +552,7 @@ func (n NewInstall) Summary() string {
 	return fmt.Sprintf("New install command for %s. Run this on the server as root (or put sudo before sh) within the hour: %s", n.Server.Name, n.InstallCommand)
 }
 
-func (t opsTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
+func (t moinTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
 	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.server())
 	if err != nil {
 		return NewInstall{}, err
@@ -565,7 +565,7 @@ func (t opsTools) newInstallCommand(_ context.Context, caller Caller, input Serv
 	}}, nil
 }
 
-func (t opsTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {
+func (t moinTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {
 	server, installToken, err := t.services.Servers.Create(caller.actor(), cmp.Or(input.Server, input.Name))
 	if err != nil {
 		return CreatedServer{}, err
@@ -594,7 +594,7 @@ type RemovedServer struct {
 
 func (r RemovedServer) Summary() string { return r.Message }
 
-func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveServerInput) (RemovedServer, error) {
+func (t moinTools) removeServer(_ context.Context, caller Caller, input RemoveServerInput) (RemovedServer, error) {
 	server, err := t.services.Servers.Get(caller.Token.WorkspaceID, input.Server)
 	if err != nil {
 		return RemovedServer{}, err
@@ -622,7 +622,7 @@ func (t opsTools) removeServer(_ context.Context, caller Caller, input RemoveSer
 	return removed, nil
 }
 
-func (t opsTools) renameServer(_ context.Context, caller Caller, input RenameServerInput) (ServerOutput, error) {
+func (t moinTools) renameServer(_ context.Context, caller Caller, input RenameServerInput) (ServerOutput, error) {
 	server, err := t.services.Servers.Rename(caller.actor(), input.Server, input.Name)
 	if err != nil {
 		return ServerOutput{}, err
@@ -630,7 +630,7 @@ func (t opsTools) renameServer(_ context.Context, caller Caller, input RenameSer
 	return ServerOutput{api.NewServer(*server)}, nil
 }
 
-func (t opsTools) updateAgent(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {
+func (t moinTools) updateAgent(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {
 	server, err := t.services.Servers.UpdateAgent(ctx, caller.actor(), input.server())
 	if err != nil {
 		return ServerOutput{}, err
@@ -654,7 +654,7 @@ func (l AppList) Summary() string {
 	return strings.Join(parts, "; ") + "."
 }
 
-func (t opsTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppList, error) {
+func (t moinTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppList, error) {
 	apps, err := t.services.Apps.List(caller.Token.WorkspaceID)
 	if err != nil {
 		return AppList{}, err
@@ -671,7 +671,7 @@ type OrderInput struct {
 	Order []string `json:"order" jsonschema:"every app or server of the workspace once, by name or ID, in the new order"`
 }
 
-func (t opsTools) reorderApps(_ context.Context, caller Caller, input OrderInput) (AppList, error) {
+func (t moinTools) reorderApps(_ context.Context, caller Caller, input OrderInput) (AppList, error) {
 	apps, err := t.services.Apps.Reorder(caller.actor(), input.Order)
 	if err != nil {
 		return AppList{}, err
@@ -699,7 +699,7 @@ func (o ServerOrder) Summary() string {
 	return "The servers in their order: " + strings.Join(names, ", ") + "."
 }
 
-func (t opsTools) reorderServers(_ context.Context, caller Caller, input OrderInput) (ServerOrder, error) {
+func (t moinTools) reorderServers(_ context.Context, caller Caller, input OrderInput) (ServerOrder, error) {
 	servers, err := t.services.Servers.Reorder(caller.actor(), input.Order)
 	if err != nil {
 		return ServerOrder{}, err
@@ -720,7 +720,7 @@ func (d AppDetail) Summary() string {
 	return fmt.Sprintf("%s on %s: live v%d, %s listed.", d.App.Name, d.App.ServerName, d.App.LiveNumber, count(len(d.Deploys), "deploy"))
 }
 
-func (t opsTools) getApp(_ context.Context, caller Caller, input AppInput) (AppDetail, error) {
+func (t moinTools) getApp(_ context.Context, caller Caller, input AppInput) (AppDetail, error) {
 	app, deploys, err := t.services.Apps.Deploys(caller.Token.WorkspaceID, input.app(), 20)
 	if err != nil {
 		return AppDetail{}, err
@@ -737,7 +737,7 @@ func (a App) Summary() string {
 	return fmt.Sprintf("Created %s on %s. Deploy it with `moin deploy %s` in its repo.", a.Name, a.ServerName, a.Name)
 }
 
-func (t opsTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (App, error) {
+func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (App, error) {
 	app, err := t.services.Apps.Create(caller.actor(), cmp.Or(input.App, input.Name), input.Server)
 	if err != nil {
 		return App{}, err
@@ -745,7 +745,7 @@ func (t opsTools) createApp(_ context.Context, caller Caller, input CreateAppInp
 	return App{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {
+func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {
 	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.App)
 	if err != nil {
 		return Done{}, err
@@ -781,7 +781,7 @@ func (d Deploy) Summary() string {
 	return summary
 }
 
-func (t opsTools) getDeploy(_ context.Context, caller Caller, input DeployInput) (Deploy, error) {
+func (t moinTools) getDeploy(_ context.Context, caller Caller, input DeployInput) (Deploy, error) {
 	deploy, lines, _, stop, err := t.services.Apps.Follow(caller.Token.WorkspaceID, input.App, input.Number)
 	if err != nil {
 		return Deploy{}, err
@@ -792,7 +792,7 @@ func (t opsTools) getDeploy(_ context.Context, caller Caller, input DeployInput)
 	return output, nil
 }
 
-func (t opsTools) rollback(_ context.Context, caller Caller, input RollbackInput) (Deploy, error) {
+func (t moinTools) rollback(_ context.Context, caller Caller, input RollbackInput) (Deploy, error) {
 	if input.Number < 0 {
 		return Deploy{}, InvalidField("number", "Use 0 or a deploy number.")
 	}
@@ -803,7 +803,7 @@ func (t opsTools) rollback(_ context.Context, caller Caller, input RollbackInput
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) redeploy(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+func (t moinTools) redeploy(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
 	deploy, err := t.services.Apps.Redeploy(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
@@ -817,7 +817,7 @@ type ImageInput struct {
 	Image string `json:"image" jsonschema:"the image reference, like ghcr.io/me/app:tag"`
 }
 
-func (t opsTools) deployImage(_ context.Context, caller Caller, input ImageInput) (Deploy, error) {
+func (t moinTools) deployImage(_ context.Context, caller Caller, input ImageInput) (Deploy, error) {
 	deploy, err := t.services.Apps.Deploy(caller.actor(), input.App, input.Image)
 	if err != nil {
 		return Deploy{}, err
@@ -834,7 +834,7 @@ func (h DeployHook) Summary() string {
 	return "New deploy hook. Store it as a CI secret; it is shown once: " + h.URL
 }
 
-func (t opsTools) createDeployHook(_ context.Context, caller Caller, input AppInput) (DeployHook, error) {
+func (t moinTools) createDeployHook(_ context.Context, caller Caller, input AppInput) (DeployHook, error) {
 	url, err := t.services.Apps.RotateDeployHook(caller.actor(), input.app())
 	if err != nil {
 		return DeployHook{}, err
@@ -842,7 +842,7 @@ func (t opsTools) createDeployHook(_ context.Context, caller Caller, input AppIn
 	return DeployHook{api.DeployHook{URL: url}}, nil
 }
 
-func (t opsTools) removeDeployHook(_ context.Context, caller Caller, input AppInput) (Done, error) {
+func (t moinTools) removeDeployHook(_ context.Context, caller Caller, input AppInput) (Done, error) {
 	removed, err := t.services.Apps.RemoveDeployHook(caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
@@ -860,7 +860,7 @@ type RegistryList struct {
 
 func (l RegistryList) Summary() string { return count(len(l.Items), "registry login") + "." }
 
-func (t opsTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (RegistryList, error) {
+func (t moinTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (RegistryList, error) {
 	logins, err := t.services.Apps.Registries(caller.Token.WorkspaceID)
 	if err != nil {
 		return RegistryList{}, err
@@ -879,7 +879,7 @@ type RegistryInput struct {
 	Password string `json:"password" jsonschema:"a password or access token with read access to packages"`
 }
 
-func (t opsTools) setRegistry(ctx context.Context, caller Caller, input RegistryInput) (RegistryList, error) {
+func (t moinTools) setRegistry(ctx context.Context, caller Caller, input RegistryInput) (RegistryList, error) {
 	err := t.services.Apps.SetRegistry(caller.actor(), input.Host, input.Username, input.Password)
 	if err != nil {
 		return RegistryList{}, err
@@ -892,7 +892,7 @@ type HostInput struct {
 	Host string `json:"host" jsonschema:"the registry host"`
 }
 
-func (t opsTools) removeRegistry(_ context.Context, caller Caller, input HostInput) (Done, error) {
+func (t moinTools) removeRegistry(_ context.Context, caller Caller, input HostInput) (Done, error) {
 	err := t.services.Apps.RemoveRegistry(caller.actor(), input.Host)
 	if err != nil {
 		return Done{}, err
@@ -900,7 +900,7 @@ func (t opsTools) removeRegistry(_ context.Context, caller Caller, input HostInp
 	return Done{Message: "Removed the login for " + input.Host + "."}, nil
 }
 
-func (t opsTools) restart(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+func (t moinTools) restart(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
 	deploy, err := t.services.Apps.Restart(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
@@ -908,7 +908,7 @@ func (t opsTools) restart(_ context.Context, caller Caller, input AppInput) (Dep
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) start(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
+func (t moinTools) start(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
 	deploy, err := t.services.Apps.Start(caller.actor(), input.app())
 	if err != nil {
 		return Deploy{}, err
@@ -916,7 +916,7 @@ func (t opsTools) start(_ context.Context, caller Caller, input AppInput) (Deplo
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) stop(ctx context.Context, caller Caller, input AppInput) (Done, error) {
+func (t moinTools) stop(ctx context.Context, caller Caller, input AppInput) (Done, error) {
 	err := t.services.Apps.Stop(ctx, caller.actor(), input.app())
 	if err != nil {
 		return Done{}, err
@@ -950,7 +950,7 @@ func (d DomainChecks) Summary() string {
 	return summary
 }
 
-func (t opsTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
+func (t moinTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
 	checks, err := t.services.Apps.CheckDomains(ctx, caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return DomainChecks{}, err
@@ -981,7 +981,7 @@ func (c Change) Summary() string {
 	return fmt.Sprintf("Saved. Deploy v%d applies it now.", c.Deploy.Number)
 }
 
-func (t opsTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
+func (t moinTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
 	current, err := t.services.Apps.Get(caller.Token.WorkspaceID, app)
 	if err != nil {
 		return Change{}, err
@@ -994,7 +994,7 @@ func (t opsTools) change(caller Caller, app string, deploy *model.Deploy, change
 	return answer, nil
 }
 
-func (t opsTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
+func (t moinTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
 	var deploy *model.Deploy
 	var changed bool
 	var err error
@@ -1038,7 +1038,7 @@ func (i Instant) Summary() string {
 	return i.URL + " via " + i.Provider + ", behind a password moin made: show returns it."
 }
 
-func (t opsTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
+func (t moinTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
 	if input.Show && !caller.Token.HasScope(model.APITokenScopeWrite) {
 		return Instant{}, &ToolError{Code: "insufficient_scope", Message: "Showing the password needs a token with read and write access."}
 	}
@@ -1056,7 +1056,7 @@ type SetInstantInput struct {
 	Open     *bool  `json:"open,omitempty" jsonschema:"true takes the password away from the instant address, false puts it back; empty keeps it"`
 }
 
-func (t opsTools) setInstant(_ context.Context, caller Caller, input SetInstantInput) (Change, error) {
+func (t moinTools) setInstant(_ context.Context, caller Caller, input SetInstantInput) (Change, error) {
 	deploy, changed, err := t.services.Apps.SetInstant(caller.actor(), input.App, input.Provider, input.Open)
 	if err != nil {
 		return Change{}, err
@@ -1071,7 +1071,7 @@ type ProtectionInput struct {
 	Password string `json:"password" jsonschema:"at least 8 characters"`
 }
 
-func (t opsTools) setProtection(_ context.Context, caller Caller, input ProtectionInput) (Change, error) {
+func (t moinTools) setProtection(_ context.Context, caller Caller, input ProtectionInput) (Change, error) {
 	if input.Password == "" {
 		return Change{}, InvalidField("password", "Enter a password of at least 8 characters.")
 	}
@@ -1082,7 +1082,7 @@ func (t opsTools) setProtection(_ context.Context, caller Caller, input Protecti
 	return t.change(caller, input.App, deploy, changed)
 }
 
-func (t opsTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
+func (t moinTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
 	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.app(), "", "")
 	if err != nil {
 		return Change{}, err
@@ -1097,7 +1097,7 @@ type Logs struct {
 
 func (l Logs) Summary() string { return count(len(l.Lines), "log line") + "." }
 
-func (t opsTools) getLogs(ctx context.Context, caller Caller, input LogsInput) (Logs, error) {
+func (t moinTools) getLogs(ctx context.Context, caller Caller, input LogsInput) (Logs, error) {
 	tail := input.Tail
 	if tail == 0 {
 		tail = 200
@@ -1119,7 +1119,7 @@ type Env struct {
 
 func (e Env) Summary() string { return count(len(e.Items), "env var") + "." }
 
-func (t opsTools) getEnv(_ context.Context, caller Caller, input AppInput) (Env, error) {
+func (t moinTools) getEnv(_ context.Context, caller Caller, input AppInput) (Env, error) {
 	env, err := t.services.Apps.Env(caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Env{}, err
@@ -1167,7 +1167,7 @@ func count(n int, noun string) string {
 	return strconv.Itoa(n) + " " + noun + "s"
 }
 
-func (t opsTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
+func (t moinTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
 	removed, err := t.services.Apps.SetEnv(caller.actor(), input.App, input.Set, input.Unset)
 	if err != nil {
 		return EnvSet{}, err
@@ -1192,7 +1192,7 @@ func (e EnvReplaced) Summary() string {
 	return "Replaced the env vars: " + e.Change.String() + ". " + e.Env.Summary()
 }
 
-func (t opsTools) replaceEnv(_ context.Context, caller Caller, input ReplaceEnvInput) (EnvReplaced, error) {
+func (t moinTools) replaceEnv(_ context.Context, caller Caller, input ReplaceEnvInput) (EnvReplaced, error) {
 	if input.Env == nil {
 		input.Env = map[string]string{}
 	}
@@ -1204,12 +1204,12 @@ func (t opsTools) replaceEnv(_ context.Context, caller Caller, input ReplaceEnvI
 	return EnvReplaced{Env: env, Change: change}, err
 }
 
-func (t opsTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {
+func (t moinTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {
 	tables, err := t.services.Apps.Tables(ctx, caller.Token.WorkspaceID, input.App, input.Database)
 	return Tables{tables}, err
 }
 
-func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input QueryInput) (QueryResult, error) {
+func (t moinTools) queryDatabase(ctx context.Context, caller Caller, input QueryInput) (QueryResult, error) {
 	limit := input.Limit
 	if limit == 0 {
 		limit = 100
@@ -1221,12 +1221,12 @@ func (t opsTools) queryDatabase(ctx context.Context, caller Caller, input QueryI
 	return QueryResult{result}, err
 }
 
-func (t opsTools) executeSQL(ctx context.Context, caller Caller, input SQLInput) (QueryResult, error) {
+func (t moinTools) executeSQL(ctx context.Context, caller Caller, input SQLInput) (QueryResult, error) {
 	result, err := t.services.Apps.Query(ctx, caller.actor(), input.App, input.Database, input.SQL, input.Params, true, 0)
 	return QueryResult{result}, err
 }
 
-func (t opsTools) getBackups(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
+func (t moinTools) getBackups(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
 	app, backups, err := t.services.Apps.Backups(ctx, caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Backups{}, err
@@ -1234,7 +1234,7 @@ func (t opsTools) getBackups(ctx context.Context, caller Caller, input AppInput)
 	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
 }
 
-func (t opsTools) backUpApp(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
+func (t moinTools) backUpApp(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
 	app, backups, err := t.services.Apps.BackUp(ctx, caller.actor(), input.app())
 	if err != nil {
 		return Backups{}, err
@@ -1242,7 +1242,7 @@ func (t opsTools) backUpApp(ctx context.Context, caller Caller, input AppInput) 
 	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
 }
 
-func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (Done, error) {
+func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (Done, error) {
 	var at *time.Time
 	if input.At != nil && *input.At != "" {
 		parsed, err := time.Parse(time.RFC3339, *input.At)
@@ -1265,7 +1265,7 @@ func (t opsTools) restoreApp(ctx context.Context, caller Caller, input RestoreIn
 	return Done{Message: "Restored the database of " + input.App + "; the app runs again."}, nil
 }
 
-func (t opsTools) setBackupSettings(_ context.Context, caller Caller, input BackupSettingsInput) (api.BackupSettings, error) {
+func (t moinTools) setBackupSettings(_ context.Context, caller Caller, input BackupSettingsInput) (api.BackupSettings, error) {
 	app, err := t.services.Apps.SetSnapshotBeforeChanges(caller.actor(), input.App, input.SnapshotBeforeChanges)
 	if err != nil {
 		return api.BackupSettings{}, err
@@ -1273,7 +1273,7 @@ func (t opsTools) setBackupSettings(_ context.Context, caller Caller, input Back
 	return api.BackupSettings{SnapshotBeforeChanges: app.SnapshotBeforeChanges}, nil
 }
 
-func (t opsTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {
+func (t moinTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {
 	buckets, err := t.services.Apps.Buckets(caller.Token.WorkspaceID)
 	if err != nil {
 		return BucketList{}, err
@@ -1285,7 +1285,7 @@ func (t opsTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (Buc
 	return BucketList{list}, nil
 }
 
-func (t opsTools) addBucket(ctx context.Context, caller Caller, input AddBucketInput) (Bucket, error) {
+func (t moinTools) addBucket(ctx context.Context, caller Caller, input AddBucketInput) (Bucket, error) {
 	bucket, err := t.services.Apps.AddBucket(ctx, caller.actor(), service.BucketInput(input))
 	if err != nil {
 		return Bucket{}, err
@@ -1293,7 +1293,7 @@ func (t opsTools) addBucket(ctx context.Context, caller Caller, input AddBucketI
 	return Bucket{api.NewBucket(*bucket)}, nil
 }
 
-func (t opsTools) editBucket(ctx context.Context, caller Caller, input EditBucketInput) (Bucket, error) {
+func (t moinTools) editBucket(ctx context.Context, caller Caller, input EditBucketInput) (Bucket, error) {
 	bucket, err := t.services.Apps.EditBucket(ctx, caller.actor(), input.Name, service.BucketInput{
 		Name: input.Rename, Endpoint: input.Endpoint, Region: input.Region, Bucket: input.Bucket, Path: input.Path,
 		AccessKey: input.AccessKey, SecretKey: input.SecretKey, Default: input.Default,
@@ -1304,7 +1304,7 @@ func (t opsTools) editBucket(ctx context.Context, caller Caller, input EditBucke
 	return Bucket{api.NewBucket(*bucket)}, nil
 }
 
-func (t opsTools) setDefaultBucket(ctx context.Context, caller Caller, input BucketNameInput) (Bucket, error) {
+func (t moinTools) setDefaultBucket(ctx context.Context, caller Caller, input BucketNameInput) (Bucket, error) {
 	bucket, err := t.services.Apps.MakeDefaultBucket(ctx, caller.actor(), input.Bucket)
 	if err != nil {
 		return Bucket{}, err
@@ -1312,7 +1312,7 @@ func (t opsTools) setDefaultBucket(ctx context.Context, caller Caller, input Buc
 	return Bucket{api.NewBucket(*bucket)}, nil
 }
 
-func (t opsTools) removeBucket(_ context.Context, caller Caller, input RemoveBucketInput) (Done, error) {
+func (t moinTools) removeBucket(_ context.Context, caller Caller, input RemoveBucketInput) (Done, error) {
 	bucket, err := t.services.Apps.Bucket(caller.Token.WorkspaceID, input.Bucket)
 	if err != nil {
 		return Done{}, err
@@ -1327,7 +1327,7 @@ func (t opsTools) removeBucket(_ context.Context, caller Caller, input RemoveBuc
 	return Done{Message: "Removed the bucket " + bucket.Name + ". What is in it stays."}, nil
 }
 
-func (t opsTools) setAppBucket(_ context.Context, caller Caller, input AppBucketInput) (App, error) {
+func (t moinTools) setAppBucket(_ context.Context, caller Caller, input AppBucketInput) (App, error) {
 	app, err := t.services.Apps.SetAppBucket(caller.actor(), input.App, input.Bucket)
 	if err != nil {
 		return App{}, err
@@ -1335,7 +1335,7 @@ func (t opsTools) setAppBucket(_ context.Context, caller Caller, input AppBucket
 	return App{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHub, error) {
+func (t moinTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHub, error) {
 	answer := api.GitHub{Installations: []api.GitHubInstallation{}}
 	link, err := t.services.Apps.GitHubInstallURL(caller.actor())
 	answer.Enabled, answer.InstallURL = err == nil, link
@@ -1350,7 +1350,7 @@ func (t opsTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitHu
 	return GitHub{answer}, nil
 }
 
-func (t opsTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Repos, error) {
+func (t moinTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Repos, error) {
 	repos, err := t.services.Apps.GitHubRepos(ctx, caller.Token.WorkspaceID)
 	if err != nil {
 		return Repos{}, err
@@ -1377,7 +1377,7 @@ func (t opsTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Rep
 	return Repos{answer, access + "."}, nil
 }
 
-func (t opsTools) listBranches(ctx context.Context, caller Caller, input BranchesInput) (Branches, error) {
+func (t moinTools) listBranches(ctx context.Context, caller Caller, input BranchesInput) (Branches, error) {
 	branches, err := t.services.Apps.GitHubBranches(ctx, caller.Token.WorkspaceID, input.Repo)
 	if err != nil {
 		return Branches{}, err
@@ -1398,7 +1398,7 @@ func (a LinkedApp) Summary() string {
 	return fmt.Sprintf("%s follows %s on %s. %s", a.Name, a.Repo, a.Branch, next)
 }
 
-func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) (LinkedApp, error) {
+func (t moinTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) (LinkedApp, error) {
 	app, err := t.services.Apps.LinkRepo(ctx, caller.actor(), input.App, input.Repo, input.Branch, input.AutoDeploy)
 	if err != nil {
 		return LinkedApp{}, err
@@ -1406,7 +1406,7 @@ func (t opsTools) linkRepo(ctx context.Context, caller Caller, input RepoInput) 
 	return LinkedApp{api.NewApp(*app)}, nil
 }
 
-func (t opsTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
+func (t moinTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
 	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Done{}, err
@@ -1421,7 +1421,7 @@ func (t opsTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (
 	return Done{Message: input.app() + " follows no repo now."}, nil
 }
 
-func (t opsTools) deployRef(ctx context.Context, caller Caller, input RefInput) (Deploy, error) {
+func (t moinTools) deployRef(ctx context.Context, caller Caller, input RefInput) (Deploy, error) {
 	deploy, err := t.services.Apps.DeployRef(ctx, caller.actor(), input.App, input.Ref)
 	if err != nil {
 		return Deploy{}, err
@@ -1429,7 +1429,7 @@ func (t opsTools) deployRef(ctx context.Context, caller Caller, input RefInput) 
 	return Deploy{api.NewDeploy(*deploy)}, nil
 }
 
-func (t opsTools) getIntegrations(_ context.Context, caller Caller, _ struct{}) (Integrations, error) {
+func (t moinTools) getIntegrations(_ context.Context, caller Caller, _ struct{}) (Integrations, error) {
 	integrations, err := t.services.Apps.Integrations(caller.Token.WorkspaceID)
 	if err != nil {
 		return Integrations{}, err
@@ -1437,7 +1437,7 @@ func (t opsTools) getIntegrations(_ context.Context, caller Caller, _ struct{}) 
 	return Integrations{api.Integrations{Cloudflare: integrations.Cloudflare, CloudflareAccount: integrations.CloudflareAccount, Tailscale: integrations.Tailscale}}, nil
 }
 
-func (t opsTools) setIntegrations(ctx context.Context, caller Caller, input IntegrationsInput) (Integrations, error) {
+func (t moinTools) setIntegrations(ctx context.Context, caller Caller, input IntegrationsInput) (Integrations, error) {
 	err := t.services.Apps.SetIntegrations(ctx, caller.actor(), input.CloudflareToken, input.TailscaleKey)
 	if err != nil {
 		return Integrations{}, err
@@ -1445,7 +1445,7 @@ func (t opsTools) setIntegrations(ctx context.Context, caller Caller, input Inte
 	return t.getIntegrations(ctx, caller, struct{}{})
 }
 
-func (t opsTools) setServerSecurity(ctx context.Context, caller Caller, input SecurityInput) (ServerOutput, error) {
+func (t moinTools) setServerSecurity(ctx context.Context, caller Caller, input SecurityInput) (ServerOutput, error) {
 	server, err := t.services.Apps.SetServerSecurity(ctx, caller.actor(), input.Server, service.SecurityInput{Tunnel: input.Tunnel, SSHTailscale: input.SSHTailscale, Firewall: input.Firewall})
 	if err != nil {
 		return ServerOutput{}, err

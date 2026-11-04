@@ -8,5 +8,5 @@ controlplane/data
 controlplane/downloads
 controlplane/node_modules
 controlplane/assets/css/output.css
-/ops
+/moin
 /dist

@@ -256,11 +256,9 @@ func sshOnTailscaleRules() string {
 }
 
 // applyFirewall replaces the agent's table in one transaction: delete and
-// add run together, so the server is never without rules in between. The
-// table of the old name goes in the same transaction.
+// add run together, so the server is never without rules in between.
 func applyFirewall(ctx context.Context, rules string) error {
-	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" +
-		"table inet " + legacyFirewall + "\ndelete table inet " + legacyFirewall + "\n" + rules
+	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" + rules
 	command := exec.CommandContext(ctx, "nft", "-f", "-")
 	command.Stdin = strings.NewReader(script)
 	output, err := command.CombinedOutput()
@@ -278,7 +276,7 @@ func resetNetwork(ctx context.Context, dir string) {
 		slog.Warn("remove the firewall of the earlier server entry", "error", err)
 	}
 	if _, err := exec.LookPath("docker"); err == nil {
-		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName, legacyTunnelName).Run()
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName).Run()
 	}
 	_ = os.Remove(filepath.Join(dir, serverConfigFile))
 }
@@ -288,13 +286,8 @@ func removeFirewall(ctx context.Context) error {
 	if err != nil {
 		return nil
 	}
-	for _, table := range []string{firewallTable, legacyFirewall} {
-		if !slices.Contains(strings.Fields(string(output)), table) {
-			continue
-		}
-		if err := exec.CommandContext(ctx, "nft", "delete", "table", "inet", table).Run(); err != nil {
-			return err
-		}
+	if !slices.Contains(strings.Fields(string(output)), firewallTable) {
+		return nil
 	}
-	return nil
+	return exec.CommandContext(ctx, "nft", "delete", "table", "inet", firewallTable).Run()
 }

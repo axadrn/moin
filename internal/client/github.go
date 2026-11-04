@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GitHub is where the ops GitHub App is installed.
+// GitHub is where the moin GitHub App is installed.
 type GitHub struct {
 	Enabled       bool   `json:"enabled"`
 	ConnectURL    string `json:"connect_url"`
@@ -19,7 +19,7 @@ type GitHub struct {
 	} `json:"installations"`
 }
 
-// GitHubRepo is a repo ops may read.
+// GitHubRepo is a repo moin may read.
 type GitHubRepo struct {
 	FullName      string `json:"full_name"`
 	DefaultBranch string `json:"default_branch"`
@@ -34,7 +34,7 @@ func (c *Client) GitHub(ctx context.Context) (GitHub, error) {
 	return answer, err
 }
 
-// GitHubRepos lists the repos ops may read.
+// GitHubRepos lists the repos moin may read.
 func (c *Client) GitHubRepos(ctx context.Context) ([]GitHubRepo, error) {
 	var answer struct {
 		Items []GitHubRepo `json:"items"`

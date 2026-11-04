@@ -11,9 +11,6 @@ services:
       - /var/lib/moin-controlplane:/app/data
       # Files the settings point to, such as the GitHub App key.
       - /etc/moin-controlplane:/run/moin-controlplane:ro
-      # The same under the old name, for settings that still point there.
-      # Remove after 2026-12-04.
-      - /etc/moin-controlplane:/run/ops-controlplane:ro
     # Only this machine reaches the port: a proxy in front of it, or the
     # tunnel below, serves it to the internet.
     ports:

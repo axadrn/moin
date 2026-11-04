@@ -15,17 +15,17 @@ func TestOldAddressReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer history.Close()
-	s := NewOldAddressService(repository.NewOldAddressDays(history), []string{"https://ops.example.com"})
-	if hosts := s.Hosts(); len(hosts) != 1 || hosts[0] != "ops.example.com" {
+	s := NewOldAddressService(repository.NewOldAddressDays(history), []string{"https://old.example.com"})
+	if hosts := s.Hosts(); len(hosts) != 1 || hosts[0] != "old.example.com" {
 		t.Fatalf("hosts = %v", hosts)
 	}
 	empty, err := s.Report()
 	if err != nil || !empty.Quiet || empty.Total != 0 {
 		t.Fatalf("empty = %+v, %v", empty, err)
 	}
-	s.Count("ops.example.com", "agent")
-	s.Count("ops.example.com", "agent")
-	s.Count("ops.example.com", "web")
+	s.Count("old.example.com", "agent")
+	s.Count("old.example.com", "agent")
+	s.Count("old.example.com", "web")
 	report, err := s.Report()
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestOldAddressReport(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	// Counts written once are not counted twice.
-	s.Count("ops.example.com", "agent")
+	s.Count("old.example.com", "agent")
 	report, _ = s.Report()
 	if report.Total != 4 {
 		t.Fatalf("total = %d, want 4", report.Total)

@@ -1,4 +1,4 @@
-// Package protocol is the contract between the ops agent and the control
+// Package protocol is the contract between the moin agent and the control
 // plane. The agent dials out: it registers once over HTTP, then holds one
 // WebSocket session. The agent and the control plane both import this package,
 // so a change here is a change on both sides.
@@ -162,13 +162,13 @@ type Hello struct {
 	// as it knows them. Older agents send none; the control plane then knows
 	// only the address the agent connected from.
 	Addresses []string `json:"addresses,omitempty"`
-	// Rules are the server's own rules for ops, from /etc/ops/rules. Nil
-	// means the server has none and ops may do everything.
+	// Rules are the server's own rules for moin, from /etc/moin/rules. Nil
+	// means the server has none and moin may do everything.
 	Rules *Rules `json:"rules,omitempty"`
 }
 
-// Rules are what the owner of a server allows ops to do there, written in
-// /etc/ops/rules on the server. The control plane cannot change them; the
+// Rules are what the owner of a server allows moin to do there, written in
+// /etc/moin/rules on the server. The control plane cannot change them; the
 // agent refuses every request they do not allow.
 type Rules struct {
 	// DataOff refuses tables, SQL and row edits.
@@ -322,7 +322,7 @@ type DeployDone struct {
 // running containers. Config holds the x-moin block of compose.yml, if any.
 type Detected struct {
 	// Kind is "compose", "dockerfile", "go" or "railpack": what the repo
-	// brought, and for railpack that ops built it with Railpack. Builder
+	// brought, and for railpack that moin built it with Railpack. Builder
 	// says what Railpack found, like "Node 24.22.1, start: npm start".
 	// Image is the image of the main service when it came from CI.
 	// Domains are the domains the main service answers on, Canonical the one
@@ -343,7 +343,7 @@ type Detected struct {
 	Config         *Config             `json:"config,omitempty"`
 }
 
-// Built says for people how ops built the app: the language Railpack found,
+// Built says for people how moin built the app: the language Railpack found,
 // like "Node 24.22.1 (Railpack)", or the kind.
 func (d Detected) Built() string {
 	if d.Kind == "railpack" && d.Builder != "" {
@@ -370,11 +370,15 @@ const DatabasePostgres = "postgres"
 // Postgres reports whether the database is a Postgres service.
 func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 
-// PostgresKey is the name of a Postgres service's database in ops: in the
+// PostgresKey is the name of a Postgres service's database in moin: in the
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
 
-// Config is the x-moin block (or the old x-ops) of compose.yml. Every field is optional.
+// OldConfigKey is the block of compose.yml under the name the product had
+// before. The agent refuses it with a message to rename it to x-moin.
+const OldConfigKey = "x-ops"
+
+// Config is the x-moin block of compose.yml. Every field is optional.
 type Config struct {
 	App       string   `json:"app,omitempty"`
 	Server    string   `json:"server,omitempty"`
@@ -387,7 +391,7 @@ type Config struct {
 	Database  string   `json:"database,omitempty"`
 	// ServiceDomains are domains by service, from the map form of domains:
 	// domains: {web: [shop.com], api: [api.shop.com]}. Ports are the ports
-	// of services ops cannot tell. Instant picks the instant address
+	// of services moin cannot tell. Instant picks the instant address
 	// provider, or off.
 	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
 	Ports          map[string]int      `json:"ports,omitempty"`
@@ -500,7 +504,7 @@ type DBTables struct {
 }
 
 // DBMigration is the newest migration of goose, golang-migrate, Prisma or
-// Drizzle. The app runs its migrations; ops only reads where they are.
+// Drizzle. The app runs its migrations; moin only reads where they are.
 type DBMigration struct {
 	Tool      string `json:"tool"`
 	Version   string `json:"version"`
@@ -561,7 +565,7 @@ type DBResult struct {
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
 // sharing one bucket never touch each other's files. Name is the bucket's
-// name in ops, which snapshots carry; older control planes send none.
+// name in moin, which snapshots carry; older control planes send none.
 type BackupStorage struct {
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
@@ -740,31 +744,18 @@ type AgentUpdate struct {
 
 // UpdateCommand updates an agent by hand on the server, as root: for an
 // agent too old to update itself, or one whose rules keep it from doing so.
-// With legacy set, the name the agent had before, it updates an agent still
-// installed under that name too: the new binary then moves it over itself.
-func UpdateCommand(baseURL, name, arch, legacy string) string {
+func UpdateCommand(baseURL, name, arch string) string {
 	binary := "/usr/local/bin/" + name
-	command := fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && ",
-		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary)
-	if legacy == "" {
-		return command + "systemctl restart " + name + "-agent"
-	}
-	return command + fmt.Sprintf("{ systemctl cat %s-agent >/dev/null 2>&1 && systemctl restart %s-agent || { ln -sf %s /usr/local/bin/%s && systemctl restart %s-agent; }; }",
-		name, name, binary, legacy, legacy)
+	return fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && systemctl restart %s-agent",
+		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary, name)
 }
 
-// AgentUnit is the systemd unit of the agent. It conflicts with the unit of
-// the name the agent had before, legacy, so the two never run at once.
-func AgentUnit(name, legacy string) string {
-	conflicts := ""
-	if legacy != "" {
-		conflicts = "Conflicts=" + legacy + "-agent.service\n"
-	}
+// AgentUnit is the systemd unit of the agent.
+func AgentUnit(name string) string {
 	return "[Unit]\n" +
 		"Description=" + name + " agent\n" +
 		"After=network-online.target docker.service\n" +
 		"Wants=network-online.target docker.service\n" +
-		conflicts +
 		"\n[Service]\n" +
 		"ExecStart=/usr/local/bin/" + name + " agent\n" +
 		"Environment=" + strings.ToUpper(name) + "_STATE_DIR=/var/lib/" + name + "\n" +

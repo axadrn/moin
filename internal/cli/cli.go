@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -86,7 +85,7 @@ Domains
   instant            The instant address, https://<app>.<ip>.sslip.io: instant [--show] [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
   instant open       No password on the instant address; protect puts it back: instant open [app]
-  protect            Ask for a password: protect [--user ops], password on stdin
+  protect            Ask for a password: protect [--user moin], password on stdin
   protect off        Make the app public again: protect off [app] [--yes]
 
 Uptime
@@ -403,8 +402,8 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 		return err
 	}
 	done(stdout, "Logged in as %s %s", style.Bold.Render(account.Email), style.Muted.Render("on "+config.URL))
-	if os.Getenv("OPS_TOKEN") != "" {
-		hint(stdout, "OPS_TOKEN is set and wins over this login. Use the new one with", "unset OPS_TOKEN")
+	if build.Getenv("TOKEN") != "" {
+		hint(stdout, client.TokenVariable+" is set and wins over this login. Use the new one with", "unset "+client.TokenVariable)
 	}
 	return nil
 }
@@ -692,20 +691,6 @@ func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io
 	}
 	if flags.NArg() > 0 {
 		return fmt.Errorf("unknown command %q. Run `%s help`", "agent "+flags.Arg(0), build.Name)
-	}
-	// An agent installed under the old name moves to the new one: first
-	// its unit, then its state. Neither failing stops the agent.
-	handed, err := agent.MoveUnit(ctx)
-	if err != nil {
-		slog.Error("move the agent to its new name", "error", err)
-	}
-	if handed || ctx.Err() != nil {
-		// systemd stops this process now; the new unit takes over.
-		<-ctx.Done()
-		return nil
-	}
-	if err := agent.MoveState(ctx, dir); err != nil {
-		slog.Error("move the agent's state to its new place", "error", err)
 	}
 	state, err := agent.LoadState(dir)
 	if err != nil {

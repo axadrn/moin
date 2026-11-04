@@ -27,7 +27,7 @@ import (
 )
 
 // Continuous Postgres backups wrap WAL-G, the way SQLite's wrap Litestream:
-// ops writes no backup logic of its own. For every Postgres service the
+// moin writes no backup logic of its own. For every Postgres service the
 // agent runs a companion container next to it:
 //
 //   - in the Postgres container's network namespace, so it reaches the
@@ -344,11 +344,6 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	b.walg.mu.Unlock()
 	if err := capSlot(ctx, target); err != nil {
 		return fmt.Errorf("cap the WAL the slot keeps: %w", err)
-	}
-	// The slot of the old name is no one's now; unread it would keep WAL
-	// until the cap.
-	if _, err := target.psql(ctx, `SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = :'slot' AND NOT active;`, map[string]string{"slot": legacyWalgSlot}, false); err != nil {
-		slog.Warn("backup: drop the WAL-G slot of the old name", "app", app, "database", database.Path, "error", err)
 	}
 	// The slot keeps the log from its creation on: wal-receive starts
 	// where it stands, never in a part Postgres already removed.
@@ -695,9 +690,9 @@ func walgNoteFor(unsupported, why string, broke, rebased, now time.Time) string 
 	}
 	note := "Continuous backup broke at " + broke.UTC().Format("Jan 2, 15:04") + " UTC: " + why + ". "
 	if rebased.IsZero() {
-		return note + "ops started a new base backup; point in time restores start again from it. Snapshots are not affected."
+		return note + "moin started a new base backup; point in time restores start again from it. Snapshots are not affected."
 	}
-	return note + "ops took a new base backup at " + rebased.UTC().Format("15:04") + " UTC; point in time restores reach back to it. Snapshots are not affected."
+	return note + "moin took a new base backup at " + rebased.UTC().Format("15:04") + " UTC; point in time restores reach back to it. Snapshots are not affected."
 }
 
 // walgBefore takes a base backup before a deploy, when the database has a

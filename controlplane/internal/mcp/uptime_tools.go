@@ -11,7 +11,7 @@ import (
 
 // registerUptimeTools registers the tools of the uptime checks.
 func registerUptimeTools(server *mcpsdk.Server, services Services) {
-	tools := opsTools{services: services}
+	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_uptime", Title: "Get uptime", Annotations: readOnly("Get uptime"),
 		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the check goes, its state, the newest check with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin checks every domain once a minute like a visitor; an answer below 500 is up. Needs the read scope.",
 	}, Read(member(services, tools.getUptime)))
@@ -74,7 +74,7 @@ type UptimeCheckInput struct {
 	Paused *bool   `json:"paused,omitempty" jsonschema:"true pauses the check, false resumes it"`
 }
 
-func (t opsTools) getUptime(_ context.Context, caller Caller, input AppInput) (Uptime, error) {
+func (t moinTools) getUptime(_ context.Context, caller Caller, input AppInput) (Uptime, error) {
 	app, uptime, err := t.services.Apps.Uptime(caller.Token.WorkspaceID, input.app())
 	if err != nil {
 		return Uptime{}, err
@@ -82,7 +82,7 @@ func (t opsTools) getUptime(_ context.Context, caller Caller, input AppInput) (U
 	return Uptime{api.NewUptime(app.Name, uptime)}, nil
 }
 
-func (t opsTools) setUptimeCheck(_ context.Context, caller Caller, input UptimeCheckInput) (UptimeDomain, error) {
+func (t moinTools) setUptimeCheck(_ context.Context, caller Caller, input UptimeCheckInput) (UptimeDomain, error) {
 	_, domain, err := t.services.Apps.SetUptimeCheck(caller.actor(), input.App, input.Domain, input.Path, input.Paused)
 	if err != nil {
 		return UptimeDomain{}, err

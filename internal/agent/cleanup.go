@@ -23,7 +23,7 @@ const (
 
 // imagesFile lists every image an app's releases ever named, so the agent
 // can remove the pulled ones once no release needs them: Docker does not
-// say which images ops pulled.
+// say which images moin pulled.
 const imagesFile = "images"
 
 // rememberImages adds the images the app's releases name to its images
@@ -75,7 +75,7 @@ func (a *apps) releaseImages(app string) []string {
 // unusedImages picks from the images apps remembered the ones to remove:
 // no release on disk names them and no container, running or stopped,
 // runs them. Names Docker does not know any more are dropped from the
-// list. Anything ops never named is not a candidate.
+// list. Anything moin never named is not a candidate.
 func unusedImages(remembered, named, inContainers, present []string) (remove, keep []string) {
 	named, inContainers, present = normalImages(named), normalImages(inContainers), normalImages(present)
 	for _, image := range normalImages(remembered) {
@@ -107,9 +107,9 @@ func normalImages(images []string) []string {
 	return normal
 }
 
-// cleanup frees disk: the images ops pulled or built that no release and
+// cleanup frees disk: the images moin pulled or built that no release and
 // no container needs, dangling images, and build cache older than a week.
-// It never touches volumes, nor images of containers, nor images ops never
+// It never touches volumes, nor images of containers, nor images moin never
 // named except dangling ones. It logs what it freed.
 func (a *apps) cleanup(ctx context.Context) {
 	containers, err := a.output(ctx, "docker", "ps", "-a", "--format", "{{.Image}}")

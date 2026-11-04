@@ -64,7 +64,7 @@ API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-moin shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook makes the old one stop working, so moin asks first when the app has a hook already; the first one needs no question. In a script, add `--yes`.
+moin shows the URL once. Store it as the CI secret `MOIN_DEPLOY_HOOK`. A new hook makes the old one stop working, so moin asks first when the app has a hook already; the first one needs no question. In a script, add `--yes`.
 
 ### Turn the deploy hook off
 
@@ -108,9 +108,9 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
       - run: |
           curl -fsS -X POST \
-            "$OPS_DEPLOY_HOOK?image=ghcr.io/${{ github.repository }}:${{ github.sha }}"
+            "$MOIN_DEPLOY_HOOK?image=ghcr.io/${{ github.repository }}:${{ github.sha }}"
         env:
-          OPS_DEPLOY_HOOK: ${{ secrets.OPS_DEPLOY_HOOK }}
+          MOIN_DEPLOY_HOOK: ${{ secrets.MOIN_DEPLOY_HOOK }}
 ```
 
 Build for the arch of your server (`moin servers` shows it). The hook answers `202` with the deploy; follow it in the web UI, the TUI or with `moin logs`.
@@ -123,7 +123,7 @@ The moin GitHub Action installs `moin` from your control plane and runs `moin de
       - uses: axadrn/moin@main
         with:
           url: https://moin.example.com
-          token: ${{ secrets.OPS_TOKEN }}
+          token: ${{ secrets.MOIN_TOKEN }}
           image: ghcr.io/${{ github.repository }}:${{ github.sha }}
 ```
 

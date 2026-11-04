@@ -111,16 +111,38 @@ func TestMainServiceAndPort(t *testing.T) {
 		t.Fatalf("main service = %q", got)
 	}
 	if got := mainService(services, &protocol.Config{Service: "redis"}); got != "redis" {
-		t.Fatalf("x-ops service = %q", got)
+		t.Fatalf("x-moin service = %q", got)
 	}
 	if got := mainService(services, &protocol.Config{Service: "nope"}); got != "" {
-		t.Fatalf("unknown x-ops service = %q", got)
+		t.Fatalf("unknown x-moin service = %q", got)
 	}
 	if got := mainPort(t.TempDir(), services["web"], nil); got != 3000 {
 		t.Fatalf("port = %d", got)
 	}
 	if got := mainPort(t.TempDir(), services["web"], &protocol.Config{Port: 9000}); got != 9000 {
-		t.Fatalf("x-ops port = %d", got)
+		t.Fatalf("x-moin port = %d", got)
+	}
+}
+
+// x-moin is the block. A block of the old name is an error that says to
+// rename it, never quietly ignored, even next to x-moin.
+func TestConfigBlock(t *testing.T) {
+	block, key, err := configBlock(map[string]any{"x-moin": map[string]any{"app": "new"}})
+	if err != nil || key != "x-moin" || block.(map[string]any)["app"] != "new" {
+		t.Fatalf("x-moin: %v %q %v", block, key, err)
+	}
+	if block, _, err := configBlock(map[string]any{}); err != nil || block != nil {
+		t.Fatalf("no block: %v %v", block, err)
+	}
+	old := protocol.OldConfigKey
+	for _, config := range []map[string]any{
+		{old: map[string]any{"app": "old"}},
+		{old: map[string]any{"app": "old"}, "x-moin": map[string]any{"app": "new"}},
+	} {
+		_, key, err := configBlock(config)
+		if err == nil || key != old || err.Error() != "compose.yml has an "+old+" block: rename it to x-moin" {
+			t.Fatalf("old block: %q %v", key, err)
+		}
 	}
 }
 
@@ -148,7 +170,7 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	}}
 	file := filepath.Join(t.TempDir(), "compose.json")
 	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc", Env: map[string]string{"KEY": "a$b"}}
-	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "ops-blog-worker:3", "redis": "redis:7"}
+	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "moin-blog-worker:3", "redis": "redis:7"}
 	err := finish(base, start, protocol.Detected{Service: "web"}, running, file)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +191,7 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	if web.Image != "ghcr.io/me/blog:abc" || web.Build != nil || web.Environment["KEY"] != "a$$b" {
 		t.Fatalf("web = %+v", web)
 	}
-	if worker.Image != "ops-blog-worker:3" || worker.Build != nil || worker.Environment["KEY"] == "" {
+	if worker.Image != "moin-blog-worker:3" || worker.Build != nil || worker.Environment["KEY"] == "" {
 		t.Fatalf("worker = %+v", worker)
 	}
 	if redis.Image != "redis:7" || redis.Environment != nil || redis.Restart != "unless-stopped" {
@@ -185,8 +207,8 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 // to do.
 func TestRestartRebuildsMissingImages(t *testing.T) {
 	bin := t.TempDir()
-	// A docker that has every image but ops-blog-web:3.
-	script := "#!/bin/sh\ncase \"$*\" in\n*ops-blog-web:3*) exit 1 ;;\nesac\n"
+	// A docker that has every image but moin-blog-web:3.
+	script := "#!/bin/sh\ncase \"$*\" in\n*moin-blog-web:3*) exit 1 ;;\nesac\n"
 	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +218,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 		"web":    map[string]any{"build": map[string]any{"context": source}},
 		"worker": map[string]any{"build": map[string]any{"context": source}},
 	}}
-	running := map[string]string{"web": "ops-blog-web:3", "worker": "ops-blog-worker:3"}
+	running := map[string]string{"web": "moin-blog-web:3", "worker": "moin-blog-worker:3"}
 	var lines []string
 	logf := func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) }
 	a := &apps{}
@@ -218,7 +240,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	web, worker := config.Services["web"], config.Services["worker"]
-	if web.Image != "moin-blog-web:5" || web.Build == nil || worker.Image != "ops-blog-worker:3" || worker.Build != nil {
+	if web.Image != "moin-blog-web:5" || web.Build == nil || worker.Image != "moin-blog-worker:3" || worker.Build != nil {
 		t.Fatalf("web = %+v, worker = %+v", web, worker)
 	}
 	if len(lines) != 1 || !strings.Contains(lines[0], "building it again") {
@@ -226,7 +248,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 	}
 
 	gone := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": filepath.Join(source, "gone")}}}}
-	err := a.rebuildMissing(context.Background(), gone, map[string]string{"web": "ops-blog-web:3"}, "web", false, logf)
+	err := a.rebuildMissing(context.Background(), gone, map[string]string{"web": "moin-blog-web:3"}, "web", false, logf)
 	if err == nil || !strings.Contains(err.Error(), "deploy again with moin deploy") {
 		t.Fatalf("err = %v", err)
 	}
