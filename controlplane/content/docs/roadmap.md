@@ -28,7 +28,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 ## Next
 
-- **Postgres and MySQL**: backups every second, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
+- **Postgres**: every change backed up, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
 
 ## Later
 
