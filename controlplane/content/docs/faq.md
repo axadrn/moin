@@ -53,7 +53,7 @@ Your first workspace gets 30 days with everything, without a card. Afterwards th
 
 **moin** /mɔɪn/ *interjection, northern German.* Hello. Said in Hamburg at any hour, in one word, by people who don't waste words.
 
-Hamburg is a port, full of containers: stacked, moved, shipped around the world, and nothing gets lost. That's what moin does for your apps.
+Hamburg is one of Europe's biggest container ports. Your apps run in containers too: packed once, shipped to any server, each one sealed off from the next. moin is the harbour master: it puts them on your servers, sends a copy of every change to your bucket, and checks every day that nothing got lost.
 
 ## I used it when it was called ops. What changes?
 
