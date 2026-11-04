@@ -3,6 +3,26 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.10
+
+November 4, 2026
+
+**In short:** Postgres gets what SQLite has: every change backed up, full copies, a daily restore check and the data browser. And a new home page: Deploy anything. Lose nothing.
+
+### New
+- **Postgres backups**: every change goes to your bucket within a minute, seconds when it's busy, with WAL-G. Go back to any second of the last 7 days: `ops restore --at "2026-11-04 14:02"`.
+- **Postgres snapshots**: a full copy every hour and before every deploy, restore and edit. `ops backup`, `ops restore <snapshot>`.
+- **Checked every day**: ops restores the newest Postgres copy into a throwaway database and checks it, like SQLite.
+- **Postgres in the data browser**: tables, rows, schema, search, edit and delete by primary key, and read-only SQL. Web: the **Data** tab. CLI: `ops db`, `ops sql`.
+- **Rows by primary key**: SQLite tables without a rowid can be edited too.
+
+### Changed
+- **Home page**: "Deploy anything. Lose nothing. Open source." The product shots change by themselves.
+- **Reads stay reads**: SQL that changes data is refused up front in a read, with a hint to use `--write`.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; deploy an app once so ops finds its Postgres.
+
 ## v1.0.0-beta.9
 
 November 4, 2026

@@ -430,11 +430,20 @@ templ HomeBackups() {
 				With { brand.Name }, each is a click to undo.
 			</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeFact("Every change", "In your bucket within a second for SQLite, a minute for Postgres. Go back to any second of the last week.", "")
+				@homeFact("Every change", "In your bucket within a second for SQLite. Within a minute for Postgres, seconds when it's busy. Go back to any second of the last week.", "")
 				@homeFact("Before every change", "A full copy before every deploy and every edit.", "")
 				@homeFact("Proven every day", "Each backup is restored and checked, every day. Not just “job ran”.", "live")
 				@homeFact("Your bucket", "R2, S3, B2 or Hetzner. Your backups never pass through us.", "")
 			</div>
+			// Sources, read November 4, 2026:
+			// AWS: "RDS uploads transaction logs for DB instances to Amazon S3
+			// every five minutes." docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html
+			// Coolify: scheduled pg_dump on a cron, coolify.io/docs/databases/backups
+			// Dokploy: "Schedule Cron", docs.dokploy.com/docs/core/databases/backups
+			<p class="mt-8 max-w-3xl text-base leading-7 text-muted-foreground">
+				<span class="text-foreground">Postgres on AWS RDS ships its changes every five minutes.</span>
+				Coolify and Dokploy back up on a schedule. { brand.Name }: every change, within a minute, checked every day.
+			</p>
 		</div>
 	</section>
 }
