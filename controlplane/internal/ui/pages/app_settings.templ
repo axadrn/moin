@@ -11,7 +11,6 @@ import (
 	field "github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -196,11 +195,9 @@ templ SettingsEmailSection(user *model.User) {
 	}
 }
 
-// EmailAlertsForm is the switch for the user's email alerts. A change
-// saves itself; a failed save answers the form as stored, so it flips back.
+// EmailAlertsForm is the switch for the user's email alerts.
 templ EmailAlertsForm(on bool) {
-	<form id="email-alerts-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/profile/email-alerts" } hx-trigger="change" hx-swap="none">
-		@csrf.Token()
+	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts") {
 		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 			@field.Content() {
 				@field.Label(field.LabelProps{For: "email-alerts"}) {
@@ -210,9 +207,9 @@ templ EmailAlertsForm(on bool) {
 					A mail when a site goes down or comes back, a server goes offline or a deploy fails, in the workspaces you own or run as admin.
 				}
 			}
-			@switchcomp.Switch(switchcomp.Props{ID: "email-alerts", Name: "on", Value: "1", DefaultChecked: on})
+			@savedSwitch("email-alerts", on)
 		}
-	</form>
+	}
 }
 
 templ SettingsPasswordSection() {

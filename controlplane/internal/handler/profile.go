@@ -36,21 +36,16 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
 }
 
-// EmailAlerts turns the user's email alerts on or off. The switch shows
-// the new state already; a failed save flips it back.
+// EmailAlerts turns the user's email alerts on or off and answers the
+// switch as stored, so a failed save flips it back.
 func (h *ProfileHandler) EmailAlerts(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	on := r.FormValue("on") == "1"
 	err := h.users.SetEmailAlerts(user.ID, on)
 	if err != nil {
 		slog.Error("failed to set email alerts", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Setting not saved", "Something went wrong. Please try again.")
-		renderOOB(w, r, pages.EmailAlertsForm(user.EmailAlerts), "outerHTML:#email-alerts-form")
-		return
+		on = user.EmailAlerts
+		toastError(w, r, "Setting not saved", "Something went wrong. Please try again.")
 	}
-	if on {
-		toastDone(w, r, "Email alerts on", "You get a mail when a site goes down, a server goes offline or a deploy fails.")
-	} else {
-		toastDone(w, r, "Email alerts off", "You no longer get alert mails.")
-	}
+	render(w, r, pages.EmailAlertsForm(on))
 }

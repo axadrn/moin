@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
@@ -15,36 +17,50 @@ func (h *AppsHandler) Uptime(w http.ResponseWriter, r *http.Request) {
 	h.renderUptime(w, r)
 }
 
-// UptimeCheck saves the path of a domain's check, or with pause its
-// switch: on checks, off pauses.
+// UptimeCheck saves the path of a domain's check.
 func (h *AppsHandler) UptimeCheck(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
-	var path *string
-	var paused *bool
-	if r.FormValue("pause") != "" {
-		off := r.FormValue("on") != "1"
-		paused = &off
-	} else {
-		value := r.FormValue("path")
-		path = &value
-	}
-	_, _, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), domain, path, paused)
+	path := r.FormValue("path")
+	_, _, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), domain, &path, nil)
 	if err != nil {
 		failed(w, r, "Check of "+domain+" not saved", err, nil)
 		return
 	}
-	// The switch shows its state itself; only a new path redraws the panel.
-	if paused == nil {
-		h.renderUptime(w, r)
+	h.renderUptime(w, r)
+	toastDone(w, r, "Path of "+domain+" saved", "The next check goes there.")
+}
+
+// UptimeOn is the switch that pauses or resumes the check of a domain: it
+// saves only that and answers the switch as stored, so a failed save flips
+// it back.
+func (h *AppsHandler) UptimeOn(w http.ResponseWriter, r *http.Request) {
+	domain := r.FormValue("domain")
+	paused := r.FormValue("on") != "1"
+	app, view, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), domain, nil, &paused)
+	if err != nil {
+		var found bool
+		app, view, found = h.uptimeDomain(r, domain)
+		if !found {
+			failed(w, r, "Check of "+domain+" not saved", err, nil)
+			return
+		}
+		toastError(w, r, "Check of "+domain+" not saved", errorMessage(err))
 	}
-	switch {
-	case paused != nil && *paused:
-		toastDone(w, r, "Check of "+domain+" paused", "Turn it on again to check every minute.")
-	case paused != nil:
-		toastDone(w, r, "Checking "+domain+" again", "The next check runs within a minute.")
-	default:
-		toastDone(w, r, "Path of "+domain+" saved", "The next check goes there.")
+	render(w, r, pages.UptimeSwitchForm(*app, view))
+}
+
+// uptimeDomain is the check of one domain of the app as stored.
+func (h *AppsHandler) uptimeDomain(r *http.Request, domain string) (*model.App, service.UptimeDomain, bool) {
+	app, uptime, err := h.apps.Uptime(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	if err != nil {
+		return nil, service.UptimeDomain{}, false
 	}
+	for _, check := range uptime.Domains {
+		if check.Domain == domain {
+			return app, check, true
+		}
+	}
+	return nil, service.UptimeDomain{}, false
 }
 
 func (h *AppsHandler) renderUptime(w http.ResponseWriter, r *http.Request) {

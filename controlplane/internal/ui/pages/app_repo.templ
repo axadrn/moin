@@ -5,9 +5,8 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/checkbox"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
@@ -213,22 +212,25 @@ templ repoLinked(view RepoView) {
 			Empty deploys the newest commit on { view.App.Branch }.
 		}
 	</form>
-	<form hx-post={ appPath + "/repo" } hx-trigger="change" hx-target="#app-repo" hx-swap="outerHTML">
-		@csrf.Token()
-		<input type="hidden" name="repo" value={ view.App.Repo }/>
-		<input type="hidden" name="branch" value={ view.App.Branch }/>
+	@AutoDeployForm(view.App)
+}
+
+// AutoDeployForm is the switch for deploy on push. It saves only that, so
+// it never waits for GitHub.
+templ AutoDeployForm(app model.App) {
+	@switchForm("auto-deploy-form", ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/repo/auto-deploy") {
 		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 			@field.Content() {
 				@field.Label(field.LabelProps{For: "repo-auto-deploy"}) {
 					Deploy every push
 				}
 				@field.Description() {
-					A push to { view.App.Branch } deploys it right away.
+					A push to { app.Branch } deploys it right away.
 				}
 			}
-			@switchcomp.Switch(switchcomp.Props{ID: "repo-auto-deploy", Name: "auto_deploy", Value: "1", DefaultChecked: view.App.AutoDeploy, Attributes: templ.Attributes{"data-auto-deploy": true}})
+			@savedSwitch("repo-auto-deploy", app.AutoDeploy)
 		}
-	</form>
+	}
 }
 
 // firstRepo is the repo the link form selects first, like a native select.

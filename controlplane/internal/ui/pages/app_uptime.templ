@@ -13,7 +13,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -141,25 +140,27 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 				Save path
 			}
 		</form>
-		// The switch shows its new state itself; swapping the panel would put
-		// the old one back while it still has focus.
-		<form hx-post={ action } hx-trigger="change" hx-swap="none">
-			@csrf.Token()
-			<input type="hidden" name="domain" value={ domain.Domain }/>
-			<input type="hidden" name="pause" value="1"/>
-			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-				@field.Content() {
-					@field.Label(field.LabelProps{For: id + "-on"}) {
-						Uptime check
-					}
-					@field.Description() {
-						Checked from outside every minute. Off pauses it, for maintenance or a domain you do not serve yet.
-					}
-				}
-				@switchcomp.Switch(switchcomp.Props{ID: id + "-on", Name: "on", Value: "1", DefaultChecked: !domain.Paused})
-			}
-		</form>
+		@UptimeSwitchForm(app, domain)
 	</div>
+}
+
+// UptimeSwitchForm is the switch that pauses the check of a domain.
+templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
+	{{ id := "uptime-" + domain.Domain }}
+	@switchForm(id+"-form", ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/uptime/on") {
+		<input type="hidden" name="domain" value={ domain.Domain }/>
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+			@field.Content() {
+				@field.Label(field.LabelProps{For: id + "-on"}) {
+					Uptime check
+				}
+				@field.Description() {
+					Checked from outside every minute. Off pauses it, for maintenance or a domain you do not serve yet.
+				}
+			}
+			@savedSwitch(id+"-on", !domain.Paused)
+		}
+	}
 }
 
 func customPath(domain service.UptimeDomain) string {

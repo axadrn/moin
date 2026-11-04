@@ -137,27 +137,14 @@ func (h *AppsHandler) branches(r *http.Request, repo string) []string {
 	return branches
 }
 
-// LinkRepo makes the app follow the chosen repo and branch. The switch of
-// a linked repo sends the same, with only deploy on push changed.
+// LinkRepo makes the app follow the chosen repo and branch.
 func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
-	before, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-	if err != nil {
-		failed(w, r, "Repo not linked", err, nil)
-		return
-	}
 	app, err := h.apps.LinkRepo(r.Context(), actor(r), r.PathValue("app"), r.FormValue("repo"), r.FormValue("branch"), r.FormValue("auto_deploy") == "1")
 	switch {
-	case err != nil && before.Repo != "":
-		// The switch flips back to what is stored.
-		h.renderRepo(w, r)
-		toastError(w, r, "Deploy on push not changed", errorMessage(err))
 	case errors.Is(err, service.ErrRepo):
 		fieldRefused(w, r, "Repo not linked", "link-repo", errorMessage(err))
 	case err != nil:
 		failed(w, r, "Repo not linked", err, map[string]string{"repo": "link-repo", "ref": "link-branch", "branch": "link-branch"})
-	case before.Repo != "":
-		// The switch saved itself; its position says so.
-		h.renderRepo(w, r)
 	case r.FormValue("deploy") != "":
 		// The link form deploys the branch right away.
 		deploy, err := h.apps.DeployRef(r.Context(), actor(r), app.Name, "")
@@ -171,6 +158,22 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 		h.renderRepo(w, r)
 		toastDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
 	}
+}
+
+// SetAutoDeploy is the switch for deploy on push: it saves only that and
+// answers the switch as stored, so a failed save flips it back.
+func (h *AppsHandler) SetAutoDeploy(w http.ResponseWriter, r *http.Request) {
+	app, err := h.apps.SetAutoDeploy(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
+	if err != nil {
+		stored, getErr := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+		if getErr != nil {
+			failed(w, r, "Deploy on push not changed", err, nil)
+			return
+		}
+		app = stored
+		toastError(w, r, "Deploy on push not changed", errorMessage(err))
+	}
+	render(w, r, pages.AutoDeployForm(*app))
 }
 
 // UnlinkRepo stops the app from following its repo.

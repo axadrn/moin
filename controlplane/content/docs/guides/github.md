@@ -92,7 +92,7 @@ API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-These turn it off; `moin link <owner>/<repo>` and `link <owner>/<repo>` in the TUI turn it on again. In the API and MCP it is `auto_deploy`.
+These turn it off; `moin link <owner>/<repo>` and `link <owner>/<repo>` in the TUI turn it on again. In the API and MCP it is `auto_deploy`. Linking the repo and branch the app follows already changes only this setting, without asking GitHub; the switch on the web does the same.
 
 A push to another branch does nothing. A push that arrives while a deploy of the app still runs is skipped; the next push, or **Deploy**, picks up the newest commit.
 

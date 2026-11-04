@@ -69,6 +69,9 @@ type AppRepository interface {
 	// through it.
 	GitHubInstallation(installationID int64) (*model.GitHubInstallation, []model.App, error)
 	SetRepo(appID, repo, branch string, autoDeploy bool, installationID int64) error
+	// SetAutoDeploy turns deploy on push on or off for a linked app and
+	// leaves its repo and branch alone.
+	SetAutoDeploy(appID string, on bool) error
 	AppsForPush(installationID int64, repo, branch string) ([]model.App, error)
 
 	Registries(workspaceID string) ([]model.Registry, error)
@@ -402,6 +405,11 @@ func (r *appRepository) DeleteGitHubInstallation(installationID int64) error {
 
 func (r *appRepository) SetRepo(appID, repo, branch string, autoDeploy bool, installationID int64) error {
 	_, err := r.db.Exec(`UPDATE apps SET repo = $1, branch = $2, auto_deploy = $3, installation_id = $4 WHERE id = $5`, repo, branch, autoDeploy, installationID, appID)
+	return err
+}
+
+func (r *appRepository) SetAutoDeploy(appID string, on bool) error {
+	_, err := r.db.Exec(`UPDATE apps SET auto_deploy = $1 WHERE id = $2 AND repo != ''`, on, appID)
 	return err
 }
 

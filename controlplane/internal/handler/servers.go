@@ -128,15 +128,17 @@ func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
 }
 
-// AgentUpdates turns automatic agent updates on or off. The switch shows
-// the new state already; a failed save flips it back.
+// AgentUpdates turns automatic agent updates on or off and answers the
+// switch as stored, so a failed save flips it back.
 func (h *ServersHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
 	err := h.servers.SetAutoUpdateAgents(actor(r), r.FormValue("on") == "1")
-	if err == nil {
+	on, getErr := h.servers.AutoUpdateAgents(ctxkeys.Workspace(r.Context()).ID)
+	if getErr != nil {
+		failed(w, r, "Setting not saved", getErr, nil)
 		return
 	}
-	toastFailed(w, r, "Setting not saved", errorMessage(err))
-	if on, err := h.servers.AutoUpdateAgents(ctxkeys.Workspace(r.Context()).ID); err == nil {
-		renderOOB(w, r, pages.AgentUpdatesForm(on), "outerHTML:#agent-updates-form")
+	if err != nil {
+		toastError(w, r, "Setting not saved", errorMessage(err))
 	}
+	render(w, r, pages.AgentUpdatesForm(on))
 }

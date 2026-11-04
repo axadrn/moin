@@ -251,7 +251,10 @@ in `internal/handler/feedback.go` and `@fieldHint` in
   why, in one sentence. The page stays as it was.
 - **If a control saves itself** (a switch, a cell of the data browser):
   its new state is the answer, no toast. If saving fails, it goes back (the
-  cell turns red) and a toast says why.
+  cell turns red) and a toast says why. A switch is a `@switchForm` with a
+  `@savedSwitch`: it posts to its own endpoint, which saves only that one
+  setting through one service method and answers the form as stored; the
+  switch is disabled while it saves.
 - **If something was copied**: the copy icon turns into a check for a
   moment. The button keeps its size and its label.
 - **If a state lasts** while the page is open (trial ended, read-only
