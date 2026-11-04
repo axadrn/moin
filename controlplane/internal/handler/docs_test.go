@@ -28,7 +28,7 @@ func TestDocsReturnsFullPagesAndHTMXFragments(t *testing.T) {
 		`hx-sync="#docs-content-wrapper:replace"`,
 		`hx-status:4xx="swap:none push:false"`,
 		`hx-status:5xx="swap:none push:false"`,
-		`goilerplate:docs:navigated`,
+		`moin:docs:navigated`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("full response does not contain %q", want)

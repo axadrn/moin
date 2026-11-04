@@ -244,7 +244,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 
 				document.addEventListener('htmx:after:settle', event => {
 					if (event.target?.id === 'docs-content-wrapper') {
-						document.dispatchEvent(new CustomEvent('goilerplate:docs:navigated'));
+						document.dispatchEvent(new CustomEvent('moin:docs:navigated'));
 					}
 				});
 
@@ -320,7 +320,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 				}
 
 				// Update active states after partial navigation.
-				document.addEventListener('goilerplate:docs:navigated', () => {
+				document.addEventListener('moin:docs:navigated', () => {
 					const currentPath = window.location.pathname;
 					
 					// Update all sidebar menu buttons

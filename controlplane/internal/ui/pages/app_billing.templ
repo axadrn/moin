@@ -141,9 +141,6 @@ templ billingOffer(plan access.Plan, basePath string) {
 				<p class="text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
 			</form>
 			@planBenefits(plan)
-			<p class="text-sm text-muted-foreground">
-				<span class="font-medium text-foreground">goilerplate buyers:</span> 50% off forever. Your code arrives by email in the next days.
-			</p>
 		</div>
 		<script nonce={ templ.GetNonce(ctx) }>
 			(function() {

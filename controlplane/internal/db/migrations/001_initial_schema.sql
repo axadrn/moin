@@ -1,5 +1,5 @@
 -- +goose Up
--- Initial database schema for goilerplate
+-- Initial database schema for moin
 -- Compatible with both PostgreSQL and SQLite
 
 -- ============================================================================

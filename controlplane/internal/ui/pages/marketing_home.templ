@@ -93,8 +93,6 @@ func homeStartLabel(ctx context.Context) string {
 	}
 }
 
-// homeGoilerplateGuide is the goilerplate guide for deploying with moin.
-const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-ops?ref=moin-landing"
 
 // ---------------------------------------------------------------- hero
 // HomeHero is the promise in two lines, one line under it, two buttons,
@@ -788,7 +786,7 @@ templ HomePricing() {
 					</ul>
 				}
 			</div>
-			<p class={ typeText, "mt-8 text-center" } data-one-price>No tiers, no per-server fees. Beta price, yours to keep. goilerplate buyers save 50%.</p>
+			<p class={ typeText, "mt-8 text-center" } data-one-price>No tiers, no per-server fees. Beta price, yours to keep.</p>
 		</div>
 	</section>
 }
@@ -843,9 +841,6 @@ templ HomeFAQ() {
 				}
 				@homeQuestion("Do I need to know Docker?") {
 					No. For a Go app, { brand.Name } sets everything up. Have a Dockerfile already? It uses yours.
-				}
-				@homeQuestion("Built with goilerplate?") {
-					One command and it is live, with backups. And 50% off, forever. <a href={ templ.SafeURL(homeGoilerplateGuide) } target="_blank" rel="noopener" class="text-foreground underline underline-offset-4 hover:text-foreground">The guide</a>
 				}
 				@homeQuestion("What can I deploy?") {
 					Any app with a Dockerfile, or any Go app. If a new version fails, the old one keeps running.
