@@ -67,6 +67,9 @@ func (m model) showCatalogApp(slug string) tea.Cmd {
 			return errMsg{err}
 		}
 		lines := []string{entry.Pitch, style.Muted.Render(entry.Website + " · " + entry.License + " · " + entry.Image)}
+		if entry.DatabaseNote != "" {
+			lines = append(lines, entry.DatabaseNote)
+		}
 		if entry.Login != "" {
 			lines = append(lines, entry.Login)
 		}

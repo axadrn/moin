@@ -155,7 +155,10 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load the catalog: %w", err)
 	}
-	catalogService := service.NewCatalogService(catalog.NewStore(entries, catalog.NewRegistry()), appService)
+	catalogStore := catalog.NewStore(entries, catalog.NewRegistry())
+	catalogCache := repository.NewCatalogCache(history)
+	catalogStore.UseCache(catalog.Cache{Load: catalogCache.Load, Save: catalogCache.Save})
+	catalogService := service.NewCatalogService(catalogStore, appService)
 	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database, history), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
 	// The hosted plane posts alerts only to public addresses.
 	if cfg.Billing && !cfg.IsDevelopment() {

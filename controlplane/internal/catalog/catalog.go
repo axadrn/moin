@@ -30,13 +30,18 @@ type Entry struct {
 	License string
 	// Image is the image the version picks the tag of, without a tag.
 	Image string
-	// Database is postgres, sqlite or empty: what ops backs up.
+	// Database is the app's database: postgres and sqlite, which ops backs
+	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
+	// for none.
 	Database string
 	// Port is what the app listens on.
 	Port int
 	// Filter picks the tags that are releases; empty takes x.y.z, with or
 	// without a v.
 	Filter *regexp.Regexp
+	// Stable is a channel tag, such as stable: releases newer than the one
+	// it names are betas and stay out. Docker Hub only.
+	Stable string
 	// Login says how to sign in the first time, if the app has a default.
 	Login string
 	// Body is the description as HTML.
@@ -48,7 +53,7 @@ type Entry struct {
 }
 
 // Categories in the order the catalog shows them.
-var Categories = []string{"Analytics", "Automation", "Monitoring", "Security", "Developer tools", "Marketing", "Productivity"}
+var Categories = []string{"Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
 
 var (
 	slugPattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
@@ -62,6 +67,16 @@ var (
 // VersionVar is the env var that holds the version: compose.yml uses it as
 // the image tag.
 const VersionVar = "VERSION"
+
+// URLVar is the app's own address, https://<its domain>, which ops sets on
+// install for an app whose compose.yml uses it: links, redirects and
+// cookies of such an app need it, so it needs a domain.
+const URLVar = "APP_URL"
+
+// NeedsURL reports whether the app needs its own address, and so a domain.
+func (e Entry) NeedsURL() bool {
+	return strings.Contains(string(e.Compose), "${"+URLVar+"}")
+}
 
 // Load reads every entry under dir, sorted by name.
 func Load(dir string) ([]Entry, error) {
@@ -104,7 +119,7 @@ func loadEntry(parser *markdown.Parser, dir, slug string) (Entry, error) {
 	entry := Entry{
 		Slug: slug, Name: text("name"), Pitch: text("pitch"), Category: text("category"),
 		Website: text("website"), Source: text("source"), License: text("license"),
-		Image: text("image"), Database: text("database"), Login: text("login"),
+		Image: text("image"), Database: text("database"), Login: text("login"), Stable: text("stable"),
 		Body: template.HTML(body),
 	}
 	switch port := meta["port"].(type) {
@@ -146,8 +161,8 @@ func (e Entry) validate() error {
 		return fmt.Errorf("image %q is not an image without a tag", e.Image)
 	case !strings.Contains(string(e.Compose), e.Image+":${"+VersionVar+"}"):
 		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, VersionVar)
-	case e.Database != "" && e.Database != "postgres" && e.Database != "sqlite":
-		return errors.New("database is postgres, sqlite or empty")
+	case e.Database != "" && databaseNames[e.Database] == "":
+		return errors.New("database is postgres, sqlite, mysql, mongodb, clickhouse or empty")
 	case e.Port <= 0 || e.Port > 65535:
 		return errors.New("port is required")
 	case !strings.HasPrefix(e.Website, "https://"):
@@ -156,13 +171,36 @@ func (e Entry) validate() error {
 	return nil
 }
 
+// databaseNames are the databases an entry may name, as people write them.
+var databaseNames = map[string]string{
+	"postgres": "Postgres", "sqlite": "SQLite",
+	"mysql": "MySQL", "mongodb": "MongoDB", "clickhouse": "ClickHouse",
+}
+
+// BackedUp reports whether ops backs up the app's database.
+func (e Entry) BackedUp() bool {
+	return e.Database == "postgres" || e.Database == "sqlite"
+}
+
+// DatabaseName is the app's database as people write it, such as MySQL.
+func (e Entry) DatabaseName() string { return databaseNames[e.Database] }
+
+// DatabaseNote says plainly what ops does with the app's database: empty
+// for one ops backs up or for no database, a sentence for the others.
+func (e Entry) DatabaseNote() string {
+	if e.Database == "" || e.BackedUp() {
+		return ""
+	}
+	return "Runs on " + e.DatabaseName() + ": ops doesn't back it up yet."
+}
+
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a
 // default, sorted: ops generates a value for each on install.
 func Secrets(compose []byte) []string {
 	var names []string
 	for _, match := range variablePattern.FindAllStringSubmatch(string(compose), -1) {
 		name, rest := match[1], match[2]
-		if name == VersionVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
+		if name == VersionVar || name == URLVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
 			continue
 		}
 		if !slices.Contains(names, name) {

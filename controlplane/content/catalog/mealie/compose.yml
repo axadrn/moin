@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 9000
+  health: /api/app/about
+
+services:
+  web:
+    image: ghcr.io/mealie-recipes/mealie:${VERSION}
+    environment:
+      ALLOW_SIGNUP: "false"
+    volumes:
+      - ./data:/app/data

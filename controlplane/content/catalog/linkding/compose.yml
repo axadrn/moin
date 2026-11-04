@@ -1,0 +1,13 @@
+x-ops:
+  service: web
+  port: 9090
+  health: /health
+
+services:
+  web:
+    image: sissbruecker/linkding:${VERSION}
+    environment:
+      LD_SUPERUSER_NAME: admin
+      LD_SUPERUSER_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - ./data:/etc/linkding/data

@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 5006
+  health: /
+
+services:
+  web:
+    image: actualbudget/actual-server:${VERSION}
+    volumes:
+      - ./data:/data

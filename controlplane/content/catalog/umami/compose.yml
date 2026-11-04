@@ -10,9 +10,15 @@ services:
       DATABASE_URL: postgresql://umami:${DB_PASSWORD}@db:5432/umami
       APP_SECRET: ${APP_SECRET}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
   db:
     image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
     environment:
       POSTGRES_USER: umami
       POSTGRES_PASSWORD: ${DB_PASSWORD}

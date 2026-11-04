@@ -1,0 +1,11 @@
+x-ops:
+  service: web
+  port: 4533
+  health: /ping
+
+services:
+  web:
+    image: deluan/navidrome:${VERSION}
+    volumes:
+      - ./data/navidrome:/data
+      - ./data/music:/music:ro

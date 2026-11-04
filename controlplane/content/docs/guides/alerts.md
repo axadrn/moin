@@ -57,8 +57,9 @@ Besides the mails, a workspace sends its alerts to up to 20 destinations. Each g
 | `backup.failed`, `backup.recovered` | backups of a database stop, and work again |
 | `drill.failed`, `drill.recovered` | the daily restore check fails, and passes again |
 | `disk.full`, `disk.ok` | a server's disk is over 90%, and under 85% again |
+| `update.available` | a newer release of an app from the [catalog](/docs/guides/catalog) is out, once per version |
 
-A destination that got every event before backup and disk alerts came gets the new ones too.
+A destination that got every event before new ones came gets the new ones too.
 
 Every member sees the destinations. Only **owners** and **admins** add, test and remove them.
 

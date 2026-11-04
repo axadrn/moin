@@ -1198,7 +1198,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name` or `fields.version`.'
+          description: '`validation_failed` with `fields.name`, `fields.version`, or `fields.domain` for an app that needs one.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -2870,7 +2870,7 @@ paths:
       tags: [Alerts]
       operationId: createAlertDestination
       summary: Add an alert destination
-      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full and disk.ok; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
+      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok and update.available; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
       requestBody:
         required: true
         content:
@@ -5191,7 +5191,7 @@ components:
           type: array
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok, update.available]
         failing:
           type: boolean
         failing_since:
@@ -5244,7 +5244,7 @@ components:
           description: Empty for all five.
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok, update.available]
     Registry:
       type: object
       required: [host, username, created_at]
@@ -5292,7 +5292,7 @@ components:
           description: When the registry got it. Null when the registry does not say, as on GHCR.
     CatalogEntry:
       type: object
-      required: [slug, name, pitch, category, website, source, license, image, database, port, login, secrets, latest]
+      required: [slug, name, pitch, category, website, source, license, image, database, database_note, port, login, needs_domain, secrets, latest]
       properties:
         slug:
           type: string
@@ -5313,12 +5313,18 @@ components:
           description: The image without a tag; VERSION is its tag.
         database:
           type: string
-          description: postgres or sqlite when ops backs up the app's database; empty otherwise.
+          description: postgres or sqlite, which ops backs up; mysql, mongodb or clickhouse, which it does not yet; empty for none.
+        database_note:
+          type: string
+          description: 'For a database ops does not back up, says so: "Runs on MySQL: ops doesn''t back it up yet." Empty otherwise.' 
         port:
           type: integer
         login:
           type: string
           description: How to sign in the first time, when the app has a default.
+        needs_domain:
+          type: boolean
+          description: The install needs a domain; ops sets APP_URL to https://<domain>.
         secrets:
           type: array
           items:

@@ -17,20 +17,24 @@ type CatalogVersion struct {
 // CatalogEntry is an open source app ops installs in one click. Versions
 // is only set by CatalogApp.
 type CatalogEntry struct {
-	Slug     string           `json:"slug"`
-	Name     string           `json:"name"`
-	Pitch    string           `json:"pitch"`
-	Category string           `json:"category"`
-	Website  string           `json:"website"`
-	Source   string           `json:"source"`
-	License  string           `json:"license"`
-	Image    string           `json:"image"`
-	Database string           `json:"database"`
-	Port     int              `json:"port"`
-	Login    string           `json:"login"`
-	Secrets  []string         `json:"secrets"`
-	Latest   *CatalogVersion  `json:"latest"`
-	Versions []CatalogVersion `json:"versions"`
+	Slug     string `json:"slug"`
+	Name     string `json:"name"`
+	Pitch    string `json:"pitch"`
+	Category string `json:"category"`
+	Website  string `json:"website"`
+	Source   string `json:"source"`
+	License  string `json:"license"`
+	Image    string `json:"image"`
+	Database string `json:"database"`
+	// DatabaseNote says when ops does not back up the app's database.
+	DatabaseNote string `json:"database_note"`
+	Port         int    `json:"port"`
+	Login        string `json:"login"`
+	// NeedsDomain says the install needs --domain.
+	NeedsDomain bool             `json:"needs_domain"`
+	Secrets     []string         `json:"secrets"`
+	Latest      *CatalogVersion  `json:"latest"`
+	Versions    []CatalogVersion `json:"versions"`
 }
 
 // CatalogInstall installs a catalog app; the empty fields take the newest

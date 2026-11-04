@@ -173,6 +173,15 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		}
 		message.URL = base + "/servers"
 		message.Payload.Server, message.Payload.Reason = target, details["used_percent"]+"% used"
+	case "update.available":
+		message.Symbol, message.Heading = "⬆️", details["catalog"]+" "+details["version"]+" is out for "+target
+		message.Lines = []string{
+			details["catalog"] + " " + details["version"] + " is out for " + target + " (you run " + details["current"] + "). Update in one click; ops backs up first.",
+			"Or run: ops update " + target,
+		}
+		message.URL = base + "/apps/" + target
+		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)
+		message.Payload.Reason = details["catalog"] + " " + details["version"] + ", runs " + details["current"]
 	case "disk.ok":
 		message.Symbol, message.Heading = "🟢", "Disk of "+target+" has room again"
 		message.Lines = []string{details["used"] + " of " + details["total"] + " used, " + details["used_percent"] + "%."}

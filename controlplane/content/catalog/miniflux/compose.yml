@@ -1,0 +1,30 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /healthcheck
+
+services:
+  web:
+    image: miniflux/miniflux:${VERSION}
+    environment:
+      DATABASE_URL: postgres://miniflux:${DB_PASSWORD}@db/miniflux?sslmode=disable
+      RUN_MIGRATIONS: "1"
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miniflux -d miniflux"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: miniflux
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: miniflux
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

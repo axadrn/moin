@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /
+
+services:
+  web:
+    image: stirlingtools/stirling-pdf:${VERSION}
+    environment:
+      DISABLE_ADDITIONAL_FEATURES: "true"
+    volumes:
+      - ./data/configs:/configs

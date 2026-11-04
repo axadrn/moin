@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 80
+  health: /
+
+services:
+  web:
+    image: freshrss/freshrss:${VERSION}
+    environment:
+      CRON_MIN: "*/20"
+    volumes:
+      - ./data:/var/www/FreshRSS/data

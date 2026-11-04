@@ -1,0 +1,35 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /
+
+services:
+  web:
+    image: docmost/docmost:${VERSION}
+    environment:
+      APP_URL: ${APP_URL}
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://docmost:${DB_PASSWORD}@db:5432/docmost?schema=public
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./data/storage:/app/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmost -d docmost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: docmost
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: docmost
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

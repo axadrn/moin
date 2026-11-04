@@ -2,6 +2,7 @@ package pages
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
@@ -27,57 +28,138 @@ import (
 templ Catalog(view CatalogView) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Self-host open source apps on your own server",
-		Description: "Umami, n8n, Vaultwarden, Gitea and more on your own server in one click. Their databases backed up, every change. Every release, the day it ships.",
+		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server in one click. Every version, updates with a backup first.",
 		Path:        "/apps",
 	}) {
 		<main class="pb-28 sm:pb-36">
 			<section class="pt-16 sm:pt-24">
 				<div class={ homeWrap, "flex flex-col items-center text-center" }>
-					<h1 class={ typeH1, "max-w-[16ch]" }>Your favorite apps. Your server.</h1>
+					<h1 class={ typeH1, "max-w-[16ch]" }>Apps, one click away.</h1>
 					<p class={ typeLead, "mt-6 max-w-xl sm:text-xl sm:leading-9" }>
-						Open source apps in one click. Their databases backed up, every change. Every release, the day it ships.
+						Install open-source apps on your server. Every version, updates with a backup first.
 					</p>
 				</div>
 			</section>
-			<div class={ homeWrap, "mt-14 sm:mt-20" }>
+			<div class={ homeWrap, "mt-12 sm:mt-16" }>
 				@catalogBody(view)
+				<p class={ typeText, "mt-12 text-center" } data-catalog-missing>
+					Missing one? Each app is one folder:
+					<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">add it with a pull request, or ask us</a>.
+				</p>
 			</div>
 		</main>
 	}
 }
 
-// catalogBody is the category filter and the grid, on the site and in the app.
+// catalogBody is the search, the order, the categories and the grid, on
+// the site and in the app. Category, search and order live in the URL, so
+// the page renders the same from a shared link; the search also filters
+// as you type.
 templ catalogBody(view CatalogView) {
 	{{ now := time.Now() }}
-	<nav class="flex max-w-full flex-wrap justify-center gap-1.5" aria-label="Categories" data-catalog-categories>
-		@catalogCategory(view.Base, "", "All", view.Category == "")
-		for _, category := range view.Categories {
-			@catalogCategory(view.Base, categorySlug(category), category, view.Category == category)
-		}
-	</nav>
-	<ul class="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list" data-catalog-grid>
-		for _, app := range view.Apps {
-			<li class="min-w-0">
-				@catalogCard(view.Base, app, now)
-			</li>
-		}
-	</ul>
+	{{ shown := 0 }}
+	<div class="flex min-w-0 flex-col gap-6" data-catalog data-base={ view.Base } data-category={ categorySlug(view.Category) } data-sort={ view.Sort }>
+		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+			<form method="get" action={ templ.SafeURL(view.Base) } class="w-full sm:max-w-sm" role="search">
+				if view.Category != "" {
+					<input type="hidden" name="category" value={ categorySlug(view.Category) }/>
+				}
+				if view.Sort == SortName {
+					<input type="hidden" name="sort" value={ SortName }/>
+				}
+				<label for="catalog-search" class="sr-only">Search apps</label>
+				@input.Input(input.Props{ID: "catalog-search", Name: "q", Type: "search", Value: view.Query, Placeholder: "Search apps", Class: "w-full", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "data-catalog-search": true}})
+			</form>
+			<nav class="flex shrink-0 gap-1 self-start rounded-full bg-muted p-1 sm:self-auto" aria-label="Order">
+				@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortUpdated), SortUpdated, "Recently updated", view.Sort != SortName)
+				@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortName), SortName, "Name A–Z", view.Sort == SortName)
+			</nav>
+		</div>
+		<nav class="flex max-w-full flex-wrap gap-1.5" aria-label="Categories" data-catalog-categories>
+			@catalogCategory(catalogURL(view.Base, "", view.Query, view.Sort), "", "All", view.Category == "")
+			for _, category := range view.Categories {
+				@catalogCategory(catalogURL(view.Base, category, view.Query, view.Sort), categorySlug(category), category, view.Category == category)
+			}
+		</nav>
+		<ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list" data-catalog-grid>
+			for _, app := range view.Apps {
+				{{ hit := catalogMatches(app, view.Query) }}
+				if hit {
+					{{ shown++ }}
+				}
+				<li class="min-w-0" hidden?={ !hit } data-search={ catalogSearchText(app) } data-name={ strings.ToLower(app.Entry.Name) } data-released={ releaseUnix(app) }>
+					@catalogCard(view.Base, app, now)
+				</li>
+			}
+		</ul>
+		<p class={ typeText, "text-center" } hidden?={ shown > 0 } data-catalog-empty>
+			No app called “<span class="text-foreground" data-catalog-query>{ view.Query }</span>” yet.
+			<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">Ask for it</a>
+		</p>
+	</div>
+	@catalogScript()
 }
 
-templ catalogCategory(base, slug, label string, active bool) {
-	{{ href := base }}
-	if slug != "" {
-		{{ href = base + "?category=" + slug }}
-	}
+templ catalogCategory(href, slug, label string, active bool) {
 	@button.Button(button.Props{
 		Href:       href,
 		Variant:    utils.IfElse(active, button.VariantSecondary, button.VariantGhost),
 		Size:       button.SizeSm,
 		Class:      utils.IfElse(active, "", "text-muted-foreground"),
-		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "page", "false")},
+		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "page", "false"), "data-catalog-category": slug},
 	}) {
 		{ label }
 	}
+}
+
+// catalogSort is one order of the segmented control.
+templ catalogSort(href, sort, label string, active bool) {
+	@button.Button(button.Props{
+		Href:       href,
+		Variant:    utils.IfElse(active, button.VariantDefault, button.VariantGhost),
+		Size:       button.SizeSm,
+		Class:      utils.IfElse(active, "", "text-muted-foreground"),
+		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "true", "false"), "data-catalog-sort": sort},
+	}) {
+		{ label }
+	}
+}
+
+// catalogScript filters the grid as you type and keeps the search in the
+// URL and in the links of the categories and orders.
+templ catalogScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const root = document.querySelector("[data-catalog]");
+			const search = root && root.querySelector("[data-catalog-search]");
+			if (!search) return;
+			const grid = root.querySelector("[data-catalog-grid]");
+			const empty = root.querySelector("[data-catalog-empty]");
+			const link = (category, sort, q) => {
+				const params = new URLSearchParams();
+				if (category) params.set("category", category);
+				if (q) params.set("q", q);
+				if (sort === "name") params.set("sort", "name");
+				const query = params.toString();
+				return root.dataset.base + (query ? "?" + query : "");
+			};
+			search.addEventListener("input", () => {
+				const q = search.value.trim();
+				const needle = q.toLowerCase();
+				let shown = 0;
+				for (const item of grid.children) {
+					item.hidden = needle !== "" && !item.dataset.search.includes(needle);
+					if (!item.hidden) shown++;
+				}
+				empty.hidden = shown > 0;
+				root.querySelector("[data-catalog-query]").textContent = q;
+				history.replaceState(null, "", link(root.dataset.category, root.dataset.sort, q));
+				for (const a of root.querySelectorAll("[data-catalog-category]")) a.href = link(a.dataset.catalogCategory, root.dataset.sort, q);
+				for (const a of root.querySelectorAll("[data-catalog-sort]")) a.href = link(root.dataset.category, a.dataset.catalogSort, q);
+			});
+			search.closest("form").addEventListener("submit", (event) => event.preventDefault());
+		})();
+	</script>
 }
 
 // catalogCard is one app in the grid: its tile, name, pitch, newest
@@ -100,7 +182,7 @@ templ catalogCard(base string, app CatalogEntryView, now time.Time) {
 						<span class="text-muted-foreground">{ note }</span>
 					}
 				}
-				if note := databaseNote(app.Entry.Database); note != "" {
+				if note := databaseBadge(app.Entry); note != "" {
 					@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "ml-auto h-auto rounded-full px-2.5 py-0.5 font-medium"}) {
 						{ note }
 					}
@@ -169,6 +251,9 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 								} else if view.Entry.Database == "sqlite" {
 									@catalogAdds("Every change of its SQLite in your bucket within a second, and restored to check it, every day.")
 								}
+								if note := view.Entry.DatabaseNote(); note != "" {
+									@catalogNote(note)
+								}
 								@catalogAdds("HTTPS on your domain, checked every minute, with an alert when it goes down.")
 								@catalogAdds("New releases the hour they ship. Update in one click, with a snapshot first.")
 								@catalogAdds("Secrets made for you, encrypted, never in a file.")
@@ -194,6 +279,17 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 			</div>
 		</main>
 	}
+}
+
+// catalogNote is a plain fact ops cannot promise yet, in the same calm
+// form as what it adds.
+templ catalogNote(text string) {
+	<li class="flex gap-3 text-base leading-7" data-catalog-database-note>
+		<span class="mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+			@icon.Minus(icon.Props{Class: "size-3 stroke-3"})
+		</span>
+		<span class="text-muted-foreground">{ text }</span>
+	</li>
 }
 
 templ catalogAdds(text string) {
@@ -251,6 +347,9 @@ templ CatalogInstall(view CatalogInstallView) {
 				<div class="min-w-0">
 					<h1 class="text-2xl font-semibold tracking-[-0.02em]">{ entry.Name }</h1>
 					<p class="mt-1 text-muted-foreground">{ entry.Pitch }</p>
+					if note := entry.DatabaseNote(); note != "" {
+						<p class="mt-2 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
+					}
 				</div>
 			</div>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
@@ -315,11 +414,19 @@ templ CatalogInstall(view CatalogInstallView) {
 							}
 							@field.Field(field.Props{Class: "gap-1.5"}) {
 								@field.Label(field.LabelProps{For: "catalog-domain"}) {
-									Domain, optional
+									if entry.NeedsURL() {
+										Domain
+									} else {
+										Domain, optional
+									}
 								}
 								@input.Input(input.Props{ID: "catalog-domain", Name: "domain", Type: "text", Placeholder: entry.Slug + ".example.com", Class: "font-mono placeholder:font-sans", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": "catalog-domain-hint"}})
 								@fieldHint("catalog-domain", "") {
-									Point its DNS to the server. Add or change it later on the app page.
+									if entry.NeedsURL() {
+										{ entry.Name } needs one: its links and sign-in point to it. Point its DNS to the server first.
+									} else {
+										Point its DNS to the server. Add or change it later on the app page.
+									}
 								}
 							}
 							<div>
@@ -354,7 +461,11 @@ templ CatalogUpdate(view CatalogUpdateView) {
 							<p class="font-semibold">{ view.Entry.Name } { view.Version }</p>
 						}
 						<p class="text-sm text-muted-foreground">
-							Runs { view.Version }, from the catalog. An update snapshots its database first.
+							if note := view.Entry.DatabaseNote(); note != "" {
+								Runs { view.Version }, from the catalog. <span data-catalog-database-note>{ note }</span>
+							} else {
+								Runs { view.Version }, from the catalog. An update snapshots its database first.
+							}
 						</p>
 					</div>
 				</div>

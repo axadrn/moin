@@ -20,6 +20,42 @@ import (
 type Version struct {
 	Tag  string    `json:"tag"`
 	Date time.Time `json:"date,omitzero"`
+	// Digest is the image the tag names, where the registry says; a
+	// channel tag like stable shares it with its version.
+	Digest string `json:"-"`
+}
+
+// UpToChannel drops the releases newer than the one the channel tag, such
+// as stable, names: a project that tags its betas like releases keeps them
+// out. Without the channel among tags, releases stay as they are.
+func UpToChannel(releases, tags []Version, channel string) []Version {
+	digest := ""
+	for _, tag := range tags {
+		if tag.Tag == channel {
+			digest = tag.Digest
+		}
+	}
+	if channel == "" || digest == "" {
+		return releases
+	}
+	newest := ""
+	for _, release := range releases {
+		for _, tag := range tags {
+			if tag.Tag == release.Tag && tag.Digest == digest && (newest == "" || Compare(release.Tag, newest) > 0) {
+				newest = release.Tag
+			}
+		}
+	}
+	if newest == "" {
+		return releases
+	}
+	var kept []Version
+	for _, release := range releases {
+		if Compare(release.Tag, newest) <= 0 {
+			kept = append(kept, release)
+		}
+	}
+	return kept
 }
 
 // Releases keeps the tags filter takes and sorts them newest first, by
@@ -98,6 +134,7 @@ func (r Registry) hub(ctx context.Context, repo string) ([]Version, error) {
 			Next    string `json:"next"`
 			Results []struct {
 				Name          string    `json:"name"`
+				Digest        string    `json:"digest"`
 				LastUpdated   time.Time `json:"last_updated"`
 				TagLastPushed time.Time `json:"tag_last_pushed"`
 			} `json:"results"`
@@ -111,7 +148,7 @@ func (r Registry) hub(ctx context.Context, repo string) ([]Version, error) {
 			if date.IsZero() {
 				date = result.LastUpdated
 			}
-			tags = append(tags, Version{Tag: result.Name, Date: date})
+			tags = append(tags, Version{Tag: result.Name, Date: date, Digest: result.Digest})
 		}
 		next = body.Next
 		// Only follow pages on Docker Hub itself.

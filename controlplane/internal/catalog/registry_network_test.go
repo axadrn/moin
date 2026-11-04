@@ -25,7 +25,7 @@ func TestRealRegistries(t *testing.T) {
 			t.Errorf("%s: %v", entry.Slug, err)
 			continue
 		}
-		releases := Releases(tags, entry.Filter)
+		releases := UpToChannel(Releases(tags, entry.Filter), tags, entry.Stable)
 		if len(releases) == 0 {
 			t.Errorf("%s: no releases among %d tags", entry.Slug, len(tags))
 			continue

@@ -22,6 +22,7 @@ var AlertKinds = []string{AlertSlack, AlertDiscord, AlertTelegram, AlertWebhook}
 var AlertEvents = []string{
 	"uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed",
 	"backup.failed", "backup.recovered", "drill.failed", "drill.recovered", "disk.full", "disk.ok",
+	"update.available",
 }
 
 // AlertEventLabel names an alert event for people.
@@ -49,6 +50,8 @@ func AlertEventLabel(event string) string {
 		return "Disk almost full"
 	case "disk.ok":
 		return "Disk has room again"
+	case "update.available":
+		return "New version of a catalog app"
 	}
 	return event
 }

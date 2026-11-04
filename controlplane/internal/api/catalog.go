@@ -34,11 +34,17 @@ type CatalogEntry struct {
 	Source   string `json:"source"`
 	License  string `json:"license"`
 	Image    string `json:"image"`
-	// Database is postgres or sqlite when the app keeps one ops backs up.
+	// Database is postgres or sqlite, which ops backs up, or mysql,
+	// mongodb or clickhouse, which it does not yet.
 	Database string `json:"database"`
-	Port     int    `json:"port"`
+	// DatabaseNote says so for a database ops does not back up; empty
+	// otherwise.
+	DatabaseNote string `json:"database_note"`
+	Port         int    `json:"port"`
 	// Login says how to sign in the first time.
 	Login string `json:"login"`
+	// NeedsDomain says the install needs a domain: ops sets APP_URL from it.
+	NeedsDomain bool `json:"needs_domain"`
 	// Secrets are the env vars ops generates on install.
 	Secrets  []string         `json:"secrets"`
 	Latest   *CatalogVersion  `json:"latest"`
@@ -85,7 +91,7 @@ func NewCatalogEntry(store *catalog.Store, entry catalog.Entry, withVersions boo
 	out := CatalogEntry{
 		Slug: entry.Slug, Name: entry.Name, Pitch: entry.Pitch, Category: entry.Category,
 		Website: entry.Website, Source: entry.Source, License: entry.License, Image: entry.Image,
-		Database: entry.Database, Port: entry.Port, Login: entry.Login, Secrets: entry.Secrets,
+		Database: entry.Database, DatabaseNote: entry.DatabaseNote(), NeedsDomain: entry.NeedsURL(), Port: entry.Port, Login: entry.Login, Secrets: entry.Secrets,
 	}
 	if out.Secrets == nil {
 		out.Secrets = []string{}

@@ -1,0 +1,14 @@
+x-ops:
+  service: web
+  port: 80
+  health: /v1/health
+
+services:
+  web:
+    image: binwiederhier/ntfy:${VERSION}
+    command: serve
+    environment:
+      NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+      NTFY_BEHIND_PROXY: "true"
+    volumes:
+      - ./data:/var/cache/ntfy

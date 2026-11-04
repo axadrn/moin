@@ -44,6 +44,10 @@ type AppRepository interface {
 	SetProtect(appID, protect string) error
 	SetStopped(appID string, stopped bool) error
 	SetCatalog(appID, slug string) error
+	// CatalogApps are the apps of every workspace installed from the
+	// catalog entry slug.
+	CatalogApps(slug string) ([]model.App, error)
+	SetCatalogNotified(appID, version string) error
 
 	ByDeployHookHash(hash string) (*model.App, error)
 	SetDeployHookHash(appID, hash string) error
@@ -279,6 +283,17 @@ func (r *appRepository) SetProtect(appID, protect string) error {
 }
 
 // SetStopped marks the app as stopped by its owner, or as running again.
+func (r *appRepository) CatalogApps(slug string) ([]model.App, error) {
+	apps := []model.App{}
+	err := r.db.Select(&apps, appSelect+` WHERE a.catalog = $1 ORDER BY a.created_at`, slug)
+	return apps, err
+}
+
+func (r *appRepository) SetCatalogNotified(appID, version string) error {
+	_, err := r.db.Exec(`UPDATE apps SET catalog_notified = $1 WHERE id = $2`, version, appID)
+	return err
+}
+
 func (r *appRepository) SetCatalog(appID, slug string) error {
 	_, err := r.db.Exec(`UPDATE apps SET catalog = $1 WHERE id = $2`, slug, appID)
 	return err

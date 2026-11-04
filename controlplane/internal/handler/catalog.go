@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/axadrn/ops/controlplane/internal/catalog"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
@@ -39,11 +40,18 @@ func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 		}
 	}
 	view.Category = pages.CategoryFromSlug(r.URL.Query().Get("category"), view.Categories)
-	for _, entry := range store.Entries() {
-		if view.Category == "" || entry.Category == view.Category {
-			view.Apps = append(view.Apps, pages.CatalogEntryView{Entry: entry, Versions: store.Versions(entry.Slug)})
-		}
+	view.Query = strings.TrimSpace(r.URL.Query().Get("q"))
+	view.Sort = pages.SortUpdated
+	if r.URL.Query().Get("sort") == pages.SortName {
+		view.Sort = pages.SortName
 	}
+	var all []pages.CatalogEntryView
+	for _, entry := range store.Entries() {
+		all = append(all, pages.CatalogEntryView{Entry: entry, Versions: store.Versions(entry.Slug)})
+	}
+	// Every app of the category stays in the page: the search hides
+	// the others, so clearing it brings them back without a reload.
+	view.Apps = pages.FilterCatalog(all, view.Category, "", view.Sort)
 	return view
 }
 

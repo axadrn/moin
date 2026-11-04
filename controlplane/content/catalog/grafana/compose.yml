@@ -1,0 +1,14 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /api/health
+
+services:
+  web:
+    image: grafana/grafana:${VERSION}
+    user: "0"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      GF_SECURITY_SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - ./data:/var/lib/grafana

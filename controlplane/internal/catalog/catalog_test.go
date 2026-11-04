@@ -30,6 +30,9 @@ func TestEntries(t *testing.T) {
 		if entry.Database == "postgres" && !strings.Contains(string(entry.Compose), "image: postgres:") {
 			t.Errorf("%s: says postgres but runs none", entry.Slug)
 		}
+		if strings.Contains(string(entry.Compose), "image: postgres:") && (!strings.Contains(string(entry.Compose), "pg_isready") || !strings.Contains(string(entry.Compose), "condition: service_healthy")) {
+			t.Errorf("%s: its Postgres needs a pg_isready health check the app waits for", entry.Slug)
+		}
 		if strings.Contains(string(entry.Compose), "PASSWORD: ") && !strings.Contains(string(entry.Compose), "PASSWORD: ${") {
 			t.Errorf("%s: a password is written out", entry.Slug)
 		}
@@ -79,6 +82,23 @@ func TestReleases(t *testing.T) {
 	}
 	if Compare("v1.2.10", "1.2.9") <= 0 || Compare("2026.10.1", "2026.9.30") <= 0 || Compare("1.0.0", "1.0.0") != 0 {
 		t.Error("Compare orders wrong")
+	}
+}
+
+// TestUpToChannel: n8n tags its betas like releases; stable names 2.46.5,
+// so 2.47.0 and 3.1.0 stay out.
+func TestUpToChannel(t *testing.T) {
+	tags := []Version{{Tag: "3.1.0", Digest: "c"}, {Tag: "2.47.0", Digest: "b"}, {Tag: "next", Digest: "b"}, {Tag: "2.46.5", Digest: "a"}, {Tag: "stable", Digest: "a"}, {Tag: "2.46.4", Digest: "z"}}
+	releases := Releases(tags, nil)
+	var got []string
+	for _, release := range UpToChannel(releases, tags, "stable") {
+		got = append(got, release.Tag)
+	}
+	if want := []string{"2.46.5", "2.46.4"}; !slices.Equal(got, want) {
+		t.Errorf("UpToChannel = %v, want %v", got, want)
+	}
+	if len(UpToChannel(releases, tags, "")) != 4 || len(UpToChannel(releases, tags, "missing")) != 4 {
+		t.Error("without a channel the releases must stay")
 	}
 }
 

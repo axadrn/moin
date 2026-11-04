@@ -10,8 +10,10 @@ import (
 
 // historySchema is the whole of history.db: everything that is a chart over
 // time and grows back by itself. Metrics: a row per server or app and minute,
-// and one per hour. Uptime: a row per domain and hour. The file has no
-// migrations and no backup: lost, the charts start over, nothing else.
+// and one per hour. Uptime: a row per domain and hour. The releases of the
+// catalog apps, so a restart serves them at once. The file has no
+// migrations and no backup: lost, the charts start over and the releases
+// are read again, nothing else.
 const historySchema = `
 CREATE TABLE IF NOT EXISTS metrics_minutes (
     target TEXT NOT NULL,
@@ -48,6 +50,11 @@ CREATE TABLE IF NOT EXISTS uptime_hours (
     PRIMARY KEY (app_id, domain, hour)
 );
 CREATE INDEX IF NOT EXISTS idx_uptime_hours_hour ON uptime_hours(hour);
+CREATE TABLE IF NOT EXISTS catalog_versions (
+    slug TEXT PRIMARY KEY,
+    versions TEXT NOT NULL,
+    checked_at INTEGER NOT NULL
+);
 `
 
 // HistoryConnection is history.db next to the database of connection. A

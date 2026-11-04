@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strconv"
@@ -18,6 +19,7 @@ var (
 	ErrCatalogApp     = errors.New("the catalog has no such app")
 	ErrCatalogVersion = errors.New("this version is not a release of the app: pick one from its list")
 	ErrNotCatalog     = errors.New("this app was not installed from the catalog")
+	ErrCatalogDomain  = errors.New("this app needs a domain: its links and sign-in point to it")
 	// versionPattern is what an image tag may be.
 	versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 )
@@ -32,7 +34,53 @@ type CatalogService struct {
 }
 
 func NewCatalogService(store *catalog.Store, apps *AppService) *CatalogService {
-	return &CatalogService{store: store, apps: apps}
+	service := &CatalogService{store: store, apps: apps}
+	store.OnRefresh = service.CheckUpdates
+	return service
+}
+
+// Run reads the releases of the catalog until ctx ends; each new one
+// checks the installed apps for an update.
+func (s *CatalogService) Run(ctx context.Context) {
+	s.store.Run(ctx)
+}
+
+// CheckUpdates records update.available for every app installed from slug
+// that runs an older release than the newest, once per release: the alert
+// goes out with it. The release it went out for stays with the app, so a
+// restart never sends it twice.
+func (s *CatalogService) CheckUpdates(slug string) {
+	entry, ok := s.store.Entry(slug)
+	if !ok {
+		return
+	}
+	latest, ok := s.store.Latest(slug)
+	if !ok {
+		return
+	}
+	apps, err := s.apps.apps.CatalogApps(slug)
+	if err != nil {
+		slog.Error("catalog: list installed apps failed", "app", slug, "error", err)
+		return
+	}
+	for _, app := range apps {
+		if app.CatalogNotified == latest.Tag {
+			continue
+		}
+		env, err := s.apps.Env(app.WorkspaceID, app.ID)
+		if err != nil {
+			continue
+		}
+		current := env[catalog.VersionVar]
+		if current == "" || catalog.Compare(latest.Tag, current) <= 0 {
+			continue
+		}
+		if err := s.apps.apps.SetCatalogNotified(app.ID, latest.Tag); err != nil {
+			slog.Error("catalog: store the notified release failed", "app_id", app.ID, "error", err)
+			continue
+		}
+		s.apps.servers.record(System(app.WorkspaceID), "update.available", "app", app.Name, map[string]string{"catalog": entry.Name, "version": latest.Tag, "current": current})
+	}
 }
 
 // Store is the catalog: its entries and their releases.
@@ -65,6 +113,10 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	if err != nil {
 		return nil, nil, err
 	}
+	domain := strings.ToLower(strings.TrimSpace(input.Domain))
+	if entry.NeedsURL() && domain == "" {
+		return nil, nil, ErrCatalogDomain
+	}
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		name = entry.Slug
@@ -96,11 +148,14 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	for _, name := range entry.Secrets {
 		env[name] = newSecret()
 	}
+	if entry.NeedsURL() {
+		env[catalog.URLVar] = "https://" + domain
+	}
 	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
 	if err != nil {
 		return app, nil, err
 	}
-	if domain := strings.TrimSpace(input.Domain); domain != "" {
+	if domain != "" {
 		_, _, err = s.apps.SetDomains(actor, app.ID, []string{domain}, "")
 		if err != nil {
 			return app, nil, err

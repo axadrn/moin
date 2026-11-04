@@ -1,0 +1,43 @@
+x-ops:
+  service: web
+  port: 5000
+  health: /
+
+services:
+  web:
+    image: ghcr.io/gitroomhq/postiz-app:${VERSION}
+    environment:
+      MAIN_URL: ${APP_URL}
+      FRONTEND_URL: ${APP_URL}
+      NEXT_PUBLIC_BACKEND_URL: ${APP_URL}/api
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://postiz:${DB_PASSWORD}@db:5432/postiz
+      REDIS_URL: redis://redis:6379
+      IS_GENERAL: "true"
+      STORAGE_PROVIDER: local
+      UPLOAD_DIRECTORY: /uploads
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
+    volumes:
+      - ./data/uploads:/uploads
+      - ./data/config:/config
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  redis:
+    image: redis:8
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postiz -d postiz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: postiz
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: postiz
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

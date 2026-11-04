@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 80
+  health: /
+
+services:
+  web:
+    image: kanboard/kanboard:${VERSION}
+    volumes:
+      - ./data:/var/www/app/data

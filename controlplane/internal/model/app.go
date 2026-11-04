@@ -36,6 +36,9 @@ type App struct {
 	// Catalog is the slug of the catalog entry the app was installed
 	// from, such as umami; empty for an app of your own.
 	Catalog string `db:"catalog"`
+	// CatalogNotified is the newest release an update.available alert
+	// went out for.
+	CatalogNotified string `db:"catalog_notified"`
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
 	BucketID      *string `db:"bucket_id"`

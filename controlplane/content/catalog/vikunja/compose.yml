@@ -1,0 +1,17 @@
+x-ops:
+  service: web
+  port: 3456
+  health: /api/v1/info
+
+services:
+  web:
+    image: vikunja/vikunja:${VERSION}
+    user: "0"
+    environment:
+      VIKUNJA_SERVICE_SECRET: ${SECRET}
+      VIKUNJA_CORS_ENABLE: "false"
+      VIKUNJA_DATABASE_TYPE: sqlite
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+    volumes:
+      - ./data/db:/db
+      - ./data/files:/app/vikunja/files

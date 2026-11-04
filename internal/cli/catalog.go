@@ -67,6 +67,10 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 		fmt.Fprintln(stdout, "Its Postgres: every change backed up, checked every day.")
 	case "sqlite":
 		fmt.Fprintln(stdout, "Its SQLite: every change backed up, checked every day.")
+	default:
+		if entry.DatabaseNote != "" {
+			fmt.Fprintln(stdout, entry.DatabaseNote)
+		}
 	}
 	if entry.Login != "" {
 		fmt.Fprintln(stdout, entry.Login)
@@ -92,6 +96,10 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 		if more := len(entry.Versions) - len(shown); more > 0 {
 			fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("and %d older", more)))
 		}
+	}
+	if entry.NeedsDomain {
+		hint(stdout, "It needs a domain. Install it with", build.Name+" catalog install "+entry.Slug+" --server <server> --domain <domain>")
+		return
 	}
 	hint(stdout, "Install it with", build.Name+" catalog install "+entry.Slug+" --server <server>")
 }
@@ -122,8 +130,11 @@ func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error 
 		return err
 	}
 	entry, err := api.CatalogApp(ctx, flags.Arg(0))
+	if err == nil && entry.DatabaseNote != "" {
+		fmt.Fprintln(stdout, "  "+entry.DatabaseNote)
+	}
 	if err == nil && entry.Login != "" {
-		hint(stdout, entry.Login, "")
+		fmt.Fprintln(stdout, "  "+entry.Login)
 	}
 	if *domain == "" {
 		hint(stdout, "Give it a domain with", build.Name+" domains add --app "+installed.App.Name+" <domain>")
