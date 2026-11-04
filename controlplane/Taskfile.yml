@@ -9,7 +9,7 @@ tasks:
       APP_URL: 'http://localhost:{{.DEV_PORT}}'
       PORT: '{{.APP_PORT}}'
     cmds:
-      - go tool templ generate --watch --log-level=warn --cmd="go run ./cmd/server/main.go" --proxy="http://localhost:{{.APP_PORT}}" --proxyport="{{.DEV_PORT}}" --proxybind="0.0.0.0" --open-browser="{{.OPEN_BROWSER}}"
+      - go tool templ generate --watch --log-level=warn --cmd="go run ./cmd/server" --proxy="http://localhost:{{.APP_PORT}}" --proxyport="{{.DEV_PORT}}" --proxybind="0.0.0.0" --open-browser="{{.OPEN_BROWSER}}"
 
   tailwind:
     desc: Watch Tailwind CSS changes

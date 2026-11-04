@@ -53,7 +53,7 @@ RUN mkdir -p downloads && \
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -ldflags "-X github.com/axadrn/ops/internal/build.Version=$VERSION" \
-      -o main ./cmd/server/main.go
+      -o main ./cmd/server
 
 # Deploy-Stage
 FROM alpine:3.24
