@@ -16,10 +16,18 @@ No. Builds run on your server. `moin deploy` puts your code into your own bucket
 
 - **No key to your servers.** Coolify Cloud and Dokploy Cloud keep an SSH key to your servers and connect in over SSH; Kamal does the same from your laptop. moin holds no SSH key: the agent on your server dials out, and your server needs no open port for moin. See [Security](/docs/guides/security).
 - **Your code and data stay yours.** Heroku, Render, Railway and Fly.io run your code and keep your volumes on their machines. With moin your apps run on your servers, your code goes through your own bucket and your backups live there too.
-- **Backups made for SQLite.** Every change copied about once a second, restore to any second of the last 7 days, and a restore check every day. Coolify, Dokploy, Render, Railway and Fly.io offer scheduled or daily backups and snapshots, without a daily restore check.
+- **Backups made for SQLite and Postgres.** Every SQLite change copied about once a second, every Postgres change within a minute, restore to any second of the last 7 days, and a restore check every day, all in your own bucket. Coolify and Dokploy back up on a schedule; Heroku, Render, Railway and Fly.io restore Postgres to a point in time on their side, and none of them checks a restore every day.
 - **One price.** Unlimited servers, apps and teammates per workspace. No tiers, no per-server fees. Or [host it yourself](/docs/self-hosting), free.
 
 The landing page has the full table, from each tool's own docs and pricing pages.
+
+## Do I need a domain?
+
+Not to start. After its first deploy every app answers at its [instant address](/docs/guides/domains#instant-address), such as `https://shop.203-0-113-7.sslip.io`, with HTTPS and a password in front until you open it. It needs ports 80 and 443, so a server behind a Cloudflare Tunnel gets none. Add your own domain when you are ready, one per service if you like.
+
+## Can I install apps like n8n or Umami?
+
+Yes: 47 open-source apps from the [catalog](/docs/guides/catalog), in one click. moin makes their secrets, backs up their database and tells you when a new release is out; an update takes a snapshot first.
 
 ## What happens when a deploy fails?
 

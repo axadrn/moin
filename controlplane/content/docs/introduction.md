@@ -4,7 +4,7 @@ description: "What moin is and how its pieces fit"
 order: 1
 ---
 
-moin deploys your apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. You use it from the browser, the `moin` CLI (commands you type), the `moin` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
+moin deploys your apps to servers you own, backs up every change of their SQLite or Postgres database to your own bucket, checks the restore every day and lets you edit the data live. You use it from the browser, the `moin` CLI (commands you type), the `moin` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
 
 New here? Read [How moin works in 2 minutes](#how-moin-works-in-2-minutes) below, then [Getting Started](/docs/getting-started).
 
@@ -14,10 +14,13 @@ moin is in beta: it works and runs real sites, and it keeps getting better fast,
 
 ## What it does
 
-- **Deploys**: `moin deploy` from a repo, a branch or commit from [GitHub](/docs/guides/github), or an image from [CI](/docs/guides/ci). Health checks, and the last good release starts again when a deploy fails.
-- **Backups**: every change of every SQLite database, continuously, into your bucket; a snapshot before every change; a restore drill every day. [Restore](/docs/guides/backups) a snapshot or any second of the last week.
-- **Data**: browse tables, edit rows and run SQL on the live database. [Reads can never change a row](/docs/guides/data).
-- **Domains**: HTTPS, www redirects and a password in front, in seconds. [Domains and access](/docs/guides/domains).
+- **Deploys**: `moin deploy` from a repo, a branch or commit from [GitHub](/docs/guides/github), or an image from [CI](/docs/guides/ci). No Dockerfile needed: moin builds Node, Bun, Python, Ruby, PHP, Go and more. Health checks, and the last good release starts again when a deploy fails. [Deploy](/docs/guides/deploy).
+- **Catalog**: 47 open-source apps in one click, such as n8n, Umami and Open WebUI, with an alert when a new release is out and a snapshot before each update. [Catalog](/docs/guides/catalog).
+- **Backups**: every change of every SQLite and Postgres database, continuously, into your bucket; a full copy before every change; a restore check every day. [Restore](/docs/guides/backups) a snapshot or any second of the last week.
+- **Data**: browse tables, edit rows and run SQL on the live database, SQLite or Postgres. [Reads can never change a row](/docs/guides/data).
+- **Domains**: every app online at once at an [instant address](/docs/guides/domains#instant-address) with HTTPS and a password, then your own domains, one per service if you like. [Domains and access](/docs/guides/domains).
+- **Run a command** in an app's container, without SSH: migrations, the first admin. [Run a command](/docs/guides/exec).
+- **Watch**: [uptime checks](/docs/guides/uptime) every minute, [metrics](/docs/guides/metrics), [alerts](/docs/guides/alerts) by email, Slack, Discord, Telegram or webhook, and an [overview](/docs/guides/overview) that says whether everything is OK.
 - **Security**: a Cloudflare Tunnel instead of open ports, SSH only on Tailscale, a firewall. [No open port](/docs/guides/security).
 - **Activity log**: who changed what, to the second, from the web, the CLI, an agent or GitHub. Never your secrets or your data. [See what it records](/docs/guides/activity).
 
@@ -43,7 +46,8 @@ moin is in beta: it works and runs real sites, and it keeps getting better fast,
 - **domain**: the address people type to reach your app, such as shop.example.com. moin gives it HTTPS.
 - **bucket**: your own storage box, for example at Cloudflare R2. One per workspace, or one per client or region: each app picks one, the default serves the rest. It holds your code on its way to the server and your backups. moin never stores either.
 - **SQLite**: a database that lives in one file next to your app, such as `/data/app.db`. moin finds it, backs it up and lets you edit it.
-- **backup**: every change of your app's SQLite database, copied to your bucket about once a second.
+- **Postgres**: a database server that runs as a service of your app. moin finds it in your compose.yml, backs it up and lets you edit it, like SQLite.
+- **backup**: every change of your app's database, copied to your bucket: about once a second for SQLite, within a minute for Postgres.
 - **snapshot**: a full copy of the database at one moment, like a photo. moin takes one before every deploy, restore and data change.
 - **restore**: puts the database back to a snapshot, or to any second of the last 7 days.
 - **team members and roles**: the people in your workspace. Members deploy and fix things. Admins also invite people and change their roles. The owner also pays and decides who else is an owner.

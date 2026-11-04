@@ -89,7 +89,7 @@ MCP: create_app
 3. Tags the built images per deploy, sets the env vars and `restart: unless-stopped`.
 4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 5 seconds later.
 5. Calls the health path, if x-moin sets one, until it answers below 500.
-6. Reports the SQLite databases it finds on the app's volumes, for the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups).
+6. Reports the SQLite databases it finds on the app's volumes and the Postgres services in its compose file, for the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups).
 
 If the start fails, the previous release starts again and the deploy is marked **failed**. Its log ends with the last lines of the service that stopped.
 
