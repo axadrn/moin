@@ -28,8 +28,12 @@ func (s *EmailService) SendForgotPasswordEmail(email, token, name string) error 
 }
 
 func (s *EmailService) SendMagicLinkEmail(email, token, name string) error {
-	magicURL := fmt.Sprintf("%s/auth/magic-link/%s", s.appURL, token)
-	return s.send("magic_link", email, magicLinkEmailTemplate(magicURL, s.appName))
+	return s.send("magic_link", email, magicLinkEmailTemplate(s.MagicLinkURL(token), s.appName))
+}
+
+// MagicLinkURL is the sign-in link of a magic link token.
+func (s *EmailService) MagicLinkURL(token string) string {
+	return fmt.Sprintf("%s/auth/magic-link/%s", s.appURL, token)
 }
 
 func (s *EmailService) SendWelcomeEmail(email, name string) error {

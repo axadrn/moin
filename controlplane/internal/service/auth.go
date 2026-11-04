@@ -531,72 +531,78 @@ func (s *AuthService) RemovePassword(userID string) error {
 // If user exists → sends magic link for login
 // If user is new → creates account and sends magic link for verification + first login
 func (s *AuthService) SendMagicLink(email string) error {
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	// Validate email
-	err := validation.ValidateEmail(email)
+	user, magicToken, err := s.magicLink(email)
 	if err != nil {
-		return ErrInvalidEmail
+		return err
 	}
-
-	// Check if user exists
-	user, err := s.userRepository.ByEmail(email)
-	if err != nil {
-		if err := s.mayCreate(email); err != nil {
-			return err
-		}
-		// User doesn't exist. Create new passwordless account
-		now := time.Now()
-		userID := uuid.New().String()
-
-		user = &model.User{
-			ID:        userID,
-			Email:     email,
-			CreatedAt: now,
-			// password_hash is NULL for passwordless accounts
-		}
-
-		err = s.userRepository.Create(user)
-		if err != nil {
-			return fmt.Errorf("failed to create user: %w", err)
-		}
-
-		slog.Info("new passwordless user created", "user_id", userID)
-	}
-
-	// Delete any existing magic link tokens for this user
-	err = s.tokenRepository.DeleteByUserAndType(user.ID, model.TokenTypeMagicLink)
-	if err != nil {
-		slog.Warn("failed to delete old magic link tokens", "error", err, "user_id", user.ID)
-	}
-
-	// Generate magic link token
-	magicToken, err := s.GenerateToken()
-	if err != nil {
-		return fmt.Errorf("failed to generate token: %w", err)
-	}
-
-	// Save token to database
-	token := &model.Token{
-		UserID:    user.ID,
-		Type:      model.TokenTypeMagicLink,
-		TokenHash: hashToken(magicToken),
-		ExpiresAt: time.Now().Add(s.tokenMagicLinkExpiry),
-	}
-	err = s.tokenRepository.Create(token)
-	if err != nil {
-		return fmt.Errorf("failed to create token: %w", err)
-	}
-
-	// Send magic link email
 	err = s.emailService.SendMagicLinkEmail(user.Email, magicToken, user.Name)
 	if err != nil {
 		slog.Error("failed to send magic link email", "error", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
-
 	slog.Info("magic link sent")
 	return nil
+}
+
+// SignInLink makes a sign-in link for email without sending it, for the
+// operator of a control plane that has no email yet. Like a sent one, it
+// works once and expires.
+func (s *AuthService) SignInLink(email string) (string, error) {
+	_, magicToken, err := s.magicLink(email)
+	if err != nil {
+		return "", err
+	}
+	return s.emailService.MagicLinkURL(magicToken), nil
+}
+
+// EnsureUser returns the user of email, and creates a passwordless account
+// when there is none and email may sign up.
+func (s *AuthService) EnsureUser(email string) (*model.User, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if err := validation.ValidateEmail(email); err != nil {
+		return nil, ErrInvalidEmail
+	}
+	user, err := s.userRepository.ByEmail(email)
+	if err == nil {
+		return user, nil
+	}
+	if err := s.mayCreate(email); err != nil {
+		return nil, err
+	}
+	// password_hash stays NULL: a passwordless account.
+	user = &model.User{ID: uuid.New().String(), Email: email, CreatedAt: time.Now()}
+	if err := s.userRepository.Create(user); err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	slog.Info("new passwordless user created", "user_id", user.ID)
+	return user, nil
+}
+
+// magicLink replaces the magic link of email's user, creating the user
+// first when needed, and returns the raw token.
+func (s *AuthService) magicLink(email string) (*model.User, string, error) {
+	user, err := s.EnsureUser(email)
+	if err != nil {
+		return nil, "", err
+	}
+	err = s.tokenRepository.DeleteByUserAndType(user.ID, model.TokenTypeMagicLink)
+	if err != nil {
+		slog.Warn("failed to delete old magic link tokens", "error", err, "user_id", user.ID)
+	}
+	magicToken, err := s.GenerateToken()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	err = s.tokenRepository.Create(&model.Token{
+		UserID:    user.ID,
+		Type:      model.TokenTypeMagicLink,
+		TokenHash: hashToken(magicToken),
+		ExpiresAt: time.Now().Add(s.tokenMagicLinkExpiry),
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create token: %w", err)
+	}
+	return user, magicToken, nil
 }
 
 // SendForgotPasswordLink sends a forgot password link that will remove the password and log the user in

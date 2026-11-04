@@ -32,6 +32,17 @@ func main() {
 		logger.Errors("application stopped", err)
 		os.Exit(1)
 	}
+	// A word after the binary is a one-off task for the operator, run next
+	// to the server on the same database. Only its result goes to stdout.
+	if len(os.Args) > 1 {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
+		err = command(cfg, os.Args[1:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	logger.Init(logger.Load(cfg.IsDevelopment()))
 	err = run(cfg)
 	if err != nil {
@@ -53,7 +64,10 @@ func run(cfg *config.Config) error {
 			return err
 		}
 	} else if cfg.IsProduction() {
-		slog.Warn("database backup off: a dead server takes the database with it; set BACKUP_DATABASE=true")
+		slog.Warn("database backup off: a dead server takes the database with it; set S3_BUCKET and BACKUP_DATABASE=true")
+	}
+	if cfg.IsProduction() && cfg.CloudflareAccountID == "" {
+		slog.Warn("email off: sign-in links and invitations go to this log instead; set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, or print a sign-in link with ./main sign-in-link")
 	}
 	application, err := app.New(cfg)
 	if err != nil {

@@ -198,7 +198,9 @@ func Load() (*Config, error) {
 	// engines, unless its env says otherwise.
 	cfg.SignupsOpen = r.boolean("SIGNUPS_OPEN", cfg.Billing)
 	cfg.RobotsNoIndex = r.boolean("ROBOTS_NOINDEX", !cfg.Billing)
-	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction())
+	// Without a bucket there is nowhere to back up to: a self-hosted control
+	// plane starts without one and says so.
+	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction() && cfg.S3Bucket != "")
 	cfg.UptimeChecks = r.boolean("UPTIME_CHECKS", cfg.IsProduction())
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
@@ -282,7 +284,9 @@ func (c *Config) validate() []error {
 	}
 	if (c.CloudflareAccountID == "") != (c.CloudflareAPIToken == "") {
 		errs = append(errs, errors.New("email delivery requires both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN"))
-	} else if c.CloudflareAccountID == "" && !c.IsDevelopment() {
+	} else if c.CloudflareAccountID == "" && !c.IsDevelopment() && c.Billing {
+		// A self-hosted control plane may start without email: sign-in links
+		// go to its log, and ops-server sign-in-link prints one.
 		errs = append(errs, errors.New("CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required for email delivery outside development"))
 	}
 
@@ -292,7 +296,9 @@ func (c *Config) validate() []error {
 	if len(c.SecretsKey) != 32 {
 		errs = append(errs, errors.New("SECRETS_KEY must be 32 bytes in base64, for example from `openssl rand -base64 32`"))
 	}
-	{
+	// Files of the control plane and its own backup need a bucket; a
+	// self-hosted one starts without them.
+	if c.Billing || c.BackupDatabase {
 		required := []struct {
 			key   string
 			value string

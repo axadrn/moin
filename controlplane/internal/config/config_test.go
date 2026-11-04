@@ -22,6 +22,30 @@ func TestLoadAllowsMissingMailCredentialsOnlyInDevelopment(t *testing.T) {
 	}
 }
 
+// TestSelfHostedStartsWithoutEmailAndBucket: one command installs a
+// self-hosted control plane before its email and bucket exist. It starts,
+// keeps no backup of itself, and sends mail to the log; a bucket with
+// BACKUP_DATABASE=true needs its settings again.
+func TestSelfHostedStartsWithoutEmailAndBucket(t *testing.T) {
+	setCoreEnvironment(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("BILLING", "false")
+	t.Setenv("SECRETS_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	t.Setenv("S3_REGION", "")
+	t.Setenv("S3_BUCKET", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.BackupDatabase {
+		t.Error("BackupDatabase without a bucket")
+	}
+	t.Setenv("BACKUP_DATABASE", "true")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "S3_BUCKET") {
+		t.Errorf("backup without a bucket: Load() error = %v", err)
+	}
+}
+
 func TestLoadDefaultsSelectedDatabaseConnection(t *testing.T) {
 	setCoreEnvironment(t)
 	cfg, err := Load()
