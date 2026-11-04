@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/google/uuid"
 )
 
@@ -45,9 +46,10 @@ func RequestSource(ctx context.Context) Source {
 	if token := ctxkeys.APIToken(ctx); token != nil {
 		source.Token = token.Name
 		switch {
-		case strings.HasPrefix(client.UserAgent, "moin-cli/"), strings.HasPrefix(client.UserAgent, "ops-cli/"):
+		// A CLI of the old name says so in its user agent.
+		case strings.HasPrefix(client.UserAgent, build.Name+"-cli/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-cli/"):
 			source.Via = ViaCLI
-		case strings.HasPrefix(client.UserAgent, "moin-tui/"), strings.HasPrefix(client.UserAgent, "ops-tui/"):
+		case strings.HasPrefix(client.UserAgent, build.Name+"-tui/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-tui/"):
 			source.Via = ViaTUI
 		default:
 			source.Via = ViaAPI

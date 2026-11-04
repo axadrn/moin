@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -18,11 +19,7 @@ import (
 // 443, gets certificates from Let's Encrypt and sends HTTP to HTTPS. Apps
 // join its network and describe their routes with labels on the main
 // service.
-const (
-	proxyName    = "ops-traefik"
-	proxyNetwork = "ops-proxy"
-	proxyImage   = "traefik:v3.6"
-)
+const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
@@ -210,7 +207,7 @@ func serviceRouter(app, service string) string { return project(app) + "-svc-" +
 // ensureProxy starts the shared Traefik container when it does not run,
 // runs an older image or another mode. In direct mode it takes 80 and 443;
 // in tunnel mode it publishes no port and cloudflared reaches it on the
-// tunnel entrypoint. OPS_HTTP_PORT and OPS_HTTPS_PORT move it off 80 and
+// tunnel entrypoint. MOIN_HTTP_PORT and MOIN_HTTPS_PORT move it off 80 and
 // 443 for development.
 func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error {
 	mode := "direct"
@@ -227,22 +224,29 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	// updates reach every server. A label holds a hash of the flags.
 	flags := proxyFlags(mode)
 	setup := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(flags, "\n"))))[:12]
-	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \"ops.mode\"}} {{index .Config.Labels \"ops.setup\"}}", proxyName)
+	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \""+labelMode+"\"}} {{index .Config.Labels \""+labelSetup+"\"}}", proxyName)
 	if err == nil && strings.TrimSpace(running) == "true "+proxyImage+" "+mode+" "+setup {
 		return nil
 	}
 	if err == nil {
 		_, _ = a.output(ctx, "docker", "rm", "-f", proxyName)
 	}
+	// The proxy of the old name holds 80 and 443.
+	_, _ = a.output(ctx, "docker", "rm", "-f", legacyProxyName)
 	data := filepath.Join(filepath.Dir(a.dir), "traefik")
 	err = os.MkdirAll(data, 0o700)
 	if err != nil {
 		return err
 	}
 	args := []string{"run", "-d", "--name", proxyName, "--restart", "unless-stopped",
-		"--network", proxyNetwork, "--label", "ops.mode=" + mode, "--label", "ops.setup=" + setup}
+		"--network", proxyNetwork, "--label", labelMode + "=" + mode, "--label", labelSetup + "=" + setup}
+	if build.Legacy() {
+		// A Cloudflare Tunnel set up under the old name sends to the old
+		// container name.
+		args = append(args, "--network-alias", legacyProxyName)
+	}
 	if mode == "direct" {
-		httpPort, httpsPort := envOr("OPS_HTTP_PORT", "80"), envOr("OPS_HTTPS_PORT", "443")
+		httpPort, httpsPort := envOr("HTTP_PORT", "80"), envOr("HTTPS_PORT", "443")
 		logf("starting the proxy on ports %s and %s", httpPort, httpsPort)
 		args = append(args, "-p", httpPort+":80", "-p", httpsPort+":443")
 	} else {
@@ -255,7 +259,24 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	)
 	args = append(args, flags...)
 	_, err = a.output(ctx, "docker", args...)
-	return err
+	if err != nil {
+		return err
+	}
+	a.joinLegacyNetwork(ctx)
+	return nil
+}
+
+// joinLegacyNetwork puts the proxy on the network of the old name too,
+// while something still runs there: an app whose move failed, or a
+// control plane on the same server that has not moved yet.
+func (a *apps) joinLegacyNetwork(ctx context.Context) {
+	if !build.Legacy() {
+		return
+	}
+	if _, err := a.output(ctx, "docker", "network", "inspect", legacyProxyNetwork); err != nil {
+		return
+	}
+	_, _ = a.output(ctx, "docker", "network", "connect", "--alias", legacyProxyName, legacyProxyNetwork, proxyName)
 }
 
 // proxyFlags configures Traefik for the mode. In direct mode the HTTPS
@@ -285,7 +306,7 @@ func proxyFlags(mode string) []string {
 }
 
 func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
+	if value := build.Getenv(key); value != "" {
 		return value
 	}
 	return fallback

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/axadrn/moin/internal/build"
 	"io"
 	"net/http"
 	"net/url"
@@ -210,7 +211,7 @@ func (r Registry) getJSONPage(ctx context.Context, address, bearer string, into 
 		return "", err
 	}
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "moin-catalog")
+	request.Header.Set("User-Agent", build.Name+"-catalog")
 	if bearer != "" {
 		request.Header.Set("Authorization", "Bearer "+bearer)
 	}

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -691,6 +692,20 @@ func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io
 	}
 	if flags.NArg() > 0 {
 		return fmt.Errorf("unknown command %q. Run `%s help`", "agent "+flags.Arg(0), build.Name)
+	}
+	// An agent installed under the old name moves to the new one: first
+	// its unit, then its state. Neither failing stops the agent.
+	handed, err := agent.MoveUnit(ctx)
+	if err != nil {
+		slog.Error("move the agent to its new name", "error", err)
+	}
+	if handed || ctx.Err() != nil {
+		// systemd stops this process now; the new unit takes over.
+		<-ctx.Done()
+		return nil
+	}
+	if err := agent.MoveState(ctx, dir); err != nil {
+		slog.Error("move the agent's state to its new place", "error", err)
 	}
 	state, err := agent.LoadState(dir)
 	if err != nil {
