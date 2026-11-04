@@ -68,6 +68,17 @@ type AdminDashboard struct {
 	Metrics AdminMetrics      `json:"metrics"`
 	Users   AdminUserPage     `json:"users"`
 	Events  []AdminAuditEvent `json:"events"`
+	// Network is only on the hosted control plane.
+	Network *AdminNetwork `json:"network,omitempty"`
+}
+
+// AdminNetwork is everything moin runs: hosted and self-hosted.
+type AdminNetwork struct {
+	Deploys          int `json:"deploys"`
+	Apps             int `json:"apps"`
+	Servers          int `json:"servers"`
+	HostedWorkspaces int `json:"hosted_workspaces"`
+	SelfHosted       int `json:"self_hosted"`
 }
 
 // NewAdminDashboard converts the admin dashboard into its JSON shape.
@@ -99,7 +110,12 @@ func NewAdminDashboard(dashboard *model.AdminDashboard) AdminDashboard {
 			CreatedAt:   event.CreatedAt.UTC(),
 		})
 	}
+	var network *AdminNetwork
+	if n := dashboard.Network; n != nil {
+		network = &AdminNetwork{Deploys: n.Deploys, Apps: n.Apps, Servers: n.Servers, HostedWorkspaces: n.HostedWorkspaces, SelfHosted: n.SelfHosted}
+	}
 	return AdminDashboard{
+		Network: network,
 		Metrics: AdminMetrics{
 			Users:          dashboard.Metrics.Users,
 			VerifiedUsers:  dashboard.Metrics.VerifiedUsers,

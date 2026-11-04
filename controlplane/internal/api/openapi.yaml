@@ -6888,3 +6888,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminAuditEvent'
+        network:
+          description: Everything moin runs, hosted and self-hosted. Only on the hosted control plane.
+          type: object
+          required: [deploys, apps, servers, hosted_workspaces, self_hosted]
+          properties:
+            deploys: {type: integer}
+            apps: {type: integer}
+            servers: {type: integer}
+            hosted_workspaces: {type: integer}
+            self_hosted: {type: integer, description: Self-hosted control planes that reported in the last fifteen minutes.}

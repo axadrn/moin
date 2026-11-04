@@ -280,6 +280,8 @@ It stops the old control plane, copies `/etc/ops-controlplane` to `/etc/moin-con
 
 Until December 4, 2026 the old install keeps working without the move: `ghcr.io/axadrn/ops-controlplane` gets every release, `OPS_IMAGE` and `OPS_PULL` still work, and settings that point to `/run/ops-controlplane` still find their files.
 
+**The admin page.** `/admin` is for the addresses in `ADMIN_EMAILS` only: users, sessions, operator activity and **Update now**. Nobody else sees it. Your control plane counts only its own people; it never sees anyone else's.
+
 **A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://ops.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old address**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
 
 ## Move or rebuild

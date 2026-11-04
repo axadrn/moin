@@ -224,6 +224,11 @@ func New(cfg *config.Config) (*App, error) {
 		AlertService:     alertService,
 	}
 	initialized = true
+	if cfg.Billing {
+		// Self-hosted control planes report to the hosted one, so only it
+		// knows the whole network.
+		adminService.UseNetwork(application.TelemetryService.Network)
+	}
 	return application, nil
 }
 

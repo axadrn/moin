@@ -34,6 +34,8 @@ type AdminService struct {
 	users       repository.UserRepository
 	auth        *AuthService
 	adminEmails map[string]struct{}
+	// network, when set, counts what moin runs everywhere (UseNetwork).
+	network func() model.Network
 	// subscriptions and activity, when set, show and change who is free
 	// forever.
 	subscriptions repository.SubscriptionRepository
@@ -121,7 +123,8 @@ func (s *AdminService) Dashboard(user *model.User, session *model.Session, query
 			TotalPages: totalPages,
 			TotalUsers: total,
 		},
-		Events: events,
+		Events:  events,
+		Network: s.networkCounts(),
 	}, nil
 }
 
@@ -274,4 +277,18 @@ func (s *AdminService) adminActionEvent(actorUserID, action, targetType, targetI
 		Metadata:    "{}",
 		CreatedAt:   time.Now(),
 	}
+}
+
+// UseNetwork shows on the dashboard what moin runs everywhere: the hosted
+// control plane sets it, a self-hosted one has no network to show.
+func (s *AdminService) UseNetwork(network func() model.Network) {
+	s.network = network
+}
+
+func (s *AdminService) networkCounts() *model.Network {
+	if s.network == nil {
+		return nil
+	}
+	network := s.network()
+	return &network
 }

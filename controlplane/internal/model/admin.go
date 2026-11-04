@@ -48,6 +48,9 @@ type AdminDashboard struct {
 	Metrics AdminMetrics
 	Users   AdminUserPage
 	Events  []AdminAuditEvent
+	// Network is everything moin runs, hosted and self-hosted; only the
+	// hosted control plane has it, since self-hosted ones report to it.
+	Network *Network
 }
 
 type AdminAuditEvent struct {

@@ -38,6 +38,17 @@ templ AdminDashboardContent(data *model.AdminDashboard) {
 			@statCard("Paid", strconv.Itoa(data.Metrics.PaidWorkspaces), "")
 			@statCard("Sessions", strconv.Itoa(data.Metrics.ActiveSessions), "")
 		</dl>
+		if data.Network != nil {
+			@panel(panelProps{Title: "Network", Description: "Everything moin runs right now: this control plane and every self-hosted one that reported in the last fifteen minutes."}) {
+				<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
+					@statCard("Deploys", strconv.Itoa(data.Network.Deploys), "all time")
+					@statCard("Apps", strconv.Itoa(data.Network.Apps), "")
+					@statCard("Servers", strconv.Itoa(data.Network.Servers), "")
+					@statCard("Hosted workspaces", strconv.Itoa(data.Network.HostedWorkspaces), "")
+					@statCard("Self-hosted", strconv.Itoa(data.Network.SelfHosted), "control planes")
+				</dl>
+			}
+		}
 		@panel(panelProps{Title: "Users", Description: "Search accounts, revoke access, or inspect the product as a user."}) {
 			<div class="flex flex-col gap-6">
 				<form

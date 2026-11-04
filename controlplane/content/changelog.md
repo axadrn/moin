@@ -3,6 +3,26 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.21
+
+November 4, 2026
+
+**In short:** the site says everything moin does today: Postgres next to SQLite everywhere, a fair comparison with sources, and answers to the questions people ask now.
+
+### Changed
+- **Postgres everywhere it belongs**: the homepage, the comparison and the docs name Postgres next to SQLite, for backups to any second, the daily restore check and the data browser.
+- **A fairer comparison**: a new row for Postgres backups, every competitor fact from their own docs.
+- **Answers that are true today**: any language deploys without a Dockerfile, the catalog, instant addresses, `moin exec`, and alerts for backups, deploys and full disks.
+- **Roadmap**: what shipped moved to Now; MySQL backups are next.
+- **A new footer**: product, docs, open source and company, at a glance.
+- **Why moin**: its own section on the homepage, linked under the buttons.
+
+### Fixed
+- **Self-hosting commands**: the install URL and `git clone` pointed at the old repository name.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`.
+
 ## v1.0.0-beta.20
 
 November 4, 2026

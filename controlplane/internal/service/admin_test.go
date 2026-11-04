@@ -258,3 +258,33 @@ func hasAdminAuditAction(events []model.AdminAuditEvent, action string) bool {
 	}
 	return false
 }
+
+func TestDashboardShowsTheNetworkOnlyWhereItIsSet(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "network-operator", Email: "network@example.com", Verified: true})
+	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	admin := NewAdminService(repository.NewAdminRepository(database), repository.NewUserRepository(database), auth, []string{operator.User.Email})
+	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+
+	selfHosted, err := admin.Dashboard(operator.User, session, "", 1)
+	if err != nil {
+		t.Fatalf("Dashboard() error = %v", err)
+	}
+	if selfHosted.Network != nil {
+		t.Fatalf("a self-hosted dashboard shows a network: %+v", selfHosted.Network)
+	}
+
+	admin.UseNetwork(func() model.Network {
+		return model.Network{SelfHosted: 3, HostedWorkspaces: 7, Counts: model.Counts{Servers: 12, Apps: 40, Deploys: 1234}}
+	})
+	hosted, err := admin.Dashboard(operator.User, session, "", 1)
+	if err != nil {
+		t.Fatalf("Dashboard() error = %v", err)
+	}
+	if hosted.Network == nil || hosted.Network.Deploys != 1234 || hosted.Network.SelfHosted != 3 {
+		t.Fatalf("hosted network = %+v, want the counts", hosted.Network)
+	}
+}
