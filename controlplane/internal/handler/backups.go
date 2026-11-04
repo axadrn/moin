@@ -116,7 +116,7 @@ func (h *AppsHandler) AddBucket(w http.ResponseWriter, r *http.Request) {
 	}
 	h.renderBucket(w, r)
 	if bucket.Default {
-		toastDone(w, r, "Bucket added", "Backups and ops deploy of every app use it now.")
+		toastDone(w, r, "Bucket added", "Backups and moin deploy of every app use it now.")
 		return
 	}
 	toastDone(w, r, "Bucket added", "Pick it for an app on the app's Backups tab.")

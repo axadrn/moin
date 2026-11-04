@@ -160,7 +160,7 @@ templ settingsSubmit(label string) {
 
 templ SettingsNameSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Name", Docs: "/docs/guides/account#change-your-name", Description: "How your team sees you in ops and in the activity."}) {
+	@panel(panelProps{Title: "Name", Docs: "/docs/guides/account#change-your-name", Description: "How your team sees you in moin and in the activity."}) {
 		<form
 			class="flex flex-col gap-2 sm:flex-row"
 			hx-patch={ basePath + "/profile/name" }
@@ -304,7 +304,7 @@ templ SettingsPasswordSection() {
 
 templ SettingsDangerZoneSection() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@dangerPanel("Delete your account", "Your account, profile and API tokens are removed from ops. This cannot be undone.", "/docs/guides/account#delete-your-account") {
+	@dangerPanel("Delete your account", "Your account, profile and API tokens are removed from moin. This cannot be undone.", "/docs/guides/account#delete-your-account") {
 		@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
 			@button.Button(button.Props{Type: "button", Variant: button.VariantDestructive, Attributes: dialog.Trigger(ctx)}) {
 				Delete account

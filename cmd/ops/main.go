@@ -1,5 +1,5 @@
-// Command ops opens the TUI without arguments, runs a CLI command with them,
-// and runs the agent on a server with `ops agent`.
+// Command moin opens the TUI without arguments, runs a CLI command with them,
+// and runs the agent on a server with `moin agent`.
 package main
 
 import (

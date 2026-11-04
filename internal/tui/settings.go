@@ -327,7 +327,7 @@ func (m model) removeSetting(row settingRow) model {
 		name := row.bucket.Name
 		return m.confirmName("Remove the bucket "+name+"?", "What is in it stays. A bucket that apps use or that keeps older backups is refused.", name, m.done(func() error { return m.api.RemoveBucket(m.ctx, name) }, "Removed the bucket "+name+"; what is in it stays"))
 	case "cloudflare":
-		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it ops cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
+		return m.confirmFirst("Remove the Cloudflare token?", "Turn tunnels off first: without it moin cannot delete them in Cloudflare.", "remove", true, m.setKeys(&blank, nil))
 	case "tailscale":
 		return m.confirmFirst("Remove the Tailscale key?", "The next security change of a server opens SSH on every interface again.", "remove", true, m.setKeys(nil, &blank))
 	case "destination":

@@ -106,7 +106,7 @@ templ ServerSecurity(view SecurityView) {
 					}
 				</form>
 			}
-			@dangerPanel("Remove this server", utils.IfElse(view.Server.Online, "Remove its apps first. Then ops disconnects its agent, and the agent's token stops working. The next page shows the command that removes the agent there.", "It is offline, so its apps go with it. They stay on the server with their data if it comes back; remove them there with ops agent uninstall --apps. The agent's token stops working."), "/docs/guides/servers#remove-a-server") {
+			@dangerPanel("Remove this server", utils.IfElse(view.Server.Online, "Remove its apps first. Then moin disconnects its agent, and the agent's token stops working. The next page shows the command that removes the agent there.", "It is offline, so its apps go with it. They stay on the server with their data if it comes back; remove them there with moin agent uninstall --apps. The agent's token stops working."), "/docs/guides/servers#remove-a-server") {
 				@button.Button(button.Props{
 					Variant: button.VariantDestructive,
 					Attributes: templ.Attributes{
@@ -139,7 +139,7 @@ templ securityKeys(view SecurityView) {
 			</div>
 			<div class="flex flex-wrap justify-end gap-2">
 				if view.Integrations.Cloudflare {
-					@removeKeyButton(view.Server.ID, "cloudflare", "Remove Cloudflare token", "Remove the Cloudflare API token? Turn tunnels off first: without the token ops cannot delete them in Cloudflare.")
+					@removeKeyButton(view.Server.ID, "cloudflare", "Remove Cloudflare token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
 				}
 				if view.Integrations.Tailscale {
 					@removeKeyButton(view.Server.ID, "tailscale", "Remove Tailscale key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
@@ -290,7 +290,7 @@ func onValue(on bool) string {
 }
 
 // portsText is what is open to everyone. Without the firewall it is what
-// ops itself listens on; any other service on the server is open too.
+// moin itself listens on; any other service on the server is open too.
 func portsText(report protocol.ServerConfigResult, sshOnTailscale bool) string {
 	ports := report.OpenPorts
 	if !report.Firewall {
@@ -341,18 +341,18 @@ func tailnetNote(ip string, key, sshOnTailscale bool) string {
 	return "Add a Tailscale auth key below: the server joins your tailnet, then SSH can answer only there."
 }
 
-// serverRules shows /etc/ops/rules of the server as the agent reported it.
+// serverRules shows /etc/moin/rules of the server as the agent reported it.
 // Only the owner of the server changes them, on the server.
 templ serverRules(server model.Server) {
 	{{ rules := service.ServerRules(server) }}
 	@panel(panelProps{Title: "Rules", Description: rulesDescription(len(rules.Lines()) > 0), Action: docsLink("/docs/guides/security#rules", "How they work"), Attrs: templ.Attributes{"data-rules-panel": true}}) {
 		if len(rules.Lines()) == 0 {
 			<p class="text-sm text-pretty text-muted-foreground">
-				To turn off data or logs, or to allow deploys only from your own repos, write <code class="font-mono text-foreground">/etc/ops/rules</code> on the server.
+				To turn off data or logs, or to allow deploys only from your own repos, write <code class="font-mono text-foreground">/etc/moin/rules</code> on the server.
 			</p>
 		} else {
 			<div class="flex flex-col gap-1">
-				<p class="text-xs text-muted-foreground">From <code class="font-mono">/etc/ops/rules</code> on the server</p>
+				<p class="text-xs text-muted-foreground">From <code class="font-mono">/etc/moin/rules</code> on the server</p>
 				<pre class="overflow-x-auto rounded-2xl bg-muted px-4 py-3 font-mono text-xs leading-relaxed" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
 			</div>
 		}
@@ -361,7 +361,7 @@ templ serverRules(server model.Server) {
 
 func rulesDescription(set bool) string {
 	if set {
-		return "The agent refuses everything these rules do not allow. Nobody can change them through ops."
+		return "The agent refuses everything these rules do not allow. Nobody can change them through moin."
 	}
-	return "No rules: ops may do everything on this server."
+	return "No rules: moin may do everything on this server."
 }

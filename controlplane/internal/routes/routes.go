@@ -257,7 +257,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/members/{memberID}/remove", workspace(workspaceHandler.RemoveMember))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/leave", workspace(workspaceHandler.Leave))
 	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/delete", workspace(workspaceHandler.Delete))
-	// Admin is for running ops as a service: only the hosted control plane
+	// Admin is for running moin as a service: only the hosted control plane
 	// has it. A self-hosted one manages its people under Team.
 	if app.Cfg.Billing {
 		adminRoute := func(next http.HandlerFunc) http.HandlerFunc {

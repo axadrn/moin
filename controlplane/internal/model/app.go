@@ -33,7 +33,7 @@ type App struct {
 	InstantOpen     bool   `db:"instant_open"`
 	InstantPassword string `db:"instant_password"`
 	// SnapshotBeforeChanges takes a snapshot before every change made
-	// through ops, when backups are set up.
+	// through moin, when backups are set up.
 	SnapshotBeforeChanges bool `db:"snapshot_before_changes"`
 	// Repo is owner/name on GitHub when the app follows one, with its
 	// branch; AutoDeploy deploys every push to it.
@@ -151,13 +151,13 @@ func (s BackupStatus) BackupError() string {
 	return s.Error
 }
 
-// GitHubInstallation is the ops GitHub App on one account or organization.
+// GitHubInstallation is the moin GitHub App on one account or organization.
 type GitHubInstallation struct {
 	InstallationID int64     `db:"installation_id"`
 	WorkspaceID    string    `db:"workspace_id"`
 	Account        string    `db:"account"`
 	CreatedAt      time.Time `db:"created_at"`
 	// SettingsURL is the page on github.com where its owner chooses the
-	// repos ops may read; empty for installations stored before ops kept it.
+	// repos moin may read; empty for installations stored before moin kept it.
 	SettingsURL string `db:"settings_url"`
 }

@@ -127,11 +127,11 @@ func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
 
 func TestOwnUsageNotGoFlags(t *testing.T) {
 	code, stdout, stderr := runCLI(t, &fakeAPI{}, "logs", "--bogus")
-	if code != 1 || !strings.Contains(stderr, "Unknown flag --bogus. Usage: `ops logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {
+	if code != 1 || !strings.Contains(stderr, "Unknown flag --bogus. Usage: `moin logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {
 		t.Errorf("bad flag: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	code, stdout, stderr = runCLI(t, &fakeAPI{}, "logs", "--help")
-	if code != 0 || !strings.Contains(stdout, "ops logs [--tail 200] [app]") || !strings.Contains(stdout, "--tail") || strings.Contains(stdout+stderr, "Usage of") {
+	if code != 0 || !strings.Contains(stdout, "moin logs [--tail 200] [app]") || !strings.Contains(stdout, "--tail") || strings.Contains(stdout+stderr, "Usage of") {
 		t.Errorf("help: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	code, stdout, _ = runCLI(t, &fakeAPI{}, "login", "--help")
@@ -141,13 +141,13 @@ func TestOwnUsageNotGoFlags(t *testing.T) {
 }
 
 func TestDestructiveCommandsAsk(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"ops agent uninstall"}`}}
+	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"moin agent uninstall"}`}}
 	code, _, stderr := runCLI(t, api, "servers", "rm", "web-1")
 	if code != 1 || !strings.Contains(stderr, "--yes") || api.seen("DELETE") {
 		t.Errorf("without --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--yes")
-	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "ops agent uninstall") {
+	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "moin agent uninstall") {
 		t.Errorf("with --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	// A server whose agent never connected has nothing to uninstall.
@@ -169,7 +169,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"ops-backups"}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/backup-storage": `{"bucket":"moin-backups"}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		if code != 1 || !strings.Contains(stderr, "--yes") {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -228,7 +228,7 @@ func TestHelpRunsNothing(t *testing.T) {
 	commands := [][]string{}
 	for _, line := range strings.Split(usage, "\n") {
 		name, _, ok := strings.Cut(strings.TrimPrefix(line, "  "), "  ")
-		if !strings.HasPrefix(line, "  ") || !ok || strings.HasPrefix(name, "ops") {
+		if !strings.HasPrefix(line, "  ") || !ok || strings.HasPrefix(name, "moin") {
 			continue
 		}
 		words := []string{}
@@ -248,7 +248,7 @@ func TestHelpRunsNothing(t *testing.T) {
 			for _, loggedIn := range []bool{true, false} {
 				api := &fakeAPI{}
 				server := httptest.NewServer(api)
-				config := filepath.Join(t.TempDir(), "ops", "config.json")
+				config := filepath.Join(t.TempDir(), "moin", "config.json")
 				if err := os.MkdirAll(filepath.Dir(config), 0o700); err != nil {
 					t.Fatal(err)
 				}
@@ -267,7 +267,7 @@ func TestHelpRunsNothing(t *testing.T) {
 				var stdout, stderr strings.Builder
 				code := Run(args, strings.NewReader(""), &stdout, &stderr)
 				server.Close()
-				if code != 0 || !strings.Contains(stdout.String(), "Usage") || (words[0] != "help" && !strings.Contains(stdout.String(), "ops "+words[0])) || stderr.Len() > 0 || len(api.requests) > 0 {
+				if code != 0 || !strings.Contains(stdout.String(), "Usage") || (words[0] != "help" && !strings.Contains(stdout.String(), "moin "+words[0])) || stderr.Len() > 0 || len(api.requests) > 0 {
 					t.Errorf("%v (logged in %v): code %d, stdout %q, stderr %q, requests %v", args, loggedIn, code, stdout.String(), stderr.String(), api.requests)
 				}
 				if _, err := os.Stat(config); err != nil {
@@ -350,7 +350,7 @@ func TestEnvPush(t *testing.T) {
 func TestLinkUnreadableRepo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		_, _ = w.Write([]byte(`{"error":{"code":"validation_failed","message":"Check the highlighted fields and try again.","fields":{"repo":"ops cannot read this repo. Install the ops GitHub App on its account and give it the repo."}}}`))
+		_, _ = w.Write([]byte(`{"error":{"code":"validation_failed","message":"Check the highlighted fields and try again.","fields":{"repo":"moin cannot read this repo. Install the moin GitHub App on its account and give it the repo."}}}`))
 	}))
 	defer server.Close()
 	t.Setenv("HOME", t.TempDir())
@@ -360,7 +360,7 @@ func TestLinkUnreadableRepo(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	var stdout, stderr strings.Builder
 	code := Run([]string{"link", "me/private", "--app", "shop"}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "cannot read me/private") || !strings.Contains(stderr.String(), "ops github") || strings.Contains(stderr.String(), "highlighted") {
+	if code != 1 || !strings.Contains(stderr.String(), "cannot read me/private") || !strings.Contains(stderr.String(), "moin github") || strings.Contains(stderr.String(), "highlighted") {
 		t.Errorf("code %d, stderr %q", code, stderr.String())
 	}
 }
@@ -425,8 +425,8 @@ func TestEnvRmMissing(t *testing.T) {
 // to a host on the internet.
 func TestLoginRefusesPlainHTTP(t *testing.T) {
 	api := &fakeAPI{}
-	code, _, stderr := runCLI(t, api, "login", "--url", "http://ops.example.com", "--token", "ops_test")
-	if code == 0 || !strings.Contains(stderr, "https://ops.example.com") || len(api.requests) > 0 {
+	code, _, stderr := runCLI(t, api, "login", "--url", "http://moin.example.com", "--token", "ops_test")
+	if code == 0 || !strings.Contains(stderr, "https://moin.example.com") || len(api.requests) > 0 {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 }
@@ -447,7 +447,7 @@ func TestBadNamesStayLocal(t *testing.T) {
 	}
 }
 
-// ops apps shop and ops app shop show one app; a typo says what exists.
+// moin apps shop and moin app shop show one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
 	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true},
 		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.de"],"config":{"domains":["shop.de"]}}}]}`
@@ -459,12 +459,12 @@ func TestAppsWithANameShowsTheApp(t *testing.T) {
 		}
 	}
 	code, _, stderr := runCLI(t, &fakeAPI{}, "apps", "lsit")
-	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "ops apps") {
+	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "moin apps") {
 		t.Errorf("typo: code %d, stderr %q", code, stderr)
 	}
 }
 
-// Domains that x-ops sets are marked, with where to change them.
+// Domains that x-moin sets are marked, with where to change them.
 func TestDomainsFromComposeAreMarked(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.de","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
 	code, stdout, stderr := runCLI(t, api, "domains", "shop")
@@ -498,7 +498,7 @@ func TestFirstHookAsksNothing(t *testing.T) {
 func TestGitHubBranchesHintIsOneCommand(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/github/repos/me/shop/branches": `{"items":["main","dev"]}`}}
 	code, stdout, stderr := runCLI(t, api, "github", "branches", "me/shop")
-	if code != 0 || !strings.Contains(stdout, "`ops link me/shop --branch <branch>`") {
+	if code != 0 || !strings.Contains(stdout, "`moin link me/shop --branch <branch>`") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

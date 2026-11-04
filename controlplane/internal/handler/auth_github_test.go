@@ -15,7 +15,7 @@ import (
 )
 
 // TestGitHubAuthNeedsClient: without a client ID and secret, GitHub would
-// show an error page, so the sign-in stays on ops.
+// show an error page, so the sign-in stays on moin.
 func TestGitHubAuthNeedsClient(t *testing.T) {
 	handler := &authHandler{cfg: &config.Config{APIURL: "https://api.example.com"}}
 	response := httptest.NewRecorder()

@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// Release is a release of ops on GitHub.
+// Release is a release of moin on GitHub.
 type Release struct {
 	Version     string
 	URL         string

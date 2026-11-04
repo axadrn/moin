@@ -33,8 +33,8 @@ const (
 var (
 	ErrBackupEndpoint = errors.New("the endpoint must be an https:// URL, or empty for AWS S3")
 	ErrBackupBucket   = errors.New("bucket, access key and secret key are required")
-	ErrBackupAccess   = errors.New("ops could not write to the bucket with these keys")
-	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: ops only reaches buckets on the public internet")
+	ErrBackupAccess   = errors.New("moin could not write to the bucket with these keys")
+	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: moin only reaches buckets on the public internet")
 	ErrNoBackups      = errors.New("backups are not set up: add a bucket first")
 	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
 	ErrRestoreOlder   = errors.New("a point in time restore reads from the app's bucket: pick a snapshot to restore from an older bucket")
@@ -70,7 +70,7 @@ func checkBucket(ctx context.Context, storage protocol.BackupStorage, publicOnly
 		})
 	}
 	key := strings.TrimLeft(path.Join(storage.Path, storage.Workspace, ".ops-check"), "/")
-	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("ops"))})
+	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("moin"))})
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (s *AppService) BackupStatus(workspaceID, idOrName string) ([]model.BackupS
 	return s.apps.BackupStatus(app.ID)
 }
 
-// snapshotBeforeWrite says whether a write through ops takes a snapshot
+// snapshotBeforeWrite says whether a write through moin takes a snapshot
 // first.
 func (s *AppService) snapshotBeforeWrite(app *model.App) bool {
 	if !app.SnapshotBeforeChanges {
@@ -347,7 +347,7 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 
 // storeBackupStatus stores the backup status of each database. Backups
 // that start failing or work again, a restore check that fails or passes
-// again, and each passed check go into the activity as ops itself; the
+// again, and each passed check go into the activity as moin itself; the
 // changes alert. The backups' own error and the check's are apart: an
 // agent from before drill_error sends the check's failure as Error alone.
 func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups) {

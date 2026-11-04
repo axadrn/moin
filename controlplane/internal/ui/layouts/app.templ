@@ -31,7 +31,7 @@ templ AppShell(p AppProps) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{
 		Title:       p.Title,
-		Description: "The ops control panel",
+		Description: "The moin control panel",
 		Path:        ctxkeys.URLPath(ctx),
 		Boost:       appBoost,
 	}) {
@@ -177,7 +177,7 @@ templ appShellScript() {
 			// The changelog dot: a version the member has not opened the
 			// changelog for yet shows a dot on the account menu and its
 			// Changelog item; opening it clears both, in this browser.
-			const seenKey = "ops-changelog-seen";
+			const seenKey = "moin-changelog-seen";
 			const markChangelog = () => {
 				const item = document.querySelector("[data-changelog]");
 				if (!item) return;

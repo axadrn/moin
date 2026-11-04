@@ -298,7 +298,7 @@ func (r *appRepository) SetInstantHost(appID, host string) error {
 	return err
 }
 
-// SetInstantPassword stores the sealed password ops made for the instant
+// SetInstantPassword stores the sealed password moin made for the instant
 // address.
 func (r *appRepository) SetInstantPassword(appID, sealed string) error {
 	_, err := r.db.Exec(`UPDATE apps SET instant_password = $1 WHERE id = $2`, sealed, appID)

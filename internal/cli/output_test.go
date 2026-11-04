@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// TestSentenceKeepsNames capitalizes a sentence but leaves the name of ops
+// TestSentenceKeepsNames capitalizes a sentence but leaves the name of moin
 // and versions as they are.
 func TestSentenceKeepsNames(t *testing.T) {
 	for text, want := range map[string]string{
 		"no SQLite database on a volume of blog": "No SQLite database on a volume of blog",
-		"ops cannot read me/blog":                "ops cannot read me/blog",
+		"moin cannot read me/blog":               "moin cannot read me/blog",
 		"v4 failed":                              "v4 failed",
 	} {
 		if got := sentence(text); got != want {

@@ -64,9 +64,9 @@ func failed(w http.ResponseWriter, r *http.Request, title string, err error, fie
 	toastFailed(w, r, title, message)
 }
 
-// invalid sends the ops:invalid event the base layout handles (feedbackScript).
+// invalid sends the moin:invalid event the base layout handles (feedbackScript).
 func invalid(w http.ResponseWriter, detail map[string]string) {
-	event, err := json.Marshal(map[string]map[string]string{"ops:invalid": detail})
+	event, err := json.Marshal(map[string]map[string]string{"moin:invalid": detail})
 	if err != nil {
 		slog.Error("encode field error failed", "error", err)
 		return

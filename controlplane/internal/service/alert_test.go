@@ -37,8 +37,8 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 	}
 	mails := testutil.NewMemoryMailer()
 	apps := repository.NewAppRepository(database, database)
-	alerts := NewAlertService(NewEmailService(mails, "https://ops.example.com", "ops"), repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), apps, repository.NewAlertDestinations(database), repository.NewWorkspaceAuditRepository(database), testBox(t))
-	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://ops.example.com")
+	alerts := NewAlertService(NewEmailService(mails, "https://moin.example.com", "moin"), repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), apps, repository.NewAlertDestinations(database), repository.NewWorkspaceAuditRepository(database), testBox(t))
+	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 			if mail.Subject != event.subject {
 				t.Errorf("%s subject = %q, want %q", event.action, mail.Subject, event.subject)
 			}
-			if !strings.Contains(mail.Text, event.body) || !strings.Contains(mail.Text, "Turn it off: https://ops.example.com/app/owner-workspace/settings") {
+			if !strings.Contains(mail.Text, event.body) || !strings.Contains(mail.Text, "Turn it off: https://moin.example.com/app/owner-workspace/settings") {
 				t.Errorf("%s text = %q", event.action, mail.Text)
 			}
 		}
@@ -85,7 +85,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 		}
 	}
 	last := mails.Messages()[len(mails.Messages())-1]
-	if !strings.Contains(last.Text, "Open in ops: https://ops.example.com/app/owner-workspace/apps/shop") || !strings.Contains(last.Text, "The app has no live version yet.") {
+	if !strings.Contains(last.Text, "Open in moin: https://moin.example.com/app/owner-workspace/apps/shop") || !strings.Contains(last.Text, "The app has no live version yet.") {
 		t.Errorf("deploy.failed text = %q", last.Text)
 	}
 }

@@ -19,7 +19,7 @@ import (
 
 var (
 	ErrGitHubState    = errors.New("the GitHub install link expired or belongs to another account: connect again")
-	ErrRepo           = errors.New("ops cannot read this repo: install the ops GitHub App on its account and give it the repo")
+	ErrRepo           = errors.New("moin cannot read this repo: install the moin GitHub App on its account and give it the repo")
 	ErrRepoName       = errors.New("name the repo as owner/name")
 	ErrNoRepo         = errors.New("the app follows no repo: link one first")
 	ErrRef            = errors.New("GitHub knows no branch, tag or commit by this name")
@@ -84,7 +84,7 @@ func (s *AppService) gitHubState(actor Actor) string {
 //     the member may manage that no other workspace holds, and sends the
 //     member to install the app if there is none.
 //
-// Without the app's OAuth, ops trusts the installation ID GitHub sent.
+// Without the app's OAuth, moin trusts the installation ID GitHub sent.
 func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installationID int64, state, code string) (string, error) {
 	if s.github == nil {
 		return "", ErrGitHubOff

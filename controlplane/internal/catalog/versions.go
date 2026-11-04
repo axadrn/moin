@@ -210,7 +210,7 @@ func (r Registry) getJSONPage(ctx context.Context, address, bearer string, into 
 		return "", err
 	}
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "ops-catalog")
+	request.Header.Set("User-Agent", "moin-catalog")
 	if bearer != "" {
 		request.Header.Set("Authorization", "Bearer "+bearer)
 	}

@@ -63,7 +63,7 @@ templ AppBackups(view BackupsView) {
 					}
 				}
 				if view.Storage == nil {
-					@emptyState("Backups go to your own bucket", "Add one S3-compatible bucket for all your apps. From then on every SQLite and Postgres database is backed up, and ops deploy keeps your code there too.", "") {
+					@emptyState("Backups go to your own bucket", "Add one S3-compatible bucket for all your apps. From then on every SQLite and Postgres database is backed up, and moin deploy keeps your code there too.", "") {
 						@button.Button(button.Props{Href: basePath + "/bucket", Attributes: templ.Attributes{"data-add-bucket": true}}) {
 							Add your bucket
 						}
@@ -76,7 +76,7 @@ templ AppBackups(view BackupsView) {
 						</div>
 					}
 					if len(view.Backups.Databases) == 0 && view.Error == "" {
-						@emptyState("No database yet", "Backups start by themselves as soon as the live release keeps a SQLite database on a volume or runs a Postgres service.", "ops deploy "+view.App.Name)
+						@emptyState("No database yet", "Backups start by themselves as soon as the live release keeps a SQLite database on a volume or runs a Postgres service.", "moin deploy "+view.App.Name)
 					}
 					<div class="grid items-stretch gap-4 lg:grid-cols-2">
 						@backupSettings(view)
@@ -171,7 +171,7 @@ templ pointInTime(view BackupsView, database protocol.DatabaseBackup, index int)
 			<p class="text-sm font-medium">Restore to a point in time</p>
 			<p class="text-sm text-pretty text-muted-foreground">
 				if database.Since != nil && database.ReplicatedAt != nil {
-					Pick a day and a second in UTC. Deleted the wrong rows at 14:02? Restore to 14:01. ops takes a snapshot of the current state first, and the app stops for a moment.
+					Pick a day and a second in UTC. Deleted the wrong rows at 14:02? Restore to 14:01. moin takes a snapshot of the current state first, and the app stops for a moment.
 				} else {
 					Possible as soon as the first change is copied.
 				}
@@ -185,7 +185,7 @@ templ pointInTime(view BackupsView, database protocol.DatabaseBackup, index int)
 				hx-select="#app-backups"
 				hx-swap="outerHTML"
 				hx-disable="find button[type='submit']"
-				hx-confirm={ "Restore " + database.Database + " to this point in time? It replaces the data there now; ops takes a snapshot of it first. The app stops for a moment." }
+				hx-confirm={ "Restore " + database.Database + " to this point in time? It replaces the data there now; moin takes a snapshot of it first. The app stops for a moment." }
 				data-confirm-name={ view.App.Name }
 				data-point-in-time={ id }
 			>
@@ -269,7 +269,7 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 								hx-select="#app-backups"
 								hx-swap="outerHTML"
 								hx-disable="find button[type='submit']"
-								hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.UTC().Format("Jan 2, 15:04") + " UTC? It replaces the data there now; ops takes a snapshot of it first. The app stops for a moment." }
+								hx-confirm={ "Restore " + database.Database + " from the snapshot of " + snapshot.CreatedAt.UTC().Format("Jan 2, 15:04") + " UTC? It replaces the data there now; moin takes a snapshot of it first. The app stops for a moment." }
 								data-confirm-name={ view.App.Name }
 							>
 								@csrf.Token()
@@ -291,7 +291,7 @@ templ snapshotList(view BackupsView, database protocol.DatabaseBackup) {
 }
 
 templ backupSettings(view BackupsView) {
-	@panel(panelProps{Title: "Automatic snapshots", Docs: "/docs/guides/backups#a-snapshot-before-every-change", Description: "A snapshot before ops changes your data, so one click undoes it."}) {
+	@panel(panelProps{Title: "Automatic snapshots", Docs: "/docs/guides/backups#a-snapshot-before-every-change", Description: "A snapshot before moin changes your data, so one click undoes it."}) {
 		@BackupSettingsForm(view.App)
 	}
 }
@@ -310,7 +310,7 @@ templ BackupSettingsForm(app model.App) {
 						Snapshot before every change
 					}
 					@field.Description() {
-						Before every deploy, restore, cell edit and SQL change made through ops. Undoes a bad migration or a wrong UPDATE.
+						Before every deploy, restore, cell edit and SQL change made through moin. Undoes a bad migration or a wrong UPDATE.
 					}
 				}
 				@switchcomp.Switch(switchcomp.Props{ID: "snapshot-before-changes", Name: "on", Value: "1", DefaultChecked: app.SnapshotBeforeChanges})
@@ -512,17 +512,17 @@ func replicatedStamp(database protocol.DatabaseBackup) string {
 // with Litestream within a second, Postgres with WAL-G within a minute.
 func continuousText(database protocol.DatabaseBackup) string {
 	if database.Kind == protocol.DatabasePostgres {
-		return "Every change to " + database.Database + " is in your bucket within a minute, with WAL-G. Every day ops restores a copy and checks it."
+		return "Every change to " + database.Database + " is in your bucket within a minute, with WAL-G. Every day moin restores a copy and checks it."
 	}
-	return "Every change to " + database.Database + " is in your bucket within a second, with Litestream. Every day ops restores a copy and checks it."
+	return "Every change to " + database.Database + " is in your bucket within a second, with Litestream. Every day moin restores a copy and checks it."
 }
 
-// snapshotText says when ops takes the full copies of a database.
+// snapshotText says when moin takes the full copies of a database.
 func snapshotText(database protocol.DatabaseBackup) string {
 	if database.Kind == protocol.DatabasePostgres {
-		return "Full copies of " + database.Database + " with pg_dump. ops takes one every hour, before every deploy and every change it makes; Back up now takes one by hand."
+		return "Full copies of " + database.Database + " with pg_dump. moin takes one every hour, before every deploy and every change it makes; Back up now takes one by hand."
 	}
-	return "Full copies of " + database.Database + ". ops takes one before every deploy and every change it makes; Back up now takes one by hand."
+	return "Full copies of " + database.Database + ". moin takes one before every deploy and every change it makes; Back up now takes one by hand."
 }
 
 func windowNote(database protocol.DatabaseBackup) string {
@@ -541,7 +541,7 @@ func verifiedText(database protocol.DatabaseBackup, now time.Time) string {
 
 func verifiedNote(database protocol.DatabaseBackup) string {
 	if database.VerifiedAt == nil {
-		return "Every day ops restores a copy and checks it."
+		return "Every day moin restores a copy and checks it."
 	}
 	return "Restored and checked, " + database.VerifiedAt.UTC().Format("Jan 2, 15:04") + " UTC."
 }

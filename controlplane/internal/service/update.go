@@ -127,7 +127,7 @@ func (s *UpdateService) Run(ctx context.Context) {
 	}
 }
 
-// githubRelease is the part of GitHub's release that ops reads.
+// githubRelease is the part of GitHub's release that moin reads.
 type githubRelease struct {
 	TagName     string    `json:"tag_name"`
 	HTMLURL     string    `json:"html_url"`

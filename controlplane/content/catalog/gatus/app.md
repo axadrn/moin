@@ -11,4 +11,4 @@ port: 8080
 logo: https://raw.githubusercontent.com/TwiN/gatus/master/.github/assets/logo.png
 ---
 
-Check your sites, APIs and ports, and show the results on a clean status page with history. Results live in its SQLite, backed up by ops. Edit the checks in the app's compose file: its config is right there.
+Check your sites, APIs and ports, and show the results on a clean status page with history. Results live in its SQLite, backed up by moin. Edit the checks in the app's compose file: its config is right there.

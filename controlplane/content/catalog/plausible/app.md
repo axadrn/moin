@@ -11,4 +11,4 @@ port: 8000
 logo: https://github.com/plausible/analytics/blob/HEAD/priv/static/images/ce/favicon.svg
 ---
 
-One light script, one clear dashboard: visitors, pages, sources and goals. Its accounts live in Postgres, which ops backs up; its events in ClickHouse, which ops does not back up yet. Give it 4 GB of memory. The first visit creates the account.
+One light script, one clear dashboard: visitors, pages, sources and goals. Its accounts live in Postgres, which moin backs up; its events in ClickHouse, which moin does not back up yet. Give it 4 GB of memory. The first visit creates the account.

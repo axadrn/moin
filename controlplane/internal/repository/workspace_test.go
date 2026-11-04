@@ -152,7 +152,7 @@ func TestAdminCannotRaceOwnerPromotionAndRemoval(t *testing.T) {
 	}
 }
 
-// ops has no seat limits: teams are free on every plan, so the seat
+// moin has no seat limits: teams are free on every plan, so the seat
 // limit tests of the workspace module do not apply.
 
 func TestInvitationAcceptanceValidatesEmailAndExpiry(t *testing.T) {

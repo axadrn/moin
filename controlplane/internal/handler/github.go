@@ -45,7 +45,7 @@ func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	// The user said no on GitHub, or asked an organization owner to
 	// install the app: nothing to connect yet. A change of the repos made on
-	// github.com, not started in ops, comes back without a state: GitHub
+	// github.com, not started in moin, comes back without a state: GitHub
 	// saved it already and the repos list shows it.
 	if query.Get("error") != "" || query.Get("setup_action") == "request" ||
 		(query.Get("setup_action") == "update" && query.Get("state") == "") {
@@ -66,7 +66,7 @@ func (h *AppsHandler) GitHubSetup(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
-// GitHubWebhook takes the events of the ops GitHub App: pushes deploy the
+// GitHubWebhook takes the events of the moin GitHub App: pushes deploy the
 // apps that follow the branch, an uninstall unlinks its apps.
 func (h *HooksHandler) GitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 5<<20))
@@ -181,7 +181,7 @@ func (h *AppsHandler) UnlinkRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderRepo(w, r)
-	toastDone(w, r, "Repo unlinked", "ops no longer deploys its pushes. The app keeps running.")
+	toastDone(w, r, "Repo unlinked", "moin no longer deploys its pushes. The app keeps running.")
 }
 
 // DeployRef deploys a branch, tag or commit from GitHub; the page follows

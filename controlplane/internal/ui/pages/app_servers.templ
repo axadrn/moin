@@ -36,7 +36,7 @@ type RemovedServer struct {
 templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool) {
 	@layouts.App("Servers") {
 		@panelPage() {
-			@pageHeader("Servers", "Every server runs the ops agent. It dials out to ops, so nothing on your server listens for us.") {
+			@pageHeader("Servers", "Every server runs the moin agent. It dials out to moin, so nothing on your server listens for us.") {
 				if canAdd {
 					@ServerAddForm()
 				}
@@ -96,7 +96,7 @@ templ ServerAdded(added AddedServer) {
 		@panel(panelProps{
 			Heading:     "server-added-heading",
 			Title:       "Install the agent on " + added.Name,
-			Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: ops stores just a fingerprint of it.",
+			Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: moin stores just a fingerprint of it.",
 			Docs:        "/docs/guides/servers#add-a-server",
 		}) {
 			<div class="flex flex-col gap-4">
@@ -149,7 +149,7 @@ templ ServerList(servers []model.Server) {
 		class="flex flex-col gap-4"
 	>
 		if len(servers) == 0 {
-			@emptyState("No servers yet", "Add a server, then run the install command ops gives you on it. Or add one from your terminal:", "ops servers add web-1") {
+			@emptyState("No servers yet", "Add a server, then run the install command moin gives you on it. Or add one from your terminal:", "moin servers add web-1") {
 				@docsLink("/docs/getting-started", "Getting started")
 			}
 		} else {

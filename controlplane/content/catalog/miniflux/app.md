@@ -8,7 +8,7 @@ license: Apache-2.0
 image: miniflux/miniflux
 database: postgres
 port: 8080
-login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
 logo: https://github.com/miniflux/v2/blob/HEAD/internal/ui/static/bin/icon.svg
 ---
 

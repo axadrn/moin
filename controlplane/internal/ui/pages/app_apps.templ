@@ -33,7 +33,7 @@ type AppsView struct {
 templ Apps(view AppsView) {
 	@layouts.App("Apps") {
 		@panelPage() {
-			@pageHeader("Apps", "Docker Compose projects on your servers. The first ops deploy in a repo creates its app.") {
+			@pageHeader("Apps", "Docker Compose projects on your servers. The first moin deploy in a repo creates its app.") {
 				<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
 					@AppAddForm(view.Servers)
 					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/catalog", Variant: button.VariantSecondary, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-link": true}}) {
@@ -128,7 +128,7 @@ templ AppList(view AppsView) {
 		class="flex flex-col gap-6"
 	>
 		if len(view.Apps) == 0 {
-			@emptyState("No apps yet", "Run ops deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "ops deploy") {
+			@emptyState("No apps yet", "Run moin deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "moin deploy") {
 				@docsLink("/docs/guides/deploy", "How it works")
 			}
 		} else {
@@ -350,7 +350,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 	{{ appPath := basePath + "/apps/" + app.Name }}
 	@layouts.AppShell(layouts.AppProps{Title: app.Name, Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: app.Name}}}) {
 		@panelPage(templ.Attributes{"data-app-page": app.Name}) {
-			@appHeader(app, "overview", "Runs on "+app.ServerName+". Deploy a new version with ops deploy "+app.Name+" in its repo.") {
+			@appHeader(app, "overview", "Runs on "+app.ServerName+". Deploy a new version with moin deploy "+app.Name+" in its repo.") {
 				@button.Button(button.Props{
 					Variant: button.VariantSecondary,
 					Attributes: templ.Attributes{
@@ -384,12 +384,12 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				@panel(panelProps{Heading: "deploy-log-heading", Title: "Deploy log", Docs: "/docs/guides/deploy#follow-a-deploy", Description: "The steps of the deploy picked under Deploys.", Action: deployLogActions(), Body: panelBodyFlush}) {
 					<div
 						id="deploy-log"
-						class="ops-term ops-term-lines max-h-[32rem] flex-1 lg:min-h-72 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+						class="moin-term moin-term-lines max-h-[32rem] flex-1 lg:min-h-72 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 						data-deploy-log
 						tabindex="0"
 						aria-label="Deploy log"
 					>
-						<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet. Deploy from GitHub below, or run <span class="font-mono text-foreground">ops deploy { app.Name }</span> in its repo.</p>
+						<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet. Deploy from GitHub below, or run <span class="font-mono text-foreground">moin deploy { app.Name }</span> in its repo.</p>
 					</div>
 				}
 			</div>
@@ -397,7 +397,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Docs: "/docs/guides/env", Description: "Stored encrypted. The next deploy or restart hands them to the app.", Body: panelBodyRows}) {
 					@AppEnv(app.Name, envKeys, nil)
 				}
-				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Docs: "/docs/guides/logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as ops logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
+				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Docs: "/docs/guides/logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as moin logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
 					<div id="app-logs" class="px-6 text-sm text-muted-foreground">Not loaded yet.</div>
 				}
 			</div>
@@ -587,7 +587,7 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 	}) {
 		if len(deploys) == 0 {
 			<div class="px-3">
-				@emptyHint("No deploys yet. Deploy from GitHub below, or run this in the repo of "+app.Name+":", "ops deploy "+app.Name)
+				@emptyHint("No deploys yet. Deploy from GitHub below, or run this in the repo of "+app.Name+":", "moin deploy "+app.Name)
 			</div>
 		} else {
 			<ol class="flex flex-col gap-1" role="list">
@@ -712,13 +712,13 @@ templ AppLogs(lines []string, message string) {
 	} else if len(lines) == 0 {
 		<div id="app-logs" class="px-6 text-sm text-muted-foreground">No log lines yet.</div>
 	} else {
-		<div id="app-logs" class="ops-term ops-term-lines max-h-[30rem] overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" data-app-logs tabindex="0" aria-label="Container logs">
+		<div id="app-logs" class="moin-term moin-term-lines max-h-[30rem] overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" data-app-logs tabindex="0" aria-label="Container logs">
 			for _, line := range lines {
 				{{ entry := parseLogLine(line) }}
-				<div class="ops-term-line ops-term-log">
+				<div class="moin-term-line moin-term-log">
 					if entry.Service != "" {
-						<span class="ops-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
-						<span class="ops-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
+						<span class="moin-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
+						<span class="moin-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
 					}
 					<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
 				</div>
@@ -892,14 +892,14 @@ templ appScript(appName string) {
 			};
 			const row = (text, kind, number) => {
 				const div = document.createElement("div");
-				div.className = "ops-term-line";
+				div.className = "moin-term-line";
 				div.dataset.kind = kind;
 				div.dataset.n = number;
 				const span = document.createElement("span");
 				const path = kind === "step" && text.match(/^(.*\S)\s+\((\/[^)\s]{24,})\)$/);
 				if (path) {
 					const host = document.createElement("span");
-					host.className = "ops-term-dim";
+					host.className = "moin-term-dim";
 					host.title = path[2];
 					host.textContent = ` (${shorten(path[2])})`;
 					span.append(path[1], host);
@@ -910,20 +910,20 @@ templ appScript(appName string) {
 				return div;
 			};
 			const label = (group) => {
-				const count = group.querySelectorAll(".ops-term-line").length;
+				const count = group.querySelectorAll(".moin-term-line").length;
 				const what = { building: "build", starting: "compose", pulling: "pull" }[group.dataset.step] || "output";
 				group.firstChild.lastChild.textContent = `${count} ${what} ${count === 1 ? "line" : "lines"}`;
 			};
 			const newFold = () => {
 				const group = document.createElement("div");
-				group.className = "ops-term-fold";
+				group.className = "moin-term-fold";
 				group.dataset.step = step;
 				const toggle = document.createElement("button");
 				toggle.type = "button";
-				toggle.className = "ops-term-toggle";
+				toggle.className = "moin-term-toggle";
 				toggle.setAttribute("aria-expanded", "false");
 				const arrow = document.createElement("span");
-				arrow.className = "ops-term-arrow";
+				arrow.className = "moin-term-arrow";
 				arrow.setAttribute("aria-hidden", "true");
 				arrow.textContent = "▸";
 				toggle.append(arrow, document.createElement("span"));
@@ -961,8 +961,8 @@ templ appScript(appName string) {
 				if (!frame) frame = requestAnimationFrame(flush);
 			};
 			const chips = {
-				running: ["bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "ops-dot-run bg-running"],
-				live: ["bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "ops-dot-live bg-live"],
+				running: ["bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "moin-dot-run bg-running"],
+				live: ["bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "moin-dot-live bg-live"],
 				failed: ["bg-failed/15 text-[color-mix(in_oklab,var(--failed),var(--foreground)_12%)]", "bg-failed"],
 			};
 			const show = (text, kind) => {
@@ -1021,7 +1021,7 @@ templ appScript(appName string) {
 				else select();
 			};
 			document.addEventListener("click", (event) => {
-				const toggle = event.target.closest(".ops-term-toggle");
+				const toggle = event.target.closest(".moin-term-toggle");
 				if (toggle) {
 					const group = toggle.parentElement;
 					const open = !group.hasAttribute("data-open");

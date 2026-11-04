@@ -20,13 +20,13 @@ func TestCloudflareMailerSends(t *testing.T) {
 	}))
 	defer server.Close()
 
-	mailer := NewCloudflareMailer("acc", "tok", "ops <noreply@example.com>")
+	mailer := NewCloudflareMailer("acc", "tok", "moin <noreply@example.com>")
 	mailer.api = server.URL
 	err := mailer.Send(context.Background(), Message{To: "a@example.com", Subject: "Hi", Text: "text", HTML: "<p>html</p>"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.From.Address != "noreply@example.com" || got.From.Name != "ops" || got.To != "a@example.com" || got.HTML != "<p>html</p>" {
+	if got.From.Address != "noreply@example.com" || got.From.Name != "moin" || got.To != "a@example.com" || got.HTML != "<p>html</p>" {
 		t.Fatalf("request = %+v", got)
 	}
 }

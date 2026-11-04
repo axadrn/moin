@@ -28,7 +28,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// fakeGitHub answers the GitHub API calls ops makes and records the
+// fakeGitHub answers the GitHub API calls moin makes and records the
 // commit statuses.
 type fakeGitHub struct {
 	mu       sync.Mutex
@@ -144,7 +144,7 @@ func TestGitHubDeploys(t *testing.T) {
 		t.Fatal(err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	github, err := NewGitHub("123", "ops-test", strings.ReplaceAll(string(keyPEM), "\n", `\n`), "hook-secret", "", "", githubServer.URL, "https://github.example")
+	github, err := NewGitHub("123", "moin-test", strings.ReplaceAll(string(keyPEM), "\n", `\n`), "hook-secret", "", "", githubServer.URL, "https://github.example")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestGitHubDeploys(t *testing.T) {
 	ctx := context.Background()
 
 	link, err := apps.GitHubInstallURL(owner)
-	if err != nil || !strings.HasPrefix(link, "https://github.example/apps/ops-test/installations/new?state=") {
+	if err != nil || !strings.HasPrefix(link, "https://github.example/apps/moin-test/installations/new?state=") {
 		t.Fatalf("install link = %q, %v", link, err)
 	}
 	parsed, _ := url.Parse(link)
@@ -170,7 +170,7 @@ func TestGitHubDeploys(t *testing.T) {
 	if installations, _ := apps.GitHubInstallations(owner.WorkspaceID); len(installations) != 1 || installations[0].Account != "axadrn" {
 		t.Fatalf("owner installations = %+v", installations)
 	}
-	if link, _ := apps.GitHubConnectURL(owner); !strings.HasPrefix(link, "https://github.example/apps/ops-test/installations/new?state=") {
+	if link, _ := apps.GitHubConnectURL(owner); !strings.HasPrefix(link, "https://github.example/apps/moin-test/installations/new?state=") {
 		t.Fatalf("without OAuth the connect link installs: %q", link)
 	}
 	// Installation IDs are public counters: another workspace's own valid
@@ -205,7 +205,7 @@ func TestGitHubDeploys(t *testing.T) {
 		t.Fatal("unlink without a repo shows in the activity")
 	}
 	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", true); !errors.Is(err, ErrRepo) {
-		t.Fatalf("link a repo ops cannot read: err = %v", err)
+		t.Fatalf("link a repo moin cannot read: err = %v", err)
 	}
 	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", true); !errors.Is(err, ErrBranch) {
 		t.Fatalf("link a branch GitHub does not have: err = %v", err)
@@ -239,7 +239,7 @@ func TestGitHubDeploys(t *testing.T) {
 	fake.waitStatus(t, "pending")
 	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	success := fake.waitStatus(t, "success")
-	if success["context"] != "ops/deploy" || !strings.HasSuffix(success["target_url"], "/app/owner-workspace/apps/blog") {
+	if success["context"] != "moin/deploy" || !strings.HasSuffix(success["target_url"], "/app/owner-workspace/apps/blog") {
 		t.Fatalf("success status = %v", success)
 	}
 
@@ -270,7 +270,7 @@ func TestGitHubDeploys(t *testing.T) {
 	}
 }
 
-// TestGitHubChecksInstaller: with the app's client ID and secret, ops
+// TestGitHubChecksInstaller: with the app's client ID and secret, moin
 // connects an installation only for a member whose GitHub account may
 // manage it.
 func TestGitHubChecksInstaller(t *testing.T) {
@@ -282,7 +282,7 @@ func TestGitHubChecksInstaller(t *testing.T) {
 		t.Fatal(err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	github, err := NewGitHub("123", "ops-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 		t.Fatal(err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	github, err := NewGitHub("123", "ops-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,16 +340,16 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	state := parsed.Query().Get("state")
 
 	// After a change of the repos ("Redirect on update") GitHub sends the
-	// installation without a code: ops asks for a sign-in with the same
+	// installation without a code: moin asks for a sign-in with the same
 	// state, which comes back with a code.
 	if next, err := apps.ConnectGitHub(ctx, owner, 7, state, ""); err != nil || next != link {
 		t.Fatalf("update without a code: %q, %v", next, err)
 	}
 	// Someone who installed the app nowhere installs it now.
-	if next, err := apps.ConnectGitHub(ctx, owner, 0, state, "code-nobody"); err != nil || next != githubServer.URL+"/apps/ops-test/installations/new?state="+url.QueryEscape(state) {
+	if next, err := apps.ConnectGitHub(ctx, owner, 0, state, "code-nobody"); err != nil || next != githubServer.URL+"/apps/moin-test/installations/new?state="+url.QueryEscape(state) {
 		t.Fatalf("no installation yet: %q, %v", next, err)
 	}
-	// The sign-in comes back with a code alone: ops connects installation 7.
+	// The sign-in comes back with a code alone: moin connects installation 7.
 	if next, err := apps.ConnectGitHub(ctx, owner, 0, state, "code-axadrn"); err != nil || next != "" {
 		t.Fatalf("sign-in: %q, %v", next, err)
 	}

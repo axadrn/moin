@@ -25,7 +25,7 @@ type RepoView struct {
 	Repos     []service.GitHubRepoOf
 	// Branches are the branches of the first repo, its default first.
 	Branches []string
-	// Installations say where on GitHub the user gives ops more repos.
+	// Installations say where on GitHub the user gives moin more repos.
 	Installations []model.GitHubInstallation
 	// Error says why the repos could not be listed.
 	Error string
@@ -38,7 +38,7 @@ templ AppRepo(view RepoView) {
 		ID:          "app-repo",
 		Heading:     "app-repo-heading",
 		Title:       "GitHub",
-		Description: "Deploy a branch, tag or commit straight from GitHub, and every push if you like. ops reports the result back as a commit status.",
+		Description: "Deploy a branch, tag or commit straight from GitHub, and every push if you like. moin reports the result back as a commit status.",
 		Action:      docsLink("/docs/guides/github", "How it works"),
 	}) {
 		<div class="flex flex-col gap-6">
@@ -48,7 +48,7 @@ templ AppRepo(view RepoView) {
 				}
 			}
 			if !view.Enabled {
-				@emptyHint("This control plane has no GitHub App. Deploy from your checkout or from CI instead.", "ops deploy "+view.App.Name)
+				@emptyHint("This control plane has no GitHub App. Deploy from your checkout or from CI instead.", "moin deploy "+view.App.Name)
 			} else if !view.Connected {
 				@repoConnect(view)
 			} else if view.App.Repo == "" {
@@ -60,10 +60,10 @@ templ AppRepo(view RepoView) {
 	}
 }
 
-// repoConnect sends the user to GitHub to install the ops GitHub App.
+// repoConnect sends the user to GitHub to install the moin GitHub App.
 templ repoConnect(view RepoView) {
 	<div class="flex flex-col items-start gap-3">
-		<p class="text-sm text-muted-foreground">First connect GitHub and choose the repos ops may read.</p>
+		<p class="text-sm text-muted-foreground">First connect GitHub and choose the repos moin may read.</p>
 		@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name, Attributes: templ.Attributes{"data-connect-github": true, "hx-boost": "false"}}) {
 			@icons.Github(icons.Props{Class: "size-4"})
 			Connect GitHub
@@ -77,7 +77,7 @@ templ repoLink(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	if len(view.Repos) == 0 {
 		<div class="flex flex-col items-start gap-3" data-no-repos>
-			<p class="text-sm text-muted-foreground">The ops GitHub App sees no repo yet. Give it access to the repo you want to deploy, then come back here.</p>
+			<p class="text-sm text-muted-foreground">The moin GitHub App sees no repo yet. Give it access to the repo you want to deploy, then come back here.</p>
 			@repoAccess(view, true)
 		</div>
 	} else {
@@ -104,7 +104,7 @@ templ repoLink(view RepoView) {
 						}
 					}
 					@fieldHint("link-repo", "") {
-						The repos the ops GitHub App may read.
+						The repos the moin GitHub App may read.
 					}
 				}
 				@RepoBranchField(view.Branches)
@@ -152,7 +152,7 @@ templ RepoBranchField(branches []string) {
 	}
 }
 
-// repoAccess links to where on GitHub the user gives ops another repo, and
+// repoAccess links to where on GitHub the user gives moin another repo, and
 // reloads the panel to see it. primary makes the link the main action, for
 // a panel with no repo yet.
 templ repoAccess(view RepoView, primary bool) {
@@ -171,7 +171,7 @@ templ repoAccess(view RepoView, primary bool) {
 				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "hx-boost": "false", "data-github-settings": installation.Account},
 			}) {
 				@icons.Github(icons.Props{Class: "size-4"})
-				Give ops access on { installation.Account }
+				Give moin access on { installation.Account }
 			}
 		}
 		@button.Button(button.Props{
@@ -195,7 +195,7 @@ templ repoLinked(view RepoView) {
 		@button.Button(button.Props{
 			Variant:    button.VariantSecondary,
 			Size:       button.SizeSm,
-			Attributes: templ.Attributes{"hx-post": appPath + "/repo/unlink", "hx-target": "#app-repo", "hx-swap": "outerHTML", "hx-disable": "this", "hx-confirm": "Unlink " + view.App.Repo + "? ops stops deploying its pushes. The app keeps running."},
+			Attributes: templ.Attributes{"hx-post": appPath + "/repo/unlink", "hx-target": "#app-repo", "hx-swap": "outerHTML", "hx-disable": "this", "hx-confirm": "Unlink " + view.App.Repo + "? moin stops deploying its pushes. The app keeps running."},
 		}) {
 			Unlink
 		}

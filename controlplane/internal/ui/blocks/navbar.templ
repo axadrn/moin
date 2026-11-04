@@ -15,7 +15,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/icons"
 )
 
-// GitHubURL is the open source repository of ops.
+// GitHubURL is the open source repository of moin.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
 // GoilerplateURL is goilerplate, the Go SaaS starter by the same author.
@@ -47,7 +47,7 @@ templ NewBadge() {
 	}
 }
 
-// BetaBadge says ops is in beta, next to the wordmark, centered on it with
+// BetaBadge says moin is in beta, next to the wordmark, centered on it with
 // items-center: Wordmark trims its box to its lowercase letters.
 templ BetaBadge(class string) {
 	@badge.Badge(badge.Props{Class: utils.CN("h-auto leading-normal rounded-full bg-secondary px-2 py-0.5 font-sans text-[11px] font-semibold text-muted-foreground", class)}) {

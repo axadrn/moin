@@ -49,7 +49,7 @@ templ Alerts(view AlertsView) {
 							{ "Signing secret of " + view.Created.Name + ", shown this once" }
 						}
 						@alert.Description(alert.DescriptionProps{Class: "flex flex-col gap-3"}) {
-							<p>Every post carries <code class="font-mono">X-Ops-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret. Store it with your webhook.</p>
+							<p>Every post carries <code class="font-mono">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret. Store it with your webhook.</p>
 							@command(view.SigningSecret)
 						}
 					}

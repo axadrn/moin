@@ -55,7 +55,7 @@ type Middleware struct {
 	Workspace Wrap
 	// RateLimitInvitations limits workspace invitation emails.
 	RateLimitInvitations Wrap
-	// InWorkspace requires onboarding and scopes an ops route to the
+	// InWorkspace requires onboarding and scopes a moin route to the
 	// workspace of the API token, or for a session to the workspace its
 	// Ops-Workspace header names.
 	InWorkspace Wrap
@@ -207,7 +207,7 @@ func Routes(h Handlers, m Middleware) []Route {
 }
 
 // hostedOnly answers 404 on a self-hosted control plane (billing off), for
-// what only running ops as a service needs.
+// what only running moin as a service needs.
 func hostedOnly(billing *BillingHandler, next http.HandlerFunc) http.HandlerFunc {
 	if billing != nil {
 		return next

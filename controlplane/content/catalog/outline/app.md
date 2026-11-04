@@ -11,4 +11,4 @@ port: 3000
 logo: https://simpleicons.org (CC0)
 ---
 
-Write and organize your team's knowledge with Markdown, search everything, and collaborate in real time. Sign-in needs Google, Slack, OIDC or email by SMTP: set those as env vars, see Outline's docs. Docs live in Postgres, backed up by ops.
+Write and organize your team's knowledge with Markdown, search everything, and collaborate in real time. Sign-in needs Google, Slack, OIDC or email by SMTP: set those as env vars, see Outline's docs. Docs live in Postgres, backed up by moin.

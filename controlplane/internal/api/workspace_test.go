@@ -12,7 +12,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
-// seedTeam seeds the billing workspace roles on the ops plan, which
+// seedTeam seeds the billing workspace roles on the moin plan, which
 // has free seats for invitations.
 func seedTeam(t *testing.T, environment *apiEnvironment) billingWorkspace {
 	t.Helper()

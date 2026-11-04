@@ -17,14 +17,14 @@ One alert per event, never one per minute:
 - **The daily restore check fails**: the newest backup did not restore cleanly. And one when a check passes again.
 - **A disk is almost full**: the disk that holds the apps' data is over 90%. A full disk stops databases from writing. And one when it is under 85% again, so a disk at 88% does not alert back and forth.
 
-Every alert links to the page in ops: the uptime of the app, the servers, the app with its deploys, or its backups. Mails and messages say the same:
+Every alert links to the page in moin: the uptime of the app, the servers, the app with its deploys, or its backups. Mails and messages say the same:
 
 ```text
 🔴 shop.example.com is down
 App: shop
 Since: 2026-11-03 14:05 UTC
 Reason: HTTP 502
-Open in ops
+Open in moin
 ```
 
 ## Who gets it
@@ -37,7 +37,7 @@ For you, in every workspace:
 
 ```surfaces
 Web: **Settings**, **Profile** tab, **Email me alerts**
-CLI: ops alerts off, then ops alerts on; ops alerts shows it
+CLI: moin alerts off, then moin alerts on; moin alerts shows it
 TUI: settings tab, **Email me alerts**, `enter`, or `:alerts`
 API: PUT /api/v1/account/email-alerts {"on": false}
 MCP: set_email_alerts
@@ -67,7 +67,7 @@ Every member sees the destinations. Only **owners** and **admins** add, test and
 
 ```surfaces
 Web: **Alerts** in the sidebar (`g` then `l`), **Add a destination**
-CLI: ops alerts add slack team-ops, then the URL on stdin; ops alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
+CLI: moin alerts add slack team-ops, then the URL on stdin; moin alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
 TUI: settings tab, `C` or `:alert`
 API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-ops", "url": "https://hooks.slack.com/services/…"}
 MCP: add_alert_destination
@@ -75,7 +75,7 @@ MCP: add_alert_destination
 
 - **Slack**: an [incoming webhook](https://api.slack.com/messaging/webhooks) of the channel, `https://hooks.slack.com/services/…`.
 - **Discord**: the channel's **Edit Channel**, **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**, `https://discord.com/api/webhooks/…`. Messages never ping anyone.
-- **Telegram**: make a bot with [@BotFather](https://t.me/BotFather) and add it to the chat. ops needs its token, like `123456:ABC-DEF…`, and the chat ID: a number like `-1001234567890` for a group or channel, or `@channelname` for a public channel.
+- **Telegram**: make a bot with [@BotFather](https://t.me/BotFather) and add it to the chat. moin needs its token, like `123456:ABC-DEF…`, and the chat ID: a number like `-1001234567890` for a group or channel, or `@channelname` for a public channel.
 - **Webhook**: any `http` or `https` URL of your own. See [Webhooks](#webhooks).
 
 The URL and the bot token are stored encrypted, like your registry passwords, and never shown again in full: the lists show the host and the last characters, like `hooks.slack.com/…WXYZ`. They never go in the activity. The hosted control plane posts only to public addresses.
@@ -86,13 +86,13 @@ A test shows that the destination takes alerts, right after you add it or whenev
 
 ```surfaces
 Web: **Alerts**, **Send test** next to the destination
-CLI: ops alerts test team-ops
+CLI: moin alerts test team-ops
 TUI: settings tab, the destination, `T`, `enter` or `:test`
 API: POST /api/v1/alert-destinations/team-ops/test
 MCP: test_alert_destination
 ```
 
-ops waits up to 10 seconds for the answer. A refused test says why, such as `HTTP 404: no_service`, and the API answers `424` with `alert_send_failed`.
+moin waits up to 10 seconds for the answer. A refused test says why, such as `HTTP 404: no_service`, and the API answers `424` with `alert_send_failed`.
 
 ### A destination that fails
 
@@ -102,7 +102,7 @@ Each destination gets 10 seconds per alert. One that does not take an alert is m
 
 ```surfaces
 Web: **Alerts**, **Remove** next to the destination
-CLI: ops alerts rm team-ops
+CLI: moin alerts rm team-ops
 TUI: settings tab, the destination, `x`, then `y`
 API: DELETE /api/v1/alert-destinations/team-ops
 MCP: remove_alert_destination
@@ -124,18 +124,18 @@ A webhook gets each alert as a JSON `POST`. Fields that do not belong to the eve
   "reason": "HTTP 502",
   "since": "2026-11-03T14:05:00Z",
   "duration": "",
-  "url": "https://ops.example.com/app/acme/apps/shop/uptime"
+  "url": "https://moin.example.com/app/acme/apps/shop/uptime"
 }
 ```
 
 `event` is one of the five above, or `test`. `reason` is why a site is down or the error of a failed deploy. `since` is when a site or server went down, `duration` how long it was down, like `4m30s`.
 
-A new webhook comes with a **signing secret**, shown this once. Every post carries `X-Ops-Signature: sha256=` and the hex HMAC-SHA256 of the body with it. Check it before you trust a post:
+A new webhook comes with a **signing secret**, shown this once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body with it. Check it before you trust a post:
 
 ```go
 mac := hmac.New(sha256.New, []byte(secret))
 mac.Write(body)
-ok := hmac.Equal([]byte(r.Header.Get("X-Ops-Signature")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil))))
+ok := hmac.Equal([]byte(r.Header.Get("X-Moin-Signature")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil))))
 ```
 
-Answer with any `2xx`; ops follows no redirects. A lost secret cannot be shown again: remove the webhook and add it again.
+Answer with any `2xx`; moin follows no redirects. A lost secret cannot be shown again: remove the webhook and add it again.

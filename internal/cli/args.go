@@ -35,7 +35,7 @@ func newFlags(name, usage string) *flagSet {
 
 // withApp adds --app.
 func (f *flagSet) withApp() *flagSet {
-	f.appFlag = f.String("app", "", "app name; default x-ops.app in compose.yml, then the directory name")
+	f.appFlag = f.String("app", "", "app name; default x-moin.app in compose.yml, then the directory name")
 	return f
 }
 
@@ -86,7 +86,7 @@ func (f *flagSet) wrong() error {
 func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
 
 // app picks the app the command works on: --app, then the argument, then
-// x-ops.app in compose.yml, then the directory name. A not found error
+// x-moin.app in compose.yml, then the directory name. A not found error
 // names it and where it came from.
 func (f *flagSet) app(argument string) (string, error) {
 	return f.appIn(argument, ".")
@@ -110,7 +110,7 @@ func (f *flagSet) appIn(argument, dir string) (string, error) {
 		from = source
 	}
 	if name == "" {
-		return "", errors.New("cannot tell the app: pass it with --app, or set x-ops.app in compose.yml")
+		return "", errors.New("cannot tell the app: pass it with --app, or set x-moin.app in compose.yml")
 	}
 	picked = pickedApp{name: name, from: from}
 	return name, nil

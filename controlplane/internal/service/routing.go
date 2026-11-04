@@ -123,12 +123,12 @@ type Instant struct {
 	User     string
 	Password string
 	// OwnPassword says the app's own password guards it, the one of its
-	// domains; ops shows no password then.
+	// domains; moin shows no password then.
 	OwnPassword bool
 }
 
 // Instant reports the app's instant address. With show, it carries the
-// password ops made for it.
+// password moin made for it.
 func (s *AppService) Instant(workspaceID, idOrName string, show bool) (Instant, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
@@ -154,7 +154,7 @@ func (s *AppService) Instant(workspaceID, idOrName string, show bool) (Instant, 
 		if ipv4, _ := ServerAddresses(*server); ipv4 == "" {
 			instant.Reason = "The server has no public IPv4 the address could name."
 		} else {
-			instant.Reason = "x-ops.instant in compose.yml turns it off."
+			instant.Reason = "x-moin.instant in compose.yml turns it off."
 		}
 	}
 	if !instant.Open {
@@ -265,7 +265,7 @@ func (s *AppService) instantRouting(app *model.App, routing *protocol.Routing) e
 	return nil
 }
 
-// instantPassword is the password ops made for the app's instant address,
+// instantPassword is the password moin made for the app's instant address,
 // made on first use.
 func (s *AppService) instantPassword(app *model.App) (string, error) {
 	if app.InstantPassword != "" {

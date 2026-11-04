@@ -54,11 +54,11 @@ templ Activity(view ActivityView) {
 				@activityFilters(view)
 			}
 			if len(view.Events) == 0 && view.filtered() {
-				@emptyState("Nothing matches", "No change of the team matches this filter.", "ops activity")
+				@emptyState("Nothing matches", "No change of the team matches this filter.", "moin activity")
 			} else if len(view.Events) == 0 {
-				@emptyState("Nothing happened yet", "Deploys, restores, SQL writes and every other change of the team show up here.", "ops activity")
+				@emptyState("Nothing happened yet", "Deploys, restores, SQL writes and every other change of the team show up here.", "moin activity")
 			} else {
-				@panel(panelProps{Title: "Changes", Docs: "/docs/guides/activity", Description: "Newest first, times in UTC. The same list is in ops activity.", Body: panelBodyRows}) {
+				@panel(panelProps{Title: "Changes", Docs: "/docs/guides/activity", Description: "Newest first, times in UTC. The same list is in moin activity.", Body: panelBodyRows}) {
 					<ol class="flex flex-col gap-1" data-activity>
 						@ActivityRows(view)
 					</ol>

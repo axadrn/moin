@@ -30,7 +30,7 @@ func TestBucketsMigrationKeepsTheBucket(t *testing.T) {
 		`INSERT INTO servers (id, workspace_id, name) VALUES ('s1', 'w1', 'web')`,
 		`INSERT INTO apps (id, workspace_id, server_id, name) VALUES ('a1', 'w1', 's1', 'shop')`,
 		`INSERT INTO backup_storage (workspace_id, endpoint, region, bucket, path, access_key, secret_key, created_at)
-			VALUES ('w1', 'https://r2.example.com', 'auto', 'acme-backups', 'ops', 'AKIA1', 'sealed-secret', '2026-10-01 10:00:00')`,
+			VALUES ('w1', 'https://r2.example.com', 'auto', 'acme-backups', 'moin', 'AKIA1', 'sealed-secret', '2026-10-01 10:00:00')`,
 	} {
 		if _, err := database.Exec(statement); err != nil {
 			t.Fatalf("%s: %v", statement, err)
@@ -48,7 +48,7 @@ func TestBucketsMigrationKeepsTheBucket(t *testing.T) {
 		t.Fatal(err)
 	}
 	if id == "" || workspace != "w1" || name != "default" || !isDefault || endpoint != "https://r2.example.com" || region != "auto" ||
-		bucket != "acme-backups" || path != "ops" || accessKey != "AKIA1" || secretKey != "sealed-secret" {
+		bucket != "acme-backups" || path != "moin" || accessKey != "AKIA1" || secretKey != "sealed-secret" {
 		t.Fatalf("bucket = %s %s %s %v %s %s %s %s %s %s", id, workspace, name, isDefault, endpoint, region, bucket, path, accessKey, secretKey)
 	}
 	var count int

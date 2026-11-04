@@ -43,8 +43,8 @@ type Server struct {
 	SSHTailscale bool                         `json:"ssh_tailscale"`
 	Firewall     bool                         `json:"firewall"`
 	Security     *protocol.ServerConfigResult `json:"security"`
-	// Rules are what the owner of the server allows ops to do there, from
-	// /etc/ops/rules on the server. Null without rules.
+	// Rules are what the owner of the server allows moin to do there, from
+	// /etc/moin/rules on the server. Null without rules.
 	Rules     *protocol.Rules `json:"rules"`
 	CreatedAt time.Time       `json:"created_at"`
 }

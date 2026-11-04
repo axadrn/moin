@@ -55,7 +55,7 @@ templ AppRouting(view RoutingView) {
 				}
 				if fromCompose(view.Checks) {
 					<p class="text-sm text-muted-foreground" data-domains-from-compose>
-						<span class="font-mono text-foreground">x-ops.domains</span> in compose.yml sets these domains. Change them there and deploy; ops cannot add or remove them while compose.yml sets them.
+						<span class="font-mono text-foreground">x-moin.domains</span> in compose.yml sets these domains. Change them there and deploy; moin cannot add or remove them while compose.yml sets them.
 					</p>
 				} else {
 					<form class="flex flex-col gap-2 sm:flex-row" hx-post={ routingPath + "/add" } hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find button[type='submit']">
@@ -103,7 +103,7 @@ templ AppRouting(view RoutingView) {
 							@field.Label(field.LabelProps{For: "protect-user"}) {
 								Username
 							}
-							@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "ops", Attributes: templ.Attributes{"autocomplete": "off", "required": true, "aria-describedby": "protect-user-hint"}})
+							@input.Input(input.Props{ID: "protect-user", Name: "username", Type: "text", Value: "moin", Attributes: templ.Attributes{"autocomplete": "off", "required": true, "aria-describedby": "protect-user-hint"}})
 							@fieldHint("protect-user", "") {
 								No spaces or colons.
 							}
@@ -227,7 +227,7 @@ templ instantPanel(view RoutingView, routingPath string) {
 								case view.Instant.Password != "":
 									Sign in as <span class="font-medium text-foreground">{ view.Instant.User }</span> with <span class="font-mono text-foreground" data-instant-password>{ view.Instant.Password }</span>.
 								default:
-									A password ops made guards it: sign in as <span class="font-medium text-foreground">{ view.Instant.User }</span>.
+									A password moin made guards it: sign in as <span class="font-medium text-foreground">{ view.Instant.User }</span>.
 							}
 						</p>
 					</div>
@@ -320,7 +320,7 @@ func domainRows(view RoutingView) []service.DomainCheck {
 	return rows
 }
 
-// fromCompose says x-ops.domains in compose.yml sets the domains of the
+// fromCompose says x-moin.domains in compose.yml sets the domains of the
 // main service.
 func fromCompose(checks []service.DomainCheck) bool {
 	return len(checks) > 0 && checks[0].FromCompose && checks[0].Service == ""
@@ -329,7 +329,7 @@ func fromCompose(checks []service.DomainCheck) bool {
 // serverAdvice is the DNS record a new domain needs.
 func serverAdvice(view RoutingView) string {
 	if view.Server.Tunnel {
-		return "Add one below; ops points its DNS at the Cloudflare Tunnel."
+		return "Add one below; moin points its DNS at the Cloudflare Tunnel."
 	}
 	if view.Server.ID == "" {
 		return "Add one below, then point its DNS at the server."
@@ -350,5 +350,5 @@ func protectUser(app model.App) string {
 			return app.Protect[:index]
 		}
 	}
-	return "ops"
+	return "moin"
 }

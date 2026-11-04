@@ -9,7 +9,7 @@ import (
 // WorkspaceAuditEvent is one change in the activity of a workspace.
 //
 // What goes in: the exact time in UTC, who did it (the member, the API token
-// by name, a deploy hook, a GitHub push or ops itself), how it came in, the
+// by name, a deploy hook, a GitHub push or moin itself), how it came in, the
 // client IP and user agent of the member's own request, what it touched and
 // the settings before and after: names, on and off, domains, branches, roles,
 // counts, versions, release numbers and error messages.
@@ -95,7 +95,7 @@ func (e WorkspaceAuditEvent) Details() map[string]string {
 	return details
 }
 
-// Actor names who did it: the member's email, or GitHub, a deploy hook or ops
+// Actor names who did it: the member's email, or GitHub, a deploy hook or moin
 // itself for changes that came without a member.
 func (e WorkspaceAuditEvent) Actor() string {
 	switch {
@@ -106,7 +106,7 @@ func (e WorkspaceAuditEvent) Actor() string {
 	case e.Via == "hook":
 		return "A deploy hook"
 	default:
-		return "ops"
+		return "moin"
 	}
 }
 
@@ -130,7 +130,7 @@ func (e WorkspaceAuditEvent) ViaLabel() string {
 	case "github":
 		label = "GitHub"
 	case "system":
-		label = "ops"
+		label = "moin"
 	}
 	if e.TokenName != "" {
 		if label == "" {
@@ -373,7 +373,7 @@ func (e WorkspaceAuditEvent) Summary() string {
 	case "disk.ok":
 		return "found room on the disk of " + target + " again, " + d["used_percent"] + "% full"
 	case "github.disconnected":
-		return "uninstalled the ops GitHub App from " + target
+		return "uninstalled the moin GitHub App from " + target
 	case "api_token.created":
 		return "created the API token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
 	case "api_token.revoked":

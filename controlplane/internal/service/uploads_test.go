@@ -14,13 +14,13 @@ import (
 // app of the same name, and an app created again gets a new folder. No
 // upload key of one is ever inside the folder of another.
 func TestUploadKeys(t *testing.T) {
-	storage := protocol.BackupStorage{Bucket: "shared", Path: "ops"}
+	storage := protocol.BackupStorage{Bucket: "shared", Path: "moin"}
 	var keys []string
 	for _, item := range []struct{ workspace, appID string }{{"ws-one", "app-1"}, {"ws-two", "app-2"}, {"ws-one", "app-3"}} {
 		storage.Workspace = item.workspace
 		keys = append(keys, uploadKey(storage, &model.App{ID: item.appID, Name: "blog"}, testUpload))
 	}
-	if keys[0] != "ops/ws-one/blog/app-1/uploads/"+testUpload+".tar.gz" {
+	if keys[0] != "moin/ws-one/blog/app-1/uploads/"+testUpload+".tar.gz" {
 		t.Fatalf("key = %s", keys[0])
 	}
 	for i, key := range keys {

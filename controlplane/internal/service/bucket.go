@@ -207,7 +207,7 @@ func (s *AppService) OlderBuckets(app *model.App) ([]Bucket, error) {
 	return views, nil
 }
 
-// AddBucket checks that ops can write to a new bucket and stores it. The
+// AddBucket checks that moin can write to a new bucket and stores it. The
 // first bucket of a workspace is its default.
 func (s *AppService) AddBucket(ctx context.Context, actor Actor, input BucketInput) (*Bucket, error) {
 	storage, err := cleanBucket(actor.WorkspaceID, input)

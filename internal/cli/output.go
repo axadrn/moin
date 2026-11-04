@@ -112,7 +112,7 @@ func explain(err error) string {
 }
 
 // sentence capitalizes the first word, but not one like "v4" or the name
-// of ops, which is always lowercase.
+// of moin, which is always lowercase.
 func sentence(text string) string {
 	runes := []rune(text)
 	if len(runes) < 2 || !unicode.IsLower(runes[1]) || strings.HasPrefix(text, build.Name+" ") {

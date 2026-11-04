@@ -20,7 +20,7 @@ func TestUpdateAgent(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	audit := repository.NewWorkspaceAuditRepository(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")
+	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	servers.downloads = t.TempDir()
 	server, installToken, err := servers.Create(owner, "web-1")
 	if err != nil {
@@ -66,7 +66,7 @@ func TestUpdateAgent(t *testing.T) {
 	}
 	_, err = servers.UpdateAgent(ctx, owner, "web-1")
 	var agentErr *AgentError
-	if !errors.As(err, &agentErr) || !strings.Contains(agentErr.Message, "too old") || !strings.Contains(agentErr.Message, "https://ops.example.com/download/"+build.Name+"-linux-arm64") {
+	if !errors.As(err, &agentErr) || !strings.Contains(agentErr.Message, "too old") || !strings.Contains(agentErr.Message, "https://moin.example.com/download/"+build.Name+"-linux-arm64") {
 		t.Fatalf("old agent: err = %v", err)
 	}
 

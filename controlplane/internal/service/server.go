@@ -345,9 +345,9 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	}
 }
 
-// ErrSubscriptionRequired means the account needs the ops plan to add a
+// ErrSubscriptionRequired means the account needs the moin plan to add a
 // server.
-var ErrSubscriptionRequired = errors.New("subscribe to ops to add servers")
+var ErrSubscriptionRequired = errors.New("subscribe to moin to add servers")
 
 // ErrTrialEnded means the workspace has no plan with changes, such as after
 // its trial: it is read-only until it subscribes.

@@ -1,4 +1,4 @@
-// Package tui is what `ops` opens without a command. It shows the same data
+// Package tui is what `moin` opens without a command. It shows the same data
 // as the web UI and the CLI, live from the control plane. This file holds the
 // state, the keys and the commands; view.go draws it.
 package tui
@@ -223,7 +223,7 @@ type model struct {
 	selected int
 	input    string
 	added    *client.NewServer
-	// again marks added as a new install command for a server ops has.
+	// again marks added as a new install command for a server moin has.
 	again   bool
 	removed *removedServer
 	// pendingSQL is a query that changes data, waiting for a yes.
@@ -866,7 +866,7 @@ func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
 			if key == "t" {
 				change.security.Tunnel = !server.Tunnel
 				change.question = "Route " + server.Name + " through a Cloudflare Tunnel?"
-				change.detail = "Ports 80 and 443 close; ops points your domains at the tunnel."
+				change.detail = "Ports 80 and 443 close; moin points your domains at the tunnel."
 				if server.Tunnel {
 					change.question, change.detail = "Take "+server.Name+" off the tunnel?", "Traefik takes ports 80 and 443 again; point your domains at the server."
 				}
@@ -1256,7 +1256,7 @@ func (m model) logs(name string) tea.Cmd {
 }
 
 // deploy packs the directory the TUI started in and follows the deploy in
-// the output panel. The app must exist; `ops deploy` creates new ones.
+// the output panel. The app must exist; `moin deploy` creates new ones.
 func (m model) deploy() tea.Cmd {
 	name := client.AppName("", m.dir)
 	return func() tea.Msg {
@@ -1304,7 +1304,7 @@ func (m model) deployRef(name, ref string) tea.Cmd {
 }
 
 // showGitHub fills the output panel with the repo the app follows and the
-// repos ops may read.
+// repos moin may read.
 func (m model) showGitHub(app client.App) tea.Cmd {
 	return func() tea.Msg {
 		repos, err := m.api.GitHubRepos(m.ctx)
@@ -1322,7 +1322,7 @@ func (m model) showGitHub(app client.App) tea.Cmd {
 		case err != nil:
 			lines = append(lines, style.Muted.Render("repos: "+sentence(err.Error())))
 		case len(repos) == 0:
-			lines = append(lines, style.Muted.Render("No repos yet: install the ops GitHub App, see the settings tab."))
+			lines = append(lines, style.Muted.Render("No repos yet: install the moin GitHub App, see the settings tab."))
 		default:
 			rows := make([][]any, 0, len(repos))
 			for _, repo := range repos {
@@ -1454,7 +1454,7 @@ func (m model) showDomains(name string) tea.Cmd {
 		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical, api:api.blog.de for the service api"
 		switch {
 		case fromCompose:
-			note = "x-ops.domains in compose.yml sets these: change them there and deploy"
+			note = "x-moin.domains in compose.yml sets these: change them there and deploy"
 		case advice != "":
 			note = "set DNS: " + advice
 		}

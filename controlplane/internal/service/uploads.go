@@ -23,11 +23,11 @@ import (
 
 // A deploy from a laptop goes into the user's own bucket: the CLI uploads
 // the source there through a signed link, the agent downloads it from
-// there and deletes it. ops signs the links and never sees the code.
+// there and deletes it. moin signs the links and never sees the code.
 
 var (
-	ErrUpload       = errors.New("the upload is unknown or expired: run ops deploy again")
-	ErrUploadBucket = errors.New("ops deploy uploads your code to your own bucket: add one first")
+	ErrUpload       = errors.New("the upload is unknown or expired: run moin deploy again")
+	ErrUploadBucket = errors.New("moin deploy uploads your code to your own bucket: add one first")
 	uploadPattern   = regexp.MustCompile(`^up_[a-z0-9]{20,64}$`)
 )
 
@@ -81,7 +81,7 @@ func (s *AppService) DeployUpload(ctx context.Context, actor Actor, idOrName, up
 	return s.deploySource(ctx, actor, "app.deployed", app, *storage, uploadKey(*storage, app, uploadID), sum)
 }
 
-// DeployFiles deploys a source ops writes itself, such as a catalog app's
+// DeployFiles deploys a source moin writes itself, such as a catalog app's
 // compose.yml: it goes into the app's bucket like an upload of the CLI,
 // and the agent fetches it from there.
 func (s *AppService) DeployFiles(ctx context.Context, actor Actor, action, idOrName string, files map[string][]byte) (*model.Deploy, error) {

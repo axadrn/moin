@@ -8,8 +8,8 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
-// Domains x-ops sets are marked and offer no remove, canonical or add,
-// because ops cannot change them.
+// Domains x-moin sets are marked and offer no remove, canonical or add,
+// because moin cannot change them.
 func TestRoutingMarksComposeDomains(t *testing.T) {
 	view := RoutingView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.de", Canonical: true, Points: true, FromCompose: true}}}
 	var html strings.Builder
@@ -30,7 +30,7 @@ func TestRoutingMarksComposeDomains(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html.String(), "Remove shop.de") || !strings.Contains(html.String(), "data-add-domain") {
-		t.Errorf("ops domains lost their actions")
+		t.Errorf("moin domains lost their actions")
 	}
 }
 
@@ -40,7 +40,7 @@ func TestRoutingInstantAndServices(t *testing.T) {
 	view := RoutingView{
 		App:     model.App{Name: "shop"},
 		Checks:  []service.DomainCheck{{Domain: "shop.de", Points: true}, {Domain: "api.shop.de", Service: "api", Points: true}},
-		Instant: service.Instant{Provider: "sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "ops"},
+		Instant: service.Instant{Provider: "sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "moin"},
 	}
 	var html strings.Builder
 	if err := AppRouting(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {

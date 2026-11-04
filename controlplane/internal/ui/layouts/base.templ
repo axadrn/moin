@@ -134,13 +134,13 @@ templ seo(props SEOProps) {
 }
 
 // feedbackScript marks the field a request failed on (DESIGN.md, Feedback):
-// the handler sends the ops:invalid event with the field's ID, and the field
+// the handler sends the moin:invalid event with the field's ID, and the field
 // turns red and takes the focus. The message replaces the hint of its hint
 // line (@fieldHint), or shows as a toast when the field has none. The line
 // keeps its height, so nothing moves. Changing the field clears it again.
 templ feedbackScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
-		document.addEventListener("ops:invalid", (event) => {
+		document.addEventListener("moin:invalid", (event) => {
 			const { field: id, title, message } = event.detail;
 			const field = document.getElementById(id);
 			if (!field) return;

@@ -9,7 +9,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
-// GitHub is the answer of GET /api/v1/github: where the ops GitHub App is
+// GitHub is the answer of GET /api/v1/github: where the moin GitHub App is
 // installed and the links that connect it.
 type GitHub struct {
 	Enabled bool `json:"enabled"`
@@ -25,7 +25,7 @@ type GitHub struct {
 type GitHubInstallation struct {
 	ID      int64  `json:"id"`
 	Account string `json:"account"`
-	// SettingsURL is where the account chooses the repos ops may read.
+	// SettingsURL is where the account chooses the repos moin may read.
 	SettingsURL string `json:"settings_url"`
 }
 
@@ -39,7 +39,7 @@ type GitHubRepos struct {
 	Items []GitHubRepo `json:"items"`
 }
 
-// GitHubRepo is a repo ops may read.
+// GitHubRepo is a repo moin may read.
 type GitHubRepo struct {
 	FullName      string `json:"full_name"`
 	DefaultBranch string `json:"default_branch"`
@@ -76,7 +76,7 @@ func (h *AppsHandler) GetGitHub(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, answer)
 }
 
-// GetGitHubRepos lists the repos ops may read.
+// GetGitHubRepos lists the repos moin may read.
 func (h *AppsHandler) GetGitHubRepos(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	repos, err := h.apps.GitHubRepos(r.Context(), workspace.ID)

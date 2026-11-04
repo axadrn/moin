@@ -1,4 +1,4 @@
-// Package githubstars knows how many stars the ops repo has on GitHub. It
+// Package githubstars knows how many stars the moin repo has on GitHub. It
 // asks GitHub at most once an hour, without a token: GitHub allows 60
 // such calls an hour per address. Pages never wait for it.
 package githubstars

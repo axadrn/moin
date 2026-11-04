@@ -8,13 +8,13 @@ order: 14
 
 ## Your workspace
 
-Everything you add to ops lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App. Everyone in the workspace sees and works on all of it. The plan belongs to the workspace too, so one subscription covers the whole team.
+Everything you add to moin lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App. Everyone in the workspace sees and works on all of it. The plan belongs to the workspace too, so one subscription covers the whole team.
 
 You name your first workspace when you sign up. Rename it later under [Rename the workspace](#rename-the-workspace).
 
 ## Create a workspace
 
-Makes one more workspace, for example one per client. On hosted ops each workspace has its own plan.
+Makes one more workspace, for example one per client. On hosted moin each workspace has its own plan.
 
 ```surfaces
 Web: the workspace switcher at the top of the sidebar, **New workspace**
@@ -41,7 +41,7 @@ Lists the members of the workspace and the invitations that wait for an answer.
 
 ```surfaces
 Web: **Team**
-CLI: ops team
+CLI: moin team
 TUI: the **team** tab
 API: GET /api/v1/workspaces/{slug}
 MCP: get_workspace
@@ -53,7 +53,7 @@ Sends an email that lets someone join the workspace. The invitation works for se
 
 ```surfaces
 Web: **Team**, **Invite a teammate**, **Send invite**
-CLI: ops team invite <email>
+CLI: moin team invite <email>
 TUI: on the team tab, `a`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
@@ -67,7 +67,7 @@ Sends the email again, for example when it landed in spam.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Resend**
-CLI: ops team resend <email>
+CLI: moin team resend <email>
 TUI: on the team tab, pick the invitation, then `enter`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
 MCP: resend_invitation
@@ -81,7 +81,7 @@ Takes an invitation back before someone accepts it.
 
 ```surfaces
 Web: **Team**, **Pending invitations**, **Revoke**
-CLI: ops team revoke <email>
+CLI: moin team revoke <email>
 TUI: on the team tab, pick the invitation, `x`, then `y`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
 MCP: revoke_invitation
@@ -93,7 +93,7 @@ Changes the name everyone in the workspace sees.
 
 ```surfaces
 Web: **Team**, **Workspace name**, **Save**
-CLI: ops team rename "<workspace-name>"
+CLI: moin team rename "<workspace-name>"
 TUI: on the team tab, `cw` or `:rename`
 API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
@@ -121,7 +121,7 @@ API: DELETE /api/v1/workspaces/{slug}/members/{id}
 
 **Leave** takes you out of the workspace. Its servers and apps stay for the others.
 
-**Delete workspace** removes the workspace with its members, invitations, activity, servers and apps from ops. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner deletes a workspace, and you type its name first. It cannot be undone. A paid plan must be cancelled and run out first.
+**Delete workspace** removes the workspace with its members, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner deletes a workspace, and you type its name first. It cannot be undone. A paid plan must be cancelled and run out first.
 
 ```surfaces
 Web: **Team**, **Leave**, then **Leave workspace**
@@ -141,7 +141,7 @@ Changing roles, removing people, leaving and deleting a workspace need you signe
 A personal API token belongs to one workspace: you pick it when you create the token under **Settings**. The CLI, the terminal UI, the GitHub Action and agents work in that workspace. For another workspace, log in with one of its tokens:
 
 ```bash
-ops login --token pat_…
+moin login --token pat_…
 ```
 
 ## Activity

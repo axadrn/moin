@@ -12,4 +12,4 @@ login: "The first account you create becomes the admin."
 logo: https://raw.githubusercontent.com/advplyr/audiobookshelf/master/client/static/icon.svg
 ---
 
-Upload your library, listen in the browser or the apps, and pick up where you left off on any device. Progress and users live in its SQLite, which ops backs up.
+Upload your library, listen in the browser or the apps, and pick up where you left off on any device. Progress and users live in its SQLite, which moin backs up.

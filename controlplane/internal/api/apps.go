@@ -176,7 +176,7 @@ type Instant struct {
 	Reason   string `json:"reason,omitempty"`
 	Open     bool   `json:"open"`
 	User     string `json:"user,omitempty"`
-	// Password is the one ops made, with show=true; OwnPassword says the
+	// Password is the one moin made, with show=true; OwnPassword says the
 	// app's own password, the one of its domains, guards it instead.
 	Password    string `json:"password,omitempty"`
 	OwnPassword bool   `json:"own_password"`
@@ -279,7 +279,7 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // {"image": "..."} deploys an image built elsewhere.
 func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		Error(w, http.StatusUnsupportedMediaType, "update_ops", "This ops is too old: sources go to your own bucket now. Update it with curl -fsSL <control plane>/cli.sh | sh.")
+		Error(w, http.StatusUnsupportedMediaType, "update_ops", "This moin is too old: sources go to your own bucket now. Update it with curl -fsSL <control plane>/cli.sh | sh.")
 		return
 	}
 	var request deployRequest
@@ -310,7 +310,7 @@ type UploadResponse struct {
 }
 
 // CreateUpload signs a link the CLI uploads a source to, in the user's own
-// bucket. ops never sees the code.
+// bucket. moin never sees the code.
 func (h *AppsHandler) CreateUpload(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	upload, err := h.apps.Upload(r.Context(), workspace.ID, r.PathValue("app"))
@@ -707,7 +707,7 @@ type DomainCheck struct {
 	Advice string   `json:"advice"`
 	Found  []string `json:"found"`
 	Points bool     `json:"points"`
-	// FromCompose says x-ops.domains in compose.yml sets the domain.
+	// FromCompose says x-moin.domains in compose.yml sets the domain.
 	FromCompose bool `json:"from_compose"`
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
@@ -779,7 +779,7 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetInstant answers the app's instant address; with show=true the
-// password ops made for it, which needs a token that may write.
+// password moin made for it, which needs a token that may write.
 func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	show := r.URL.Query().Get("show") == "true"

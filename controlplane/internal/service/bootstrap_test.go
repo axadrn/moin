@@ -14,7 +14,7 @@ import (
 // signs in once.
 func TestBootstrap(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
-	servers := NewServerService(repository.NewServerRepository(environment.database), repository.NewWorkspaceAuditRepository(environment.database), "https://ops.example.com")
+	servers := NewServerService(repository.NewServerRepository(environment.database), repository.NewWorkspaceAuditRepository(environment.database), "https://moin.example.com")
 
 	first, err := Bootstrap(environment.auth, environment.workspaceService, servers, "Admin@Example.com", "Web_1.example.com")
 	if err != nil || !strings.HasPrefix(first, installTokenMarker) {

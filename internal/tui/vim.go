@@ -711,7 +711,7 @@ var helpEntries = [][2]string{
 	{"gg G", "the top, the end; G follows new lines"},
 	{"", "Apps"},
 	{"a", "create an app"},
-	{"d", "deploy the directory ops started in"},
+	{"d", "deploy the directory moin started in"},
 	{"gh", "GitHub: deploy a branch, link or unlink a repo"},
 	{"i", "deploy an image"},
 	{"R", "redeploy"},

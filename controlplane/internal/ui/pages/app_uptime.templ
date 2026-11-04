@@ -32,7 +32,7 @@ templ AppUptime(view UptimeView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " uptime", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Uptime"}}}) {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
-			@appHeader(view.App, "uptime", "ops visits every domain once a minute from outside, like a visitor. Down and back up again go to the activity.")
+			@appHeader(view.App, "uptime", "moin visits every domain once a minute from outside, like a visitor. Down and back up again go to the activity.")
 			<div id="app-uptime" class="flex flex-col gap-6">
 				if !view.Uptime.ServerOnline && view.App.ServerName != "" {
 					@stateAlert(templ.Attributes{"data-server-offline": true}) {
@@ -40,7 +40,7 @@ templ AppUptime(view UptimeView) {
 					}
 				}
 				if len(view.Uptime.Domains) == 0 {
-					@emptyState("No domains to check", "Add a domain to the app and deploy it; from then on ops checks it every minute.", "ops domains add blog.de")
+					@emptyState("No domains to check", "Add a domain to the app and deploy it; from then on moin checks it every minute.", "moin domains add blog.de")
 				}
 				for _, domain := range view.Uptime.Domains {
 					@uptimeDomain(view, domain)

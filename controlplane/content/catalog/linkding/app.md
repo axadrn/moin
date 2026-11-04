@@ -8,7 +8,7 @@ license: MIT
 image: sissbruecker/linkding
 database: sqlite
 port: 9090
-login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
 logo: https://github.com/sissbruecker/linkding/blob/HEAD/assets/logo.svg
 ---
 

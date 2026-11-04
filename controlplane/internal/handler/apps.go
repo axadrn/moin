@@ -17,7 +17,7 @@ import (
 	"github.com/axadrn/moin/internal/dotenv"
 )
 
-// AppsHandler is the apps pages of the web UI. Deploys come from `ops
+// AppsHandler is the apps pages of the web UI. Deploys come from `moin
 // deploy`; the web UI follows them, rolls back, shows logs and keeps env vars.
 type AppsHandler struct {
 	apps    *service.AppService
@@ -106,7 +106,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, pages.AppAddForm(servers))
-	toastDone(w, r, app.Name+" added", "Run ops deploy "+app.Name+" in its repo to ship it.")
+	toastDone(w, r, app.Name+" added", "Run moin deploy "+app.Name+" in its repo to ship it.")
 }
 
 func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {

@@ -19,7 +19,7 @@ func newServerService(t *testing.T) *ServerService {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "other"})
-	return NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://ops.example.com/")
+	return NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com/")
 }
 
 var testHello = protocol.Hello{ProtocolVersion: protocol.Version, AgentVersion: "v0.1.0", Hostname: "box", OS: "linux", Arch: "arm64"}
@@ -33,7 +33,7 @@ func TestInstallTokenWorksOnce(t *testing.T) {
 	if !strings.HasPrefix(installToken, "ins_") {
 		t.Fatalf("install token %q has no marker", installToken)
 	}
-	if got := servers.InstallCommand(installToken); got != "curl -fsSL https://ops.example.com/install.sh | sh -s -- "+installToken {
+	if got := servers.InstallCommand(installToken); got != "curl -fsSL https://moin.example.com/install.sh | sh -s -- "+installToken {
 		t.Fatalf("install command = %q", got)
 	}
 
@@ -155,7 +155,7 @@ func TestSessionsMarkServersOnline(t *testing.T) {
 	}
 	// The agent connected, so it is installed there.
 	uninstall, _, err := servers.Delete(owner, "prod")
-	if err != nil || uninstall != "ops agent uninstall" {
+	if err != nil || uninstall != "moin agent uninstall" {
 		t.Fatalf("delete = %q, %v", uninstall, err)
 	}
 	if kicked != 2 {
@@ -192,7 +192,7 @@ func TestAddingServersNeedsThePlan(t *testing.T) {
 	plan = access.PlanPro
 	_, _, err = servers.Create(owner, "web-1")
 	if err != nil || !servers.CanAdd(owner.WorkspaceID) {
-		t.Fatalf("ops plan: err = %v", err)
+		t.Fatalf("moin plan: err = %v", err)
 	}
 }
 

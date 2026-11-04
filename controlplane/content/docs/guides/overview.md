@@ -8,29 +8,29 @@ order: 0
 
 ## What needs you
 
-ops lists only what you have to act on, the most urgent first:
+moin lists only what you have to act on, the most urgent first:
 
 - **A server offline**: its agent stopped answering. A server whose agent never connected is not on the list.
 - **A failed deploy**: the newest deploy of an app failed, with the version that still runs.
 - **Backups that stopped**, and **a restore check that failed** ([Backups](/docs/guides/backups)).
 - **A domain down**, from the [uptime](/docs/guides/uptime) checks.
 - **A disk over 90%** on a server ([Metrics](/docs/guides/metrics)).
-- **An agent behind** the control plane, which updates by itself or with `ops servers update` ([Servers](/docs/guides/servers)).
+- **An agent behind** the control plane, which updates by itself or with `moin servers update` ([Servers](/docs/guides/servers)).
 
-Below it: the counts (apps live, servers online, backups checked in the last 24 hours), the [catalog](/docs/guides/catalog) apps with a newer release, and the last changes from the [activity log](/docs/guides/activity). Nothing new is stored; the Overview reads what ops already knows.
+Below it: the counts (apps live, servers online, backups checked in the last 24 hours), the [catalog](/docs/guides/catalog) apps with a newer release, and the last changes from the [activity log](/docs/guides/activity). Nothing new is stored; the Overview reads what moin already knows.
 
 ```surfaces
 Web: **Overview**, the first item of the sidebar, or `g` then `o`
-CLI: ops status
+CLI: moin status
 TUI: :status
 API: GET /api/v1/status
 MCP: get_status
 ```
 
-`ops status` exits with `1` when something needs you and `0` when all is good, so a script or a cron job can check it:
+`moin status` exits with `1` when something needs you and `0` when all is good, so a script or a cron job can check it:
 
 ```bash
-ops status || echo "ops needs you"
+moin status || echo "moin needs you"
 ```
 
 The API answers `ok`, the `issues` with their `kind`, `target`, `detail` and the `path` in the panel where you fix them, the `updates` and the `counts`.

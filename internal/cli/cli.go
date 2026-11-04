@@ -1,4 +1,4 @@
-// Package cli is `ops <command>`. Without a command, `ops` opens the TUI.
+// Package cli is `moin <command>`. Without a command, `moin` opens the TUI.
 package cli
 
 import (
@@ -23,11 +23,11 @@ import (
 	"golang.org/x/term"
 )
 
-const usage = `ops deploys and runs Docker Compose apps on your own servers.
+const usage = `moin deploys and runs Docker Compose apps on your own servers.
 
 Usage
-  ops                Open the terminal UI
-  ops <command>      Run one command
+  moin                Open the terminal UI
+  moin <command>      Run one command
 
 Account
   login              Sign in with a personal API token: login [--url <url>], token asked or on stdin
@@ -54,7 +54,7 @@ Servers
   servers update     Update the agent to the control plane's version now: servers update [web-1]
   servers auto-update  Agents update by themselves, on by default: servers auto-update [on|off]
   servers secure     Lock it down: secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
-  servers rules      The server's own rules for ops, from /etc/ops/rules on it
+  servers rules      The server's own rules for moin, from /etc/moin/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
   integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
 
@@ -99,8 +99,8 @@ Metrics
   metrics --server   A server: CPU, memory, disk, network and its apps by memory: metrics --server web-1
 
 GitHub
-  github             Where the ops GitHub App is installed, and the link to install it
-  github repos       Repos ops may read, and where to give it more
+  github             Where the moin GitHub App is installed, and the link to install it
+  github repos       Repos moin may read, and where to give it more
   github branches    Branches of a repo: github branches owner/name
   link               Follow a repo: link owner/name [--branch main] [--auto=false]
   unlink             Stop following it: unlink [app] [--yes]
@@ -151,24 +151,24 @@ Agent
   agent uninstall    Remove the agent from this server; the apps keep running: agent uninstall [--apps] [--yes]
   agent              Run the agent on this server
 
-  version            Show the version of ops and the control plane, and a newer release
+  version            Show the version of moin and the control plane, and a newer release
   update             Update a self-hosted control plane to the newest release [--yes]
   update <app>       Update an app from the catalog, after a snapshot: update umami [--version 3.4.1]
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
-from x-ops.app in compose.yml, then from the name of the current directory.
+from x-moin.app in compose.yml, then from the name of the current directory.
 Flags may come before or after the arguments. Commands that remove or
 replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
 
-Docs: https://ops.goilerplate.com/docs, or /docs on your own control plane.
+Docs: https://moin.run/docs, or /docs on your own control plane.
 `
 
 // printUsage writes the help: section names bold, descriptions muted on a
 // terminal, all in one column after the longest command.
 func printUsage(w io.Writer) {
-	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(usage, "ops", build.Name), "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(usage, "\n"), "\n")
 	width := 0
 	for _, line := range lines {
 		if name, _, ok := usageEntry(line); ok {
@@ -465,7 +465,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
 		var apiErr *client.Error
 		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
-			return fmt.Errorf("adding servers needs the ops plan: an owner subscribes under Billing at %s/app", config.URL)
+			return fmt.Errorf("adding servers needs the moin plan: an owner subscribes under Billing at %s/app", config.URL)
 		}
 		if err != nil {
 			return err
@@ -514,7 +514,7 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		fmt.Fprintln(stdout)
 		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
 		fmt.Fprintln(stdout)
-		hint(stdout, "It shows once: ops stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
+		hint(stdout, "It shows once: moin stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
 		return nil
 	case "rename":
 		flags := newFlags("servers rename", "servers rename <server> <new name>")
@@ -730,7 +730,7 @@ func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Rea
 	return nil
 }
 
-// printRules shows /etc/ops/rules of a server as its agent reported it.
+// printRules shows /etc/moin/rules of a server as its agent reported it.
 func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout io.Writer) error {
 	list, err := api.Servers(ctx)
 	if err != nil {
@@ -743,10 +743,10 @@ func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout
 		lines := server.Rules.Lines()
 		if len(lines) == 0 {
 			fmt.Fprintf(stdout, "%s has no rules: %s may do everything there.\n", style.Bold.Render(server.Name), build.Name)
-			hint(stdout, "Write them on the server in", "/etc/ops/rules")
+			hint(stdout, "Write them on the server in", "/etc/moin/rules")
 			return nil
 		}
-		fmt.Fprintf(stdout, "/etc/ops/rules on %s:\n\n", style.Bold.Render(server.Name))
+		fmt.Fprintf(stdout, "/etc/moin/rules on %s:\n\n", style.Bold.Render(server.Name))
 		for _, line := range lines {
 			fmt.Fprintln(stdout, "  "+line)
 		}

@@ -27,7 +27,7 @@ const (
 	telemetryMax = 100_000
 )
 
-// TelemetryService counts what ops runs. A self-hosted control plane sends a
+// TelemetryService counts what moin runs. A self-hosted control plane sends a
 // few counts every five minutes to the hosted one, which adds them to its own for
 // the landing page. Nothing else ever goes out: no name, domain or address.
 type TelemetryService struct {
@@ -115,7 +115,7 @@ func (s *TelemetryService) Receive(report model.TelemetryReport) error {
 // ErrTelemetry is a report that is not one.
 var ErrTelemetry = fmt.Errorf("not a telemetry report")
 
-// Network is what ops runs right now, hosted and self-hosted, cached for a
+// Network is what moin runs right now, hosted and self-hosted, cached for a
 // few minutes.
 func (s *TelemetryService) Network() model.Network {
 	s.mu.Lock()

@@ -489,7 +489,7 @@
   }
 }
 
-/* ops docs look (Native, DESIGN.md). Overrides the shadcn defaults above. */
+/* moin docs look (Native, DESIGN.md). Overrides the shadcn defaults above. */
 @layer components {
   .typeset {
     --typeset-body: color-mix(in oklab, var(--foreground) 86%, transparent);
@@ -623,7 +623,7 @@
 
 }
 
-/* ops docs: commands never break across lines. Inline code in a table stays
+/* moin docs: commands never break across lines. Inline code in a table stays
    on one line; a wide table scrolls sideways in its .typeset-scroll box. */
 @layer components {
   .typeset :is(td, th) code {

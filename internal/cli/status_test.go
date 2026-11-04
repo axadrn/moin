@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestStatus: ops status exits 0 when all is good and 1 when something
+// TestStatus: moin status exits 0 when all is good and 1 when something
 // needs you, so scripts and CI can check it.
 func TestStatus(t *testing.T) {
 	good := &fakeAPI{answers: map[string]string{

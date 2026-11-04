@@ -108,7 +108,7 @@ func (c *Cloudflare) PointAtTunnel(ctx context.Context, token, host, tunnelID st
 	if err != nil {
 		return "", err
 	}
-	record := map[string]any{"type": "CNAME", "name": host, "content": tunnelID + ".cfargotunnel.com", "proxied": true, "comment": "ops tunnel"}
+	record := map[string]any{"type": "CNAME", "name": host, "content": tunnelID + ".cfargotunnel.com", "proxied": true, "comment": "moin tunnel"}
 	if len(records) > 0 {
 		err = c.call(ctx, token, http.MethodPut, "/zones/"+zone+"/dns_records/"+records[0].ID, record, nil)
 	} else {

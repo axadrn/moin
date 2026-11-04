@@ -50,7 +50,7 @@ func TestAlertDestinations(t *testing.T) {
 		"POST /api/v1/alert-destinations/team/test": `{"name":"team"}`,
 	}}
 	code, stdout, stderr := runCLIWith(t, api, "https://ci.example.com/hook\n", "alerts", "add", "webhook", "ci", "--events", "deploy.failed")
-	if code != 0 || !strings.Contains(stdout, "Signing secret, shown this once: f00dfeed") || !strings.Contains(stdout, "ops alerts test ci") {
+	if code != 0 || !strings.Contains(stdout, "Signing secret, shown this once: f00dfeed") || !strings.Contains(stdout, "moin alerts test ci") {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if !api.seen(`POST /api/v1/alert-destinations {"kind":"webhook","name":"ci","url":"https://ci.example.com/hook","events":["deploy.failed"]}`) {

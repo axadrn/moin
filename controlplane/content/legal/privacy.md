@@ -1,16 +1,16 @@
 ---
 title: Privacy Policy
-description: What the hosted ops service stores, why, where it lives and how to get rid of it
+description: What the hosted moin service stores, why, where it lives and how to get rid of it
 lastUpdated: November 3, 2026
 ---
 
-Short version: ops stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
+Short version: moin stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
 
-This policy covers the hosted ops service. A control plane you host yourself sends us nothing about its users; you decide what it stores.
+This policy covers the hosted moin service. A control plane you host yourself sends us nothing about its users; you decide what it stores.
 
 ## Who we are
 
-The hosted ops service is run by its operator ("we"). We decide how the data described here is used. Write to [{{support_email}}](mailto:{{support_email}}) about anything in this policy.
+The hosted moin service is run by its operator ("we"). We decide how the data described here is used. Write to [{{support_email}}](mailto:{{support_email}}) about anything in this policy.
 
 ## Website visits and server logs
 
@@ -26,7 +26,7 @@ Legal basis: our legitimate interest in knowing which pages help (Art. 6(1)(f) G
 
 ## Cookies and browser storage
 
-ops sets only cookies it needs to work, so there is no cookie banner:
+moin sets only cookies it needs to work, so there is no cookie banner:
 
 - **session_token** keeps you signed in, for up to 7 days.
 - **csrf_token** protects forms against forged requests.
@@ -39,25 +39,25 @@ Your light or dark theme and a few view choices stay in your browser's local sto
 
 For your account we store your email address and, if you add them, your name and avatar. You sign in with a link sent by email, or with GitHub if it is offered; with GitHub we ask GitHub for your verified email address and store only that. Sign-in links expire after 10 minutes. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and sign-in links are stored only as cryptographic hashes.
 
-We send only emails that belong to the service: sign-in links, invitations, changes to your account, and important changes to ops. No newsletters or marketing emails.
+We send only emails that belong to the service: sign-in links, invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
 
 Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
 ## Servers, apps and deploys
 
-To run your apps ops stores:
+To run your apps moin stores:
 
 - **Servers**: name, hostname, operating system, architecture, agent version, firewall and security settings, and the IP addresses of the server. The agent token is stored as a hash.
 - **Apps**: name, domains, routing settings, deploy history with its logs, what the agent detected about the app (such as its services, port and SQLite databases), and the status of its backups.
-- **GitHub**: if you connect the ops GitHub App, the installation and its account name, the repo and branch of each app, and the commit of each deploy.
-- **Code**: never. `ops deploy` puts your code into your own bucket through a link ops signs, and your server deletes it there after downloading. Deploys from GitHub go from GitHub straight to your server.
+- **GitHub**: if you connect the moin GitHub App, the installation and its account name, the repo and branch of each app, and the commit of each deploy.
+- **Code**: never. `moin deploy` puts your code into your own bucket through a link moin signs, and your server deletes it there after downloading. Deploys from GitHub go from GitHub straight to your server.
 - **Secrets**: env vars, registry passwords, the secret key of your backup bucket, your Cloudflare API token, Cloudflare tunnel tokens and your Tailscale auth key are encrypted with AES-256-GCM before they are stored. Deploy hook tokens are stored as SHA-256 hashes, protection passwords as bcrypt hashes.
 
-Your apps, their files and their databases live on your servers, not with us. When you open the logs or the data of an app, ops fetches them from your server for that one view and does not keep them. Backups go from your server straight to the bucket you configure, never through ops.
+Your apps, their files and their databases live on your servers, not with us. When you open the logs or the data of an app, moin fetches them from your server for that one view and does not keep them. Backups go from your server straight to the bucket you configure, never through moin.
 
-When you connect Cloudflare or Tailscale, ops uses your token or key only to set up what you asked for, such as a tunnel, DNS records or Tailscale SSH on your server. What happens in those accounts is covered by their own privacy policies.
+When you connect Cloudflare or Tailscale, moin uses your token or key only to set up what you asked for, such as a tunnel, DNS records or Tailscale SSH on your server. What happens in those accounts is covered by their own privacy policies.
 
-If your apps hold personal data of other people, you are the controller for that data. ops only passes your instructions to your servers. Ask at [{{support_email}}](mailto:{{support_email}}) if you need a data processing agreement.
+If your apps hold personal data of other people, you are the controller for that data. moin only passes your instructions to your servers. Ask at [{{support_email}}](mailto:{{support_email}}) if you need a data processing agreement.
 
 Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
@@ -71,7 +71,7 @@ Legal basis: our and your team's legitimate interest in a secure, accountable se
 
 ## Support access
 
-To help with a problem, our support team can open your account as you see it. While they do, ops hides env var values, the data in your databases and the logs of your apps. When such a visit starts and ends is recorded in our own log, which is kept for 180 days.
+To help with a problem, our support team can open your account as you see it. While they do, moin hides env var values, the data in your databases and the logs of your apps. When such a visit starts and ends is recorded in our own log, which is kept for 180 days.
 
 Legal basis: the contract with you and our legitimate interest in a secure service (Art. 6(1)(b) and (f) GDPR).
 
@@ -85,18 +85,18 @@ Legal basis: the contract with you (Art. 6(1)(b) GDPR) and tax law (Art. 6(1)(c)
 
 A control plane someone hosts themselves sends us, unless its owner turns it off, a random instance ID, its version and the number of its servers, apps and deploys every five minutes. No names, domains, emails or addresses. We add the numbers up for our landing page.
 
-Legal basis: our legitimate interest in knowing how ops is used (Art. 6(1)(f) GDPR).
+Legal basis: our legitimate interest in knowing how moin is used (Art. 6(1)(f) GDPR).
 
 ## Who else processes data
 
-We share data only with the services that run ops for us, and only what each one needs:
+We share data only with the services that run moin for us, and only what each one needs:
 
 | Service | What it does | What it gets |
 | --- | --- | --- |
-| Hetzner Online (EU) | Hosts the control plane | Everything ops stores, on our server |
+| Hetzner Online (EU) | Hosts the control plane | Everything moin stores, on our server |
 | Cloudflare (USA) | Protects the site, sends our emails, stores files and a copy of our database | Every request to the site, your email address and the emails we send you, your avatar, a copy of our database |
 | Stripe (USA and EU) | Payments, tax and invoices | Your email address and what you enter at checkout |
-| GitHub (USA) | Sign-in with GitHub and the ops GitHub App, if you use them | What you allow on GitHub; ops reads your email address and the repos you chose |
+| GitHub (USA) | Sign-in with GitHub and the moin GitHub App, if you use them | What you allow on GitHub; moin reads your email address and the repos you chose |
 
 Umami runs on a server we control, so no other company gets the page views.
 
@@ -114,7 +114,7 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 - **Invitations**: deleted 180 days after they were sent.
 - **Support log**: 180 days.
 - **Server logs**: a short time, for security and troubleshooting.
-- **Our database backup**: a copy of the control plane's database goes to our bucket within seconds, so we can restore ops after a failure. Deleted data drops out of that copy within 7 days.
+- **Our database backup**: a copy of the control plane's database goes to our bucket within seconds, so we can restore moin after a failure. Deleted data drops out of that copy within 7 days.
 - **Payment records**: Stripe keeps them as long as tax law requires.
 
 ## Your rights
@@ -127,7 +127,7 @@ Secrets are encrypted, tokens and passwords are stored only as hashes, and the s
 
 ## Age
 
-ops is not meant for anyone under 16. If we learn that an account belongs to someone younger, we delete it.
+moin is not meant for anyone under 16. If we learn that an account belongs to someone younger, we delete it.
 
 ## Changes
 

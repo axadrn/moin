@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// Server is a machine with an ops agent. Online is not stored: the agent hub
+// Server is a machine with a moin agent. Online is not stored: the agent hub
 // knows which servers hold a session right now.
 type Server struct {
 	ID               string     `db:"id"`
@@ -30,7 +30,7 @@ type Server struct {
 	SSHTailscale bool   `db:"ssh_tailscale"`
 	Firewall     bool   `db:"firewall"`
 	Security     string `db:"security"`
-	// Rules are the server's own rules for ops, as JSON; see
+	// Rules are the server's own rules for moin, as JSON; see
 	// service.ServerRules.
 	Rules string `db:"rules"`
 	// Position is the place of the server in the workspace's order, from 0.

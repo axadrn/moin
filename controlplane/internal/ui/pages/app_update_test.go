@@ -49,7 +49,7 @@ func TestUpdateNotice(t *testing.T) {
 	// An update under way polls; a rolled back one says why.
 	running := out
 	running.Update = &model.UpdateState{State: "updating", Version: "v0.3.0", From: "v0.2.0", At: time.Now()}
-	if html := renderNotice(t, running); !strings.Contains(html, "every 5s") || !strings.Contains(html, "Updating ops to v0.3.0") {
+	if html := renderNotice(t, running); !strings.Contains(html, "every 5s") || !strings.Contains(html, "Updating moin to v0.3.0") {
 		t.Errorf("running: %s", html)
 	}
 	rolledBack := out

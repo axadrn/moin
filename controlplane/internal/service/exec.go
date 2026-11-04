@@ -32,7 +32,7 @@ type ExecResult struct {
 // ErrNoCommand is a run without a command.
 var ErrNoCommand = errors.New("give a command to run")
 
-// ExecServices are the services a command can run in, as far as ops knows
+// ExecServices are the services a command can run in, as far as moin knows
 // them from the live release: the main one first, then the databases.
 func (s *AppService) ExecServices(workspaceID, idOrName string) ([]string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)

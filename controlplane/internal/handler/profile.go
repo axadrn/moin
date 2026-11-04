@@ -33,7 +33,7 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, layouts.SidebarIdentityUpdates(updatedUser))
-	toastDone(w, r, "Name saved", "Your team sees it in ops and in the activity.")
+	toastDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
 }
 
 // EmailAlerts turns the user's email alerts on or off. The switch shows

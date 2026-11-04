@@ -249,7 +249,7 @@ templ copyButton(value, target, label string) {
 // fields: the hint (children, may be empty), or the message when the field
 // is wrong (DESIGN.md, Feedback). The line is there from the start, so a
 // message only swaps text; err shows one the page renders with, the
-// ops:invalid event of a handler one it answers with. The field points at
+// moin:invalid event of a handler one it answers with. The field points at
 // it with aria-describedby id-hint.
 templ fieldHint(id, err string) {
 	@field.Description(field.DescriptionProps{

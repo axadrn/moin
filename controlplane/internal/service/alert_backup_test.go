@@ -90,7 +90,7 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	audit := repository.NewWorkspaceAuditRepository(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")
+	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 		servers.checkDisk(server.ID, used<<30, total)
 	}
 	// A new control plane process, the disk still full.
-	restarted := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")
+	restarted := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	connect(restarted)
 	for _, used := range []uint64{93, 91, 80, 82} {
 		restarted.checkDisk(server.ID, used<<30, total)
@@ -147,17 +147,17 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	f.add(t, model.AlertWebhook, "hook", f.url+"/hook", "")
 	f.add(t, model.AlertWebhook, "deploys-only", f.url+"/deploys", "", "deploy.failed")
 	at := time.Date(2026, 11, 4, 3, 0, 0, 0, time.UTC)
-	backups := "https://ops.example.com/app/owner-workspace/apps/shop/backups"
-	servers := "https://ops.example.com/app/owner-workspace/servers"
+	backups := "https://moin.example.com/app/owner-workspace/apps/shop/backups"
+	servers := "https://moin.example.com/app/owner-workspace/servers"
 
 	f.alerts.Send(owner.WorkspaceID, "backup.failed", "shop", map[string]string{"database": "postgres-db", "error": "continuous backup: <denied> & co"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Backups of shop stopped*\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: ops backups shop\n<"+backups+"|Open in ops>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Backups of shop stopped*\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack backup.failed = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🔴 Backups of shop stopped**\nDatabase: postgres-db, app shop.\nError: continuous backup: <denied> & co\nNew changes are not in your bucket until this is fixed. What is there stays. See: ops backups shop\nOpen in ops: <"+backups+">" {
+	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🔴 Backups of shop stopped**\nDatabase: postgres-db, app shop.\nError: continuous backup: <denied> & co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\nOpen in moin: <"+backups+">" {
 		t.Errorf("discord backup.failed = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Backups of shop stopped</b>\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: ops backups shop\n<a href=\""+backups+"\">Open in ops</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Backups of shop stopped</b>\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\n<a href=\""+backups+"\">Open in moin</a>" {
 		t.Errorf("telegram backup.failed = %q", text)
 	}
 	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"backup.failed","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"","reason":"continuous backup: <denied> & co","since":"","duration":"","url":"`+backups+`"}` {
@@ -165,11 +165,11 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	}
 
 	f.alerts.Send(owner.WorkspaceID, "backup.recovered", "shop", map[string]string{"database": "postgres-db"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🟢 Backups of shop work again*\nDatabase: postgres-db, app shop. Every change goes to your bucket again.\n<"+backups+"|Open in ops>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🟢 Backups of shop work again*\nDatabase: postgres-db, app shop. Every change goes to your bucket again.\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack backup.recovered = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "drill.failed", "shop", map[string]string{"database": "data/app.db", "error": "restore drill failed: integrity check"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Restore check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore drill failed: integrity check\nThe newest backup did not restore cleanly. Take a snapshot now and look: ops backups shop\n<"+backups+"|Open in ops>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Restore check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore drill failed: integrity check\nThe newest backup did not restore cleanly. Take a snapshot now and look: moin backups shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack drill.failed = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "drill.recovered", "shop", map[string]string{"database": "data/app.db"}, at)
@@ -177,14 +177,14 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 		t.Errorf("webhook drill.recovered = %s", body)
 	}
 	f.alerts.Send(owner.WorkspaceID, "disk.full", "web-1", map[string]string{"used_percent": "93", "used": "37 GB", "total": "40 GB"}, at)
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🟠 Disk of web-1 is 93% full</b>\n37 GB of 40 GB used.\nA full disk stops databases from writing. Free space or grow the disk. Apps on it: shop.\n<a href=\""+servers+"\">Open in ops</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🟠 Disk of web-1 is 93% full</b>\n37 GB of 40 GB used.\nA full disk stops databases from writing. Free space or grow the disk. Apps on it: shop.\n<a href=\""+servers+"\">Open in moin</a>" {
 		t.Errorf("telegram disk.full = %q", text)
 	}
 	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"disk.full","workspace":"owner-workspace","app":"","server":"web-1","domain":"","reason":"93% used","since":"","duration":"","url":"`+servers+`"}` {
 		t.Errorf("webhook disk.full = %s", body)
 	}
 	f.alerts.Send(owner.WorkspaceID, "disk.ok", "web-1", map[string]string{"used_percent": "80", "used": "32 GB", "total": "40 GB"}, at)
-	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🟢 Disk of web-1 has room again**\n32 GB of 40 GB used, 80%.\nOpen in ops: <"+servers+">" {
+	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🟢 Disk of web-1 has room again**\n32 GB of 40 GB used, 80%.\nOpen in moin: <"+servers+">" {
 		t.Errorf("discord disk.ok = %q", text)
 	}
 	if f.chat.count("/hook") != 6 || f.chat.count("/deploys") != 0 {
@@ -198,7 +198,7 @@ func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	audit := repository.NewWorkspaceAuditRepository(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")
+	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	apps := NewAppService(repository.NewAppRepository(database, database), servers, testBox(t))
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {

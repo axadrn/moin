@@ -8,7 +8,7 @@ license: BSL-1.1
 image: directus/directus
 database: postgres
 port: 8055
-login: "Sign in as admin@example.com with ADMIN_PASSWORD from ops env --show, then change both."
+login: "Sign in as admin@example.com with ADMIN_PASSWORD from moin env --show, then change both."
 logo: https://simpleicons.org (CC0)
 ---
 

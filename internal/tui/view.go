@@ -92,7 +92,7 @@ func (m model) header(width int) []string {
 	return []string{left + strings.Repeat(" ", gap) + right, rule(width)}
 }
 
-// host is the control plane without the scheme, like "ops.goilerplate.com".
+// host is the control plane without the scheme, like "moin.run".
 func host(raw string) string {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
@@ -139,7 +139,7 @@ func (m model) serversView(width, room int) []string {
 		for _, line := range wrapCommand(m.added.InstallCommand, width-len(pad)-1) {
 			added = append(added, pad+style.Accent.Render(line))
 		}
-		added = append(added, "", pad+style.Muted.Render("It shows once: ops stores only a fingerprint of it. The server turns online here when its agent connects."))
+		added = append(added, "", pad+style.Muted.Render("It shows once: moin stores only a fingerprint of it. The server turns online here when its agent connects."))
 	}
 	if m.removed != nil {
 		added = append(added, "",

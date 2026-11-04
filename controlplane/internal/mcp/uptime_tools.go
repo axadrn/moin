@@ -13,12 +13,12 @@ import (
 func registerUptimeTools(server *mcpsdk.Server, services Services) {
 	tools := opsTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_uptime", Title: "Get uptime", Annotations: readOnly("Get uptime"),
-		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the check goes, its state, the newest check with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. ops checks every domain once a minute like a visitor; an answer below 500 is up. Needs the read scope.",
+		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the check goes, its state, the newest check with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin checks every domain once a minute like a visitor; an answer below 500 is up. Needs the read scope.",
 	}, Read(member(services, tools.getUptime)))
 	writeTool := change(false, true)
 	writeTool.Title = "Set an uptime check"
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "set_uptime_check", Title: "Set an uptime check", Annotations: writeTool,
-		Description: "Changes the path the uptime check of one domain of an app goes to (empty goes back to the health path from x-ops.health, or /), or pauses and resumes it. A missing field keeps its setting. Returns the domain. Needs a token with read and write access.",
+		Description: "Changes the path the uptime check of one domain of an app goes to (empty goes back to the health path from x-moin.health, or /), or pauses and resumes it. A missing field keeps its setting. Returns the domain. Needs a token with read and write access.",
 	}, Write(changes(services, tools.setUptimeCheck)))
 }
 

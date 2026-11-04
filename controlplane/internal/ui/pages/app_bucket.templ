@@ -31,9 +31,9 @@ templ Bucket(view BucketView) {
 				@bucketAdd(len(view.Buckets) == 0)
 				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it", Docs: "/docs/guides/bucket#what-goes-in-the-bucket"}) {
 					<dl class="grid gap-4 text-sm md:grid-cols-3">
-						@bucketUse("Your code", "ops deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
+						@bucketUse("Your code", "moin deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
 						@bucketUse("Your backups", "Every change of every SQLite database. Restore any second of the last week.")
-						@bucketUse("Nothing of ours", "ops keeps the keys encrypted. Your data never passes through ops.")
+						@bucketUse("Nothing of ours", "moin keeps the keys encrypted. Your data never passes through moin.")
 					</dl>
 				}
 			</div>
@@ -96,7 +96,7 @@ templ bucketPanel(bucket service.Bucket) {
 							"hx-select":         "#bucket",
 							"hx-swap":           "outerHTML",
 							"hx-disable":        "this",
-							"hx-confirm":        "Remove the bucket " + bucket.Name + " from ops? What is in it stays there.",
+							"hx-confirm":        "Remove the bucket " + bucket.Name + " from moin? What is in it stays there.",
 							"data-confirm-name": bucket.Name,
 							"data-remove-bucket": bucket.Name,
 						},
@@ -141,7 +141,7 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 	<form class="flex flex-col gap-6" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-storage-form>
 		@csrf.Token()
 		<div class="grid gap-3 sm:grid-cols-2">
-			@bucketField(prefix, "name", "Name", bucket.Name, "like client-a", "Your name for it in ops.", "text", false)
+			@bucketField(prefix, "name", "Name", bucket.Name, "like client-a", "Your name for it in moin.", "text", false)
 			@bucketField(prefix, "region", "Region", bucket.Region, "auto", "auto for R2.", "text", false)
 			@bucketField(prefix, "endpoint", "Endpoint", bucket.Endpoint, "https://<account>.r2.cloudflarestorage.com", "Starts with https://. Empty for AWS S3.", "text", true)
 			@bucketField(prefix, "bucket", "Bucket", bucket.Bucket, "your bucket's name", "", "text", false)
@@ -150,7 +150,7 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Stored encrypted.", "password", false)
 		</div>
 		<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<p class="text-xs text-muted-foreground">ops writes and deletes a test file first.</p>
+			<p class="text-xs text-muted-foreground">moin writes and deletes a test file first.</p>
 			@button.Button(button.Props{Type: button.TypeSubmit}) {
 				if adding {
 					Add bucket

@@ -1,6 +1,6 @@
 ---
 title: "AI agents (MCP)"
-description: "Let Claude and other agents run ops for you"
+description: "Let Claude and other agents run moin for you"
 order: 12
 ---
 
@@ -15,7 +15,7 @@ First [create an API token](/docs/guides/account#create-an-api-token). Pick **Re
 ### Claude Code
 
 ```bash
-claude mcp add --transport http ops https://ops.example.com/mcp \
+claude mcp add --transport http moin https://moin.example.com/mcp \
   --header "Authorization: Bearer pat_…"
 ```
 
@@ -24,12 +24,12 @@ claude mcp add --transport http ops https://ops.example.com/mcp \
 In `.cursor/mcp.json`:
 
 ```json
-{"mcpServers": {"ops": {"url": "https://ops.example.com/mcp", "headers": {"Authorization": "Bearer pat_…"}}}}
+{"mcpServers": {"moin": {"url": "https://moin.example.com/mcp", "headers": {"Authorization": "Bearer pat_…"}}}}
 ```
 
 ### Other clients
 
-Any client that speaks MCP over HTTP works: give it the URL `https://ops.example.com/mcp` and the header `Authorization: Bearer pat_…`.
+Any client that speaks MCP over HTTP works: give it the URL `https://moin.example.com/mcp` and the header `Authorization: Bearer pat_…`.
 
 ## Tools
 
@@ -104,7 +104,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `replace_env` | replaces all env vars at once, like one `.env` file; keys not sent are removed; returns the keys added, changed and removed | write, destructive |
 | `get_github` | GitHub installations and the install link | read |
 | `list_branches` | the branches of a repo, the default first | read |
-| `list_repos` | repos ops may read, and where on GitHub to give it more | read |
+| `list_repos` | repos moin may read, and where on GitHub to give it more | read |
 | `link_repo` | follows a repo and branch | write |
 | `unlink_repo` | stops following it | write, destructive |
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |

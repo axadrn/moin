@@ -13,7 +13,7 @@ func TestHistoryConnection(t *testing.T) {
 	if !strings.HasPrefix(got, filepath.Join("data", "history.db")+"?") {
 		t.Errorf("file database: %q", got)
 	}
-	if got := HistoryConnection("file:/var/lib/ops/ops.db"); !strings.HasPrefix(got, "/var/lib/ops/history.db?") {
+	if got := HistoryConnection("file:/var/lib/moin/ops.db"); !strings.HasPrefix(got, "/var/lib/moin/history.db?") {
 		t.Errorf("file: prefix: %q", got)
 	}
 	for _, memory := range []string{":memory:", "file::memory:?cache=shared", ""} {
@@ -21,7 +21,7 @@ func TestHistoryConnection(t *testing.T) {
 			t.Errorf("%q: %q", memory, got)
 		}
 	}
-	history, err := OpenHistory(HistoryConnection(filepath.Join(t.TempDir(), "ops.db")))
+	history, err := OpenHistory(HistoryConnection(filepath.Join(t.TempDir(), "moin.db")))
 	if err != nil {
 		t.Fatal(err)
 	}

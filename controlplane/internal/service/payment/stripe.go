@@ -253,7 +253,7 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 		return fmt.Errorf("subscription has no items")
 	}
 
-	// A price ops does not sell must not open a paid plan.
+	// A price moin does not sell must not open a paid plan.
 	priceID := subscription.Items.Data[0].Price.ID
 	planID := s.getLocalPlanID(priceID)
 	if planID == "" {
@@ -321,7 +321,7 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 	}
 
 	if len(subscription.Items.Data) > 0 {
-		// A price ops does not sell leaves plan and status as they are.
+		// A price moin does not sell leaves plan and status as they are.
 		priceID := subscription.Items.Data[0].Price.ID
 		planID := s.getLocalPlanID(priceID)
 		if planID == "" {

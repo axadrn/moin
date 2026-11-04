@@ -7,7 +7,7 @@ import (
 )
 
 // TestBadNamesStopBeforeTheServer: a made-up snapshot ID or ref name is
-// refused before ops looks anything up, sends it to GitHub or to an agent.
+// refused before moin looks anything up, sends it to GitHub or to an agent.
 func TestBadNamesStopBeforeTheServer(t *testing.T) {
 	s := &AppService{}
 	ctx := context.Background()

@@ -8,7 +8,7 @@ license: AGPL-3.0
 image: listmonk/listmonk
 database: postgres
 port: 9000
-login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
 logo: https://github.com/knadh/listmonk/blob/HEAD/static/public/static/logo.svg
 ---
 

@@ -8,7 +8,7 @@ license: AGPL-3.0
 image: nextcloud
 database: postgres
 port: 80
-login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
 logo: https://github.com/nextcloud/server/blob/HEAD/core/img/favicon-touch.svg
 ---
 

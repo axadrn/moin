@@ -10,7 +10,7 @@ import (
 )
 
 // TestGitHubSetupUpdateFromGitHub: a change of the repos made on github.com
-// comes back without a state, and goes back to ops instead of an error.
+// comes back without a state, and goes back to moin instead of an error.
 func TestGitHubSetupUpdateFromGitHub(t *testing.T) {
 	h := NewAppsHandler(nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/app/github/setup?code=abc&installation_id=177812748&setup_action=update", nil)

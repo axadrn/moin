@@ -13,4 +13,4 @@ login: "The first account you create becomes the admin."
 logo: https://raw.githubusercontent.com/open-webui/open-webui/main/static/favicon.png
 ---
 
-A chat app for every model you run or rent: Ollama on your own server, OpenAI, Anthropic through a compatible API, or any other. Chats, files and users stay in its SQLite, which ops backs up.
+A chat app for every model you run or rent: Ollama on your own server, OpenAI, Anthropic through a compatible API, or any other. Chats, files and users stay in its SQLite, which moin backs up.

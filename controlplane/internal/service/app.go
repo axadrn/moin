@@ -47,7 +47,7 @@ var (
 	ErrRegistryLogin  = errors.New("registry username and password are required")
 	ErrDomain         = errors.New("domains must be host names like blog.de")
 	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
-	ErrComposeDomains = errors.New("the domains of this app come from x-ops.domains in compose.yml")
+	ErrComposeDomains = errors.New("the domains of this app come from x-moin.domains in compose.yml")
 	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
 	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
 	ErrEnvKey         = errors.New("env keys are letters, digits and underscores and do not start with a digit")
@@ -452,7 +452,7 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 	if err != nil {
 		return nil, false, err
 	}
-	// x-ops wins, so a change here would never reach the app.
+	// x-moin wins, so a change here would never reach the app.
 	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
 		return nil, false, ErrComposeDomains
 	}
@@ -559,8 +559,8 @@ type DomainCheck struct {
 	Advice string
 	Found  []string
 	Points bool
-	// FromCompose says x-ops.domains in compose.yml sets the domain, so
-	// it changes there, not in ops.
+	// FromCompose says x-moin.domains in compose.yml sets the domain, so
+	// it changes there, not in moin.
 	FromCompose bool
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
@@ -580,7 +580,7 @@ func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 	return Detected(*deploy)
 }
 
-// composeDomains are the domains x-ops.domains sets for the main service in
+// composeDomains are the domains x-moin.domains sets for the main service in
 // the live release, and its canonical one; none when compose.yml sets none
 // for it.
 func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
@@ -591,7 +591,7 @@ func (s *AppService) composeDomains(app *model.App) (domains []string, canonical
 	return detected.Domains, detected.Canonical
 }
 
-// composeServiceDomains are the domains x-ops.domains sets for the other
+// composeServiceDomains are the domains x-moin.domains sets for the other
 // services in the live release, by service.
 func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
 	detected := s.liveDetected(app)
@@ -683,7 +683,7 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 		cancel()
 		domain.Points = resolvesTo(domain.Found, ipv4, ipv6)
 		if server.Tunnel {
-			// ops points the domain at the tunnel itself; Cloudflare proxies
+			// moin points the domain at the tunnel itself; Cloudflare proxies
 			// it, so it resolves to Cloudflare's addresses.
 			domain.Address = server.TunnelID + ".cfargotunnel.com"
 			domain.Advice = "CNAME record to " + domain.Address
@@ -701,7 +701,7 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
 	}
 	// Then the domains of the other services, by service: compose.yml's
-	// where it sets them, else ops'.
+	// where it sets them, else moin'.
 	services := app.ServiceDomainMap()
 	fromComposeServices := s.composeServiceDomains(app)
 	maps.Copy(services, fromComposeServices)
@@ -968,7 +968,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 		if err == nil {
 			app, err := s.apps.ByID(deploy.AppID)
 			if err == nil {
-				// The instant address the release serves, which x-ops may
+				// The instant address the release serves, which x-moin may
 				// have changed or turned off.
 				if app.InstantHost != done.Detected.Instant {
 					_ = s.apps.SetInstantHost(app.ID, done.Detected.Instant)
@@ -981,7 +981,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 	}
 }
 
-// recordFinished writes how a deploy ended to the activity, as ops itself:
+// recordFinished writes how a deploy ended to the activity, as moin itself:
 // its number, how long it took and, for a failed one, why.
 func (s *AppService) recordFinished(deployID, status, failure string) {
 	deploy, err := s.apps.DeployByID(deployID)

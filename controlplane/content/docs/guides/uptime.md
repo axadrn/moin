@@ -8,7 +8,7 @@ From the first deploy on, the control plane visits every domain of every app onc
 
 - **Up** is any answer below 500: a page, a redirect, a `404` or the password prompt of a protected app all mean the app answers.
 - **Down** is a `5xx`, no answer within 10 seconds, a refused connection, a DNS name that does not resolve or a certificate a browser would refuse. A failed check is tried again a few seconds later; only when that fails too is the domain down, so one lost packet is no outage.
-- **Where it goes**: the health path from `x-ops.health` in `compose.yml` ([Config in the repo](/docs/guides/config)), else `/`. You can change it per domain.
+- **Where it goes**: the health path from `x-moin.health` in `compose.yml` ([Config in the repo](/docs/guides/config)), else `/`. You can change it per domain.
 
 Each domain gets its own second of the minute, so the checks of many apps spread evenly instead of all starting at once.
 
@@ -18,7 +18,7 @@ Per domain: the state, uptime over the last 24 hours, 7 and 30 days, the newest 
 
 ```surfaces
 Web: the app, **Uptime** tab
-CLI: ops uptime <app-name>
+CLI: moin uptime <app-name>
 TUI: on the app, `u`; `enter` checks again
 API: GET /api/v1/apps/{app}/uptime
 MCP: get_uptime
@@ -28,7 +28,7 @@ A domain shows **pending** until its first check, within a minute of the deploy.
 
 ## Down and back up
 
-When a domain goes down and when it comes back, ops writes it to the [activity log](/docs/guides/activity), with the reason, such as `HTTP 502` or `no answer within 10s`, and how long it was down. The outage shows under the domain too.
+When a domain goes down and when it comes back, moin writes it to the [activity log](/docs/guides/activity), with the reason, such as `HTTP 502` or `no answer within 10s`, and how long it was down. The outage shows under the domain too.
 
 A dead server cannot warn anyone itself, so the control plane watches the agents too: an agent that has not answered for two minutes puts `lost web-1` in the activity, and `has web-1 back` when it connects again. The uptime of its apps' domains shows the outage from the outside.
 
@@ -40,7 +40,7 @@ Checks a path like `/health` instead of the health path or `/`. `default` goes b
 
 ```surfaces
 Web: the app, **Uptime**, the domain's **Path**, then **Save path**
-CLI: ops uptime path blog.de /health
+CLI: moin uptime path blog.de /health
 TUI: on the app, `u`, then `blog.de /health` and `enter`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"path": "/health"}
 MCP: set_uptime_check
@@ -52,13 +52,13 @@ For maintenance, or a domain whose DNS is not set yet. A paused check counts nei
 
 ```surfaces
 Web: the app, **Uptime**, the domain's **Uptime check** switch
-CLI: ops uptime pause blog.de, then ops uptime resume blog.de
+CLI: moin uptime pause blog.de, then moin uptime resume blog.de
 TUI: on the app, `u`, then `pause blog.de` or `resume blog.de`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"paused": true}
 MCP: set_uptime_check
 ```
 
-## What ops keeps
+## What moin keeps
 
 The newest result of each domain lives in the control plane's memory. Per domain and hour, how many checks ran, how many found it up and their response times stay for 31 days, in `history.db` without a backup: they grow back. Every outage stays for 90 days in the database, with its backup. See [what is kept where](/docs/self-hosting#database-backup). On the hosted control plane checks only reach public addresses.
 

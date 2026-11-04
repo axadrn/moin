@@ -108,7 +108,7 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("catalog install", "catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]")
 	server := flags.String("server", "", "the server to install it on")
-	version := flags.String("version", "", "a release from ops catalog <app>; default the newest")
+	version := flags.String("version", "", "a release from moin catalog <app>; default the newest")
 	name := flags.String("name", "", "the app name; default the catalog app's")
 	domain := flags.String("domain", "", "a domain for the app")
 	if err := flags.parse(args); err != nil {
@@ -150,7 +150,7 @@ func updateApp(ctx context.Context, app, version string, stdout io.Writer) error
 		return err
 	}
 	if version != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("An older version may not undo the migrations of a newer one; ops takes a snapshot first."))
+		fmt.Fprintln(stdout, style.Muted.Render("An older version may not undo the migrations of a newer one; moin takes a snapshot first."))
 	}
 	updated, err := api.UpdateApp(ctx, app, version)
 	if err != nil {

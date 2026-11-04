@@ -26,7 +26,7 @@ type DocsService struct {
 // docsPlaceholder is the control plane in the doc sources. Every page but
 // the self-hosting guide shows the real APP_URL instead, so commands copy
 // as they are.
-const docsPlaceholder = "https://ops.example.com"
+const docsPlaceholder = "https://moin.example.com"
 
 func NewDocsService(contentPath, appURL string) *DocsService {
 	return &DocsService{

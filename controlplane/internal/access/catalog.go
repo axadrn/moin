@@ -25,7 +25,7 @@ var Product = Catalog{
 		},
 		{
 			ID:           PlanPro,
-			Name:         "ops Hosted",
+			Name:         "moin Hosted",
 			Description:  "Deploys, backups and data for your servers",
 			MonthlyPrice: 2900,
 			YearlyPrice:  24900,

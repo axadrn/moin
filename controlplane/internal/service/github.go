@@ -24,16 +24,16 @@ import (
 	"time"
 )
 
-// GitHub is the ops GitHub App. Users install it on their account or
-// organization; ops then reads the repos they chose, downloads a commit as
+// GitHub is the moin GitHub App. Users install it on their account or
+// organization; moin then reads the repos they chose, downloads a commit as
 // a tarball for a deploy and writes the deploy's commit status.
 type GitHub struct {
 	appID         string
 	slug          string
 	key           *rsa.PrivateKey
 	webhookSecret string
-	// clientID and clientSecret let ops ask GitHub who installed the app.
-	// Without them ops trusts the installation ID in the setup link.
+	// clientID and clientSecret let moin ask GitHub who installed the app.
+	// Without them moin trusts the installation ID in the setup link.
 	clientID     string
 	clientSecret string
 	apiURL       string
@@ -114,19 +114,19 @@ func (g *GitHub) InstallURL(state string) string {
 
 // AuthorizeURL is where a user signs in to GitHub with the app. GitHub
 // sends them back to the callback URL, the setup URL, with a code and the
-// state: no installation ID, so ops looks up their installations itself.
+// state: no installation ID, so moin looks up their installations itself.
 func (g *GitHub) AuthorizeURL(state string) string {
 	return g.webURL + "/login/oauth/authorize?client_id=" + url.QueryEscape(g.clientID) + "&state=" + url.QueryEscape(state)
 }
 
-// ChecksInstaller says whether ops can ask GitHub who installed the app.
+// ChecksInstaller says whether moin can ask GitHub who installed the app.
 func (g *GitHub) ChecksInstaller() bool {
 	return g.clientID != "" && g.clientSecret != ""
 }
 
 // UserInstallations lists the installations of the app that a GitHub user
 // may manage. GitHub sends a code along after the install or the sign-in;
-// ops trades it for a token of that user and asks GitHub. Without this
+// moin trades it for a token of that user and asks GitHub. Without this
 // check anyone could claim someone else's installation by its ID, which is
 // only a counter. A code that is wrong, used or expired finds none.
 func (g *GitHub) UserInstallations(ctx context.Context, code string) ([]int64, error) {
@@ -291,7 +291,7 @@ func (g *GitHub) Commit(ctx context.Context, installationID int64, repo, ref str
 
 // Tarball is where the agent downloads a commit itself, with the
 // authorization to send: the code goes from GitHub to the server and never
-// through ops. The token only reads this one repo and expires within the
+// through moin. The token only reads this one repo and expires within the
 // hour, so a server never holds access to the other repos of the
 // installation.
 func (g *GitHub) Tarball(ctx context.Context, installationID int64, repo, sha string) (url, authorization string, err error) {
@@ -311,13 +311,13 @@ func (g *GitHub) Tarball(ctx context.Context, installationID int64, repo, sha st
 	return g.apiURL + "/repos/" + repo + "/tarball/" + sha, "token " + answer.Token, nil
 }
 
-// SetStatus writes the ops commit status of a deploy.
+// SetStatus writes the moin commit status of a deploy.
 func (g *GitHub) SetStatus(ctx context.Context, installationID int64, repo, sha, state, targetURL, description string) error {
 	token, err := g.token(ctx, installationID)
 	if err != nil {
 		return err
 	}
-	body := map[string]string{"state": state, "target_url": targetURL, "description": clipText(description, 140), "context": "ops/deploy"}
+	body := map[string]string{"state": state, "target_url": targetURL, "description": clipText(description, 140), "context": "moin/deploy"}
 	return g.call(ctx, http.MethodPost, "/repos/"+repo+"/statuses/"+sha, "token "+token, body, nil)
 }
 

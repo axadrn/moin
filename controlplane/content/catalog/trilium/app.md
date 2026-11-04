@@ -12,4 +12,4 @@ login: "The first visit asks you to set a password."
 logo: https://raw.githubusercontent.com/TriliumNext/Trilium/main/apps/client/src/assets/icon.png
 ---
 
-Write notes in a tree of any depth, link them, add code, maps and diagrams, and find anything in seconds. Everything lives in its SQLite, backed up by ops.
+Write notes in a tree of any depth, link them, add code, maps and diagrams, and find anything in seconds. Everything lives in its SQLite, backed up by moin.

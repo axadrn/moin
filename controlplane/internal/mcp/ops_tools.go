@@ -21,7 +21,7 @@ import (
 // registerOpsTools registers a tool for every server and app action of the
 // web UI, the CLI and the TUI. Removing a server or an app is destructive:
 // clients ask before they call it.
-// member runs an ops tool only while the token's user is still a member of
+// member runs a moin tool only while the token's user is still a member of
 // the token's workspace; a removed member's token finds nothing.
 func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In, Out] {
 	return func(ctx context.Context, caller Caller, input In) (Out, error) {
@@ -58,7 +58,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		return &mcpsdk.Tool{Name: name, Title: title, Description: description, Annotations: annotations}
 	}
 	mcpsdk.AddTool(server, add("list_servers", "List servers",
-		"Lists the user's servers with online status, OS, arch, agent version and rules: what the owner allows ops to do on each server, from /etc/ops/rules there. The agent refuses what its rules do not allow; nobody can change them through ops. Needs the read scope.",
+		"Lists the user's servers with online status, OS, arch, agent version and rules: what the owner allows moin to do on each server, from /etc/moin/rules there. The agent refuses what its rules do not allow; nobody can change them through moin. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listServers)))
 	mcpsdk.AddTool(server, add("add_server", "Add a server",
 		"Adds a server and returns its one-time install command. The user runs it as root on the machine within an hour; the agent then connects. Needs a token with read and write access.",
@@ -67,13 +67,13 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Removes a server and disconnects its agent. Fails with server_has_apps while it is online and has apps; an offline server goes with its apps, listed in apps, which stay on the machine if it comes back. The agent stays installed on the machine: returns uninstall_command, which the user runs on the server to remove it, empty when no agent ever connected; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeServer)))
 	mcpsdk.AddTool(server, add("new_install_command", "New install command",
-		"Makes a new one-time install command for a server and returns it, for a lost command or to move the agent to another machine. It works once within an hour; ops stores only a fingerprint, so it is shown this once. The old install command stops working, and an agent that registers with the new one takes over from the old agent. Needs a token with read and write access.",
+		"Makes a new one-time install command for a server and returns it, for a lost command or to move the agent to another machine. It works once within an hour; moin stores only a fingerprint, so it is shown this once. The old install command stops working, and an agent that registers with the new one takes over from the old agent. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.newInstallCommand)))
 	mcpsdk.AddTool(server, add("rename_server", "Rename a server",
 		"Gives a server a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.renameServer)))
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
-		"Has the agent of a server download the ops binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
+		"Has the agent of a server download the moin binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.updateAgent)))
 	mcpsdk.AddTool(server, add("reorder_servers", "Order the servers",
 		"Puts the servers of the workspace in a new order and returns them in it. order names every server once, by name or ID; list_servers gives the current order. Every list shows it: the web, the CLI, the TUI, the API and list_servers. Needs a token with read and write access.",
@@ -82,10 +82,10 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
 	mcpsdk.AddTool(server, add("get_app", "Get an app",
-		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres; the x-ops block). Needs the read scope.",
+		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres; the x-moin block). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, add("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from `ops deploy` in the repo, which can also create the app. Needs a token with read and write access.",
+		"Creates an app on a server. Deploys come from `moin deploy` in the repo, which can also create the app. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, add("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
@@ -130,16 +130,16 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Runs a stopped app again, with its env vars, domains and protection as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(member(services, tools.start)))
 	mcpsdk.AddTool(server, add("check_domains", "Check domains",
-		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-ops.domains in compose.yml sets; they change there. Needs the read scope.",
+		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-moin.domains in compose.yml sets; they change there. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, add("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-ops.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, add("get_instant", "Get the instant address",
-		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one ops made, which show returns with a token that may write. Needs the read scope.",
+		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which show returns with a token that may write. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getInstant)))
 	mcpsdk.AddTool(server, add("set_instant", "Set the instant address",
-		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it, then applies it to the running release. x-ops.instant in compose.yml wins. Needs a token with read and write access.",
+		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it, then applies it to the running release. x-moin.instant in compose.yml wins. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setInstant)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
@@ -178,10 +178,10 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Takes a snapshot of every database of an app now. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.backUpApp)))
 	mcpsdk.AddTool(server, add("restore_app", "Restore a database",
-		"Puts a database of an app back from a snapshot or as it was at a point in time. ops takes a snapshot of the current state first; the app stops for the swap and starts again. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
+		"Puts a database of an app back from a snapshot or as it was at a point in time. moin takes a snapshot of the current state first; the app stops for the swap and starts again. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.restoreApp)))
 	mcpsdk.AddTool(server, add("set_backup_settings", "Snapshot before changes",
-		"Turns the snapshot before every deploy, restore and data change made through ops on or off for an app. Needs a token with read and write access.",
+		"Turns the snapshot before every deploy, restore and data change made through moin on or off for an app. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setBackupSettings)))
 	mcpsdk.AddTool(server, add("list_buckets", "List buckets",
 		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that upload and back up there now) and older_backups (apps that moved to another bucket and keep their older backups there). Needs the read scope.",
@@ -196,19 +196,19 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Makes a bucket the workspace's default: apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default, and restores of them read from there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
 	mcpsdk.AddTool(server, add("remove_bucket", "Remove a bucket",
-		"Removes a bucket from ops; what is in it stays. A bucket that apps use, or that keeps older backups of an app, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
+		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that keeps older backups of an app, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeBucket)))
 	mcpsdk.AddTool(server, add("set_app_bucket", "Choose an app's bucket",
 		"Moves an app's uploads and new backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its older backups stay in the old bucket: get_backups still lists them with their bucket, and restore_app reads them from there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setAppBucket)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
-		"Returns where the ops GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
+		"Returns where the moin GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getGitHub)))
 	mcpsdk.AddTool(server, add("list_repos", "List GitHub repos",
-		"Lists the repos the ops GitHub App may read, and where on github.com the user gives it access to another repo. Needs the read scope.",
+		"Lists the repos the moin GitHub App may read, and where on github.com the user gives it access to another repo. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRepos)))
 	mcpsdk.AddTool(server, add("list_branches", "List branches",
-		"Lists the branches of a repo the ops GitHub App may read, the default branch first. Needs the read scope.",
+		"Lists the branches of a repo the moin GitHub App may read, the default branch first. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listBranches)))
 	mcpsdk.AddTool(server, add("link_repo", "Link a repo",
 		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. A branch the repo does not have on GitHub is refused; list_branches lists them. Needs a token with read and write access.",
@@ -270,18 +270,18 @@ type RemoveServerInput struct {
 
 // RemoveBucketInput is the input of remove_bucket.
 type RemoveBucketInput struct {
-	Bucket  string `json:"bucket" jsonschema:"the bucket's name in ops"`
+	Bucket  string `json:"bucket" jsonschema:"the bucket's name in moin"`
 	Confirm string `json:"confirm" jsonschema:"the bucket's name, typed out, after the user agreed"`
 }
 
 // BucketNameInput names one bucket.
 type BucketNameInput struct {
-	Bucket string `json:"bucket" jsonschema:"the bucket's name in ops"`
+	Bucket string `json:"bucket" jsonschema:"the bucket's name in moin"`
 }
 
 // AddBucketInput is the input of add_bucket.
 type AddBucketInput struct {
-	Name      string `json:"name" jsonschema:"a name for the bucket in ops: lowercase letters, digits, dashes"`
+	Name      string `json:"name" jsonschema:"a name for the bucket in moin: lowercase letters, digits, dashes"`
 	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
 	Region    string `json:"region,omitempty" jsonschema:"the region; auto for Cloudflare R2, the default"`
 	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the storage provider"`
@@ -293,8 +293,8 @@ type AddBucketInput struct {
 
 // EditBucketInput is the input of edit_bucket.
 type EditBucketInput struct {
-	Name      string `json:"name" jsonschema:"the bucket's current name in ops"`
-	Rename    string `json:"rename,omitempty" jsonschema:"a new name in ops; empty keeps it"`
+	Name      string `json:"name" jsonschema:"the bucket's current name in moin"`
+	Rename    string `json:"rename,omitempty" jsonschema:"a new name in moin; empty keeps it"`
 	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
 	Region    string `json:"region,omitempty" jsonschema:"the region; auto for Cloudflare R2"`
 	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the storage provider"`
@@ -307,7 +307,7 @@ type EditBucketInput struct {
 // AppBucketInput is the input of set_app_bucket.
 type AppBucketInput struct {
 	App    string `json:"app" jsonschema:"the app name or ID"`
-	Bucket string `json:"bucket" jsonschema:"the bucket's name in ops; empty follows the workspace's default"`
+	Bucket string `json:"bucket" jsonschema:"the bucket's name in moin; empty follows the workspace's default"`
 }
 
 // BucketList is the output of list_buckets.
@@ -416,7 +416,7 @@ type GitHub struct {
 }
 
 // Repos is the output of list_repos. Access says where on GitHub the user
-// gives ops a repo it does not see yet.
+// gives moin a repo it does not see yet.
 type Repos struct {
 	api.GitHubRepos
 	Access string `json:"access"`
@@ -428,9 +428,9 @@ func (r Repos) Summary() string {
 		names = append(names, repo.FullName)
 	}
 	if len(names) == 0 {
-		return "ops may read no repo yet. " + r.Access
+		return "moin may read no repo yet. " + r.Access
 	}
-	return "ops may read " + strings.Join(names, ", ") + ". " + r.Access
+	return "moin may read " + strings.Join(names, ", ") + ". " + r.Access
 }
 
 // BranchesInput is the input of list_branches.
@@ -480,7 +480,7 @@ type RestoreInput struct {
 // BackupSettingsInput is the input of set_backup_settings.
 type BackupSettingsInput struct {
 	App                   string `json:"app" jsonschema:"the app name or ID"`
-	SnapshotBeforeChanges bool   `json:"snapshot_before_changes" jsonschema:"take a snapshot before every change made through ops"`
+	SnapshotBeforeChanges bool   `json:"snapshot_before_changes" jsonschema:"take a snapshot before every change made through moin"`
 }
 
 // Backups is the output of get_backups and back_up_app.
@@ -734,7 +734,7 @@ type App struct {
 }
 
 func (a App) Summary() string {
-	return fmt.Sprintf("Created %s on %s. Deploy it with `ops deploy %s` in its repo.", a.Name, a.ServerName, a.Name)
+	return fmt.Sprintf("Created %s on %s. Deploy it with `moin deploy %s` in its repo.", a.Name, a.ServerName, a.Name)
 }
 
 func (t opsTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (App, error) {
@@ -945,7 +945,7 @@ func (d DomainChecks) Summary() string {
 	}
 	summary := strings.Join(parts, "; ") + "."
 	if fromCompose {
-		summary += " x-ops.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot."
+		summary += " x-moin.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot."
 	}
 	return summary
 }
@@ -1015,7 +1015,7 @@ func (t opsTools) setDomains(_ context.Context, caller Caller, input DomainsInpu
 // InstantInput is the input of get_instant.
 type InstantInput struct {
 	App  string `json:"app" jsonschema:"the app name or ID"`
-	Show bool   `json:"show,omitempty" jsonschema:"include the password ops made; needs a token with read and write access"`
+	Show bool   `json:"show,omitempty" jsonschema:"include the password moin made; needs a token with read and write access"`
 }
 
 // Instant is the output of get_instant.
@@ -1035,7 +1035,7 @@ func (i Instant) Summary() string {
 	case i.Password != "":
 		return i.URL + " via " + i.Provider + ", user " + i.User + " with the password in password."
 	}
-	return i.URL + " via " + i.Provider + ", behind a password ops made: show returns it."
+	return i.URL + " via " + i.Provider + ", behind a password moin made: show returns it."
 }
 
 func (t opsTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
@@ -1367,7 +1367,7 @@ func (t opsTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Rep
 	for _, installation := range github.Installations {
 		links = append(links, installation.Account+": "+installation.SettingsURL)
 	}
-	access := "Don't see a repo? The user gives ops access to it on GitHub"
+	access := "Don't see a repo? The user gives moin access to it on GitHub"
 	if len(links) > 0 {
 		access += ", " + strings.Join(links, "; ")
 	}

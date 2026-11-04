@@ -1,4 +1,4 @@
-// Package style is the look of ops in the terminal: the brand and status
+// Package style is the look of moin in the terminal: the brand and status
 // colors of the web UI (controlplane/DESIGN.md), symbols and text styles. The
 // TUI and the CLI both use it, so a status looks the same everywhere.
 package style

@@ -55,7 +55,7 @@ templ appCI(appName string, hook bool) {
 								}
 							</div>
 							@fieldHint("image-ref", "") {
-								Same as <code class="font-mono">ops deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
+								Same as <code class="font-mono">moin deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
 							}
 						}
 					</form>
@@ -64,7 +64,7 @@ templ appCI(appName string, hook bool) {
 					Heading:     "app-hook-heading",
 					Title:       "Deploy hook",
 					Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
-					Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
+					Description: "A secret URL your CI calls after it pushed the image. moin then deploys that image.",
 				}) {
 					@AppHook(appName, "", hook)
 				}
@@ -78,11 +78,11 @@ templ appCI(appName string, hook bool) {
 templ AppHook(appName, url string, on bool) {
 	<div id="app-hook" class="flex flex-col gap-3" data-hook-on?={ on }>
 		if url == "" && on {
-			<p class="text-sm text-muted-foreground">A hook is on: CI can deploy { appName } with it. ops showed its URL once; if it is lost, make a new one.</p>
+			<p class="text-sm text-muted-foreground">A hook is on: CI can deploy { appName } with it. moin showed its URL once; if it is lost, make a new one.</p>
 		} else if url == "" {
-			<p class="text-sm text-muted-foreground">No hook yet. ops shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
+			<p class="text-sm text-muted-foreground">No hook yet. moin shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
 		} else {
-			<p class="text-sm font-medium">Copy it now: ops shows it only this once. Store it as the CI secret <code class="font-mono">OPS_DEPLOY_HOOK</code>.</p>
+			<p class="text-sm font-medium">Copy it now: moin shows it only this once. Store it as the CI secret <code class="font-mono">OPS_DEPLOY_HOOK</code>.</p>
 			<div data-deploy-hook>
 				@command(url)
 			</div>

@@ -130,7 +130,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 				built = "Railpack: " + deploy.Detected.Builder
 			}
 		}
-		// The live release says what it answers on; x-ops wins there.
+		// The live release says what it answers on; x-moin wins there.
 		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
 			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
 		}
@@ -195,7 +195,7 @@ func PrintApps(stdout io.Writer, list []client.App) {
 }
 
 // deploy packs the directory, uploads it and follows the deploy. An app that
-// does not exist yet is created on the server x-ops or --server names, or on
+// does not exist yet is created on the server x-moin or --server names, or on
 // the only server.
 func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [app]").withApp()
@@ -283,7 +283,7 @@ func createApp(ctx context.Context, api *client.Client, name, server, dir string
 			return err
 		}
 		if len(servers) != 1 {
-			return fmt.Errorf("app %s does not exist yet: pass --server or set x-ops.server, you have %d servers", name, len(servers))
+			return fmt.Errorf("app %s does not exist yet: pass --server or set x-moin.server, you have %d servers", name, len(servers))
 		}
 		server = servers[0].Name
 	}

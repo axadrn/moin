@@ -33,7 +33,7 @@ func frames() map[string]model {
 		{Name: "shop", ServerName: "dock-1", LatestNumber: 7, LatestStatus: "running", LiveNumber: 6},
 		{Name: "notes", ServerName: "dock-1"},
 	}
-	detected := &protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db", HostPath: "/var/lib/ops/apps/hello/volumes/data/app.db"}}}
+	detected := &protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db", HostPath: "/var/lib/moin/apps/hello/volumes/data/app.db"}}}
 	var deploys []client.Deploy
 	for number := 43; number > 30; number-- {
 		deploy := client.Deploy{Number: number, Status: "succeeded", Detected: detected, CreatedAt: now.Add(-time.Hour), FinishedAt: &finished}
@@ -48,9 +48,9 @@ func frames() map[string]model {
 		deploys = append(deploys, deploy)
 	}
 	detail := &client.AppDetail{App: apps[0], Deploys: deploys}
-	log := []string{"downloading the source", "detected compose, service web on port 8080", "building", " Image ops-hello-web:43 Building ", "#1 [internal] load local bake definitions", "#1 DONE 0.0s", "", "#2 ERROR: failed to read dockerfile", " Image ops-hello-web:43 Built ", "starting", " Container ops-hello-web-1 Started ", "health check http://172.18.0.2:8080/index.html"}
+	log := []string{"downloading the source", "detected compose, service web on port 8080", "building", " Image moin-hello-web:43 Building ", "#1 [internal] load local bake definitions", "#1 DONE 0.0s", "", "#2 ERROR: failed to read dockerfile", " Image moin-hello-web:43 Built ", "starting", " Container moin-hello-web-1 Started ", "health check http://172.18.0.2:8080/index.html"}
 
-	base := model{url: "https://ops.goilerplate.com", dir: "/home/me/hello", servers: servers, apps: apps}
+	base := model{url: "https://moin.run", dir: "/home/me/hello", servers: servers, apps: apps}
 	out := map[string]model{}
 	add := func(name string, change func(*model)) {
 		m := base
@@ -62,7 +62,7 @@ func frames() map[string]model {
 	add("servers-empty", func(m *model) { m.servers = nil })
 	add("servers-add", func(m *model) { m.mode, m.input = modeAdd, "tui-1" })
 	add("servers-added", func(m *model) {
-		m.added = &client.NewServer{Server: client.Server{Name: "tui-1"}, InstallCommand: "curl -fsSL https://ops.goilerplate.com/install.sh | sh -s -- ins_4k2j9x0c8v7b6n5m4l3k2j1h0g9f8d7s"}
+		m.added = &client.NewServer{Server: client.Server{Name: "tui-1"}, InstallCommand: "curl -fsSL https://moin.run/install.sh | sh -s -- ins_4k2j9x0c8v7b6n5m4l3k2j1h0g9f8d7s"}
 	})
 	add("servers-remove", func(m *model) {
 		m.selected = 2
@@ -163,7 +163,7 @@ func frames() map[string]model {
 		m.tab, m.input = tabApps, "shop"
 	})
 	stored := settings{loaded: true, buckets: []client.Bucket{
-		{Name: "default", Default: true, Endpoint: "https://abc.r2.cloudflarestorage.com", Region: "auto", Bucket: "ops-backups", Folder: "ws/", AccessKey: "AKIA123", Apps: []string{"hello"}},
+		{Name: "default", Default: true, Endpoint: "https://abc.r2.cloudflarestorage.com", Region: "auto", Bucket: "moin-backups", Folder: "ws/", AccessKey: "AKIA123", Apps: []string{"hello"}},
 		{Name: "client-a", Endpoint: "https://s3.eu-central-1.amazonaws.com", Region: "eu-central-1", Bucket: "client-a-backups", Folder: "ws/", AccessKey: "AKIA456", OlderBackups: []string{"shop"}},
 	},
 		integrations: client.Integrations{Cloudflare: true, CloudflareAccount: "Acme"},

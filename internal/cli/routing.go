@@ -160,7 +160,7 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
 	}
 	if fromCompose {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-ops.domains in compose.yml sets the domains marked from compose.yml: change them there and deploy."))
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-moin.domains in compose.yml sets the domains marked from compose.yml: change them there and deploy."))
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ var instantCommands = append([]string{"open", "protect"}, append(slices.Clone(pr
 // opens it or puts the password back.
 func instant(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]").withApp()
-	show := flags.Bool("show", false, "show the password ops made for it")
+	show := flags.Bool("show", false, "show the password moin made for it")
 	if err := flags.parse(args); err != nil {
 		return err
 	}

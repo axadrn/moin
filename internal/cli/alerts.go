@@ -163,7 +163,7 @@ func addAlertDestination(ctx context.Context, args []string, stdin io.Reader, st
 	done(stdout, "Added %s (%s) for %s.", added.Name, added.Kind, alertEvents(added.Events))
 	if added.SigningSecret != "" {
 		fmt.Fprintln(stdout, "  Signing secret, shown this once: "+style.Bold.Render(added.SigningSecret))
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each post carries X-Ops-Signature: sha256=<HMAC-SHA256 of the body with it>."))
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each post carries X-Moin-Signature: sha256=<HMAC-SHA256 of the body with it>."))
 	}
 	hint(stdout, "Send it a test:", build.Name+" alerts test "+added.Name)
 	return nil

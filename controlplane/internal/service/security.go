@@ -138,7 +138,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		if err != nil {
 			return nil, err
 		}
-		tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, "ops-"+server.Name+"-"+server.ID[:8])
+		tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, "moin-"+server.Name+"-"+server.ID[:8])
 		if err != nil {
 			return nil, fmt.Errorf("create the tunnel: %w", err)
 		}
@@ -248,7 +248,7 @@ func leftOver(report *protocol.ServerConfigResult) bool {
 }
 
 // tunnelHosts are the domains of every app on a server: the ones set
-// through ops and the ones x-ops set in the live release.
+// through moin and the ones x-moin set in the live release.
 func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 	apps, err := s.apps.ListByWorkspaceID(server.WorkspaceID)
 	if err != nil {
@@ -280,7 +280,7 @@ func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 }
 
 // syncTunnel routes every domain of the server's apps through its tunnel
-// and points their DNS at it. A domain whose DNS ops cannot set, such as
+// and points their DNS at it. A domain whose DNS moin cannot set, such as
 // one in another Cloudflare account, is a problem to report, not a
 // failure: the user can point it at the tunnel by hand.
 func (s *AppService) syncTunnel(ctx context.Context, server *model.Server) ([]string, error) {

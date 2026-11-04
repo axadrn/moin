@@ -38,7 +38,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/workspaces/{slug}/leave` | leaves the workspace (*session*) |
 | `GET /api/v1/workspaces/{slug}/billing` | the plan and the subscription, where billing is on |
 | `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | a checkout link; the billing portal (owner, *session*) |
-| `GET /api/v1/servers` · `POST` | servers, with their `rules` from `/etc/ops/rules` |
+| `GET /api/v1/servers` · `POST` | servers, with their `rules` from `/etc/moin/rules` |
 | `GET /api/v1/servers/events` | server list as server-sent events |
 | `POST /api/v1/servers/{id}/install` | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | renames a server `{"name": "…"}` |
@@ -69,7 +69,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET /api/v1/alert-destinations` · `POST` · `DELETE /{name}` | where [alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) go besides email: Slack, Discord, Telegram or a webhook; `POST` takes `{"kind", "name", "url"}`, or `bot_token` and `chat_id` for Telegram, and `events`; a webhook answers with its `signing_secret` once (owner or admin to change) |
 | `POST /api/v1/alert-destinations/{name}/test` | sends a test alert; `424` with `alert_send_failed` and the reason when the destination refuses it (owner or admin) |
 | `GET` · `PUT /api/v1/integrations` | the Cloudflare API token and the Tailscale auth key |
-| `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; repos ops reads |
+| `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; repos moin reads |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | the branches of a repo, the default first |
 | `PUT` · `DELETE /api/v1/apps/{app}/repo` | links or unlinks a GitHub repo and branch |
 | `GET /api/v1/apps/{app}/databases` | Databases of the live release: SQLite files and Postgres services |

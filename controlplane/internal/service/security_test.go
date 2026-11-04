@@ -15,7 +15,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// fakeCloudflare answers the Cloudflare API calls ops makes and records
+// fakeCloudflare answers the Cloudflare API calls moin makes and records
 // them as "METHOD path".
 type fakeCloudflare struct {
 	mu    sync.Mutex

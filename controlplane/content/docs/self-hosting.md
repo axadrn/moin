@@ -1,10 +1,10 @@
 ---
 title: "Self-hosting"
-description: "Free forever: run all of ops yourself, the same product we host"
+description: "Free forever: run all of moin yourself, the same product we host"
 order: 3
 ---
 
-**Free forever.** All of ops is open source under AGPL-3.0, the control plane too. Run it on your own server and you get exactly the product we host: every feature, unlimited servers, apps and members, no license key and no account with us.
+**Free forever.** All of moin is open source under AGPL-3.0, the control plane too. Run it on your own server and you get exactly the product we host: every feature, unlimited servers, apps and members, no license key and no account with us.
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
@@ -13,7 +13,7 @@ order: 3
 | Servers, apps, members | unlimited | unlimited |
 | Setup | about an hour | two minutes |
 | Control plane | on your own server | ours, nothing to run |
-| Updates | one click, when ops says a release is out | the day they ship, by us |
+| Updates | one click, when moin says a release is out | the day they ship, by us |
 | GitHub App, email | you set them up | ready to use |
 | Backups of the control plane | yours to run | every day, by us |
 | Support | GitHub issues | email, from the team |
@@ -30,10 +30,10 @@ Billing, and who gets in. With `BILLING=false` there are no prices, no checkout 
 And it is private:
 
 - No landing page. Your `APP_URL` opens the sign-in page, or your workspace when you are signed in.
-- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This ops is private. Ask its admin for an invitation."
+- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This moin is private. Ask its admin for an invitation."
 - The docs stay at `/docs`. The terms and privacy pages of our hosted service are not there, and search engines are asked to stay away (`ROBOTS_NOINDEX` is on).
 
-## Three ways to run ops
+## Three ways to run moin
 
 - **Hosted.** We run the control plane. Your servers keep your apps and data, with no open port for us.
 - **One server.** The control plane and your apps on one machine, in one command. The way to start.
@@ -44,7 +44,7 @@ And it is private:
 Point a domain at the server with an A record, then run this as root on a fresh Ubuntu or Debian server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com
+curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
 It takes a few minutes and does it all:
@@ -68,7 +68,7 @@ Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the 
 1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/ops/update.sh`. Use a bucket no other control plane backs up to: its backup lives in the folder `controlplane/litestream`.
 2. Wait a few seconds, so the last change is in the bucket. Then, on the old server, stop the control plane and its updater: `docker compose -f /opt/ops/compose.yml --profile '*' down`. Your apps keep running, and the proxy still serves them.
 3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The same `SECRETS_KEY` matters most: it opens your apps' secrets. The control plane restores its database from the bucket on its first start: your account, workspaces, apps and API tokens are there. Point the domain at the new server.
-4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `ops servers install-command <server>` and run it on the old server: the agent now dials your domain, as the same server. Your apps keep running.
+4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `moin servers install-command <server>` and run it on the old server: the agent now dials your domain, as the same server. Your apps keep running.
 5. Once all works, remove the old settings from the old server: `rm -r /opt/ops /etc/ops-controlplane /var/lib/ops-controlplane`.
 
 ## Where to run it
@@ -98,7 +98,7 @@ Three files do the work. They are in the repo, in `controlplane/deploy/`:
 
 ```bash
 git clone https://github.com/axadrn/ops
-cd ops/controlplane/deploy
+cd moin/controlplane/deploy
 sh setup.sh
 ```
 
@@ -106,7 +106,7 @@ sh setup.sh
 
 ```bash
 APP_ENV=production
-APP_URL=https://ops.example.com
+APP_URL=https://moin.example.com
 BILLING=false
 # You: the first admin. Sign up with this address.
 ADMIN_EMAILS=you@example.com
@@ -184,7 +184,7 @@ GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
 ```
 
-With the client ID and secret, ops asks GitHub who installed the app, and connects an installation only for someone whose GitHub account may manage it. They also let **Connect GitHub** work when the app is already installed: ops signs the user in to GitHub and connects the installations they have. Without them, ops trusts the installation in the link GitHub sends back and says so in its log when it starts.
+With the client ID and secret, moin asks GitHub who installed the app, and connects an installation only for someone whose GitHub account may manage it. They also let **Connect GitHub** work when the app is already installed: moin signs the user in to GitHub and connects the installations they have. Without them, moin trusts the installation in the link GitHub sends back and says so in its log when it starts.
 
 ### Who signs in
 
@@ -205,7 +205,7 @@ Off by default. To count visitors with your own Umami, set `UMAMI_WEBSITE_ID` an
 Sign up at your `APP_URL` with your address from `ADMIN_EMAILS`, then point the CLI at it:
 
 ```bash
-ops login --url https://ops.example.com
+moin login --url https://moin.example.com
 ```
 
 The install line for a server, the CLI, the terminal UI and MCP all talk to your control plane from then on. The rest of these docs apply as they are.
@@ -218,7 +218,7 @@ Every five minutes a self-hosted control plane tells us that it runs, with a few
 {"instance": "8f14e45f-ceea-467a-9575-6c6f2b2b8f1e", "version": "v0.1.0", "counts": {"servers": 3, "apps": 7, "deploys": 412}}
 ```
 
-The instance ID is random and made once, on the first start. There is no name, domain, email, address or data of your apps in it, and we do not keep the address it comes from. The numbers add up to what the landing page shows as running on ops right now; a control plane that stops sending drops off within fifteen minutes. The code is in `controlplane/internal/service/telemetry.go`, and the control plane says so in its log when it starts.
+The instance ID is random and made once, on the first start. There is no name, domain, email, address or data of your apps in it, and we do not keep the address it comes from. The numbers add up to what the landing page shows as running on moin right now; a control plane that stops sending drops off within fifteen minutes. The code is in `controlplane/internal/service/telemetry.go`, and the control plane says so in its log when it starts.
 
 Turn it off with one setting:
 
@@ -251,14 +251,14 @@ When the control plane starts and finds no database, it restores the newest one 
 
 **The control plane.** Once a day it asks GitHub for the newest release. When one is out, the admins in `ADMIN_EMAILS` see a note at the top of the web UI: the version, what is new in one line, and a link to the release notes. Then:
 
-- Click **Update now**. Or run `ops update` in the CLI, or `u` on the settings tab of the TUI.
+- Click **Update now**. Or run `moin update` in the CLI, or `u` on the settings tab of the TUI.
 - Or run `sh update.sh` on the server, as before.
 
-ops is away for about a minute. Your apps keep running. Before the database changes, ops keeps a copy of it next to it, like `/var/lib/ops-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
+moin is away for about a minute. Your apps keep running. Before the database changes, moin keeps a copy of it next to it, like `/var/lib/ops-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
 
-`ops version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
+`moin version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
 
-**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. ops itself never touches Docker: someone who breaks into it can at most ask for an official ops release, never run their own code on your server. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
+**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. moin itself never touches Docker: someone who breaks into it can at most ask for an official moin release, never run their own code on your server. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
 
 To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh` when you like.
 

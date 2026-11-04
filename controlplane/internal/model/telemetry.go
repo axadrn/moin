@@ -19,7 +19,7 @@ type TelemetryReport struct {
 	SeenAt     time.Time `db:"seen_at" json:"-"`
 }
 
-// Network is everything ops runs right now: the hosted control plane and
+// Network is everything moin runs right now: the hosted control plane and
 // every self-hosted one that reported in the last fifteen minutes.
 type Network struct {
 	SelfHosted       int

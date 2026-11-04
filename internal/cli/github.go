@@ -14,7 +14,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// github shows where the ops GitHub App is installed and its repos.
+// github shows where the moin GitHub App is installed and its repos.
 func github(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("github", "github, github repos, or github branches owner/name")
 	if err := flags.parse(args); err != nil {

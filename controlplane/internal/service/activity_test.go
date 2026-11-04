@@ -10,7 +10,7 @@ import (
 )
 
 // TestActivityNeverHoldsSecrets makes changes with secret values and user
-// data in them and checks that none of it lands in the activity: ops keeps
+// data in them and checks that none of it lands in the activity: moin keeps
 // names, numbers and settings, never values, passwords, tokens or rows.
 func TestActivityNeverHoldsSecrets(t *testing.T) {
 	apps, servers, server, agent := newAppService(t)
@@ -99,9 +99,9 @@ func TestActivityFiltersAndPages(t *testing.T) {
 		t.Fatalf("web-1 has %d events, want added, installed, two apps and a row", len(onServer))
 	}
 	// The owner created the workspace, added the server and the apps and
-	// deleted a row; ops installed the server.
+	// deleted a row; moin installed the server.
 	if mine := page(model.ActivityFilter{User: "owner@example.com"}, "", 50); len(mine) != 5 {
-		t.Fatalf("owner has %d events, want 5 without the install by ops", len(mine))
+		t.Fatalf("owner has %d events, want 5 without the install by moin", len(mine))
 	}
 	all := page(model.ActivityFilter{}, "", 50)
 	first := page(model.ActivityFilter{}, "", 2)

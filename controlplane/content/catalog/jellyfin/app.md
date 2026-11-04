@@ -12,4 +12,4 @@ login: "A setup wizard creates the admin on first visit."
 logo: https://simpleicons.org (CC0)
 ---
 
-Stream your media library to the browser, phones and TVs, with users, watch progress and subtitles. Its library lives in SQLite, which ops backs up; put your media under the app's data folder.
+Stream your media library to the browser, phones and TVs, with users, watch progress and subtitles. Its library lives in SQLite, which moin backs up; put your media under the app's data folder.

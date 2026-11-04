@@ -67,7 +67,7 @@ func TestStripePeriodEndComesFromTheItemSinceBasil(t *testing.T) {
 	}
 }
 
-// TestStripeUnknownPriceKeepsThePlan: a subscription for a price ops does
+// TestStripeUnknownPriceKeepsThePlan: a subscription for a price moin does
 // not sell, or with no price, neither opens nor changes a plan.
 func TestStripeUnknownPriceKeepsThePlan(t *testing.T) {
 	database := testutil.NewDatabase(t)

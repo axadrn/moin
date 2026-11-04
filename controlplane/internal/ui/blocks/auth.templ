@@ -19,7 +19,7 @@ const AuthPrimary = "w-full"
 const AuthSecondary = "w-full"
 
 // AuthShell is the auth screen: the form in a quiet column on the left,
-// and on a wide screen what ops promises on the right.
+// and on a wide screen what moin promises on the right.
 templ AuthShell(appName string) {
 	<div class="grid min-h-svh bg-background lg:grid-cols-2">
 		<div class="flex min-h-svh flex-col px-5 sm:px-10">
@@ -46,7 +46,7 @@ templ AuthShell(appName string) {
 	</div>
 }
 
-// authAside is the promise of ops, as on the home page.
+// authAside is the promise of moin, as on the home page.
 templ authAside() {
 	<aside class="hidden p-3 lg:flex">
 		@card.Card(card.Props{Class: "min-w-0 flex-1 justify-center gap-0 rounded-4xl py-0"}) {
@@ -66,7 +66,7 @@ templ authAside() {
 	</aside>
 }
 
-// authProof is one promise of ops, with a check.
+// authProof is one promise of moin, with a check.
 templ authProof(text string) {
 	<li class="flex items-center gap-3">
 		<span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-live text-background">

@@ -2,7 +2,7 @@ package status
 
 import "github.com/axadrn/moin/controlplane/internal/ui/utils"
 
-// Kind is one of the states every status in ops shows as (DESIGN.md): live ●
+// Kind is one of the states every status in moin shows as (DESIGN.md): live ●
 // (online, the live deploy), running ◐ (deploying), waiting ○ in the running
 // color (an agent that never connected), done ✓ muted (a deploy that
 // succeeded but is no longer live), failed ✗ (failed, offline) and idle ○
@@ -52,9 +52,9 @@ templ Symbol(k Kind, class ...string) {
 	}
 	switch kind(k) {
 		case KindLive:
-			<span data-slot="status-symbol" aria-hidden="true" class={ utils.CN("ops-dot-live inline-block size-2 shrink-0 rounded-full bg-live", cls) }></span>
+			<span data-slot="status-symbol" aria-hidden="true" class={ utils.CN("moin-dot-live inline-block size-2 shrink-0 rounded-full bg-live", cls) }></span>
 		case KindRunning:
-			<span data-slot="status-symbol" aria-hidden="true" class={ utils.CN("ops-dot-run inline-block size-2 shrink-0 rounded-full bg-running", cls) }></span>
+			<span data-slot="status-symbol" aria-hidden="true" class={ utils.CN("moin-dot-run inline-block size-2 shrink-0 rounded-full bg-running", cls) }></span>
 		case KindWaiting:
 			<span data-slot="status-symbol" aria-hidden="true" class={ utils.CN("inline-block size-2 shrink-0 rounded-full border-[1.5px] border-running", cls) }></span>
 		case KindDone:

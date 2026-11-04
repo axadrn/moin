@@ -13,7 +13,7 @@ func TestVersionSaysANewerReleaseIsOut(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	for _, want := range []string{"control plane v0.2.0", "ops v0.3.0 is out. One-click updates.", "releases/tag/v0.3.0", "ops update"} {
+	for _, want := range []string{"control plane v0.2.0", "moin v0.3.0 is out. One-click updates.", "releases/tag/v0.3.0", "moin update"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout %q misses %q", stdout, want)
 		}

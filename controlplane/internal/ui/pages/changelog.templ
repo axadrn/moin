@@ -10,13 +10,13 @@ import (
 templ Changelog(html string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Changelog",
-		Description: "What shipped in ops, newest first.",
+		Description: "What shipped in moin, newest first.",
 		Path:        "/changelog",
 	}) {
 		<main class="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
 			<header class="mb-10 border-b pb-8">
 				<h1 class="font-display text-[clamp(2.1rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.03em]">What shipped.</h1>
-				<p class="mt-4 text-muted-foreground">Every release of ops, newest first. Follow it with <a class="underline underline-offset-4 hover:text-foreground" href="/changelog.xml">RSS</a>, in your reader or a Slack channel.</p>
+				<p class="mt-4 text-muted-foreground">Every release of moin, newest first. Follow it with <a class="underline underline-offset-4 hover:text-foreground" href="/changelog.xml">RSS</a>, in your reader or a Slack channel.</p>
 			</header>
 			<article class="min-w-0">
 				@blocks.Typeset(html)

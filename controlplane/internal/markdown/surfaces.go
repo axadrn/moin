@@ -15,11 +15,11 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// A surfaces block says how to do one task on each surface of ops:
+// A surfaces block says how to do one task on each surface of moin:
 //
 //	```surfaces
 //	Web: **Server** → **Security** → **Keys**
-//	CLI: ops integrations cloudflare
+//	CLI: moin integrations cloudflare
 //	TUI: settings tab, **Cloudflare token**, `enter`
 //	API: PUT /api/v1/integrations
 //	MCP: set_integrations
@@ -174,7 +174,7 @@ func (surfacesExtension) Extend(m goldmark.Markdown) {
 // for the markdown the docs hand to people and AI agents:
 //
 //   - Web: **Server** → **Security** → **Keys**
-//   - CLI: `ops integrations cloudflare`
+//   - CLI: `moin integrations cloudflare`
 func PlainSurfaces(source []byte) []byte {
 	var out bytes.Buffer
 	var block []string

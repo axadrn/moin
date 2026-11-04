@@ -91,7 +91,7 @@ func (r *serverRepository) get(query string, args ...any) (*model.Server, error)
 }
 
 // ByIDOrNameForWorkspace finds a server of the user by its ID or its name, so the
-// CLI can say `ops servers rm prod`.
+// CLI can say `moin servers rm prod`.
 func (r *serverRepository) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.Server, error) {
 	return r.get(`SELECT * FROM servers WHERE workspace_id = $1 AND (id = $2 OR name = $2)`, workspaceID, idOrName)
 }

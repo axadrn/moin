@@ -79,7 +79,7 @@ func viaName(via, token string) string {
 	case "hook":
 		name = "deploy hook"
 	case "system":
-		name = "ops"
+		name = "moin"
 	}
 	if token != "" {
 		return name + ", token " + token

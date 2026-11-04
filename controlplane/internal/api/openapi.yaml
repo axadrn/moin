@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: "ops API"
+  title: "moin API"
   version: v1
   description: |
-    JSON API of ops. Every endpoint under `/api/v1` uses the same
+    JSON API of moin. Every endpoint under `/api/v1` uses the same
     services and rules as the web app.
 
     Authentication: sign in with one of the `/api/v1/auth` endpoints and send the returned
@@ -61,9 +61,9 @@ tags:
   - name: Status
     description: 'Whether everything is OK in a workspace: what needs you (failed deploys, broken backups or restore checks, servers offline, full disks, domains down, agents behind), catalog apps with a newer release, and what runs well.'
   - name: Catalog
-    description: 'Open source apps ops installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with ops; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
+    description: 'Open source apps moin installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with moin; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
-    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the agent detects compose.yml, a Dockerfile or a Go module, reads the optional `x-ops` block, builds, starts and checks it. Env vars are stored encrypted. Everything in the ops endpoints belongs to the workspace of the API token.'
+    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the agent detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env vars are stored encrypted. Everything in the moin endpoints belongs to the workspace of the API token.'
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
@@ -75,9 +75,9 @@ tags:
   - name: Metrics
     description: Every agent samples its server and the containers of its apps every 15 seconds. The control plane keeps the last hour of samples, minutes for 24 hours and hours for 30 days.
   - name: GitHub
-    description: The ops GitHub App connects repos. Link a repo and branch to an app, deploy a ref without a checkout, deploy every push, and get the result as a commit status.
+    description: The moin GitHub App connects repos. Link a repo and branch to an app, deploy a ref without a checkout, deploy every push, and get the result as a commit status.
   - name: Servers
-    description: Servers with an ops agent. The web UI, the CLI and the TUI use the same endpoints. A server is online while its agent holds a session.
+    description: Servers with a moin agent. The web UI, the CLI and the TUI use the same endpoints. A server is online while its agent holds a session.
   - name: Admin
     description: Operator dashboard data and session revocation. Admins only.
   - name: OAuth
@@ -1050,7 +1050,7 @@ paths:
       tags: [Servers]
       operationId: newInstallCommand
       summary: New install command
-      description: A new install token and command for the server, shown this once, for one hour; ops stores only a fingerprint of it. The old install command stops working. An agent that registers with it takes over the server, and the agent token of the old one stops working.
+      description: A new install token and command for the server, shown this once, for one hour; moin stores only a fingerprint of it. The old install command stops working. An agent that registers with it takes over the server, and the agent token of the old one stops working.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1079,7 +1079,7 @@ paths:
       tags: [Servers]
       operationId: updateAgent
       summary: Update the agent of a server
-      description: The agent downloads the binary this control plane serves for its OS and CPU, from the control plane URL it is registered with, checks it against the SHA-256 the control plane sends, swaps it in and restarts through systemd. The answer comes once the new agent is connected, within three minutes. An agent refuses while a deploy runs, without systemd, and when its server has rules in `/etc/ops/rules`; agents older than the update say so with the command that updates them on the server.
+      description: The agent downloads the binary this control plane serves for its OS and CPU, from the control plane URL it is registered with, checks it against the SHA-256 the control plane sends, swaps it in and restarts through systemd. The answer comes once the new agent is connected, within three minutes. An agent refuses while a deploy runs, without systemd, and when its server has rules in `/etc/moin/rules`; agents older than the update say so with the command that updates them on the server.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1413,7 +1413,7 @@ paths:
       tags: [Apps]
       operationId: createDeploy
       summary: Deploy
-      description: 'Starts a deploy. `{"upload": "...", "sha256": "..."}` deploys a source the CLI put into your bucket through createUpload; the server downloads it, checks the SHA-256 and deletes it from the bucket. `{"image": "..."}` deploys an image built elsewhere with the compose file of the running release. `{"ref": "main"}` has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. ops never stores your code. Follow the deploy with its events.'
+      description: 'Starts a deploy. `{"upload": "...", "sha256": "..."}` deploys a source the CLI put into your bucket through createUpload; the server downloads it, checks the SHA-256 and deletes it from the bucket. `{"image": "..."}` deploys an image built elsewhere with the compose file of the running release. `{"ref": "main"}` has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1469,7 +1469,7 @@ paths:
       tags: [Apps]
       operationId: createUpload
       summary: Sign an upload
-      description: A link valid for 15 minutes that takes a gzipped tar of the source with a PUT, straight into your own bucket. ops signs it with your bucket's key and never sees the code. Deploy it with createDeploy and the upload ID.
+      description: A link valid for 15 minutes that takes a gzipped tar of the source with a PUT, straight into your own bucket. moin signs it with your bucket's key and never sees the code. Deploy it with createDeploy and the upload ID.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1943,7 +1943,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-ops` block of compose.yml wins for every field it sets.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1974,7 +1974,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`domains_from_compose`. x-ops.domains in compose.yml sets the domains of the live release; change them there and deploy.'
+          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live release; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.domains`, `fields.canonical` or `fields.service`.'
@@ -1988,7 +1988,7 @@ paths:
       tags: [Apps]
       operationId: getInstant
       summary: Get the instant address
-      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one ops made, shown with `show=true`, which needs a token with read and write access.'
+      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one moin made, shown with `show=true`, which needs a token with read and write access.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1999,7 +1999,7 @@ paths:
           required: false
           schema:
             type: boolean
-          description: Include the password ops made for the address.
+          description: Include the password moin made for the address.
       responses:
         '200':
           description: The instant address.
@@ -2021,7 +2021,7 @@ paths:
       tags: [Apps]
       operationId: setInstant
       summary: Set the instant address
-      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-ops.instant` in compose.yml wins.'
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-moin.instant` in compose.yml wins.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2588,7 +2588,7 @@ paths:
       tags: [Backups]
       operationId: setBackupSettings
       summary: Snapshot before changes
-      description: Turns the snapshot before every deploy, restore and data change made through ops on or off. On by default.
+      description: Turns the snapshot before every deploy, restore and data change made through moin on or off. On by default.
       requestBody:
         required: true
         content:
@@ -2791,7 +2791,7 @@ paths:
       tags: [Backups]
       operationId: setBackupStorage
       summary: Set the default bucket
-      description: Changes the workspace's default bucket, or adds the first one, named default. ops checks that it can write to the bucket first and stores the secret key encrypted. Empty endpoint means AWS S3; Cloudflare R2, Backblaze B2, Hetzner and other S3-compatible stores take their endpoint. Use addBucket and editBucket for more than one bucket.
+      description: Changes the workspace's default bucket, or adds the first one, named default. moin checks that it can write to the bucket first and stores the secret key encrypted. Empty endpoint means AWS S3; Cloudflare R2, Backblaze B2, Hetzner and other S3-compatible stores take their endpoint. Use addBucket and editBucket for more than one bucket.
       requestBody:
         required: true
         content:
@@ -2867,7 +2867,7 @@ paths:
       tags: [Backups]
       operationId: addBucket
       summary: Add a bucket
-      description: Checks that ops can write to the bucket and stores it under a name, with the secret key encrypted. The first bucket is the default; `default` makes a later one the default.
+      description: Checks that moin can write to the bucket and stores it under a name, with the secret key encrypted. The first bucket is the default; `default` makes a later one the default.
       requestBody:
         required: true
         content:
@@ -3047,7 +3047,7 @@ paths:
       tags: [Alerts]
       operationId: createAlertDestination
       summary: Add an alert destination
-      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok and update.available; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
+      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok and update.available; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
       requestBody:
         required: true
         content:
@@ -3150,7 +3150,7 @@ paths:
       tags: [GitHub]
       operationId: getGitHub
       summary: GitHub connection
-      description: Where the ops GitHub App is installed, the link that connects GitHub, and the link that installs it on another account or organization.
+      description: Where the moin GitHub App is installed, the link that connects GitHub, and the link that installs it on another account or organization.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3184,7 +3184,7 @@ paths:
                           type: string
                         settings_url:
                           type: string
-                          description: The page on github.com where the account chooses the repos ops may read. For an installation connected before ops kept it, the install link, which leads there too.
+                          description: The page on github.com where the account chooses the repos moin may read. For an installation connected before moin kept it, the install link, which leads there too.
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -3197,7 +3197,7 @@ paths:
       tags: [GitHub]
       operationId: getGitHubRepos
       summary: List repos
-      description: Every repo the user's installations of the ops GitHub App may read.
+      description: Every repo the user's installations of the moin GitHub App may read.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3251,7 +3251,7 @@ paths:
       tags: [GitHub]
       operationId: getGitHubBranches
       summary: List branches
-      description: The branches of a repo ops may read, the default branch first.
+      description: The branches of a repo moin may read, the default branch first.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3278,7 +3278,7 @@ paths:
           description: '`github_off` when the control plane has no GitHub App.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.repo` when ops cannot read the repo.'
+          description: '`validation_failed` with `fields.repo` when moin cannot read the repo.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3289,7 +3289,7 @@ paths:
       tags: [GitHub]
       operationId: setAppRepo
       summary: Link a repo
-      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and ops writes the result as the commit status `ops/deploy`.
+      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`.
       requestBody:
         required: true
         content:
@@ -3467,7 +3467,7 @@ paths:
       tags: [Servers]
       operationId: setIntegrations
       summary: Set integrations
-      description: 'Stores the Cloudflare API token, checked against Cloudflare first, and the Tailscale auth key, both encrypted. A missing field keeps its key, an empty one removes it. The token needs Account: Cloudflare Tunnel Edit and Zone: DNS Edit; Zone: Zone Settings Edit is optional and lets ops turn on Always Use HTTPS.'
+      description: 'Stores the Cloudflare API token, checked against Cloudflare first, and the Tailscale auth key, both encrypted. A missing field keeps its key, an empty one removes it. The token needs Account: Cloudflare Tunnel Edit and Zone: DNS Edit; Zone: Zone Settings Edit is optional and lets moin turn on Always Use HTTPS.'
       requestBody:
         required: true
         content:
@@ -4433,7 +4433,7 @@ components:
       name: name
       in: path
       required: true
-      description: The bucket's name in ops from `GET /api/v1/buckets`.
+      description: The bucket's name in moin from `GET /api/v1/buckets`.
       schema:
         type: string
     DeployNumber:
@@ -5001,7 +5001,7 @@ components:
                 type: string
         rules:
           type: [object, 'null']
-          description: What the owner of the server allows ops to do there, from /etc/ops/rules on the server. The agent enforces them; the control plane cannot change them. Null without rules.
+          description: What the owner of the server allows moin to do there, from /etc/moin/rules on the server. The agent enforces them; the control plane cannot change them. Null without rules.
           properties:
             data_off:
               type: boolean
@@ -5144,7 +5144,7 @@ components:
           description: Every push to the branch deploys.
         snapshot_before_changes:
           type: boolean
-          description: A snapshot before every change made through ops.
+          description: A snapshot before every change made through moin.
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
@@ -5236,7 +5236,7 @@ components:
         kind:
           type: string
           enum: [compose, dockerfile, go, railpack]
-          description: What the repo brought. railpack means it had no compose.yml, Dockerfile or go.mod and ops built it with Railpack.
+          description: What the repo brought. railpack means it had no compose.yml, Dockerfile or go.mod and moin built it with Railpack.
         builder:
           type: string
           description: What Railpack found, for kind railpack, like "Node 24.22.1, start: npm run start".
@@ -5266,7 +5266,7 @@ components:
                 description: The compose service that runs Postgres.
         config:
           type: object
-          description: The `x-ops` block of compose.yml.
+          description: The `x-moin` block of compose.yml.
           properties:
             app:
               type: string
@@ -5332,7 +5332,7 @@ components:
           type: string
         password:
           type: string
-          description: The password ops made, with show=true.
+          description: The password moin made, with show=true.
         own_password:
           type: boolean
           description: The app's own password, the one of its domains, guards it.
@@ -5388,7 +5388,7 @@ components:
                 type: boolean
               from_compose:
                 type: boolean
-                description: x-ops.domains in compose.yml of the live release sets the domain. It wins over the domains set in ops, so it changes in compose.yml, then a deploy.
+                description: x-moin.domains in compose.yml of the live release sets the domain. It wins over the domains set in moin, so it changes in compose.yml, then a deploy.
               service:
                 type: string
                 description: The service of compose.yml the domain reaches; absent for the main one.
@@ -5451,7 +5451,7 @@ components:
           properties:
             signing_secret:
               type: string
-              description: Only for a webhook, only in this answer. Check `X-Ops-Signature` with it.
+              description: Only for a webhook, only in this answer. Check `X-Moin-Signature` with it.
     AlertDestinationRequest:
       type: object
       required: [kind, name]
@@ -5544,10 +5544,10 @@ components:
           description: The image without a tag; VERSION is its tag.
         database:
           type: string
-          description: postgres or sqlite, which ops backs up; mysql, mongodb or clickhouse, which it does not yet; empty for none.
+          description: postgres or sqlite, which moin backs up; mysql, mongodb or clickhouse, which it does not yet; empty for none.
         database_note:
           type: string
-          description: 'For a database ops does not back up, says so: "Runs on MySQL: ops doesn''t back it up yet." Empty otherwise.' 
+          description: 'For a database moin does not back up, says so: "Runs on MySQL: moin doesn''t back it up yet." Empty otherwise.' 
         port:
           type: integer
         login:
@@ -5555,12 +5555,12 @@ components:
           description: How to sign in the first time, when the app has a default.
         needs_domain:
           type: boolean
-          description: The install needs a domain; ops sets APP_URL to https://<domain>.
+          description: The install needs a domain; moin sets APP_URL to https://<domain>.
         secrets:
           type: array
           items:
             type: string
-          description: The env vars ops generates on install.
+          description: The env vars moin generates on install.
         latest:
           oneOf:
             - $ref: '#/components/schemas/CatalogVersion'
@@ -5698,7 +5698,7 @@ components:
             $ref: '#/components/schemas/DBTable'
         migration:
           type: object
-          description: The newest migration that goose, golang-migrate, Prisma or Drizzle recorded. The app runs its migrations; ops only reads where they are.
+          description: The newest migration that goose, golang-migrate, Prisma or Drizzle recorded. The app runs its migrations; moin only reads where they are.
           required: [tool, version]
           properties:
             tool:
@@ -5854,7 +5854,7 @@ components:
           type: string
         folder:
           type: string
-          description: Where this workspace's files are in the bucket, path then the workspace ID, like ops/0b6c1f8e-…/.
+          description: Where this workspace's files are in the bucket, path then the workspace ID, like moin/0b6c1f8e-…/.
         access_key:
           type: string
         created_at:
@@ -5884,7 +5884,7 @@ components:
       properties:
         name:
           type: string
-          description: The bucket's name in ops, like default or client-a.
+          description: The bucket's name in moin, like default or client-a.
         default:
           type: boolean
           description: Apps without a bucket of their own use it.
@@ -6151,7 +6151,7 @@ components:
           type: string
         path:
           type: string
-          description: Where the check goes. The app's health path from `x-ops.health`, or /, unless set.
+          description: Where the check goes. The app's health path from `x-moin.health`, or /, unless set.
         custom_path:
           type: boolean
         paused:
@@ -6567,7 +6567,7 @@ components:
           description: 'JSON text with details of the event, such as `{"number":"12","ref":"main"}`, and settings before and after, such as `{"from":"member","to":"admin"}`. Env values, secrets, tokens, passwords, SQL text and row contents are never in it; a SQL write has the kind of statement, its tables and the row count.'
         actor:
           type: string
-          description: The member's email, or `GitHub`, `A deploy hook` or `ops` for changes without a member.
+          description: The member's email, or `GitHub`, `A deploy hook` or `moin` for changes without a member.
           examples: [ada@example.com]
         summary:
           type: string
@@ -6576,7 +6576,7 @@ components:
         via:
           type: string
           enum: [web, cli, tui, api, mcp, hook, github, system, '']
-          description: How the change came in. `system` is ops itself, such as a deploy that ended or a restore drill. Events from before the CLI and TUI were told apart say `api` for them. Empty for some older events.
+          description: How the change came in. `system` is moin itself, such as a deploy that ended or a restore drill. Events from before the CLI and TUI were told apart say `api` for them. Empty for some older events.
         token:
           type: string
           description: The name of the API token the change came with, empty without one.

@@ -22,17 +22,17 @@ func TestUpdateAlertReachesEveryDestination(t *testing.T) {
 	f.add(t, model.AlertTelegram, "telegram", telegramToken, "-1001234")
 	f.add(t, model.AlertWebhook, "hook", f.url+"/hook", "")
 	f.add(t, model.AlertWebhook, "deploys-only", f.url+"/deploys", "", "deploy.failed")
-	page := "https://ops.example.com/app/owner-workspace/apps/shop"
+	page := "https://moin.example.com/app/owner-workspace/apps/shop"
 	f.alerts.Send(owner.WorkspaceID, "update.available", "shop", map[string]string{"catalog": "Umami", "version": "3.5.0", "current": "3.4.1"}, time.Now())
 
-	line := "Umami 3.5.0 is out for shop (you run 3.4.1). Update in one click; ops backs up first."
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*⬆️ Umami 3.5.0 is out for shop*\n"+line+"\nOr run: ops update shop\n<"+page+"|Open in ops>" {
+	line := "Umami 3.5.0 is out for shop (you run 3.4.1). Update in one click; moin backs up first."
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*⬆️ Umami 3.5.0 is out for shop*\n"+line+"\nOr run: moin update shop\n<"+page+"|Open in moin>" {
 		t.Errorf("slack = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**⬆️ Umami 3.5.0 is out for shop**\n"+line+"\nOr run: ops update shop\nOpen in ops: <"+page+">" {
+	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**⬆️ Umami 3.5.0 is out for shop**\n"+line+"\nOr run: moin update shop\nOpen in moin: <"+page+">" {
 		t.Errorf("discord = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>⬆️ Umami 3.5.0 is out for shop</b>\n"+line+"\nOr run: ops update shop\n<a href=\""+page+"\">Open in ops</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>⬆️ Umami 3.5.0 is out for shop</b>\n"+line+"\nOr run: moin update shop\n<a href=\""+page+"\">Open in moin</a>" {
 		t.Errorf("telegram = %q", text)
 	}
 	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"update.available","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"","reason":"Umami 3.5.0, runs 3.4.1","since":"","duration":"","url":"`+page+`"}` {

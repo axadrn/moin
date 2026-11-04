@@ -8,7 +8,7 @@ license: GPL-3.0
 image: ghcr.io/paperless-ngx/paperless-ngx
 database: postgres
 port: 8000
-login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
 logo: https://github.com/paperless-ngx/paperless-ngx/blob/HEAD/docs/assets/logo_leaf.svg
 ---
 

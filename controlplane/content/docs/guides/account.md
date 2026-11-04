@@ -8,7 +8,7 @@ order: 16
 
 ## Sign up and sign in
 
-Sign in with GitHub, with a link ops emails you, or with a password once you set one. The first sign-in asks for your name and the name of your first workspace. After GitHub sign-in both are filled in from your GitHub profile; with an email link you type them. Someone invited to a workspace gives only their name and joins that workspace.
+Sign in with GitHub, with a link moin emails you, or with a password once you set one. The first sign-in asks for your name and the name of your first workspace. After GitHub sign-in both are filled in from your GitHub profile; with an email link you type them. Someone invited to a workspace gives only their name and joins that workspace.
 
 ```surfaces
 Web: the sign-in page, **Continue with GitHub** or **Continue with email**
@@ -19,7 +19,7 @@ The API takes `name` and an optional `workspace_name`; without it the workspace 
 
 ## Change your name
 
-The name your team sees in ops and in the activity.
+The name your team sees in moin and in the activity.
 
 ```surfaces
 Web: **Settings**, **Profile** tab, **Name**, **Save**
@@ -41,7 +41,7 @@ A mail when a site goes down, a server goes offline or a deploy fails, in the wo
 
 ## Change your email
 
-Sign-in links and notices go to the new address once you click the link ops sends there.
+Sign-in links and notices go to the new address once you click the link moin sends there.
 
 ```surfaces
 Web: **Settings**, **Profile** tab, **Email**, **Save**
@@ -81,7 +81,7 @@ Web: **Settings**, **Tokens** tab, **Create token**
 API: POST /api/v1/account/tokens
 ```
 
-ops shows the token once. Then `ops login` on your computer asks for it.
+moin shows the token once. Then `moin login` on your computer asks for it.
 
 ## See your API tokens
 
@@ -92,7 +92,7 @@ API: GET /api/v1/account/tokens
 
 ## Revoke an API token
 
-Requests with it stop working right away. The web asks first. `ops logout` only forgets the token on your computer; it still works until you revoke it.
+Requests with it stop working right away. The web asks first. `moin logout` only forgets the token on your computer; it still works until you revoke it.
 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Revoke** on the token
@@ -105,7 +105,7 @@ A token cannot be renamed or get more rights. Make a new one and revoke the old 
 
 Removes your account, your profile, your picture, your sessions and your API tokens, and takes you out of every workspace. It cannot be undone, so you type `DELETE` first.
 
-Your servers, apps and env vars belong to a workspace, not to you, so they stay for your team. If you are the last owner of a workspace, hand it to someone else or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first. Deleting a workspace removes its servers and apps from ops; the apps keep running on your servers.
+Your servers, apps and env vars belong to a workspace, not to you, so they stay for your team. If you are the last owner of a workspace, hand it to someone else or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first. Deleting a workspace removes its servers and apps from moin; the apps keep running on your servers.
 
 ```surfaces
 Web: **Settings**, **Security** tab, **Delete account**
@@ -118,7 +118,7 @@ An API token, and so the CLI, the TUI and agents, cannot change your email, pass
 
 ## Billing
 
-On hosted ops you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. When the trial ends and nobody has subscribed, the workspace is read-only: your apps and their backups keep running, and you can still see everything and stop and start apps, but not deploy or add servers until you subscribe.
+On hosted moin you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. When the trial ends and nobody has subscribed, the workspace is read-only: your apps and their backups keep running, and you can still see everything and stop and start apps, but not deploy or add servers until you subscribe.
 
 Only the owner of the workspace sees the plan and pays, on the web: **Billing** in the sidebar. Buying and cancelling happen only on the web.
 

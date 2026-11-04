@@ -108,7 +108,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 						// and truncates, so nothing overlaps on a phone.
 						<div class="ml-auto flex shrink-0 items-center gap-1">
 							@docsSearch(docsTree)
-							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "ops on GitHub"}}) {
+							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "moin on GitHub"}}) {
 								@icons.Github(icons.Props{Class: "size-4"})
 							}
 							@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground hover:text-foreground"})
@@ -217,7 +217,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 				// and the browser keeps it for the next pages and visits. This
 				// script lives outside the swapped docs content and runs once
 				// per document, so its listener stays.
-				const surfaceKey = 'ops-docs-surface';
+				const surfaceKey = 'moin-docs-surface';
 				function showSurface(value, picked) {
 					if (!/^[a-z]+$/.test(value || '')) return;
 					// The block that was clicked stays where it is on the screen

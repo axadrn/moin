@@ -196,15 +196,15 @@ func releasedShort(version catalog.Version, now time.Time) string {
 	}
 }
 
-// databaseSentence says in words what ops does for the app's database.
+// databaseSentence says in words what moin does for the app's database.
 func databaseSentence(entry catalog.Entry) string {
 	if entry.BackedUp() {
-		return "ops backs up every change, checked daily"
+		return "moin backs up every change, checked daily"
 	}
 	if entry.Database == "mysql" {
-		return "Runs on MySQL: ops backups for MySQL come next"
+		return "Runs on MySQL: moin backups for MySQL come next"
 	}
-	return "Runs on " + entry.DatabaseName() + ": ops doesn't back it up yet"
+	return "Runs on " + entry.DatabaseName() + ": moin doesn't back it up yet"
 }
 
 // catalogJSONLD describes the app for search engines, as JSON-LD.

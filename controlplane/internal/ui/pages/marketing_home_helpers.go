@@ -11,8 +11,8 @@ func liveCount(count int) string {
 	return text
 }
 
-// compareTools are the columns of the comparison, ops first.
-var compareTools = []string{"ops", "Coolify Cloud", "Dokploy Cloud", "Kamal", "Heroku", "Render", "Railway", "Fly.io", "Uncloud"}
+// compareTools are the columns of the comparison, moin first.
+var compareTools = []string{"moin", "Coolify Cloud", "Dokploy Cloud", "Kamal", "Heroku", "Render", "Railway", "Fly.io", "Uncloud"}
 
 // compareColumn is one column of a tab: a tool, named for that tab, and
 // what it costs there when that differs from its row, such as a hosted
@@ -23,7 +23,7 @@ type compareColumn struct {
 	Price compareCell
 }
 
-// compareTab is one view of the comparison: ops next to the tools people
+// compareTab is one view of the comparison: moin next to the tools people
 // weigh it against.
 type compareTab struct {
 	Value   string
@@ -34,13 +34,13 @@ type compareTab struct {
 var (
 	free     = plain("Free", "you run it")
 	opsFree  = plain("Free", "every feature")
-	selfHost = []compareColumn{{"ops", 0, opsFree}, {"Coolify", 1, free}, {"Dokploy", 2, free}, {"Kamal", 3, compareCell{}}, {"Uncloud", 8, compareCell{}}}
+	selfHost = []compareColumn{{"moin", 0, opsFree}, {"Coolify", 1, free}, {"Dokploy", 2, free}, {"Kamal", 3, compareCell{}}, {"Uncloud", 8, compareCell{}}}
 )
 
 var compareTabs = []compareTab{
-	{"hosted", "Hosted", []compareColumn{{"ops Hosted", 0, compareCell{}}, {"Coolify Cloud", 1, compareCell{}}, {"Dokploy Cloud", 2, compareCell{}}}},
+	{"hosted", "Hosted", []compareColumn{{"moin Hosted", 0, compareCell{}}, {"Coolify Cloud", 1, compareCell{}}, {"Dokploy Cloud", 2, compareCell{}}}},
 	{"self-hosted", "Self-hosted", selfHost},
-	{"platforms", "Platforms", []compareColumn{{"ops Hosted", 0, compareCell{}}, {"Heroku", 4, compareCell{}}, {"Render", 5, compareCell{}}, {"Railway", 6, compareCell{}}, {"Fly.io", 7, compareCell{}}}},
+	{"platforms", "Platforms", []compareColumn{{"moin Hosted", 0, compareCell{}}, {"Heroku", 4, compareCell{}}, {"Render", 5, compareCell{}}, {"Railway", 6, compareCell{}}, {"Fly.io", 7, compareCell{}}}},
 }
 
 // cellFor is what a column says in a row: its own price on the price row

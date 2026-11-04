@@ -20,7 +20,7 @@ func registerAlertTools(server *mcpsdk.Server, services Services) {
 	add := change(false, false)
 	add.Title = "Add an alert destination"
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "add_alert_destination", Title: add.Title, Annotations: add,
-		Description: "Adds an alert destination: kind slack or discord with the incoming webhook url, telegram with bot_token and chat_id, or webhook with any http or https url. events picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok and update.available; none means all. A webhook returns signing_secret this once: each post carries X-Ops-Signature: sha256=<hex HMAC-SHA256 of the body>; tell the user to store it. Ask the user for the URL or token; never guess one. Only owners and admins. Needs a token with read and write access.",
+		Description: "Adds an alert destination: kind slack or discord with the incoming webhook url, telegram with bot_token and chat_id, or webhook with any http or https url. events picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, drill.failed, drill.recovered, disk.full, disk.ok and update.available; none means all. A webhook returns signing_secret this once: each post carries X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>; tell the user to store it. Ask the user for the URL or token; never guess one. Only owners and admins. Needs a token with read and write access.",
 	}, Write(member(services, tools.add)))
 	remove := change(true, true)
 	remove.Title = "Remove an alert destination"

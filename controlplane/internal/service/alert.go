@@ -43,7 +43,7 @@ func alerted(action string) bool {
 }
 
 // alertMessage is one alert as every destination says it: the symbol and
-// the heading, the lines below, the link into ops, and the fields of the
+// the heading, the lines below, the link into moin, and the fields of the
 // webhook body.
 type alertMessage struct {
 	Symbol  string
@@ -142,7 +142,7 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		message.Lines = []string{
 			"Database: " + database + ", app " + target + ".",
 			"Error: " + orDash(clipText(details["error"], 300)),
-			"New changes are not in your bucket until this is fixed. What is there stays. See: ops backups " + target,
+			"New changes are not in your bucket until this is fixed. What is there stays. See: moin backups " + target,
 		}
 		message.URL = base + "/apps/" + target + "/backups"
 		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
@@ -156,7 +156,7 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		message.Lines = []string{
 			"Database: " + details["database"] + ", app " + target + ".",
 			"Error: " + orDash(clipText(details["error"], 300)),
-			"The newest backup did not restore cleanly. Take a snapshot now and look: ops backups " + target,
+			"The newest backup did not restore cleanly. Take a snapshot now and look: moin backups " + target,
 		}
 		message.URL = base + "/apps/" + target + "/backups"
 		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
@@ -176,8 +176,8 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 	case "update.available":
 		message.Symbol, message.Heading = "⬆️", details["catalog"]+" "+details["version"]+" is out for "+target
 		message.Lines = []string{
-			details["catalog"] + " " + details["version"] + " is out for " + target + " (you run " + details["current"] + "). Update in one click; ops backs up first.",
-			"Or run: ops update " + target,
+			details["catalog"] + " " + details["version"] + " is out for " + target + " (you run " + details["current"] + "). Update in one click; moin backs up first.",
+			"Or run: moin update " + target,
 		}
 		message.URL = base + "/apps/" + target
 		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)

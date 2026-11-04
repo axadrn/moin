@@ -84,8 +84,8 @@
 }
 
 :root {
-  /* ops design tokens. DESIGN.md explains them; the TUI and the CLI use the
-     same brand and status colors (ops/internal/style). */
+  /* moin design tokens. DESIGN.md explains them; the TUI and the CLI use the
+     same brand and status colors (moin/internal/style). */
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   /* Headlines and big numbers: Geist, heavy and tight (.font-display). */
   --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
@@ -242,21 +242,21 @@
 /* app */
 @layer components {
   /* The running symbol turns (the landing page uses it too). */
-  .ops-turn {
+  .moin-turn {
     animation: goilerplate-spin 1.6s linear infinite;
     transform-origin: center;
   }
 
   /* Status dots: live breathes, running blinks. */
-  .ops-dot-live {
-    animation: ops-breathe 2.4s ease-out infinite;
+  .moin-dot-live {
+    animation: moin-breathe 2.4s ease-out infinite;
   }
-  .ops-dot-run {
-    animation: ops-blink 1.2s ease-in-out infinite;
+  .moin-dot-run {
+    animation: moin-blink 1.2s ease-in-out infinite;
   }
 
   /* Logs and commands: mono on the surface they sit on. */
-  .ops-term {
+  .moin-term {
     --tf: var(--card-foreground);
     color: color-mix(in oklab, var(--tf) 92%, transparent);
     font-family: var(--font-mono);
@@ -266,10 +266,10 @@
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklab, var(--tf) 18%, transparent) transparent;
   }
-  .ops-term-lines {
+  .moin-term-lines {
     counter-reset: line;
   }
-  .ops-term-line {
+  .moin-term-line {
     counter-increment: line;
     display: grid;
     grid-template-columns: 2.75rem minmax(0, 1fr);
@@ -277,62 +277,62 @@
     white-space: pre-wrap;
     overflow-wrap: break-word;
   }
-  .ops-term-line::before {
+  .moin-term-line::before {
     content: counter(line);
     padding-right: 1rem;
     text-align: right;
     color: color-mix(in oklab, var(--tf) 22%, transparent);
     user-select: none;
   }
-  .ops-term-line[data-n]::before {
+  .moin-term-line[data-n]::before {
     content: attr(data-n);
   }
-  .ops-term-line:hover {
+  .moin-term-line:hover {
     background: color-mix(in oklab, var(--tf) 4%, transparent);
   }
-  .ops-term-line[data-kind="out"] {
+  .moin-term-line[data-kind="out"] {
     color: color-mix(in oklab, var(--tf) 50%, transparent);
   }
-  .ops-term-line[data-kind="step"] > span::before {
+  .moin-term-line[data-kind="step"] > span::before {
     content: "→ ";
     color: color-mix(in oklab, var(--tf) 45%, transparent);
   }
-  .ops-term-line[data-kind="ok"] {
+  .moin-term-line[data-kind="ok"] {
     color: var(--live);
   }
-  .ops-term-line[data-kind="ok"] > span::before {
+  .moin-term-line[data-kind="ok"] > span::before {
     content: "✓ ";
   }
-  .ops-term-line[data-kind="err"] {
+  .moin-term-line[data-kind="err"] {
     color: var(--failed);
   }
-  .ops-term-line[data-kind="err"] > span::before {
+  .moin-term-line[data-kind="err"] > span::before {
     content: "✗ ";
   }
-  .ops-term-dim {
+  .moin-term-dim {
     color: color-mix(in oklab, var(--tf) 42%, transparent);
   }
   @media (max-width: 40rem) {
-    .ops-term-line {
+    .moin-term-line {
       grid-template-columns: 2.25rem minmax(0, 1fr);
       padding-right: 0.75rem;
     }
-    .ops-term-line::before {
+    .moin-term-line::before {
       padding-right: 0.75rem;
     }
   }
 
   /* Tool output between two steps folds into one line. */
-  .ops-term-fold:not(:has(.ops-term-line)) {
+  .moin-term-fold:not(:has(.moin-term-line)) {
     display: none;
   }
-  .ops-term-fold:not([data-open]) > .ops-term-line[data-kind="out"] {
+  .moin-term-fold:not([data-open]) > .moin-term-line[data-kind="out"] {
     display: none;
   }
-  .ops-term-fold[data-open] {
+  .moin-term-fold[data-open] {
     background: color-mix(in oklab, var(--tf) 3%, transparent);
   }
-  .ops-term-toggle {
+  .moin-term-toggle {
     display: flex;
     width: 100%;
     align-items: center;
@@ -346,32 +346,32 @@
     outline: none;
     border-radius: 8px;
   }
-  .ops-term-toggle:hover {
+  .moin-term-toggle:hover {
     color: var(--tf);
     background: color-mix(in oklab, var(--tf) 5%, transparent);
   }
-  .ops-term-toggle:focus-visible {
+  .moin-term-toggle:focus-visible {
     box-shadow: inset 0 0 0 2px var(--ring);
   }
-  .ops-term-arrow {
+  .moin-term-arrow {
     display: inline-block;
     transition: rotate 0.12s ease-out;
   }
-  [data-open] > .ops-term-toggle .ops-term-arrow {
+  [data-open] > .moin-term-toggle .moin-term-arrow {
     rotate: 90deg;
   }
   @media (max-width: 40rem) {
-    .ops-term-toggle {
+    .moin-term-toggle {
       padding-left: 2.25rem;
     }
   }
 
   /* Container logs: time, service, message. Phones show the message only. */
-  .ops-term-log {
+  .moin-term-log {
     grid-template-columns: 2.25rem minmax(0, 1fr);
   }
   @media (min-width: 40rem) {
-    .ops-term-log {
+    .moin-term-log {
       grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr);
     }
   }
@@ -383,15 +383,15 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .ops-turn,
-    .ops-dot-live,
-    .ops-dot-run {
+    .moin-turn,
+    .moin-dot-live,
+    .moin-dot-run {
       animation: none;
     }
   }
 }
 
-@keyframes ops-breathe {
+@keyframes moin-breathe {
   0% {
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
   }
@@ -403,7 +403,7 @@
   }
 }
 
-@keyframes ops-blink {
+@keyframes moin-blink {
   50% {
     opacity: 0.35;
   }

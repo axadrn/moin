@@ -34,7 +34,7 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 	name := os.Getenv("OPS_TEST_S3_BUCKET")
 	if name == "" {
-		name = "ops-dev"
+		name = "moin-dev"
 	}
 	bucket := Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: name, AccessKey: "x", SecretKey: "y", Folder: fmt.Sprintf("test-%d/litestream", time.Now().UnixNano())}
 	ctx := context.Background()

@@ -11,14 +11,14 @@ import (
 )
 
 // registerCatalogTools registers the tools of the catalog: open source
-// apps ops installs in one click, and their updates.
+// apps moin installs in one click, and their updates.
 func registerCatalogTools(server *mcpsdk.Server, services Services) {
 	tools := catalogTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "list_catalog", Title: "List the catalog", Annotations: readOnly("List the catalog"),
-		Description: "Lists the open source apps ops installs in one click, such as Umami or n8n: slug, name, what it does, category, the database ops backs up (postgres or sqlite) and the newest release. Needs the read scope.",
+		Description: "Lists the open source apps moin installs in one click, such as Umami or n8n: slug, name, what it does, category, the database moin backs up (postgres or sqlite) and the newest release. Needs the read scope.",
 	}, Read(member(services, tools.list)))
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_catalog_app", Title: "A catalog app", Annotations: readOnly("A catalog app"),
-		Description: "Returns one catalog app by slug with every release, newest first, with dates where the registry gives them, the secrets ops generates on install and how to sign in the first time. Needs the read scope.",
+		Description: "Returns one catalog app by slug with every release, newest first, with dates where the registry gives them, the secrets moin generates on install and how to sign in the first time. Needs the read scope.",
 	}, Read(member(services, tools.get)))
 	install := change(false, false)
 	install.Title = "Install a catalog app"

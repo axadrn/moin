@@ -204,7 +204,7 @@ templ catalogScript() {
 
 // catalogCard is one app in the grid, the same shape for every app: tile,
 // name and category; a pitch of two lines; and at the bottom one line with
-// the newest release and what ops backs up, which never wraps.
+// the newest release and what moin backs up, which never wraps.
 templ catalogCard(base string, app CatalogEntryView, now time.Time) {
 	<a href={ templ.SafeURL(base + "/" + app.Entry.Slug) } class="group block h-full rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring" data-catalog-app={ app.Entry.Slug }>
 		@card.Card(card.Props{Class: "flex h-full flex-col gap-0 rounded-4xl p-6 shadow-none ring-1 ring-foreground/5 transition-colors group-hover:bg-muted/60 sm:p-7"}) {
@@ -232,7 +232,7 @@ templ catalogCard(base string, app CatalogEntryView, now time.Time) {
 }
 
 // catalogDatabase is the app's database in the card footer, at a glance:
-// a green shield when ops backs it up, a grey crossed one when it does not
+// a green shield when moin backs it up, a grey crossed one when it does not
 // yet. The sentence lives in the tooltip and for screen readers.
 templ catalogDatabase(entry catalog.Entry) {
 	if entry.Database != "" {
@@ -264,7 +264,7 @@ templ catalogTile(entry catalog.Entry, class string) {
 	}
 }
 
-// CatalogApp is the page of one catalog app: what it is, what ops adds,
+// CatalogApp is the page of one catalog app: what it is, what moin adds,
 // every release, and the way to install it.
 templ CatalogApp(view CatalogEntryView, appURL string) {
 	@layouts.Home(layouts.SEOProps{
@@ -346,9 +346,9 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 	}
 }
 
-// catalogNote is a plain fact ops cannot promise yet, in the same calm
+// catalogNote is a plain fact moin cannot promise yet, in the same calm
 // form as what it adds.
-// catalogNote says what ops does not do for the app's database yet; for a
+// catalogNote says what moin does not do for the app's database yet; for a
 // database not planned yet, a link asks for it.
 templ catalogNote(text, ask string) {
 	<li class="flex gap-3 text-base leading-7" data-catalog-database-note>
@@ -425,7 +425,7 @@ templ CatalogInstall(view CatalogInstallView) {
 				</div>
 			</div>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-				@panel(panelProps{Heading: "catalog-install-heading", Title: "Install", Description: "ops makes the app on the server, generates its secrets as env vars and deploys it. Every deploy snapshots its database first.", Docs: "/docs/guides/catalog"}) {
+				@panel(panelProps{Heading: "catalog-install-heading", Title: "Install", Description: "moin makes the app on the server, generates its secrets as env vars and deploys it. Every deploy snapshots its database first.", Docs: "/docs/guides/catalog"}) {
 					if len(view.Servers) == 0 {
 						<p class="text-sm text-muted-foreground">Add a server first. <a class="underline underline-offset-4" href={ templ.SafeURL(basePath + "/servers") }>Servers</a></p>
 					} else {
@@ -546,7 +546,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 					hx-post={ basePath + "/apps/" + view.App.Name + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
-					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one; ops takes a snapshot first." }
+					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one; moin takes a snapshot first." }
 				>
 					@csrf.Token()
 					<label for="catalog-update-version" class="sr-only">Version</label>

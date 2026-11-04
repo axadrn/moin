@@ -100,7 +100,7 @@ func RequireChanges(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// WithTokenWorkspace scopes an ops API route, whose path names no
+// WithTokenWorkspace scopes a moin API route, whose path names no
 // workspace, to the workspace of the personal API token. A session names
 // the workspace in the Ops-Workspace header, or an EventSource, which sends
 // no headers, in the workspace query parameter; otherwise it gets its first.

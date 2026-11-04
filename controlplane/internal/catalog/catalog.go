@@ -1,7 +1,7 @@
-// Package catalog is the list of open source apps ops installs in one
+// Package catalog is the list of open source apps moin installs in one
 // click. Each entry is a folder in content/catalog: app.md with what the
 // app is, compose.yml with how it runs, and an optional logo.svg. They ship
-// with ops, so a self-hosted control plane has the same catalog. Versions
+// with moin, so a self-hosted control plane has the same catalog. Versions
 // come from the image's registry, asked by every control plane itself.
 package catalog
 
@@ -31,7 +31,7 @@ type Entry struct {
 	License string
 	// Image is the image the version picks the tag of, without a tag.
 	Image string
-	// Database is the app's database: postgres and sqlite, which ops backs
+	// Database is the app's database: postgres and sqlite, which moin backs
 	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
 	// for none.
 	Database string
@@ -52,7 +52,7 @@ type Entry struct {
 	// media type; none shows the first letter instead.
 	Logo     []byte
 	LogoType string
-	// Secrets are the ${NAME}s of compose.yml ops generates on install.
+	// Secrets are the ${NAME}s of compose.yml moin generates on install.
 	Secrets []string
 }
 
@@ -72,7 +72,7 @@ var (
 // the image tag.
 const VersionVar = "VERSION"
 
-// URLVar is the app's own address, https://<its domain>, which ops sets on
+// URLVar is the app's own address, https://<its domain>, which moin sets on
 // install for an app whose compose.yml uses it: links, redirects and
 // cookies of such an app need it, so it needs a domain.
 const URLVar = "APP_URL"
@@ -191,7 +191,7 @@ var databaseNames = map[string]string{
 	"mysql": "MySQL", "mongodb": "MongoDB", "clickhouse": "ClickHouse",
 }
 
-// BackedUp reports whether ops backs up the app's database.
+// BackedUp reports whether moin backs up the app's database.
 func (e Entry) BackedUp() bool {
 	return e.Database == "postgres" || e.Database == "sqlite"
 }
@@ -199,29 +199,29 @@ func (e Entry) BackedUp() bool {
 // DatabaseName is the app's database as people write it, such as MySQL.
 func (e Entry) DatabaseName() string { return databaseNames[e.Database] }
 
-// DatabaseNote says plainly what ops does with the app's database: empty
-// for one ops backs up or for no database, a sentence for the others.
+// DatabaseNote says plainly what moin does with the app's database: empty
+// for one moin backs up or for no database, a sentence for the others.
 func (e Entry) DatabaseNote() string {
 	if e.Database == "" || e.BackedUp() {
 		return ""
 	}
 	if e.Database == "mysql" {
-		return "Runs on MySQL: ops backups for MySQL come next."
+		return "Runs on MySQL: moin backups for MySQL come next."
 	}
-	return "Runs on " + e.DatabaseName() + ": ops doesn't back it up yet."
+	return "Runs on " + e.DatabaseName() + ": moin doesn't back it up yet."
 }
 
 // BackupRequestURL opens a GitHub issue that asks for backups of the app's
-// database, for one ops does not back up and has not planned yet; "" else.
+// database, for one moin does not back up and has not planned yet; "" else.
 func (e Entry) BackupRequestURL() string {
 	if e.Database == "" || e.BackedUp() || e.Database == "mysql" {
 		return ""
 	}
-	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want ops to back up its "+e.DatabaseName()+".")
+	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want moin to back up its "+e.DatabaseName()+".")
 }
 
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a
-// default, sorted: ops generates a value for each on install.
+// default, sorted: moin generates a value for each on install.
 func Secrets(compose []byte) []string {
 	var names []string
 	for _, match := range variablePattern.FindAllStringSubmatch(string(compose), -1) {

@@ -414,7 +414,7 @@ func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 
 // uptimeDomains are the domains of an app and its health path, if its
 // live release has one: the domains the release answers on win over the
-// ones set in ops, like for the tunnel.
+// ones set in moin, like for the tunnel.
 func uptimeDomains(domainsJSON, detectedJSON string) (domains []string, health string) {
 	_ = json.Unmarshal([]byte(domainsJSON), &domains)
 	if detected := Detected(model.Deploy{Detected: detectedJSON}); detected != nil {

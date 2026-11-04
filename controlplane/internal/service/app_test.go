@@ -60,7 +60,7 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "other"})
-	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://ops.example.com")
+	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
 	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
 	if err != nil {
 		t.Fatal(err)
@@ -385,7 +385,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 
 	// The hook deploys an image and hands the agent the matching login.
 	url, err := apps.RotateDeployHook(owner, "blog")
-	if err != nil || !strings.HasPrefix(url, "https://ops.example.com/webhooks/deploy/dph_") {
+	if err != nil || !strings.HasPrefix(url, "https://moin.example.com/webhooks/deploy/dph_") {
 		t.Fatalf("hook url = %q, %v", url, err)
 	}
 	token := url[strings.LastIndex(url, "/")+1:]
@@ -492,7 +492,7 @@ func TestDomainsAndProtectionApplyToTheRunningRelease(t *testing.T) {
 	}
 }
 
-// x-ops.domains wins over the domains set in ops, so ops lists those and
+// x-moin.domains wins over the domains set in moin, so moin lists those and
 // refuses to change domains it cannot apply.
 func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
@@ -510,7 +510,7 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 		t.Fatalf("checks = %+v, %v", checks, err)
 	}
 	if _, _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); !errors.Is(err, ErrComposeDomains) {
-		t.Fatalf("set domains under x-ops: err = %v", err)
+		t.Fatalf("set domains under x-moin: err = %v", err)
 	}
 }
 

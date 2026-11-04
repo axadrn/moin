@@ -13,7 +13,7 @@ import (
 )
 
 // execArgs splits `exec [app] [flags] -- <command…>` at the first "--":
-// what comes before is ops's, what comes after is the command's own, flags
+// what comes before is moin's, what comes after is the command's own, flags
 // and all.
 func execArgs(args []string) (own, command []string) {
 	cut := slices.Index(args, "--")

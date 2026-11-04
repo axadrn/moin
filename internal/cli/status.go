@@ -63,6 +63,6 @@ func printStatus(w io.Writer, status client.Status) {
 		for _, update := range status.Updates {
 			fmt.Fprintf(w, "  %s %s %s → %s\n", update.App, style.Muted.Render(update.Name), update.Version, update.Latest)
 		}
-		hint(w, "Update one with", "ops update <app>")
+		hint(w, "Update one with", "moin update <app>")
 	}
 }

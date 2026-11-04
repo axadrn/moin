@@ -72,7 +72,7 @@ const homeAnchor = "scroll-mt-23 sm:scroll-mt-25"
 const homeSection = "mt-28 sm:mt-36"
 
 // homePrimary is the one main button of the page: the free trial, or sign
-// in while sign-up is closed and on a self-hosted ops.
+// in while sign-up is closed and on a self-hosted moin.
 templ homePrimary() {
 	@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA}) {
 		{ homeStartLabel(ctx) }
@@ -92,8 +92,8 @@ func homeStartLabel(ctx context.Context) string {
 	}
 }
 
-// homeGoilerplateGuide is the goilerplate guide for deploying with ops.
-const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-ops?ref=ops-landing"
+// homeGoilerplateGuide is the goilerplate guide for deploying with moin.
+const homeGoilerplateGuide = blocks.GoilerplateURL + "/docs/guides/deploy-with-ops?ref=moin-landing"
 
 // ---------------------------------------------------------------- hero
 // HomeHero is the promise in two lines, one line under it, two buttons,
@@ -139,7 +139,7 @@ templ homeStage() {
 				@homeShot("backups", "The backups page: continuous backup, restore to any second in the window, and the snapshots", false)
 			</div>
 		}
-		<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5" aria-label="What ops reports">
+		<div class="mt-5 flex flex-wrap items-center justify-center gap-2.5" aria-label="What moin reports">
 			@homeChip("blog", "live", "live v6")
 			@homeChip("shop.db", "live", "verified by restore")
 			@homeChip("api", "failed", "v3 failed · v2 runs again")
@@ -240,7 +240,7 @@ templ homeChip(app, kind, text string) {
 				}
 			case "running":
 				@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-sm font-medium text-running"}) {
-					<span class="ops-turn inline-block leading-none">◐</span>
+					<span class="moin-turn inline-block leading-none">◐</span>
 					{ text }
 				}
 			default:
@@ -258,18 +258,18 @@ templ homeChip(app, kind, text string) {
 // same.
 const liveShowsAt = 1000
 
-// HomeLive is what ops runs right now: the hosted control plane counts
+// HomeLive is what moin runs right now: the hosted control plane counts
 // itself, self-hosted ones report every five minutes. We say what is true.
 templ HomeLive(network model.Network) {
 	<section id="live" class={ homeAnchor, homeSection } data-live>
 		<div class={ homeWrap }>
 			<p class="flex items-center gap-2.5 text-sm font-semibold text-muted-foreground">
 				<span class="lp-pulse size-2 rounded-full bg-live"></span>
-				Running on ops right now
+				Running on moin right now
 			</p>
 			<dl class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 				@homeLiveNumber(network.SelfHosted, "self-hosted control planes", "self-hosted")
-				@homeLiveNumber(network.HostedWorkspaces, "teams on hosted ops", "hosted")
+				@homeLiveNumber(network.HostedWorkspaces, "teams on hosted moin", "hosted")
 				@homeLiveNumber(network.Servers, "servers", "servers")
 				@homeLiveNumber(network.Apps, "apps live", "apps")
 				@homeLiveNumber(network.Deploys, "deploys so far", "deploys")
@@ -298,9 +298,9 @@ templ HomeCommands() {
 				No Dockerfile? { brand.Name } reads your repo and builds it. <a href="/docs/getting-started" class="text-foreground underline underline-offset-4 hover:text-foreground">Every step</a>
 			</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16">
-				@homeCommand("ops servers add web-1", "Paste one line on any Linux server. No open port, no SSH key.")
-				@homeCommand("ops deploy", "Your server builds the app and puts it live, if it is healthy.")
-				@homeCommand("ops restore --at 14:01", "Deleted the wrong rows at 14:02? Go back to 14:01.")
+				@homeCommand("moin servers add web-1", "Paste one line on any Linux server. No open port, no SSH key.")
+				@homeCommand("moin deploy", "Your server builds the app and puts it live, if it is healthy.")
+				@homeCommand("moin restore --at 14:01", "Deleted the wrong rows at 14:02? Go back to 14:01.")
 			</div>
 		</div>
 	</section>
@@ -335,8 +335,8 @@ templ HomeWaysIn() {
 					@homeWayWeb()
 				}
 				@homeWay("CLI", "For scripts and CI.") {
-					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground sm:text-sm">
-						<p><span class="text-terminal-foreground/50">$ </span>ops rollback v12</p>
+					<div class="moin-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground sm:text-sm">
+						<p><span class="text-terminal-foreground/50">$ </span>moin rollback v12</p>
 						<p class="text-terminal-foreground/60">→ Rollback v14 of shop to v12 started</p>
 						<p class="text-live">✓ v14 of shop is live <span class="text-terminal-foreground/50">in 3s</span></p>
 					</div>
@@ -356,7 +356,7 @@ templ HomeWaysIn() {
 				@badge.Badge(badge.Props{Class: "h-auto leading-normal text-card-foreground text-base font-normal inline-flex items-center gap-3 rounded-full bg-card py-1.5 pr-1.5 pl-5"}) {
 					<span class="text-sm font-semibold">Desktop app</span>
 					@badge.Badge(badge.Props{Class: "h-auto leading-normal inline-flex items-center gap-2 rounded-full bg-running/14 px-3.5 py-1.5 text-sm font-medium text-running"}) {
-						<span class="ops-turn inline-block leading-none">◐</span>
+						<span class="moin-turn inline-block leading-none">◐</span>
 						coming soon
 					}
 				}
@@ -406,10 +406,10 @@ templ homeWayDeploy(number, status, when string, hover bool) {
 }
 
 // homeWayTUI is the app screen of the terminal UI asking before the
-// rollback, as ops draws it.
+// rollback, as moin draws it.
 templ homeWayTUI() {
-	<div class="ops-term overflow-x-auto rounded-3xl bg-terminal py-4 text-sm leading-[1.65] whitespace-pre text-terminal-foreground sm:text-sm" aria-label="The terminal UI asks before it rolls shop back">
-		<p class="px-5"><span class="font-semibold">ops</span>{ "   " }<span class="text-terminal-foreground/50">servers 1</span>{ "   apps › shop   " }<span class="text-terminal-foreground/50">activity</span></p>
+	<div class="moin-term overflow-x-auto rounded-3xl bg-terminal py-4 text-sm leading-[1.65] whitespace-pre text-terminal-foreground sm:text-sm" aria-label="The terminal UI asks before it rolls shop back">
+		<p class="px-5"><span class="font-semibold">moin</span>{ "   " }<span class="text-terminal-foreground/50">servers 1</span>{ "   apps › shop   " }<span class="text-terminal-foreground/50">activity</span></p>
 		<p class="mt-3 px-5">{ "  " }<span class="font-semibold">shop</span>{ "   " }<span class="text-live">● live v13</span></p>
 		<p class="mt-2 px-5 text-terminal-foreground/50">{ "  DEPLOY   STATUS        TOOK" }</p>
 		<p class="px-5">{ "  v13      " }<span class="text-live">● live</span>{ "         5s" }</p>
@@ -499,14 +499,14 @@ templ HomeData() {
 						Live from your server. Every change takes a snapshot first.
 					</p>
 				</div>
-				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-sm">
-					<p><span class="text-terminal-foreground/50">$ </span>ops sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
+				<div class="moin-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre-wrap text-terminal-foreground sm:text-sm">
+					<p><span class="text-terminal-foreground/50">$ </span>moin sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
 					<p class="mt-2 text-terminal-foreground/50">STATUS      COUNT(*)</p>
 					<p>delivered   38</p>
 					<p>paid        126</p>
 					<p>refunded    39</p>
 					<p>shipped     74</p>
-					<p class="mt-4"><span class="text-terminal-foreground/50">$ </span>ops sql --write "UPDATE orders SET status = 'shipped' WHERE id = 412"</p>
+					<p class="mt-4"><span class="text-terminal-foreground/50">$ </span>moin sql --write "UPDATE orders SET status = 'shipped' WHERE id = 412"</p>
 					<p class="text-live">✓ 1 row changed</p>
 				</div>
 			}
@@ -528,7 +528,7 @@ templ HomeUptime() {
 						Down? You hear it by email, Slack, Discord or Telegram. Nothing to set up, no second tool to pay for.
 					</p>
 				</div>
-				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1" aria-label="Two alert emails from ops">
+				<div class="self-center divide-y divide-border rounded-3xl bg-background px-1" aria-label="Two alert emails from moin">
 					@homeAlert("shop.example.com is down", "HTTP 502 · since 14:02", false)
 					@homeAlert("shop.example.com is back up", "down for 4 minutes", true)
 				</div>
@@ -549,7 +549,7 @@ templ homeAlert(subject, detail string, up bool) {
 }
 
 // ---------------------------------------------------------------- compare
-// HomeCompare puts ops next to what people use instead, fact by fact, from
+// HomeCompare puts moin next to what people use instead, fact by fact, from
 // their own docs and pricing pages (compareGroups), in three tabs: hosted
 // control planes, tools you run yourself, and platforms. Each cell carries a mark to read
 // at a glance; each column says how many facts it wins.
@@ -583,7 +583,7 @@ templ HomeCompare() {
 }
 
 // compareTable is a tab of the comparison on a wide screen: the facts
-// down, ops and the tools across, each with how many facts it wins.
+// down, moin and the tools across, each with how many facts it wins.
 templ compareTable(tab compareTab) {
 	<div class={ utils.CN(homeSurface, "max-h-[80svh] overflow-auto overscroll-x-contain ring-1 ring-border") }>
 		<table class="w-full border-separate border-spacing-0 text-left">
@@ -625,12 +625,12 @@ templ compareTable(tab compareTab) {
 	</div>
 }
 
-// compareHead is a tool's column head: its name and its wins. ops wears
+// compareHead is a tool's column head: its name and its wins. moin wears
 // the tint that runs down its column.
-templ compareHead(column compareColumn, ops bool) {
-	<th scope="col" class={ "sticky top-0 z-20 min-w-36 px-3 pt-5 pb-4 align-bottom sm:px-4", templ.KV("bg-card", !ops), templ.KV("bg-[color-mix(in_oklab,var(--live)_10%,var(--card))]", ops) }>
-		<span class={ "block text-base font-semibold", templ.KV("text-live", ops) }>{ column.Name }</span>
-		<span class={ "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", templ.KV("bg-live text-background", ops), templ.KV("bg-muted text-muted-foreground", !ops) }>
+templ compareHead(column compareColumn, moin bool) {
+	<th scope="col" class={ "sticky top-0 z-20 min-w-36 px-3 pt-5 pb-4 align-bottom sm:px-4", templ.KV("bg-card", !moin), templ.KV("bg-[color-mix(in_oklab,var(--live)_10%,var(--card))]", moin) }>
+		<span class={ "block text-base font-semibold", templ.KV("text-live", moin) }>{ column.Name }</span>
+		<span class={ "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", templ.KV("bg-live text-background", moin), templ.KV("bg-muted text-muted-foreground", !moin) }>
 			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
 			{ strconv.Itoa(compareWins(column.Tool)) } of { strconv.Itoa(compareFacts(column.Tool)) }
 		</span>
@@ -639,7 +639,7 @@ templ compareHead(column compareColumn, ops bool) {
 
 // compareCellView is a cell of the comparison: its mark and its word or
 // two, with the detail below in small print.
-templ compareCellView(cell compareCell, ops bool) {
+templ compareCellView(cell compareCell, moin bool) {
 	<span class="inline-flex items-start gap-2.5 text-left">
 		switch cell.Mark {
 			case markYes:
@@ -658,7 +658,7 @@ templ compareCellView(cell compareCell, ops bool) {
 				<span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground" aria-label="Not said" role="img">?</span>
 		}
 		<span class="flex flex-col">
-			<span class={ "text-base leading-6 font-semibold whitespace-nowrap", templ.KV("text-foreground", ops), templ.KV("text-foreground", !ops) }>{ cell.Short }</span>
+			<span class={ "text-base leading-6 font-semibold whitespace-nowrap", templ.KV("text-foreground", moin), templ.KV("text-foreground", !moin) }>{ cell.Short }</span>
 			if cell.Detail != "" {
 				<span class="mt-0.5 text-xs leading-4 text-muted-foreground">{ cell.Detail }</span>
 			}
@@ -675,7 +675,7 @@ templ HomeStart() {
 			<ol class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
 				@homeStep("1", "Sign in", "With GitHub or your email.")
 				@homeStep("2", "Add a server", "One line on any Linux box.")
-				@homeStep("3", "Deploy", "ops deploy. Backed up from the first second.")
+				@homeStep("3", "Deploy", "moin deploy. Backed up from the first second.")
 			</ol>
 			<div class="mt-10 flex flex-col items-start gap-3">
 				@homePrimary()
@@ -700,7 +700,7 @@ templ homeStep(number, title, text string) {
 }
 
 // ---------------------------------------------------------------- pricing
-// HomePricing puts the free self-hosted ops next to the hosted one: the same
+// HomePricing puts the free self-hosted moin next to the hosted one: the same
 // product, so the rows say what running it takes. Both cards have the same
 // rows in the same order, short enough to stay on one line.
 templ HomePricing() {
@@ -783,7 +783,7 @@ templ HomeNext() {
 			<h2 class={ typeH2 }>This is just the start.</h2>
 			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every provider. Nothing anyone else can read.</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
-				@homeNextStep("Servers in one click", "Create them at Hetzner, DigitalOcean and more, right from ops.")
+				@homeNextStep("Servers in one click", "Create them at Hetzner, DigitalOcean and more, right from moin.")
 				@homeNextStep("Zero trust", "Secrets only on your servers, end to end encrypted.")
 				@homeNextStep("Signed commands", "Your servers only obey changes you signed.")
 			</div>
@@ -834,33 +834,33 @@ templ HomeFAQ() {
 				@homeQuestion("Can you see my data?") {
 					Only what you open, and we never store it. Want none at all? One line on your server turns data access off, even for us.
 				}
-				@homeQuestion("What happens if ops is down?") {
+				@homeQuestion("What happens if moin is down?") {
 					Your apps keep running. They live on your servers. You just cannot deploy until it is back.
 				}
 				@homeQuestion("Is it open source?") {
 					Yes, all of it, under AGPL-3.0. Host it yourself for free, or let us run it.
 				}
 				@homeQuestion("Why AGPL, and can I contribute?") {
-					AGPL keeps ops open: who runs a changed ops as a service shares the changes. Contributions welcome: open an issue first, then a pull request.
+					AGPL keeps moin open: who runs a changed moin as a service shares the changes. Contributions welcome: open an issue first, then a pull request.
 				}
 				@homeQuestion("Can my AI agent use it?") {
-					Yes. ops has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
+					Yes. moin has an <a href="/docs/guides/mcp" class="text-foreground underline underline-offset-4 hover:text-foreground">MCP server</a>: Claude, Cursor or any MCP client can deploy, roll back, read logs and set env vars with a personal API token.
 				}
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
 				}
-				@homeQuestion("Is ops the final name?") {
-					Not yet. ops is a working name while we're in beta, and may change with 1.0. Your account, servers and data move with it. Nothing to do on your side.
+				@homeQuestion("Is moin the final name?") {
+					Not yet. moin is a working name while we're in beta, and may change with 1.0. Your account, servers and data move with it. Nothing to do on your side.
 				}
 				@homeQuestion("Can my team use it?") {
 					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@homeQuestion("How does the trial work?") {
-						30 days with everything, no card. After that, ops is read-only until you subscribe. Your apps and backups keep running.
+						30 days with everything, no card. After that, moin is read-only until you subscribe. Your apps and backups keep running.
 					}
 					@homeQuestion("What is a workspace?") {
-						Your team in ops: its servers, apps and people. One plan per workspace.
+						Your team in moin: its servers, apps and people. One plan per workspace.
 					}
 					@homeQuestion("Do I pay per workspace?") {
 						Yes, with unlimited servers, apps and teammates. Most teams need one.

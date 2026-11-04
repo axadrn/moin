@@ -34,18 +34,18 @@ type CatalogEntry struct {
 	Source   string `json:"source"`
 	License  string `json:"license"`
 	Image    string `json:"image"`
-	// Database is postgres or sqlite, which ops backs up, or mysql,
+	// Database is postgres or sqlite, which moin backs up, or mysql,
 	// mongodb or clickhouse, which it does not yet.
 	Database string `json:"database"`
-	// DatabaseNote says so for a database ops does not back up; empty
+	// DatabaseNote says so for a database moin does not back up; empty
 	// otherwise.
 	DatabaseNote string `json:"database_note"`
 	Port         int    `json:"port"`
 	// Login says how to sign in the first time.
 	Login string `json:"login"`
-	// NeedsDomain says the install needs a domain: ops sets APP_URL from it.
+	// NeedsDomain says the install needs a domain: moin sets APP_URL from it.
 	NeedsDomain bool `json:"needs_domain"`
-	// Secrets are the env vars ops generates on install.
+	// Secrets are the env vars moin generates on install.
 	Secrets  []string         `json:"secrets"`
 	Latest   *CatalogVersion  `json:"latest"`
 	Versions []CatalogVersion `json:"versions,omitempty"`

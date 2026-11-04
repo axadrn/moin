@@ -56,7 +56,7 @@ templ AppData(view DataView) {
 					@emptyState("The data could not be read", view.Error, "")
 				</div>
 			} else if len(view.Databases) == 0 {
-				@emptyStateWith("No database yet", noDatabase(), "ops deploy "+view.App.Name)
+				@emptyStateWith("No database yet", noDatabase(), "moin deploy "+view.App.Name)
 			} else {
 				<div class="grid items-stretch gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
 					@dataSidebar(view)
@@ -364,7 +364,7 @@ templ dataSchema(table protocol.DBTable) {
 				<pre class={ dataTermClasses }>{ index }</pre>
 			}
 		}
-		<p class="text-xs text-muted-foreground">To change the schema, add a migration to your repo and deploy. ops takes a snapshot before every deploy.</p>
+		<p class="text-xs text-muted-foreground">To change the schema, add a migration to your repo and deploy. moin takes a snapshot before every deploy.</p>
 	</div>
 }
 
@@ -455,7 +455,7 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 
 templ dataConsole(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
-	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Docs: "/docs/guides/data#run-sql", Description: "Reads only, until you allow changes. The same as ops sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
+	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Docs: "/docs/guides/data#run-sql", Description: "Reads only, until you allow changes. The same as moin sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
 		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']">
 			@csrf.Token()
 			<input type="hidden" name="db" value={ view.Database }/>
@@ -465,7 +465,7 @@ templ dataConsole(view DataView) {
 				Name:        "sql",
 				Rows:        4,
 				Placeholder: sqlPlaceholder(view),
-				Class:       "ops-term field-sizing-fixed min-h-0 w-full resize-y border-0 bg-terminal font-mono text-terminal-foreground dark:bg-terminal",
+				Class:       "moin-term field-sizing-fixed min-h-0 w-full resize-y border-0 bg-terminal font-mono text-terminal-foreground dark:bg-terminal",
 				Attributes:  templ.Attributes{"spellcheck": "false", "data-sql": true},
 			})
 			<p hidden class="flex items-center gap-2 text-xs text-running" data-sql-schema-hint>
@@ -604,7 +604,7 @@ const (
 	dataHeadClasses     = "sticky top-0 z-10 bg-card text-muted-foreground first:pl-6 last:pr-6"
 	dataCellClasses     = "max-w-[22rem] truncate font-mono first:pl-6 last:pr-6"
 	dataEditCellClasses = "max-w-[22rem] py-1 px-0 first:pl-3 whitespace-normal"
-	dataTermClasses     = "ops-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 font-mono text-sm whitespace-pre-wrap text-terminal-foreground"
+	dataTermClasses     = "moin-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 font-mono text-sm whitespace-pre-wrap text-terminal-foreground"
 )
 
 // isNumeric says whether a column holds numbers, by SQLite's type affinity,
@@ -726,5 +726,5 @@ func isBlob(column protocol.DBColumn) bool {
 }
 
 templ noDatabase() {
-	ops finds SQLite files on the volumes of the live release and every service that runs Postgres. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>, or runs <code class="font-mono">postgres:17</code>.
+	moin finds SQLite files on the volumes of the live release and every service that runs Postgres. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>, or runs <code class="font-mono">postgres:17</code>.
 }
