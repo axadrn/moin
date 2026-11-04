@@ -176,6 +176,50 @@ func TestWALGPointInTime(t *testing.T) {
 	if len(snapshots) == 0 || snapshots[0].Reason != "before-restore" {
 		t.Errorf("snapshots %+v", snapshots)
 	}
+	// Continuous backup goes on after the restore, on the new timeline:
+	// the old slot from the restored data is gone, WAL-G streams again.
+	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'ops_walg' AND active;`) != "1"; {
+		if time.Now().After(deadline) {
+			logs, _ := exec.Command("docker", "logs", "--tail", "10", companionName(app, "db")).CombinedOutput()
+			t.Fatalf("WAL-G does not stream after the restore: %s", logs)
+		}
+		time.Sleep(time.Second)
+	}
+	sql(`INSERT INTO orders VALUES (5, 'T3'), (6, 'T3');`)
+	waitWAL()
+	time.Sleep(2 * time.Second)
+	afterT3 := time.Now().UTC()
+	time.Sleep(2 * time.Second)
+	sql(`DELETE FROM orders;`)
+	waitWAL()
+	running, _ = a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
+	if strings.TrimSpace(running) != "true" {
+		t.Fatal("WAL-G stopped after the restore")
+	}
+	restoreTo := func(at time.Time, want string) {
+		t.Helper()
+		if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &at}); err != nil {
+			t.Fatalf("restore to %s: %v", at, err)
+		}
+		target, err = a.postgres(ctx, app, database)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for deadline := time.Now().Add(time.Minute); exec.Command("docker", "exec", target.container, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "app").Run() != nil; {
+			if time.Now().After(deadline) {
+				t.Fatal("postgres did not come back")
+			}
+			time.Sleep(time.Second)
+		}
+		if got := sql(`SELECT coalesce(string_agg(id || ':' || at, ',' ORDER BY id), '') FROM orders;`); got != want {
+			t.Fatalf("after the restore to %s: %s, want %s", at, got, want)
+		}
+	}
+	// A second restore, to after T3 on the new timeline.
+	restoreTo(afterT3, "1:T1,2:T1,5:T3,6:T3")
+	// And back before the first restore: the older history still serves.
+	restoreTo(between, "1:T1,2:T1")
+
 	// A time outside the window is refused, and nothing changes.
 	future := time.Now().Add(time.Hour)
 	if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &future}); err == nil || !strings.Contains(err.Error(), "outside the point in time window") {

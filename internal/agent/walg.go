@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -56,6 +57,9 @@ const (
 	// walgBrokeShows is how long the backups page says the continuous
 	// backup broke and started again.
 	walgBrokeShows = 24 * time.Hour
+	// Why continuous backup broke, in the backups page's words.
+	walgWhyCap  = "WAL-G fell more than " + walgSlotCap + " behind, so Postgres dropped its place to keep the disk from filling"
+	walgWhyLost = "WAL-G asked for a part of the log Postgres no longer has"
 )
 
 // walgSHA256 are the checksums of the pinned release, by GOARCH.
@@ -76,9 +80,11 @@ type walgState struct {
 	based time.Time
 	// unsupported says why the image runs snapshots only.
 	unsupported string
-	// broke is when Postgres dropped the slot past its cap; rebased is
-	// when the base backup after it finished.
+	// broke is when continuous backup lost its place in the log; rebased
+	// is when the base backup after it finished.
 	broke, rebased time.Time
+	// why says how it broke.
+	why string
 }
 
 // walg runs the companions and remembers their state.
@@ -340,6 +346,11 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	if err := capSlot(ctx, target); err != nil {
 		return fmt.Errorf("cap the WAL the slot keeps: %w", err)
 	}
+	// The slot keeps the log from its creation on: wal-receive starts
+	// where it stands, never in a part Postgres already removed.
+	if _, err := target.psql(ctx, `SELECT pg_create_physical_replication_slot(:'slot', true) WHERE NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = :'slot');`, map[string]string{"slot": walgSlot}, false); err != nil {
+		return fmt.Errorf("create the slot: %w", err)
+	}
 	data, err := b.apps.pgDataOf(ctx, target.container)
 	if err != nil {
 		return err
@@ -411,7 +422,7 @@ func (b *backups) walgCheckSlot(ctx context.Context, app string, database protoc
 	}
 	state := b.walgState(drillKey(app, database))
 	b.walg.mu.Lock()
-	state.broke, state.rebased, state.based = time.Now().UTC(), time.Time{}, time.Time{}
+	state.broke, state.rebased, state.based, state.why = time.Now().UTC(), time.Time{}, time.Time{}, walgWhyCap
 	b.walg.mu.Unlock()
 	slog.Error("backup: WAL-G fell too far behind, Postgres dropped its slot; taking a new base backup", "app", app, "database", database.Path)
 	return true, nil
@@ -508,6 +519,16 @@ func (b *backups) walgOnce(ctx context.Context) {
 			wanted[companionName(app, database.Service)] = true
 			if _, err := b.walgCheckSlot(ctx, app, database); err != nil {
 				slog.Warn("backup: check the WAL-G slot", "app", app, "database", database.Path, "error", err)
+			}
+			if b.walgStuck(ctx, app, database) {
+				slog.Error("backup: WAL-G lost its place in the log; starting it over with a new base backup", "app", app, "database", database.Path)
+				state := b.walgState(drillKey(app, database))
+				b.walg.mu.Lock()
+				state.broke, state.rebased, state.based, state.why = time.Now().UTC(), time.Time{}, time.Time{}, walgWhyLost
+				b.walg.mu.Unlock()
+				if err := b.walgFresh(ctx, app, database); err != nil {
+					slog.Warn("backup: start WAL-G over", "app", app, "database", database.Path, "error", err)
+				}
 			}
 			if err := b.walgEnsure(ctx, app, database); err != nil {
 				slog.Warn("backup: continuous Postgres backup", "app", app, "database", database.Path, "error", err)
@@ -644,17 +665,17 @@ func (b *backups) walgNote(app string, database protocol.Database) string {
 	state := b.walgState(drillKey(app, database))
 	b.walg.mu.Lock()
 	defer b.walg.mu.Unlock()
-	return walgNoteFor(state.unsupported, state.broke, state.rebased, time.Now())
+	return walgNoteFor(state.unsupported, state.why, state.broke, state.rebased, time.Now())
 }
 
-func walgNoteFor(unsupported string, broke, rebased, now time.Time) string {
+func walgNoteFor(unsupported, why string, broke, rebased, now time.Time) string {
 	if unsupported != "" {
 		return unsupported
 	}
 	if broke.IsZero() || now.Sub(broke) > walgBrokeShows {
 		return ""
 	}
-	note := "Continuous backup broke at " + broke.UTC().Format("Jan 2, 15:04") + " UTC: WAL-G fell more than " + walgSlotCap + " behind, so Postgres dropped its place to keep the disk from filling. "
+	note := "Continuous backup broke at " + broke.UTC().Format("Jan 2, 15:04") + " UTC: " + why + ". "
 	if rebased.IsZero() {
 		return note + "ops started a new base backup; point in time restores start again from it. Snapshots are not affected."
 	}
@@ -804,22 +825,65 @@ func (b *backups) pgRestorePoint(ctx context.Context, request protocol.BackupRes
 	if startErr != nil {
 		return fmt.Errorf("start the app again: %w", startErr)
 	}
-	// A new timeline starts: a base backup on it keeps the window whole.
-	state := b.walgState(drillKey(request.App, database))
-	b.walg.mu.Lock()
-	state.lsn = ""
-	b.walg.mu.Unlock()
+	// A new timeline starts. The restored data still holds the old slot,
+	// whose place in the log is gone: continuous backup starts over with a
+	// fresh slot, and a base backup on the new timeline right away.
+	if err := b.walgFresh(ctx, request.App, database); err != nil {
+		slog.Error("backup: start continuous backup again after the restore", "app", request.App, "error", err)
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
-		if err := b.walgEnsure(ctx, request.App, database); err == nil {
-			if err := b.walgBase(ctx, request.App, database); err != nil {
-				slog.Warn("backup: base backup after the restore", "app", request.App, "error", err)
-			}
+		if err := b.walgBase(ctx, request.App, database); err != nil {
+			slog.Warn("backup: base backup after the restore", "app", request.App, "error", err)
 		}
 	}()
 	slog.Info("backup: restored to a point in time", "app", request.App, "database", database.Path, "at", at)
 	return nil
+}
+
+// walgFresh starts continuous backup over: it removes WAL-G and its slot,
+// takes a checkpoint, creates the slot again so it keeps the log from
+// now on, and starts wal-receive. The caller takes a new base backup.
+func (b *backups) walgFresh(ctx context.Context, app string, database protocol.Database) error {
+	_, _ = b.apps.output(ctx, "docker", "rm", "-f", companionName(app, database.Service))
+	state := b.walgState(drillKey(app, database))
+	b.walg.mu.Lock()
+	state.lsn = ""
+	b.walg.mu.Unlock()
+	var err error
+	// Postgres may still be starting, and a slot stays active for a moment
+	// after WAL-G is gone.
+	for deadline := time.Now().Add(2 * time.Minute); time.Now().Before(deadline); {
+		var target pgTarget
+		target, err = b.apps.postgres(ctx, app, database)
+		if err == nil {
+			_, err = target.psql(ctx, `SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = :'slot';
+CHECKPOINT;
+SELECT pg_create_physical_replication_slot(:'slot', true);`, map[string]string{"slot": walgSlot}, false)
+		}
+		if err == nil {
+			return b.walgEnsure(ctx, app, database)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return err
+}
+
+// walgStuck reports whether a stopped WAL-G asked for a part of the log
+// Postgres no longer has: it cannot go on from its slot.
+func (b *backups) walgStuck(ctx context.Context, app string, database protocol.Database) bool {
+	name := companionName(app, database.Service)
+	running, err := b.apps.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", name)
+	if err != nil || strings.TrimSpace(running) != "false" {
+		return false
+	}
+	logs, _ := exec.CommandContext(ctx, "docker", "logs", "--tail", "20", name).CombinedOutput()
+	return strings.Contains(string(logs), "has already been removed")
 }
 
 // walgObjects counts what is under a database's WAL-G folder, for tests.
