@@ -18,6 +18,7 @@ import (
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
@@ -165,6 +166,7 @@ templ dataTable(view DataView) {
 	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
 	{{ table := *view.Table }}
 	{{ withRowID := table.RowID }}
+	{{ editable := service.Editable(table) }}
 	@panel(panelProps{Heading: "data-table-heading", Title: table.Name, Description: tableLine(view), Body: panelBodyFlush, Action: addRowAction(view)}) {
 		@dataToolbar(view)
 		if view.Schema {
@@ -188,7 +190,7 @@ templ dataTable(view DataView) {
 									</span>
 								}
 							}
-							if withRowID {
+							if editable {
 								@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses + " w-12"}) {
 									<span class="sr-only">Delete</span>
 								}
@@ -197,13 +199,13 @@ templ dataTable(view DataView) {
 					}
 					@tablecomp.Body() {
 						for _, row := range view.Result.Rows {
-							{{ rowID := rowIDOf(row, withRowID) }}
-							@tablecomp.Row(tablecomp.RowProps{Class: "group/row", Attributes: templ.Attributes{"data-row": rowID}}) {
+							{{ ref := rowRefOf(table, row, withRowID) }}
+							@tablecomp.Row(tablecomp.RowProps{Class: "group/row", Attributes: templ.Attributes{"data-row": ref.RowID + ref.Key}}) {
 								for index, column := range table.Columns {
 									{{ value := cellValue(row, index, withRowID) }}
-									if withRowID && !isBlob(column) {
+									if editable && !isBlob(column) {
 										@tablecomp.Cell(tablecomp.CellProps{Class: dataEditCellClasses}) {
-											@DataCell(dataPath, view.Database, table.Name, rowID, column, value, "")
+											@DataCell(dataPath, view.Database, table.Name, ref, column, value, "")
 										}
 									} else {
 										@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-right": isNumeric(column), "text-muted-foreground italic": value == nil})}) {
@@ -211,21 +213,21 @@ templ dataTable(view DataView) {
 										}
 									}
 								}
-								if withRowID {
+								if editable {
 									@tablecomp.Cell(tablecomp.CellProps{Class: "py-0 pr-4 text-right"}) {
 										@button.Button(button.Props{
 											Variant: button.VariantGhost,
 											Size:    button.SizeIconSm,
 											Class:   "text-muted-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100",
 											Attributes: templ.Attributes{
-												"aria-label": "Delete row " + rowID,
+												"aria-label": "Delete " + strings.ToLower(ref.Label()),
 												"title":      "Delete this row",
 												"hx-post":    dataPath + "/delete",
-												"hx-vals":    deleteRowVals(view.Database, table.Name, rowID),
+												"hx-vals":    deleteRowVals(view.Database, table.Name, ref),
 												"hx-target":  "closest tr",
 												"hx-swap":    "outerHTML",
 												"hx-disable": "this",
-												"hx-confirm": "Delete row " + rowID + " of " + table.Name + "? This cannot be undone.",
+												"hx-confirm": "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone.",
 											},
 										}) {
 											@icon.Trash2()
@@ -260,10 +262,10 @@ func tableLine(view DataView) string {
 		return rows + ". Its columns, indexes and the statement that created it."
 	case table.Type == "view":
 		return rows + ". A view, read only."
-	case table.RowID:
+	case service.Editable(table):
 		return rows + ". Click a cell to edit, Enter saves, Esc cancels."
 	}
-	return rows + ". A WITHOUT ROWID table: add rows here, change them with SQL below."
+	return rows + ". No primary key, so rows have no name to edit them by: add rows here, change them with SQL below."
 }
 
 // addRowAction is the one action of the table card: Add row, on the rows
@@ -416,7 +418,7 @@ func newRowPlaceholder(column protocol.DBColumn) string {
 
 // DataCell is one editable cell: a form that saves on Enter or when it
 // loses focus with a changed value.
-templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn, value any, state string) {
+templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol.DBColumn, value any, state string) {
 	<form
 		class="m-0"
 		hx-post={ dataPath + "/cell" }
@@ -427,7 +429,11 @@ templ DataCell(dataPath, database, table, rowID string, column protocol.DBColumn
 		@csrf.Token()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table }/>
-		<input type="hidden" name="rowid" value={ rowID }/>
+		if ref.Key != "" {
+			<input type="hidden" name="key" value={ ref.Key }/>
+		} else {
+			<input type="hidden" name="rowid" value={ ref.RowID }/>
+		}
 		<input type="hidden" name="column" value={ column.Name }/>
 		if value == nil {
 			<input type="hidden" name="was_null" value="1"/>
@@ -631,17 +637,52 @@ func isNumber(value any) bool {
 }
 
 // deleteRowVals are the hx-vals of the delete button of a row.
-func deleteRowVals(database, table, rowID string) string {
-	vals, _ := json.Marshal(map[string]string{"db": database, "table": table, "rowid": rowID})
-	return string(vals)
+func deleteRowVals(database, table string, ref DataRowRef) string {
+	vals := map[string]string{"db": database, "table": table}
+	if ref.Key != "" {
+		vals["key"] = ref.Key
+	} else {
+		vals["rowid"] = ref.RowID
+	}
+	body, _ := json.Marshal(vals)
+	return string(body)
 }
 
+// DataRowRef names a row on the data page: by its rowid, or by the values
+// of its primary key as JSON, column by column.
+type DataRowRef struct {
+	RowID string
+	Key   string
+}
 
-func rowIDOf(row []any, withRowID bool) string {
-	if !withRowID || len(row) == 0 {
-		return ""
+// Label names the row for people: "Row 12", or "The row" by its key.
+func (r DataRowRef) Label() string {
+	if r.Key == "" {
+		return "Row " + r.RowID
 	}
-	return cellInput(row[0])
+	return "The row"
+}
+
+// rowRefOf names a row of a page: by its rowid, the first value when the
+// page has one, or by the values of the primary key.
+func rowRefOf(table protocol.DBTable, row []any, withRowID bool) DataRowRef {
+	if withRowID {
+		if len(row) == 0 {
+			return DataRowRef{}
+		}
+		return DataRowRef{RowID: cellInput(row[0])}
+	}
+	key := map[string]string{}
+	for index, column := range table.Columns {
+		if column.PrimaryKey && index < len(row) {
+			key[column.Name] = cellInput(row[index])
+		}
+	}
+	if len(key) == 0 {
+		return DataRowRef{}
+	}
+	body, _ := json.Marshal(key)
+	return DataRowRef{Key: string(body)}
 }
 
 func cellValue(row []any, index int, withRowID bool) any {
@@ -680,7 +721,8 @@ func cellInput(value any) string {
 }
 
 func isBlob(column protocol.DBColumn) bool {
-	return strings.Contains(strings.ToUpper(column.Type), "BLOB")
+	kind := strings.ToUpper(column.Type)
+	return strings.Contains(kind, "BLOB") || kind == "BYTEA"
 }
 
 templ noDatabase() {

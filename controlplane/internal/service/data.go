@@ -17,7 +17,7 @@ const dataTimeout = 40 * time.Second
 var (
 	ErrNoDatabase = errors.New("the live release has no database: no SQLite file on a volume, no Postgres service")
 	ErrNoTable    = errors.New("the database has no such table")
-	ErrNoRowID    = errors.New("rows of Postgres tables, views and WITHOUT ROWID tables cannot be edited here: use SQL")
+	ErrNoRowID    = errors.New("rows of views and tables without a primary key cannot be edited one by one: use SQL")
 	ErrNoColumn   = errors.New("the table has no such column")
 	ErrSQL        = errors.New("the query is empty")
 	ErrReadOnly   = errors.New("a read query tried to change data")
@@ -146,7 +146,7 @@ func (s *AppService) Rows(ctx context.Context, workspaceID, idOrName, database, 
 }
 
 // UpdateCell sets one column of one row. A nil value stores NULL.
-func (s *AppService) UpdateCell(ctx context.Context, actor Actor, idOrName, database, table string, rowID int64, column string, value *string) error {
+func (s *AppService) UpdateCell(ctx context.Context, actor Actor, idOrName, database, table string, row RowKey, column string, value *string) error {
 	target, err := s.editable(ctx, actor.WorkspaceID, idOrName, database, table)
 	if err != nil {
 		return err
@@ -158,26 +158,81 @@ func (s *AppService) UpdateCell(ctx context.Context, actor Actor, idOrName, data
 	if value != nil {
 		param = *value
 	}
-	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `UPDATE `+quoteName(table)+` SET `+quoteName(column)+` = ? WHERE rowid = ?`, []any{param, rowID}, true, 0)
-	if err == nil {
-		s.servers.record(actor, "data.cell_updated", "app", idOrName, map[string]string{"database": database, "table": table, "row": strconv.FormatInt(rowID, 10), "column": column})
-	}
-	return err
-}
-
-// DeleteRow deletes one row by its rowid.
-func (s *AppService) DeleteRow(ctx context.Context, actor Actor, idOrName, database, table string, rowID int64) error {
-	_, err := s.editable(ctx, actor.WorkspaceID, idOrName, database, table)
+	where, params, err := rowWhere(target, row)
 	if err != nil {
 		return err
 	}
-	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `DELETE FROM `+quoteName(table)+` WHERE rowid = ?`, []any{rowID}, true, 0)
+	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `UPDATE `+quoteName(table)+` SET `+quoteName(column)+` = ?`+where, append([]any{param}, params...), true, 0)
 	if err == nil {
-		s.servers.record(actor, "data.row_deleted", "app", idOrName, map[string]string{"database": database, "table": table, "row": strconv.FormatInt(rowID, 10)})
+		s.servers.record(actor, "data.cell_updated", "app", idOrName, map[string]string{"database": database, "table": table, "row": row.label(), "column": column})
 	}
 	return err
 }
 
+// DeleteRow deletes one row by its rowid or its primary key.
+func (s *AppService) DeleteRow(ctx context.Context, actor Actor, idOrName, database, table string, row RowKey) error {
+	target, err := s.editable(ctx, actor.WorkspaceID, idOrName, database, table)
+	if err != nil {
+		return err
+	}
+	where, params, err := rowWhere(target, row)
+	if err != nil {
+		return err
+	}
+	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `DELETE FROM `+quoteName(table)+where, params, true, 0)
+	if err == nil {
+		s.servers.record(actor, "data.row_deleted", "app", idOrName, map[string]string{"database": database, "table": table, "row": row.label()})
+	}
+	return err
+}
+
+// RowKey names one row: by the rowid of a SQLite table, or by the values
+// of the primary key, column by column, for Postgres and WITHOUT ROWID
+// tables.
+type RowKey struct {
+	RowID int64
+	Key   map[string]string
+}
+
+// label names the row in the activity: its rowid, never key values, which
+// may be user data such as an email.
+func (k RowKey) label() string {
+	if k.Key != nil {
+		return "by primary key"
+	}
+	return strconv.FormatInt(k.RowID, 10)
+}
+
+// ErrNoKey is a key that misses a column of the primary key, or has one
+// that is not in it.
+var ErrNoKey = errors.New("name the row by every column of its primary key")
+
+// rowWhere is the WHERE of one row, with ? marks for its values: the
+// rowid, or every column of the primary key.
+func rowWhere(table protocol.DBTable, row RowKey) (string, []any, error) {
+	if row.Key == nil && table.RowID {
+		return ` WHERE rowid = ?`, []any{row.RowID}, nil
+	}
+	parts, params := []string{}, []any{}
+	for _, column := range table.Columns {
+		if !column.PrimaryKey {
+			continue
+		}
+		value, ok := row.Key[column.Name]
+		if !ok {
+			return "", nil, ErrNoKey
+		}
+		parts = append(parts, quoteName(column.Name)+" = ?")
+		params = append(params, value)
+	}
+	if len(parts) != len(row.Key) {
+		return "", nil, ErrNoKey
+	}
+	return ` WHERE ` + strings.Join(parts, " AND "), params, nil
+}
+
+// editable returns a table whose rows can be edited one by one: by rowid,
+// or by a primary key.
 func (s *AppService) editable(ctx context.Context, workspaceID, idOrName, database, table string) (protocol.DBTable, error) {
 	tables, err := s.Tables(ctx, workspaceID, idOrName, database)
 	if err != nil {
@@ -187,10 +242,20 @@ func (s *AppService) editable(ctx context.Context, workspaceID, idOrName, databa
 	if index < 0 {
 		return protocol.DBTable{}, ErrNoTable
 	}
-	if !tables.Tables[index].RowID {
+	if !Editable(tables.Tables[index]) {
 		return protocol.DBTable{}, ErrNoRowID
 	}
 	return tables.Tables[index], nil
+}
+
+// Editable reports whether the rows of a table can be edited one by one:
+// a table with a rowid or a primary key. Views and tables without a key
+// change through SQL.
+func Editable(table protocol.DBTable) bool {
+	if table.Type != "table" {
+		return false
+	}
+	return table.RowID || slices.ContainsFunc(table.Columns, func(c protocol.DBColumn) bool { return c.PrimaryKey })
 }
 
 func quoteName(name string) string { return `"` + strings.ReplaceAll(name, `"`, `""`) + `"` }

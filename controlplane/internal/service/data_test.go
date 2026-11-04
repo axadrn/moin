@@ -26,6 +26,30 @@ func TestReadOnlyError(t *testing.T) {
 	}
 }
 
+// TestRowWhere: a row is named by its rowid or by every column of its
+// primary key; key values only ever travel as params, names quoted.
+func TestRowWhere(t *testing.T) {
+	sqlite := protocol.DBTable{Name: "users", Type: "table", RowID: true, Columns: []protocol.DBColumn{{Name: "id", PrimaryKey: true}}}
+	where, params, err := rowWhere(sqlite, RowKey{RowID: 7})
+	if err != nil || where != ` WHERE rowid = ?` || len(params) != 1 || params[0] != int64(7) {
+		t.Errorf("rowid: %q %v %v", where, params, err)
+	}
+	postgres := protocol.DBTable{Name: "members", Type: "table", Columns: []protocol.DBColumn{{Name: "team", PrimaryKey: true}, {Name: `us"er`, PrimaryKey: true}, {Name: "role"}}}
+	evil := "x'); DROP TABLE members; --"
+	where, params, err = rowWhere(postgres, RowKey{Key: map[string]string{"team": evil, `us"er`: "1"}})
+	if err != nil || where != ` WHERE "team" = ? AND "us""er" = ?` || params[0] != evil || params[1] != "1" {
+		t.Errorf("key: %q %v %v", where, params, err)
+	}
+	for _, key := range []map[string]string{{"team": "a"}, {"team": "a", `us"er`: "1", "role": "admin"}, {}} {
+		if _, _, err := rowWhere(postgres, RowKey{Key: key}); !errors.Is(err, ErrNoKey) {
+			t.Errorf("key %v: %v", key, err)
+		}
+	}
+	if Editable(protocol.DBTable{Type: "table", Columns: []protocol.DBColumn{{Name: "a"}}}) || !Editable(postgres) || Editable(protocol.DBTable{Type: "view", RowID: true}) {
+		t.Error("Editable")
+	}
+}
+
 // TestNewestFirst: a table without rowid pages by its primary key, newest
 // first; a view or a table without one keeps the database's order.
 func TestNewestFirst(t *testing.T) {

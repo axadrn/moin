@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/protocol"
 )
 
@@ -45,11 +46,19 @@ type InsertRequest struct {
 // RowRequest names one row: PATCH sets Column to Value (null for NULL),
 // DELETE removes it.
 type RowRequest struct {
-	Database string  `json:"database"`
-	Table    string  `json:"table"`
-	RowID    int64   `json:"rowid"`
-	Column   string  `json:"column"`
-	Value    *string `json:"value"`
+	Database string `json:"database"`
+	Table    string `json:"table"`
+	RowID    int64  `json:"rowid"`
+	// Key names the row by its primary key, column by column: for Postgres
+	// and tables without a rowid. It wins over RowID.
+	Key    map[string]string `json:"key,omitempty"`
+	Column string            `json:"column"`
+	Value  *string           `json:"value"`
+}
+
+// row is the row a request names.
+func (r RowRequest) row() service.RowKey {
+	return service.RowKey{RowID: r.RowID, Key: r.Key}
 }
 
 // Databases lists the databases of the app's live release: SQLite files and Postgres services.
@@ -120,7 +129,7 @@ func (h *AppsHandler) UpdateRow(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.UpdateCell(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Table, request.RowID, request.Column, request.Value)
+	err := h.apps.UpdateCell(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Table, request.row(), request.Column, request.Value)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -134,7 +143,7 @@ func (h *AppsHandler) DeleteRow(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.DeleteRow(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Table, request.RowID)
+	err := h.apps.DeleteRow(r.Context(), actor(r), r.PathValue("app"), request.Database, request.Table, request.row())
 	if err != nil {
 		ServiceError(w, err)
 		return

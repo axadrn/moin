@@ -8,7 +8,9 @@ ops reads your app's database live from its server, SQLite or Postgres. You can 
 
 ops finds the database by itself: every SQLite file on a [volume](/docs/guides/deploy#your-data-survives-every-deploy) of the live release, up to three folders deep, and every service that runs [Postgres](/docs/guides/backups#postgres), named `postgres-<service>`. When there are several, name one with `x-ops.database` in [the repo](/docs/guides/config), or pick one with `--db <path>` or `--db postgres-db` in the CLI.
 
-For Postgres, ops runs `psql` inside your Postgres container over its local socket: no password leaves the container. It shows the tables of the `public` schema. Every value you type travels as a psql variable, never as SQL. Rows of a Postgres table are not edited cell by cell yet: change them with SQL, which takes a snapshot first like every edit.
+For Postgres, ops runs `psql` inside your Postgres container over its local socket: no password leaves the container. It shows the tables of the `public` schema. Every value you type travels as a psql variable, never as SQL.
+
+ops edits a row by its rowid on SQLite and by its primary key on Postgres. A table without a primary key has no name for a single row: add rows there, and change them with SQL.
 
 ## See the tables
 
@@ -73,7 +75,7 @@ API: PATCH /api/v1/apps/{app}/databases/rows
 MCP: execute_sql
 ```
 
-The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. Agents see `execute_sql` as destructive, so they ask first.
+The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. It names a row by `rowid` on SQLite, or by `key`, every column of the primary key, such as `{"id": "42"}`. Agents see `execute_sql` as destructive, so they ask first.
 
 ## Reads cannot change anything
 

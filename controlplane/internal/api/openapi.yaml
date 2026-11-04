@@ -2085,7 +2085,7 @@ paths:
       tags: [Data]
       operationId: updateTableRow
       summary: Edit a cell
-      description: Sets one column of one row, found by its rowid. A null value stores NULL.
+      description: Sets one column of one row, found by its rowid or its primary key. A null value stores NULL.
       requestBody:
         required: true
         content:
@@ -2108,10 +2108,10 @@ paths:
           description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `not_editable` for views and WITHOUT ROWID tables.'
+          description: '`server_offline`, `not_editable` for views and tables without a primary key.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.column`.'
+          description: '`validation_failed` with `fields.column`; `invalid_row_key` when the key misses a column of the primary key.'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
@@ -2120,7 +2120,7 @@ paths:
       tags: [Data]
       operationId: deleteTableRow
       summary: Delete a row
-      description: Deletes one row, found by its rowid.
+      description: Deletes one row, found by its rowid or its primary key.
       requestBody:
         required: true
         content:
@@ -2143,7 +2143,10 @@ paths:
           description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `not_editable` for views and WITHOUT ROWID tables.'
+          description: '`server_offline`, `not_editable` for views and tables without a primary key.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`invalid_row_key` when the key misses a column of the primary key.'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
@@ -5170,7 +5173,7 @@ components:
           type: integer
         rowid:
           type: boolean
-          description: False for views and WITHOUT ROWID tables, whose rows cannot be edited by rowid.
+          description: False for views, Postgres tables and WITHOUT ROWID tables; their rows are edited by primary key instead, when they have one.
         sql:
           type: string
           description: The CREATE statement.
@@ -5231,7 +5234,7 @@ components:
             type: string
     RowRequest:
       type: object
-      required: [table, rowid]
+      required: [table]
       properties:
         database:
           type: string
@@ -5239,6 +5242,12 @@ components:
           type: string
         rowid:
           type: integer
+          description: The row by its rowid, for SQLite tables that have one.
+        key:
+          type: object
+          additionalProperties:
+            type: string
+          description: The row by every column of its primary key, such as `{"id":"42"}`, for Postgres and tables without a rowid. It wins over `rowid`.
         column:
           type: string
           description: The column to set. PATCH only.
