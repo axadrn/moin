@@ -47,6 +47,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | CPU, memory, disk, network and load of the server now and over a range, and its apps now, the most memory first |
 | `GET /api/v1/agent-updates` · `PUT` | whether agents update by themselves `{"auto": true}`; on by default |
+| `GET /api/v1/status` | whether everything is OK: `ok`, the `issues` that need you with the `path` to fix them, catalog `updates` and `counts` ([Overview](/docs/guides/overview)) |
 | `GET /api/v1/catalog` · `GET /{slug}` | the [catalog](/docs/guides/catalog) with each app's newest release, or one app with every release |
 | `POST /api/v1/catalog/{slug}/install` | installs a catalog app `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy |
 | `POST /api/v1/apps/{app}/update` | sets a catalog app to a release `{"version": "3.4.1"}`, the newest when empty, and deploys it |

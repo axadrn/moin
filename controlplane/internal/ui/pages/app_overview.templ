@@ -1,0 +1,155 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/controlplane/internal/service"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+)
+
+// OverviewView is the workspace at a glance: the status and the newest
+// changes, if the member may see them.
+type OverviewView struct {
+	Status   service.WorkspaceStatus
+	Activity []model.WorkspaceAuditEvent
+	// SeeActivity says the member may read the activity.
+	SeeActivity bool
+}
+
+// Overview answers one question: is everything OK? What needs you first,
+// then what could be newer, then what happened.
+templ Overview(view OverviewView) {
+	@layouts.App("Overview") {
+		@panelPage() {
+			@pageHeader("Overview", "Is everything OK? What needs you, what could be newer and what happened last.")
+			if view.Status.OK() {
+				@overviewAllGood(view.Status)
+			} else {
+				@overviewIssues(view.Status.Issues)
+			}
+			@statGrid(templ.Attributes{"data-overview-counts": true}) {
+				@statCard("Apps live", strconv.Itoa(view.Status.AppsLive), "of "+plural(view.Status.Apps, "app", "apps"))
+				@statCard("Servers online", strconv.Itoa(view.Status.ServersOnline), "of "+strconv.Itoa(view.Status.Servers))
+				@statCard("Backups checked", strconv.Itoa(view.Status.BackupsChecked), "of "+plural(view.Status.Databases, "database", "databases")+", last 24 h")
+				@statCard("Updates", strconv.Itoa(len(view.Status.Updates)), overviewUpdatesNote(len(view.Status.Updates)))
+			}
+			if len(view.Status.Updates) > 0 {
+				@overviewUpdates(view.Status.Updates)
+			}
+			if view.SeeActivity && len(view.Activity) > 0 {
+				@panel(panelProps{Title: "Last changes", Docs: "/docs/guides/activity", Action: overviewAllActivity(), Body: panelBodyRows}) {
+					<ol class="flex flex-col gap-1" data-overview-activity>
+						@ActivityRows(ActivityView{Events: view.Activity})
+					</ol>
+				}
+			}
+		}
+	}
+}
+
+// overviewAllGood is the calm answer when nothing needs you.
+templ overviewAllGood(status service.WorkspaceStatus) {
+	@card.Card(card.Props{Class: "flex-row items-center gap-5 px-6 py-6 sm:px-8", Attributes: templ.Attributes{"data-overview-ok": true}}) {
+		<span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-live/15 text-live" aria-hidden="true">
+			@icon.Check(icon.Props{Class: "size-5 stroke-3"})
+		</span>
+		<div class="min-w-0">
+			<p class="text-xl font-semibold tracking-[-0.02em]">All good.</p>
+			<p class="mt-0.5 text-sm text-muted-foreground">
+				{ plural(status.AppsLive, "app", "apps") } live, { plural(status.ServersOnline, "server", "servers") } online, { plural(status.BackupsChecked, "backup", "backups") } checked today.
+			</p>
+		</div>
+	}
+}
+
+// overviewIssues is what needs you, most urgent first, each a link to where
+// to fix it.
+templ overviewIssues(issues []service.StatusIssue) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@panel(panelProps{Title: overviewNeedsTitle(len(issues)), Body: panelBodyRows, Attrs: templ.Attributes{"data-overview-issues": true}}) {
+		<ul class="flex flex-col gap-1" role="list">
+			for _, issue := range issues {
+				<li>
+					<a href={ templ.SafeURL(basePath + issue.Path) } class="group/issue flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring" data-issue={ issue.Kind }>
+						<span class={ "flex size-8 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
+							@overviewIssueIcon(issue.Kind)
+						</span>
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm font-medium">{ issue.Target }</span>
+							<span class="block truncate text-xs text-muted-foreground">{ issue.Detail }</span>
+						</span>
+						@icon.ChevronRight(icon.Props{Class: "size-4 shrink-0 text-muted-foreground transition-transform group-hover/issue:translate-x-0.5"})
+					</a>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// overviewUpdates are the catalog apps a newer release is out for.
+templ overviewUpdates(updates []service.StatusUpdate) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@panel(panelProps{Title: "Updates", Docs: "/docs/guides/catalog", Body: panelBodyRows, Attrs: templ.Attributes{"data-overview-updates": true}}) {
+		<ul class="flex flex-col gap-1" role="list">
+			for _, update := range updates {
+				<li>
+					<a href={ templ.SafeURL(basePath + "/apps/" + update.App) } class="group/update flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring">
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm font-medium">{ update.App }</span>
+							<span class="block truncate text-xs text-muted-foreground">{ update.Name } <span class="font-mono">{ update.Version }</span> → <span class="font-mono text-foreground">{ update.Latest }</span></span>
+						</span>
+						@icon.ChevronRight(icon.Props{Class: "size-4 shrink-0 text-muted-foreground transition-transform group-hover/update:translate-x-0.5"})
+					</a>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ overviewAllActivity() {
+	<a href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/activity") } class="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">All activity</a>
+}
+
+templ overviewIssueIcon(kind string) {
+	switch kind {
+		case service.IssueServerDown:
+			@icon.ServerOff(icon.Props{Class: "size-4"})
+		case service.IssueDeployFailed:
+			@icon.CircleX(icon.Props{Class: "size-4"})
+		case service.IssueBackupFailed, service.IssueDrillFailed:
+			@icon.ShieldOff(icon.Props{Class: "size-4"})
+		case service.IssueDomainDown:
+			@icon.Globe(icon.Props{Class: "size-4"})
+		case service.IssueDiskFull:
+			@icon.HardDrive(icon.Props{Class: "size-4"})
+		default:
+			@icon.RefreshCw(icon.Props{Class: "size-4"})
+	}
+}
+
+// overviewIssueTone colors an issue: red for what is broken, amber for what
+// waits.
+func overviewIssueTone(kind string) string {
+	if kind == service.IssueAgentBehind {
+		return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+	}
+	return "bg-failed/12 text-failed"
+}
+
+func overviewNeedsTitle(n int) string {
+	if n == 1 {
+		return "1 thing needs you"
+	}
+	return strconv.Itoa(n) + " things need you"
+}
+
+func overviewUpdatesNote(n int) string {
+	if n == 0 {
+		return "everything current"
+	}
+	return "newer releases out"
+}

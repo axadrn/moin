@@ -117,6 +117,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
 		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces),
 		Alerts:      api.NewAlertsHandler(alerts),
+		Status:      api.NewStatusHandler(service.NewStatusService(service.NewAppService(repository.NewAppRepository(database, database), servers, box), servers, nil)),
 	}
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,

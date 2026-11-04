@@ -43,6 +43,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `add_alert_destination` | adds Slack, Discord, Telegram or a webhook; a webhook returns its `signing_secret` once | write |
 | `test_alert_destination` | sends a test alert | write |
 | `remove_alert_destination` | removes a destination | write, destructive |
+| `get_status` | whether everything is OK: what needs you, catalog updates and counts | read |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
 | `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no agent ever connected, and the `apps` that went with an offline server | write, destructive |

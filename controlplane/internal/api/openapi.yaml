@@ -58,6 +58,8 @@ tags:
     description: Workspace invitations opened with the token from the invitation email.
   - name: Billing
     description: Workspace subscriptions, checkout and billing management.
+  - name: Status
+    description: 'Whether everything is OK in a workspace: what needs you (failed deploys, broken backups or restore checks, servers offline, full disks, domains down, agents behind), catalog apps with a newer release, and what runs well.'
   - name: Catalog
     description: 'Open source apps ops installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with ops; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
@@ -1101,6 +1103,30 @@ paths:
           description: '`server_offline`, or `no_agent_binary` when the control plane serves no binary for the server.'
         '424':
           $ref: '#/components/responses/AgentError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/status:
+    get:
+      tags: [Status]
+      operationId: getStatus
+      summary: Is everything OK?
+      description: What needs you, most urgent first, each with the path of the web page to fix it under the workspace; catalog apps a newer release is out for; and counts of what runs well. `ok` is false when an issue needs you; updates never make it false.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The workspace now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -5339,6 +5365,66 @@ components:
           items:
             $ref: '#/components/schemas/CatalogVersion'
           description: Every release, newest first. Only on GET /api/v1/catalog/{slug}.
+    Status:
+      type: object
+      required: [ok, issues, updates, counts]
+      properties:
+        ok:
+          type: boolean
+          description: True when nothing needs you.
+        issues:
+          type: array
+          items:
+            type: object
+            required: [kind, target, detail, path, since]
+            properties:
+              kind:
+                type: string
+                enum: [server.down, deploy.failed, backup.failed, drill.failed, domain.down, disk.full, agent.behind]
+              target:
+                type: string
+                description: The app, server or domain.
+              detail:
+                type: string
+              path:
+                type: string
+                description: The web page to fix it, under /app/{workspace}.
+              since:
+                type: string
+                format: date-time
+                nullable: true
+        updates:
+          type: array
+          items:
+            type: object
+            required: [app, name, version, latest]
+            properties:
+              app:
+                type: string
+              name:
+                type: string
+                description: The catalog app's name, such as Umami.
+              version:
+                type: string
+              latest:
+                type: string
+        counts:
+          type: object
+          required: [apps, apps_live, servers, servers_online, databases, backups_checked]
+          properties:
+            apps:
+              type: integer
+            apps_live:
+              type: integer
+            servers:
+              type: integer
+            servers_online:
+              type: integer
+            databases:
+              type: integer
+            backups_checked:
+              type: integer
+              description: Databases whose restore check passed in the last 24 hours.
     CatalogList:
       type: object
       required: [items]

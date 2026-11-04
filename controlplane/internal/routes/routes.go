@@ -126,10 +126,16 @@ func SetupRoutes(app *app.App) http.Handler {
 		return middleware.RequireAuth(middleware.WithWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 	}
 	mux.HandleFunc("GET /app", middleware.RequireAuth(workspaceHandler.Redirect))
-	// Sign-ins and invitations lead to the dashboard; the apps are the overview.
-	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", workspace(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps", http.StatusSeeOther)
-	}))
+	// Sign-ins and invitations lead to the dashboard, and a workspace's own
+	// address too: both are the overview.
+	overview := handler.NewOverviewHandler(app.StatusService, app.WorkspaceService)
+	toOverview := workspace(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/overview", http.StatusSeeOther)
+	})
+	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", toOverview)
+	mux.HandleFunc("GET /app/{workspaceSlug}", toOverview)
+	mux.HandleFunc("GET /app/{workspaceSlug}/overview", workspace(overview.Page))
+	mux.HandleFunc("GET /app/{workspaceSlug}/command", workspace(handler.NewCommandHandler(app.AppService, app.ServerService).Items))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.SettingsPage))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
@@ -293,6 +299,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Version:     api.NewVersionHandler(app.UpdateService, app.ServerService),
 		Alerts:      api.NewAlertsHandler(app.AlertService),
 		Catalog:     api.NewCatalogHandler(app.CatalogService),
+		Status:      api.NewStatusHandler(app.StatusService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -322,6 +329,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Updates:       app.UpdateService,
 		Alerts:        app.AlertService,
 		Catalog:       app.CatalogService,
+		Status:        app.StatusService,
 		BillingOff:    !app.Cfg.Billing,
 	})
 	mux.Handle("/mcp", mcp.Handler(mcpServer))

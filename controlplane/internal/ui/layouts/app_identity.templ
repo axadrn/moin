@@ -13,7 +13,7 @@ import (
 templ AppSidebarIdentity() {
 	<div class="flex flex-col gap-2" data-app-base={ ctxkeys.AppBasePath(ctx) }>
 		<a
-			href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/apps") }
+			href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/overview") }
 			aria-label={ brand.Name + " apps" }
 			class="flex h-8 items-center gap-2 rounded-lg px-2 ring-sidebar-ring outline-hidden transition-[padding] focus-visible:ring-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 		>

@@ -502,7 +502,7 @@ var tabNames = []string{"servers", "apps", "activity", "team", "settings"}
 
 // commandNames are what tab completes on the command line.
 func commandNames() []string {
-	names := append([]string{"catalog", "e", "help", "noh", "open", "q", "tabnext", "tabprevious"}, tabNames...)
+	names := append([]string{"catalog", "e", "help", "noh", "open", "q", "status", "tabnext", "tabprevious"}, tabNames...)
 	for name := range commandKeys {
 		names = append(names, name)
 	}
@@ -582,6 +582,9 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 	}
 	if name == "catalog" {
 		return m.catalogCommand(args)
+	}
+	if name == "status" && len(args) == 0 {
+		return m, m.showStatus()
 	}
 	// :update on an app from the catalog sets it to the newest release,
 	// or the version given.
@@ -673,6 +676,7 @@ var helpEntries = [][2]string{
 	{":q ZZ", "quit, like q and ctrl+c"},
 	{":e <app>", "opens an app"},
 	{":servers :apps …", "switches the tab"},
+	{":status", "is everything OK? what needs you, updates, what runs"},
 	{":deploy :restart …", "every key by its name, like :logs or :hook off"},
 	{"tab", "completes a command"},
 	{"", "Output panel"},

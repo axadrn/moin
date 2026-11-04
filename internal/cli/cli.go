@@ -32,6 +32,7 @@ Usage
 Account
   login              Sign in with a personal API token: login [--url <url>], token asked or on stdin
   logout             Forget the token on this machine
+  status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
   activity           Who deployed, restored or changed what: activity [--limit 30]
   alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]; also lists the destinations
   alerts add         Send alerts to Slack, Discord, Telegram or a webhook: alerts add slack|discord|telegram|webhook <name> [--chat <id>] [--events a,b], URL or bot token on stdin
@@ -245,6 +246,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		done(stdout, "Logged out")
 		return nil
+	case "status":
+		return status(ctx, rest, stdout)
 	case "activity":
 		return activity(ctx, rest, stdout)
 	case "alerts":

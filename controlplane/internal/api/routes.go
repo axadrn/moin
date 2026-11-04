@@ -31,6 +31,7 @@ type Handlers struct {
 	Version     *VersionHandler
 	Alerts      *AlertsHandler
 	Catalog     *CatalogHandler
+	Status      *StatusHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -128,6 +129,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/agent-updates", m.InWorkspace(h.Version.AgentUpdates), TokenRead},
 		{"PUT /api/v1/agent-updates", m.InWorkspace(h.Version.SetAgentUpdates), TokenWrite},
 		{"GET /api/v1/servers/events", m.InWorkspace(streams.wrap(h.Servers.Events)), TokenRead},
+		{"GET /api/v1/status", m.InWorkspace(h.Status.Get), TokenRead},
 		{"GET /api/v1/catalog", m.InWorkspace(h.Catalog.List), TokenRead},
 		{"GET /api/v1/catalog/{slug}", m.InWorkspace(h.Catalog.Get), TokenRead},
 		{"POST /api/v1/catalog/{slug}/install", m.InWorkspace(h.Catalog.Install), TokenWrite},

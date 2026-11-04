@@ -27,6 +27,7 @@ templ AppSidebarNavigation() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ path := ctxkeys.URLPath(ctx) }}
 	@navGroup("Platform", []navItem{
+		{Title: "Overview", URL: basePath + "/overview", Icon: icon.Gauge, Active: path == basePath+"/overview", Key: "O"},
 		{Title: "Apps", URL: basePath + "/apps", Icon: icon.Boxes, Active: path == basePath+"/apps", Key: "A"},
 		{Title: "Servers", URL: basePath + "/servers", Icon: icon.Server, Active: strings.HasPrefix(path, basePath+"/servers"), Key: "S"},
 		{Title: "Buckets", URL: basePath + "/bucket", Icon: icon.Archive, Active: strings.HasPrefix(path, basePath+"/bucket"), Key: "B"},

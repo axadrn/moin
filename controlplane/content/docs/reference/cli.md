@@ -19,6 +19,7 @@ order: 1
 | `ops team resend <email>` | sends an invitation again; only the new link works |
 | `ops team revoke <email> [--yes]` | takes an invitation back |
 | `ops team rename <name>` | renames the workspace; its links stay the same |
+| `ops status` | is everything OK: what needs you, catalog updates and what runs; exits `1` when something needs you ([Overview](/docs/guides/overview)) |
 | `ops servers` | lists servers |
 | `ops servers add [name]` | adds a server, prints its install command; without a name it gets one like `brave-otter` |
 | `ops servers install-command <name>` | prints a new one-time install command; the old one stops working |

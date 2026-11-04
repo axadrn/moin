@@ -43,6 +43,7 @@ type App struct {
 	ServerService       *service.ServerService
 	AppService          *service.AppService
 	CatalogService      *service.CatalogService
+	StatusService       *service.StatusService
 	AlertService        *service.AlertService
 }
 
@@ -215,6 +216,7 @@ func New(cfg *config.Config) (*App, error) {
 		ServerService:    serverService,
 		AppService:       appService,
 		CatalogService:   catalogService,
+		StatusService:    service.NewStatusService(appService, serverService, catalogService),
 		AlertService:     alertService,
 	}
 	initialized = true

@@ -5,6 +5,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/icons"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/kbd"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/separator"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
@@ -48,6 +49,14 @@ templ AppHeader(p AppHeaderProps) {
 			</ol>
 		</nav>
 		<div class="ml-auto flex items-center gap-1">
+			// ⌘K: jump to an app, a server or a page.
+			@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Class: "gap-2 px-3 font-normal text-muted-foreground", Attributes: templ.Attributes{"data-command-open": true, "aria-label": "Jump to an app, a server or a page"}}) {
+				@icon.Search(icon.Props{Class: "size-3.5"})
+				<span class="hidden md:inline">Jump to</span>
+				@kbd.Kbd(kbd.Props{Class: "hidden md:inline-flex"}) {
+					⌘K
+				}
+			}
 			@button.Button(button.Props{Href: "/docs", Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Class: "hidden gap-1 px-3 sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener"}}) {
 				Docs
 				@icon.ArrowUpRight(icon.Props{Class: "size-3.5"})

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -804,4 +805,34 @@ func (s *AppService) SetUptimeCheck(actor Actor, idOrName, domain string, path *
 	}
 	view, err := s.uptimeDomain(app, domain, health, now)
 	return app, view, err
+}
+
+// DownDomain is a domain of an app that the checks find down.
+type DownDomain struct {
+	App    string
+	Domain string
+	Since  *time.Time
+}
+
+// DownDomains lists the domains of apps that are down now, unpaused, from
+// the checker's state; the overview shows them.
+func (s *AppService) DownDomains(apps []model.App) []DownDomain {
+	u := s.uptime
+	u.load(s.apps.UptimeChecks)
+	names := make(map[string]string, len(apps))
+	for _, app := range apps {
+		names[app.ID] = app.Name
+	}
+	var down []DownDomain
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	for key, state := range u.states {
+		name, ok := names[key.app]
+		if !ok || state.check.Paused || state.check.State != model.UptimeDown {
+			continue
+		}
+		down = append(down, DownDomain{App: name, Domain: key.domain, Since: state.check.Since})
+	}
+	sort.Slice(down, func(i, j int) bool { return down[i].Domain < down[j].Domain })
+	return down
 }
