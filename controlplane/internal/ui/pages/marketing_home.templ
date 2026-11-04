@@ -113,11 +113,16 @@ templ HomeHero() {
 					Read the docs
 				}
 			</div>
+			<p class="mt-6 text-sm text-muted-foreground/70">
+				<span class="font-semibold text-muted-foreground">moin</span> /mɔɪn/ · hello, the Hamburg way.
+				<a href="#why-moin" class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Read the story →</a>
+			</p>
 		</div>
 		<div class={ homeWrap, "mt-20 sm:mt-28" }>
 			@homeStage()
 		</div>
 		@stageScript()
+		@whyMoinScript()
 	</section>
 }
 
@@ -162,6 +167,22 @@ templ homeStageTab(name, label string) {
 // thin line filling under the tab. It waits while the pointer is on the
 // stage or the stage is off screen, stops for good once someone picks a
 // tab, and never runs for reduced motion.
+// whyMoinScript opens a FAQ question when the address names its anchor,
+// such as #why-moin from the line under the hero buttons.
+templ whyMoinScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const open = () => {
+				const item = location.hash && document.getElementById(location.hash.slice(1));
+				const trigger = item && item.querySelector("[data-slot=accordion-trigger]");
+				if (trigger && trigger.getAttribute("aria-expanded") !== "true") trigger.click();
+			};
+			addEventListener("hashchange", open);
+			open();
+		})();
+	</script>
+}
+
 templ stageScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
@@ -849,7 +870,7 @@ templ HomeFAQ() {
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
 				}
-				@homeQuestion("Why moin?") {
+				@homeQuestionID("why-moin", "Why moin?") {
 					<span class="block"><strong class="font-semibold text-foreground">moin</strong> /mɔɪn/ <em>interjection, northern German.</em> Hello. Said in Hamburg at any hour, in one word, by people who don't waste words.</span>
 					<span class="mt-4 block">I grew up in Hamburg. The port is full of containers, stacked, moved, shipped around the world, and nothing gets lost. That's what moin does for your apps.</span>
 				}
@@ -876,7 +897,15 @@ templ HomeFAQ() {
 }
 
 templ homeQuestion(question string) {
-	@accordion.Item() {
+	@homeQuestionID("", question) {
+		{ children... }
+	}
+}
+
+// homeQuestionID is a question with an anchor: a link to #<id> scrolls to it
+// and opens it (whyMoinScript).
+templ homeQuestionID(id string, question string) {
+	@accordion.Item(accordion.ItemProps{ID: id, Class: "scroll-mt-28"}) {
 		@accordion.Trigger(accordion.TriggerProps{Class: "items-center gap-6 rounded-none px-4 py-5 text-base font-semibold hover:no-underline sm:px-5 sm:py-6 **:data-[slot=accordion-trigger-icon]:hidden"}) {
 			{ question }
 			@icon.Plus(icon.Props{Class: "ml-auto size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-45"})
