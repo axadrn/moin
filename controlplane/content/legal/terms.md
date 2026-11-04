@@ -1,10 +1,10 @@
 ---
 title: Terms of Service
 description: The plain-language rules for using the hosted moin service
-lastUpdated: November 2, 2026
+lastUpdated: November 4, 2026
 ---
 
-These terms are the agreement between you and us, the team that runs the hosted moin service. They cover the website, the control plane, its API and MCP server, and the `moin` command line tool and agent when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
+These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA, the company that runs the hosted moin service. They cover the website, the control plane, its API and MCP server, and the `moin` command line tool and agent when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
 
 ## The service
 
@@ -66,19 +66,29 @@ moin is in beta and moves fast. That means:
 
 ## No guarantees
 
-moin comes "as is" and "as available". We work hard to keep it up and correct, but we do not promise uptime, uninterrupted service, a response time for support, or that moin is free of errors. As far as the law allows, we give no warranties beyond what these terms say.
+We work hard to keep moin up and correct, but we do not promise uptime, uninterrupted service, a response time for support, or that moin is free of errors.
+
+**MOIN, ITS SOFTWARE, AGENT, COMMAND LINE TOOL AND HOSTED SERVICE ARE PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND. AS FAR AS THE LAW ALLOWS, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND THAT BACKUPS OR RESTORES WILL BE COMPLETE, CORRECT OR AVAILABLE.**
 
 Your apps run on your servers, not on ours. If the control plane is down, your apps keep running; you just cannot deploy or change them through moin until it is back. moin helps you keep apps running, but it cannot guarantee that a deploy, a rollback or a health check succeeds, or that your server stays reachable.
 
 ## Backups and your data
 
-moin backs up the databases of your apps to the bucket you choose and checks the backups every day. These backups are best effort. Check that they are there and that you can restore them, and keep your own copy of anything you cannot afford to lose. We are not responsible for lost or damaged data, on your servers, in your bucket or in moin.
+moin backs up the databases of your apps to the bucket you choose and checks the backups every day. These backups are best effort. Check that they are there and that you can restore them, and keep your own copy of anything you cannot afford to lose.
+
+You alone are responsible for your data. We are not responsible for data that is lost, damaged, leaked or not backed up, in any form and for any reason: on your servers, in your bucket or in moin, including through a deploy, rollback, update, migration, backup, restore, restore check, a command you or moin runs, or an outage of moin or of any service it uses.
 
 ## Liability
 
-We are not liable for indirect or consequential damage, such as lost profits, lost revenue, lost data or downtime of your apps.
+**AS FAR AS THE LAW ALLOWS, WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, GOODWILL OR DOWNTIME, HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, EVEN IF WE WERE TOLD THEY MIGHT HAPPEN.**
 
-Our total liability for all claims about moin is limited to what you paid for the hosted service in the 12 months before the event that caused the claim. If you paid nothing, we are liable only where the law requires it.
+**OUR TOTAL LIABILITY FOR ALL CLAIMS ABOUT MOIN IS LIMITED TO WHAT YOU PAID FOR THE HOSTED SERVICE IN THE 12 MONTHS BEFORE THE EVENT THAT CAUSED THE CLAIM. IF YOU PAID NOTHING, INCLUDING WHEN YOU HOST MOIN YOURSELF, IT IS ZERO.**
+
+For the use of moin, your contracting party is Berry Good Ideas LLC alone; for the purchase itself, Stripe is the seller of record (see Plans and payment). The owners, members, managers, employees and contributors of Berry Good Ideas LLC are not personally liable to you, privately or in business, for anything about moin.
+
+## Indemnity
+
+You defend and hold us harmless from claims by others, and the costs that come with them, that arise from your apps, your data, your servers, or your breach of these terms or of the law.
 
 These limits do not apply where the law does not allow them, such as for intent, gross negligence, or injury to life, body or health. Rights you have as a consumer under mandatory law stay unaffected.
 
@@ -92,7 +102,7 @@ If we ever end the hosted service, we tell you by email in good time and refund 
 
 ## The law
 
-These terms are governed by the law at the place of business of the operator of the hosted service. If you are a consumer, the mandatory protections of the country where you live still apply. If one part of these terms does not hold up, the rest still applies. Before going to court, write to us; most problems are solved by email.
+These terms are governed by the laws of the State of Wyoming, USA, without its conflict of law rules. The state and federal courts in Wyoming are the only place for disputes about moin, and you agree to their jurisdiction. If you are a consumer, the mandatory protections of the country where you live still apply. If one part of these terms does not hold up, the rest still applies. Before going to court, write to us; most problems are solved by email.
 
 ## Changes to these terms
 
