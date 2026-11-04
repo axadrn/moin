@@ -6,7 +6,7 @@ order: 1
 
 moin deploys your apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. You use it from the browser, the `moin` CLI (commands you type), the `moin` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
 
-New here? Read [How moin works in 2 minutes](#how-ops-works-in-2-minutes) below, then [Getting Started](/docs/getting-started).
+New here? Read [How moin works in 2 minutes](#how-moin-works-in-2-minutes) below, then [Getting Started](/docs/getting-started).
 
 All of moin is open source. Use the hosted control plane, or [host it yourself for free](/docs/self-hosting): the same product, every feature, no limits.
 

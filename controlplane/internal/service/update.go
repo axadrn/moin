@@ -24,7 +24,7 @@ import (
 const (
 	// ReleasesURL is where a self-hosted control plane learns of the newest
 	// release. GitHub answers it without a token.
-	ReleasesURL = "https://api.github.com/repos/axadrn/ops/releases/latest"
+	ReleasesURL = "https://api.github.com/repos/axadrn/moin/releases/latest"
 	// updateCheckEvery is how often it asks.
 	updateCheckEvery = 24 * time.Hour
 	// updaterAlive is how old the updater's heartbeat may be for "Update
@@ -144,7 +144,7 @@ func (s *UpdateService) Check(ctx context.Context) error {
 		return err
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "ops-controlplane/"+s.version)
+	request.Header.Set("User-Agent", "moin-controlplane/"+s.version)
 	s.mu.Lock()
 	if s.etag != "" {
 		request.Header.Set("If-None-Match", s.etag)

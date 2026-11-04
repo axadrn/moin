@@ -1,7 +1,7 @@
 # Contributor License Agreement
 
 By signing, you agree to the following for every contribution you send to
-moin (github.com/axadrn/ops), now and later.
+moin (github.com/axadrn/moin), now and later.
 
 1. **License.** You license your contribution to Axel Adrian and to everyone
    who receives moin under the Apache License 2.0

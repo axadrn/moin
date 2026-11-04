@@ -48,7 +48,7 @@ type Config struct {
 	GitHubClientID     string
 	GitHubClientSecret string
 
-	// The ops GitHub App, which connects repos. Without an app ID the
+	// The moin GitHub App, which connects repos. Without an app ID the
 	// control plane runs without it.
 	GitHubAppID            string
 	GitHubAppSlug          string
