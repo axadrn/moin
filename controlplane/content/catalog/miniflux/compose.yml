@@ -1,4 +1,4 @@
-x-ops:
+x-moin:
   service: web
   port: 8080
   health: /healthcheck

@@ -1,4 +1,4 @@
-x-ops:
+x-moin:
   service: web
   port: 9090
   health: /health

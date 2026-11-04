@@ -23,7 +23,7 @@ const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
-// route settles the routing of a release: x-ops wins for every field it
+// route settles the routing of a release: x-moin wins for every field it
 // sets, the control plane's settings fill the rest. Domains are the main
 // service's; ServiceDomains those of the others; Instant its instant
 // address.
@@ -39,7 +39,7 @@ func route(app string, detected protocol.Detected, routing *protocol.Routing) (p
 	if len(config.Domains) > 0 {
 		detected.Domains = slices.Clone(config.Domains)
 	}
-	// The map form of x-ops domains may name the main service too.
+	// The map form of x-moin domains may name the main service too.
 	if main, ok := config.ServiceDomains[detected.Service]; ok && len(config.Domains) == 0 {
 		detected.Domains = slices.Clone(main)
 	}
@@ -94,7 +94,7 @@ func route(app string, detected protocol.Detected, routing *protocol.Routing) (p
 		return detected, fmt.Errorf("canonical domain %s is not one of the domains", detected.Canonical)
 	}
 	if config.Protect && routing.Protect == "" {
-		return detected, errors.New("x-ops.protect is on but no password is set: set one with ops protect")
+		return detected, errors.New("x-moin.protect is on but no password is set: set one with moin protect")
 	}
 	provider := routing.Instant
 	switch config.Instant {
@@ -103,7 +103,7 @@ func route(app string, detected protocol.Detected, routing *protocol.Routing) (p
 		provider = ""
 	default:
 		if !slices.Contains(protocol.InstantProviders, config.Instant) {
-			return detected, fmt.Errorf("x-ops.instant is %q: use off, %s", config.Instant, strings.Join(protocol.InstantProviders, ", "))
+			return detected, fmt.Errorf("x-moin.instant is %q: use off, %s", config.Instant, strings.Join(protocol.InstantProviders, ", "))
 		}
 		provider = config.Instant
 	}

@@ -24,8 +24,8 @@ func TestEntries(t *testing.T) {
 		t.Fatalf("%d entries", len(entries))
 	}
 	for _, entry := range entries {
-		if !strings.Contains(string(entry.Compose), "x-ops:") {
-			t.Errorf("%s: compose.yml has no x-ops block", entry.Slug)
+		if !strings.Contains(string(entry.Compose), "x-moin:") {
+			t.Errorf("%s: compose.yml has no x-moin block", entry.Slug)
 		}
 		// pgvector/pgvector is Postgres with vectors; the agent backs it up
 		// like postgres.
