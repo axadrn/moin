@@ -105,7 +105,12 @@ func MoveUnit(ctx context.Context) (bool, error) {
 		}
 	}
 	slog.Info("starting the agent under its new name; this one stops")
-	if out, err := exec.CommandContext(ctx, "systemctl", "--no-block", "start", build.Name+"-agent").CombinedOutput(); err != nil {
+	// Starting the new unit stops the old one, and systemd stops all of its
+	// processes, systemctl here among them: killed by a signal means it
+	// worked.
+	out, err := exec.Command("systemctl", "--no-block", "start", build.Name+"-agent").CombinedOutput()
+	var exit *exec.ExitError
+	if err != nil && !(errors.As(err, &exit) && !exit.Exited()) {
 		return false, fmt.Errorf("start %s-agent: %v %s", build.Name, err, strings.TrimSpace(string(out)))
 	}
 	return true, nil
@@ -345,9 +350,12 @@ func (m *rename) run(ctx context.Context) {
 		}
 	}
 	if !failed {
-		// Gone once nothing uses it; a control plane on this server may
-		// still, until it moves too.
-		_, _ = m.apps.output(ctx, "docker", "network", "rm", legacyProxyNetwork)
+		// Gone once nothing but the proxy uses it; a control plane on this
+		// server may still, until it moves too: then the proxy stays on it.
+		_, _ = m.apps.output(ctx, "docker", "network", "disconnect", legacyProxyNetwork, proxyName)
+		if _, err := m.apps.output(ctx, "docker", "network", "rm", legacyProxyNetwork); err != nil {
+			m.apps.joinLegacyNetwork(ctx)
+		}
 		m.state.Done = true
 		logf("done: every app runs under the new name")
 	}
