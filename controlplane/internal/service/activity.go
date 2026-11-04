@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/google/uuid"
 )
 
@@ -22,7 +23,7 @@ const (
 	ViaMCP    = "mcp"
 	ViaGitHub = "github"
 	ViaHook   = "hook"
-	// ViaSystem is moin itself, such as a deploy that ended or a server whose
+	// ViaSystem is ops itself, such as a deploy that ended or a server whose
 	// agent connected.
 	ViaSystem = "system"
 )
@@ -44,10 +45,11 @@ func RequestSource(ctx context.Context) Source {
 	source := Source{Via: ViaWeb, IP: client.IP, UserAgent: client.UserAgent}
 	if token := ctxkeys.APIToken(ctx); token != nil {
 		source.Token = token.Name
+		// A CLI of the old name says so in its user agent.
 		switch {
-		case strings.HasPrefix(client.UserAgent, "moin-cli/"), strings.HasPrefix(client.UserAgent, "ops-cli/"):
+		case strings.HasPrefix(client.UserAgent, build.Name+"-cli/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-cli/"):
 			source.Via = ViaCLI
-		case strings.HasPrefix(client.UserAgent, "moin-tui/"), strings.HasPrefix(client.UserAgent, "ops-tui/"):
+		case strings.HasPrefix(client.UserAgent, build.Name+"-tui/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-tui/"):
 			source.Via = ViaTUI
 		default:
 			source.Via = ViaAPI
@@ -57,7 +59,7 @@ func RequestSource(ctx context.Context) Source {
 }
 
 // Actor is who changes something in a workspace: a member through the web,
-// the CLI, the TUI, the API or MCP, a deploy hook, GitHub for a push, or moin
+// the CLI, the TUI, the API or MCP, a deploy hook, GitHub for a push, or ops
 // itself.
 type Actor struct {
 	WorkspaceID string
@@ -65,7 +67,7 @@ type Actor struct {
 	Source
 }
 
-// System is moin itself acting in a workspace.
+// System is ops itself acting in a workspace.
 func System(workspaceID string) Actor {
 	return Actor{WorkspaceID: workspaceID, Source: Source{Via: ViaSystem}}
 }
@@ -77,7 +79,7 @@ func System(workspaceID string) Actor {
 // before and after: names, on and off, domains, branches, roles, counts,
 // versions, release numbers and error messages. What we never log: env var
 // values, secrets, tokens, passwords, SQL text, row contents or cell values,
-// file contents and log lines of an app. moin keeps none of the user's data,
+// file contents and log lines of an app. ops keeps none of the user's data,
 // so details only ever hold names, numbers and settings.
 func recordActivity(audit repository.WorkspaceAuditRepository, at time.Time, actor Actor, action, targetType, target string, details map[string]string) {
 	if audit == nil || actor.WorkspaceID == "" {

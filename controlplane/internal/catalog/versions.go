@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Version is a release of an app: its image tag, and when it was pushed if
@@ -210,7 +212,7 @@ func (r Registry) getJSONPage(ctx context.Context, address, bearer string, into 
 		return "", err
 	}
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "moin-catalog")
+	request.Header.Set("User-Agent", build.Name+"-catalog")
 	if bearer != "" {
 		request.Header.Set("Authorization", "Bearer "+bearer)
 	}
