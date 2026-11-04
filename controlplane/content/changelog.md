@@ -3,6 +3,18 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.8
+
+November 4, 2026
+
+**In short:** the app page puts Deploy from GitHub first; deploying from CI waits behind one click.
+
+### Changed
+- **Deploy from CI**: deploying an image and the deploy hook now sit folded under **Deploy from CI** on the app page, so the GitHub **Deploy** is the one you see. An app with a hook shows it open.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.7
 
 November 4, 2026

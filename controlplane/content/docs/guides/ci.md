@@ -57,7 +57,7 @@ MCP: remove_registry
 Gives you a secret URL that deploys an image when CI calls it.
 
 ```surfaces
-Web: the app page, **Deploy hook**, **New deploy hook**
+Web: the app page, **Deploy from CI**, **Show**, **Deploy hook**, **New deploy hook**
 CLI: ops hook <app-name>
 TUI: on the app, `:hook`, then `y` to replace a hook
 API: POST /api/v1/apps/{app}/hook
@@ -71,7 +71,7 @@ ops shows the URL once. Store it as the CI secret `OPS_DEPLOY_HOOK`. A new hook 
 Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop using CI or think the URL leaked. A new hook can be made again any time.
 
 ```surfaces
-Web: the app page, **Deploy hook**, **Turn off**
+Web: the app page, **Deploy from CI**, **Deploy hook**, **Turn off**
 CLI: ops hook off <app-name>
 TUI: on the app, `:hook off`, then `y`
 API: DELETE /api/v1/apps/{app}/hook
@@ -134,7 +134,7 @@ The step waits until the deploy is live and fails the job when the deploy fails.
 Deploys an image that is already in a registry, without CI.
 
 ```surfaces
-Web: the app page, **Deploy an image**, **Deploy image**
+Web: the app page, **Deploy from CI**, **Show**, **Deploy an image**, **Deploy image**
 CLI: ops deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
 TUI: on the app, `i`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys

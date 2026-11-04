@@ -5,6 +5,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/item"
@@ -13,47 +14,63 @@ import (
 
 // appCI is the "Build in CI" part of the app page: deploy an image built
 // elsewhere, and the deploy hook CI calls; hook says the app has one.
+//
+// Most apps deploy from GitHub, so it stays folded until opened or until
+// the app has a hook: its buttons are not the Deploy a first look wants.
 templ appCI(appName string, hook bool) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div class="grid items-stretch gap-4 lg:grid-cols-2">
-		@panel(panelProps{
-			Heading:     "app-image-heading",
-			Title:       "Deploy an image",
-			Description: "Ship an image built in CI or anywhere else. The server keeps the compose file of the live release and only pulls the new image.",
-			Docs:        "/docs/guides/ci#deploy-an-image-by-hand",
-		}) {
-			<form
-				class="flex flex-col gap-3"
-				hx-post={ basePath + "/apps/" + appName + "/image" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@csrf.Token()
-				@field.Field(field.Props{Class: "gap-1"}) {
-					@field.Label(field.LabelProps{For: "image-ref"}) {
-						Image
-					}
-					<div class="flex flex-col gap-2 sm:flex-row">
-						@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-describedby": "image-ref-hint"}})
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
-							Deploy image
+	@collapsible.Collapsible(collapsible.Props{DefaultOpen: hook, Class: "flex flex-col gap-4", Attributes: templ.Attributes{"data-app-ci": true}}) {
+		<div class="flex flex-wrap items-center justify-between gap-3 rounded-4xl bg-card px-6 py-5">
+			<div class="min-w-0">
+				<h2 class="text-base font-semibold">Deploy from CI</h2>
+				<p class="text-sm text-muted-foreground">For builds in CI, not GitHub above: deploy an image by hand, or give CI a hook URL.</p>
+			</div>
+			@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: collapsible.Trigger(ctx)}) {
+				Show
+			}
+		</div>
+		@collapsible.Content() {
+			<div class="grid items-stretch gap-4 lg:grid-cols-2">
+				@panel(panelProps{
+					Heading:     "app-image-heading",
+					Title:       "Deploy an image",
+					Description: "Ship an image built in CI or anywhere else. The server keeps the compose file of the live release and only pulls the new image.",
+					Docs:        "/docs/guides/ci#deploy-an-image-by-hand",
+				}) {
+					<form
+						class="flex flex-col gap-3"
+						hx-post={ basePath + "/apps/" + appName + "/image" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@csrf.Token()
+						@field.Field(field.Props{Class: "gap-1"}) {
+							@field.Label(field.LabelProps{For: "image-ref"}) {
+								Image
+							}
+							<div class="flex flex-col gap-2 sm:flex-row">
+								@input.Input(input.Props{ID: "image-ref", Name: "image", Type: "text", Placeholder: "ghcr.io/me/" + appName + ":3f2a9c1", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-describedby": "image-ref-hint"}})
+								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-deploy-image": true}}) {
+									Deploy image
+								}
+							</div>
+							@fieldHint("image-ref", "") {
+								Same as <code class="font-mono">ops deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
+							}
 						}
-					</div>
-					@fieldHint("image-ref", "") {
-						Same as <code class="font-mono">ops deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
-					}
+					</form>
 				}
-			</form>
+				@panel(panelProps{
+					Heading:     "app-hook-heading",
+					Title:       "Deploy hook",
+					Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
+					Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
+				}) {
+					@AppHook(appName, "", hook)
+				}
+			</div>
 		}
-		@panel(panelProps{
-			Heading:     "app-hook-heading",
-			Title:       "Deploy hook",
-			Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
-			Description: "A secret URL your CI calls after it pushed the image. ops then deploys that image.",
-		}) {
-			@AppHook(appName, "", hook)
-		}
-	</div>
+	}
 }
 
 // AppHook shows a new deploy hook URL once, with the curl CI runs, and
@@ -98,16 +115,16 @@ templ AppHook(appName, url string, on bool) {
 // replaces a hook, whose URL then stops working.
 templ newHookButton(appName string, replaces bool) {
 	{{
-	attributes := templ.Attributes{
-		"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
-		"hx-target":     "#app-hook",
-		"hx-swap":       "outerHTML",
-		"hx-disable":    "this",
-		"data-new-hook": true,
-	}
-	if replaces {
-		attributes["hx-confirm"] = "Create a new deploy hook? The old URL stops working."
-	}
+		attributes := templ.Attributes{
+			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+			"hx-target":     "#app-hook",
+			"hx-swap":       "outerHTML",
+			"hx-disable":    "this",
+			"data-new-hook": true,
+		}
+		if replaces {
+			attributes["hx-confirm"] = "Create a new deploy hook? The old URL stops working."
+		}
 	}}
 	@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: attributes}) {
 		New deploy hook
