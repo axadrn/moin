@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -125,6 +126,9 @@ func TestMoveStateDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(to, "apps", "shop")); err != nil {
 		t.Fatalf("not moved: %v", err)
 	}
+	if !newRename(to, newApps(to, nil), nil).marked {
+		t.Fatal("the moved state is not marked")
+	}
 	if target, err := os.Readlink(from); err != nil || target != to {
 		t.Fatalf("link = %q, %v", target, err)
 	}
@@ -203,7 +207,12 @@ func TestRenameState(t *testing.T) {
 	m.state.Volumes = append(m.state.Volumes, "ops-shop_pgdata")
 	m.save()
 	again := newRename(dir, newApps(dir, nil), nil)
-	if again.state.Apps["shop"] != "done" || len(again.state.Volumes) != 1 {
+	if again.state.Apps["shop"] != "done" || len(again.state.Volumes) != 1 || !again.marked {
 		t.Errorf("state = %+v", again.state)
+	}
+	// A state that never had the old name does not move anything.
+	fresh := newRename(t.TempDir(), newApps(dir, nil), nil)
+	if fresh.marked || fresh.needed(context.Background()) {
+		t.Error("a fresh state wants to move")
 	}
 }

@@ -192,12 +192,16 @@ func moveStateDir(from, to string) error {
 		return fmt.Errorf("%s is not empty: leaving %s as it is", to, from)
 	}
 	_ = os.Remove(to)
+	// The mark goes in first and moves along: it says this state came from
+	// the old name, so the Docker side moves too, and a crash before the
+	// link still gets one.
+	if _, err := os.Stat(filepath.Join(from, migrationFile)); err != nil {
+		saveJSON(filepath.Join(from, migrationFile), migrationState{Apps: map[string]string{}, Running: map[string]bool{}})
+	}
 	slog.Info("moving the state", "from", from, "to", to)
 	if err := os.Rename(from, to); err != nil {
 		return err
 	}
-	// Mark the move, so a crash before the link still gets one.
-	saveJSON(filepath.Join(to, migrationFile), migrationState{Apps: map[string]string{}, Running: map[string]bool{}})
 	return os.Symlink(to, from)
 }
 
@@ -211,6 +215,10 @@ func removeLegacyStateLink(dir string) {
 
 // rename moves the Docker side: apps, proxy, tunnel.
 type rename struct {
+	// marked is set when the state came from the old name: only then the
+	// Docker side moves. A fresh agent, or one in development with its own
+	// state dir, never touches the old name's containers.
+	marked   bool
 	dir      string
 	apps     *apps
 	security *security
@@ -221,7 +229,8 @@ type rename struct {
 
 func newRename(dir string, a *apps, s *security) *rename {
 	m := &rename{dir: dir, apps: a, security: s, helper: proxyImage}
-	body, _ := os.ReadFile(filepath.Join(dir, migrationFile))
+	body, err := os.ReadFile(filepath.Join(dir, migrationFile))
+	m.marked = err == nil
 	_ = json.Unmarshal(body, &m.state)
 	if m.state.Apps == nil {
 		m.state.Apps = map[string]string{}
@@ -236,7 +245,7 @@ func (m *rename) save() { saveJSON(filepath.Join(m.dir, migrationFile), m.state)
 
 // needed reports whether anything of the old name is left in Docker.
 func (m *rename) needed(ctx context.Context) bool {
-	if m.state.Done {
+	if !m.marked || m.state.Done {
 		return false
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
@@ -275,7 +284,7 @@ func (m *rename) run(ctx context.Context) {
 			legacyApps.Store(app, true)
 		}
 	}
-	if !build.Legacy() {
+	if !build.Legacy() && m.marked {
 		m.cleanup(ctx)
 	}
 	if !m.needed(ctx) {
