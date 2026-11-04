@@ -79,8 +79,8 @@ type AppService struct {
 	// proxyOnFirstConnect sends a server its config the first time its
 	// agent connects, which starts the proxy; see ProxyOnFirstConnect.
 	proxyOnFirstConnect bool
-	uptime            *uptimeChecker
-	metrics           *metricsStore
+	uptime              *uptimeChecker
+	metrics             *metricsStore
 
 	mu          sync.Mutex
 	live        map[string]*liveDeploy
