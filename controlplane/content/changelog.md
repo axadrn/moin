@@ -3,6 +3,18 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.23
+
+November 4, 2026
+
+**In short:** page counts only on the public site, never inside your workspace.
+
+### Changed
+- **Analytics only where it belongs**: the home page, docs, changelog, catalog and legal pages are counted; the app, the admin and sign-in never are, so no workspace or app name and no sign-in link reaches a page counter.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`.
+
 ## v1.0.0-beta.22
 
 November 4, 2026
