@@ -30,13 +30,14 @@ func NewCatalogHandler(catalog *service.CatalogService, servers *service.ServerS
 // view is the catalog, filtered by the category in the query.
 func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 	store := h.catalog.Store()
-	view := pages.CatalogView{Base: base}
+	view := pages.CatalogView{Base: base, Counts: map[string]int{}}
+	for _, entry := range store.Entries() {
+		view.Counts[entry.Category]++
+		view.Total++
+	}
 	for _, category := range catalog.Categories {
-		for _, entry := range store.Entries() {
-			if entry.Category == category {
-				view.Categories = append(view.Categories, category)
-				break
-			}
+		if view.Counts[category] > 0 {
+			view.Categories = append(view.Categories, category)
 		}
 	}
 	view.Category = pages.CategoryFromSlug(r.URL.Query().Get("category"), view.Categories)
@@ -79,6 +80,20 @@ func (h *CatalogHandler) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, pages.CatalogApp(view, h.appURL))
+}
+
+// Logo serves an app's logo from the catalog, never from its project's
+// site. An SVG runs no script here: the policy forbids it.
+func (h *CatalogHandler) Logo(w http.ResponseWriter, r *http.Request) {
+	view, ok := h.entry(r)
+	if !ok || len(view.Entry.Logo) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", view.Entry.LogoType)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(view.Entry.Logo)
 }
 
 // Start sends the "Install on your server" button of the site to the

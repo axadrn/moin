@@ -9,6 +9,7 @@ image: ghcr.io/paperless-ngx/paperless-ngx
 database: postgres
 port: 8000
 login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+logo: https://github.com/paperless-ngx/paperless-ngx/blob/HEAD/docs/assets/logo_leaf.svg
 ---
 
 Drop in scans and PDFs: it reads the text, tags them and makes every letter, invoice and contract findable in a second. Its index lives in your own Postgres. Give it 2 GB of memory.

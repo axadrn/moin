@@ -8,6 +8,7 @@ license: AGPL-3.0
 image: ghcr.io/requarks/wiki
 database: postgres
 port: 3000
+logo: https://github.com/requarks/wiki/blob/HEAD/frontend/public/_assets/logo-wikijs.svg
 ---
 
 Write in Markdown or a visual editor, organize pages in a tree, search everything. Pages live in your own Postgres. The first visit creates the admin.

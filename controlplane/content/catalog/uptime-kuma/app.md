@@ -8,6 +8,7 @@ license: MIT
 image: louislam/uptime-kuma
 database: sqlite
 port: 3001
+logo: https://github.com/louislam/uptime-kuma/blob/HEAD/public/icon.svg
 ---
 
 Watch websites, APIs, ports and certificates, get told on 90 channels when something breaks, and show a public status page. You create your account on the first visit.

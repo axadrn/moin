@@ -9,6 +9,7 @@ image: ghcr.io/umami-software/umami
 database: postgres
 port: 3000
 login: "Sign in as admin with the password umami, then change it right away."
+logo: https://github.com/umami-software/umami/blob/HEAD/src/assets/logo.svg
 ---
 
 See who visits your sites, from where and what they read, without cookie banners. One script tag per site, and the data stays in your own Postgres.

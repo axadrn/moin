@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/catalog"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
 	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
@@ -31,36 +30,39 @@ templ Catalog(view CatalogView) {
 		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server in one click. Every version, updates with a backup first.",
 		Path:        "/apps",
 	}) {
-		<main class="pb-28 sm:pb-36">
-			<section class="pt-16 sm:pt-24">
-				<div class={ homeWrap, "flex flex-col items-center text-center" }>
-					<h1 class={ typeH1, "max-w-[16ch]" }>Apps, one click away.</h1>
-					<p class={ typeLead, "mt-6 max-w-xl sm:text-xl sm:leading-9" }>
-						Install open-source apps on your server. Every version, updates with a backup first.
-					</p>
-				</div>
-			</section>
-			<div class={ homeWrap, "mt-12 sm:mt-16" }>
-				@catalogBody(view)
-				<p class={ typeText, "mt-12 text-center" } data-catalog-missing>
-					Missing one? Each app is one folder:
-					<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">add it with a pull request, or ask us</a>.
-				</p>
-			</div>
+		<main class={ homeWrap, "pt-12 pb-28 sm:pt-20 sm:pb-36" }>
+			@catalogBody(view, catalogHeading())
 		</main>
 	}
 }
 
-// catalogBody is the search, the order, the categories and the grid, on
-// the site and in the app. Category, search and order live in the URL, so
-// the page renders the same from a shared link; the search also filters
-// as you type.
-templ catalogBody(view CatalogView) {
+// catalogHeading is the title of the public catalog.
+templ catalogHeading() {
+	<h1 class={ typeH2 }>Apps, one click away.</h1>
+	<p class={ typeLead, "mt-4 max-w-xl" }>Install open-source apps on your server. Every version, updates with a backup first.</p>
+}
+
+// catalogBody lays the catalog out like an index: on large screens the
+// search and the categories with their counts in a sticky column at the
+// left, the heading, the order and the grid at the right; on small ones
+// the heading, the search, a select of the categories, the order and the
+// grid. Category, search and order live in the URL, so the page renders
+// the same from a shared link, and the search filters as you type.
+templ catalogBody(view CatalogView, heading templ.Component) {
 	{{ now := time.Now() }}
 	{{ shown := 0 }}
-	<div class="flex min-w-0 flex-col gap-6" data-catalog data-base={ view.Base } data-category={ categorySlug(view.Category) } data-sort={ view.Sort }>
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<form method="get" action={ templ.SafeURL(view.Base) } class="w-full sm:max-w-sm" role="search">
+	<div class="flex min-w-0 flex-col gap-6 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-8" data-catalog data-base={ view.Base } data-category={ categorySlug(view.Category) } data-sort={ view.Sort }>
+		if heading != nil {
+			<header class="min-w-0 lg:col-start-2 lg:row-start-1">
+				@heading
+			</header>
+		}
+		// On every screen the search docks under the navbar: on large ones with
+		// the categories at the left, on small ones as a bar with the
+		// category select, on the page's own background so nothing shows
+		// through.
+		<aside class="sticky top-[4.25rem] z-40 -mx-4 flex min-w-0 flex-col gap-2 bg-background/95 px-4 py-2 backdrop-blur sm:top-[4.75rem] lg:top-24 lg:z-auto lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:gap-6 lg:self-start lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+			<form method="get" action={ templ.SafeURL(view.Base) } role="search">
 				if view.Category != "" {
 					<input type="hidden" name="category" value={ categorySlug(view.Category) }/>
 				}
@@ -70,59 +72,91 @@ templ catalogBody(view CatalogView) {
 				<label for="catalog-search" class="sr-only">Search apps</label>
 				@input.Input(input.Props{ID: "catalog-search", Name: "q", Type: "search", Value: view.Query, Placeholder: "Search apps", Class: "w-full", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "data-catalog-search": true}})
 			</form>
-			<nav class="flex shrink-0 gap-1 self-start rounded-full bg-muted p-1 sm:self-auto" aria-label="Order">
-				@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortUpdated), SortUpdated, "Recently updated", view.Sort != SortName)
-				@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortName), SortName, "Name A–Z", view.Sort == SortName)
-			</nav>
-		</div>
-		<nav class="flex max-w-full flex-wrap gap-1.5" aria-label="Categories" data-catalog-categories>
-			@catalogCategory(catalogURL(view.Base, "", view.Query, view.Sort), "", "All", view.Category == "")
-			for _, category := range view.Categories {
-				@catalogCategory(catalogURL(view.Base, category, view.Query, view.Sort), categorySlug(category), category, view.Category == category)
-			}
-		</nav>
-		<ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list" data-catalog-grid>
-			for _, app := range view.Apps {
-				{{ hit := catalogMatches(app, view.Query) }}
-				if hit {
-					{{ shown++ }}
+			<nav class="hidden flex-col gap-0.5 lg:flex" aria-label="Categories" data-catalog-categories>
+				@catalogCategory(catalogURL(view.Base, "", view.Query, view.Sort), "", "All", view.Total, view.Category == "")
+				for _, category := range view.Categories {
+					@catalogCategory(catalogURL(view.Base, category, view.Query, view.Sort), categorySlug(category), category, view.Counts[category], view.Category == category)
 				}
-				<li class="min-w-0" hidden?={ !hit } data-search={ catalogSearchText(app) } data-name={ strings.ToLower(app.Entry.Name) } data-released={ releaseUnix(app) }>
-					@catalogCard(view.Base, app, now)
-				</li>
-			}
-		</ul>
-		<p class={ typeText, "text-center" } hidden?={ shown > 0 } data-catalog-empty>
-			No app called “<span class="text-foreground" data-catalog-query>{ view.Query }</span>” yet.
-			<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">Ask for it</a>
-		</p>
+			</nav>
+			<div class="lg:hidden" data-catalog-category-select>
+				<label for="catalog-category" class="sr-only">Category</label>
+				@selectcomp.Select(selectcomp.Props{Name: "category-select", DefaultValue: categorySlug(view.Category), Items: categoryItems(view)}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-category", Class: "w-full"}) {
+						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "All categories"})
+					}
+					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+						@selectcomp.Group() {
+							@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+								All categories <span class="text-muted-foreground">{ strconv.Itoa(view.Total) }</span>
+							}
+							for _, category := range view.Categories {
+								@selectcomp.Item(selectcomp.ItemProps{Value: categorySlug(category)}) {
+									{ category } <span class="text-muted-foreground">{ strconv.Itoa(view.Counts[category]) }</span>
+								}
+							}
+						}
+					}
+				}
+			</div>
+		</aside>
+		<section class="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-2" aria-label="Apps">
+			<div class="flex items-center justify-between gap-3">
+				<p class="text-sm text-muted-foreground" data-catalog-count>{ strconv.Itoa(len(view.Apps)) } apps</p>
+				<nav class="flex shrink-0 gap-0.5 rounded-full bg-muted p-0.5" aria-label="Order">
+					@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortUpdated), SortUpdated, "Recently updated", view.Sort != SortName)
+					@catalogSort(catalogURL(view.Base, view.Category, view.Query, SortName), SortName, "Name A–Z", view.Sort == SortName)
+				</nav>
+			</div>
+			<ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" role="list" data-catalog-grid>
+				for _, app := range view.Apps {
+					{{ hit := catalogMatches(app, view.Query) }}
+					if hit {
+						{{ shown++ }}
+					}
+					<li class="min-w-0" hidden?={ !hit } data-search={ catalogSearchText(app) } data-name={ strings.ToLower(app.Entry.Name) } data-released={ releaseUnix(app) }>
+						@catalogCard(view.Base, app, now)
+					</li>
+				}
+			</ul>
+			<p class={ typeText, "py-8 text-center" } hidden?={ shown > 0 } data-catalog-empty>
+				No app called “<span class="text-foreground" data-catalog-query>{ view.Query }</span>” yet.
+				<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">Ask for it</a>
+			</p>
+			<p class={ typeText, "mt-6" } data-catalog-missing>
+				Missing one? Each app is one folder:
+				<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">add it with a pull request, or ask us</a>.
+			</p>
+		</section>
 	</div>
 	@catalogScript()
 }
 
-templ catalogCategory(href, slug, label string, active bool) {
-	@button.Button(button.Props{
-		Href:       href,
-		Variant:    utils.IfElse(active, button.VariantSecondary, button.VariantGhost),
-		Size:       button.SizeSm,
-		Class:      utils.IfElse(active, "", "text-muted-foreground"),
-		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "page", "false"), "data-catalog-category": slug},
-	}) {
-		{ label }
-	}
+// catalogCategory is one category of the list on large screens, with its
+// count; the picked one stands out.
+templ catalogCategory(href, slug, label string, count int, active bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "flex items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+			templ.KV("bg-secondary font-medium text-foreground", active),
+			templ.KV("text-muted-foreground hover:bg-muted hover:text-foreground", !active) }
+		aria-current={ utils.IfElse(active, "page", "false") }
+		data-catalog-category={ slug }
+	>
+		<span class="truncate">{ label }</span>
+		<span class="text-xs tabular-nums text-muted-foreground">{ strconv.Itoa(count) }</span>
+	</a>
 }
 
-// catalogSort is one order of the segmented control.
+// catalogSort is one order of the small segmented control.
 templ catalogSort(href, sort, label string, active bool) {
-	@button.Button(button.Props{
-		Href:       href,
-		Variant:    utils.IfElse(active, button.VariantDefault, button.VariantGhost),
-		Size:       button.SizeSm,
-		Class:      utils.IfElse(active, "", "text-muted-foreground"),
-		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "true", "false"), "data-catalog-sort": sort},
-	}) {
-		{ label }
-	}
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+			templ.KV("bg-background text-foreground shadow-sm", active),
+			templ.KV("text-muted-foreground hover:text-foreground", !active) }
+		aria-current={ utils.IfElse(active, "true", "false") }
+		data-catalog-sort={ sort }
+	>{ label }</a>
 }
 
 // catalogScript filters the grid as you type and keeps the search in the
@@ -152,51 +186,82 @@ templ catalogScript() {
 					if (!item.hidden) shown++;
 				}
 				empty.hidden = shown > 0;
+				root.querySelector("[data-catalog-count]").textContent = shown + " apps";
 				root.querySelector("[data-catalog-query]").textContent = q;
 				history.replaceState(null, "", link(root.dataset.category, root.dataset.sort, q));
 				for (const a of root.querySelectorAll("[data-catalog-category]")) a.href = link(a.dataset.catalogCategory, root.dataset.sort, q);
 				for (const a of root.querySelectorAll("[data-catalog-sort]")) a.href = link(root.dataset.category, a.dataset.catalogSort, q);
 			});
 			search.closest("form").addEventListener("submit", (event) => event.preventDefault());
+			// The category select on small screens goes to its category.
+			root.addEventListener("change", (event) => {
+				if (event.target.name !== "category-select") return;
+				location.href = link(event.target.value, root.dataset.sort, search.value.trim());
+			});
 		})();
 	</script>
 }
 
-// catalogCard is one app in the grid: its tile, name, pitch, newest
-// release and what ops backs up.
+// catalogCard is one app in the grid, the same shape for every app: tile,
+// name and category; a pitch of two lines; and at the bottom one line with
+// the newest release and what ops backs up, which never wraps.
 templ catalogCard(base string, app CatalogEntryView, now time.Time) {
 	<a href={ templ.SafeURL(base + "/" + app.Entry.Slug) } class="group block h-full rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring" data-catalog-app={ app.Entry.Slug }>
-		@card.Card(card.Props{Class: "h-full gap-0 rounded-4xl p-6 shadow-none ring-1 ring-foreground/5 transition-colors group-hover:bg-muted/60 sm:p-7"}) {
+		@card.Card(card.Props{Class: "flex h-full flex-col gap-0 rounded-4xl p-6 shadow-none ring-1 ring-foreground/5 transition-colors group-hover:bg-muted/60 sm:p-7"}) {
 			<div class="flex items-center gap-4">
-				@catalogTile(app.Entry, "size-12 text-xl")
+				@catalogTile(app.Entry, "size-11 text-lg")
 				<div class="min-w-0">
-					<h2 class="truncate text-lg font-semibold tracking-[-0.02em]">{ app.Entry.Name }</h2>
-					<p class="text-sm text-muted-foreground">{ app.Entry.Category }</p>
+					<h2 class="truncate text-base font-semibold tracking-[-0.01em]">{ app.Entry.Name }</h2>
+					<p class="truncate text-sm text-muted-foreground">{ app.Entry.Category }</p>
 				</div>
 			</div>
-			<p class={ typeText, "mt-5 line-clamp-2" }>{ app.Entry.Pitch }</p>
-			<div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-				if latest, ok := app.Latest(); ok {
-					<span class="font-mono text-foreground">{ latest.Tag }</span>
-					if note := released(latest, now); note != "" {
-						<span class="text-muted-foreground">{ note }</span>
+			<p class="mt-4 line-clamp-2 min-h-[3rem] text-[15px] leading-6 text-muted-foreground">{ app.Entry.Pitch }</p>
+			<div class="mt-auto flex h-7 items-center gap-3 pt-5 text-sm" data-catalog-footer>
+				<span class="min-w-0 truncate text-muted-foreground">
+					if latest, ok := app.Latest(); ok {
+						<span class="font-mono text-foreground">{ latest.Tag }</span>
+						if note := releasedShort(latest, now); note != "" {
+							{ " · " + note }
+						}
 					}
-				}
-				if note := databaseBadge(app.Entry); note != "" {
-					@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "ml-auto h-auto rounded-full px-2.5 py-0.5 font-medium"}) {
-						{ note }
-					}
-				}
+				</span>
+				@catalogDatabase(app.Entry)
 			</div>
 		}
 	</a>
 }
 
-// catalogTile is the app's logo, or its first letter on a calm tile.
+// catalogDatabase is the app's database in the card footer, at a glance:
+// a green shield when ops backs it up, a grey crossed one when it does not
+// yet. The sentence lives in the tooltip and for screen readers.
+templ catalogDatabase(entry catalog.Entry) {
+	if entry.Database != "" {
+		{{ backed := entry.BackedUp() }}
+		<span class={ "ml-auto flex shrink-0 items-center gap-1.5 font-medium", templ.KV("text-foreground", backed), templ.KV("text-muted-foreground", !backed) } title={ databaseSentence(entry) } data-catalog-database={ entry.Database }>
+			if backed {
+				@icon.ShieldCheck(icon.Props{Class: "size-4 text-live"})
+			} else {
+				@icon.ShieldOff(icon.Props{Class: "size-4"})
+			}
+			{ entry.DatabaseName() }
+			<span class="sr-only">{ ": " + databaseSentence(entry) }</span>
+		</span>
+	}
+}
+
+// catalogTile is the app's icon, like on a phone's home screen: its logo
+// on a white rounded square in both themes, since logos are drawn for a
+// white page, or its first letter on the same shape.
 templ catalogTile(entry catalog.Entry, class string) {
-	<span class={ utils.CN("flex shrink-0 items-center justify-center rounded-2xl bg-foreground font-semibold text-background", class) } aria-hidden="true">
-		{ monogram(entry.Name) }
-	</span>
+	if len(entry.Logo) > 0 {
+		<span class={ utils.CN("flex shrink-0 items-center justify-center rounded-[28%] bg-white p-2 shadow-sm ring-1 ring-black/5 dark:ring-white/15", class) } aria-hidden="true">
+			<img src={ "/apps/" + entry.Slug + "/logo" } alt="" class="size-full object-contain" loading="lazy" decoding="async"/>
+		</span>
+	} else {
+		<span class={ utils.CN("flex shrink-0 items-center justify-center rounded-[28%] bg-foreground font-semibold text-background shadow-sm", class) } aria-hidden="true">
+			{ monogram(entry.Name) }
+		</span>
+	}
 }
 
 // CatalogApp is the page of one catalog app: what it is, what ops adds,
@@ -216,7 +281,7 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 				</a>
 				<header class="mt-8 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
 					<div class="flex min-w-0 items-start gap-5">
-						@catalogTile(view.Entry, "size-16 text-2xl sm:size-20 sm:text-3xl")
+						@catalogTile(view.Entry, "size-16 p-3 text-2xl sm:size-20 sm:p-4 sm:text-3xl")
 						<div class="min-w-0">
 							<h1 class={ typeH2 }>{ view.Entry.Name }</h1>
 							<p class={ typeLead, "mt-3 max-w-xl" }>{ view.Entry.Pitch }</p>
@@ -331,7 +396,7 @@ templ CatalogInApp(view CatalogView) {
 	@layouts.App("Catalog") {
 		@panelPage() {
 			@pageHeader("Catalog", "Open source apps to install in one click. Their databases backed up, every change.")
-			@catalogBody(view)
+			@catalogBody(view, nil)
 		}
 	}
 }
@@ -343,7 +408,7 @@ templ CatalogInstall(view CatalogInstallView) {
 	@layouts.App("Install " + entry.Name) {
 		@panelPage() {
 			<div class="flex min-w-0 items-start gap-4">
-				@catalogTile(entry, "size-14 text-2xl")
+				@catalogTile(entry, "size-14 p-3 text-2xl")
 				<div class="min-w-0">
 					<h1 class="text-2xl font-semibold tracking-[-0.02em]">{ entry.Name }</h1>
 					<p class="mt-1 text-muted-foreground">{ entry.Pitch }</p>

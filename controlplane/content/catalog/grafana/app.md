@@ -9,6 +9,7 @@ image: grafana/grafana
 database: sqlite
 port: 3000
 login: "Sign in as admin with the password in ADMIN_PASSWORD: ops env --show."
+logo: https://github.com/grafana/grafana/blob/HEAD/public/img/grafana_icon.svg
 ---
 
 Charts and alerts on top of Prometheus, Postgres, Loki and a hundred other sources, shared with your team. Its own settings live in SQLite on your server.

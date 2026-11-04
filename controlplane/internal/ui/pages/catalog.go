@@ -40,6 +40,19 @@ type CatalogView struct {
 	// SortName. Both, and the category, live in the URL.
 	Query string
 	Sort  string
+	// Counts are the apps of each category, Total of all of them.
+	Counts map[string]int
+	Total  int
+}
+
+// categoryItems are the categories for the select on small screens, with
+// their counts, All first.
+func categoryItems(view CatalogView) []selectcomp.ItemData {
+	items := []selectcomp.ItemData{{Value: "", Label: "All categories " + strconv.Itoa(view.Total)}}
+	for _, category := range view.Categories {
+		items = append(items, selectcomp.ItemData{Value: categorySlug(category), Label: category + " " + strconv.Itoa(view.Counts[category])})
+	}
+	return items
 }
 
 // The orders of the catalog.
@@ -156,16 +169,39 @@ func released(version catalog.Version, now time.Time) string {
 	return "released " + ago(version.Date, now)
 }
 
-// databaseBadge is what ops does for the app's database, short, for its
-// card: "Postgres backed up", or "MySQL, no backup yet".
-func databaseBadge(entry catalog.Entry) string {
-	switch {
-	case entry.Database == "":
+// releasedShort is when a release came out, always relative: "8 days
+// ago", "2 years ago".
+func releasedShort(version catalog.Version, now time.Time) string {
+	if version.Date.IsZero() {
 		return ""
-	case entry.BackedUp():
-		return entry.DatabaseName() + " backed up"
 	}
-	return entry.DatabaseName() + ", no backup yet"
+	days := int(now.Sub(version.Date).Hours() / 24)
+	switch {
+	case days < 1:
+		return "today"
+	case days == 1:
+		return "yesterday"
+	case days < 31:
+		return strconv.Itoa(days) + " days ago"
+	case days < 365:
+		if months := days / 30; months > 1 {
+			return strconv.Itoa(months) + " months ago"
+		}
+		return "a month ago"
+	default:
+		if years := days / 365; years > 1 {
+			return strconv.Itoa(years) + " years ago"
+		}
+		return "a year ago"
+	}
+}
+
+// databaseSentence says in words what ops does for the app's database.
+func databaseSentence(entry catalog.Entry) string {
+	if entry.BackedUp() {
+		return "ops backs up every change, checked daily"
+	}
+	return "Runs on " + entry.DatabaseName() + ": ops doesn't back it up yet"
 }
 
 // catalogJSONLD describes the app for search engines, as JSON-LD.

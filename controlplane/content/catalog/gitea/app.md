@@ -8,6 +8,7 @@ license: MIT
 image: gitea/gitea
 database: sqlite
 port: 3000
+logo: https://github.com/go-gitea/gitea/blob/HEAD/assets/logo.svg
 ---
 
 Repositories, pull requests, issues, packages and Actions, in one Go binary. Clone over HTTPS. The first visit sets it up; the first account you create is the admin.

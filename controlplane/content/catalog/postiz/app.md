@@ -8,6 +8,7 @@ license: AGPL-3.0
 image: ghcr.io/gitroomhq/postiz-app
 database: postgres
 port: 5000
+logo: https://github.com/gitroomhq/postiz-app/blob/HEAD/apps/frontend/public/logo.svg
 ---
 
 Plan and publish to X, LinkedIn, Instagram, Bluesky, Mastodon and more, with a calendar, teams and AI help. It needs its domain. Each network needs its own API keys: set them as env vars after install, such as X_API_KEY, then deploy again. Which keys each network needs: https://docs.postiz.com/providers. Its posts live in Postgres; Redis is only a cache.

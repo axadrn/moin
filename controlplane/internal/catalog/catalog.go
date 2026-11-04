@@ -47,7 +47,10 @@ type Entry struct {
 	// Body is the description as HTML.
 	Body    template.HTML
 	Compose []byte
-	Logo    []byte
+	// Logo is the project's logo, logo.svg or logo.png, and LogoType its
+	// media type; none shows the first letter instead.
+	Logo     []byte
+	LogoType string
 	// Secrets are the ${NAME}s of compose.yml ops generates on install.
 	Secrets []string
 }
@@ -141,11 +144,16 @@ func loadEntry(parser *markdown.Parser, dir, slug string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	logo, err := os.ReadFile(filepath.Join(dir, "logo.svg"))
-	if err == nil {
-		entry.Logo = logo
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return Entry{}, err
+	for _, logo := range []struct{ file, kind string }{{"logo.svg", "image/svg+xml"}, {"logo.png", "image/png"}} {
+		body, err := os.ReadFile(filepath.Join(dir, logo.file))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return Entry{}, err
+		}
+		entry.Logo, entry.LogoType = body, logo.kind
+		break
 	}
 	entry.Secrets = Secrets(entry.Compose)
 	return entry, entry.validate()

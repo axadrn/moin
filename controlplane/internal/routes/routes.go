@@ -91,6 +91,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux.HandleFunc("GET /apps", catalogPages.List)
 	mux.HandleFunc("GET /apps/{slug}", catalogPages.Show)
+	mux.HandleFunc("GET /apps/{slug}/logo", catalogPages.Logo)
 	// The legal pages describe the hosted service; a self-hosted control
 	// plane answers them with not found.
 	if app.Cfg.Billing {
