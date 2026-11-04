@@ -52,14 +52,14 @@ templ authAside() {
 		@card.Card(card.Props{Class: "min-w-0 flex-1 justify-center gap-0 rounded-4xl py-0"}) {
 			<div class="mx-auto w-full max-w-md px-12 py-16">
 				<p class="text-[3.25rem] leading-[1.03] font-semibold tracking-[-0.045em]">
-					<span class="block">Your servers.</span>
-					<span class="block text-live">Zero data loss.</span>
+					<span class="block">Deploy anything.</span>
+					<span class="block text-muted-foreground/60">Lose nothing.</span>
 				</p>
-				<p class="mt-6 text-lg leading-8 text-muted-foreground">Deploy any app to servers you own. Every site checked every minute.</p>
+				<p class="mt-6 text-lg leading-8 text-muted-foreground">Any app. Any server. Every SQLite and Postgres change backed up, checked every day.</p>
 				<ul class="mt-10 flex flex-col gap-4 text-base font-medium">
 					@authProof("No SSH keys, no open ports")
-					@authProof("Every change backed up")
-					@authProof("Uptime checks built in")
+					@authProof("Every change in your own bucket")
+					@authProof("Restores checked every day")
 				</ul>
 			</div>
 		}
