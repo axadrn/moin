@@ -54,7 +54,7 @@ order: 1
 | `ops domains rm [--service <service>] <domain> ... [--yes]` | removes domains |
 | `ops domains canonical <domain\|none>` | the domain the others redirect to |
 | `ops instant [--show] [app]` | the instant address, with the password ops made for it with `--show` |
-| `ops instant sslip.io\|nip.io\|traefik.me\|off [app]` | picks the provider of the instant address, or turns it off |
+| `ops instant sslip.io\|nip.io\|off [app]` | picks the provider of the instant address, or turns it off |
 | `ops instant open\|protect [app]` | takes the password away from the instant address, or puts it back |
 | `ops protect [--user ops] [app]` | asks for a password; the password comes from stdin |
 | `ops protect off [app] [--yes]` | makes the app public again |

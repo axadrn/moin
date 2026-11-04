@@ -171,7 +171,7 @@ var instantCommands = append([]string{"open", "protect"}, append(slices.Clone(pr
 // instant shows the app's instant address, picks its provider or off, and
 // opens it or puts the password back.
 func instant(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|traefik.me|off [app]; instant open|protect [app]").withApp()
+	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]").withApp()
 	show := flags.Bool("show", false, "show the password ops made for it")
 	if err := flags.parse(args); err != nil {
 		return err

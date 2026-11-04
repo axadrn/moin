@@ -265,7 +265,7 @@ type Routing struct {
 
 // InstantProviders are the services that name an IP without any setup:
 // <name>.<ip with dashes>.<provider> resolves to the IP.
-var InstantProviders = []string{"sslip.io", "nip.io", "traefik.me"}
+var InstantProviders = []string{"sslip.io", "nip.io"}
 
 // InstantHost is the instant address of an app on a server with the public
 // IPv4 ip, such as shop.203-0-113-7.sslip.io, or "" when the provider is

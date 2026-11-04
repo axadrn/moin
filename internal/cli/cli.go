@@ -82,7 +82,7 @@ Domains
   domains rm         Remove domains: domains rm www.blog.de [--yes]
   domains canonical  Redirect the others to one: domains canonical blog.de|none
   instant            The instant address, https://<app>.<ip>.sslip.io: instant [--show] [app]
-  instant <provider> Pick sslip.io, nip.io or traefik.me, or off: instant nip.io [app]
+  instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
   instant open       No password on the instant address; protect puts it back: instant open [app]
   protect            Ask for a password: protect [--user ops], password on stdin
   protect off        Make the app public again: protect off [app] [--yes]

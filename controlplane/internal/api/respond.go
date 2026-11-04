@@ -247,7 +247,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrService, field: "service", message: "Use the name of a service in compose.yml: lowercase letters, digits, dashes, dots or underscores."},
 	{err: service.ErrMainService, field: "service", message: "This is the app's main service: set its domains without a service."},
 	{err: service.ErrDomainTaken, field: "domains", message: "A domain reaches one service of an app: remove it from the other one first."},
-	{err: service.ErrInstantProvider, field: "provider", message: "Choose sslip.io, nip.io, traefik.me or off."},
+	{err: service.ErrInstantProvider, field: "provider", message: "Choose sslip.io, nip.io or off."},
 	{err: service.ErrComposeDomains, status: http.StatusConflict, code: "domains_from_compose", message: "The domains of this app come from x-ops.domains in compose.yml. Change them there and deploy."},
 	{err: service.ErrProtectUser, field: "username", message: "Use a username without spaces or colons."},
 	{err: service.ErrProtect, field: "password", message: "Use a password of 8 to 72 characters."},

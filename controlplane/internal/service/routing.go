@@ -18,7 +18,7 @@ var (
 	ErrService         = errors.New("a service name is lowercase letters, digits, dashes, dots or underscores")
 	ErrMainService     = errors.New("this is the app's main service: set its domains without --service")
 	ErrDomainTaken     = errors.New("a domain reaches one service of an app")
-	ErrInstantProvider = errors.New("the instant address provider is sslip.io, nip.io, traefik.me or off")
+	ErrInstantProvider = errors.New("the instant address provider is sslip.io, nip.io or off")
 )
 
 // servicePattern is a compose service name.

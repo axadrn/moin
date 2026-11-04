@@ -27,7 +27,6 @@ func TestInstantHost(t *testing.T) {
 	for _, test := range []struct{ app, ip, provider, want string }{
 		{"shop", "203.0.113.7", "sslip.io", "shop.203-0-113-7.sslip.io"},
 		{"shop", "203.0.113.7", "nip.io", "shop.203-0-113-7.nip.io"},
-		{"shop", "203.0.113.7", "traefik.me", "shop.203-0-113-7.traefik.me"},
 		{"shop", "203.0.113.7", "off", ""},
 		{"shop", "203.0.113.7", "", ""},
 		{"shop", "2a01:4f8::1", "sslip.io", ""},

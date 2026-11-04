@@ -42,7 +42,7 @@ func TestRouteInstant(t *testing.T) {
 		{"sslip.io", "", "203.0.113.7", "shop.203-0-113-7.sslip.io", false},
 		{"sslip.io", "nip.io", "203.0.113.7", "shop.203-0-113-7.nip.io", false},
 		{"sslip.io", "off", "203.0.113.7", "", false},
-		{"", "traefik.me", "203.0.113.7", "shop.203-0-113-7.traefik.me", false},
+		{"", "traefik.me", "203.0.113.7", "", true},
 		{"sslip.io", "", "", "", false},
 		{"sslip.io", "", "2a01:4f8::1", "", false},
 		{"sslip.io", "example.com", "203.0.113.7", "", true},

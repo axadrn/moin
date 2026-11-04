@@ -2021,7 +2021,7 @@ paths:
       tags: [Apps]
       operationId: setInstant
       summary: Set the instant address
-      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io`, `traefik.me` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-ops.instant` in compose.yml wins.'
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-ops.instant` in compose.yml wins.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -5051,7 +5051,7 @@ components:
           description: The app's instant address, such as https://shop.203-0-113-7.sslip.io. Empty when it has none.
         instant_provider:
           type: string
-          enum: [sslip.io, nip.io, traefik.me, 'off']
+          enum: [sslip.io, nip.io, 'off']
         instant_open:
           type: boolean
           description: No password guards the instant address.
@@ -5245,7 +5245,7 @@ components:
           description: The instant address with https://, empty when the app has none.
         provider:
           type: string
-          enum: [sslip.io, nip.io, traefik.me, 'off']
+          enum: [sslip.io, nip.io, 'off']
         reason:
           type: string
           description: Why the app has no instant address.
@@ -5265,7 +5265,7 @@ components:
       properties:
         provider:
           type: string
-          enum: ['', sslip.io, nip.io, traefik.me, 'off']
+          enum: ['', sslip.io, nip.io, 'off']
         open:
           type: boolean
     ProtectionRequest:

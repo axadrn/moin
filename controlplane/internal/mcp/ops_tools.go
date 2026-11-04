@@ -139,7 +139,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one ops made, which show returns with a token that may write. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getInstant)))
 	mcpsdk.AddTool(server, add("set_instant", "Set the instant address",
-		"Picks the provider of the instant address of an app, sslip.io, nip.io or traefik.me, or off, and whether a password guards it, then applies it to the running release. x-ops.instant in compose.yml wins. Needs a token with read and write access.",
+		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it, then applies it to the running release. x-ops.instant in compose.yml wins. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setInstant)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
@@ -1049,7 +1049,7 @@ func (t opsTools) getInstant(_ context.Context, caller Caller, input InstantInpu
 // SetInstantInput is the input of set_instant.
 type SetInstantInput struct {
 	App      string `json:"app" jsonschema:"the app name or ID"`
-	Provider string `json:"provider,omitempty" jsonschema:"sslip.io, nip.io, traefik.me or off; empty keeps it"`
+	Provider string `json:"provider,omitempty" jsonschema:"sslip.io, nip.io or off; empty keeps it"`
 	Open     *bool  `json:"open,omitempty" jsonschema:"true takes the password away from the instant address, false puts it back; empty keeps it"`
 }
 

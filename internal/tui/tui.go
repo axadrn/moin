@@ -1527,7 +1527,7 @@ func (m model) instant(name string, args []string) tea.Cmd {
 				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, "", &open) })
 			default:
 				if args[0] != "off" && !slices.Contains(protocol.InstantProviders, args[0]) {
-					return errMsg{fmt.Errorf("pick sslip.io, nip.io, traefik.me, off, open or protect")}
+					return errMsg{fmt.Errorf("pick sslip.io, nip.io, off, open or protect")}
 				}
 				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, args[0], nil) })
 			}
@@ -1551,7 +1551,7 @@ func (m model) instant(name string, args []string) tea.Cmd {
 				lines = append(lines, "user       "+address.User, "password   "+address.Password)
 			}
 		}
-		note := ":instant sslip.io|nip.io|traefik.me|off picks the provider, :instant open|protect the password"
+		note := ":instant sslip.io|nip.io|off picks the provider, :instant open|protect the password"
 		return outputMsg{id: m.shared.outputs.Add(1), title: "instant address of " + name, note: style.Muted.Render(note), lines: lines}
 	}
 }

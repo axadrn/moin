@@ -19,7 +19,7 @@ x-ops:
   canonical: <domain>          # the others redirect here
   ports: {api: 5678}           # the port of each other service with domains
   protect: true                # ask for the password set in ops
-  instant: sslip.io            # the instant address: sslip.io, nip.io, traefik.me or off
+  instant: sslip.io            # the instant address: sslip.io, nip.io or off
   database: /data/app.db       # a SQLite file on a volume, or postgres-<service>
 
 services:

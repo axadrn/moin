@@ -37,7 +37,7 @@ API: PUT /api/v1/apps/{app}/instant
 MCP: set_instant
 ```
 
-The providers are `sslip.io` (the default), `nip.io` and `traefik.me`. `x-ops.instant` in compose.yml [wins](#in-the-repo). Let's Encrypt issues at most 50 certificates a week for all of `traefik.me` together, so its HTTPS often waits for days; `sslip.io` and `nip.io` have no such shared limit.
+The providers are `sslip.io` (the default) and `nip.io`: if one is down, switch to the other. `x-ops.instant` in compose.yml [wins](#in-the-repo).
 
 An instant address needs a public IPv4 and ports 80 and 443 open to the internet, for Let's Encrypt and for visitors. A server behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), or with no public IPv4, gets none: ops says so instead of the address. Give such an app a domain; ops points it at the tunnel. A quick tunnel or Tailscale Funnel for closed servers may come later.
 
@@ -161,7 +161,7 @@ x-ops:
   domains: [<domain>, www.<domain>]
   canonical: <domain>
   protect: true   # the password itself is set in ops, never in the repo
-  instant: nip.io # or sslip.io, traefik.me, off
+  instant: nip.io # or sslip.io, off
 ```
 
 For several services, `domains` takes a map by service, and `ports` their ports:
