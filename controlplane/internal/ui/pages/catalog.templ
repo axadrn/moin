@@ -317,7 +317,7 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 									@catalogAdds("Every change of its SQLite in your bucket within a second, and restored to check it, every day.")
 								}
 								if note := view.Entry.DatabaseNote(); note != "" {
-									@catalogNote(note)
+									@catalogNote(note, view.Entry.BackupRequestURL())
 								}
 								@catalogAdds("HTTPS on your domain, checked every minute, with an alert when it goes down.")
 								@catalogAdds("New releases the hour they ship. Update in one click, with a snapshot first.")
@@ -348,12 +348,19 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 
 // catalogNote is a plain fact ops cannot promise yet, in the same calm
 // form as what it adds.
-templ catalogNote(text string) {
+// catalogNote says what ops does not do for the app's database yet; for a
+// database not planned yet, a link asks for it.
+templ catalogNote(text, ask string) {
 	<li class="flex gap-3 text-base leading-7" data-catalog-database-note>
 		<span class="mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
 			@icon.Minus(icon.Props{Class: "size-3 stroke-3"})
 		</span>
-		<span class="text-muted-foreground">{ text }</span>
+		<span class="text-muted-foreground">
+			{ text }
+			if ask != "" {
+				<a href={ templ.SafeURL(ask) } target="_blank" rel="noopener" class="text-foreground underline underline-offset-4">Want it? Tell us</a>.
+			}
+		</span>
 	</li>
 }
 

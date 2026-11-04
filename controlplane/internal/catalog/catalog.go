@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -199,7 +200,19 @@ func (e Entry) DatabaseNote() string {
 	if e.Database == "" || e.BackedUp() {
 		return ""
 	}
+	if e.Database == "mysql" {
+		return "Runs on MySQL: ops backups for MySQL come next."
+	}
 	return "Runs on " + e.DatabaseName() + ": ops doesn't back it up yet."
+}
+
+// BackupRequestURL opens a GitHub issue that asks for backups of the app's
+// database, for one ops does not back up and has not planned yet; "" else.
+func (e Entry) BackupRequestURL() string {
+	if e.Database == "" || e.BackedUp() || e.Database == "mysql" {
+		return ""
+	}
+	return "https://github.com/axadrn/ops/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want ops to back up its "+e.DatabaseName()+".")
 }
 
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a

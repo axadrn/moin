@@ -201,6 +201,9 @@ func databaseSentence(entry catalog.Entry) string {
 	if entry.BackedUp() {
 		return "ops backs up every change, checked daily"
 	}
+	if entry.Database == "mysql" {
+		return "Runs on MySQL: ops backups for MySQL come next"
+	}
 	return "Runs on " + entry.DatabaseName() + ": ops doesn't back it up yet"
 }
 

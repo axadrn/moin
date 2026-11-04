@@ -31,7 +31,9 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 - **Servers in one click**: create them at Hetzner, DigitalOcean, Vultr and UpCloud, right from ops. [#1](https://github.com/axadrn/ops/issues/1)
 
-MySQL and MariaDB run like any service; ops backups for them come when customers ask.
+- **MySQL backups**: every change backed up and checked daily, like Postgres, so WordPress and the other MySQL apps of the catalog lose nothing either.
+
+MongoDB, ClickHouse and the rest run like any service; ops backups for them come when you ask for them.
 
 ## Later
 
