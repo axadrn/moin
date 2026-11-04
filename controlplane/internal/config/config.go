@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/internal/client"
 	"net/mail"
 	"net/netip"
@@ -161,7 +162,7 @@ func Load() (*Config, error) {
 		AppEnv:       appEnv,
 		AppURL:       r.string("APP_URL", ""),
 		Port:         r.string("PORT", "8090"),
-		SupportEmail: r.string("SUPPORT_EMAIL", "hello@example.com"),
+		SupportEmail: r.string("SUPPORT_EMAIL", brand.SupportEmail),
 		AdminEmails:  r.emails("ADMIN_EMAILS"),
 		DBConnection: r.string("DB_CONNECTION", "./data/acme.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"),
 
