@@ -3,6 +3,19 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.18
+
+November 4, 2026
+
+**In short:** run a command in your app's container from anywhere, no SSH: migrations, the first admin, a quick look.
+
+### New
+- **Run a command**: `ops exec shop -- rails db:migrate`, or `--service db -- psql -c "…"`. The output streams live and the command's exit code comes back. Web: **Run a command** on the app page. Also the TUI `:exec`, the API and MCP `exec_command`.
+- **Safe by default**: only owners and admins, never through a shell, at most an hour, every run in the activity with its exit code. `exec: off` in `/etc/ops/rules` turns it off for a server.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; an older agent answers that it needs the update first.
+
 ## v1.0.0-beta.17
 
 November 4, 2026
