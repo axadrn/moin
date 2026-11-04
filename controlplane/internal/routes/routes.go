@@ -88,6 +88,9 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
 	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(content.Root, app.Cfg.AppURL, build.Name))
+	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
+	mux.HandleFunc("GET /apps", catalogPages.List)
+	mux.HandleFunc("GET /apps/{slug}", catalogPages.Show)
 	// The legal pages describe the hosted service; a self-hosted control
 	// plane answers them with not found.
 	if app.Cfg.Billing {
@@ -147,6 +150,12 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/update", workspace(updates.Start))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/install", workspace(servers.NewInstall))
 	apps := handler.NewAppsHandler(app.AppService, app.ServerService, app.UserService)
+	mux.HandleFunc("GET /apps/{slug}/install", middleware.RequireAuth(catalogPages.Start))
+	mux.HandleFunc("GET /app/{workspaceSlug}/catalog", workspace(catalogPages.InApp))
+	mux.HandleFunc("GET /app/{workspaceSlug}/catalog/{slug}", workspace(catalogPages.InstallPage))
+	mux.HandleFunc("POST /app/{workspaceSlug}/catalog/{slug}/install", workspace(catalogPages.Install))
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/catalog", workspace(catalogPages.UpdatePanel))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/update", workspace(catalogPages.Update))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps", workspace(apps.AppsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/list", workspace(apps.List))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps", workspace(apps.Create))
@@ -282,6 +291,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Apps:        api.NewAppsHandler(app.AppService),
 		Version:     api.NewVersionHandler(app.UpdateService, app.ServerService),
 		Alerts:      api.NewAlertsHandler(app.AlertService),
+		Catalog:     api.NewCatalogHandler(app.CatalogService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -310,6 +320,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Apps:          app.AppService,
 		Updates:       app.UpdateService,
 		Alerts:        app.AlertService,
+		Catalog:       app.CatalogService,
 		BillingOff:    !app.Cfg.Billing,
 	})
 	mux.Handle("/mcp", mcp.Handler(mcpServer))

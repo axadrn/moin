@@ -1,0 +1,402 @@
+package pages
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/catalog"
+	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	"github.com/axadrn/ops/controlplane/internal/ui/blocks"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/field"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/input"
+	selectcomp "github.com/axadrn/ops/controlplane/internal/ui/components/select"
+	"github.com/axadrn/ops/controlplane/internal/ui/csrf"
+	"github.com/axadrn/ops/controlplane/internal/ui/layouts"
+	"github.com/axadrn/ops/controlplane/internal/ui/utils"
+)
+
+// ---------------------------------------------------------------- public
+
+// Catalog is the public catalog: open source apps to run on your own
+// server, each with its newest release.
+templ Catalog(view CatalogView) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host open source apps on your own server",
+		Description: "Umami, n8n, Vaultwarden, Gitea and more on your own server in one click. Their databases backed up, every change. Every release, the day it ships.",
+		Path:        "/apps",
+	}) {
+		<main class="pb-28 sm:pb-36">
+			<section class="pt-16 sm:pt-24">
+				<div class={ homeWrap, "flex flex-col items-center text-center" }>
+					<h1 class={ typeH1, "max-w-[16ch]" }>Your favorite apps. Your server.</h1>
+					<p class={ typeLead, "mt-6 max-w-xl sm:text-xl sm:leading-9" }>
+						Open source apps in one click. Their databases backed up, every change. Every release, the day it ships.
+					</p>
+				</div>
+			</section>
+			<div class={ homeWrap, "mt-14 sm:mt-20" }>
+				@catalogBody(view)
+			</div>
+		</main>
+	}
+}
+
+// catalogBody is the category filter and the grid, on the site and in the app.
+templ catalogBody(view CatalogView) {
+	{{ now := time.Now() }}
+	<nav class="flex max-w-full flex-wrap justify-center gap-1.5" aria-label="Categories" data-catalog-categories>
+		@catalogCategory(view.Base, "", "All", view.Category == "")
+		for _, category := range view.Categories {
+			@catalogCategory(view.Base, categorySlug(category), category, view.Category == category)
+		}
+	</nav>
+	<ul class="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" role="list" data-catalog-grid>
+		for _, app := range view.Apps {
+			<li class="min-w-0">
+				@catalogCard(view.Base, app, now)
+			</li>
+		}
+	</ul>
+}
+
+templ catalogCategory(base, slug, label string, active bool) {
+	{{ href := base }}
+	if slug != "" {
+		{{ href = base + "?category=" + slug }}
+	}
+	@button.Button(button.Props{
+		Href:       href,
+		Variant:    utils.IfElse(active, button.VariantSecondary, button.VariantGhost),
+		Size:       button.SizeSm,
+		Class:      utils.IfElse(active, "", "text-muted-foreground"),
+		Attributes: templ.Attributes{"aria-current": utils.IfElse(active, "page", "false")},
+	}) {
+		{ label }
+	}
+}
+
+// catalogCard is one app in the grid: its tile, name, pitch, newest
+// release and what ops backs up.
+templ catalogCard(base string, app CatalogEntryView, now time.Time) {
+	<a href={ templ.SafeURL(base + "/" + app.Entry.Slug) } class="group block h-full rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring" data-catalog-app={ app.Entry.Slug }>
+		@card.Card(card.Props{Class: "h-full gap-0 rounded-4xl p-6 shadow-none ring-1 ring-foreground/5 transition-colors group-hover:bg-muted/60 sm:p-7"}) {
+			<div class="flex items-center gap-4">
+				@catalogTile(app.Entry, "size-12 text-xl")
+				<div class="min-w-0">
+					<h2 class="truncate text-lg font-semibold tracking-[-0.02em]">{ app.Entry.Name }</h2>
+					<p class="text-sm text-muted-foreground">{ app.Entry.Category }</p>
+				</div>
+			</div>
+			<p class={ typeText, "mt-5 line-clamp-2" }>{ app.Entry.Pitch }</p>
+			<div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+				if latest, ok := app.Latest(); ok {
+					<span class="font-mono text-foreground">{ latest.Tag }</span>
+					if note := released(latest, now); note != "" {
+						<span class="text-muted-foreground">{ note }</span>
+					}
+				}
+				if note := databaseNote(app.Entry.Database); note != "" {
+					@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "ml-auto h-auto rounded-full px-2.5 py-0.5 font-medium"}) {
+						{ note }
+					}
+				}
+			</div>
+		}
+	</a>
+}
+
+// catalogTile is the app's logo, or its first letter on a calm tile.
+templ catalogTile(entry catalog.Entry, class string) {
+	<span class={ utils.CN("flex shrink-0 items-center justify-center rounded-2xl bg-foreground font-semibold text-background", class) } aria-hidden="true">
+		{ monogram(entry.Name) }
+	</span>
+}
+
+// CatalogApp is the page of one catalog app: what it is, what ops adds,
+// every release, and the way to install it.
+templ CatalogApp(view CatalogEntryView, appURL string) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host " + view.Entry.Name + " on your own server",
+		Description: view.Entry.Name + ": " + view.Entry.Pitch + " Install it on your own server in one click, with its database backed up, every change.",
+		Path:        "/apps/" + view.Entry.Slug,
+	}) {
+		@templ.Raw(catalogJSONLD(view, appURL+"/apps/"+view.Entry.Slug))
+		<main class="pb-28 sm:pb-36">
+			<div class={ homeWrap, "pt-12 sm:pt-20" }>
+				<a href="/apps" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+					@icon.ArrowLeft(icon.Props{Class: "size-4"})
+					All apps
+				</a>
+				<header class="mt-8 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+					<div class="flex min-w-0 items-start gap-5">
+						@catalogTile(view.Entry, "size-16 text-2xl sm:size-20 sm:text-3xl")
+						<div class="min-w-0">
+							<h1 class={ typeH2 }>{ view.Entry.Name }</h1>
+							<p class={ typeLead, "mt-3 max-w-xl" }>{ view.Entry.Pitch }</p>
+						</div>
+					</div>
+					<div class="flex flex-col gap-3 sm:flex-row">
+						@button.Button(button.Props{Href: "/apps/" + view.Entry.Slug + "/install", Size: button.SizeLg, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-install": true}}) {
+							Install on your server
+							@icon.ArrowRight(icon.Props{Class: "size-4"})
+						}
+						@button.Button(button.Props{Href: view.Entry.Website, Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeLg, Class: "gap-2", Attributes: templ.Attributes{"rel": "noopener"}}) {
+							Website
+							@icon.ArrowUpRight(icon.Props{Class: "size-4"})
+						}
+					</div>
+				</header>
+				<div class="mt-14 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+					<div class="flex min-w-0 flex-col gap-3">
+						@card.Card(card.Props{Class: "gap-0 rounded-4xl p-7 shadow-none ring-0 sm:p-9"}) {
+							<div class="min-w-0 text-base leading-7">
+								@blocks.Typeset(string(view.Entry.Body))
+							</div>
+							if view.Entry.Login != "" {
+								<p class="mt-5 rounded-2xl bg-muted px-4 py-3 text-sm">{ view.Entry.Login }</p>
+							}
+						}
+						@card.Card(card.Props{Class: "gap-0 rounded-4xl p-7 shadow-none ring-0 sm:p-9"}) {
+							<h2 class={ typeH3 }>What { brand.Name } adds</h2>
+							<ul class="mt-6 grid gap-4">
+								if view.Entry.Database == "postgres" {
+									@catalogAdds("Every change of its Postgres in your bucket within a minute, and restored to check it, every day.")
+								} else if view.Entry.Database == "sqlite" {
+									@catalogAdds("Every change of its SQLite in your bucket within a second, and restored to check it, every day.")
+								}
+								@catalogAdds("HTTPS on your domain, checked every minute, with an alert when it goes down.")
+								@catalogAdds("New releases the hour they ship. Update in one click, with a snapshot first.")
+								@catalogAdds("Secrets made for you, encrypted, never in a file.")
+							</ul>
+						}
+					</div>
+					<div class="flex min-w-0 flex-col gap-3">
+						@catalogVersions(view, 12)
+						@card.Card(card.Props{Class: "gap-0 rounded-4xl p-7 shadow-none ring-0"}) {
+							<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">
+								<dt class="text-muted-foreground">License</dt>
+								<dd>{ view.Entry.License }</dd>
+								<dt class="text-muted-foreground">Image</dt>
+								<dd class="truncate font-mono">{ view.Entry.Image }</dd>
+								if view.Entry.Source != "" {
+									<dt class="text-muted-foreground">Source</dt>
+									<dd class="truncate"><a href={ templ.SafeURL("https://" + view.Entry.Source) } target="_blank" rel="noopener" class="underline-offset-4 hover:underline">{ view.Entry.Source }</a></dd>
+								}
+							</dl>
+						}
+					</div>
+				</div>
+			</div>
+		</main>
+	}
+}
+
+templ catalogAdds(text string) {
+	<li class="flex gap-3 text-base leading-7">
+		<span class="mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-live text-background">
+			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
+		</span>
+		<span class="text-muted-foreground">{ text }</span>
+	</li>
+}
+
+// catalogVersions lists the newest releases with when they came out.
+templ catalogVersions(view CatalogEntryView, limit int) {
+	{{ now := time.Now() }}
+	@card.Card(card.Props{Class: "gap-0 rounded-4xl p-7 shadow-none ring-0", Attributes: templ.Attributes{"data-catalog-versions": true}}) {
+		<h2 class={ typeH3 }>Versions</h2>
+		if len(view.Versions) == 0 {
+			<p class={ typeText, "mt-4" }>The releases show once the registry answered. Try again in a minute.</p>
+		} else {
+			<ul class="mt-5 divide-y divide-border">
+				for _, version := range shownVersions(view.Versions, limit) {
+					<li class="flex items-center justify-between gap-4 py-2.5 text-sm">
+						<span class="font-mono">{ version.Tag }</span>
+						<span class="text-muted-foreground">{ released(version, now) }</span>
+					</li>
+				}
+			</ul>
+			if more := len(view.Versions) - limit; more > 0 {
+				<p class="mt-3 text-sm text-muted-foreground">and { strconv.Itoa(more) } older, every one installable</p>
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------- app
+
+// CatalogInApp is the catalog inside a workspace.
+templ CatalogInApp(view CatalogView) {
+	@layouts.App("Catalog") {
+		@panelPage() {
+			@pageHeader("Catalog", "Open source apps to install in one click. Their databases backed up, every change.")
+			@catalogBody(view)
+		}
+	}
+}
+
+// CatalogInstall is the install form of a catalog app in a workspace.
+templ CatalogInstall(view CatalogInstallView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ entry := view.App.Entry }}
+	@layouts.App("Install " + entry.Name) {
+		@panelPage() {
+			<div class="flex min-w-0 items-start gap-4">
+				@catalogTile(entry, "size-14 text-2xl")
+				<div class="min-w-0">
+					<h1 class="text-2xl font-semibold tracking-[-0.02em]">{ entry.Name }</h1>
+					<p class="mt-1 text-muted-foreground">{ entry.Pitch }</p>
+				</div>
+			</div>
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+				@panel(panelProps{Heading: "catalog-install-heading", Title: "Install", Description: "ops makes the app on the server, generates its secrets as env vars and deploys it. Every deploy snapshots its database first.", Docs: "/docs/guides/catalog"}) {
+					if len(view.Servers) == 0 {
+						<p class="text-sm text-muted-foreground">Add a server first. <a class="underline underline-offset-4" href={ templ.SafeURL(basePath + "/servers") }>Servers</a></p>
+					} else {
+						<form
+							id="catalog-install-form"
+							class="flex flex-col gap-4"
+							hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
+							hx-swap="none"
+							hx-disable="find button[type='submit']"
+						>
+							@csrf.Token()
+							@field.Field(field.Props{Class: "gap-1.5"}) {
+								@field.Label(field.LabelProps{For: "catalog-version"}) {
+									Version
+								}
+								@selectcomp.Select(selectcomp.Props{Name: "version", DefaultValue: firstVersion(view.App.Versions), Items: versionItems(view.App.Versions), Disabled: len(view.App.Versions) == 0}) {
+									@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-version", Class: "w-full"}) {
+										@selectcomp.Value(selectcomp.ValueProps{Placeholder: "The newest release"})
+									}
+									@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+										@selectcomp.Group() {
+											for _, version := range view.App.Versions {
+												@selectcomp.Item(selectcomp.ItemProps{Value: version.Tag}) {
+													{ version.Tag }
+												}
+											}
+										}
+									}
+								}
+							}
+							@field.Field(field.Props{Class: "gap-1.5"}) {
+								@field.Label(field.LabelProps{For: "catalog-server"}) {
+									Server
+								}
+								@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: view.Servers[0].Name, Items: appAddServerItems(view.Servers)}) {
+									@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-server", Class: "w-full"}) {
+										@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Server"})
+									}
+									@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+										@selectcomp.Group() {
+											for _, server := range view.Servers {
+												@selectcomp.Item(selectcomp.ItemProps{Value: server.Name}) {
+													{ server.Name }
+												}
+											}
+										}
+									}
+								}
+							}
+							@field.Field(field.Props{Class: "gap-1.5"}) {
+								@field.Label(field.LabelProps{For: "catalog-name"}) {
+									App name
+								}
+								@input.Input(input.Props{ID: "catalog-name", Name: "name", Type: "text", Value: entry.Slug, Class: "font-mono", Attributes: templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-describedby": "catalog-name-hint"}})
+								@fieldHint("catalog-name", "") {
+									Lowercase letters, digits and dashes.
+								}
+							}
+							@field.Field(field.Props{Class: "gap-1.5"}) {
+								@field.Label(field.LabelProps{For: "catalog-domain"}) {
+									Domain, optional
+								}
+								@input.Input(input.Props{ID: "catalog-domain", Name: "domain", Type: "text", Placeholder: entry.Slug + ".example.com", Class: "font-mono placeholder:font-sans", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": "catalog-domain-hint"}})
+								@fieldHint("catalog-domain", "") {
+									Point its DNS to the server. Add or change it later on the app page.
+								}
+							}
+							<div>
+								@button.Button(button.Props{Type: button.TypeSubmit, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-submit": true}}) {
+									@icon.Download(icon.Props{Class: "size-4"})
+									Install { entry.Name }
+								}
+							</div>
+						</form>
+					}
+				}
+				@catalogVersions(view.App, 8)
+			</div>
+		}
+	}
+}
+
+// CatalogUpdate is the panel of an app from the catalog: the version it
+// runs, the newest, and the way to another one.
+templ CatalogUpdate(view CatalogUpdateView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<div id="catalog-update" data-catalog-update>
+		@card.Card(card.Props{Class: utils.CN("min-w-0 gap-0 p-5 sm:p-6", utils.IfElse(view.Newer, "ring-live/40", ""))}) {
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div class="flex min-w-0 items-center gap-4">
+					@catalogTile(view.Entry, "size-11 text-lg")
+					<div class="min-w-0">
+						if view.Newer {
+							<p class="font-semibold">{ view.Entry.Name } { view.Latest.Tag } is out <span class="font-normal text-muted-foreground">{ released(view.Latest, now) }</span></p>
+						} else {
+							<p class="font-semibold">{ view.Entry.Name } { view.Version }</p>
+						}
+						<p class="text-sm text-muted-foreground">
+							Runs { view.Version }, from the catalog. An update snapshots its database first.
+						</p>
+					</div>
+				</div>
+				<form
+					class="flex flex-col gap-2 sm:flex-row sm:items-center"
+					hx-post={ basePath + "/apps/" + view.App.Name + "/update" }
+					hx-swap="none"
+					hx-disable="find button[type='submit']"
+					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one; ops takes a snapshot first." }
+				>
+					@csrf.Token()
+					<label for="catalog-update-version" class="sr-only">Version</label>
+					@selectcomp.Select(selectcomp.Props{Name: "version", DefaultValue: firstVersion(view.Versions), Items: versionItems(view.Versions), Disabled: len(view.Versions) == 0}) {
+						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-update-version", Class: "w-full sm:w-40"}) {
+							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Version"})
+						}
+						@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignEnd}) {
+							@selectcomp.Group() {
+								for _, version := range view.Versions {
+									@selectcomp.Item(selectcomp.ItemProps{Value: version.Tag}) {
+										{ version.Tag }
+									}
+								}
+							}
+						}
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: utils.IfElse(view.Newer, button.VariantDefault, button.VariantSecondary), Attributes: templ.Attributes{"data-catalog-update-submit": true}}) {
+						if view.Newer {
+							Update
+						} else {
+							Deploy version
+						}
+					}
+				</form>
+			</div>
+		}
+	</div>
+}
+
+func firstVersion(versions []catalog.Version) string {
+	if len(versions) == 0 {
+		return ""
+	}
+	return versions[0].Tag
+}

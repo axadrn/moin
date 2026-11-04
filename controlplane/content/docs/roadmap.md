@@ -14,6 +14,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **Backups** of every SQLite and Postgres change into your own bucket, a full copy before every change ops makes and a restore check every day. [Backups](/docs/guides/backups)
 - **Data**: browse tables, edit rows and run SQL on the live database, SQLite or Postgres. [Data](/docs/guides/data)
 - **Domains** with HTTPS, and a password in front if you like. [Domains](/docs/guides/domains)
+- **App catalog**: Umami, n8n, Vaultwarden, Gitea and more in one click, every release the hour it ships, updates with a snapshot first. [Catalog](/docs/guides/catalog)
 - **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
 - **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline or a deploy fails, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
 - **Live metrics, built in**: CPU, memory, disk and network for every server and app, live for the last hour and up to 30 days back, with every deploy marked on the charts. [Metrics](/docs/guides/metrics)

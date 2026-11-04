@@ -77,6 +77,8 @@ The TUI moves like vim, and `?` shows every key.
 | `:hook off`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
 | `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first) or `=<domain>` for the canonical one |
 | `p` | apps | password: type `user:password`, or `off` (asks first) |
+| `:catalog` | apps | lists the [catalog](/docs/guides/catalog); `:catalog <app>` shows its releases, `:catalog install <app> <server> [version]` installs it |
+| `:update [version]` | apps | sets the selected catalog app to the newest release, or the one given, and follows the deploy |
 | `u` or `:uptime` | apps | shows the uptime of every domain and the last outages; `enter` checks again, `pause <domain>` or `resume <domain>` pauses or resumes a check, `<domain> /health` sets its path, `<domain> default` goes back to the health path or `/` |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
 | `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |

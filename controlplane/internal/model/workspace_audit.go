@@ -167,6 +167,10 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "created the app " + target + " on " + d["server"]
 	case "app.deployed":
 		return "deployed " + target + version + source
+	case "app.installed":
+		return "installed " + d["catalog"] + " " + d["version"] + " from the catalog as " + target + version
+	case "app.updated":
+		return "set " + target + " to " + d["catalog"] + " " + d["version"] + " as" + version
 	case "app.redeployed":
 		return "redeployed " + target + " as" + version
 	case "app.rolled_back":

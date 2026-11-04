@@ -1,10 +1,17 @@
 package service
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -71,20 +78,73 @@ func (s *AppService) DeployUpload(ctx context.Context, actor Actor, idOrName, up
 	if err != nil {
 		return nil, ErrUploadBucket
 	}
-	presign := s3.NewPresignClient(bucketClient(*storage))
-	key := aws.String(uploadKey(*storage, app, uploadID))
-	get, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(storage.Bucket), Key: key}, s3.WithPresignExpires(downloadLinkLifetime))
+	return s.deploySource(ctx, actor, "app.deployed", app, *storage, uploadKey(*storage, app, uploadID), sum)
+}
+
+// DeployFiles deploys a source ops writes itself, such as a catalog app's
+// compose.yml: it goes into the app's bucket like an upload of the CLI,
+// and the agent fetches it from there.
+func (s *AppService) DeployFiles(ctx context.Context, actor Actor, action, idOrName string, files map[string][]byte) (*model.Deploy, error) {
+	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return nil, err
 	}
-	remove, err := presign.PresignDeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(storage.Bucket), Key: key}, s3.WithPresignExpires(downloadLinkLifetime))
+	storage, err := s.appStorage(app)
+	if err != nil {
+		return nil, ErrUploadBucket
+	}
+	body, err := tarball(files, s.now())
+	if err != nil {
+		return nil, err
+	}
+	key := uploadKey(*storage, app, "up_"+randomToken())
+	_, err = bucketClient(*storage).PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key), Body: bytes.NewReader(body)})
+	if err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(body)
+	return s.deploySource(ctx, actor, action, app, *storage, key, hex.EncodeToString(sum[:]))
+}
+
+// tarball packs files, by their names, into a gzipped tar.
+func tarball(files map[string][]byte, now time.Time) ([]byte, error) {
+	var buffer bytes.Buffer
+	zipped := gzip.NewWriter(&buffer)
+	archive := tar.NewWriter(zipped)
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		err := archive.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(files[name])), ModTime: now, Typeflag: tar.TypeReg})
+		if err == nil {
+			_, err = archive.Write(files[name])
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := archive.Close(); err != nil {
+		return nil, err
+	}
+	if err := zipped.Close(); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// deploySource starts a deploy of the source at key in the app's bucket.
+// The agent downloads it, checks sum and deletes it.
+func (s *AppService) deploySource(ctx context.Context, actor Actor, action string, app *model.App, storage protocol.BackupStorage, key, sum string) (*model.Deploy, error) {
+	presign := s3.NewPresignClient(bucketClient(storage))
+	get, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key)}, s3.WithPresignExpires(downloadLinkLifetime))
+	if err != nil {
+		return nil, err
+	}
+	remove, err := presign.PresignDeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(key)}, s3.WithPresignExpires(downloadLinkLifetime))
 	if err != nil {
 		return nil, err
 	}
 	deploy := s.newDeploy(app)
 	deploy.SourceKey, deploy.SourceSHA256 = "server", sum
 	start := protocol.DeployStart{SourceURL: get.URL, SHA256: sum, SourceDeleteURL: remove.URL}
-	return s.start(actor, "app.deployed", app, deploy, start)
+	return s.start(actor, action, app, deploy, start)
 }
 
 // uploadKey is where a source waits for the server, next to the app's

@@ -1,0 +1,12 @@
+x-ops:
+  service: web
+  port: 3000
+  health: /api/healthz
+
+services:
+  web:
+    image: gitea/gitea:${VERSION}
+    environment:
+      GITEA__database__DB_TYPE: sqlite3
+    volumes:
+      - ./data:/data

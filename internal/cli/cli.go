@@ -107,6 +107,11 @@ CI
   registry set       Save a login: registry set <host> <username>
   registry rm        Remove a login: registry rm <host> [--yes]
 
+Catalog
+  catalog            Open source apps to install in one click, with their newest release
+  catalog <app>      An app of the catalog with every release: catalog umami
+  catalog install    Install one: catalog install umami --server web-1 [--version 3.4.1] [--name stats] [--domain stats.example.com]
+
 Data
   db                 Tables, rows and migration of the app's database, SQLite or Postgres: db [app]
   db rows            A page of a table, newest first: db rows orders [--limit 20] [--offset 20]
@@ -143,6 +148,7 @@ Agent
 
   version            Show the version of ops and the control plane, and a newer release
   update             Update a self-hosted control plane to the newest release [--yes]
+  update <app>       Update an app from the catalog, after a snapshot: update umami [--version 3.4.1]
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
@@ -287,6 +293,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return domains(ctx, rest, stdin, stdout)
 	case "protect":
 		return protect(ctx, rest, stdin, stdout)
+	case "catalog":
+		return catalog(ctx, rest, stdout)
 	case "uptime":
 		return uptime(ctx, rest, stdout)
 	case "metrics":

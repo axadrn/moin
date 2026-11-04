@@ -76,6 +76,9 @@ order: 1
 | `ops buckets use <bucket> [app]` · `ops buckets use --default [app]` | moves an app's uploads and new backups to a bucket, or back to the default; older backups stay where they are |
 | `ops backups bucket` · `bucket set` · `bucket rm [--yes]` | the default bucket, as before there were several |
 | `ops deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
+| `ops catalog [app]` | lists the [catalog](/docs/guides/catalog) with each app's newest release, or one app with every release |
+| `ops catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy |
+| `ops update <app> [--version <tag>]` | sets a catalog app to a release, the newest by default, and deploys it after a snapshot |
 | `ops github` · `ops github repos` | where the GitHub App is installed, with the install link; the repos it reads and where to give it more |
 | `ops github branches <owner/name>` | the branches of a repo, the default first |
 | `ops link owner/name [--branch main] [--auto=false] [app]` | follows a repo; every push deploys unless `--auto=false` |

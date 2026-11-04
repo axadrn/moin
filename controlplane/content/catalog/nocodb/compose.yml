@@ -1,0 +1,23 @@
+x-ops:
+  service: web
+  port: 8080
+  health: /api/v1/health
+
+services:
+  web:
+    image: nocodb/nocodb:${VERSION}
+    environment:
+      NC_DB: pg://db:5432?u=nocodb&p=${DB_PASSWORD}&d=nocodb
+      NC_AUTH_JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./data/files:/usr/app/data
+    depends_on:
+      - db
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: nocodb
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: nocodb
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

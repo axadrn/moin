@@ -67,11 +67,15 @@ func printUpdate(stdout io.Writer, info client.Version) {
 // update updates a self-hosted control plane to the newest release and
 // follows it until it is back.
 func update(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("update", "update [--yes]").withYes()
+	flags := newFlags("update", "update [--yes], or update <app> [--version <tag>] for an app from the catalog").withYes()
+	appVersion := flags.String("version", "", "with an app: a release from ops catalog; default the newest")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() > 0 {
+	if flags.NArg() == 1 {
+		return updateApp(ctx, flags.Arg(0), *appVersion, stdout)
+	}
+	if flags.NArg() > 1 || *appVersion != "" {
 		return flags.wrong()
 	}
 	api, err := apiClient()

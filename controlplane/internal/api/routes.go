@@ -30,6 +30,7 @@ type Handlers struct {
 	Apps        *AppsHandler
 	Version     *VersionHandler
 	Alerts      *AlertsHandler
+	Catalog     *CatalogHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -127,6 +128,9 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/agent-updates", m.InWorkspace(h.Version.AgentUpdates), TokenRead},
 		{"PUT /api/v1/agent-updates", m.InWorkspace(h.Version.SetAgentUpdates), TokenWrite},
 		{"GET /api/v1/servers/events", m.InWorkspace(streams.wrap(h.Servers.Events)), TokenRead},
+		{"GET /api/v1/catalog", m.InWorkspace(h.Catalog.List), TokenRead},
+		{"GET /api/v1/catalog/{slug}", m.InWorkspace(h.Catalog.Get), TokenRead},
+		{"POST /api/v1/catalog/{slug}/install", m.InWorkspace(h.Catalog.Install), TokenWrite},
 		{"GET /api/v1/apps", m.InWorkspace(h.Apps.List), TokenRead},
 		{"POST /api/v1/apps", m.InWorkspace(h.Apps.Create), TokenWrite},
 		{"PUT /api/v1/apps/order", m.InWorkspace(h.Apps.Reorder), TokenWrite},
@@ -138,6 +142,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/apps/{app}/deploys/{number}", m.InWorkspace(h.Apps.GetDeploy), TokenRead},
 		{"GET /api/v1/apps/{app}/deploys/{number}/events", m.InWorkspace(streams.wrap(h.Apps.DeployEvents)), TokenRead},
 		{"POST /api/v1/apps/{app}/rollback", m.InWorkspace(h.Apps.Rollback), TokenWrite},
+		{"POST /api/v1/apps/{app}/update", m.InWorkspace(h.Catalog.Update), TokenWrite},
 		{"POST /api/v1/apps/{app}/redeploy", m.InWorkspace(h.Apps.Redeploy), TokenWrite},
 		{"POST /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RotateHook), TokenWrite},
 		{"DELETE /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RemoveHook), TokenWrite},

@@ -67,6 +67,10 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `set_registry` | stores a registry login | write |
 | `remove_registry` | removes a registry login | write, destructive |
 | `rollback_app` | starts an earlier release again | write, destructive |
+| `list_catalog` | the catalog with each app's newest release | read |
+| `get_catalog_app` | a catalog app with every release | read |
+| `install_catalog_app` | installs a catalog app on a server | write |
+| `update_app` | sets a catalog app to a release and deploys it | write |
 | `get_logs` | the last container lines | read |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |

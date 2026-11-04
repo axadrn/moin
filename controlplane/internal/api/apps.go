@@ -51,7 +51,10 @@ type App struct {
 	Bucket string `json:"bucket"`
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
-	Hook      bool      `json:"hook"`
+	Hook bool `json:"hook"`
+	// Catalog is the slug of the catalog entry the app was installed
+	// from; empty for an app of your own.
+	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -141,6 +144,7 @@ func NewApp(app model.App) App {
 		SnapshotBeforeChanges: app.SnapshotBeforeChanges,
 		Hook:                  app.DeployHookHash != nil,
 		Bucket:                app.BucketName,
+		Catalog:               app.Catalog,
 		CreatedAt:             app.CreatedAt.UTC(),
 	}
 }

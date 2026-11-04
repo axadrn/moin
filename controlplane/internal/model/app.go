@@ -33,6 +33,9 @@ type App struct {
 	// Stopped is set when its owner stopped the app. A deploy, a restart
 	// or a start clears it.
 	Stopped bool `db:"stopped"`
+	// Catalog is the slug of the catalog entry the app was installed
+	// from, such as umami; empty for an app of your own.
+	Catalog string `db:"catalog"`
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
 	BucketID      *string `db:"bucket_id"`

@@ -16,6 +16,7 @@ var publicRoutes = []struct {
 }{
 	{"/", "1.0", "daily"},
 	{"/docs", "0.8", "weekly"},
+	{"/apps", "0.8", "daily"},
 	{"/changelog", "0.6", "weekly"},
 	{"/auth", "0.3", "monthly"},
 }
@@ -29,6 +30,13 @@ type SitemapService struct {
 	// legal lists the terms and privacy pages, which only the hosted
 	// service serves.
 	legal bool
+	// catalog are the slugs of the catalog apps, each a page under /apps.
+	catalog []string
+}
+
+// AddCatalog lists a page for each catalog app.
+func (s *SitemapService) AddCatalog(slugs []string) {
+	s.catalog = slugs
 }
 
 func NewSitemapService(
@@ -62,6 +70,9 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 			Loc: s.baseURL + route.Path, LastMod: today,
 			ChangeFreq: route.ChangeFreq, Priority: route.Priority,
 		})
+	}
+	for _, slug := range s.catalog {
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/apps/" + slug, LastMod: today, ChangeFreq: "daily", Priority: "0.7"})
 	}
 	if s.legal {
 		for _, path := range legalRoutes {

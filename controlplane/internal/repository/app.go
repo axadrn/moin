@@ -43,6 +43,7 @@ type AppRepository interface {
 	SetRouting(appID, domains, canonical string) error
 	SetProtect(appID, protect string) error
 	SetStopped(appID string, stopped bool) error
+	SetCatalog(appID, slug string) error
 
 	ByDeployHookHash(hash string) (*model.App, error)
 	SetDeployHookHash(appID, hash string) error
@@ -278,6 +279,11 @@ func (r *appRepository) SetProtect(appID, protect string) error {
 }
 
 // SetStopped marks the app as stopped by its owner, or as running again.
+func (r *appRepository) SetCatalog(appID, slug string) error {
+	_, err := r.db.Exec(`UPDATE apps SET catalog = $1 WHERE id = $2`, slug, appID)
+	return err
+}
+
 func (r *appRepository) SetStopped(appID string, stopped bool) error {
 	_, err := r.db.Exec(`UPDATE apps SET stopped = $1 WHERE id = $2`, stopped, appID)
 	return err

@@ -38,7 +38,10 @@ type App struct {
 	Hook bool `json:"hook"`
 	// Bucket is the bucket the app uploads and backs up to; empty follows
 	// the workspace's default.
-	Bucket    string    `json:"bucket"`
+	Bucket string `json:"bucket"`
+	// Catalog is the catalog entry the app was installed from; empty for
+	// an app of your own.
+	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

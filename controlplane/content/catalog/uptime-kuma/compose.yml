@@ -1,0 +1,10 @@
+x-ops:
+  service: web
+  port: 3001
+  health: /
+
+services:
+  web:
+    image: louislam/uptime-kuma:${VERSION}
+    volumes:
+      - ./data:/app/data

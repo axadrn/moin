@@ -90,6 +90,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	registerMetricsTools(server, services)
 	registerUpdateTools(server, services)
 	registerAlertTools(server, services)
+	registerCatalogTools(server, services)
 }
 
 func readOnly(title string) *mcpsdk.ToolAnnotations {

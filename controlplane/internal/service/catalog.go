@@ -1,0 +1,223 @@
+package service
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/ops/controlplane/internal/catalog"
+	"github.com/axadrn/ops/controlplane/internal/model"
+)
+
+var (
+	ErrCatalogApp     = errors.New("the catalog has no such app")
+	ErrCatalogVersion = errors.New("this version is not a release of the app: pick one from its list")
+	ErrNotCatalog     = errors.New("this app was not installed from the catalog")
+	// versionPattern is what an image tag may be.
+	versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
+)
+
+// CatalogService installs the apps of the catalog and updates them. An
+// install is an ordinary app: its compose.yml from the catalog goes to
+// the server like a deploy from the CLI, its secrets are env vars, and
+// VERSION picks the image tag.
+type CatalogService struct {
+	store *catalog.Store
+	apps  *AppService
+}
+
+func NewCatalogService(store *catalog.Store, apps *AppService) *CatalogService {
+	return &CatalogService{store: store, apps: apps}
+}
+
+// Store is the catalog: its entries and their releases.
+func (s *CatalogService) Store() *catalog.Store { return s.store }
+
+// CatalogInstall is what an install needs. Version, Name and Domain may
+// be empty: the newest release, the slug, no domain.
+type CatalogInstall struct {
+	Slug, Version, Server, Name, Domain string
+}
+
+// CatalogApp is what the catalog knows about an installed app: its entry,
+// the version it runs and the newest release.
+type CatalogApp struct {
+	Entry   catalog.Entry
+	Version string
+	Latest  catalog.Version
+	// Newer is set when Latest is newer than Version.
+	Newer bool
+}
+
+// Install creates the app on a server, gives it its secrets and VERSION,
+// and deploys it.
+func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (*model.App, *model.Deploy, error) {
+	entry, ok := s.store.Entry(strings.TrimSpace(input.Slug))
+	if !ok {
+		return nil, nil, ErrCatalogApp
+	}
+	version, err := s.version(entry, input.Version)
+	if err != nil {
+		return nil, nil, err
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = entry.Slug
+	}
+	if !appNamePattern.MatchString(name) {
+		return nil, nil, ErrAppName
+	}
+	// Check what would stop the deploy before the app exists.
+	server, err := s.apps.servers.servers.ByIDOrNameForWorkspace(strings.TrimSpace(input.Server), actor.WorkspaceID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !s.apps.servers.Online(server.ID) {
+		return nil, nil, ErrServerOffline
+	}
+	if _, err := s.apps.apps.DefaultBucket(actor.WorkspaceID); err != nil {
+		return nil, nil, ErrUploadBucket
+	}
+	app, err := s.apps.Create(actor, name, server.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.apps.apps.SetCatalog(app.ID, entry.Slug)
+	if err != nil {
+		return app, nil, err
+	}
+	app.Catalog = entry.Slug
+	env := map[string]string{catalog.VersionVar: version}
+	for _, name := range entry.Secrets {
+		env[name] = newSecret()
+	}
+	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+	if err != nil {
+		return app, nil, err
+	}
+	if domain := strings.TrimSpace(input.Domain); domain != "" {
+		_, _, err = s.apps.SetDomains(actor, app.ID, []string{domain}, "")
+		if err != nil {
+			return app, nil, err
+		}
+	}
+	deploy, err := s.deploy(ctx, actor, "app.installed", app, entry, version)
+	return app, deploy, err
+}
+
+// Update sets the app to version, the newest release when empty, and
+// deploys it. The deploy snapshots its databases first, as every deploy
+// does. An older version goes too, but migrations may not go back.
+func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, version string) (*model.App, *model.Deploy, error) {
+	app, err := s.apps.Get(actor.WorkspaceID, idOrName)
+	if err != nil {
+		return nil, nil, err
+	}
+	if app.Catalog == "" {
+		return app, nil, ErrNotCatalog
+	}
+	entry, ok := s.store.Entry(app.Catalog)
+	if !ok {
+		return app, nil, ErrCatalogApp
+	}
+	version, err = s.version(entry, version)
+	if err != nil {
+		return app, nil, err
+	}
+	current, err := s.apps.Env(actor.WorkspaceID, app.ID)
+	if err != nil {
+		return app, nil, err
+	}
+	env := map[string]string{catalog.VersionVar: version}
+	// A newer compose.yml may ask for a secret the app does not have yet.
+	for _, name := range entry.Secrets {
+		if current[name] == "" {
+			env[name] = newSecret()
+		}
+	}
+	if current[catalog.VersionVar] != version || len(env) > 1 {
+		_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+		if err != nil {
+			return app, nil, err
+		}
+	}
+	deploy, err := s.deploy(ctx, actor, "app.updated", app, entry, version)
+	return app, deploy, err
+}
+
+// deploy sends the entry's compose.yml to the app's server and records
+// action with the version.
+func (s *CatalogService) deploy(ctx context.Context, actor Actor, action string, app *model.App, entry catalog.Entry, version string) (*model.Deploy, error) {
+	deploy, err := s.apps.DeployFiles(ctx, actor, "", app.ID, map[string][]byte{"compose.yml": entry.Compose})
+	if err != nil {
+		return nil, err
+	}
+	s.apps.servers.record(actor, action, "app", app.Name, map[string]string{"catalog": entry.Name, "version": version, "number": strconv.Itoa(deploy.Number)})
+	return deploy, nil
+}
+
+// version is the release to run: wanted, or the newest when empty. Before
+// the registry ever answered, any tag the entry's filter takes goes.
+func (s *CatalogService) version(entry catalog.Entry, wanted string) (string, error) {
+	wanted = strings.TrimSpace(wanted)
+	releases := s.store.Versions(entry.Slug)
+	if wanted == "" {
+		if len(releases) == 0 {
+			return "", ErrCatalogVersion
+		}
+		return releases[0].Tag, nil
+	}
+	if !versionPattern.MatchString(wanted) {
+		return "", ErrCatalogVersion
+	}
+	if len(releases) == 0 {
+		if !entry.Filter.MatchString(wanted) {
+			return "", ErrCatalogVersion
+		}
+		return wanted, nil
+	}
+	if !slices.ContainsFunc(releases, func(release catalog.Version) bool { return release.Tag == wanted }) {
+		return "", ErrCatalogVersion
+	}
+	return wanted, nil
+}
+
+// App is the app named idOrName.
+func (s *CatalogService) App(workspaceID, idOrName string) (*model.App, error) {
+	return s.apps.Get(workspaceID, idOrName)
+}
+
+// Info says what the catalog knows of app; ok is false for an app of your
+// own.
+func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, bool) {
+	if app.Catalog == "" {
+		return CatalogApp{}, false
+	}
+	entry, ok := s.store.Entry(app.Catalog)
+	if !ok {
+		return CatalogApp{}, false
+	}
+	info := CatalogApp{Entry: entry}
+	env, err := s.apps.Env(workspaceID, app.ID)
+	if err == nil {
+		info.Version = env[catalog.VersionVar]
+	}
+	if latest, ok := s.store.Latest(entry.Slug); ok {
+		info.Latest = latest
+		info.Newer = info.Version != "" && catalog.Compare(latest.Tag, info.Version) > 0
+	}
+	return info, true
+}
+
+// newSecret is 32 random bytes as URL-safe text: fine in a database URL,
+// a header or YAML.
+func newSecret() string {
+	buffer := make([]byte, 32)
+	_, _ = rand.Read(buffer)
+	return base64.RawURLEncoding.EncodeToString(buffer)
+}

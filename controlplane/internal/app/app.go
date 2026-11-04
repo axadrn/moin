@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/axadrn/ops/controlplane/internal/brand"
+	"github.com/axadrn/ops/controlplane/internal/catalog"
 	"github.com/axadrn/ops/controlplane/internal/config"
 	"github.com/axadrn/ops/controlplane/internal/content"
 	"github.com/axadrn/ops/controlplane/internal/db"
@@ -41,6 +42,7 @@ type App struct {
 	APITokenService     *service.APITokenService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
+	CatalogService      *service.CatalogService
 	AlertService        *service.AlertService
 }
 
@@ -147,6 +149,13 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
+	// The catalog ships in content/catalog; its releases come from the
+	// registries, asked by this control plane itself.
+	entries, err := catalog.Load(filepath.Join(content.Root, "catalog"))
+	if err != nil {
+		return nil, fmt.Errorf("load the catalog: %w", err)
+	}
+	catalogService := service.NewCatalogService(catalog.NewStore(entries, catalog.NewRegistry()), appService)
 	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database, history), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
 	// The hosted plane posts alerts only to public addresses.
 	if cfg.Billing && !cfg.IsDevelopment() {
@@ -202,6 +211,7 @@ func New(cfg *config.Config) (*App, error) {
 		APITokenService:  apiTokenService,
 		ServerService:    serverService,
 		AppService:       appService,
+		CatalogService:   catalogService,
 		AlertService:     alertService,
 	}
 	initialized = true

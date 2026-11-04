@@ -58,6 +58,8 @@ tags:
     description: Workspace invitations opened with the token from the invitation email.
   - name: Billing
     description: Workspace subscriptions, checkout and billing management.
+  - name: Catalog
+    description: 'Open source apps ops installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with ops; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
     description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the agent detects compose.yml, a Dockerfile or a Go module, reads the optional `x-ops` block, builds, starts and checks it. Env vars are stored encrypted. Everything in the ops endpoints belongs to the workspace of the API token.'
   - name: Data
@@ -1102,6 +1104,104 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/catalog:
+    get:
+      tags: [Catalog]
+      operationId: listCatalog
+      summary: List the catalog
+      description: Every app of the catalog with its newest release. `latest` is null until the image registry answered.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The catalog, by name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/catalog/{slug}:
+    parameters:
+      - $ref: '#/components/parameters/CatalogSlug'
+    get:
+      tags: [Catalog]
+      operationId: getCatalogApp
+      summary: A catalog app
+      description: One app of the catalog with every release, newest first. A release from GHCR has no date.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The catalog app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogEntry'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. The catalog has no app with this slug.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/catalog/{slug}/install:
+    parameters:
+      - $ref: '#/components/parameters/CatalogSlug'
+    post:
+      tags: [Catalog]
+      operationId: installCatalogApp
+      summary: Install a catalog app
+      description: Creates the app on the server, generates every secret its compose.yml needs as an env var, sets VERSION and deploys it from the app's bucket. An empty version takes the newest release, an empty name the slug.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogInstallRequest'
+      responses:
+        '202':
+          description: The new app and its started deploy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogDeploy'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No such catalog app or server.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline`, or `no_bucket` when the workspace has no bucket to put the source in.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name` or `fields.version`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/apps:
     get:
       tags: [Apps]
@@ -1473,6 +1573,51 @@ paths:
           description: '`server_offline`, `deploy_running`, `no_rollback` or `release_gone` when the server no longer keeps that release.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/update:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    post:
+      tags: [Catalog]
+      operationId: updateApp
+      summary: Update a catalog app
+      description: Sets VERSION to the version, the newest release when empty, and deploys the app's compose.yml from the catalog. The deploy takes a snapshot of its SQLite and Postgres databases first. An older version goes too, but its migrations may not go back.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppUpdateRequest'
+      responses:
+        '202':
+          description: The app and its started deploy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogDeploy'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`not_from_catalog`, `server_offline`, `deploy_running` or `no_bucket`.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.version`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4100,6 +4245,13 @@ components:
       description: The app ID or name from `GET /api/v1/apps`.
       schema:
         type: string
+    CatalogSlug:
+      name: slug
+      in: path
+      required: true
+      description: The slug of a catalog app from `GET /api/v1/catalog`, such as umami.
+      schema:
+        type: string
     BucketName:
       name: name
       in: path
@@ -4806,6 +4958,9 @@ components:
         bucket:
           type: string
           description: The bucket the app uploads and backs up to, by name. Empty follows the workspace's default bucket.
+        catalog:
+          type: string
+          description: The slug of the catalog entry the app was installed from, such as umami. Empty for an app of your own.
         created_at:
           type: string
           format: date-time
@@ -5124,6 +5279,98 @@ components:
         number:
           type: integer
           minimum: 0
+    CatalogVersion:
+      type: object
+      required: [tag, date]
+      properties:
+        tag:
+          type: string
+          description: The image tag, such as 3.4.1.
+        date:
+          type: [string, 'null']
+          format: date-time
+          description: When the registry got it. Null when the registry does not say, as on GHCR.
+    CatalogEntry:
+      type: object
+      required: [slug, name, pitch, category, website, source, license, image, database, port, login, secrets, latest]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        pitch:
+          type: string
+        category:
+          type: string
+        website:
+          type: string
+        source:
+          type: string
+        license:
+          type: string
+        image:
+          type: string
+          description: The image without a tag; VERSION is its tag.
+        database:
+          type: string
+          description: postgres or sqlite when ops backs up the app's database; empty otherwise.
+        port:
+          type: integer
+        login:
+          type: string
+          description: How to sign in the first time, when the app has a default.
+        secrets:
+          type: array
+          items:
+            type: string
+          description: The env vars ops generates on install.
+        latest:
+          oneOf:
+            - $ref: '#/components/schemas/CatalogVersion'
+            - type: 'null'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogVersion'
+          description: Every release, newest first. Only on GET /api/v1/catalog/{slug}.
+    CatalogList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogEntry'
+    CatalogInstallRequest:
+      type: object
+      required: [server]
+      properties:
+        server:
+          type: string
+          description: The server, by name or ID.
+        version:
+          type: string
+          description: A release from the entry's versions. Empty is the newest.
+        name:
+          type: string
+          description: The app name. Empty is the slug.
+        domain:
+          type: string
+          description: A domain for the app, optional.
+    AppUpdateRequest:
+      type: object
+      properties:
+        version:
+          type: string
+          description: A release from the catalog entry's versions. Empty is the newest.
+    CatalogDeploy:
+      type: object
+      required: [app, deploy]
+      properties:
+        app:
+          $ref: '#/components/schemas/App'
+        deploy:
+          $ref: '#/components/schemas/Deploy'
     Databases:
       type: object
       required: [items]

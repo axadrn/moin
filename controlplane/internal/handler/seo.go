@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/axadrn/ops/controlplane/internal/catalog"
 	"github.com/axadrn/ops/controlplane/internal/service"
 	"net/http"
 	"os"
@@ -24,8 +25,16 @@ func NewSEOHandler(
 	robotsNoIndex bool,
 	legal bool,
 ) *SEOHandler {
+	sitemap := service.NewSitemapService(docsService, baseURL, legal)
+	if entries, err := catalog.Load(filepath.Join(contentPath, "catalog")); err == nil {
+		slugs := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			slugs = append(slugs, entry.Slug)
+		}
+		sitemap.AddCatalog(slugs)
+	}
 	return &SEOHandler{
-		sitemapService: service.NewSitemapService(docsService, baseURL, legal),
+		sitemapService: sitemap,
 		docsService:    docsService,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
 		llmsPath:       filepath.Join(contentPath, "llms.txt"),

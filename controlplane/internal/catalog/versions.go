@@ -1,0 +1,170 @@
+package catalog
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Version is a release of an app: its image tag, and when it was pushed if
+// the registry says.
+type Version struct {
+	Tag  string    `json:"tag"`
+	Date time.Time `json:"date,omitzero"`
+}
+
+// Releases keeps the tags filter takes and sorts them newest first, by
+// their numbers: 1.10.0 comes before 1.9.2.
+func Releases(tags []Version, filter *regexp.Regexp) []Version {
+	if filter == nil {
+		filter = defaultFilter
+	}
+	var releases []Version
+	for _, tag := range tags {
+		if filter.MatchString(tag.Tag) && !slices.ContainsFunc(releases, func(v Version) bool { return v.Tag == tag.Tag }) {
+			releases = append(releases, tag)
+		}
+	}
+	slices.SortStableFunc(releases, func(a, b Version) int { return Compare(b.Tag, a.Tag) })
+	return releases
+}
+
+// Compare orders two tags by their numbers, then as text: negative when a
+// is older.
+func Compare(a, b string) int {
+	numbers := func(tag string) []int {
+		var parts []int
+		for _, field := range strings.FieldsFunc(strings.TrimPrefix(tag, "v"), func(r rune) bool { return r < '0' || r > '9' }) {
+			number, err := strconv.Atoi(field)
+			if err != nil {
+				break
+			}
+			parts = append(parts, number)
+		}
+		return parts
+	}
+	if order := slices.Compare(numbers(a), numbers(b)); order != 0 {
+		return order
+	}
+	return strings.Compare(a, b)
+}
+
+// Registry asks Docker Hub and the GitHub Container Registry for the tags
+// of an image, anonymously. The URLs are there for tests.
+type Registry struct {
+	Client  *http.Client
+	HubURL  string
+	GHCRURL string
+}
+
+// NewRegistry asks the real registries.
+func NewRegistry() Registry {
+	return Registry{Client: &http.Client{Timeout: 20 * time.Second}, HubURL: "https://hub.docker.com", GHCRURL: "https://ghcr.io"}
+}
+
+// maxPages bounds how far back Docker Hub is read, 100 tags a page.
+const maxPages = 10
+
+// Tags lists the tags of image: ghcr.io/owner/name from GHCR, anything
+// else from Docker Hub.
+func (r Registry) Tags(ctx context.Context, image string) ([]Version, error) {
+	if rest, ok := strings.CutPrefix(image, "ghcr.io/"); ok {
+		return r.ghcr(ctx, rest)
+	}
+	repo := strings.TrimPrefix(image, "docker.io/")
+	if host, _, ok := strings.Cut(repo, "/"); ok && strings.ContainsAny(host, ".:") {
+		return nil, fmt.Errorf("%s: only Docker Hub and ghcr.io are read", image)
+	}
+	if !strings.Contains(repo, "/") {
+		repo = "library/" + repo
+	}
+	return r.hub(ctx, repo)
+}
+
+func (r Registry) hub(ctx context.Context, repo string) ([]Version, error) {
+	next := r.HubURL + "/v2/repositories/" + repo + "/tags?page_size=100&ordering=last_updated"
+	var tags []Version
+	for page := 0; next != "" && page < maxPages; page++ {
+		var body struct {
+			Next    string `json:"next"`
+			Results []struct {
+				Name          string    `json:"name"`
+				LastUpdated   time.Time `json:"last_updated"`
+				TagLastPushed time.Time `json:"tag_last_pushed"`
+			} `json:"results"`
+		}
+		err := r.getJSON(ctx, next, "", &body)
+		if err != nil {
+			return nil, err
+		}
+		for _, result := range body.Results {
+			date := result.TagLastPushed
+			if date.IsZero() {
+				date = result.LastUpdated
+			}
+			tags = append(tags, Version{Tag: result.Name, Date: date})
+		}
+		next = body.Next
+		// Only follow pages on Docker Hub itself.
+		if next != "" && !strings.HasPrefix(next, r.HubURL+"/") {
+			next = ""
+		}
+	}
+	return tags, nil
+}
+
+func (r Registry) ghcr(ctx context.Context, repo string) ([]Version, error) {
+	var token struct {
+		Token string `json:"token"`
+	}
+	err := r.getJSON(ctx, r.GHCRURL+"/token?scope="+url.QueryEscape("repository:"+repo+":pull"), "", &token)
+	if err != nil {
+		return nil, err
+	}
+	var list struct {
+		Tags []string `json:"tags"`
+	}
+	err = r.getJSON(ctx, r.GHCRURL+"/v2/"+repo+"/tags/list?n=10000", token.Token, &list)
+	if err != nil {
+		return nil, err
+	}
+	tags := make([]Version, 0, len(list.Tags))
+	for _, tag := range list.Tags {
+		tags = append(tags, Version{Tag: tag})
+	}
+	return tags, nil
+}
+
+func (r Registry) getJSON(ctx context.Context, address, bearer string, into any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", "ops-catalog")
+	if bearer != "" {
+		request.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	response, err := r.Client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: %s", request.URL.Host, response.Status)
+	}
+	err = json.NewDecoder(io.LimitReader(response.Body, 8<<20)).Decode(into)
+	if err != nil {
+		return errors.New(request.URL.Host + ": unreadable answer")
+	}
+	return nil
+}

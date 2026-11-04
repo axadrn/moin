@@ -34,7 +34,13 @@ templ Apps(view AppsView) {
 	@layouts.App("Apps") {
 		@panelPage() {
 			@pageHeader("Apps", "Docker Compose projects on your servers. The first ops deploy in a repo creates its app.") {
-				@AppAddForm(view.Servers)
+				<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+					@AppAddForm(view.Servers)
+					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/catalog", Variant: button.VariantSecondary, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-link": true}}) {
+						@icon.LayoutGrid(icon.Props{Class: "size-4"})
+						From the catalog
+					}
+				</div>
 			}
 			@AppList(view)
 		}
@@ -368,6 +374,9 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 				}) {
 					Redeploy
 				}
+			}
+			if app.Catalog != "" {
+				<div hx-get={ appPath + "/catalog" } hx-trigger="load" hx-swap="outerHTML"></div>
 			}
 			@appFacts(app, deploys)
 			<div class="grid items-stretch gap-4 lg:grid-cols-2">

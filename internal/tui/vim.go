@@ -502,7 +502,7 @@ var tabNames = []string{"servers", "apps", "activity", "team", "settings"}
 
 // commandNames are what tab completes on the command line.
 func commandNames() []string {
-	names := append([]string{"e", "help", "noh", "open", "q", "tabnext", "tabprevious"}, tabNames...)
+	names := append([]string{"catalog", "e", "help", "noh", "open", "q", "tabnext", "tabprevious"}, tabNames...)
 	for name := range commandKeys {
 		names = append(names, name)
 	}
@@ -579,6 +579,22 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 	}
 	if index := slices.Index(tabNames, name); index >= 0 {
 		return m.toTab(tab(index))
+	}
+	if name == "catalog" {
+		return m.catalogCommand(args)
+	}
+	// :update on an app from the catalog sets it to the newest release,
+	// or the version given.
+	if app, ok := m.currentApp(); ok && name == "update" && m.tab == tabApps {
+		if app.Catalog == "" {
+			m.err = fmt.Errorf("%s is not from the catalog: :redeploy builds it again", app.Name)
+			return m, nil
+		}
+		version := ""
+		if len(args) > 0 {
+			version = args[0]
+		}
+		return m, m.updateCatalogApp(app.Name, version)
 	}
 	keys, ok := commandKeys[name]
 	if !ok {
@@ -682,6 +698,9 @@ var helpEntries = [][2]string{
 	{"o", "domains"},
 	{"p", "password"},
 	{":hook", "a new deploy hook; :hook off turns it off"},
+	{":catalog", "open source apps to install; :catalog <app> its versions"},
+	{":catalog install", "install one: :catalog install <app> <server> [version]"},
+	{":update", "an app from the catalog to its newest release, or :update <version>"},
 	{"K J", "move the app up, down; :move up, :move down"},
 	{"x", "remove"},
 	{"", "Servers"},
