@@ -204,7 +204,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			if err != nil {
 				return detected, err
 			}
-			config, detected, err = a.resolve(ctx, start.App, src)
+			config, detected, err = a.resolve(ctx, start.App, src, start.Env)
 		} else {
 			// A deploy without source keeps the compose file of the running
 			// release and its images; an image replaces the main one.
@@ -395,8 +395,9 @@ func (a *apps) checkHealth(ctx context.Context, container string, port int, path
 
 // resolve reads the compose file of a release's source through `docker
 // compose config` and moves the data mounts out of the release. It reports
-// what it found.
-func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, protocol.Detected, error) {
+// what it found. The app's env vars fill ${VAR} in the file, as a .env
+// next to it would, so a service like postgres gets its password.
+func (a *apps) resolve(ctx context.Context, app, src string, env map[string]string) (map[string]any, protocol.Detected, error) {
 	detected := protocol.Detected{Kind: "compose"}
 	if composePath(src) == "" {
 		var err error
@@ -405,7 +406,11 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 			return nil, detected, err
 		}
 	}
-	raw, err := a.output(ctx, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
+	vars := make([]string, 0, len(env))
+	for key, value := range env {
+		vars = append(vars, key+"="+value)
+	}
+	raw, err := a.outputEnv(ctx, vars, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
 	if err != nil {
 		return nil, detected, fmt.Errorf("compose.yml: %w", err)
 	}

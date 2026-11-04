@@ -3,6 +3,19 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.11
+
+November 4, 2026
+
+**In short:** `${VAR}` in compose.yml takes your env vars from ops, so a Postgres service gets its password; update if your compose uses variables.
+
+### Fixed
+- **Variables in compose.yml**: `${DB_PASSWORD}` and the like now take the app's env vars from ops, as a `.env` next to the file would. Before, they came out empty and a service such as Postgres did not start.
+- **Deploys while a database is down**: a Postgres that does not run no longer blocks the deploy that could fix it. The deploy log says there was no snapshot, and why.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; then deploy the app again.
+
 ## v1.0.0-beta.10
 
 November 4, 2026

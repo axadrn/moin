@@ -40,7 +40,7 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 	if !protocol.ValidAppName(app) || !validService(database.Service) {
 		return pgTarget{}, errors.New("invalid app or service name")
 	}
-	out, err := a.output(ctx, "docker", "ps", "-q",
+	out, err := a.output(ctx, "docker", "ps", "-q", "--filter", "status=running",
 		"--filter", "label=com.docker.compose.project="+project(app),
 		"--filter", "label=com.docker.compose.service="+database.Service)
 	if err != nil {
@@ -48,7 +48,7 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 	}
 	container, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
 	if container == "" {
-		return pgTarget{}, fmt.Errorf("the Postgres service %s of %s is not running", database.Service, app)
+		return pgTarget{}, fmt.Errorf("the Postgres service %s of %s is %w", database.Service, app, errPostgresDown)
 	}
 	inspected, err := a.output(ctx, "docker", "inspect", "-f", "{{json .Config.Env}}\n{{.Config.Image}}", container)
 	if err != nil {
@@ -60,6 +60,10 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 	user, name := pgNames(env)
 	return pgTarget{container: container, image: strings.TrimSpace(image), user: user, database: name}, nil
 }
+
+// errPostgresDown is a Postgres service that is not running, such as one
+// that restarts over and over.
+var errPostgresDown = errors.New("not running")
 
 // pgNames reads the user and database the official image creates:
 // POSTGRES_USER, default postgres, and POSTGRES_DB, default the user.

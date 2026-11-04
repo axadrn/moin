@@ -32,6 +32,20 @@ MCP: get_env
 
 Reading values needs an API token with write access: reading a secret is as strong as writing it. An AI agent that reads or sets values over MCP sees them, and so does the provider of its model: give it the secrets it needs, not all of them.
 
+## In compose.yml
+
+`${NAME}` in your `compose.yml` takes the env var from ops, like a `.env` next to the file would. So a service that is not built from your repo, such as Postgres, gets its secrets too, and none lands in the repo:
+
+```yaml
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+```
+
+Set it with `ops env set DB_PASSWORD=...`, then deploy. A change to such a variable takes a deploy, not just a restart.
+
 ## Set an env var
 
 Adds an env var or changes its value.

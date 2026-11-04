@@ -466,6 +466,14 @@ func (b *backups) snapshotBefore(ctx context.Context, app, reason string, logf f
 	}
 	for _, database := range b.apps.runningDatabases(app) {
 		snapshot, err := b.snapshotOne(ctx, app, database, reason)
+		if errors.Is(err, errPostgresDown) {
+			// A Postgres that does not run holds nothing a change could
+			// break, and a deploy may be what fixes it: go on, and say so.
+			if logf != nil {
+				logf("no snapshot of %s: it is not running", database.Path)
+			}
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("snapshot of %s before the change: %w", database.Path, err)
 		}
