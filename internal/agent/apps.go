@@ -326,6 +326,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		}()
 	}
 	a.prune(ctx, start.App)
+	a.cleanup(ctx)
 	return detected, nil
 }
 
@@ -1033,8 +1034,10 @@ func isSQLite(path string) bool {
 
 var imagePattern = regexp.MustCompile(`"image": "([^"]+)"`)
 
-// prune keeps the newest releases and the images they use.
+// prune keeps the newest releases and the images they use. The images of
+// the releases it removes stay in the images file for cleanup.
 func (a *apps) prune(ctx context.Context, app string) {
+	a.rememberImages(app)
 	entries, _ := os.ReadDir(filepath.Join(a.appDir(app), "releases"))
 	current := a.current(app)
 	releases := []protocol.Release{}

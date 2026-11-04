@@ -108,6 +108,10 @@ MCP: update_agent
 
 `ops servers update` without a name updates every online server with an older agent. A server with rules in `/etc/ops/rules` never updates from ops; update it on the server, see the [CLI reference](/docs/reference/cli#agent-updates).
 
+## Disk space
+
+The agent keeps the disk clean by itself, after every deploy and once a day. It removes the images that no release ops keeps and no container uses, images without a name, and build cache older than a week. Everything a rollback needs stays, and so do your volumes and anything ops did not put on the server. The agent's log says what it freed. When the disk is over 90% anyway, ops [alerts](/docs/guides/alerts).
+
 ## Remove a server
 
 Disconnects the agent and makes its token stop working.
