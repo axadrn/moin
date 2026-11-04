@@ -20,7 +20,7 @@ Legal basis: our legitimate interest in a secure, working service (Art. 6(1)(f) 
 
 ## Page views
 
-We count page views with Umami on a server we run. Umami sets no cookies, uses your IP address only to tell the country and does not store it, and shows us only totals, such as which pages are read and which site sent a visitor. We do not use Google Analytics or any advertising network.
+We count page views of our public pages (home, docs, changelog, apps, legal) with Umami on a server we run; never inside your workspace. Umami sets no cookies, uses your IP address only to tell the country and does not store it, and shows us only totals, such as which pages are read and which site sent a visitor. We do not use Google Analytics or any advertising network.
 
 Legal basis: our legitimate interest in knowing which pages help (Art. 6(1)(f) GDPR).
 

@@ -24,6 +24,7 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 		Description:  currentPage.Description,
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(currentPage),
+		Public:       true,
 	}) {
 		@sidebar.Provider() {
 			@sidebar.Sidebar() {

@@ -2,7 +2,9 @@ package layouts
 
 import "github.com/axadrn/moin/controlplane/internal/ui/blocks"
 
+// Home is the layout of the public site: it carries the page counter.
 templ Home(seo SEOProps) {
+	{{ seo.Public = true }}
 	@Base(seo) {
 		<div class="min-h-svh bg-background">
 			@blocks.Navbar()
