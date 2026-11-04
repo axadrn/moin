@@ -32,7 +32,7 @@ templ Bucket(view BucketView) {
 				@panel(panelProps{Heading: "bucket-use-heading", Title: "What goes in it", Docs: "/docs/guides/bucket#what-goes-in-the-bucket"}) {
 					<dl class="grid gap-4 text-sm md:grid-cols-3">
 						@bucketUse("Your code", "moin deploy puts it there and your server picks it up. Code from GitHub skips the bucket.")
-						@bucketUse("Your backups", "Every change of every SQLite database. Restore any second of the last week.")
+						@bucketUse("Your backups", "Every change of every SQLite and Postgres database. Restore any second of the last week.")
 						@bucketUse("Nothing of ours", "moin keeps the keys encrypted. Your data never passes through moin.")
 					</dl>
 				}

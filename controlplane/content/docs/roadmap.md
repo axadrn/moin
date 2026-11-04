@@ -10,13 +10,16 @@ moin is in beta. It works and runs real sites today, and it keeps growing. No da
 
 What you get today, on every surface: the web, the CLI, the terminal UI, the API and MCP.
 
-- **Deploys** from your repo, a GitHub branch or commit, or an image from CI. A failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
-- **Backups** of every SQLite and Postgres change into your own bucket, a full copy before every change moin makes and a restore check every day. [Backups](/docs/guides/backups)
+- **Deploys** from your repo, a GitHub branch or commit, or an image from CI, with or without a Dockerfile: Node, Bun, Python, Ruby, PHP, Go and more. A failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
+- **Backups** of every SQLite and Postgres change into your own bucket, restore to any second of 7 days, a full copy before every change moin makes and a restore check every day. [Backups](/docs/guides/backups)
 - **Data**: browse tables, edit rows and run SQL on the live database, SQLite or Postgres. [Data](/docs/guides/data)
-- **Domains** with HTTPS, and a password in front if you like. [Domains](/docs/guides/domains)
-- **App catalog**: Umami, n8n, Vaultwarden, Gitea and more in one click, every release the hour it ships, updates with a snapshot first. [Catalog](/docs/guides/catalog)
-- **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
-- **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline or a deploy fails, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
+- **Domains** with HTTPS, one per service if you like, and a password in front. [Domains](/docs/guides/domains)
+- **Instant address**: every app online after its first deploy at `<app>.<server-ip>.sslip.io`, with HTTPS and a password, before it has a domain. [Instant address](/docs/guides/domains#instant-address)
+- **Run a command** in an app's container, without SSH, from every surface. [Run a command](/docs/guides/exec)
+- **App catalog**: 47 apps such as Umami, n8n, Open WebUI and Vaultwarden in one click, every release the hour it ships, updates with a snapshot first. [Catalog](/docs/guides/catalog)
+- **Overview and ⌘K**: one page says whether everything is OK, `moin status` the same for scripts, and ⌘K jumps anywhere. [Overview](/docs/guides/overview)
+- **Uptime checks, built in**: every domain of every service checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
+- **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline, a deploy fails, a backup stops or a disk fills up, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
 - **Live metrics, built in**: CPU, memory, disk and network for every server and app, live for the last hour and up to 30 days back, with every deploy marked on the charts. [Metrics](/docs/guides/metrics)
 - **More than one bucket**: give each app its own bucket for uploads and backups, say one per client. [Bucket](/docs/guides/bucket)
 - **Updates in one click**: a self-hosted moin tells you when a release is out and updates itself; agents update themselves. [Self-hosting](/docs/self-hosting#updates)
@@ -25,7 +28,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **Vim keys in the terminal UI**: `gg`, `G`, `/` to search, `:` commands. [Terminal UI](/docs/reference/tui)
 - **Security**: a Cloudflare Tunnel instead of open ports, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
 - **Teams and the activity log**: who changed what, to the second. [Activity log](/docs/guides/activity)
-- **Self-hosting**, free, with every feature. [Self-hosting](/docs/self-hosting)
+- **Self-hosting**, free, with every feature, on one server with one command. [Self-hosting](/docs/self-hosting)
 
 ## Next
 
