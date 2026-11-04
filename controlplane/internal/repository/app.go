@@ -41,6 +41,10 @@ type AppRepository interface {
 	SetEnv(appID string, set map[string]string, unset []string, at time.Time) error
 
 	SetRouting(appID, domains, canonical string) error
+	SetServiceDomains(appID, domains string) error
+	SetInstant(appID, provider string, open bool) error
+	SetInstantHost(appID, host string) error
+	SetInstantPassword(appID, sealed string) error
 	SetProtect(appID, protect string) error
 	SetStopped(appID string, stopped bool) error
 	SetCatalog(appID, slug string) error
@@ -273,6 +277,31 @@ func (r *appRepository) DeleteRegistry(workspaceID, host string) error {
 // SetRouting stores the domains (a JSON array) and the canonical domain.
 func (r *appRepository) SetRouting(appID, domains, canonical string) error {
 	_, err := r.db.Exec(`UPDATE apps SET domains = $1, canonical = $2 WHERE id = $3`, domains, canonical, appID)
+	return err
+}
+
+// SetServiceDomains stores the domains of the other services, a JSON object.
+func (r *appRepository) SetServiceDomains(appID, domains string) error {
+	_, err := r.db.Exec(`UPDATE apps SET service_domains = $1 WHERE id = $2`, domains, appID)
+	return err
+}
+
+// SetInstant stores the instant address provider and whether it is open.
+func (r *appRepository) SetInstant(appID, provider string, open bool) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant = $1, instant_open = $2 WHERE id = $3`, provider, open, appID)
+	return err
+}
+
+// SetInstantHost stores the instant address the app is served at.
+func (r *appRepository) SetInstantHost(appID, host string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant_host = $1 WHERE id = $2`, host, appID)
+	return err
+}
+
+// SetInstantPassword stores the sealed password ops made for the instant
+// address.
+func (r *appRepository) SetInstantPassword(appID, sealed string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant_password = $1 WHERE id = $2`, sealed, appID)
 	return err
 }
 

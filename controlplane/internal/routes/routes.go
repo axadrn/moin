@@ -185,6 +185,8 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/canonical", workspace(apps.MakeCanonical))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/protect", workspace(apps.Protect))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/unprotect", workspace(apps.Unprotect))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/instant", workspace(apps.SetInstant))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/routing/instant-password", workspace(apps.SetInstantPassword))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/registries", workspace(apps.SetRegistry))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/registries/{host}", workspace(apps.DeleteRegistry))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/logs", workspace(apps.Logs))

@@ -15,9 +15,11 @@ x-ops:
   service: web                 # gets the traffic; default: the only service, the only built one, or web
   port: 8080                   # default: ports, expose, PORT, Dockerfile EXPOSE, then 8080
   health: /healthz             # called after the start, must answer below 500
-  domains: [<domain>, www.<domain>]
+  domains: [<domain>, www.<domain>]   # or by service: {web: [<domain>], api: [api.<domain>]}
   canonical: <domain>          # the others redirect here
+  ports: {api: 5678}           # the port of each other service with domains
   protect: true                # ask for the password set in ops
+  instant: sslip.io            # the instant address: sslip.io, nip.io, traefik.me or off
   database: /data/app.db       # a SQLite file on a volume, or postgres-<service>
 
 services:
@@ -31,6 +33,6 @@ Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
 
 The agent reports what it detected after every deploy: kind, service, port, databases and this block. The web UI shows it on the app page, the TUI on the app, `ops deploy` at the end and MCP in `get_app`.
 
-Fields in `x-ops` win over the settings you make in ops, such as [domains](/docs/guides/domains#in-the-repo). `database` picks the file the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
+Fields in `x-ops` win over the settings you make in ops, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address). `database` picks the file the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
 
 Secrets never belong in the repo. Use [env vars](/docs/guides/env).

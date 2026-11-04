@@ -48,6 +48,13 @@ func DenyAPITokens(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// CanWrite says whether the caller may change data: a session, or a token
+// with the write scope.
+func CanWrite(r *http.Request) bool {
+	token := ctxkeys.APIToken(r.Context())
+	return token == nil || token.HasScope(model.APITokenScopeWrite)
+}
+
 func (access TokenAccess) wrap(next http.HandlerFunc) http.HandlerFunc {
 	switch access {
 	case TokenRead:

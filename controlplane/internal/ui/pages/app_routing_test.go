@@ -33,3 +33,35 @@ func TestRoutingMarksComposeDomains(t *testing.T) {
 		t.Errorf("ops domains lost their actions")
 	}
 }
+
+// The instant address shows with its password hidden, and a domain of
+// another service shows its service and no canonical action.
+func TestRoutingInstantAndServices(t *testing.T) {
+	view := RoutingView{
+		App:     model.App{Name: "shop"},
+		Checks:  []service.DomainCheck{{Domain: "shop.de", Points: true}, {Domain: "api.shop.de", Service: "api", Points: true}},
+		Instant: service.Instant{Provider: "sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "ops"},
+	}
+	var html strings.Builder
+	if err := AppRouting(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		t.Fatal(err)
+	}
+	page := html.String()
+	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-show", `data-domain-service="api"`, "Remove api.shop.de"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("no %s", want)
+		}
+	}
+	if strings.Count(page, "Make canonical") != 1 {
+		t.Errorf("a service domain offers canonical")
+	}
+
+	view.Instant = service.Instant{Provider: "sslip.io", Reason: "The server runs behind a Cloudflare Tunnel."}
+	html.Reset()
+	if err := AppRouting(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html.String(), "data-instant-reason") || strings.Contains(html.String(), "data-instant-url") {
+		t.Errorf("no reason for the missing address")
+	}
+}

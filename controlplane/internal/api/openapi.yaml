@@ -1943,7 +1943,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-ops` block of compose.yml wins for every field it sets.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-ops` block of compose.yml wins for every field it sets.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1977,7 +1977,82 @@ paths:
           description: '`domains_from_compose`. x-ops.domains in compose.yml sets the domains of the live release; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.domains` or `fields.canonical`.'
+          description: '`validation_failed` with `fields.domains`, `fields.canonical` or `fields.service`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/instant:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    get:
+      tags: [Apps]
+      operationId: getInstant
+      summary: Get the instant address
+      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one ops made, shown with `show=true`, which needs a token with read and write access.'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      parameters:
+        - name: show
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Include the password ops made for the address.
+      responses:
+        '200':
+          description: The instant address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instant'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`insufficient_scope` for `show=true` with a read-only token.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags: [Apps]
+      operationId: setInstant
+      summary: Set the instant address
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io`, `traefik.me` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-ops.instant` in compose.yml wins.'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstantRequest'
+      responses:
+        '200':
+          description: The app, and the deploy that applies the change to the running release; `deploy` is null when the next deploy applies it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Change'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.provider`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4964,6 +5039,22 @@ components:
         protected:
           type: boolean
           description: A password guards the app.
+        service_domains:
+          type: object
+          description: The domains of the app's other services, by service.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        instant:
+          type: string
+          description: The app's instant address, such as https://shop.203-0-113-7.sslip.io. Empty when it has none.
+        instant_provider:
+          type: string
+          enum: [sslip.io, nip.io, traefik.me, 'off']
+        instant_open:
+          type: boolean
+          description: No password guards the instant address.
         stopped:
           type: boolean
           description: The app was stopped. A deploy, a restart or a start runs it again.
@@ -5142,6 +5233,41 @@ components:
         canonical:
           type: string
           example: blog.de
+        service:
+          type: string
+          description: Set the domains of this service of compose.yml, not the main one. `canonical` is for the main service only.
+    Instant:
+      type: object
+      required: [url, provider, open, own_password]
+      properties:
+        url:
+          type: string
+          description: The instant address with https://, empty when the app has none.
+        provider:
+          type: string
+          enum: [sslip.io, nip.io, traefik.me, 'off']
+        reason:
+          type: string
+          description: Why the app has no instant address.
+        open:
+          type: boolean
+          description: No password guards it.
+        user:
+          type: string
+        password:
+          type: string
+          description: The password ops made, with show=true.
+        own_password:
+          type: boolean
+          description: The app's own password, the one of its domains, guards it.
+    InstantRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: ['', sslip.io, nip.io, traefik.me, 'off']
+        open:
+          type: boolean
     ProtectionRequest:
       type: object
       required: [username, password]
@@ -5187,6 +5313,9 @@ components:
               from_compose:
                 type: boolean
                 description: x-ops.domains in compose.yml of the live release sets the domain. It wins over the domains set in ops, so it changes in compose.yml, then a deploy.
+              service:
+                type: string
+                description: The service of compose.yml the domain reaches; absent for the main one.
     DeployHook:
       type: object
       required: [url]

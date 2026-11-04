@@ -38,6 +38,14 @@ type App struct {
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
 	Protected    bool     `json:"protected"`
+	// ServiceDomains are the domains of the app's other services.
+	ServiceDomains map[string][]string `json:"service_domains"`
+	// Instant is the app's instant address, "" when it has none;
+	// InstantProvider its provider or off; InstantOpen says no password
+	// guards it.
+	Instant         string `json:"instant"`
+	InstantProvider string `json:"instant_provider"`
+	InstantOpen     bool   `json:"instant_open"`
 	// Stopped is set when the app was stopped; a deploy, restart or start
 	// runs it again.
 	Stopped bool `json:"stopped"`
@@ -137,6 +145,10 @@ func NewApp(app model.App) App {
 		Domains:               app.DomainList(),
 		Canonical:             app.Canonical,
 		Protected:             app.Protect != "",
+		ServiceDomains:        app.ServiceDomainMap(),
+		Instant:               instantURL(app.InstantHost),
+		InstantProvider:       app.Instant,
+		InstantOpen:           app.InstantOpen,
 		Stopped:               app.Stopped,
 		Repo:                  app.Repo,
 		Branch:                app.Branch,
@@ -147,6 +159,31 @@ func NewApp(app model.App) App {
 		Catalog:               app.Catalog,
 		CreatedAt:             app.CreatedAt.UTC(),
 	}
+}
+
+func instantURL(host string) string {
+	if host == "" {
+		return ""
+	}
+	return "https://" + host
+}
+
+// Instant is the instant address of an app: its URL, or why it has none,
+// and the password in front of it when asked for.
+type Instant struct {
+	URL      string `json:"url"`
+	Provider string `json:"provider"`
+	Reason   string `json:"reason,omitempty"`
+	Open     bool   `json:"open"`
+	User     string `json:"user,omitempty"`
+	// Password is the one ops made, with show=true; OwnPassword says the
+	// app's own password, the one of its domains, guards it instead.
+	Password    string `json:"password,omitempty"`
+	OwnPassword bool   `json:"own_password"`
+}
+
+func NewInstant(instant service.Instant) Instant {
+	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason, Open: instant.Open, User: instant.User, Password: instant.Password, OwnPassword: instant.OwnPassword}
 }
 
 func NewDeploy(deploy model.Deploy) Deploy {
@@ -644,6 +681,13 @@ type Change struct {
 type domainsRequest struct {
 	Domains   []string `json:"domains"`
 	Canonical string   `json:"canonical"`
+	// Service sets the domains of another service than the main one.
+	Service string `json:"service"`
+}
+
+type instantRequest struct {
+	Provider string `json:"provider"`
+	Open     *bool  `json:"open"`
 }
 
 type protectionRequest struct {
@@ -665,6 +709,9 @@ type DomainCheck struct {
 	Points bool     `json:"points"`
 	// FromCompose says x-ops.domains in compose.yml sets the domain.
 	FromCompose bool `json:"from_compose"`
+	// Service is the service of compose.yml the domain reaches, empty for
+	// the main one.
+	Service string `json:"service,omitempty"`
 }
 
 // DomainChecks is the answer of GET /api/v1/apps/{app}/domains.
@@ -679,7 +726,7 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 		if found == nil {
 			found = []string{}
 		}
-		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, FromCompose: check.FromCompose})
+		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, FromCompose: check.FromCompose, Service: check.Service})
 	}
 	return out
 }
@@ -716,7 +763,47 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	deploy, changed, err := h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
+	var deploy *model.Deploy
+	var changed bool
+	var err error
+	if request.Service != "" {
+		deploy, changed, err = h.apps.SetServiceDomains(actor(r), r.PathValue("app"), request.Service, request.Domains)
+	} else {
+		deploy, changed, err = h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
+	}
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
+}
+
+// GetInstant answers the app's instant address; with show=true the
+// password ops made for it, which needs a token that may write.
+func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	show := r.URL.Query().Get("show") == "true"
+	if show && !CanWrite(r) {
+		Error(w, http.StatusForbidden, "insufficient_scope", "Showing the password needs a token with read and write access.")
+		return
+	}
+	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"), show)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewInstant(instant))
+}
+
+// SetInstant picks the provider of the app's instant address, or off, and
+// whether a password guards it.
+func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	var request instantRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider, request.Open)
 	if err != nil {
 		ServiceError(w, err)
 		return

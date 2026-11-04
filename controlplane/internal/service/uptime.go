@@ -11,6 +11,7 @@ import (
 	"hash/fnv"
 	"io"
 	"log/slog"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -419,6 +420,11 @@ func uptimeDomains(domainsJSON, detectedJSON string) (domains []string, health s
 	if detected := Detected(model.Deploy{Detected: detectedJSON}); detected != nil {
 		if len(detected.Domains) > 0 {
 			domains = detected.Domains
+		}
+		// The domains of the other services are checked too, in the order
+		// of their services.
+		for _, service := range slices.Sorted(maps.Keys(detected.ServiceDomains)) {
+			domains = append(domains, detected.ServiceDomains[service]...)
 		}
 		if detected.Config != nil && uptimePath.MatchString(detected.Config.Health) {
 			health = detected.Config.Health

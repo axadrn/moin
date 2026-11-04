@@ -1429,6 +1429,9 @@ func (m model) showDomains(name string) tea.Cmd {
 			if check.Canonical {
 				line += "   canonical"
 			}
+			if check.Service != "" {
+				line += "   service " + check.Service
+			}
 			if check.FromCompose {
 				line += "   from compose.yml"
 			}
@@ -1437,7 +1440,12 @@ func (m model) showDomains(name string) tea.Cmd {
 		if len(lines) == 0 {
 			lines = append(lines, "no domains yet")
 		}
-		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical"
+		if detail, err := m.api.App(m.ctx, name); err == nil {
+			if detail.App.Instant != "" {
+				lines = append(lines, "", detail.App.Instant+"   instant address · :instant to change it")
+			}
+		}
+		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical, api:api.blog.de for the service api"
 		switch {
 		case fromCompose:
 			note = "x-ops.domains in compose.yml sets these: change them there and deploy"
@@ -1451,6 +1459,17 @@ func (m model) showDomains(name string) tea.Cmd {
 // changeDomains adds blog.de, removes -blog.de or sets =blog.de canonical.
 func (m model) changeDomains(app client.App, input string) tea.Cmd {
 	return func() tea.Msg {
+		// api:api.blog.de adds a domain to the service api, -api:api.blog.de
+		// removes it: domains never hold a colon.
+		if service, domain, found := strings.Cut(strings.TrimPrefix(input, "-"), ":"); found {
+			list := slices.Clone(app.ServiceDomains[service])
+			if strings.HasPrefix(input, "-") {
+				list = slices.DeleteFunc(list, func(d string) bool { return d == domain })
+			} else {
+				list = append(list, domain)
+			}
+			return m.changed(app.Name, func() (client.Change, error) { return m.api.SetServiceDomains(m.ctx, app.Name, service, list) })
+		}
 		list, canonical := slices.Clone(app.Domains), app.Canonical
 		switch {
 		case strings.HasPrefix(input, "-"):
@@ -1478,6 +1497,62 @@ func (m model) changeDomains(app client.App, input string) tea.Cmd {
 			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, app.Name))
 		}
 		return noticeMsg("Saved. " + app.Name + " takes it with its next deploy or start.")
+	}
+}
+
+// changed runs a change of an app and follows the deploy that applies it.
+func (m model) changed(name string, change func() (client.Change, error)) tea.Msg {
+	result, err := change()
+	if err != nil {
+		return errMsg{err}
+	}
+	if result.Unchanged {
+		return noticeMsg("Nothing changed.")
+	}
+	if result.Deploy != nil {
+		return m.follow(name, *result.Deploy, fmt.Sprintf("restart v%d of %s", result.Deploy.Number, name))
+	}
+	return noticeMsg("Saved. " + name + " takes it with its next deploy or start.")
+}
+
+// instant shows the instant address of the app with its password, or picks
+// its provider, off, open or protect.
+func (m model) instant(name string, args []string) tea.Cmd {
+	return func() tea.Msg {
+		if len(args) > 0 {
+			var msg tea.Msg
+			switch args[0] {
+			case "open", "protect":
+				open := args[0] == "open"
+				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, "", &open) })
+			default:
+				if args[0] != "off" && !slices.Contains(protocol.InstantProviders, args[0]) {
+					return errMsg{fmt.Errorf("pick sslip.io, nip.io, traefik.me, off, open or protect")}
+				}
+				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, args[0], nil) })
+			}
+			return msg
+		}
+		address, err := m.api.Instant(m.ctx, name, true)
+		if err != nil {
+			return errMsg{err}
+		}
+		lines := []string{}
+		if address.URL == "" {
+			lines = append(lines, "no instant address. "+address.Reason)
+		} else {
+			lines = append(lines, address.URL, "provider   "+address.Provider)
+			switch {
+			case address.Open:
+				lines = append(lines, "password   none: open to everyone")
+			case address.OwnPassword:
+				lines = append(lines, "password   the app's own, user "+address.User)
+			default:
+				lines = append(lines, "user       "+address.User, "password   "+address.Password)
+			}
+		}
+		note := ":instant sslip.io|nip.io|traefik.me|off picks the provider, :instant open|protect the password"
+		return outputMsg{id: m.shared.outputs.Add(1), title: "instant address of " + name, note: style.Muted.Render(note), lines: lines}
 	}
 }
 

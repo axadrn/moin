@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/internal/client"
 	"github.com/axadrn/ops/internal/style"
+	"github.com/axadrn/ops/protocol"
 )
 
 // domainCommands are the subcommands of domains. Any other first argument
@@ -25,9 +26,9 @@ func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		command, args = args[0], args[1:]
 	}
 	usage := map[string]string{
-		"add":       "domains add [--app <app>] <domain> ...",
-		"rm":        "domains rm [--app <app>] <domain> ... [--yes]",
-		"remove":    "domains rm [--app <app>] <domain> ... [--yes]",
+		"add":       "domains add [--app <app>] [--service <service>] <domain> ...",
+		"rm":        "domains rm [--app <app>] [--service <service>] <domain> ... [--yes]",
+		"remove":    "domains rm [--app <app>] [--service <service>] <domain> ... [--yes]",
 		"canonical": "domains canonical [--app <app>] <domain|none>",
 	}[command]
 	if usage == "" {
@@ -36,6 +37,10 @@ func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	flags := newFlags("domains "+command, usage).withApp()
 	if command == "rm" || command == "remove" {
 		flags.withYes()
+	}
+	service := ""
+	if command == "add" || command == "rm" || command == "remove" {
+		flags.StringVar(&service, "service", "", "a service of compose.yml other than the main one")
 	}
 	if err := flags.parse(args); err != nil {
 		return err
@@ -63,6 +68,9 @@ func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return err
 	}
 	list, canonical := detail.App.Domains, detail.App.Canonical
+	if service != "" {
+		list = slices.Clone(detail.App.ServiceDomains[service])
+	}
 	switch command {
 	case "add":
 		if flags.NArg() == 0 {
@@ -94,7 +102,12 @@ func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			canonical = ""
 		}
 	}
-	change, err := api.SetDomains(ctx, name, list, canonical)
+	var change client.Change
+	if service != "" {
+		change, err = api.SetServiceDomains(ctx, name, service, list)
+	} else {
+		change, err = api.SetDomains(ctx, name, list, canonical)
+	}
 	if err != nil {
 		return err
 	}
@@ -107,7 +120,15 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 	if err != nil {
 		return err
 	}
+	// The instant address, when it can tell.
+	detail, _ := api.App(ctx, name)
+	if detail.App.Instant != "" && len(checks) > 0 {
+		defer fmt.Fprintln(stdout, "  "+style.Muted.Render("Instant address: "+detail.App.Instant))
+	}
 	if len(checks) == 0 {
+		if detail.App.Instant != "" {
+			fmt.Fprintln(stdout, "  "+name+" answers at its instant address "+detail.App.Instant+" until it has a domain.")
+		}
 		hint(stdout, name+" has no domains yet. Add one:", build.Name+" domains add blog.de www.blog.de")
 		return nil
 	}
@@ -121,6 +142,9 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 			state = badge(stdout, style.Badge(style.StatusWaiting, "set DNS"), "set DNS")
 		}
 		roles := []string{}
+		if check.Service != "" {
+			roles = append(roles, "service "+check.Service)
+		}
 		if check.Canonical {
 			roles = append(roles, "canonical")
 		}
@@ -136,7 +160,88 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
 	}
 	if fromCompose {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-ops.domains in compose.yml sets these domains: change them there and deploy. ops cannot add or remove them."))
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-ops.domains in compose.yml sets the domains marked from compose.yml: change them there and deploy."))
+	}
+	return nil
+}
+
+// instantCommands are the subcommands of instant; anything else is the app.
+var instantCommands = append([]string{"open", "protect"}, append(slices.Clone(protocol.InstantProviders), "off")...)
+
+// instant shows the app's instant address, picks its provider or off, and
+// opens it or puts the password back.
+func instant(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|traefik.me|off [app]; instant open|protect [app]").withApp()
+	show := flags.Bool("show", false, "show the password ops made for it")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	command, argument := "", flags.Arg(0)
+	if slices.Contains(instantCommands, flags.Arg(0)) {
+		command, argument = flags.Arg(0), flags.Arg(1)
+	}
+	if flags.NArg() > 2 || (command == "" && flags.NArg() > 1) {
+		return flags.wrong()
+	}
+	name, err := flags.app(argument)
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	if command != "" {
+		var change client.Change
+		switch command {
+		case "open", "protect":
+			open := command == "open"
+			change, err = api.SetInstant(ctx, name, "", &open)
+		default:
+			change, err = api.SetInstant(ctx, name, command, nil)
+		}
+		if err != nil {
+			return err
+		}
+		if !change.Unchanged {
+			switch command {
+			case "open":
+				done(stdout, "The instant address of %s is open to everyone now.", name)
+			case "protect":
+				done(stdout, "A password guards the instant address of %s again.", name)
+			case "off":
+				done(stdout, "%s has no instant address now.", name)
+			default:
+				done(stdout, "%s gets its instant address from %s now.", name, command)
+			}
+		}
+		reportChange(ctx, api, name, change, stdout)
+	}
+	address, err := api.Instant(ctx, name, *show)
+	if err != nil {
+		return err
+	}
+	if address.URL == "" {
+		fmt.Fprintln(stdout, name+" has no instant address. "+address.Reason)
+		if address.Provider == "off" {
+			hint(stdout, "Turn it on with", build.Name+" instant sslip.io "+name)
+		}
+		return nil
+	}
+	rows := [][]string{{"address", address.URL}, {"provider", address.Provider}}
+	switch {
+	case address.Open:
+		rows = append(rows, []string{"password", "none: open to everyone"})
+	case address.OwnPassword:
+		rows = append(rows, []string{"password", "the app's own, user " + address.User})
+	case address.Password != "":
+		rows = append(rows, []string{"user", address.User}, []string{"password", address.Password})
+	default:
+		rows = append(rows, []string{"user", address.User}, []string{"password", "hidden: add --show"})
+	}
+	table(stdout, []string{"", ""}, rows)
+	if command == "" {
+		hint(stdout, "Another provider, if this one is down:", build.Name+" instant nip.io "+name)
 	}
 	return nil
 }

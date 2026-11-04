@@ -133,8 +133,14 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-ops.domains in compose.yml sets; they change there. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, add("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. HTTPS is always on. Fails when x-ops.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-ops.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
+	mcpsdk.AddTool(server, add("get_instant", "Get the instant address",
+		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one ops made, which show returns with a token that may write. Needs the read scope.",
+		readOnly("")), Read(member(services, tools.getInstant)))
+	mcpsdk.AddTool(server, add("set_instant", "Set the instant address",
+		"Picks the provider of the instant address of an app, sslip.io, nip.io or traefik.me, or off, and whether a password guards it, then applies it to the running release. x-ops.instant in compose.yml wins. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.setInstant)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setProtection)))
@@ -954,6 +960,7 @@ type DomainsInput struct {
 	App       string   `json:"app" jsonschema:"the app name or ID"`
 	Domains   []string `json:"domains" jsonschema:"every domain the app answers on, like blog.de and www.blog.de"`
 	Canonical string   `json:"canonical,omitempty" jsonschema:"the domain the others redirect to; empty for none"`
+	Service   string   `json:"service,omitempty" jsonschema:"a service of compose.yml other than the main one, to set its domains; empty for the main one"`
 }
 
 // Change is the output of routing changes.
@@ -985,7 +992,69 @@ func (t opsTools) change(caller Caller, app string, deploy *model.Deploy, change
 }
 
 func (t opsTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
-	deploy, changed, err := t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
+	var deploy *model.Deploy
+	var changed bool
+	var err error
+	if input.Service != "" {
+		if input.Canonical != "" {
+			return Change{}, InvalidField("canonical", "canonical is for the main service only.")
+		}
+		deploy, changed, err = t.services.Apps.SetServiceDomains(caller.actor(), input.App, input.Service, input.Domains)
+	} else {
+		deploy, changed, err = t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
+	}
+	if err != nil {
+		return Change{}, err
+	}
+	return t.change(caller, input.App, deploy, changed)
+}
+
+// InstantInput is the input of get_instant.
+type InstantInput struct {
+	App  string `json:"app" jsonschema:"the app name or ID"`
+	Show bool   `json:"show,omitempty" jsonschema:"include the password ops made; needs a token with read and write access"`
+}
+
+// Instant is the output of get_instant.
+type Instant struct {
+	api.Instant
+}
+
+func (i Instant) Summary() string {
+	if i.URL == "" {
+		return "The app has no instant address. " + i.Reason
+	}
+	switch {
+	case i.Open:
+		return i.URL + " via " + i.Provider + ", open to everyone."
+	case i.OwnPassword:
+		return i.URL + " via " + i.Provider + ", behind the app's own password."
+	case i.Password != "":
+		return i.URL + " via " + i.Provider + ", user " + i.User + " with the password in password."
+	}
+	return i.URL + " via " + i.Provider + ", behind a password ops made: show returns it."
+}
+
+func (t opsTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
+	if input.Show && !caller.Token.HasScope(model.APITokenScopeWrite) {
+		return Instant{}, &ToolError{Code: "insufficient_scope", Message: "Showing the password needs a token with read and write access."}
+	}
+	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App, input.Show)
+	if err != nil {
+		return Instant{}, err
+	}
+	return Instant{api.NewInstant(instant)}, nil
+}
+
+// SetInstantInput is the input of set_instant.
+type SetInstantInput struct {
+	App      string `json:"app" jsonschema:"the app name or ID"`
+	Provider string `json:"provider,omitempty" jsonschema:"sslip.io, nip.io, traefik.me or off; empty keeps it"`
+	Open     *bool  `json:"open,omitempty" jsonschema:"true takes the password away from the instant address, false puts it back; empty keeps it"`
+}
+
+func (t opsTools) setInstant(_ context.Context, caller Caller, input SetInstantInput) (Change, error) {
+	deploy, changed, err := t.services.Apps.SetInstant(caller.actor(), input.App, input.Provider, input.Open)
 	if err != nil {
 		return Change{}, err
 	}

@@ -233,7 +233,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRoutingLabels(t *testing.T) {
-	detected, err := route(protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.de"}}, &protocol.Routing{Domains: []string{"Blog.de", "www.blog.de"}, Protect: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.de"}}, &protocol.Routing{Domains: []string{"Blog.de", "www.blog.de"}, Protect: "me:$2y$05$abc"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestRoutingLabels(t *testing.T) {
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouting(config, service, "blog", detected, "me:$2y$05$abc")
+	addRouting(config, service, "blog", project("blog"), detected.Domains, detected.Canonical, detected.Port, "me:$2y$05$abc", "", "")
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.ops-blog.rule"] != "Host(`blog.de`) || Host(`www.blog.de`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.ops-blog.rule"])
@@ -259,10 +259,10 @@ func TestRoutingLabels(t *testing.T) {
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")
 	}
-	if _, err := route(protocol.Detected{Config: &protocol.Config{Protect: true}}, nil); err == nil {
+	if _, err := route("blog", protocol.Detected{Config: &protocol.Config{Protect: true}}, nil); err == nil {
 		t.Fatal("protect without password must fail")
 	}
-	if _, err := route(protocol.Detected{}, &protocol.Routing{Domains: []string{"not a domain"}}); err == nil {
+	if _, err := route("blog", protocol.Detected{}, &protocol.Routing{Domains: []string{"not a domain"}}); err == nil {
 		t.Fatal("a bad domain must fail")
 	}
 }

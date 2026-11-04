@@ -50,9 +50,12 @@ order: 1
 | `ops rollback [app] [v<number>] [--yes]` | starts an earlier release again; without a number the one before the live one |
 | `ops logs [--tail 200] [app]` | prints container logs |
 | `ops domains [app]` | lists domains and their DNS |
-| `ops domains add <domain> ...` | adds domains |
-| `ops domains rm <domain> ... [--yes]` | removes domains |
+| `ops domains add [--service <service>] <domain> ...` | adds domains, to another service of compose.yml with `--service` |
+| `ops domains rm [--service <service>] <domain> ... [--yes]` | removes domains |
 | `ops domains canonical <domain\|none>` | the domain the others redirect to |
+| `ops instant [--show] [app]` | the instant address, with the password ops made for it with `--show` |
+| `ops instant sslip.io\|nip.io\|traefik.me\|off [app]` | picks the provider of the instant address, or turns it off |
+| `ops instant open\|protect [app]` | takes the password away from the instant address, or puts it back |
 | `ops protect [--user ops] [app]` | asks for a password; the password comes from stdin |
 | `ops protect off [app] [--yes]` | makes the app public again |
 | `ops uptime [app]` | uptime of every domain over 24 hours, 7 and 30 days, the newest check and the last outages |

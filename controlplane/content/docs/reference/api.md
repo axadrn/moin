@@ -85,7 +85,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it, `409 bucket_in_use` while apps use it or it keeps older backups |
 | `PUT /api/v1/apps/{app}/bucket` | the app's bucket `{"bucket": "client-a"}`, or `""` for the default; older backups stay in the old bucket |
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | the default bucket, for older clients |
-| `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical |
+| `GET` · `PUT /api/v1/apps/{app}/domains` | DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`; domains and canonical, or with `service` the domains of another service |
+| `GET` · `PUT /api/v1/apps/{app}/instant` | the instant address, its provider and password (`?show=true` with a token that may write); pick the provider or `off`, and `open` |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | password protection |
 | `POST /api/v1/apps/{app}/restart` | starts the live release again with the current settings |
 | `POST /api/v1/apps/{app}/stop` | takes the app offline; its data stays |

@@ -28,7 +28,13 @@ type App struct {
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
 	Protected    bool     `json:"protected"`
-	Stopped      bool     `json:"stopped"`
+	// ServiceDomains are the domains of the app's other services.
+	ServiceDomains map[string][]string `json:"service_domains"`
+	// Instant is the instant address, "" when the app has none.
+	Instant         string `json:"instant"`
+	InstantProvider string `json:"instant_provider"`
+	InstantOpen     bool   `json:"instant_open"`
+	Stopped         bool   `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
 	Repo                  string `json:"repo"`
 	Branch                string `json:"branch"`
@@ -320,6 +326,9 @@ type DomainCheck struct {
 	Points    bool     `json:"points"`
 	// FromCompose says x-ops.domains in compose.yml sets the domain.
 	FromCompose bool `json:"from_compose"`
+	// Service is the service of compose.yml the domain reaches, empty for
+	// the main one.
+	Service string `json:"service"`
 }
 
 // Change is the app after a routing change, and the deploy that applies it,
@@ -344,6 +353,48 @@ func (c *Client) CheckDomains(ctx context.Context, app string) ([]DomainCheck, e
 func (c *Client) SetDomains(ctx context.Context, app string, domains []string, canonical string) (Change, error) {
 	var response Change
 	err := c.do(ctx, http.MethodPut, appPath(app, "domains"), map[string]any{"domains": domains, "canonical": canonical}, &response)
+	return response, err
+}
+
+// SetServiceDomains replaces the domains of another service of the app.
+func (c *Client) SetServiceDomains(ctx context.Context, app, service string, domains []string) (Change, error) {
+	var response Change
+	err := c.do(ctx, http.MethodPut, appPath(app, "domains"), map[string]any{"domains": domains, "service": service}, &response)
+	return response, err
+}
+
+// Instant is the app's instant address, or why it has none.
+type Instant struct {
+	URL         string `json:"url"`
+	Provider    string `json:"provider"`
+	Reason      string `json:"reason"`
+	Open        bool   `json:"open"`
+	User        string `json:"user"`
+	Password    string `json:"password"`
+	OwnPassword bool   `json:"own_password"`
+}
+
+// Instant reports the app's instant address; show includes the password
+// ops made for it.
+func (c *Client) Instant(ctx context.Context, app string, show bool) (Instant, error) {
+	var response Instant
+	path := appPath(app, "instant")
+	if show {
+		path += "?show=true"
+	}
+	err := c.do(ctx, http.MethodGet, path, nil, &response)
+	return response, err
+}
+
+// SetInstant picks the provider of the instant address or off ("" keeps
+// it), and whether it is open (nil keeps it).
+func (c *Client) SetInstant(ctx context.Context, app, provider string, open *bool) (Change, error) {
+	var response Change
+	body := map[string]any{"provider": provider}
+	if open != nil {
+		body["open"] = *open
+	}
+	err := c.do(ctx, http.MethodPut, appPath(app, "instant"), body, &response)
 	return response, err
 }
 

@@ -417,9 +417,16 @@ func (h *AppsHandler) Routing(w http.ResponseWriter, r *http.Request) {
 	h.renderRouting(w, r)
 }
 
-// AddDomain adds one domain and applies it.
+// AddDomain adds one domain, to the main service or the one named, and
+// applies it.
 func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 	domain := strings.TrimSpace(r.FormValue("domain"))
+	if service := strings.TrimSpace(r.FormValue("service")); service != "" {
+		h.changeServiceDomains(w, r, service, domain+" added", "Domain not added", func(domains []string) []string {
+			return append(domains, domain)
+		})
+		return
+	}
 	h.changeDomains(w, r, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
 		return append(domains, domain), canonical
 	})
@@ -428,6 +435,12 @@ func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 // RemoveDomain removes one domain and applies it.
 func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
+	if service := r.FormValue("service"); service != "" {
+		h.changeServiceDomains(w, r, service, domain+" removed", domain+" not removed", func(domains []string) []string {
+			return slices.DeleteFunc(domains, func(d string) bool { return d == domain })
+		})
+		return
+	}
 	h.changeDomains(w, r, domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
 		if canonical == domain {
 			canonical = ""
@@ -456,6 +469,53 @@ func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, done
 	if err != nil {
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name"})
 		return
+	}
+	h.routingChanged(w, r, done, deploy, changed)
+}
+
+func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Request, service, done, notDone string, change func([]string) []string) {
+	workspace := ctxkeys.Workspace(r.Context())
+	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		renderError(w, "load app failed", err)
+		return
+	}
+	domains := change(slices.Clone(app.ServiceDomainMap()[service]))
+	deploy, changed, err := h.apps.SetServiceDomains(actor(r), app.ID, service, domains)
+	if err != nil {
+		failed(w, r, notDone, err, map[string]string{"domains": "domain-name", "service": "domain-service"})
+		return
+	}
+	h.routingChanged(w, r, done, deploy, changed)
+}
+
+// SetInstant picks the provider of the instant address, or off.
+func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
+	provider := r.FormValue("provider")
+	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
+	if err != nil {
+		failed(w, r, "Instant address not changed", err, nil)
+		return
+	}
+	done := "Instant address via " + provider
+	if provider == "off" {
+		done = "Instant address off"
+	}
+	h.routingChanged(w, r, done, deploy, changed)
+}
+
+// SetInstantPassword puts the password in front of the instant address, or
+// takes it away.
+func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request) {
+	open := r.FormValue("on") != "1"
+	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
+	if err != nil {
+		failed(w, r, "Password not changed", err, nil)
+		return
+	}
+	done := "Password on the instant address"
+	if open {
+		done = "Instant address open to everyone"
 	}
 	h.routingChanged(w, r, done, deploy, changed)
 }
@@ -518,7 +578,12 @@ func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "check domains failed", err)
 		return
 	}
-	view := pages.RoutingView{App: *app, Checks: checks}
+	instant, err := h.apps.Instant(workspace.ID, app.ID, r.URL.Query().Get("show") == "true")
+	if err != nil {
+		renderError(w, "load instant address failed", err)
+		return
+	}
+	view := pages.RoutingView{App: *app, Checks: checks, Instant: instant}
 	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
 		view.Server = *server
 	}

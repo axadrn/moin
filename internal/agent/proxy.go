@@ -27,8 +27,10 @@ const (
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
 // route settles the routing of a release: x-ops wins for every field it
-// sets, the control plane's settings fill the rest.
-func route(detected protocol.Detected, routing *protocol.Routing) (protocol.Detected, error) {
+// sets, the control plane's settings fill the rest. Domains are the main
+// service's; ServiceDomains those of the others; Instant its instant
+// address.
+func route(app string, detected protocol.Detected, routing *protocol.Routing) (protocol.Detected, error) {
 	if routing == nil {
 		routing = &protocol.Routing{}
 	}
@@ -36,21 +38,60 @@ func route(detected protocol.Detected, routing *protocol.Routing) (protocol.Dete
 	if config == nil {
 		config = &protocol.Config{}
 	}
-	detected.Domains = routing.Domains
+	detected.Domains = slices.Clone(routing.Domains)
 	if len(config.Domains) > 0 {
-		detected.Domains = config.Domains
+		detected.Domains = slices.Clone(config.Domains)
+	}
+	// The map form of x-ops domains may name the main service too.
+	if main, ok := config.ServiceDomains[detected.Service]; ok && len(config.Domains) == 0 {
+		detected.Domains = slices.Clone(main)
+	}
+	detected.ServiceDomains = map[string][]string{}
+	for service, list := range routing.Services {
+		if service != detected.Service {
+			detected.ServiceDomains[service] = slices.Clone(list)
+		}
+	}
+	for service, list := range config.ServiceDomains {
+		if service != detected.Service {
+			detected.ServiceDomains[service] = slices.Clone(list)
+		}
+	}
+	for service, list := range detected.ServiceDomains {
+		if len(list) == 0 {
+			delete(detected.ServiceDomains, service)
+		}
+	}
+	if len(detected.ServiceDomains) == 0 {
+		detected.ServiceDomains = nil
 	}
 	detected.Canonical = routing.Canonical
 	if config.Canonical != "" {
 		detected.Canonical = config.Canonical
 	}
 	detected.Protected = routing.Protect != "" || config.Protect
-	for index, domain := range detected.Domains {
-		domain = strings.ToLower(strings.TrimSpace(domain))
-		if !domainPattern.MatchString(domain) {
-			return detected, fmt.Errorf("%q is not a domain name", domain)
+	seen := map[string]bool{}
+	clean := func(list []string) error {
+		for index, domain := range list {
+			domain = strings.ToLower(strings.TrimSpace(domain))
+			if !domainPattern.MatchString(domain) {
+				return fmt.Errorf("%q is not a domain name", domain)
+			}
+			if seen[domain] {
+				return fmt.Errorf("%s is on two services: a domain reaches one", domain)
+			}
+			seen[domain] = true
+			list[index] = domain
 		}
-		detected.Domains[index] = domain
+		return nil
+	}
+	if err := clean(detected.Domains); err != nil {
+		return detected, err
+	}
+	for _, list := range detected.ServiceDomains {
+		if err := clean(list); err != nil {
+			return detected, err
+		}
 	}
 	if detected.Canonical != "" && !slices.Contains(detected.Domains, detected.Canonical) {
 		return detected, fmt.Errorf("canonical domain %s is not one of the domains", detected.Canonical)
@@ -58,6 +99,18 @@ func route(detected protocol.Detected, routing *protocol.Routing) (protocol.Dete
 	if config.Protect && routing.Protect == "" {
 		return detected, errors.New("x-ops.protect is on but no password is set: set one with ops protect")
 	}
+	provider := routing.Instant
+	switch config.Instant {
+	case "":
+	case "off":
+		provider = ""
+	default:
+		if !slices.Contains(protocol.InstantProviders, config.Instant) {
+			return detected, fmt.Errorf("x-ops.instant is %q: use off, %s", config.Instant, strings.Join(protocol.InstantProviders, ", "))
+		}
+		provider = config.Instant
+	}
+	detected.Instant = protocol.InstantHost(app, routing.InstantIP, provider)
 	return detected, nil
 }
 
@@ -68,55 +121,71 @@ func protectHash(routing *protocol.Routing) string {
 	return routing.Protect
 }
 
-// addRouting puts the main service on the proxy network and labels its
-// routes: every domain over HTTPS, the other domains redirecting to the
-// canonical one, and basic auth when a password is set.
-func addRouting(config, service map[string]any, app string, detected protocol.Detected, protect string) {
-	name := project(app)
-	hosts := make([]string, 0, len(detected.Domains))
-	for _, domain := range detected.Domains {
-		hosts = append(hosts, "Host(`"+domain+"`)")
-	}
+// addRouting puts a service of app on the proxy network and labels its routes:
+// every domain over HTTPS, the other domains redirecting to the canonical
+// one, and basic auth when a password is set. name names its router, such
+// as ops-shop for the main service; instant, when set, is the instant
+// address on a router of its own, with instantProtect in front of it.
+func addRouting(config, service map[string]any, app, name string, domains []string, canonical string, port int, protect, instant, instantProtect string) {
 	labels := map[string]any{
-		"traefik.enable":                                              "true",
-		"traefik.docker.network":                                      proxyNetwork,
-		"traefik.http.routers." + name + ".rule":                      strings.Join(hosts, " || "),
-		"traefik.http.routers." + name + ".entrypoints":               "websecure",
-		"traefik.http.services." + name + ".loadbalancer.server.port": fmt.Sprint(detected.Port),
+		"traefik.enable":         "true",
+		"traefik.docker.network": proxyNetwork,
+		"traefik.http.services." + name + ".loadbalancer.server.port": fmt.Sprint(port),
 	}
-	middlewares := []string{}
-	others := []string{}
-	for _, domain := range detected.Domains {
-		if detected.Canonical != "" && domain != detected.Canonical {
-			others = append(others, regexp.QuoteMeta(domain))
+	if len(domains) > 0 {
+		hosts := make([]string, 0, len(domains))
+		for _, domain := range domains {
+			hosts = append(hosts, "Host(`"+domain+"`)")
+		}
+		labels["traefik.http.routers."+name+".rule"] = strings.Join(hosts, " || ")
+		labels["traefik.http.routers."+name+".entrypoints"] = "websecure"
+		labels["traefik.http.routers."+name+".service"] = name
+		middlewares := []string{}
+		others := []string{}
+		for _, domain := range domains {
+			if canonical != "" && domain != canonical {
+				others = append(others, regexp.QuoteMeta(domain))
+			}
+		}
+		if len(others) > 0 {
+			labels["traefik.http.middlewares."+name+"-canonical.redirectregex.regex"] = escape("^https?://(" + strings.Join(others, "|") + ")(:[0-9]+)?(.*)")
+			labels["traefik.http.middlewares."+name+"-canonical.redirectregex.replacement"] = escape("https://" + canonical + "${3}")
+			labels["traefik.http.middlewares."+name+"-canonical.redirectregex.permanent"] = "true"
+			middlewares = append(middlewares, name+"-canonical")
+		}
+		if protect != "" {
+			labels["traefik.http.middlewares."+name+"-auth.basicauth.users"] = escape(protect)
+			middlewares = append(middlewares, name+"-auth")
+		}
+		if len(middlewares) > 0 {
+			labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
+		}
+		// The same routes for traffic from a Cloudflare Tunnel, which
+		// arrives as HTTP on an entrypoint no port publishes.
+		labels["traefik.http.routers."+name+"-tunnel.rule"] = labels["traefik.http.routers."+name+".rule"]
+		labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
+		labels["traefik.http.routers."+name+"-tunnel.service"] = name
+		if len(middlewares) > 0 {
+			labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(middlewares, ",")
 		}
 	}
-	if len(others) > 0 {
-		labels["traefik.http.middlewares."+name+"-canonical.redirectregex.regex"] = escape("^https?://(" + strings.Join(others, "|") + ")(:[0-9]+)?(.*)")
-		labels["traefik.http.middlewares."+name+"-canonical.redirectregex.replacement"] = escape("https://" + detected.Canonical + "${3}")
-		labels["traefik.http.middlewares."+name+"-canonical.redirectregex.permanent"] = "true"
-		middlewares = append(middlewares, name+"-canonical")
-	}
-	if protect != "" {
-		labels["traefik.http.middlewares."+name+"-auth.basicauth.users"] = escape(protect)
-		middlewares = append(middlewares, name+"-auth")
-	}
-	if len(middlewares) > 0 {
-		labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
-	}
-	// The same routes for traffic from a Cloudflare Tunnel, which arrives
-	// as HTTP on an entrypoint no port publishes.
-	labels["traefik.http.routers."+name+"-tunnel.rule"] = labels["traefik.http.routers."+name+".rule"]
-	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
-	labels["traefik.http.routers."+name+"-tunnel.service"] = name
-	if len(middlewares) > 0 {
-		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(middlewares, ",")
+	// The instant address has a router of its own: no canonical redirect,
+	// and its own password, so own domains can stay public.
+	if instant != "" {
+		router := name + "-instant"
+		labels["traefik.http.routers."+router+".rule"] = "Host(`" + instant + "`)"
+		labels["traefik.http.routers."+router+".entrypoints"] = "websecure"
+		labels["traefik.http.routers."+router+".service"] = name
+		if instantProtect != "" {
+			labels["traefik.http.middlewares."+router+"-auth.basicauth.users"] = escape(instantProtect)
+			labels["traefik.http.routers."+router+".middlewares"] = router + "-auth"
+		}
 	}
 	existing, _ := service["labels"].(map[string]any)
+	if existing == nil {
+		existing = map[string]any{}
+	}
 	for key, value := range labels {
-		if existing == nil {
-			existing = map[string]any{}
-		}
 		existing[key] = value
 	}
 	service["labels"] = existing
@@ -129,11 +198,14 @@ func addRouting(config, service map[string]any, app string, detected protocol.De
 	service["networks"] = networks
 	top, _ := config["networks"].(map[string]any)
 	if top == nil {
-		top = map[string]any{"default": map[string]any{"name": name + "_default"}}
+		top = map[string]any{"default": map[string]any{"name": project(app) + "_default"}}
 	}
 	top[proxyNetwork] = map[string]any{"name": proxyNetwork, "external": true}
 	config["networks"] = top
 }
+
+// serviceRouter names the router of a service other than the main one.
+func serviceRouter(app, service string) string { return project(app) + "-svc-" + service }
 
 // ensureProxy starts the shared Traefik container when it does not run,
 // runs an older image or another mode. In direct mode it takes 80 and 443;

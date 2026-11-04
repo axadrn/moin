@@ -456,16 +456,16 @@ func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, 
 	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
 		return nil, false, ErrComposeDomains
 	}
-	clean := []string{}
-	for _, domain := range domains {
-		domain = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
-		if domain == "" || slices.Contains(clean, domain) {
-			continue
+	clean, err := cleanDomains(domains)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, list := range app.ServiceDomainMap() {
+		for _, domain := range clean {
+			if slices.Contains(list, domain) {
+				return nil, false, ErrDomainTaken
+			}
 		}
-		if !domainPattern.MatchString(domain) || len(domain) > 253 {
-			return nil, false, ErrDomain
-		}
-		clean = append(clean, domain)
 	}
 	canonical = strings.ToLower(strings.TrimSpace(canonical))
 	if canonical != "" && !slices.Contains(clean, canonical) {
@@ -562,23 +562,49 @@ type DomainCheck struct {
 	// FromCompose says x-ops.domains in compose.yml sets the domain, so
 	// it changes there, not in ops.
 	FromCompose bool
+	// Service is the service of compose.yml the domain reaches, empty for
+	// the main one.
+	Service string
 }
 
-// composeDomains are the domains x-ops.domains sets in the live release,
-// and its canonical one; none when compose.yml sets no domains.
-func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
+// liveDetected is what the agent found in the live release, nil before the
+// first deploy.
+func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 	if app.LiveNumber == 0 {
-		return nil, ""
+		return nil
 	}
 	deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
 	if err != nil {
-		return nil, ""
+		return nil
 	}
-	detected := Detected(*deploy)
-	if detected == nil || detected.Config == nil || len(detected.Config.Domains) == 0 {
+	return Detected(*deploy)
+}
+
+// composeDomains are the domains x-ops.domains sets for the main service in
+// the live release, and its canonical one; none when compose.yml sets none
+// for it.
+func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
+	detected := s.liveDetected(app)
+	if detected == nil || detected.Config == nil || (len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0) {
 		return nil, ""
 	}
 	return detected.Domains, detected.Canonical
+}
+
+// composeServiceDomains are the domains x-ops.domains sets for the other
+// services in the live release, by service.
+func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
+	detected := s.liveDetected(app)
+	if detected == nil || detected.Config == nil {
+		return nil
+	}
+	set := map[string][]string{}
+	for service, domains := range detected.Config.ServiceDomains {
+		if service != detected.Service && len(domains) > 0 {
+			set[service] = domains
+		}
+	}
+	return set
 }
 
 // ServerAddresses are the IPv4 and IPv6 of a server: the address its agent
@@ -644,31 +670,49 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 	if err != nil {
 		return nil, err
 	}
-	checks := []DomainCheck{}
 	ipv4, ipv6 := ServerAddresses(*server)
 	address := ipv4
 	if address == "" {
 		address = ipv6
 	}
+	// check looks one domain up: does it point at the server?
+	check := func(domain DomainCheck) DomainCheck {
+		domain.Address, domain.IPv4, domain.IPv6, domain.Advice = address, ipv4, ipv6, DNSAdvice(ipv4, ipv6)
+		lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		domain.Found, _ = net.DefaultResolver.LookupHost(lookupCtx, domain.Domain)
+		cancel()
+		domain.Points = resolvesTo(domain.Found, ipv4, ipv6)
+		if server.Tunnel {
+			// ops points the domain at the tunnel itself; Cloudflare proxies
+			// it, so it resolves to Cloudflare's addresses.
+			domain.Address = server.TunnelID + ".cfargotunnel.com"
+			domain.Advice = "CNAME record to " + domain.Address
+			domain.Points = len(domain.Found) > 0
+		}
+		return domain
+	}
+	checks := []DomainCheck{}
 	domains, canonical := app.DomainList(), app.Canonical
 	fromCompose, composeCanonical := s.composeDomains(app)
 	if len(fromCompose) > 0 {
 		domains, canonical = fromCompose, composeCanonical
 	}
 	for _, domain := range domains {
-		check := DomainCheck{Domain: domain, Canonical: domain == canonical, Address: address, IPv4: ipv4, IPv6: ipv6, Advice: DNSAdvice(ipv4, ipv6), FromCompose: len(fromCompose) > 0}
-		lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		check.Found, _ = net.DefaultResolver.LookupHost(lookupCtx, domain)
-		cancel()
-		check.Points = resolvesTo(check.Found, ipv4, ipv6)
-		if server.Tunnel {
-			// ops points the domain at the tunnel itself; Cloudflare proxies
-			// it, so it resolves to Cloudflare's addresses.
-			check.Address = server.TunnelID + ".cfargotunnel.com"
-			check.Advice = "CNAME record to " + check.Address
-			check.Points = len(check.Found) > 0
+		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
+	}
+	// Then the domains of the other services, by service: compose.yml's
+	// where it sets them, else ops'.
+	services := app.ServiceDomainMap()
+	fromComposeServices := s.composeServiceDomains(app)
+	maps.Copy(services, fromComposeServices)
+	main := s.mainService(app)
+	for _, service := range slices.Sorted(maps.Keys(services)) {
+		if service == main {
+			continue
 		}
-		checks = append(checks, check)
+		for _, domain := range services[service] {
+			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: len(fromComposeServices[service]) > 0}))
+		}
 	}
 	return checks, nil
 }
@@ -778,7 +822,11 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 		return nil, err
 	}
 	start.DeployID, start.App, start.AppID, start.Number = deploy.ID, app.Name, app.ID, deploy.Number
-	start.Routing = &protocol.Routing{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect}
+	start.Routing = &protocol.Routing{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect, Services: serviceRouting(app)}
+	err = s.instantRouting(app, start.Routing)
+	if err != nil {
+		return nil, err
+	}
 	start.Snapshot = s.snapshotBeforeWrite(app)
 	if start.FromNumber == 0 {
 		start.Env = env
@@ -915,12 +963,19 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 		s.notify(live.workspaceID)
 	}
 	s.reportFinished(deployID, status, done.Error)
-	if status == model.DeploySucceeded && len(done.Detected.Domains) > 0 {
+	if status == model.DeploySucceeded {
 		deploy, err := s.apps.DeployByID(deployID)
 		if err == nil {
 			app, err := s.apps.ByID(deploy.AppID)
 			if err == nil {
-				s.syncTunnelOf(app)
+				// The instant address the release serves, which x-ops may
+				// have changed or turned off.
+				if app.InstantHost != done.Detected.Instant {
+					_ = s.apps.SetInstantHost(app.ID, done.Detected.Instant)
+				}
+				if len(done.Detected.Domains) > 0 {
+					s.syncTunnelOf(app)
+				}
 			}
 		}
 	}

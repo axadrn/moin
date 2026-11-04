@@ -21,6 +21,17 @@ type App struct {
 	Canonical string `db:"canonical"`
 	// Protect is an htpasswd line when a password protects the app.
 	Protect string `db:"protect"`
+	// ServiceDomains is a JSON object of the domains of the app's other
+	// services, by service; use ServiceDomainMap.
+	ServiceDomains string `db:"service_domains"`
+	// Instant is the provider of the instant address, such as sslip.io, or
+	// off; InstantHost the address the last deploy served it at. A password
+	// guards it unless InstantOpen: Protect when set, else InstantPassword,
+	// sealed.
+	Instant         string `db:"instant"`
+	InstantHost     string `db:"instant_host"`
+	InstantOpen     bool   `db:"instant_open"`
+	InstantPassword string `db:"instant_password"`
 	// SnapshotBeforeChanges takes a snapshot before every change made
 	// through ops, when backups are set up.
 	SnapshotBeforeChanges bool `db:"snapshot_before_changes"`
@@ -85,6 +96,13 @@ type Registry struct {
 	Username    string    `db:"username"`
 	Password    string    `db:"password"`
 	CreatedAt   time.Time `db:"created_at"`
+}
+
+// ServiceDomainMap returns the domains of the app's other services.
+func (a App) ServiceDomainMap() map[string][]string {
+	domains := map[string][]string{}
+	_ = json.Unmarshal([]byte(a.ServiceDomains), &domains)
+	return domains
 }
 
 // DomainList returns the app's domains.

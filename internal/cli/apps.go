@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"slices"
@@ -156,7 +157,19 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	if app.Protected {
 		password = "on"
 	}
-	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"password", password}, {"repo", repo}}
+	instantText := "none"
+	if app.Instant != "" {
+		instantText = app.Instant
+		if !app.InstantOpen {
+			instantText += ", with a password"
+		}
+	} else if app.InstantProvider == "off" {
+		instantText = "off"
+	}
+	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"instant", instantText}, {"password", password}, {"repo", repo}}
+	for _, service := range slices.Sorted(maps.Keys(app.ServiceDomains)) {
+		rows = append(rows, []string{service, strings.Join(app.ServiceDomains[service], ", ")})
+	}
 	if built != "" {
 		rows = append(rows, []string{"built", built})
 	}
@@ -329,8 +342,31 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 		return errReported
 	}
 	fmt.Fprintln(stdout, style.Success.Render(style.SymbolDone)+" "+style.Bold.Render(fmt.Sprintf("v%d of %s is live", result.Number, name))+style.Muted.Render(" in "+progress.elapsed()))
+	if app, err := api.App(ctx, name); err == nil {
+		checks, _ := api.CheckDomains(ctx, name)
+		printLiveAt(app.App, checks, stdout)
+	}
 	hint(stdout, "See it run with", build.Name+" logs "+name)
 	return nil
+}
+
+// printLiveAt says where an app answers: the domains of every service and
+// its instant address, with how to get past its password.
+func printLiveAt(app client.App, checks []client.DomainCheck, stdout io.Writer) {
+	urls := []string{}
+	for _, check := range checks {
+		urls = append(urls, "https://"+check.Domain)
+	}
+	if app.Instant != "" {
+		urls = append(urls, app.Instant)
+	}
+	if len(urls) == 0 {
+		return
+	}
+	fmt.Fprintln(stdout, "  live at "+strings.Join(urls, ", "))
+	if app.Instant != "" && !app.InstantOpen && !app.Protected {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+": see it with "+build.Name+" instant --show "+app.Name))
+	}
 }
 
 // isResult reports whether a deploy log line is the agent's last word,

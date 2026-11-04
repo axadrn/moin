@@ -502,7 +502,7 @@ var tabNames = []string{"servers", "apps", "activity", "team", "settings"}
 
 // commandNames are what tab completes on the command line.
 func commandNames() []string {
-	names := append([]string{"catalog", "e", "help", "noh", "open", "q", "status", "tabnext", "tabprevious"}, tabNames...)
+	names := append([]string{"catalog", "e", "help", "instant", "noh", "open", "q", "status", "tabnext", "tabprevious"}, tabNames...)
 	for name := range commandKeys {
 		names = append(names, name)
 	}
@@ -585,6 +585,15 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 	}
 	if name == "status" && len(args) == 0 {
 		return m, m.showStatus()
+	}
+	// :instant shows the instant address of the open app, or changes it.
+	if name == "instant" {
+		app, ok := m.currentApp()
+		if !ok || m.tab != tabApps {
+			m.err = errors.New(":instant works on the apps tab, on an app")
+			return m, nil
+		}
+		return m, m.instant(app.Name, args)
 	}
 	// :update on an app from the catalog sets it to the newest release,
 	// or the version given.
@@ -702,6 +711,7 @@ var helpEntries = [][2]string{
 	{"o", "domains"},
 	{"p", "password"},
 	{":hook", "a new deploy hook; :hook off turns it off"},
+	{":instant", "the instant address and its password; :instant nip.io, off, open or protect changes it"},
 	{":catalog", "open source apps to install; :catalog <app> its versions"},
 	{":catalog install", "install one: :catalog install <app> <server> [version]"},
 	{":update", "an app from the catalog to its newest release, or :update <version>"},

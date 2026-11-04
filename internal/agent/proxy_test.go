@@ -3,8 +3,6 @@ package agent
 import (
 	"slices"
 	"strings"
-
-	"github.com/axadrn/ops/protocol"
 	"testing"
 )
 
@@ -33,7 +31,7 @@ func TestProxyFlags(t *testing.T) {
 // never asked for a new domain. The router sets none.
 func TestRoutingLeavesTLSToTheEntrypoint(t *testing.T) {
 	service := map[string]any{}
-	addRouting(map[string]any{}, service, "shop", protocol.Detected{Port: 8080, Domains: []string{"shop.example.com"}}, "")
+	addRouting(map[string]any{}, service, "shop", project("shop"), []string{"shop.example.com"}, "", 8080, "", "", "")
 	labels, _ := service["labels"].(map[string]any)
 	if len(labels) == 0 {
 		t.Fatalf("no labels: %v", service)

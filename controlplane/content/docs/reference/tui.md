@@ -75,7 +75,8 @@ The TUI moves like vim, and `?` shows every key.
 | `i` | apps | deploys an image built in CI; type the image, then `enter` |
 | `:hook` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
 | `:hook off`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
-| `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first) or `=<domain>` for the canonical one |
+| `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first), `=<domain>` for the canonical one, or `<service>:<domain>` to add one to another service of compose.yml |
+| `:instant` | apps | the instant address and its password; `:instant nip.io`, `:instant off`, `:instant open` or `:instant protect` changes it |
 | `p` | apps | password: type `user:password`, or `off` (asks first) |
 | `:status` | everywhere | is everything OK: what needs you, catalog updates and what runs, in the output panel |
 | `:catalog` | apps | lists the [catalog](/docs/guides/catalog); `:catalog <app>` shows its releases, `:catalog install <app> <server> [version]` installs it |

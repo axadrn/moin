@@ -227,7 +227,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		}
 		saveJSON(filepath.Join(release, "base.json"), config)
 		detected.Image = start.Image
-		detected, err = route(detected, start.Routing)
+		detected, err = route(start.App, detected, start.Routing)
 		if err != nil {
 			return detected, err
 		}
@@ -239,7 +239,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		if err != nil {
 			return detected, err
 		}
-		if len(detected.Domains) > 0 {
+		if len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != "" {
 			err = a.ensureProxy(ctx, logf)
 			if err != nil {
 				return detected, fmt.Errorf("proxy: %w", err)
@@ -685,8 +685,19 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 		if service["restart"] == nil {
 			service["restart"] = "unless-stopped"
 		}
-		if name == detected.Service && len(detected.Domains) > 0 {
-			addRouting(config, service, start.App, detected, protectHash(start.Routing))
+		switch {
+		case name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != ""):
+			instantProtect := ""
+			if start.Routing != nil {
+				instantProtect = start.Routing.InstantProtect
+			}
+			addRouting(config, service, start.App, project(start.App), detected.Domains, detected.Canonical, detected.Port, protectHash(start.Routing), detected.Instant, instantProtect)
+		case len(detected.ServiceDomains[name]) > 0:
+			canonical := ""
+			if slices.Contains(detected.ServiceDomains[name], detected.Canonical) {
+				canonical = detected.Canonical
+			}
+			addRouting(config, service, start.App, serviceRouter(start.App, name), detected.ServiceDomains[name], canonical, servicePort(name, service, detected.Config), protectHash(start.Routing), "", "")
 		}
 	}
 	body, err = json.MarshalIndent(config, "", "  ")
@@ -916,6 +927,15 @@ func mainService(services map[string]any, config *protocol.Config) string {
 	return ""
 }
 
+// servicePort is the port a service other than the main one listens on:
+// the one x-ops.ports names, else what its compose entry says, else 8080.
+func servicePort(name string, service map[string]any, config *protocol.Config) int {
+	if config != nil && config.Ports[name] > 0 {
+		return config.Ports[name]
+	}
+	return mainPort("", service, nil)
+}
+
 // mainPort is the port the service listens on inside its container.
 func mainPort(src string, service any, config *protocol.Config) int {
 	if config != nil && config.Port > 0 {
@@ -940,7 +960,7 @@ func mainPort(src string, service any, config *protocol.Config) int {
 			return port
 		}
 	}
-	if port := exposedPort(src); port > 0 {
+	if port := exposedPort(src); src != "" && port > 0 {
 		return port
 	}
 	return 8080

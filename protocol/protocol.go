@@ -5,9 +5,12 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
+	"slices"
 	"strings"
 	"time"
 )
@@ -250,6 +253,29 @@ type Routing struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
 	Protect   string   `json:"protect,omitempty"`
+	// Services are the domains of the app's other services, by service.
+	Services map[string][]string `json:"services,omitempty"`
+	// Instant is the provider of the app's instant address, such as
+	// sslip.io, "" for none; InstantIP the server's public IPv4 it names.
+	// InstantProtect is the htpasswd line in front of it, "" when open.
+	Instant        string `json:"instant,omitempty"`
+	InstantIP      string `json:"instant_ip,omitempty"`
+	InstantProtect string `json:"instant_protect,omitempty"`
+}
+
+// InstantProviders are the services that name an IP without any setup:
+// <name>.<ip with dashes>.<provider> resolves to the IP.
+var InstantProviders = []string{"sslip.io", "nip.io", "traefik.me"}
+
+// InstantHost is the instant address of an app on a server with the public
+// IPv4 ip, such as shop.203-0-113-7.sslip.io, or "" when the provider is
+// none of InstantProviders or the IP is not IPv4.
+func InstantHost(app, ip, provider string) string {
+	address, err := netip.ParseAddr(ip)
+	if err != nil || !address.Is4() || !slices.Contains(InstantProviders, provider) || app == "" {
+		return ""
+	}
+	return app + "." + strings.ReplaceAll(address.String(), ".", "-") + "." + provider
 }
 
 // Registry is a login for pulling Image from a private registry.
@@ -282,16 +308,20 @@ type Detected struct {
 	// Image is the image of the main service when it came from CI.
 	// Domains are the domains the main service answers on, Canonical the one
 	// the others redirect to, Protected whether a password guards it.
-	Kind      string     `json:"kind"`
-	Builder   string     `json:"builder,omitempty"`
-	Image     string     `json:"image,omitempty"`
-	Domains   []string   `json:"domains,omitempty"`
-	Canonical string     `json:"canonical,omitempty"`
-	Protected bool       `json:"protected,omitempty"`
-	Service   string     `json:"service"`
-	Port      int        `json:"port"`
-	Databases []Database `json:"databases"`
-	Config    *Config    `json:"config,omitempty"`
+	Kind      string   `json:"kind"`
+	Builder   string   `json:"builder,omitempty"`
+	Image     string   `json:"image,omitempty"`
+	Domains   []string `json:"domains,omitempty"`
+	Canonical string   `json:"canonical,omitempty"`
+	Protected bool     `json:"protected,omitempty"`
+	// ServiceDomains are the domains of the other services, by service;
+	// Instant is the main service's instant address, "" when it has none.
+	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
+	Instant        string              `json:"instant,omitempty"`
+	Service        string              `json:"service"`
+	Port           int                 `json:"port"`
+	Databases      []Database          `json:"databases"`
+	Config         *Config             `json:"config,omitempty"`
 }
 
 // Built says for people how ops built the app: the language Railpack found,
@@ -336,6 +366,48 @@ type Config struct {
 	Canonical string   `json:"canonical,omitempty"`
 	Protect   bool     `json:"protect,omitempty"`
 	Database  string   `json:"database,omitempty"`
+	// ServiceDomains are domains by service, from the map form of domains:
+	// domains: {web: [shop.com], api: [api.shop.com]}. Ports are the ports
+	// of services ops cannot tell. Instant picks the instant address
+	// provider, or off.
+	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
+	Ports          map[string]int      `json:"ports,omitempty"`
+	Instant        string              `json:"instant,omitempty"`
+}
+
+// UnmarshalJSON reads domains as a list, for the main service, or as a map
+// of service to domains.
+func (c *Config) UnmarshalJSON(body []byte) error {
+	type plain Config
+	var raw struct {
+		plain
+		Domains json.RawMessage `json:"domains,omitempty"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return err
+	}
+	*c = Config(raw.plain)
+	c.Domains = nil
+	domains := bytes.TrimSpace(raw.Domains)
+	switch {
+	case len(domains) == 0 || string(domains) == "null":
+	case domains[0] == '{':
+		byService := map[string][]string{}
+		if err := json.Unmarshal(domains, &byService); err != nil {
+			return fmt.Errorf("x-ops domains: %w", err)
+		}
+		if c.ServiceDomains == nil {
+			c.ServiceDomains = map[string][]string{}
+		}
+		for service, list := range byService {
+			c.ServiceDomains[service] = list
+		}
+	default:
+		if err := json.Unmarshal(domains, &c.Domains); err != nil {
+			return fmt.Errorf("x-ops domains: %w", err)
+		}
+	}
+	return nil
 }
 
 // LogsRequest asks for the last Tail lines of every container of an app.

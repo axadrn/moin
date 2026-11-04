@@ -4,7 +4,42 @@ description: "Your own domains with HTTPS, the www redirect and a password"
 order: 4
 ---
 
-Every server runs one proxy, Traefik, which ops starts with the first domain. A proxy is the program that takes the web traffic and hands it to the right app. Traefik answers on ports 80 and 443, gets certificates from Let's Encrypt and sends HTTP to HTTPS. HTTPS is always on.
+Every server runs one proxy, Traefik, which ops starts with the first app. A proxy is the program that takes the web traffic and hands it to the right app. Traefik answers on ports 80 and 443, gets certificates from Let's Encrypt and sends HTTP to HTTPS. HTTPS is always on.
+
+## Instant address
+
+Every app answers at an address with HTTPS right after its first deploy, before you buy a domain:
+
+```text
+https://<app>.<server IPv4 with dashes>.sslip.io
+https://shop.203-0-113-7.sslip.io
+```
+
+Services like [sslip.io](https://sslip.io) answer every such name with the IP in it, so it points at your server with no DNS to set. Let's Encrypt gives it a certificate like any domain. ops shows it on the app page, after `ops deploy` ("live at …"), in `ops apps <app>`, the TUI, the API and MCP.
+
+A password guards it by default, so a fresh app is not open to the whole internet: the app's own [password](#protect-with-a-password) when it has one, else one ops made, user `ops`.
+
+```surfaces
+Web: the app page, **Instant address**, **Show password**
+CLI: ops instant --show
+TUI: on the app, `:instant`
+API: GET /api/v1/apps/{app}/instant?show=true
+MCP: get_instant
+```
+
+Pick another provider if one is down, take the password away, or turn the address off:
+
+```surfaces
+Web: the app page, **Instant address**, **Provider** or the **Password** switch
+CLI: ops instant nip.io, ops instant open, ops instant protect, ops instant off
+TUI: on the app, `:instant nip.io`, `:instant open`, `:instant protect` or `:instant off`
+API: PUT /api/v1/apps/{app}/instant
+MCP: set_instant
+```
+
+The providers are `sslip.io` (the default), `nip.io` and `traefik.me`. `x-ops.instant` in compose.yml [wins](#in-the-repo). Let's Encrypt issues at most 50 certificates a week for all of `traefik.me` together, so its HTTPS often waits for days; `sslip.io` and `nip.io` have no such shared limit.
+
+An instant address needs a public IPv4 and ports 80 and 443 open to the internet, for Let's Encrypt and for visitors. A server behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), or with no public IPv4, gets none: ops says so instead of the address. Give such an app a domain; ops points it at the tunnel. A quick tunnel or Tailscale Funnel for closed servers may come later.
 
 ## Add a domain
 
@@ -103,6 +138,20 @@ MCP: remove_protection
 
 A change of the domains or the password restarts the app so it applies. If nothing changes, like the same domains again or `protect off` on an app without a password, ops says "Nothing changed" and restarts nothing. The API answers with `"unchanged": true`.
 
+## Domains per service
+
+An app of several services, such as a `web` and an `api` in one compose.yml, can give each its own domains. The main service keeps the plain domains; the others name their service:
+
+```surfaces
+Web: the app page, **Domains**, the domain and its service, **Add domain**
+CLI: ops domains add --service api api.<domain>
+TUI: on the app, `o`, then type `api:api.<domain>`
+API: PUT /api/v1/apps/{app}/domains with "service": "api"
+MCP: set_domains with service
+```
+
+Each service gets its own route on its own port: `x-ops.ports` sets it, else ops reads the service's `ports` or `expose`, then 8080. The password and the canonical redirect work the same, and [uptime checks](/docs/guides/uptime) check every domain. A domain reaches one service only.
+
 ## In the repo
 
 You can also keep domains and the password switch next to your code, in `compose.yml`:
@@ -112,6 +161,19 @@ x-ops:
   domains: [<domain>, www.<domain>]
   canonical: <domain>
   protect: true   # the password itself is set in ops, never in the repo
+  instant: nip.io # or sslip.io, traefik.me, off
+```
+
+For several services, `domains` takes a map by service, and `ports` their ports:
+
+```yaml
+x-ops:
+  service: web
+  domains:
+    web: [<domain>]
+    api: [api.<domain>]
+  ports:
+    api: 5678
 ```
 
 Fields in `x-ops` win over the settings in ops. [Config in the repo](/docs/guides/config) lists all of them.

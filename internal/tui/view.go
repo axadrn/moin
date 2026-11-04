@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strings"
@@ -212,6 +213,9 @@ func (m model) detailView(width, room int) []string {
 	if facts != "" {
 		lines = append(lines, pad+facts)
 	}
+	if addresses := appAddresses(app); addresses != "" {
+		lines = append(lines, pad+style.Muted.Render("at ")+addresses)
+	}
 	lines = append(lines, "")
 
 	if len(m.detail.Deploys) == 0 {
@@ -244,6 +248,27 @@ func (m model) detailView(width, room int) []string {
 		lines = append(lines, m.panel(width, room-len(lines))...)
 	}
 	return lines
+}
+
+// appAddresses are the domains of every service and the instant address.
+func appAddresses(app client.App) string {
+	urls := []string{}
+	for _, domain := range app.Domains {
+		urls = append(urls, "https://"+domain)
+	}
+	for _, service := range slices.Sorted(maps.Keys(app.ServiceDomains)) {
+		for _, domain := range app.ServiceDomains[service] {
+			urls = append(urls, "https://"+domain+style.Muted.Render(" ("+service+")"))
+		}
+	}
+	if app.Instant != "" {
+		instant := app.Instant + style.Muted.Render(" (instant")
+		if !app.InstantOpen {
+			instant += style.Muted.Render(", password")
+		}
+		urls = append(urls, instant+style.Muted.Render(")"))
+	}
+	return strings.Join(urls, dot())
 }
 
 // historyRows is how many deploys the open app lists and lets you pick.
@@ -475,7 +500,7 @@ func (m model) prompt() ([]string, [][2]string) {
 	case modeConfirmWrite:
 		return bar(style.Warning, style.Bold.Render("This query changes data. Run it?"), m.pendingSQL), [][2]string{{"y", "run"}, cancel}
 	case modeDomains:
-		return bar(style.Accent, style.Bold.Render("Domain: ")+m.input+cursor), [][2]string{{"blog.de", "add"}, {"-blog.de", "remove"}, {"=blog.de", "canonical"}, {"esc", "close"}}
+		return bar(style.Accent, style.Bold.Render("Domain: ")+m.input+cursor), [][2]string{{"blog.de", "add"}, {"-blog.de", "remove"}, {"=blog.de", "canonical"}, {"api:api.blog.de", "for a service"}, {"esc", "close"}}
 	case modeProtect:
 		masked := m.input
 		if user, password, found := strings.Cut(m.input, ":"); found {
