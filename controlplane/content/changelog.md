@@ -3,6 +3,22 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.19
+
+November 4, 2026
+
+**In short:** 47 apps in the catalog, with AI on your own server: Open WebUI, Ollama, Flowise, plus Metabase, Outline, Twenty, Directus, Jellyfin and more.
+
+### New
+- **17 more apps**: Open WebUI, Ollama, Flowise, Activepieces, Metabase, Outline, Twenty, Directus, Appsmith, Jellyfin, Audiobookshelf, Trilium, Homepage, Gatus, Healthchecks, PrivateBin and Seafile. Each one installed for real before it got in.
+- **An AI category**: chat with your own models, next to your data.
+
+### Fixed
+- **Newest releases from GitHub's registry**: ops read only the first page of tags, so some apps showed an old release as the newest. It reads them all now.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. The catalog comes with it.
+
 ## v1.0.0-beta.18
 
 November 4, 2026
