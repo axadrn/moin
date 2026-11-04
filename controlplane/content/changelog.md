@@ -3,6 +3,23 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.17
+
+November 4, 2026
+
+**In short:** every app is online at once, with HTTPS and a password, before it has a domain; and each service of an app can have its own.
+
+### New
+- **Instant address**: after its first deploy every app answers at `<app>.<your-server-ip>.sslip.io` with HTTPS, guarded by a password until you open it. Switch to `nip.io` if one is ever down. Web: **Instant address** on the app page. CLI: `ops instant`, `ops instant nip.io`, `ops instant open`.
+- **Domains per service**: `shop.com` for `web` and `api.shop.com` for `api` in one app. In compose.yml under `x-ops.domains`, or `ops domains add --service api api.shop.com`.
+- **Uptime for every service**: each domain of each service is checked every minute.
+
+### Changed
+- **`ops deploy`** ends with the address the app is live at.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves; servers behind a Cloudflare Tunnel get no instant address, since it needs ports 80 and 443 open.
+
 ## v1.0.0-beta.16
 
 November 4, 2026
