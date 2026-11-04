@@ -206,6 +206,8 @@ In ops the database is `postgres-<service>`, here `postgres-db`: in the bucket, 
 - **Checked daily.** ops restores the newest copy into a throwaway Postgres of the same image, with no network, and checks that every table came back.
 - **Restore to a point in time.** ops takes a full copy first, rebuilds the data in a new volume from the base backup and the log up to your second, and only when that worked stops the app, swaps the data in and starts the app again. If anything fails before the swap, nothing changed.
 
+ops sets `max_slot_wal_keep_size` to 4 GB when it is still the default, so a WAL-G that stays down never fills your disk: past that Postgres drops WAL-G's place, ops takes a new base backup at once, and the Backups tab says so for a day.
+
 Requirements: the data is on a volume, as above, and the image is Debian-based, like `postgres:17`. WAL-G does not run on Alpine images such as `postgres:17-alpine`: they get full copies and the daily check, and the Backups tab says so.
 
 In the bucket the database's folder holds `walg/` (every change and the base backups) next to `snapshots/`.

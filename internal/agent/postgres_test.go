@@ -7,9 +7,32 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/ops/protocol"
 )
+
+// TestWalgNote: a lost slot shows for a day, first with the base backup
+// being taken, then with when it finished; an unsupported image wins.
+func TestWalgNote(t *testing.T) {
+	now := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	broke := now.Add(-time.Hour)
+	if got := walgNoteFor("", time.Time{}, time.Time{}, now); got != "" {
+		t.Errorf("nothing broke: %q", got)
+	}
+	if got := walgNoteFor("", broke, time.Time{}, now); !strings.Contains(got, "broke at Nov 4, 11:00 UTC") || !strings.Contains(got, "4GB") || !strings.Contains(got, "started a new base backup") {
+		t.Errorf("broke: %q", got)
+	}
+	if got := walgNoteFor("", broke, broke.Add(5*time.Minute), now); !strings.Contains(got, "took a new base backup at 11:05 UTC") {
+		t.Errorf("rebased: %q", got)
+	}
+	if got := walgNoteFor("", broke, broke, now.Add(25*time.Hour)); got != "" {
+		t.Errorf("after a day: %q", got)
+	}
+	if got := walgNoteFor("alpine", broke, time.Time{}, now); got != "alpine" {
+		t.Errorf("unsupported: %q", got)
+	}
+}
 
 func TestPostgresImage(t *testing.T) {
 	for image, want := range map[string]bool{

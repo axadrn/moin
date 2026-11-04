@@ -648,7 +648,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		if err == nil && !since.IsZero() {
 			backup.Since, backup.ReplicatedAt = &since, &until
 		}
-		backup.Note = b.walgUnsupported(app, database)
+		backup.Note = b.walgNote(app, database)
 		b.mu.Lock()
 		last := b.verified[drillKey(app, database)]
 		b.mu.Unlock()

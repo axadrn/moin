@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,12 +45,6 @@ func TestWALGPointInTime(t *testing.T) {
 				"environment": map[string]string{"POSTGRES_USER": "app", "POSTGRES_DB": "shop", "POSTGRES_PASSWORD": "secret"},
 				"volumes":     []any{map[string]any{"type": "volume", "source": "pgdata", "target": "/var/lib/postgresql/data"}},
 			},
-			// A local S3 for this test only.
-			"s3": map[string]any{
-				"image":   "chrislusf/seaweedfs:latest",
-				"command": []string{"server", "-s3", "-s3.port=8333", "-dir=/data"},
-				"ports":   []any{map[string]any{"target": 8333, "published": "19000"}},
-			},
 		},
 		"volumes": map[string]any{"pgdata": map[string]any{"name": "ops-walgtest-pgdata"}},
 	}
@@ -61,10 +56,15 @@ func TestWALGPointInTime(t *testing.T) {
 	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("4f6c1d2e-0000-4000-8000-000000000001"), 0o600)
 	down := func() {
 		exec.Command("docker", "compose", "-p", project(app), "-f", composeFile, "down", "-v").Run()
-		exec.Command("docker", "rm", "-f", companionName(app, "db")).Run()
+		exec.Command("docker", "rm", "-f", companionName(app, "db"), "ops-walgtest-s3").Run()
 	}
 	down()
 	defer down()
+	// A local S3 for this test only, outside the app: a restore stops and
+	// starts the app's services, never the bucket.
+	if out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", "ops-walgtest-s3", "-p", "19000:8333", "chrislusf/seaweedfs:latest", "server", "-s3", "-s3.port=8333", "-dir=/data").CombinedOutput(); err != nil {
+		t.Fatalf("s3: %v %s", err, out)
+	}
 	if out, err := exec.CommandContext(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "up", "-d").CombinedOutput(); err != nil {
 		t.Fatalf("compose up: %v %s", err, out)
 	}
@@ -180,6 +180,54 @@ func TestWALGPointInTime(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 	if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &future}); err == nil || !strings.Contains(err.Error(), "outside the point in time window") {
 		t.Errorf("restore to the future: %v", err)
+	}
+
+	// The slot is capped, so a WAL-G that stays down cannot fill the disk.
+	b.walgOnce(ctx)
+	if got := sql(`SHOW max_slot_wal_keep_size;`); got != "4GB" {
+		t.Errorf("max_slot_wal_keep_size = %s, want 4GB", got)
+	}
+	// WAL-G stays down past a (here tiny) cap: Postgres drops its place,
+	// ops notices, starts a new companion and takes a new base backup.
+	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'ops_walg' AND restart_lsn IS NOT NULL;`) != "1"; {
+		if time.Now().After(deadline) {
+			t.Fatal("WAL-G never started streaming")
+		}
+		time.Sleep(time.Second)
+	}
+	if out, err := exec.Command("docker", "stop", companionName(app, "db")).CombinedOutput(); err != nil {
+		t.Fatalf("stop the companion: %v %s", err, out)
+	}
+	sql(`ALTER SYSTEM SET max_slot_wal_keep_size = '1MB';`)
+	sql(`SELECT pg_reload_conf();`)
+	lost := false
+	for round := 0; round < 20 && !lost; round++ {
+		sql(fmt.Sprintf(`INSERT INTO orders SELECT g, 'x' FROM generate_series(%d, %d) g; SELECT pg_switch_wal();`, 1000+round*1000, 1999+round*1000))
+		sql(`CHECKPOINT;`)
+		lost = sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'ops_walg'), '');`) == "lost"
+	}
+	if !lost {
+		t.Fatalf("the slot never got lost: %s; cap %s; lsn %s", sql(`SELECT string_agg(slot_name || ' ' || coalesce(wal_status, '-') || ' ' || active || ' ' || coalesce(restart_lsn::text, '-'), '; ') FROM pg_replication_slots;`), sql(`SHOW max_slot_wal_keep_size;`), sql(`SELECT pg_current_wal_lsn();`))
+	}
+	basesBefore, _ := b.walgBaseBackups(ctx, app, database)
+	b.walgOnce(ctx)
+	if got := sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'ops_walg'), 'none');`); got == "lost" {
+		t.Errorf("the slot is still lost")
+	}
+	running, _ = a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
+	if strings.TrimSpace(running) != "true" {
+		t.Errorf("no companion after the lost slot")
+	}
+	basesAfter, _ := b.walgBaseBackups(ctx, app, database)
+	if len(basesAfter) <= len(basesBefore) {
+		t.Errorf("no new base backup: %d before, %d after", len(basesBefore), len(basesAfter))
+	}
+	status = b.status(ctx, app, database, false)
+	if !strings.Contains(status.Note, "Continuous backup broke") || !strings.Contains(status.Note, "took a new base backup") {
+		t.Errorf("note %q", status.Note)
+	}
+	if status.Since == nil || status.Since.Before(basesAfter[len(basesAfter)-1].at.Add(-time.Second)) {
+		t.Errorf("the window starts before the new base backup: %v", status.Since)
 	}
 
 	// Without a bucket the companion goes and its slot with it.

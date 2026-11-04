@@ -50,6 +50,12 @@ const (
 	walgTick      = time.Minute
 	walgBaseEvery = 24 * time.Hour
 	walgSlot      = "ops_walg"
+	// walgSlotCap is how much WAL Postgres keeps for a WAL-G that is down.
+	// Past it Postgres drops the slot instead of filling the disk.
+	walgSlotCap = "4GB"
+	// walgBrokeShows is how long the backups page says the continuous
+	// backup broke and started again.
+	walgBrokeShows = 24 * time.Hour
 )
 
 // walgSHA256 are the checksums of the pinned release, by GOARCH.
@@ -70,6 +76,9 @@ type walgState struct {
 	based time.Time
 	// unsupported says why the image runs snapshots only.
 	unsupported string
+	// broke is when Postgres dropped the slot past its cap; rebased is
+	// when the base backup after it finished.
+	broke, rebased time.Time
 }
 
 // walg runs the companions and remembers their state.
@@ -229,7 +238,7 @@ func (b *backups) walgPrefix(app string, database protocol.Database) (*protocol.
 
 // walgEnv is the environment WAL-G reads, as an env file only root may
 // read: the keys never show in ps. remove deletes the file.
-func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget, data pgData) (file string, remove func(), err error) {
+func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget) (file string, remove func(), err error) {
 	region := storage.Region
 	if region == "" {
 		region = "auto"
@@ -245,7 +254,10 @@ func walgEnv(storage *protocol.BackupStorage, prefix string, target pgTarget, da
 		"PGPORT=5432",
 		"PGUSER=" + target.user,
 		"PGDATABASE=" + target.database,
-		"PGDATA=" + data.dir,
+		// wal-receive keeps its own files under $PGDATA/pg_wal, and the
+		// image's PGDATA is the data, which the companion mounts read-only:
+		// point it elsewhere. backup-push gets the data folder as argument.
+		"PGDATA=/tmp/ops-walg",
 		"SSL_CERT_FILE=/etc/ssl/certs/ops-ca.crt",
 	}
 	if storage.Endpoint != "" {
@@ -325,11 +337,14 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	b.walg.mu.Lock()
 	state.unsupported = ""
 	b.walg.mu.Unlock()
+	if err := capSlot(ctx, target); err != nil {
+		return fmt.Errorf("cap the WAL the slot keeps: %w", err)
+	}
 	data, err := b.apps.pgDataOf(ctx, target.container)
 	if err != nil {
 		return err
 	}
-	envFile, remove, err := walgEnv(storage, prefix, target, data)
+	envFile, remove, err := walgEnv(storage, prefix, target)
 	if err != nil {
 		return err
 	}
@@ -351,10 +366,55 @@ func (b *backups) walgEnsure(ctx context.Context, app string, database protocol.
 	}
 	if err == nil && len(newest) > 0 {
 		b.walg.mu.Lock()
-		state.based = newest[len(newest)-1].at
+		// After a lost slot the old base backups do not count: one is due.
+		if state.broke.IsZero() || !state.rebased.IsZero() {
+			state.based = newest[len(newest)-1].at
+		}
 		b.walg.mu.Unlock()
 	}
 	return nil
+}
+
+// capSlotSQL sets max_slot_wal_keep_size on Postgres 13 and newer, only
+// while it is the default -1: a value the owner chose stays.
+const capSlotSQL = `SELECT current_setting('server_version_num')::int >= 130000 AND current_setting('max_slot_wal_keep_size') = '-1' AS due \gset
+\if :due
+ALTER SYSTEM SET max_slot_wal_keep_size = :'cap';
+SELECT pg_reload_conf();
+\endif
+`
+
+// capSlot caps the WAL Postgres keeps for the WAL-G slot, so a WAL-G that
+// stays down never fills the disk: past the cap Postgres drops the slot.
+func capSlot(ctx context.Context, target pgTarget) error {
+	_, err := target.psql(ctx, capSlotSQL, map[string]string{"cap": walgSlotCap}, false)
+	return err
+}
+
+// walgCheckSlot finds a slot Postgres dropped past its cap: WAL-G lost its
+// place, so the log in the bucket has a gap. It drops the slot, removes
+// the companion and asks for a new base backup, from which the window
+// starts again. It reports whether the slot was lost.
+func (b *backups) walgCheckSlot(ctx context.Context, app string, database protocol.Database) (bool, error) {
+	target, err := b.apps.postgres(ctx, app, database)
+	if err != nil {
+		return false, err
+	}
+	out, err := target.psql(ctx, `SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = :'slot'), '');`, map[string]string{"slot": walgSlot}, false)
+	if err != nil || strings.TrimSpace(out) != "lost" {
+		return false, err
+	}
+	_, _ = b.apps.output(ctx, "docker", "rm", "-f", companionName(app, database.Service))
+	_, err = target.psql(ctx, `SELECT pg_drop_replication_slot(:'slot');`, map[string]string{"slot": walgSlot}, false)
+	if err != nil {
+		return true, err
+	}
+	state := b.walgState(drillKey(app, database))
+	b.walg.mu.Lock()
+	state.broke, state.rebased, state.based = time.Now().UTC(), time.Time{}, time.Time{}
+	b.walg.mu.Unlock()
+	slog.Error("backup: WAL-G fell too far behind, Postgres dropped its slot; taking a new base backup", "app", app, "database", database.Path)
+	return true, nil
 }
 
 // walgBase takes a base backup with the companion, then lets WAL-G delete
@@ -375,6 +435,9 @@ func (b *backups) walgBase(ctx context.Context, app string, database protocol.Da
 	state := b.walgState(drillKey(app, database))
 	b.walg.mu.Lock()
 	state.based = time.Now().UTC()
+	if !state.broke.IsZero() && state.rebased.IsZero() {
+		state.rebased = state.based
+	}
 	b.walg.mu.Unlock()
 	// The base backup ends in an open WAL segment: close it, so the backup
 	// can be restored as soon as wal-receive uploads it.
@@ -443,6 +506,9 @@ func (b *backups) walgOnce(ctx context.Context) {
 	for app, databases := range b.pgDatabases() {
 		for _, database := range databases {
 			wanted[companionName(app, database.Service)] = true
+			if _, err := b.walgCheckSlot(ctx, app, database); err != nil {
+				slog.Warn("backup: check the WAL-G slot", "app", app, "database", database.Path, "error", err)
+			}
 			if err := b.walgEnsure(ctx, app, database); err != nil {
 				slog.Warn("backup: continuous Postgres backup", "app", app, "database", database.Path, "error", err)
 				continue
@@ -530,6 +596,18 @@ func (b *backups) walgWindow(ctx context.Context, app string, database protocol.
 	if err != nil || len(backups) == 0 {
 		return since, until, err
 	}
+	// After a lost slot the log has a gap: the window starts again at the
+	// first base backup after it, and there is none until that one is done.
+	state := b.walgState(drillKey(app, database))
+	b.walg.mu.Lock()
+	broke := state.broke
+	b.walg.mu.Unlock()
+	if !broke.IsZero() {
+		backups = slices.DeleteFunc(backups, func(backup walgBackup) bool { return backup.at.Before(broke) })
+		if len(backups) == 0 {
+			return since, until, nil
+		}
+	}
 	since = backups[0].at
 	until = backups[len(backups)-1].at
 	storage, prefix, err := b.walgPrefix(app, database)
@@ -557,6 +635,30 @@ func (b *backups) walgUnsupported(app string, database protocol.Database) string
 	b.walg.mu.Lock()
 	defer b.walg.mu.Unlock()
 	return state.unsupported
+}
+
+// walgNote is what the backups page says about a database's continuous
+// backup: an image WAL-G does not run in, or, for a day, a lost slot and
+// the base backup that started it again.
+func (b *backups) walgNote(app string, database protocol.Database) string {
+	state := b.walgState(drillKey(app, database))
+	b.walg.mu.Lock()
+	defer b.walg.mu.Unlock()
+	return walgNoteFor(state.unsupported, state.broke, state.rebased, time.Now())
+}
+
+func walgNoteFor(unsupported string, broke, rebased, now time.Time) string {
+	if unsupported != "" {
+		return unsupported
+	}
+	if broke.IsZero() || now.Sub(broke) > walgBrokeShows {
+		return ""
+	}
+	note := "Continuous backup broke at " + broke.UTC().Format("Jan 2, 15:04") + " UTC: WAL-G fell more than " + walgSlotCap + " behind, so Postgres dropped its place to keep the disk from filling. "
+	if rebased.IsZero() {
+		return note + "ops started a new base backup; point in time restores start again from it. Snapshots are not affected."
+	}
+	return note + "ops took a new base backup at " + rebased.UTC().Format("15:04") + " UTC; point in time restores reach back to it. Snapshots are not affected."
 }
 
 // walgBefore takes a base backup before a deploy, when the database has a
@@ -625,7 +727,7 @@ func (b *backups) pgRestorePoint(ctx context.Context, request protocol.BackupRes
 	if _, err := b.snapshotOne(ctx, request.App, database, "before-restore"); err != nil {
 		return fmt.Errorf("snapshot before the restore: %w", err)
 	}
-	envFile, remove, err := walgEnv(storage, prefix, target, data)
+	envFile, remove, err := walgEnv(storage, prefix, target)
 	if err != nil {
 		return err
 	}
