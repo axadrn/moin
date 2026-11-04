@@ -67,4 +67,4 @@ Builds run on **your** server. `moin deploy` puts the source into your bucket an
 
 Start with [Getting Started](/docs/getting-started).
 
-Why the name? moin is how Hamburg says hello: short, friendly, at any hour. Hamburg is a port, and ports run on containers.
+Why the name? moin is how Hamburg says hello: short, friendly, at any hour. Hamburg is a container port, and your apps run in containers too: moin ships them to your servers and loses none of their data.
