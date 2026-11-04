@@ -49,18 +49,8 @@ templ AppShell(p AppProps) {
 					<div id="sidebar-nav" class="contents">
 						@AppSidebarNavigation()
 					</div>
-					// The apps load after the page and again after every boosted
-					// swap, which pushes the new URL, so the open app stays marked.
-					<div
-						id="sidebar-apps"
-						class="contents"
-						hx-get={ basePath + "/apps/nav" }
-						hx-trigger="load, apps-changed from:body, htmx:after:history:push from:document"
-						hx-swap="innerHTML"
-					></div>
 				}
 				@sidebar.Footer() {
-					@AppSidebarHelp()
 					@AppTrialCard()
 					{{ user := ctxkeys.User(ctx) }}
 					if user != nil {

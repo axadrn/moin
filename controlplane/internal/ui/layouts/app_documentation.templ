@@ -3,48 +3,24 @@ package layouts
 import (
 	"github.com/axadrn/ops/internal/build"
 	"github.com/axadrn/ops/controlplane/internal/ctxkeys"
+	dropdown "github.com/axadrn/ops/controlplane/internal/ui/components/dropdownmenu"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/ops/controlplane/internal/ui/components/sidebar"
 )
 
-// AppSidebarHelp is the quiet links above the user: the docs, support and
-// the version of the control plane, which opens the changelog.
-templ AppSidebarHelp() {
-	@sidebar.Menu() {
-		@sidebar.MenuItem() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{
-				Href:       "/docs",
-				Size:       sidebar.MenuButtonSizeSm,
-				Tooltip:    "Documentation",
-				Class:      "text-sidebar-foreground/70",
-				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"},
-			}) {
-				@icon.BookOpen()
-				<span>Documentation</span>
-			}
-		}
-		@sidebar.MenuItem() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{
-				Href:    "mailto:" + ctxkeys.RenderConfig(ctx).SupportEmail,
-				Size:    sidebar.MenuButtonSizeSm,
-				Tooltip: "Support",
-				Class:   "text-sidebar-foreground/70",
-			}) {
-				@icon.LifeBuoy()
-				<span>Support</span>
-			}
-		}
-		@sidebar.MenuItem() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{
-				Href:       "/changelog",
-				Size:       sidebar.MenuButtonSizeSm,
-				Tooltip:    build.Name + " " + build.Version,
-				Class:      "text-sidebar-foreground/70",
-				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-version": build.Version},
-			}) {
-				@icon.Tag()
-				<span>{ build.Name } <span class="font-mono text-xs">{ build.Version }</span></span>
-			}
-		}
+// AppSidebarHelpItems are the docs, support and the version of the control
+// plane in the account menu: there when needed, out of the way otherwise.
+templ AppSidebarHelpItems() {
+	@dropdown.Item(dropdown.ItemProps{Href: "/docs", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+		@icon.BookOpen()
+		Docs
+	}
+	@dropdown.Item(dropdown.ItemProps{Href: "mailto:" + ctxkeys.RenderConfig(ctx).SupportEmail}) {
+		@icon.LifeBuoy()
+		Support
+	}
+	@dropdown.Item(dropdown.ItemProps{Href: "/changelog", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-version": build.Version}}) {
+		@icon.Tag()
+		Changelog
+		<span class="ml-auto font-mono text-xs text-muted-foreground">{ build.Version }</span>
 	}
 }

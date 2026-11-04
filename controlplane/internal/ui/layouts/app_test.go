@@ -54,7 +54,7 @@ func TestAppLayoutRendersTheSidebarAsItWasLeft(t *testing.T) {
 	if !strings.Contains(expanded, `data-state="expanded"`) || !strings.Contains(expanded, `data-templ-collapsible="icon"`) {
 		t.Fatal("the sidebar does not start expanded and collapsible to icons")
 	}
-	for _, hook := range []string{`id="sidebar-workspace"`, `id="sidebar-apps"`, `id="sidebar-avatar"`, `id="sidebar-user-name"`, `id="dropdown-user-label"`, "data-app-base=", `data-sidebar="rail"`, `hx-post="/auth/logout"`} {
+	for _, hook := range []string{`id="sidebar-workspace"`, `id="sidebar-avatar"`, `id="sidebar-user-name"`, `id="dropdown-user-label"`, "data-app-base=", `data-sidebar="rail"`, `hx-post="/auth/logout"`} {
 		if !strings.Contains(expanded, hook) {
 			t.Fatalf("the sidebar lost %s", hook)
 		}

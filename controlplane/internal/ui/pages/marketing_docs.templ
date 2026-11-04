@@ -72,9 +72,9 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 						@sidebar.Trigger()
 						@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-4 data-vertical:self-auto"})
 						@templ.Fragment("docs-breadcrumb") {
-							<div id="docs-breadcrumb" class="min-w-0" hx-swap-oob="true">
+							<div id="docs-breadcrumb" class="min-w-0 flex-1 overflow-hidden" hx-swap-oob="true">
 								@breadcrumb.Breadcrumb() {
-									@breadcrumb.List(breadcrumb.ListProps{Class: "flex-nowrap"}) {
+									@breadcrumb.List(breadcrumb.ListProps{Class: "min-w-0 flex-nowrap"}) {
 										@breadcrumb.Item(breadcrumb.ItemProps{Class: "hidden sm:inline-flex"}) {
 											@breadcrumb.Link(breadcrumb.LinkProps{Href: "/"}) {
 												{ brand.Name }
@@ -95,8 +95,8 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 										if docsPageURL(currentPage) != "/docs" {
 											@breadcrumb.Item(breadcrumb.ItemProps{Class: "min-w-0"}) {
 												@breadcrumb.Separator()
-												@breadcrumb.Page() {
-													<span class="block max-w-[46vw] truncate sm:max-w-none">{ currentPage.Title }</span>
+												@breadcrumb.Page(breadcrumb.ItemProps{Class: "block min-w-0 truncate"}) {
+													{ currentPage.Title }
 												}
 											}
 										}
@@ -104,7 +104,9 @@ templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.
 								}
 							</div>
 						}
-						<div class="ml-auto flex items-center gap-1">
+						// The right side never shrinks; the breadcrumb takes what is left
+						// and truncates, so nothing overlaps on a phone.
+						<div class="ml-auto flex shrink-0 items-center gap-1">
 							@docsSearch(docsTree)
 							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "ops on GitHub"}}) {
 								@icons.Github(icons.Props{Class: "size-4"})

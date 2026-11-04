@@ -8,7 +8,7 @@ import (
 )
 
 // AppSidebarUser is nav-user of shadcn's sidebar-07: the signed-in user
-// with a menu for the account, the theme and signing out.
+// with a menu for the account, the theme, help and signing out.
 templ AppSidebarUser(user *model.User) {
 	@sidebar.Menu() {
 		@sidebar.MenuItem() {
@@ -41,6 +41,10 @@ templ AppSidebarUser(user *model.User) {
 							@icon.SunMoon()
 							Theme
 						}
+					}
+					@dropdown.Separator()
+					@dropdown.Group() {
+						@AppSidebarHelpItems()
 					}
 					@dropdown.Separator()
 					@dropdown.Group() {

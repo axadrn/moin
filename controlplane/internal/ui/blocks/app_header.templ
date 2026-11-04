@@ -48,7 +48,7 @@ templ AppHeader(p AppHeaderProps) {
 			</ol>
 		</nav>
 		<div class="ml-auto flex items-center gap-1">
-			@button.Button(button.Props{Href: "/docs", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeSm, Class: "hidden gap-1 px-3 font-normal text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener"}}) {
+			@button.Button(button.Props{Href: "/docs", Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Class: "hidden gap-1 px-3 sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener"}}) {
 				Docs
 				@icon.ArrowUpRight(icon.Props{Class: "size-3.5"})
 			}
