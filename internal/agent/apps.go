@@ -251,12 +251,21 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			}
 		} else if start.SourceURL != "" || start.SourceNumber > 0 {
 			logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
+			if detected.Builder != "" {
+				logf("→ Railpack: %s", detected.Builder)
+			}
 		} else {
 			logf("applying env and routing to the running images")
 		}
 		if builds(config) {
 			logf("building")
-			err = a.compose(ctx, start.App, composeFile, logf, "build")
+			// A Railpack build reads the app's env as BuildKit secrets, from
+			// the environment of compose, never from its arguments.
+			var environment []string
+			if detected.Kind == "railpack" {
+				environment = buildEnv(start.Env)
+			}
+			err = a.run(ctx, logf, environment, "compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "build")
 			if err != nil {
 				return detected, fmt.Errorf("build: %w", err)
 			}
@@ -401,9 +410,15 @@ func (a *apps) resolve(ctx context.Context, app, src string, env map[string]stri
 	detected := protocol.Detected{Kind: "compose"}
 	if composePath(src) == "" {
 		var err error
-		detected.Kind, err = generate(src)
+		detected.Kind, err = generate(src, app)
 		if err != nil {
 			return nil, detected, err
+		}
+		if detected.Kind == "railpack" {
+			detected.Builder, err = a.railpackPrepare(ctx, src, filepath.Dir(src), env)
+			if err != nil {
+				return nil, detected, err
+			}
 		}
 	}
 	vars := make([]string, 0, len(env))
@@ -610,6 +625,9 @@ func finish(base map[string]any, start protocol.DeployStart, detected protocol.D
 			}
 			service["environment"] = environment
 		}
+		if name == detected.Service && detected.Kind == "railpack" {
+			railpackSecrets(config, service, start.Env)
+		}
 		if service["restart"] == nil {
 			service["restart"] = "unless-stopped"
 		}
@@ -710,12 +728,14 @@ func composePath(src string) string {
 
 // generate writes what a repo without compose.yml needs: a compose.yml with
 // one service and, for a Go module without Dockerfile, the Dockerfile too.
-func generate(src string) (string, error) {
+// A repo with none of these builds with Railpack, from a plan resolve has it
+// write next to src.
+func generate(src, app string) (string, error) {
 	kind := "dockerfile"
 	if _, err := os.Stat(filepath.Join(src, "Dockerfile")); err != nil {
 		goMod, err := os.ReadFile(filepath.Join(src, "go.mod"))
 		if err != nil {
-			return "", errors.New("found no compose.yml, Dockerfile or go.mod")
+			return "railpack", os.WriteFile(filepath.Join(src, "compose.yml"), []byte(railpackCompose(app)), 0o644)
 		}
 		kind = "go"
 		err = os.WriteFile(filepath.Join(src, "Dockerfile"), []byte(goDockerfile(src, goMod)), 0o644)

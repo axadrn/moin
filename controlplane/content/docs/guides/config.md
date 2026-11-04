@@ -6,7 +6,7 @@ order: 5
 
 Everything ops needs to know about an app can live next to its code, in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional; without them ops detects what it can, as [Deploy](/docs/guides/deploy#deploy-from-a-repo) shows.
 
-Your repo has only a `Dockerfile` or a `go.mod`? Then you need no file at all. To set one of these fields anyway, add a `compose.yml` like the one below: it then replaces the one ops would write, so it needs the `services` part too.
+Your repo has only a `Dockerfile` or a `go.mod`, or none of them and ops [builds it with Railpack](/docs/guides/deploy#no-dockerfile)? Then you need no file at all. To set one of these fields anyway, add a `compose.yml` like the one below: it then replaces the one ops would write, so it needs the `services` part too, with a `Dockerfile` to build. For a Railpack app, change the start command with the env var `RAILPACK_START_CMD` instead.
 
 ```yaml
 x-ops:

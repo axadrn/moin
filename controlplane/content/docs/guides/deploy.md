@@ -36,9 +36,27 @@ What the repo brings decides how ops builds it:
 | `compose.yml` | uses it |
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
 | a Go module | also writes the Dockerfile: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
-| none of these | fails the deploy with `found no compose.yml, Dockerfile or go.mod` |
+| none of these | builds it with [Railpack](#no-dockerfile): Node, Bun, Python, Ruby, PHP and more |
 
 Your app must listen on the port ops gives it in `PORT`, or on the port in your compose file or Dockerfile. [Config in the repo](/docs/guides/config) changes the port, the health check and more.
+
+### No Dockerfile
+
+No Dockerfile? No problem. ops reads your repo and builds it with [Railpack](https://railpack.com), the open source builder Railway made: Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more.
+
+- **It finds the language and the version**: from `package.json`, `requirements.txt`, `pyproject.toml`, `Gemfile`, `composer.json` and the like.
+- **It finds the start command**: the `start` script, a `Procfile`, `main.py`. Set your own with the env var `RAILPACK_START_CMD`.
+- **Your app listens on `PORT`**: ops sets it to 8080 and sends traffic there, like Railway.
+- **Your env vars reach the build**, as secrets that never land in the image or in a log. A build that needs `NEXT_PUBLIC_API_URL` gets it.
+- **Data goes to `/data`**, like any app ops builds: `DATA_DIR=/data` is set.
+
+The deploy says what it found:
+
+```text
+→ Railpack: Node 24.22.1, start: npm run start
+```
+
+The app page, `ops apps <app-name>`, the TUI, the API and `get_app` show it too. If Railpack cannot tell how to build or start the repo, the deploy fails with its reason; add a `Dockerfile` or a `compose.yml` and deploy again. The agent downloads Railpack once, checked against its published checksum, and the build runs on your server with Docker's own BuildKit.
 
 ## See your apps
 

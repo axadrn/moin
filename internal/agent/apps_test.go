@@ -55,7 +55,7 @@ func TestGenerateFindsTheMainPackage(t *testing.T) {
 	os.WriteFile(filepath.Join(src, "go.mod"), []byte("module x\n\ngo 1.26.3\n"), 0o644)
 	os.MkdirAll(filepath.Join(src, "cmd", "web"), 0o755)
 	os.WriteFile(filepath.Join(src, "cmd", "web", "main.go"), []byte("package main\n"), 0o644)
-	kind, err := generate(src)
+	kind, err := generate(src, "shop")
 	if err != nil || kind != "go" {
 		t.Fatalf("generate = %q, %v", kind, err)
 	}
@@ -66,8 +66,39 @@ func TestGenerateFindsTheMainPackage(t *testing.T) {
 	if composePath(src) == "" {
 		t.Fatal("generate wrote no compose.yml")
 	}
-	if _, err := generate(t.TempDir()); err == nil {
-		t.Fatal("an empty repo must fail")
+}
+
+// TestGenerateOrder: compose.yml wins, then a Dockerfile, then a Go module,
+// and anything else builds with Railpack, from the plan next to src.
+func TestGenerateOrder(t *testing.T) {
+	for _, test := range []struct {
+		files map[string]string
+		kind  string
+	}{
+		{map[string]string{"Dockerfile": "FROM scratch\nEXPOSE 3000\n", "go.mod": "module x\n", "package.json": "{}"}, "dockerfile"},
+		{map[string]string{"go.mod": "module x\n\ngo 1.26\n", "main.go": "package main\n", "package.json": "{}"}, "go"},
+		{map[string]string{"package.json": `{"scripts":{"start":"node server.js"}}`}, "railpack"},
+		{map[string]string{"requirements.txt": "flask\n"}, "railpack"},
+	} {
+		src := filepath.Join(t.TempDir(), "src")
+		os.MkdirAll(src, 0o755)
+		for name, body := range test.files {
+			os.WriteFile(filepath.Join(src, name), []byte(body), 0o644)
+		}
+		kind, err := generate(src, "shop")
+		if err != nil || kind != test.kind {
+			t.Fatalf("%v: generate = %q, %v; want %s", test.files, kind, err, test.kind)
+		}
+		compose, _ := os.ReadFile(composePath(src))
+		if kind == "railpack" {
+			for _, want := range []string{"dockerfile: ../railpack-plan.json", "BUILDKIT_SYNTAX: " + railpackFrontend, "cache-key: ops-shop", `PORT: "8080"`, "./data:/data"} {
+				if !strings.Contains(string(compose), want) {
+					t.Errorf("railpack compose lacks %q:\n%s", want, compose)
+				}
+			}
+		} else if strings.Contains(string(compose), "railpack") {
+			t.Errorf("%s compose names railpack:\n%s", kind, compose)
+		}
 	}
 }
 

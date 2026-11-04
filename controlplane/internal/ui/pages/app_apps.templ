@@ -192,7 +192,7 @@ templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
 			<dl class="flex flex-wrap gap-x-8 gap-y-3">
 				@serverFact("Server", app.ServerName, app.ServerName)
 				if hasNewest && newest.Detected != nil {
-					@serverFact("Service", newest.Detected.Service+":"+strconv.Itoa(newest.Detected.Port), newest.Detected.Kind)
+					@serverFact("Service", newest.Detected.Service+":"+strconv.Itoa(newest.Detected.Port), newest.Detected.Built())
 				}
 				if hasNewest {
 					@serverFact("Last deploy", ago(newest.CreatedAt, now), stamp(newest.CreatedAt))
@@ -221,7 +221,7 @@ templ appRow(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
 				if hasNewest && newest.Detected != nil {
 					<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
 					<span aria-hidden="true">·</span>
-					{ newest.Detected.Kind }
+					{ newest.Detected.Built() }
 					<span aria-hidden="true">·</span>
 				}
 				on { app.ServerName }
@@ -515,7 +515,7 @@ templ appFacts(app model.App, deploys []api.Deploy) {
 			@statCard("Deploys", "0", "")
 		}
 		if detected != nil {
-			@statCard("Port", strconv.Itoa(detected.Port), detected.Service+" · "+detected.Kind, templ.Attributes{"data-detected": true}) {
+			@statCard("Port", strconv.Itoa(detected.Port), detected.Service+" · "+detected.Built(), templ.Attributes{"data-detected": true}) {
 				for _, database := range detected.Databases {
 					<span class="mt-1 block truncate text-xs text-muted-foreground" title={ "On the server: " + database.HostPath }>database <span class="font-mono text-foreground">{ database.Path }</span></span>
 				}

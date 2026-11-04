@@ -201,7 +201,7 @@ func (m model) detailView(width, room int) []string {
 			continue
 		}
 		detected := deploy.Detected
-		facts += dot() + detected.Kind + dot() + style.Muted.Render("service ") + detected.Service + dot() + style.Muted.Render("port ") + fmt.Sprint(detected.Port)
+		facts += dot() + detected.Built() + dot() + style.Muted.Render("service ") + detected.Service + dot() + style.Muted.Render("port ") + fmt.Sprint(detected.Port)
 		lines = append(lines, pad+facts)
 		for _, database := range detected.Databases {
 			lines = append(lines, pad+style.Muted.Render("database ")+database.Path+dot()+style.Muted.Render(database.HostPath))

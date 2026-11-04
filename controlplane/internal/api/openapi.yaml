@@ -4887,7 +4887,11 @@ components:
       properties:
         kind:
           type: string
-          enum: [compose, dockerfile, go]
+          enum: [compose, dockerfile, go, railpack]
+          description: What the repo brought. railpack means it had no compose.yml, Dockerfile or go.mod and ops built it with Railpack.
+        builder:
+          type: string
+          description: What Railpack found, for kind railpack, like "Node 24.22.1, start: npm run start".
         service:
           type: string
           description: The service that gets the traffic.

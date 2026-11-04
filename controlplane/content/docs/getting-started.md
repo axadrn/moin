@@ -9,7 +9,7 @@ order: 2
 - **An account on ops.** Sign up on the hosted control plane, or [host it yourself](/docs/self-hosting).
 - **A Linux server** that you can log in to as root, on amd64 or arm64. Rent one at any provider, such as Hetzner.
 - **A bucket**, an online storage box at Cloudflare R2, AWS S3, Backblaze B2, Hetzner or Exoscale. [Your bucket](/docs/guides/bucket) explains why ops needs one.
-- **Your app in a folder**, with a `compose.yml`, a `Dockerfile` or a `go.mod` in it. [Deploy](/docs/guides/deploy#deploy-from-a-repo) says what ops does with each.
+- **Your app in a folder**: with a `compose.yml`, a `Dockerfile` or a `go.mod`, or none of them for Node, Bun, Python, Ruby, PHP and more. [Deploy](/docs/guides/deploy#deploy-from-a-repo) says what ops does with each.
 - **A domain**, if people should reach the app in a browser. You can add it at the end.
 
 Not sure what a word means? [How ops works in 2 minutes](/docs#how-ops-works-in-2-minutes) explains each one.

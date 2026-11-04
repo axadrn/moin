@@ -121,7 +121,14 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	app := detail.App
 	fmt.Fprintln(stdout, style.Bold.Render(app.Name)+" "+badge(stdout, style.App(app), app.Status()))
 	domains, canonical, fromCompose := app.Domains, app.Canonical, false
+	built := ""
 	for _, deploy := range detail.Deploys {
+		if deploy.Number == app.LiveNumber && deploy.Detected != nil {
+			built = deploy.Detected.Built()
+			if deploy.Detected.Builder != "" {
+				built = "Railpack: " + deploy.Detected.Builder
+			}
+		}
 		// The live release says what it answers on; x-ops wins there.
 		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
 			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
@@ -150,6 +157,9 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		password = "on"
 	}
 	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"password", password}, {"repo", repo}}
+	if built != "" {
+		rows = append(rows, []string{"built", built})
+	}
 	for _, row := range rows {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-9s", row[0]))+" "+row[1])
 	}

@@ -82,7 +82,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
 	mcpsdk.AddTool(server, add("get_app", "Get an app",
-		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile or Go; service; port; databases, SQLite and Postgres; the x-ops block). Needs the read scope.",
+		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres; the x-ops block). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, add("create_app", "Create an app",
 		"Creates an app on a server. Deploys come from `ops deploy` in the repo, which can also create the app. Needs a token with read and write access.",

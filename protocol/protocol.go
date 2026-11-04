@@ -276,11 +276,14 @@ type DeployDone struct {
 // Detected is what the agent learned about an app from its repo and its
 // running containers. Config holds the x-ops block of compose.yml, if any.
 type Detected struct {
-	// Kind is "compose", "dockerfile" or "go": what the repo brought.
+	// Kind is "compose", "dockerfile", "go" or "railpack": what the repo
+	// brought, and for railpack that ops built it with Railpack. Builder
+	// says what Railpack found, like "Node 24.22.1, start: npm start".
 	// Image is the image of the main service when it came from CI.
 	// Domains are the domains the main service answers on, Canonical the one
 	// the others redirect to, Protected whether a password guards it.
 	Kind      string     `json:"kind"`
+	Builder   string     `json:"builder,omitempty"`
 	Image     string     `json:"image,omitempty"`
 	Domains   []string   `json:"domains,omitempty"`
 	Canonical string     `json:"canonical,omitempty"`
@@ -289,6 +292,16 @@ type Detected struct {
 	Port      int        `json:"port"`
 	Databases []Database `json:"databases"`
 	Config    *Config    `json:"config,omitempty"`
+}
+
+// Built says for people how ops built the app: the language Railpack found,
+// like "Node 24.22.1 (Railpack)", or the kind.
+func (d Detected) Built() string {
+	if d.Kind == "railpack" && d.Builder != "" {
+		language, _, _ := strings.Cut(d.Builder, ", start:")
+		return language + " (Railpack)"
+	}
+	return d.Kind
 }
 
 // Database is a database of an app: a SQLite file the agent found on one
