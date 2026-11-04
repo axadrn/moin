@@ -8,6 +8,7 @@ import (
 	"github.com/axadrn/ops/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/button"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/card"
+	"github.com/axadrn/ops/controlplane/internal/ui/components/table"
 	"github.com/axadrn/ops/controlplane/internal/ui/components/tabs"
 	"github.com/axadrn/ops/controlplane/internal/ui/utils"
 
@@ -106,6 +107,7 @@ templ HomeHero() {
 				<span class="block text-muted-foreground/60">Open source.</span>
 			</h1>
 			<p class="mt-8 text-xl text-muted-foreground sm:mt-10 sm:text-2xl">Any app. Any server.</p>
+			<p class="mt-3 text-base text-muted-foreground/70">Every SQLite and Postgres change backed up, checked every day.</p>
 			<div class="mt-10 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
 				@homePrimary()
 				@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
@@ -426,37 +428,63 @@ templ HomeBackups() {
 		<div class={ homeWrap }>
 			<h2 class={ typeH2, "max-w-[14ch]" }>Never lose a row.</h2>
 			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground">
-				<span class="text-foreground">A bad migration, an <code class="font-mono">UPDATE</code> without <code class="font-mono">WHERE</code>, a dead disk.</span>
-				With { brand.Name }, each is a click to undo.
+				<span class="text-foreground">Every change is in your bucket within a second.</span>
+				Every day, { brand.Name } restores it and checks it works.
 			</p>
-			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeFact("Every change", "In your bucket within a second for SQLite. Within a minute for Postgres, seconds when it's busy. Go back to any second of the last week.", "")
-				@homeFact("Before every change", "A full copy before every deploy and every edit.", "")
-				@homeFact("Proven every day", "Each backup is restored and checked, every day. Not just “job ran”.", "live")
-				@homeFact("Your bucket", "R2, S3, B2 or Hetzner. Your backups never pass through us.", "")
-			</div>
 			// Sources, read November 4, 2026:
 			// AWS: "RDS uploads transaction logs for DB instances to Amazon S3
 			// every five minutes." docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html
-			// Coolify: scheduled pg_dump on a cron, coolify.io/docs/databases/backups
+			// Coolify: scheduled dumps on a cron; "A successful backup only proves
+			// that Coolify created a file", coolify.io/docs/databases/backups
 			// Dokploy: "Schedule Cron", docs.dokploy.com/docs/core/databases/backups
-			<p class="mt-8 max-w-3xl text-base leading-7 text-muted-foreground">
-				<span class="text-foreground">Postgres on AWS RDS ships its changes every five minutes.</span>
-				Coolify and Dokploy back up on a schedule. { brand.Name }: every change, within a minute, checked every day.
-			</p>
+			@card.Card(card.Props{Class: "mt-12 gap-0 overflow-hidden rounded-4xl bg-card py-0 text-base shadow-none ring-0 sm:mt-16"}) {
+				@table.Table(table.Props{Class: "text-base"}) {
+					@table.Header() {
+						@table.Row(table.RowProps{Class: "hover:bg-transparent"}) {
+							@table.Head(table.HeadProps{Class: "h-14 pl-6 text-sm font-normal text-muted-foreground sm:pl-8"}) {
+								How old is your newest backup?
+							}
+							@table.Head(table.HeadProps{Class: "h-14 text-sm font-normal text-muted-foreground"}) {
+								SQLite
+							}
+							@table.Head(table.HeadProps{Class: "h-14 text-sm font-normal text-muted-foreground"}) {
+								Postgres
+							}
+							@table.Head(table.HeadProps{Class: "h-14 pr-6 text-sm font-normal text-muted-foreground sm:pr-8"}) {
+								Restore checked
+							}
+						}
+					}
+					@table.Body() {
+						@homeBackupRow(brand.Name, "1 second", "1 minute", "Every day", true)
+						@homeBackupRow("AWS RDS", "–", "5 minutes", "No", false)
+						@homeBackupRow("Coolify, Dokploy", "Your schedule", "Your schedule", "By you", false)
+					}
+				}
+			}
+			<ul class="mt-8 flex flex-col gap-3 text-base text-muted-foreground sm:flex-row sm:gap-10">
+				<li><span class="text-foreground">A full copy</span> before every deploy and every edit.</li>
+				<li><span class="text-foreground">Your bucket:</span> R2, S3, B2 or Hetzner. Never through us.</li>
+			</ul>
 		</div>
 	</section>
 }
 
-templ homeFact(title, text, kind string) {
-	@card.Card(card.Props{Class: utils.CN("block gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-10"))}) {
-		<p class={ typeH3, "flex items-center gap-3" }>
-			if kind == "live" {
-				<span class="lp-pulse size-2.5 rounded-full bg-live"></span>
-			}
-			{ title }
-		</p>
-		<p class="mt-4 max-w-lg text-base leading-7 text-muted-foreground">{ text }</p>
+// homeBackupRow is one line of the backup comparison; ours stands out.
+templ homeBackupRow(name, sqlite, postgres, checked string, ours bool) {
+	@table.Row(table.RowProps{Class: utils.CN("hover:bg-transparent", utils.IfElse(ours, "bg-live/8", ""))}) {
+		@table.Cell(table.CellProps{Class: utils.CN("h-16 pl-6 font-semibold whitespace-nowrap sm:pl-8", utils.IfElse(!ours, "font-normal text-muted-foreground", ""))}) {
+			{ name }
+		}
+		@table.Cell(table.CellProps{Class: utils.CN("whitespace-nowrap tabular-nums", utils.IfElse(ours, "font-semibold text-live", ""), utils.IfElse(!ours, "text-muted-foreground", ""))}) {
+			{ sqlite }
+		}
+		@table.Cell(table.CellProps{Class: utils.CN("whitespace-nowrap tabular-nums", utils.IfElse(ours, "font-semibold text-live", ""), utils.IfElse(!ours, "text-muted-foreground", ""))}) {
+			{ postgres }
+		}
+		@table.Cell(table.CellProps{Class: utils.CN("pr-6 whitespace-nowrap sm:pr-8", utils.IfElse(ours, "font-semibold text-live", ""), utils.IfElse(!ours, "text-muted-foreground", ""))}) {
+			{ checked }
+		}
 	}
 }
 
