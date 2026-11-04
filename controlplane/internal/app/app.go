@@ -95,13 +95,18 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("initialize mail provider: %w", err)
 	}
 	email := service.NewEmailService(mailProvider, cfg.AppURL, brand.Name)
-	fileStorage, err := storage.NewS3Storage(storage.S3Config{
-		Region: cfg.S3Region, Bucket: cfg.S3Bucket,
-		AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey, Endpoint: cfg.S3Endpoint,
-		PresignExpiryPublic: cfg.S3PresignExpiryPublic, PresignExpiryPrivate: cfg.S3PresignExpiryPrivate,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("initialize storage: %w", err)
+	// A self-hosted control plane may start without a bucket; files such as
+	// avatars wait for one.
+	var fileStorage storage.Storage = storage.None{}
+	if cfg.S3Bucket != "" {
+		fileStorage, err = storage.NewS3Storage(storage.S3Config{
+			Region: cfg.S3Region, Bucket: cfg.S3Bucket,
+			AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey, Endpoint: cfg.S3Endpoint,
+			PresignExpiryPublic: cfg.S3PresignExpiryPublic, PresignExpiryPrivate: cfg.S3PresignExpiryPrivate,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("initialize storage: %w", err)
+		}
 	}
 	fileService := service.NewFileService(files, fileStorage)
 	subscriptionService := service.NewSubscriptionService(subscriptions, adminEvents)
