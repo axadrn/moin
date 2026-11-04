@@ -342,7 +342,9 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 	}
 	// A process that crashes right after starting passes --wait without a
 	// healthcheck, and with its restart policy it may even be running again
-	// a moment later. Give it a moment and count its restarts meanwhile.
+	// a moment later. One that restarts once while its database starts is
+	// fine: the service passes once it runs stableFor without a restart,
+	// and fails if it does not within startWindow.
 	restarts := func() string {
 		ids, _ := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "-a", "-q", detected.Service)
 		if len(strings.Fields(ids)) == 0 {
@@ -351,24 +353,66 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		count, _ := a.output(ctx, "docker", "inspect", "-f", "{{.RestartCount}}", strings.Fields(ids)[0])
 		return strings.TrimSpace(count)
 	}
-	before := restarts()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(5 * time.Second):
+	running, err := a.stable(ctx, func() (bool, string) {
+		ids, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
+		return err == nil && strings.TrimSpace(ids) != "", restarts() + " " + strings.TrimSpace(ids)
+	})
+	if err != nil {
+		return err
 	}
-	running, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
-	if err != nil || strings.TrimSpace(running) == "" || restarts() != before {
+	if !running {
 		// The rollback replaces these containers, and their logs with them:
 		// keep the crash in the deploy log.
 		logf("last logs of %s:", detected.Service)
 		_ = a.compose(ctx, app, composeFile, logf, "logs", "--no-color", "--tail", "20", detected.Service)
 		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
 	}
+	ids, _ := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
+	containers := strings.Fields(ids)
+	if len(containers) == 0 {
+		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
+	}
 	if detected.Config == nil || detected.Config.Health == "" {
 		return nil
 	}
-	return a.checkHealth(ctx, strings.Fields(running)[0], detected.Port, detected.Config.Health, logf)
+	return a.checkHealth(ctx, containers[0], detected.Port, detected.Config.Health, logf)
+}
+
+// The window a started service gets to settle: it passes once it runs for
+// stableFor with nothing about it changing, and fails after startWindow.
+var (
+	stableFor   = 10 * time.Second
+	startWindow = 30 * time.Second
+	stableTick  = time.Second
+)
+
+// stable polls state, which says whether the service runs and a fingerprint
+// of its restarts, until it has run unchanged for stableFor. It reports
+// false when startWindow ends first.
+func (a *apps) stable(ctx context.Context, state func() (bool, string)) (bool, error) {
+	deadline := time.Now().Add(startWindow)
+	var since time.Time
+	last := ""
+	for {
+		up, print := state()
+		switch {
+		case !up:
+			since = time.Time{}
+		case since.IsZero() || print != last:
+			since = time.Now()
+		case time.Since(since) >= stableFor:
+			return true, nil
+		}
+		last = print
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-time.After(stableTick):
+		}
+	}
 }
 
 // checkHealth calls the health path on the container until it answers below 500.

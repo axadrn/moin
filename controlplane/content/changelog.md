@@ -7,7 +7,7 @@ description: What shipped in ops, newest first.
 
 November 4, 2026
 
-**In short:** self-host ops on one server with one command: the control plane and your apps together, with HTTPS.
+**In short:** self-host ops on one server with one command, and the home page shows in one table how fresh your backups are.
 
 ### New
 - **One server, one command**: `curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com` installs Docker, the control plane and the agent, and serves it on your domain with a Let's Encrypt certificate. It prints your sign-in link.
@@ -15,6 +15,9 @@ November 4, 2026
 
 ### Changed
 - **Self-hosted without email or a bucket**: a self-hosted control plane starts without them. Sign-in links go to its log, and `docker compose -f /opt/ops/compose.yml exec controlplane ./main sign-in-link` prints one. Add email and a bucket any time.
+
+### Fixed
+- **Apps that wait for their database**: a service that restarts once while its database starts no longer fails the deploy. ops now waits until it has run for 10 seconds without a restart, up to 30 seconds.
 
 ### Upgrade
 Self-hosted: **Update now**, or `sh update.sh`. Nothing changes for a control plane on its own server.
