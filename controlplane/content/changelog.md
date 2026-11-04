@@ -3,6 +3,20 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.16
+
+November 4, 2026
+
+**In short:** one page tells you whether everything is OK, and ⌘K takes you anywhere.
+
+### New
+- **Overview**: the first page of a workspace. "All good." when it is, otherwise what needs you: a server offline, a failed deploy, a backup that stopped, a domain down, a full disk. Each with the way to fix it.
+- **`ops status`**: the same in your terminal, and it exits 1 when something needs you, for scripts and CI. Also the TUI `:status`, the API and MCP `get_status`.
+- **⌘K**: jump to any app, server, bucket or page, and deploy, restart or roll back from the keyboard. `?` shows every shortcut.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.15
 
 November 4, 2026
