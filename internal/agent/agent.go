@@ -1,4 +1,4 @@
-// Package agent is `ops agent`: the process on a server that dials out to the
+// Package agent is `moin agent`: the process on a server that dials out to the
 // control plane and holds one WebSocket session to it.
 package agent
 
@@ -38,7 +38,7 @@ const (
 	registerLimit = 10 * time.Second
 )
 
-// ErrNotRegistered means the agent has no state yet and needs `ops agent register`.
+// ErrNotRegistered means the agent has no state yet and needs `moin agent register`.
 var ErrNotRegistered = errors.New("agent is not registered: run `" + build.Name + " agent register --url <control plane> --token <install token>`")
 
 // State is what the agent keeps between restarts.

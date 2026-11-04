@@ -963,7 +963,7 @@ func (b *backups) drillOne(ctx context.Context, item watched) error {
 	return integrityCheck(ctx, target)
 }
 
-// sweepUploads deletes, once an hour, what ops deploy left in the bucket:
+// sweepUploads deletes, once an hour, what moin deploy left in the bucket:
 // a source the server never fetched, because the CLI stopped after the
 // upload or the deploy never started. The server deletes each source as
 // soon as it has it; this catches the rest after a day.

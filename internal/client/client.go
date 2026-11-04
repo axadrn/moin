@@ -29,7 +29,7 @@ const DefaultURL = "https://moin.run"
 // ErrNotLoggedIn means there is no token in the environment or config file.
 var ErrNotLoggedIn = errors.New("not logged in: run `" + build.Name + " login`")
 
-// Config is what `ops login` saves.
+// Config is what `moin login` saves.
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
