@@ -21,16 +21,16 @@ const GitHubURL = "https://github.com/" + githubstars.Repo
 // GoilerplateURL is goilerplate, the Go SaaS starter by the same author.
 const GoilerplateURL = "https://goilerplate.com"
 
-// Wordmark is the brand name in the display face with its full stop drawn
+// Wordmark is the brand name in Satoshi Black with its full stop drawn
 // as a container, a rounded block a little wider than tall: moin, the
 // Hamburg hello, and the containers in the port. Its box is trimmed to the
 // lowercase letters, from the baseline to the x-height (text-box), so a
 // label centered next to it sits on the middle of the letters the eye sees,
 // not on the empty room the font keeps above them.
 templ Wordmark(class ...string) {
-	<span class={ "inline-flex items-baseline gap-[0.03em] font-display text-foreground [text-box:trim-both_ex_alphabetic]", class }>
+	<span class={ "inline-flex items-baseline gap-[0.035em] font-wordmark text-foreground [text-box:trim-both_ex_alphabetic]", class }>
 		{ brand.Name }
-		<span aria-hidden="true" class="inline-block h-[0.125em] w-[0.17em] rounded-[0.022em] bg-foreground"></span>
+		<span aria-hidden="true" class="inline-block h-[0.15em] w-[0.19em] rounded-[0.03em] bg-foreground"></span>
 	</span>
 }
 
