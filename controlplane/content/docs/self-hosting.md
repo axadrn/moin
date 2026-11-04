@@ -65,10 +65,11 @@ Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the 
 
 ### Move from one server to two
 
-1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/ops/update.sh`.
-2. On the old server, stop it: `docker compose -f /opt/ops/compose.yml down`. Your apps keep running.
-3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The control plane restores its database from the bucket on its first start. Point the domain at the new server.
-4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `ops servers install-command <server>` and run it on the old server: the agent now dials your domain. Your apps keep running.
+1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/ops/update.sh`. Use a bucket no other control plane backs up to: its backup lives in the folder `controlplane/litestream`.
+2. Wait a few seconds, so the last change is in the bucket. Then, on the old server, stop the control plane and its updater: `docker compose -f /opt/ops/compose.yml --profile '*' down`. Your apps keep running, and the proxy still serves them.
+3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The same `SECRETS_KEY` matters most: it opens your apps' secrets. The control plane restores its database from the bucket on its first start: your account, workspaces, apps and API tokens are there. Point the domain at the new server.
+4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `ops servers install-command <server>` and run it on the old server: the agent now dials your domain, as the same server. Your apps keep running.
+5. Once all works, remove the old settings from the old server: `rm -r /opt/ops /etc/ops-controlplane /var/lib/ops-controlplane`.
 
 ## Where to run it
 
