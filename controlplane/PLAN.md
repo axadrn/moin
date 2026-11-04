@@ -18,9 +18,9 @@ browser ───────┼──▶ control plane ◀── moin agent (se
 
 | Piece | Repo | Source | What it is |
 | --- | --- | --- | --- |
-| control plane | `axadrn/ops/controlplane` | open source (AGPL-3.0) | Go app, hosted by us or self-hosted. Accounts, billing, servers, apps, deploys, backups, audit log. Serves the web UI and the API. Agents connect to it. |
-| `moin` | `axadrn/ops` | open source (AGPL-3.0) | One binary. `moin` opens the TUI, `moin <command>` is the CLI, `moin agent` is the agent on a server. |
-| protocol | `axadrn/ops/protocol` | open source | Go package with the messages between agent and control plane. The control plane and the agent import it. |
+| control plane | `axadrn/moin/controlplane` | open source (AGPL-3.0) | Go app, hosted by us or self-hosted. Accounts, billing, servers, apps, deploys, backups, audit log. Serves the web UI and the API. Agents connect to it. |
+| `moin` | `axadrn/moin` | open source (AGPL-3.0) | One binary. `moin` opens the TUI, `moin <command>` is the CLI, `moin agent` is the agent on a server. |
+| protocol | `axadrn/moin/protocol` | open source | Go package with the messages between agent and control plane. The control plane and the agent import it. |
 
 We host the control plane. Anyone may self-host it: SQLite, billing off.
 

@@ -179,7 +179,7 @@ templ alertDestinationForm() {
 					}
 					@fieldHint("alert-kind", "")
 				}
-				@alertField("name", "Name", "team-ops", "Lowercase letters, digits and dashes.", "text", "")
+				@alertField("name", "Name", "team-chat", "Lowercase letters, digits and dashes.", "text", "")
 				@alertField("url", "Webhook URL", "https://hooks.slack.com/services/…", "Slack: an incoming webhook. Discord: Server settings, Integrations, Webhooks. Webhook: any http or https URL.", "password", "url")
 				@alertField("bot_token", "Bot token", "123456:ABC-DEF…", "From @BotFather. Add the bot to the chat first.", "password", "telegram")
 				@alertField("chat_id", "Chat ID", "-1001234567890", "The chat, group or channel the bot writes to, or @channelname.", "text", "telegram")

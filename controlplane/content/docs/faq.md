@@ -65,7 +65,7 @@ Almost everything. Every action on servers, apps, data, backups, domains and inv
 
 ## Is moin open source?
 
-Yes, all of it, under AGPL-3.0 at [github.com/axadrn/ops](https://github.com/axadrn/ops): the `moin` binary (CLI, terminal UI, agent) and the control plane. We host the control plane for you, and you may host it yourself.
+Yes, all of it, under AGPL-3.0 at [github.com/axadrn/moin](https://github.com/axadrn/moin): the `moin` binary (CLI, terminal UI, agent) and the control plane. We host the control plane for you, and you may host it yourself.
 
 ## Why AGPL, and can I contribute?
 

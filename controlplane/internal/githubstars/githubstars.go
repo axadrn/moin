@@ -12,7 +12,7 @@ import (
 )
 
 // Repo is the repo whose stars the navbar shows.
-const Repo = "axadrn/ops"
+const Repo = "axadrn/moin"
 
 var (
 	// apiURL is where the stars come from; tests point it at a fake.

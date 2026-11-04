@@ -120,7 +120,7 @@ Build for the arch of your server (`moin servers` shows it). The hook answers `2
 The moin GitHub Action installs `moin` from your control plane and runs `moin deploy` with a personal API token. Without `image` it puts the repo into [your bucket](/docs/guides/bucket) and your server builds it; with `image` it deploys the image the job pushed.
 
 ```yaml
-      - uses: axadrn/ops@main
+      - uses: axadrn/moin@main
         with:
           url: https://moin.example.com
           token: ${{ secrets.OPS_TOKEN }}

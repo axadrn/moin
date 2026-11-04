@@ -67,9 +67,9 @@ Every member sees the destinations. Only **owners** and **admins** add, test and
 
 ```surfaces
 Web: **Alerts** in the sidebar (`g` then `l`), **Add a destination**
-CLI: moin alerts add slack team-ops, then the URL on stdin; moin alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
+CLI: moin alerts add slack team-chat, then the URL on stdin; moin alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
 TUI: settings tab, `C` or `:alert`
-API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-ops", "url": "https://hooks.slack.com/services/…"}
+API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-chat", "url": "https://hooks.slack.com/services/…"}
 MCP: add_alert_destination
 ```
 
@@ -86,9 +86,9 @@ A test shows that the destination takes alerts, right after you add it or whenev
 
 ```surfaces
 Web: **Alerts**, **Send test** next to the destination
-CLI: moin alerts test team-ops
+CLI: moin alerts test team-chat
 TUI: settings tab, the destination, `T`, `enter` or `:test`
-API: POST /api/v1/alert-destinations/team-ops/test
+API: POST /api/v1/alert-destinations/team-chat/test
 MCP: test_alert_destination
 ```
 
@@ -102,9 +102,9 @@ Each destination gets 10 seconds per alert. One that does not take an alert is m
 
 ```surfaces
 Web: **Alerts**, **Remove** next to the destination
-CLI: moin alerts rm team-ops
+CLI: moin alerts rm team-chat
 TUI: settings tab, the destination, `x`, then `y`
-API: DELETE /api/v1/alert-destinations/team-ops
+API: DELETE /api/v1/alert-destinations/team-chat
 MCP: remove_alert_destination
 ```
 
