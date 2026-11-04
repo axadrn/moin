@@ -353,6 +353,15 @@ func (e WorkspaceAuditEvent) Summary() string {
 		return "could not back up " + d["database"] + " of " + target
 	case "backup.recovered":
 		return "backs up " + d["database"] + " of " + target + " again"
+	case "app.exec":
+		ran := "ran `" + d["command"] + "` in " + d["service"] + " of " + target
+		switch {
+		case d["error"] != "":
+			return ran + ": " + d["error"]
+		case d["result"] != "":
+			return ran + ", " + d["result"]
+		}
+		return ran + ", exit " + d["exit_code"]
 	case "backup.drill_passed":
 		return "restored " + d["database"] + " of " + target + " in a restore drill and checked it"
 	case "drill.failed":
