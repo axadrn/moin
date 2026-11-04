@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What the hosted moin service stores, why, where it lives and how to get rid of it
-lastUpdated: November 3, 2026
+lastUpdated: November 4, 2026
 ---
 
 Short version: moin stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
@@ -10,7 +10,7 @@ This policy covers the hosted moin service. A control plane you host yourself se
 
 ## Who we are
 
-The hosted moin service is run by its operator ("we"). We decide how the data described here is used. Write to [{{support_email}}](mailto:{{support_email}}) about anything in this policy.
+The hosted moin service is run by Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA ("we"). We decide how the data described here is used. Write to [{{support_email}}](mailto:{{support_email}}) about anything in this policy.
 
 ## Website visits and server logs
 
