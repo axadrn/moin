@@ -699,7 +699,8 @@ func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io
 	if err != nil {
 		slog.Error("move the agent to its new name", "error", err)
 	}
-	if handed {
+	if handed || ctx.Err() != nil {
+		// systemd stops this process now; the new unit takes over.
 		<-ctx.Done()
 		return nil
 	}
