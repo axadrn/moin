@@ -361,7 +361,7 @@ func (s *sampler) containers(ctx context.Context, seconds float64, first bool, m
 	limit := make(chan struct{}, 4)
 	var wait sync.WaitGroup
 	for index, container := range running {
-		app, ok := strings.CutPrefix(container.Labels["com.docker.compose.project"], "ops-")
+		app, ok := appOfProject(container.Labels["com.docker.compose.project"])
 		if !ok || !appIDPattern.MatchString(app) {
 			results[index].err = errors.New("not an ops app")
 			continue

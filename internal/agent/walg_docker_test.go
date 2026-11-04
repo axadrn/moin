@@ -178,7 +178,7 @@ func TestWALGPointInTime(t *testing.T) {
 	}
 	// Continuous backup goes on after the restore, on the new timeline:
 	// the old slot from the restored data is gone, WAL-G streams again.
-	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'ops_walg' AND active;`) != "1"; {
+	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'moin_walg' AND active;`) != "1"; {
 		if time.Now().After(deadline) {
 			logs, _ := exec.Command("docker", "logs", "--tail", "10", companionName(app, "db")).CombinedOutput()
 			t.Fatalf("WAL-G does not stream after the restore: %s", logs)
@@ -233,7 +233,7 @@ func TestWALGPointInTime(t *testing.T) {
 	}
 	// WAL-G stays down past a (here tiny) cap: Postgres drops its place,
 	// ops notices, starts a new companion and takes a new base backup.
-	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'ops_walg' AND restart_lsn IS NOT NULL;`) != "1"; {
+	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'moin_walg' AND restart_lsn IS NOT NULL;`) != "1"; {
 		if time.Now().After(deadline) {
 			t.Fatal("WAL-G never started streaming")
 		}
@@ -248,14 +248,14 @@ func TestWALGPointInTime(t *testing.T) {
 	for round := 0; round < 20 && !lost; round++ {
 		sql(fmt.Sprintf(`INSERT INTO orders SELECT g, 'x' FROM generate_series(%d, %d) g; SELECT pg_switch_wal();`, 1000+round*1000, 1999+round*1000))
 		sql(`CHECKPOINT;`)
-		lost = sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'ops_walg'), '');`) == "lost"
+		lost = sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'moin_walg'), '');`) == "lost"
 	}
 	if !lost {
 		t.Fatalf("the slot never got lost: %s; cap %s; lsn %s", sql(`SELECT string_agg(slot_name || ' ' || coalesce(wal_status, '-') || ' ' || active || ' ' || coalesce(restart_lsn::text, '-'), '; ') FROM pg_replication_slots;`), sql(`SHOW max_slot_wal_keep_size;`), sql(`SELECT pg_current_wal_lsn();`))
 	}
 	basesBefore, _ := b.walgBaseBackups(ctx, app, database)
 	b.walgOnce(ctx)
-	if got := sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'ops_walg'), 'none');`); got == "lost" {
+	if got := sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'moin_walg'), 'none');`); got == "lost" {
 		t.Errorf("the slot is still lost")
 	}
 	running, _ = a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
@@ -278,13 +278,13 @@ func TestWALGPointInTime(t *testing.T) {
 	b.walgOnce(ctx)
 	b.storage = nil
 	b.walgOnce(ctx)
-	if out, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=ops.walg").Output(); strings.TrimSpace(string(out)) != "" {
+	if out, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=moin.walg").Output(); strings.TrimSpace(string(out)) != "" {
 		t.Errorf("companion left: %s", out)
 	}
 	if slots := sql(`SELECT count(*) FROM pg_replication_slots;`); slots != "0" {
 		t.Errorf("slots left: %s", slots)
 	}
-	out, _ := exec.Command("docker", "volume", "ls", "-q", "--filter", "name=ops-restore-").Output()
+	out, _ := exec.Command("docker", "volume", "ls", "-q", "--filter", "name=moin-restore-").Output()
 	if strings.TrimSpace(string(out)) != "" {
 		t.Errorf("restore volumes left: %s", out)
 	}
