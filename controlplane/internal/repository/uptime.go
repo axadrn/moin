@@ -70,14 +70,28 @@ func (r *appRepository) AddUptimeHours(hours []model.UptimeHour) error {
 	if len(hours) == 0 {
 		return nil
 	}
-	tx, err := r.db.Beginx()
+	// history.db cannot see the apps: skip the hours of an app removed
+	// meanwhile here.
+	exists := map[string]bool{}
+	for _, hour := range hours {
+		if _, seen := exists[hour.AppID]; seen {
+			continue
+		}
+		var found int
+		err := r.db.Get(&found, `SELECT COUNT(*) FROM apps WHERE id = $1`, hour.AppID)
+		if err != nil {
+			return err
+		}
+		exists[hour.AppID] = found > 0
+	}
+	tx, err := r.history.Beginx()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 	statement, err := tx.Preparex(tx.Rebind(`
 		INSERT INTO uptime_hours (app_id, domain, hour, checks, up, response_ms, max_ms)
-		SELECT $1, $2, $3, $4, $5, $6, $7 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (app_id, domain, hour) DO UPDATE SET checks = uptime_hours.checks + excluded.checks,
 			up = uptime_hours.up + excluded.up, response_ms = uptime_hours.response_ms + excluded.response_ms,
 			max_ms = MAX(uptime_hours.max_ms, excluded.max_ms)`))
@@ -86,6 +100,9 @@ func (r *appRepository) AddUptimeHours(hours []model.UptimeHour) error {
 	}
 	defer statement.Close()
 	for _, hour := range hours {
+		if !exists[hour.AppID] {
+			continue
+		}
 		_, err = statement.Exec(hour.AppID, hour.Domain, hour.Hour.UTC(), hour.Checks, hour.Up, hour.ResponseMS, hour.MaxMS)
 		if err != nil {
 			return err
@@ -96,7 +113,7 @@ func (r *appRepository) AddUptimeHours(hours []model.UptimeHour) error {
 
 func (r *appRepository) UptimeCounts(appID, domain string, since time.Time) (model.UptimeCounts, error) {
 	var counts model.UptimeCounts
-	err := r.db.Get(&counts, `
+	err := r.history.Get(&counts, `
 		SELECT COALESCE(SUM(checks), 0) AS checks, COALESCE(SUM(up), 0) AS up,
 			COALESCE(SUM(response_ms), 0) AS response_ms, COALESCE(MAX(max_ms), 0) AS max_ms
 		FROM uptime_hours WHERE app_id = $1 AND domain = $2 AND hour >= $3
@@ -127,7 +144,7 @@ func (r *appRepository) UptimeOutages(appID, domain string, limit int) ([]model.
 }
 
 func (r *appRepository) PruneUptime(hoursBefore, outagesBefore time.Time) error {
-	_, err := r.db.Exec(`DELETE FROM uptime_hours WHERE hour < $1`, hoursBefore.UTC())
+	_, err := r.history.Exec(`DELETE FROM uptime_hours WHERE hour < $1`, hoursBefore.UTC())
 	if err != nil {
 		return err
 	}

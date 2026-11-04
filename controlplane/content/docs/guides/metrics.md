@@ -47,10 +47,10 @@ Requests, errors and response times per app are not measured yet: Traefik does n
 
 ## What ops keeps
 
-The last hour of samples lives in the control plane's memory, about 7 KB per server or app. Once a minute the finished minutes go to `metrics.db`, a file of their own next to the control plane's database, in one write, one row per server or app and minute, never a row per sample; once an hour they add up into hours. Minutes stay for 24 hours, hours for 30 days. After a restart of the control plane, the last hour comes back from the minutes.
+The last hour of samples lives in the control plane's memory, about 7 KB per server or app. Once a minute the finished minutes go to `history.db`, a file next to the control plane's database, in one write, one row per server or app and minute, never a row per sample; once an hour they add up into hours. Minutes stay for 24 hours, hours for 30 days. After a restart of the control plane, the last hour comes back from the minutes.
 
 A server with five apps writes six rows a minute, so 1,000 such servers are 6,000 rows a minute in one transaction: one small control plane keeps up with thousands of servers.
 
-`metrics.db` has no backup: it is history the agents send again every 15 seconds, so losing it costs old charts, never data. The main database stays small, its backup cheap and a restore fast.
+`history.db` has no backup: metrics grow back every 15 seconds, so losing it costs old charts, never data. See [what is kept where](/docs/self-hosting#database-backup).
 
 An agent older than metrics sends none until it has [updated itself](/docs/self-hosting#updates), on its next connect.

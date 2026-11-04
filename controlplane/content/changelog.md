@@ -7,14 +7,16 @@ description: What shipped in ops, newest first.
 
 November 4, 2026
 
-**In short:** agents built from a commit now update themselves too, so their metrics arrive, and metrics move to a file of their own to keep the database small.
+**In short:** every agent now updates itself, so metrics arrive everywhere, charts move to a file of their own to keep the database small, and the app tabs fit on a phone.
 
 ### Changed
-- **Metrics in their own file**: metrics live in `metrics.db` next to the database, without a backup. The database stays small and a restore fast; the charts of the last hours start over once.
+- **Charts in their own file**: metrics and hourly uptime live in `history.db` next to the database, without a backup. The database stays small and a restore fast. The charts start over once; outages and uptime state stay.
+- **Home page**: the live numbers show from 1,000 deploys on.
 
 ### Fixed
 - **Agents that never updated**: an agent built from a commit instead of a release, such as one installed from `main`, now updates itself like any older agent.
 - **Metrics page**: no longer tells you to update agents by hand; they update themselves.
+- **App tabs on a phone**: Overview, Data, Backups, Uptime and Metrics no longer push the page wider than the screen; swipe them.
 
 ### Upgrade
 Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.

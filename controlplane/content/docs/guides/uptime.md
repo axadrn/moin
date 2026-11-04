@@ -60,7 +60,7 @@ MCP: set_uptime_check
 
 ## What ops keeps
 
-The newest result of each domain lives in the control plane's memory. The database keeps, per domain and hour, how many checks ran, how many found it up and their response times, for 31 days, and every outage for 90 days. On the hosted control plane checks only reach public addresses.
+The newest result of each domain lives in the control plane's memory. Per domain and hour, how many checks ran, how many found it up and their response times stay for 31 days, in `history.db` without a backup: they grow back. Every outage stays for 90 days in the database, with its backup. See [what is kept where](/docs/self-hosting#database-backup). On the hosted control plane checks only reach public addresses.
 
 A self-hosted control plane checks in production; `UPTIME_CHECKS=false` turns the checks off, `UPTIME_CHECKS=true` turns them on in development.
 

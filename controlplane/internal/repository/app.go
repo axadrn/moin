@@ -72,12 +72,13 @@ type AppRepository interface {
 
 type appRepository struct {
 	db *sqlx.DB
-	// metrics is metrics.db, which has no backup; see db.OpenMetrics.
-	metrics *sqlx.DB
+	// history is history.db: metrics and uptime counts, no backup; see
+	// db.OpenHistory.
+	history *sqlx.DB
 }
 
-func NewAppRepository(db, metrics *sqlx.DB) AppRepository {
-	return &appRepository{db: db, metrics: metrics}
+func NewAppRepository(db, history *sqlx.DB) AppRepository {
+	return &appRepository{db: db, history: history}
 }
 
 const appSelect = `

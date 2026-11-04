@@ -8,7 +8,7 @@ import (
 
 // MetricsRepository stores the metrics of servers and apps: a row per
 // minute and one per hour. The control plane keeps the samples in memory and
-// writes minutes in one batch a minute, to metrics.db.
+// writes minutes in one batch a minute, to history.db.
 type MetricsRepository interface {
 	// AddMetricsMinutes writes minutes in one transaction; a minute that is
 	// there already takes the new values.
@@ -31,7 +31,7 @@ func (r *appRepository) AddMetricsMinutes(rows []model.MetricsRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	tx, err := r.metrics.Beginx()
+	tx, err := r.history.Beginx()
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (r *appRepository) AddMetricsMinutes(rows []model.MetricsRow) error {
 }
 
 func (r *appRepository) RollUpMetrics(from, to int64) error {
-	_, err := r.metrics.Exec(`
+	_, err := r.history.Exec(`
 		INSERT OR REPLACE INTO metrics_hours (target, hour, cpu, memory, disk, net_rx, net_tx, load)
 		SELECT target, minute - minute % 3600, CAST(AVG(cpu) AS INTEGER), CAST(AVG(memory) AS INTEGER),
 			CAST(AVG(disk) AS INTEGER), CAST(AVG(net_rx) AS INTEGER), CAST(AVG(net_tx) AS INTEGER), CAST(AVG(load) AS INTEGER)
@@ -64,7 +64,7 @@ func (r *appRepository) RollUpMetrics(from, to int64) error {
 
 func (r *appRepository) MetricsMinutes(target string, from, to int64) ([]model.MetricsRow, error) {
 	rows := []model.MetricsRow{}
-	err := r.metrics.Select(&rows, `
+	err := r.history.Select(&rows, `
 		SELECT target, minute AS at, cpu, memory, disk, net_rx, net_tx, load FROM metrics_minutes
 		WHERE target = $1 AND minute >= $2 AND minute < $3 ORDER BY minute`, target, from, to)
 	return rows, err
@@ -72,18 +72,18 @@ func (r *appRepository) MetricsMinutes(target string, from, to int64) ([]model.M
 
 func (r *appRepository) MetricsHours(target string, from, to int64) ([]model.MetricsRow, error) {
 	rows := []model.MetricsRow{}
-	err := r.metrics.Select(&rows, `
+	err := r.history.Select(&rows, `
 		SELECT target, hour AS at, cpu, memory, disk, net_rx, net_tx, load FROM metrics_hours
 		WHERE target = $1 AND hour >= $2 AND hour < $3 ORDER BY hour`, target, from, to)
 	return rows, err
 }
 
 func (r *appRepository) PruneMetrics(minutesBefore, hoursBefore int64) error {
-	_, err := r.metrics.Exec(`DELETE FROM metrics_minutes WHERE minute < $1`, minutesBefore)
+	_, err := r.history.Exec(`DELETE FROM metrics_minutes WHERE minute < $1`, minutesBefore)
 	if err != nil {
 		return err
 	}
-	_, err = r.metrics.Exec(`DELETE FROM metrics_hours WHERE hour < $1`, hoursBefore)
+	_, err = r.history.Exec(`DELETE FROM metrics_hours WHERE hour < $1`, hoursBefore)
 	return err
 }
 

@@ -39,7 +39,7 @@ templ Home(network model.Network) {
 	}) {
 		<main>
 			@HomeHero()
-			if ctxkeys.RenderConfig(ctx).Billing {
+			if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 				@HomeLive(network)
 			}
 			@HomeCommands()
@@ -99,7 +99,7 @@ templ HomeHero() {
 	<section class="pt-16 sm:pt-28">
 		<div class={ homeWrap, "grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
 			<div>
-				@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"}) {
+				@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto max-w-full rounded-full px-3 py-1 text-center text-[13px] font-medium sm:text-sm whitespace-normal text-muted-foreground"}) {
 					Any app. Any server. Best with Go and SQLite.
 				}
 				<h1 class={ typeH1, "mt-6" }>
@@ -254,9 +254,13 @@ templ homeChip(app, kind, text string) {
 }
 
 // ---------------------------------------------------------------- live
+// liveShowsAt is how many deploys it takes before the home page shows the
+// live numbers: small ones say "nobody uses this". They are counted all the
+// same.
+const liveShowsAt = 1000
+
 // HomeLive is what ops runs right now: the hosted control plane counts
-// itself, self-hosted ones report every five minutes. Zero is fine: we say
-// what is true.
+// itself, self-hosted ones report every five minutes. We say what is true.
 templ HomeLive(network model.Network) {
 	<section id="live" class={ homeAnchor, homeSection } data-live>
 		<div class={ homeWrap }>
