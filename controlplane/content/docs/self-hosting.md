@@ -113,7 +113,7 @@ ADMIN_EMAILS=you@example.com
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
 # openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
 SECRETS_KEY=
-EMAIL_FROM=ops@example.com
+EMAIL_FROM=hello@example.com
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_API_TOKEN=
 S3_ENDPOINT=
