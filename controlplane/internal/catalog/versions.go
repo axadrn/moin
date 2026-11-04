@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/axadrn/moin/internal/build"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/axadrn/moin/internal/build"
 )
 
 // Version is a release of an app: its image tag, and when it was pushed if
