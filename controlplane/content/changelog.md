@@ -3,6 +3,29 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.15
+
+November 4, 2026
+
+**In short:** 30 open-source apps on your server in one click, any version, updates with a backup first: Umami, n8n, Grafana, Nextcloud, Vaultwarden, WordPress and more.
+
+### New
+- **App catalog**: browse at `/apps`, install from the Apps page, `ops catalog install umami --server web-1`, the TUI, the API or MCP. ops makes the secrets, sets HTTPS on your domain and backs up its Postgres or SQLite.
+- **Every version**: pick any release, newest first with its date, fetched from Docker Hub and GitHub once an hour.
+- **Updates**: "Umami 3.5.0 is out" on the app page, `ops update <app>`, with a snapshot first. An `update.available` alert tells you once per release.
+- **RSS for the changelog**: `/changelog.xml`, and a dot in the account menu when there is something new.
+
+### Changed
+- **A calmer navbar**: Pricing, Docs, Changelog, and Apps on its own. Roadmap moved to the footer, and Get started is the one way in.
+- **The app sidebar**: no app list and no shortcut letters; Docs, Support and the changelog are in the account menu.
+- **Health checks**: a redirect counts as up, and a slow first start gets two minutes.
+
+### Fixed
+- **Docs on a phone**: a long page title no longer runs under the search.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.14
 
 November 4, 2026
