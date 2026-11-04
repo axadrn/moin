@@ -44,7 +44,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
 
 	profile := handler.NewProfileHandler(app.UserService)
-	agent := handler.NewAgentHandler(app.ServerService, app.Cfg.AppURL, clientIPs)
+	agent := handler.NewAgentHandler(app.ServerService, app.Cfg.AppURL, clientIPs, app.OldAddressService.Hosts())
 	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService)
 	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
 	billing := handler.NewBillingHandler(app.PaymentService, app.WorkspaceService)
@@ -264,6 +264,7 @@ func SetupRoutes(app *app.App) http.Handler {
 			return middleware.RequireAuth(middleware.RequireAdmin(next))
 		}
 		mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
+		mux.HandleFunc("GET /admin/old-address", adminRoute(admin.OldAddress))
 		mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 		mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 		mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
@@ -345,6 +346,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		securityHeaders,
 		middleware.RequestLogging(app.Cfg.LogHTTP, clientIPs),
 		middleware.Client(clientIPs),
+		middleware.OldAddress(app.OldAddressService.Hosts(), app.Cfg.AppURL, app.OldAddressService.Count),
 		middleware.CORS(app.Cfg.CORSAllowedOrigins),
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),

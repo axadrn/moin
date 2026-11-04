@@ -4287,6 +4287,30 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/admin/old-address:
+    get:
+      tags: [Admin]
+      operationId: getAdminOldAddress
+      summary: Get the traffic on the old addresses
+      description: >-
+        What still arrives on the old addresses of the control plane
+        (OLD_URLS) over the last 14 days, by day, host and kind: web, form,
+        api, agent, download, webhook. After 14 quiet days `quiet` is true
+        and the old address can go.
+      responses:
+        '200':
+          description: The traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OldAddress'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/admin/users/{userID}/sessions/revoke:
     parameters:
       - $ref: '#/components/parameters/UserID'
@@ -6810,6 +6834,48 @@ components:
         created_at:
           type: string
           format: date-time
+    OldAddress:
+      type: object
+      required: [hosts, days, rows, total, quiet, quiet_days]
+      properties:
+        hosts:
+          type: array
+          items:
+            type: string
+          description: The old hosts the control plane still answers on.
+        days:
+          type: integer
+          description: How many days rows reaches back.
+        rows:
+          type: array
+          items:
+            type: object
+            required: [day, host, kind, requests, last_at]
+            properties:
+              day:
+                type: string
+                format: date
+              host:
+                type: string
+              kind:
+                type: string
+                enum: [web, form, api, agent, download, webhook]
+              requests:
+                type: integer
+              last_at:
+                type: string
+                format: date-time
+        total:
+          type: integer
+        last_at:
+          type: string
+          format: date-time
+          description: The newest request; missing without one.
+        quiet:
+          type: boolean
+          description: Nothing arrived for quiet_days days, so the old address can go.
+        quiet_days:
+          type: integer
     AdminDashboard:
       type: object
       required: [metrics, users, events]

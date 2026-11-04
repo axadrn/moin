@@ -36,6 +36,16 @@ func (h *AdminHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AdminDashboard(dashboard))
 }
 
+// OldAddress shows what still arrives on the old addresses.
+func (h *AdminHandler) OldAddress(w http.ResponseWriter, r *http.Request) {
+	report, err := h.admin.OldAddress(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()))
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	render(w, r, pages.AdminOldAddress(report))
+}
+
 func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request) {
 	err := h.admin.RevokeUserSessions(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"))
 	if err != nil {

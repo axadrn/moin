@@ -135,6 +135,17 @@ func (h *AdminHandler) Users(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewAdminDashboard(dashboard))
 }
 
+// OldAddress returns what still arrives on the old addresses of the
+// control plane over the last days.
+func (h *AdminHandler) OldAddress(w http.ResponseWriter, r *http.Request) {
+	report, err := h.admin.OldAddress(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, report)
+}
+
 // RevokeUserSessions signs a user out everywhere.
 func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request) {
 	err := h.admin.RevokeUserSessions(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"))
