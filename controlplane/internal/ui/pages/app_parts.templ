@@ -11,6 +11,9 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/tooltip"
+	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
 // The parts every page of the control panel is built from.
@@ -107,11 +110,11 @@ type panelProps struct {
 	// Action is the one small control right of the title.
 	Action templ.Component
 	// Docs is the docs page, with its anchor, that explains the panel: a
-	// "How it works" link right of the title, before the Action.
+	// small book right of the title, before the Action.
 	Docs  string
-	Body   panelBody
-	Class  string
-	Attrs  templ.Attributes
+	Body  panelBody
+	Class string
+	Attrs templ.Attributes
 }
 
 // panel is a card with a title: one topic of a page.
@@ -123,8 +126,11 @@ templ panel(p panelProps) {
 	if p.Heading != "" {
 		{{ attrs["aria-labelledby"] = p.Heading }}
 	}
+	// Only an Action goes under the title on phones; the book alone stays
+	// right of it.
+	{{ stack := p.Action != nil }}
 	@card.Card(card.Props{ID: p.ID, Class: utils.CN("h-full min-w-0", p.Class), Attributes: attrs}) {
-		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
+		@card.Header(card.HeaderProps{Class: utils.IfElse(stack, panelHeaderStack, "")}) {
 			@card.Title(card.TitleProps{ID: p.Heading, Class: "flex min-w-0 items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
 				{ p.Title }
 			}
@@ -134,9 +140,9 @@ templ panel(p panelProps) {
 				}
 			}
 			if p.Action != nil || p.Docs != "" {
-				@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-1", panelActionStack)}) {
+				@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-1", utils.IfElse(stack, panelActionStack, ""))}) {
 					if p.Docs != "" {
-						@docsLink(p.Docs, "How it works")
+						@docsButton(p.Docs, "How it works", utils.IfElse(stack, "max-sm:-ml-2", ""))
 					}
 					if p.Action != nil {
 						@p.Action
@@ -212,7 +218,7 @@ templ dangerPanel(title, body, docs string) {
 				{ body }
 			}
 			@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-2", panelActionStack)}) {
-				@docsLink(docs, "How it works")
+				@docsButton(docs, "How it works", "max-sm:-ml-2")
 				{ children... }
 			}
 		}
@@ -276,7 +282,41 @@ templ stateAlert(attrs templ.Attributes) {
 	}
 }
 
-// docsLink is the quiet link from a card to its guide.
+// docsButton is the docs page that explains a card: a small book in the
+// card's header, named by a tooltip. label says it, like "How it works";
+// class moves it, so the glyph lines up when it sits under the title.
+templ docsButton(href, label, class string) {
+	@tooltip.Tooltip() {
+		{{ attrs := tooltip.Trigger(ctx) }}
+		{{ attrs["aria-label"] = label }}
+		{{ attrs["data-docs"] = href }}
+		@button.Button(button.Props{Href: href, Variant: button.VariantGhost, Size: button.SizeIconSm, Class: utils.CN("-my-1 text-muted-foreground", class), Attributes: attrs}) {
+			@icon.BookOpen(icon.Props{Class: "size-4"})
+		}
+		@tooltip.Content() {
+			{ label }
+		}
+	}
+}
+
+// switchForm is a switch that saves itself (DESIGN.md, Feedback): a change
+// posts the switch, as "on", to action, which saves only that and answers
+// this form as stored. The switch is disabled while it saves, so a second
+// click cannot overtake the first.
+templ switchForm(id, action string) {
+	<form id={ id } hx-post={ action } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+		@csrf.Token()
+		{ children... }
+	</form>
+}
+
+// savedSwitch is the switch of a switchForm. Its root carries an id too,
+// so the focus stays on it when the answer swaps the form.
+templ savedSwitch(id string, on bool) {
+	@switchcomp.Switch(switchcomp.Props{ID: id, Name: "on", Value: "1", DefaultChecked: on, Attributes: templ.Attributes{"id": id + "-switch"}})
+}
+
+// docsLink is the quiet link from an empty state to its guide.
 templ docsLink(href, label string) {
 	@button.Button(button.Props{Href: href, Variant: button.VariantSecondary, Size: button.SizeSm}) {
 		@icon.BookOpen(icon.Props{Class: "size-3.5"})

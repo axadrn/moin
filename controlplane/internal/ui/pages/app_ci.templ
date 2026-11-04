@@ -144,7 +144,7 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 					Logins your servers use to pull private images built in CI. Passwords and tokens are stored encrypted and only handed to the agent for the pull.
 				}
 				@card.Action() {
-					@docsLink("/docs/guides/ci#1-save-a-registry-login", "How it works")
+					@docsButton("/docs/guides/ci#1-save-a-registry-login", "How it works", "")
 				}
 			}
 			@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {

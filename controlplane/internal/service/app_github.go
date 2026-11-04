@@ -235,6 +235,11 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	if err != nil {
 		return nil, err
 	}
+	// The repo and branch the app follows already: only deploy on push
+	// changes, and GitHub need not answer for that.
+	if app.Repo != "" && strings.EqualFold(repo, app.Repo) && branch == app.Branch {
+		return s.SetAutoDeploy(actor, app.ID, autoDeploy)
+	}
 	found, err := s.gitHubRepo(ctx, actor.WorkspaceID, repo)
 	if err != nil {
 		return nil, err
@@ -257,6 +262,29 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 		return nil, err
 	}
 	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
+	s.notify(actor.WorkspaceID)
+	return s.apps.ByID(app.ID)
+}
+
+// SetAutoDeploy turns deploy on push on or off for an app that follows a
+// repo. It changes nothing else and asks GitHub nothing, so a switch on the
+// page saves even while GitHub is slow or down.
+func (s *AppService) SetAutoDeploy(actor Actor, idOrName string, on bool) (*model.App, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if app.Repo == "" {
+		return nil, ErrNoRepo
+	}
+	if app.AutoDeploy == on {
+		return app, nil
+	}
+	err = s.apps.SetAutoDeploy(app.ID, on)
+	if err != nil {
+		return nil, err
+	}
+	s.servers.record(actor, "repo.auto_deploy", "app", app.Name, map[string]string{"repo": app.Repo, "branch": app.Branch, "on": strconv.FormatBool(on)})
 	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }
