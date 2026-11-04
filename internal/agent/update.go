@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
@@ -32,6 +33,7 @@ const (
 type updater struct {
 	// url is the control plane the agent is registered with; the binary
 	// only ever comes from there.
+	mu  sync.Mutex
 	url string
 	// executable is the binary to replace, systemd its unit when the agent
 	// runs under systemd, "" otherwise.
@@ -58,7 +60,7 @@ func newUpdater(url string) *updater {
 // one rename. Nothing changes when a step fails.
 func (u *updater) install(ctx context.Context, update protocol.AgentUpdate) error {
 	if u.systemd == "" {
-		return fmt.Errorf("this agent does not run under systemd, so it cannot restart itself: update it on the server: %s", protocol.UpdateCommand(u.url, build.Name, runtime.GOARCH))
+		return fmt.Errorf("this agent does not run under systemd, so it cannot restart itself: update it on the server: %s", protocol.UpdateCommand(u.baseURL(), build.Name, runtime.GOARCH, ""))
 	}
 	if u.executable == "" {
 		return errors.New("cannot find the agent's own binary")
@@ -69,7 +71,7 @@ func (u *updater) install(ctx context.Context, update protocol.AgentUpdate) erro
 	}
 	ctx, cancel := context.WithTimeout(ctx, downloadLimit)
 	defer cancel()
-	url := u.url + protocol.DownloadPath + build.Name + "-" + runtime.GOOS + "-" + runtime.GOARCH
+	url := u.baseURL() + protocol.DownloadPath + build.Name + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -119,6 +121,19 @@ func (u *updater) install(ctx context.Context, update protocol.AgentUpdate) erro
 		return fmt.Errorf("the new binary says %q, not %s %s", got, build.Name, update.Version)
 	}
 	return os.Rename(temp, u.executable)
+}
+
+// setURL changes the control plane the binary comes from.
+func (u *updater) setURL(url string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.url = strings.TrimRight(url, "/")
+}
+
+func (u *updater) baseURL() string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.url
 }
 
 // restart has systemd restart the agent with the new binary. It does not

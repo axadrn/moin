@@ -27,9 +27,9 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
-// DefaultStateDir is where a root agent keeps its state. OPS_STATE_DIR
+// DefaultStateDir is where a root agent keeps its state. MOIN_STATE_DIR
 // overrides it, for example when an agent runs without root in development.
-const DefaultStateDir = "/var/lib/ops"
+const DefaultStateDir = "/var/lib/" + build.Name
 
 const (
 	stateFile     = "agent.json"
@@ -48,10 +48,12 @@ type State struct {
 	AgentToken string `json:"agent_token"`
 }
 
-// StateDir returns OPS_STATE_DIR or DefaultStateDir.
+// StateDir returns MOIN_STATE_DIR or DefaultStateDir. The unit of an agent
+// of the old name sets OPS_STATE_DIR to the old default: that agent moves
+// to DefaultStateDir (see migrate.go).
 func StateDir() string {
-	dir := os.Getenv("OPS_STATE_DIR")
-	if dir == "" {
+	dir := build.Getenv("STATE_DIR")
+	if dir == "" || dir == legacyStateDir {
 		return DefaultStateDir
 	}
 	return dir
@@ -156,13 +158,15 @@ func Run(ctx context.Context, dir string, state State) error {
 	if _, err := LoadRules(rulesFile); err != nil {
 		return err
 	}
-	agent := &runner{state: state, rulesFile: rulesFile, pending: map[string]protocol.DeployDone{}}
+	agent := &runner{dir: dir, state: state, rulesFile: rulesFile, pending: map[string]protocol.DeployDone{}}
 	agent.apps = newApps(dir, agent.send)
 	agent.backups = newBackups(agent.apps, agent.send)
 	agent.apps.backups = agent.backups
 	agent.security = newSecurity(dir, agent.apps)
 	agent.apps.proxyMode = agent.security.proxyMode
 	agent.updater = newUpdater(state.URL)
+	// What the old name left moves before anything else touches the apps.
+	newRename(dir, agent.apps, agent.security).run(ctx)
 	go agent.backups.drills(ctx)
 	go agent.backups.pgSnapshots(ctx)
 	go agent.backups.walgLoop(ctx)
@@ -198,6 +202,8 @@ var errRejected = errors.New("the control plane rejected the agent token: regist
 // runner is one agent process. conn is the current session, nil between
 // sessions.
 type runner struct {
+	dir string
+	// state is read and changed under mu: agent.url moves it.
 	state State
 	// rulesFile is read for every request, so a change to it counts at once.
 	rulesFile string
@@ -249,12 +255,15 @@ func (r *runner) send(messageType protocol.MessageType, requestID string, data a
 // session holds one WebSocket session. connected reports whether the dial
 // succeeded, so Run can reset its backoff.
 func (r *runner) session(ctx context.Context) (connected bool, err error) {
-	sessionURL, err := websocketURL(r.state.URL + protocol.SessionPath)
+	r.mu.Lock()
+	state := r.state
+	r.mu.Unlock()
+	sessionURL, err := websocketURL(state.URL + protocol.SessionPath)
 	if err != nil {
 		return false, err
 	}
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+r.state.AgentToken)
+	header.Set("Authorization", "Bearer "+state.AgentToken)
 	conn, response, err := websocket.Dial(ctx, sessionURL, &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		if response != nil && response.StatusCode == http.StatusUnauthorized {
@@ -273,7 +282,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	slog.Info("connected", "url", r.state.URL, "server_id", r.state.ServerID)
+	slog.Info("connected", "url", state.URL, "server_id", state.ServerID)
 
 	r.mu.Lock()
 	r.conn = conn
@@ -498,6 +507,13 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeExecDone, message.RequestID, done)
+	case protocol.TypeAgentURL:
+		var moved protocol.AgentURL
+		if err := message.Decode(&moved); err != nil {
+			slog.Error("bad agent.url", "error", err)
+			return
+		}
+		r.move(ctx, moved.URL)
 	case protocol.TypeAgentUpdate:
 		var update protocol.AgentUpdate
 		if err := message.Decode(&update); err != nil {
@@ -507,7 +523,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		// A new binary could allow what the rules stop, so with rules only
 		// the owner updates it, on the server.
 		if rules != nil {
-			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.state.URL, build.Name, runtime.GOARCH)))
+			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH, "")))
 			return
 		}
 		if r.deploying.Load() > 0 {
@@ -526,6 +542,66 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		if message.RequestID != "" {
 			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))
 		}
+	}
+}
+
+// url is the control plane's address.
+func (r *runner) url() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.state.URL
+}
+
+// moveCheck is how long the new address has to answer.
+const moveCheck = 10 * time.Second
+
+// move dials the control plane at a new address from now on, when the
+// control plane says the one this agent dialed is old. It only moves when
+// the new address answers, never from https to http, and keeps it in the
+// state, so it survives a restart. The session ends, and the next one
+// dials the new address.
+func (r *runner) move(ctx context.Context, to string) {
+	to = strings.TrimRight(to, "/")
+	r.mu.Lock()
+	state := r.state
+	r.mu.Unlock()
+	if to == "" || to == state.URL {
+		return
+	}
+	parsed, err := url.Parse(to)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && (parsed.Scheme != "http" || strings.HasPrefix(state.URL, "https://"))) {
+		slog.Warn("not moving to the control plane's new address: it is not a valid https address", "url", to)
+		return
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, moveCheck)
+	defer cancel()
+	request, err := http.NewRequestWithContext(checkCtx, http.MethodGet, to+"/healthz", nil)
+	if err != nil {
+		return
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		slog.Warn("not moving to the control plane's new address yet: it does not answer", "url", to, "error", err)
+		return
+	}
+	response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		slog.Warn("not moving to the control plane's new address yet: it does not answer", "url", to, "status", response.Status)
+		return
+	}
+	state.URL = to
+	if err := saveState(r.dir, state); err != nil {
+		slog.Error("keep the control plane's new address", "error", err)
+		return
+	}
+	r.mu.Lock()
+	r.state = state
+	conn := r.conn
+	r.mu.Unlock()
+	r.updater.setURL(to)
+	slog.Info("the control plane has a new address: moving", "url", to)
+	if conn != nil {
+		conn.Close(websocket.StatusNormalClosure, "moving to "+to)
 	}
 }
 
