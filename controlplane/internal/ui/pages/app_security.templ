@@ -200,7 +200,7 @@ templ securityScript() {
 templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
 	<div id="security-state" class="flex flex-col gap-6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
-		@panel(panelProps{Title: "Access", Description: "How the internet reaches this server. Nothing changes until you press Apply.", Action: docsLink("/docs/guides/security", "How it works")}) {
+		@panel(panelProps{Title: "Access", Description: "How the internet reaches this server. Nothing changes until you press Apply.", Docs: "/docs/guides/security"}) {
 			<form class="flex flex-col gap-6" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
 				@csrf.Token()
 				// What the page showed: Apply changes only the switches flipped here
@@ -345,7 +345,7 @@ func tailnetNote(ip string, key, sshOnTailscale bool) string {
 // Only the owner of the server changes them, on the server.
 templ serverRules(server model.Server) {
 	{{ rules := service.ServerRules(server) }}
-	@panel(panelProps{Title: "Rules", Description: rulesDescription(len(rules.Lines()) > 0), Action: docsLink("/docs/guides/security#rules", "How they work"), Attrs: templ.Attributes{"data-rules-panel": true}}) {
+	@panel(panelProps{Title: "Rules", Description: rulesDescription(len(rules.Lines()) > 0), Docs: "/docs/guides/security#rules", Attrs: templ.Attributes{"data-rules-panel": true}}) {
 		if len(rules.Lines()) == 0 {
 			<p class="text-sm text-pretty text-muted-foreground">
 				To turn off data or logs, or to allow deploys only from your own repos, write <code class="font-mono text-foreground">/etc/moin/rules</code> on the server.
