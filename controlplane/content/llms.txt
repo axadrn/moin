@@ -1,6 +1,6 @@
 # moin
 
-> moin deploys apps to servers you own, backs up every change of their SQLite database to your own bucket and lets you edit the data live. It works from the web, the moin CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under AGPL-3.0.
+> moin deploys any app to servers you own, backs up every change of its SQLite or Postgres database to your own bucket, checks the restore every day and lets you edit the data live. It installs 47 open-source apps in one click, gives every app an HTTPS address before it has a domain, and checks every domain every minute. It works from the web, the moin CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under AGPL-3.0.
 
 Every docs page is also available as Markdown: add .md to its URL.
 
@@ -10,13 +10,16 @@ Every docs page is also available as Markdown: add .md to its URL.
 - [Getting Started](/docs/getting-started): From a fresh server to a live app
 - [Self-hosting](/docs/self-hosting): Run all of moin yourself, free
 - [Deploy](/docs/guides/deploy): Deploy, redeploy and roll back apps
-- [Backups](/docs/guides/backups): Every change of every SQLite database in your own bucket
+- [Backups](/docs/guides/backups): Every change of every SQLite and Postgres database in your own bucket
+- [Catalog](/docs/guides/catalog): Open-source apps in one click
+- [Domains](/docs/guides/domains): Instant address, your own domains, per service
+- [Run a command](/docs/guides/exec): A command in an app's container, without SSH
 - [AI agents (MCP)](/docs/guides/mcp): Let Claude and other agents run moin
 - [CLI](/docs/reference/cli): Every moin command
 - [API](/docs/reference/api): The JSON API under /api/v1
 - [FAQ](/docs/faq): Common questions
 - [Roadmap](/docs/roadmap): Now, next and later
-- [Changelog](/changelog): What shipped, newest first
+- [Changelog](/changelog): What shipped, newest first, also as RSS at /changelog.xml
 
 ## Public pages
 

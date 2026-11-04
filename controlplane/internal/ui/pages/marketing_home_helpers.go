@@ -139,8 +139,16 @@ var compareGroups = []compareGroup{
 	{"Your data", []compareRow{
 		{"Keeps your code and data", []compareCell{yes("Never", "your bucket, your server"), yes("No"), yes("No"), yes("No"), no("Yes", "on their disks"), no("Yes", "on their disks"), no("Yes", "on their disks"), no("Yes", "on their disks"), yes("No")}, false},
 		{"SQLite backups", []compareCell{yes("Every change", "in your bucket within a second, restore to any second"), part("Scheduled"), part("Scheduled", "volume backups"), unsaid(), no("Not possible", "the disk resets daily"), part("Daily", "disk snapshot"), part("Daily", "volume backup"), part("Daily", "volume snapshot"), unsaid()}, false},
+		// Postgres sources: coolify.io/docs/databases/backups (pg_dump on a cron),
+		// docs.dokploy.com/docs/core/databases/backups (cron),
+		// devcenter.heroku.com/articles/heroku-postgres-plans (rollback: Essential no,
+		// Standard 4 days, Premium and Advanced 1 week), render.com/docs/postgresql-backups
+		// (paid databases, 3 days on Hobby, 7 on Pro), docs.railway.com/volumes/point-in-time-recovery
+		// (turned on per database, about 4 weeks), fly.io/mpg (Managed Postgres,
+		// point-in-time restore, backups kept ten days). Kamal and Uncloud say nothing.
+		{"Postgres backups", []compareCell{yes("Every change", "in your bucket within a minute, restore to any second"), part("Scheduled", "pg_dump on a cron"), part("Scheduled", "on a cron"), unsaid(), yes("Point in time", "Standard and up, 4 to 7 days"), yes("Point in time", "paid plans, 3 or 7 days"), yes("Point in time", "turn it on, about 4 weeks"), yes("Point in time", "Managed Postgres, 10 days"), unsaid()}, false},
 		{"Restore tested every day", []compareCell{yes("Yes", "a real restore, daily"), no("No"), no("No"), unsaid(), no("No"), no("No"), no("No"), no("No"), unsaid()}, false},
-		{"Browse and edit live data", []compareCell{yes("Yes", "SQLite, read and write"), part("Add-on", "pgAdmin or CloudBeaver"), unsaid(), no("No"), part("Postgres only"), no("No"), part("Tables", "of its databases"), unsaid(), unsaid()}, false},
+		{"Browse and edit live data", []compareCell{yes("Yes", "SQLite and Postgres, read and write"), part("Add-on", "pgAdmin or CloudBeaver"), unsaid(), no("No"), part("Postgres only"), no("No"), part("Tables", "of its databases"), unsaid(), unsaid()}, false},
 	}},
 	{"Every day", []compareRow{
 		// Uptime sources: coolify.io/docs/knowledge-base/monitoring,
