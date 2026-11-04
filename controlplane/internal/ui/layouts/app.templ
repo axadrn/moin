@@ -173,6 +173,25 @@ templ appShellScript() {
 		(() => {
 			if (window.opsShell) return;
 			window.opsShell = true;
+			// The changelog dot: a version the member has not opened the
+			// changelog for yet shows a dot on the account menu and its
+			// Changelog item; opening it clears both, in this browser.
+			const seenKey = "ops-changelog-seen";
+			const markChangelog = () => {
+				const item = document.querySelector("[data-changelog]");
+				if (!item) return;
+				let seen = "";
+				try { seen = localStorage.getItem(seenKey) || ""; } catch {}
+				const fresh = item.dataset.changelog !== seen;
+				document.querySelectorAll("[data-changelog-dot]").forEach((dot) => { dot.hidden = !fresh; });
+			};
+			document.addEventListener("click", (event) => {
+				const item = event.target.closest("[data-changelog]");
+				if (!item) return;
+				try { localStorage.setItem(seenKey, item.dataset.changelog); } catch {}
+				markChangelog();
+			});
+			markChangelog();
 			const copy = async (text) => {
 				try {
 					await navigator.clipboard.writeText(text);

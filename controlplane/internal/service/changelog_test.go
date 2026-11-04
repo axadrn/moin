@@ -58,3 +58,23 @@ func TestChangelogFormat(t *testing.T) {
 		t.Errorf("Changelog renders %d bytes, %v", len(html), err)
 	}
 }
+
+// TestChangelogReleases: the feed reads every version with its date and
+// its In short line, newest first.
+func TestChangelogReleases(t *testing.T) {
+	releases, err := ChangelogReleases("../../content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(releases) < 10 {
+		t.Fatalf("%d releases", len(releases))
+	}
+	for _, release := range releases {
+		if release.Date.IsZero() || release.InShort == "" {
+			t.Errorf("%s: date %v, in short %q", release.Version, release.Date, release.InShort)
+		}
+	}
+	if !releases[0].Date.After(releases[len(releases)-1].Date) && releases[0].Date != releases[len(releases)-1].Date {
+		t.Errorf("not newest first: %v … %v", releases[0].Date, releases[len(releases)-1].Date)
+	}
+}

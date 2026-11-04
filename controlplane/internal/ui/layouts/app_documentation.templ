@@ -18,9 +18,12 @@ templ AppSidebarHelpItems() {
 		@icon.LifeBuoy()
 		Support
 	}
-	@dropdown.Item(dropdown.ItemProps{Href: "/changelog", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-version": build.Version}}) {
+	// A dot marks a version the member has not opened the changelog for
+	// yet; the shell script shows it and clears it on click.
+	@dropdown.Item(dropdown.ItemProps{Href: "/changelog", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-version": build.Version, "data-changelog": build.Version}}) {
 		@icon.Tag()
 		Changelog
+		<span data-changelog-dot hidden class="size-1.5 rounded-full bg-live"></span>
 		<span class="ml-auto font-mono text-xs text-muted-foreground">{ build.Version }</span>
 	}
 }
