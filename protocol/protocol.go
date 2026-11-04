@@ -95,6 +95,12 @@ const (
 	// restarts, or with TypeError and changes nothing.
 	TypeAgentUpdate MessageType = "agent.update"
 
+	// TypeAgentURL tells the agent the control plane's address when it
+	// dialed an old one (AgentURL). The agent checks that the address
+	// answers, keeps it and dials it from then on. It has no request ID and
+	// no answer: an agent that does not know it ignores it.
+	TypeAgentURL MessageType = "agent.url"
+
 	// TypeMetrics is a sample of the server and its apps (Metrics), sent by
 	// the agent every MetricsEvery without a request. A control plane that
 	// does not know it drops it; an agent that does not send it shows no
@@ -719,6 +725,11 @@ type Error struct {
 // there.
 const DownloadPath = "/download/"
 
+// AgentURL is the address of the control plane an agent should dial.
+type AgentURL struct {
+	URL string `json:"url"`
+}
+
 // AgentUpdate is the binary the agent should run: the control plane's
 // version and the SHA-256 of the binary it serves for the agent's OS and
 // CPU. The agent downloads it from its own control plane URL.
@@ -729,10 +740,38 @@ type AgentUpdate struct {
 
 // UpdateCommand updates an agent by hand on the server, as root: for an
 // agent too old to update itself, or one whose rules keep it from doing so.
-func UpdateCommand(baseURL, name, arch string) string {
+// With legacy set, the name the agent had before, it updates an agent still
+// installed under that name too: the new binary then moves it over itself.
+func UpdateCommand(baseURL, name, arch, legacy string) string {
 	binary := "/usr/local/bin/" + name
-	return fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && systemctl restart %s-agent",
-		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary, name)
+	command := fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && ",
+		strings.TrimRight(baseURL, "/"), DownloadPath, name, arch, binary, binary, binary, binary)
+	if legacy == "" {
+		return command + "systemctl restart " + name + "-agent"
+	}
+	return command + fmt.Sprintf("{ systemctl cat %s-agent >/dev/null 2>&1 && systemctl restart %s-agent || { ln -sf %s /usr/local/bin/%s && systemctl restart %s-agent; }; }",
+		name, name, binary, legacy, legacy)
+}
+
+// AgentUnit is the systemd unit of the agent. It conflicts with the unit of
+// the name the agent had before, legacy, so the two never run at once.
+func AgentUnit(name, legacy string) string {
+	conflicts := ""
+	if legacy != "" {
+		conflicts = "Conflicts=" + legacy + "-agent.service\n"
+	}
+	return "[Unit]\n" +
+		"Description=" + name + " agent\n" +
+		"After=network-online.target docker.service\n" +
+		"Wants=network-online.target docker.service\n" +
+		conflicts +
+		"\n[Service]\n" +
+		"ExecStart=/usr/local/bin/" + name + " agent\n" +
+		"Environment=" + strings.ToUpper(name) + "_STATE_DIR=/var/lib/" + name + "\n" +
+		"Restart=always\n" +
+		"RestartSec=2\n" +
+		"\n[Install]\n" +
+		"WantedBy=multi-user.target\n"
 }
 
 // UninstallCommand removes the agent from a server, run on it as root: its

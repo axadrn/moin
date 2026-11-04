@@ -18,7 +18,7 @@ Everything else is in the docs: [moin.run/docs](https://moin.run/docs), or `/doc
 ## Build
 
 ```bash
-go install github.com/axadrn/moin/cmd/ops@latest
+go install github.com/axadrn/moin/cmd/moin@latest
 ```
 
 The control plane is in [`controlplane`](controlplane).
