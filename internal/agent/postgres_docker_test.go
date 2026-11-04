@@ -116,6 +116,60 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 	if _, err := query(`SELECT 1 \! id`, nil, true); err == nil {
 		t.Error("a shell command passed")
 	}
+	// The schema of a table is a CREATE TABLE built from its columns.
+	tables, err = a.pgTables(ctx, "pgtest", database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range tables.Tables {
+		if table.Name == "users" && (!strings.HasPrefix(table.SQL, "CREATE TABLE users (") || !strings.Contains(table.SQL, "id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass)") || !strings.Contains(table.SQL, "PRIMARY KEY (id)")) {
+			t.Errorf("users schema:\n%s", table.SQL)
+		}
+		if table.Name == "names" && !strings.HasPrefix(table.SQL, "CREATE VIEW names AS") {
+			t.Errorf("names schema:\n%s", table.SQL)
+		}
+	}
+	// A read that changes is refused before it runs; SHOW and EXPLAIN read.
+	if _, err := query(`DELETE FROM users`, nil, false); err == nil || !strings.Contains(err.Error(), "A read cannot change data: run it with --write.") {
+		t.Errorf("a delete as a read: %v", err)
+	}
+	if result, err := query(`SHOW server_version_num`, nil, false); err != nil || len(result.Columns) != 1 || len(result.Rows) != 1 || !strings.HasPrefix(result.Rows[0][0].(string), "17") {
+		t.Errorf("SHOW: %+v %v", result, err)
+	}
+	if result, err := query(`EXPLAIN SELECT * FROM users`, nil, false); err != nil || len(result.Columns) != 1 || result.Columns[0] != "QUERY PLAN" || len(result.Rows) == 0 {
+		t.Errorf("EXPLAIN: %+v %v", result, err)
+	}
+
+	// Edits by primary key, the SQL the control plane builds: values,
+	// keys too, are psql variables, never SQL.
+	if _, err := target.psql(ctx, `CREATE TABLE codes (code text PRIMARY KEY, label text);`, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	keyEvil := "k'); DELETE FROM codes; --"
+	cellEvil := "v' WHERE true; DROP TABLE codes; --"
+	if result, err := query(`INSERT INTO "codes" ("code", "label") VALUES (?, ?)`, []any{"a", "A"}, true); err != nil || result.Changes != 1 {
+		t.Fatalf("insert: %+v %v", result, err)
+	}
+	if result, err := query(`INSERT INTO "codes" ("code", "label") VALUES (?, ?)`, []any{keyEvil, "E"}, true); err != nil || result.Changes != 1 {
+		t.Fatalf("insert evil key: %+v %v", result, err)
+	}
+	if result, err := query(`UPDATE "codes" SET "label" = ? WHERE "code" = ?`, []any{cellEvil, keyEvil}, true); err != nil || result.Changes != 1 {
+		t.Fatalf("edit a cell by key: %+v %v", result, err)
+	}
+	result, err = query(`SELECT code, label FROM codes ORDER BY code`, nil, false)
+	if err != nil || len(result.Rows) != 2 || result.Rows[0][1] != "A" || result.Rows[1][0] != keyEvil || result.Rows[1][1] != cellEvil {
+		t.Fatalf("after the edit: %+v %v", result, err)
+	}
+	if result, err := query(`DELETE FROM "codes" WHERE "code" = ?`, []any{"a' OR '1'='1"}, true); err != nil || result.Changes != 0 {
+		t.Errorf("delete by an injected key: %+v %v", result, err)
+	}
+	if result, err := query(`DELETE FROM "codes" WHERE "code" = ?`, []any{keyEvil}, true); err != nil || result.Changes != 1 {
+		t.Errorf("delete a row by key: %+v %v", result, err)
+	}
+	if result, err := query(`SELECT code FROM codes`, nil, false); err != nil || len(result.Rows) != 1 || result.Rows[0][0] != "a" {
+		t.Errorf("after the delete: %+v %v", result, err)
+	}
+
 	// The limit truncates.
 	result, err = a.pgQuery(ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: "pgtest"}, SQL: `SELECT generate_series(1, 50) AS n`, Limit: 5}, database)
 	if err != nil || len(result.Rows) != 5 || !result.Truncated {

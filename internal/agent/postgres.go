@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -155,7 +156,18 @@ const pgTablesSQL = `SELECT coalesce(json_agg(json_build_object(
 	'type', CASE WHEN c.relkind IN ('v', 'm') THEN 'view' ELSE 'table' END,
 	'rows', CASE WHEN c.relkind IN ('r', 'p', 'm') THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', n.nspname, c.relname), false, true, '')))[1]::text::bigint ELSE 0 END,
 	'rowid', false,
-	'sql', CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid) ELSE '' END,
+	'sql', CASE
+		WHEN c.relkind = 'v' THEN format('CREATE VIEW %I AS', c.relname) || E'\n' || rtrim(pg_get_viewdef(c.oid), ';')
+		WHEN c.relkind = 'm' THEN format('CREATE MATERIALIZED VIEW %I AS', c.relname) || E'\n' || rtrim(pg_get_viewdef(c.oid), ';')
+		ELSE format('CREATE TABLE %I (', c.relname) || E'\n' || (
+			SELECT string_agg('  ' || format('%I %s', a.attname, format_type(a.atttypid, a.atttypmod))
+				|| CASE WHEN a.attnotnull THEN ' NOT NULL' ELSE '' END
+				|| coalesce(' DEFAULT ' || pg_get_expr(d.adbin, d.adrelid), ''), E',\n' ORDER BY a.attnum)
+			FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+			WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped)
+			|| coalesce(E',\n  ' || (SELECT pg_get_constraintdef(k.oid) FROM pg_constraint k WHERE k.conrelid = c.oid AND k.contype = 'p'), '')
+			|| E'\n)'
+	END,
 	'columns', (SELECT coalesce(json_agg(json_build_object(
 			'name', a.attname,
 			'type', format_type(a.atttypid, a.atttypmod),
@@ -238,6 +250,13 @@ func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database p
 	if pgMultiple(sql) {
 		return result, errors.New("a read runs one statement: run the others one by one")
 	}
+	first := pgFirstWord(sql)
+	if !slices.Contains([]string{"SELECT", "WITH", "VALUES", "TABLE", "SHOW", "EXPLAIN"}, first) {
+		return result, errors.New("A read cannot change data: run it with --write.")
+	}
+	if first == "SHOW" || first == "EXPLAIN" {
+		return target.pgPlain(ctx, sql, vars, result)
+	}
 	limit := request.Limit
 	if limit <= 0 {
 		limit = defaultRows
@@ -280,6 +299,69 @@ func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database p
 				}
 			}
 		}
+	}
+	return result, nil
+}
+
+// pgFirstWord is the first keyword of SQL, upper case, after comments,
+// spaces and opening parentheses.
+func pgFirstWord(sql string) string {
+	for {
+		sql = strings.TrimLeft(sql, " \t\r\n(")
+		switch {
+		case strings.HasPrefix(sql, "--"):
+			_, rest, found := strings.Cut(sql, "\n")
+			if !found {
+				return ""
+			}
+			sql = rest
+		case strings.HasPrefix(sql, "/*"):
+			_, rest, found := strings.Cut(sql, "*/")
+			if !found {
+				return ""
+			}
+			sql = rest
+		default:
+			end := strings.IndexFunc(sql, func(r rune) bool { return !(r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') })
+			if end < 0 {
+				end = len(sql)
+			}
+			return strings.ToUpper(sql[:end])
+		}
+	}
+}
+
+// pgPlain runs SHOW or EXPLAIN, which cannot sit in a subquery, in a READ
+// ONLY transaction: one row per line, the columns from \gdesc.
+func (t pgTarget) pgPlain(ctx context.Context, sql string, vars map[string]string, result protocol.DBResult) (protocol.DBResult, error) {
+	const separator = "\x1f"
+	pset := "\\pset fieldsep '\\037'\n"
+	desc, err := t.psql(ctx, "BEGIN READ ONLY;\n"+pset+sql+" \\gdesc\nROLLBACK;\n", vars, false)
+	if err != nil {
+		return result, err
+	}
+	for _, line := range strings.Split(strings.TrimSpace(desc), "\n") {
+		if name, _, ok := strings.Cut(line, separator); ok {
+			result.Columns = append(result.Columns, name)
+		}
+	}
+	out, err := t.psql(ctx, pgStatementTimeout+"BEGIN READ ONLY;\n"+pset+sql+";\nROLLBACK;\n", vars, false)
+	if err != nil {
+		return result, err
+	}
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		fields := strings.Split(line, separator)
+		if len(fields) != len(result.Columns) && len(result.Rows) > 0 {
+			// A value over several lines goes on in the next line.
+			last := result.Rows[len(result.Rows)-1]
+			last[len(last)-1] = fmt.Sprint(last[len(last)-1]) + "\n" + line
+			continue
+		}
+		row := make([]any, len(fields))
+		for index, field := range fields {
+			row[index] = field
+		}
+		result.Rows = append(result.Rows, row)
 	}
 	return result, nil
 }
