@@ -1,7 +1,27 @@
 ---
 title: Changelog
-description: What shipped in ops, newest first.
+description: What shipped in moin, newest first.
 ---
+
+## v1.0.0-beta.20
+
+November 4, 2026
+
+**In short:** ops is now moin, at moin.run. Deploy anything. Lose nothing. Everything you run moves over by itself, and nothing breaks on the way.
+
+### Why
+moin is how Hamburg says hello. Hamburg is a container port, and your apps run in containers too. [The story](https://moin.run/#why-moin).
+
+### Changed
+- **New name, new home**: moin at [moin.run](https://moin.run), the command `moin`, the logo `moin.`. The old address sends you to the new one.
+- **Your servers move by themselves**: the next agent update renames everything on the server to moin, copies each app's data and checks it file by file. Apps keep serving while it moves.
+- **Backups go on**: Postgres starts a fresh continuous backup under its new name right away. Every older snapshot and point in time still restores.
+- **Self-hosted moves too**: `update.sh` copies your settings and data to the new folders and starts moin from the image `ghcr.io/axadrn/moin`. The old folders stay.
+- **Old names keep working until December 4, 2026**: the `ops` command, `x-ops` in compose.yml, `OPS_*` variables, the old download paths and image, and the `X-Ops-Signature` webhook header next to the new `X-Moin-Signature`.
+- **One address for everything**: write to hello@moin.run.
+
+### Upgrade
+Hosted: nothing to do. Self-hosted: **Update now**, or `sh update.sh`; agents follow by themselves. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
 
 ## v1.0.0-beta.19
 
