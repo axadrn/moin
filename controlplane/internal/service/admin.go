@@ -38,6 +38,8 @@ type AdminService struct {
 	// forever.
 	subscriptions repository.SubscriptionRepository
 	activity      repository.WorkspaceAuditRepository
+	// oldAddress counts what still arrives on old addresses.
+	oldAddress *OldAddressService
 }
 
 func NewAdminService(repo repository.AdminRepository, users repository.UserRepository, auth *AuthService, adminEmails []string) *AdminService {
@@ -61,6 +63,20 @@ func (s *AdminService) IsAdmin(user *model.User, session *model.Session) bool {
 	}
 	_, ok := s.adminEmails[strings.ToLower(user.Email)]
 	return ok
+}
+
+// UseOldAddress has the dashboard show the traffic on the old addresses.
+func (s *AdminService) UseOldAddress(oldAddress *OldAddressService) {
+	s.oldAddress = oldAddress
+}
+
+// OldAddress is the traffic on the old addresses of the control plane, for
+// admins.
+func (s *AdminService) OldAddress(user *model.User, session *model.Session) (*model.OldAddress, error) {
+	if !s.IsAdmin(user, session) {
+		return nil, ErrAdminPermission
+	}
+	return s.oldAddress.Report()
 }
 
 func (s *AdminService) Dashboard(user *model.User, session *model.Session, query string, page int) (*model.AdminDashboard, error) {

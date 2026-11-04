@@ -50,6 +50,14 @@ CREATE TABLE IF NOT EXISTS uptime_hours (
     PRIMARY KEY (app_id, domain, hour)
 );
 CREATE INDEX IF NOT EXISTS idx_uptime_hours_hour ON uptime_hours(hour);
+CREATE TABLE IF NOT EXISTS old_address_days (
+    day TEXT NOT NULL,
+    host TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    requests INTEGER NOT NULL DEFAULT 0,
+    last_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, host, kind)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS catalog_versions (
     slug TEXT PRIMARY KEY,
     versions TEXT NOT NULL,

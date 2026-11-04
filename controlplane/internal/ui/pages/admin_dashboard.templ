@@ -26,7 +26,11 @@ templ AdminDashboard(data *model.AdminDashboard) {
 templ AdminDashboardContent(data *model.AdminDashboard) {
 	{{ currentUser := ctxkeys.User(ctx) }}
 	<div id="admin-content" class="flex flex-col gap-6" hx-swap-oob="true">
-		@pageHeader("Admin", "Users, workspaces, sessions and operator activity.")
+		@pageHeader("Admin", "Users, workspaces, sessions and operator activity.") {
+			@button.Button(button.Props{Href: "/admin/old-address", Variant: button.VariantSecondary}) {
+				Old address
+			}
+		}
 		<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
 			@statCard("Users", strconv.Itoa(data.Metrics.Users), "")
 			@statCard("Verified", strconv.Itoa(data.Metrics.VerifiedUsers), "")

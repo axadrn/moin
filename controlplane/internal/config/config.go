@@ -31,6 +31,11 @@ type Config struct {
 	SupportEmail  string
 	AdminEmails   []string
 	RobotsNoIndex bool
+	// OldURLs are addresses the control plane had before APP_URL, such as
+	// https://ops.goilerplate.com. It still answers on them: browsers go
+	// on to APP_URL, agents and the CLI move there by themselves, and
+	// admins see how much still arrives on them.
+	OldURLs []string
 
 	// Database
 	DBConnection string
@@ -190,6 +195,7 @@ func Load() (*Config, error) {
 		LogHTTP: r.boolean("LOG_HTTP", true),
 
 		CORSAllowedOrigins:     r.origins("CORS_ALLOWED_ORIGINS"),
+		OldURLs:                r.origins("OLD_URLS"),
 		S3Region:               r.string("S3_REGION", ""),
 		S3Bucket:               r.string("S3_BUCKET", ""),
 		S3AccessKey:            r.string("S3_ACCESS_KEY", ""),
