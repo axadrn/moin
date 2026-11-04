@@ -3,6 +3,23 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.13
+
+November 4, 2026
+
+**In short:** you hear it when a backup stops, a restore check fails or a disk fills up, and servers clean up old images by themselves.
+
+### New
+- **Backup alerts**: a backup that stops working, or a daily restore check that fails, sends an alert by email, Slack, Discord, Telegram or webhook, once, and again when it works. `ops alerts add …`, events `backup.failed`, `drill.failed`.
+- **Disk alerts**: a server over 90% full sends an alert, and another when it is back under 85%. Event `disk.full`.
+- **Disk cleanup**: after every deploy and once a day, servers remove images no release needs anymore, dangling images and build cache older than a week. Rollback images and volumes stay.
+
+### Fixed
+- **Restore check while a database is down**: it no longer fails just because the Postgres service is stopped.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves. Destinations that get every event also get the new ones.
+
 ## v1.0.0-beta.12
 
 November 4, 2026
