@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"regexp"
@@ -146,10 +147,11 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	app.Catalog = entry.Slug
 	env := map[string]string{catalog.VersionVar: version}
 	for _, name := range entry.Secrets {
-		env[name] = newSecret()
+		env[name] = newSecret(name)
 	}
 	if entry.NeedsURL() {
 		env[catalog.URLVar] = "https://" + domain
+		env[catalog.DomainVar] = domain
 	}
 	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
 	if err != nil {
@@ -192,7 +194,7 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 	// A newer compose.yml may ask for a secret the app does not have yet.
 	for _, name := range entry.Secrets {
 		if current[name] == "" {
-			env[name] = newSecret()
+			env[name] = newSecret(name)
 		}
 	}
 	if current[catalog.VersionVar] != version || len(env) > 1 {
@@ -270,9 +272,17 @@ func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, b
 }
 
 // newSecret is 32 random bytes as URL-safe text: fine in a database URL,
-// a header or YAML.
-func newSecret() string {
-	buffer := make([]byte, 32)
+// a header or YAML. Some apps want a key in hex: a name that ends in _HEX
+// gets 32 bytes as 64 hex digits, one that ends in _HEX16 16 bytes as 32.
+func newSecret(name string) string {
+	size, encode := 32, base64.RawURLEncoding.EncodeToString
+	switch {
+	case strings.HasSuffix(name, "_HEX16"):
+		size, encode = 16, hex.EncodeToString
+	case strings.HasSuffix(name, "_HEX"):
+		encode = hex.EncodeToString
+	}
+	buffer := make([]byte, size)
 	_, _ = rand.Read(buffer)
-	return base64.RawURLEncoding.EncodeToString(buffer)
+	return encode(buffer)
 }

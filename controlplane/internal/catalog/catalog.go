@@ -57,7 +57,7 @@ type Entry struct {
 }
 
 // Categories in the order the catalog shows them.
-var Categories = []string{"Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
+var Categories = []string{"AI", "Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
 
 var (
 	slugPattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
@@ -77,9 +77,14 @@ const VersionVar = "VERSION"
 // cookies of such an app need it, so it needs a domain.
 const URLVar = "APP_URL"
 
-// NeedsURL reports whether the app needs its own address, and so a domain.
+// DomainVar is the app's domain alone, without https://, for an app that
+// asks for its host name rather than its address.
+const DomainVar = "APP_DOMAIN"
+
+// NeedsURL reports whether the app needs its own address or domain, and so
+// a domain.
 func (e Entry) NeedsURL() bool {
-	return strings.Contains(string(e.Compose), "${"+URLVar+"}")
+	return strings.Contains(string(e.Compose), "${"+URLVar+"}") || strings.Contains(string(e.Compose), "${"+DomainVar+"}")
 }
 
 // Load reads every entry under dir, sorted by name.
@@ -221,7 +226,7 @@ func Secrets(compose []byte) []string {
 	var names []string
 	for _, match := range variablePattern.FindAllStringSubmatch(string(compose), -1) {
 		name, rest := match[1], match[2]
-		if name == VersionVar || name == URLVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
+		if name == VersionVar || name == URLVar || name == DomainVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
 			continue
 		}
 		if !slices.Contains(names, name) {

@@ -4,7 +4,7 @@ description: "Open source apps on your own server in one click, every release, u
 order: 3
 ---
 
-The catalog is a list of open source apps ops installs in one click, such as Umami, n8n, Grafana, Nextcloud, Vaultwarden and Paperless-ngx. Pick one, a version and a server. A minute later it runs, with its database backed up, every change.
+The catalog is a list of open source apps ops installs in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx. Pick one, a version and a server. A minute later it runs, with its database backed up, every change.
 
 - **Every release.** ops reads the image registry of each app once an hour. You see every release, the newest first, the hour it ships. Pick any of them, also an older one.
 - **Its database is safe.** A Postgres or SQLite inside the app is backed up like any app's: every change in your bucket, a full copy before every deploy, and a restore check every day. See [Backups](/docs/guides/backups).
@@ -112,9 +112,10 @@ services:
 The rules, which a test checks:
 
 - **The image** is on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, and `compose.yml` runs it as `<image>:${VERSION}`.
-- **Every secret** is a `${NAME}`: ops generates it on install. Never write a password out.
+- **Every secret** is a `${NAME}`: ops generates it on install, 32 random bytes as URL-safe text. A name that ends in `_HEX` gets 64 hex digits, one that ends in `_HEX16` 32, for apps that want a key in hex. Never write a password out.
+- **Its own address**: `${APP_URL}` is `https://<its domain>` and `${APP_DOMAIN}` the domain alone. An app that uses either needs a domain on install.
 - **A database** is Postgres in the same compose file, with a `pg_isready` health check the app waits for, or SQLite under `./data`, so ops backs it up.
 - **Versions**: by default only tags like `1.2.3` or `v1.2.3` count. A project with other tags sets `versions:` to a regular expression. One that tags its betas like releases sets `stable:` to its channel tag, such as `stable`: newer releases stay out.
-- **Category** is one of Analytics, Automation, Monitoring, Communication, Productivity, Documents, Reading, Developer tools, Security, Marketing, Finance or Media.
+- **Category** is one of AI, Analytics, Automation, Monitoring, Communication, Websites, Productivity, Documents, Reading, Developer tools, Security, Marketing, Finance or Media.
 
 Install it once on a server of your own with `ops catalog install` before you open the pull request.

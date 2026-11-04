@@ -27,10 +27,13 @@ func TestEntries(t *testing.T) {
 		if !strings.Contains(string(entry.Compose), "x-ops:") {
 			t.Errorf("%s: compose.yml has no x-ops block", entry.Slug)
 		}
-		if entry.Database == "postgres" && !strings.Contains(string(entry.Compose), "image: postgres:") {
+		// pgvector/pgvector is Postgres with vectors; the agent backs it up
+		// like postgres.
+		runsPostgres := strings.Contains(string(entry.Compose), "image: postgres:") || strings.Contains(string(entry.Compose), "image: pgvector/pgvector:")
+		if entry.Database == "postgres" && !runsPostgres {
 			t.Errorf("%s: says postgres but runs none", entry.Slug)
 		}
-		if strings.Contains(string(entry.Compose), "image: postgres:") && (!strings.Contains(string(entry.Compose), "pg_isready") || !strings.Contains(string(entry.Compose), "condition: service_healthy")) {
+		if runsPostgres && (!strings.Contains(string(entry.Compose), "pg_isready") || !strings.Contains(string(entry.Compose), "condition: service_healthy")) {
 			t.Errorf("%s: its Postgres needs a pg_isready health check the app waits for", entry.Slug)
 		}
 		if strings.Contains(string(entry.Compose), "PASSWORD: ") && !strings.Contains(string(entry.Compose), "PASSWORD: ${") {
@@ -181,5 +184,42 @@ func TestStoreKeepsReleasesWhenTheRegistryFails(t *testing.T) {
 	}
 	if time.Since(store.Checked("a")) > time.Minute {
 		t.Error("never checked")
+	}
+}
+
+// TestAppDomain: ${APP_DOMAIN}, the domain alone, needs a domain like
+// ${APP_URL} and is no secret.
+func TestAppDomain(t *testing.T) {
+	entry := Entry{Compose: []byte("services:\n  web:\n    environment:\n      HOST: ${APP_DOMAIN}\n      KEY: ${KEY}\n")}
+	if !entry.NeedsURL() {
+		t.Error("APP_DOMAIN needs no domain")
+	}
+	if got := Secrets(entry.Compose); !slices.Equal(got, []string{"KEY"}) {
+		t.Errorf("secrets = %v", got)
+	}
+}
+
+// TestRegistryGHCRPages: GHCR answers 1000 tags a page and links the
+// next; releases on a later page count too.
+func TestRegistryGHCRPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/token":
+			_, _ = w.Write([]byte(`{"token":"t0k"}`))
+		case r.URL.Query().Get("last") == "":
+			w.Header().Set("Link", `</v2/me/app/tags/list?last=git-1&n=1000>; rel="next"`)
+			_, _ = w.Write([]byte(`{"tags":["git-0","git-1"]}`))
+		default:
+			_, _ = w.Write([]byte(`{"tags":["v0.6.1","v0.6.2"]}`))
+		}
+	}))
+	defer server.Close()
+	registry := Registry{Client: server.Client(), HubURL: server.URL, GHCRURL: server.URL}
+	tags, err := registry.Tags(context.Background(), "ghcr.io/me/app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if releases := Releases(tags, nil); len(releases) != 2 || releases[0].Tag != "v0.6.2" {
+		t.Errorf("releases = %+v", releases)
 	}
 }

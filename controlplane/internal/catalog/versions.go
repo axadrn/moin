@@ -167,24 +167,47 @@ func (r Registry) ghcr(ctx context.Context, repo string) ([]Version, error) {
 	if err != nil {
 		return nil, err
 	}
-	var list struct {
-		Tags []string `json:"tags"`
-	}
-	err = r.getJSON(ctx, r.GHCRURL+"/v2/"+repo+"/tags/list?n=10000", token.Token, &list)
-	if err != nil {
-		return nil, err
-	}
-	tags := make([]Version, 0, len(list.Tags))
-	for _, tag := range list.Tags {
-		tags = append(tags, Version{Tag: tag})
+	// GHCR answers at most 1000 tags a page and links the next one; an
+	// image with many build tags has its releases on a later page.
+	var tags []Version
+	address := r.GHCRURL + "/v2/" + repo + "/tags/list?n=1000"
+	for page := 0; address != "" && page < ghcrPages; page++ {
+		var list struct {
+			Tags []string `json:"tags"`
+		}
+		next, err := r.getJSONPage(ctx, address, token.Token, &list)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range list.Tags {
+			tags = append(tags, Version{Tag: tag})
+		}
+		address = ""
+		if next != "" {
+			address = r.GHCRURL + next
+		}
 	}
 	return tags, nil
 }
 
+// ghcrPages bounds the pages of tags read from GHCR: 50,000 tags.
+const ghcrPages = 50
+
 func (r Registry) getJSON(ctx context.Context, address, bearer string, into any) error {
+	_, err := r.getJSONPage(ctx, address, bearer, into)
+	return err
+}
+
+// linkNext is the path of the next page in a Link header, as registries
+// send it: </v2/x/tags/list?last=y&n=1000>; rel="next".
+var linkNext = regexp.MustCompile(`<(/[^>]+)>;\s*rel="next"`)
+
+// getJSONPage is getJSON that also reports the path of the next page, or
+// "" on the last.
+func (r Registry) getJSONPage(ctx context.Context, address, bearer string, into any) (string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", "ops-catalog")
@@ -193,15 +216,19 @@ func (r Registry) getJSON(ctx context.Context, address, bearer string, into any)
 	}
 	response, err := r.Client.Do(request)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: %s", request.URL.Host, response.Status)
+		return "", fmt.Errorf("%s: %s", request.URL.Host, response.Status)
 	}
 	err = json.NewDecoder(io.LimitReader(response.Body, 8<<20)).Decode(into)
 	if err != nil {
-		return errors.New(request.URL.Host + ": unreadable answer")
+		return "", errors.New(request.URL.Host + ": unreadable answer")
 	}
-	return nil
+	next := ""
+	if match := linkNext.FindStringSubmatch(response.Header.Get("Link")); match != nil {
+		next = match[1]
+	}
+	return next, nil
 }
