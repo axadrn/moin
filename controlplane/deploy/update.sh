@@ -83,4 +83,11 @@ fi
 mkdir -p "$data"
 # shellcheck disable=SC2086
 COMPOSE_PROFILES=$profiles docker compose $files up -d --pull "$MOIN_PULL" --remove-orphans "$@"
+# The agent's network of the old name goes once the control plane left it
+# and nothing else uses it; the proxy only stayed on it for the control
+# plane.
+if [ "${MOIN_PROXY_NETWORK:-}" = moin-proxy ] && docker network inspect ops-proxy >/dev/null 2>&1; then
+	docker network disconnect ops-proxy moin-traefik >/dev/null 2>&1 || true
+	docker network rm ops-proxy >/dev/null 2>&1 || docker network connect ops-proxy moin-traefik >/dev/null 2>&1 || true
+fi
 echo "moin control plane started."
