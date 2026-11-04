@@ -21,7 +21,7 @@ func TestPostgresDocker(t *testing.T) {
 	defer cancel()
 	const image = "postgres:17"
 	out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--rm",
-		"--label", "com.docker.compose.project=ops-pgtest", "--label", "com.docker.compose.service=db",
+		"--label", "com.docker.compose.project=moin-pgtest", "--label", "com.docker.compose.service=db",
 		"-e", "POSTGRES_USER=app", "-e", "POSTGRES_DB=shop", "-e", "POSTGRES_PASSWORD=secret", image).CombinedOutput()
 	if err != nil {
 		t.Fatalf("docker run: %v %s", err, out)
@@ -210,7 +210,7 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 	if err := a.pgDrill(ctx, image, broken); err == nil {
 		t.Error("a broken dump passed the drill")
 	}
-	left, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=ops.drill=true").Output()
+	left, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=moin.drill=true").Output()
 	if strings.TrimSpace(string(left)) != "" {
 		t.Errorf("drill containers left behind: %s", left)
 	}

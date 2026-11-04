@@ -91,7 +91,7 @@ func TestGenerateOrder(t *testing.T) {
 		}
 		compose, _ := os.ReadFile(composePath(src))
 		if kind == "railpack" {
-			for _, want := range []string{"dockerfile: ../railpack-plan.json", "BUILDKIT_SYNTAX: " + railpackFrontend, "cache-key: ops-shop", `PORT: "8080"`, "./data:/data"} {
+			for _, want := range []string{"dockerfile: ../railpack-plan.json", "BUILDKIT_SYNTAX: " + railpackFrontend, "cache-key: moin-shop", `PORT: "8080"`, "./data:/data"} {
 				if !strings.Contains(string(compose), want) {
 					t.Errorf("railpack compose lacks %q:\n%s", want, compose)
 				}
@@ -218,7 +218,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	web, worker := config.Services["web"], config.Services["worker"]
-	if web.Image != "ops-blog-web:5" || web.Build == nil || worker.Image != "ops-blog-worker:3" || worker.Build != nil {
+	if web.Image != "moin-blog-web:5" || web.Build == nil || worker.Image != "ops-blog-worker:3" || worker.Build != nil {
 		t.Fatalf("web = %+v, worker = %+v", web, worker)
 	}
 	if len(lines) != 1 || !strings.Contains(lines[0], "building it again") {
@@ -244,17 +244,17 @@ func TestRoutingLabels(t *testing.T) {
 	service := config["services"].(map[string]any)["web"].(map[string]any)
 	addRouting(config, service, "blog", project("blog"), detected.Domains, detected.Canonical, detected.Port, "me:$2y$05$abc", "", "")
 	labels := service["labels"].(map[string]any)
-	if labels["traefik.http.routers.ops-blog.rule"] != "Host(`blog.de`) || Host(`www.blog.de`)" {
-		t.Fatalf("rule = %v", labels["traefik.http.routers.ops-blog.rule"])
+	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.de`) || Host(`www.blog.de`)" {
+		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
 	}
-	if labels["traefik.http.routers.ops-blog.middlewares"] != "ops-blog-canonical,ops-blog-auth" {
-		t.Fatalf("middlewares = %v", labels["traefik.http.routers.ops-blog.middlewares"])
+	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical,moin-blog-auth" {
+		t.Fatalf("middlewares = %v", labels["traefik.http.routers.moin-blog.middlewares"])
 	}
-	if labels["traefik.http.middlewares.ops-blog-auth.basicauth.users"] != "me:$$2y$$05$$abc" {
-		t.Fatalf("auth = %v", labels["traefik.http.middlewares.ops-blog-auth.basicauth.users"])
+	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"] != "me:$$2y$$05$$abc" {
+		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"])
 	}
-	if labels["traefik.http.middlewares.ops-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.de)(:[0-9]+)?(.*)` {
-		t.Fatalf("regex = %v", labels["traefik.http.middlewares.ops-blog-canonical.redirectregex.regex"])
+	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.de)(:[0-9]+)?(.*)` {
+		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
 	}
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")

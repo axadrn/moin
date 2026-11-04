@@ -26,11 +26,9 @@ import (
 //	        tunnel entrypoint; no port is open. Cloudflare terminates HTTPS.
 const (
 	serverConfigFile = "server.json"
-	tunnelName       = "ops-cloudflared"
 	tunnelImage      = "cloudflare/cloudflared:2026.9.3"
 	tunnelEntrypoint = "tunnel"
 	tunnelPort       = "8080"
-	firewallTable    = "ops"
 	tailscalePort    = "41641"
 )
 
@@ -126,7 +124,7 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 
 // ensureTunnel runs cloudflared with the token, or removes it without one.
 func (s *security) ensureTunnel(ctx context.Context, token string) error {
-	running, err := s.apps.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \"ops.token\"}}", tunnelName)
+	running, err := s.apps.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \""+labelToken+"\"}}", tunnelName)
 	want := "true " + tunnelImage + " " + tokenLabel(token)
 	if err == nil && strings.TrimSpace(running) == want && token != "" {
 		return nil
@@ -141,7 +139,7 @@ func (s *security) ensureTunnel(ctx context.Context, token string) error {
 	// environment, so the token never shows on a command line in ps.
 	_, err = s.apps.outputEnv(ctx, []string{"TUNNEL_TOKEN=" + token}, "docker", "run", "-d", "--name", tunnelName, "--restart", "unless-stopped",
 		"--network", proxyNetwork,
-		"--label", "ops.token="+tokenLabel(token),
+		"--label", labelToken+"="+tokenLabel(token),
 		"-e", "TUNNEL_TOKEN",
 		tunnelImage, "tunnel", "--no-autoupdate", "run")
 	return err
@@ -175,7 +173,7 @@ func joinTailnet(ctx context.Context, authKey string) (string, error) {
 	defer cancel()
 	// tailscale reads the key from a file with "file:", so the key never
 	// shows on a command line in ps. Only root can read the file.
-	keyFile, err := os.CreateTemp("", "ops-tailscale-key-*")
+	keyFile, err := os.CreateTemp("", tempName("tailscale-key-*"))
 	if err != nil {
 		return "", err
 	}
@@ -218,7 +216,7 @@ func openPorts(proxy string, sshOnTailscale, tailscale bool) []string {
 	return ports
 }
 
-// firewallRules is the nftables table ops owns: inbound only what the
+// firewallRules is the nftables table the agent owns: inbound only what the
 // server needs, answers to its own connections, loopback and ping.
 // Containers are not filtered here: Docker publishes their ports on its
 // own chains, and in tunnel mode nothing is published.
@@ -243,7 +241,7 @@ func firewallRules(ports []string, sshOnTailscale bool) string {
 	return rules.String()
 }
 
-// sshOnTailscaleRules is the ops table without the firewall: it only
+// sshOnTailscaleRules is the agent's table without the firewall: it only
 // keeps SSH off every network but the tailnet and lets the rest in.
 func sshOnTailscaleRules() string {
 	var rules strings.Builder
@@ -257,10 +255,12 @@ func sshOnTailscaleRules() string {
 	return rules.String()
 }
 
-// applyFirewall replaces the ops table in one transaction: delete and add
-// run together, so the server is never without rules in between.
+// applyFirewall replaces the agent's table in one transaction: delete and
+// add run together, so the server is never without rules in between. The
+// table of the old name goes in the same transaction.
 func applyFirewall(ctx context.Context, rules string) error {
-	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" + rules
+	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" +
+		"table inet " + legacyFirewall + "\ndelete table inet " + legacyFirewall + "\n" + rules
 	command := exec.CommandContext(ctx, "nft", "-f", "-")
 	command.Stdin = strings.NewReader(script)
 	output, err := command.CombinedOutput()
@@ -278,15 +278,23 @@ func resetNetwork(ctx context.Context, dir string) {
 		slog.Warn("remove the firewall of the earlier server entry", "error", err)
 	}
 	if _, err := exec.LookPath("docker"); err == nil {
-		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName).Run()
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName, legacyTunnelName).Run()
 	}
 	_ = os.Remove(filepath.Join(dir, serverConfigFile))
 }
 
 func removeFirewall(ctx context.Context) error {
 	output, err := exec.CommandContext(ctx, "nft", "list", "tables").Output()
-	if err != nil || !slices.Contains(strings.Fields(string(output)), firewallTable) {
+	if err != nil {
 		return nil
 	}
-	return exec.CommandContext(ctx, "nft", "delete", "table", "inet", firewallTable).Run()
+	for _, table := range []string{firewallTable, legacyFirewall} {
+		if !slices.Contains(strings.Fields(string(output)), table) {
+			continue
+		}
+		if err := exec.CommandContext(ctx, "nft", "delete", "table", "inet", table).Run(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

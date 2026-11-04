@@ -14,7 +14,7 @@ import (
 // compose is the command's.
 func TestExecArgs(t *testing.T) {
 	got := execArgs("shop", "/var/lib/ops/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
-	want := []string{"compose", "-p", "ops-shop", "-f", "/var/lib/ops/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
+	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/ops/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
 	}
