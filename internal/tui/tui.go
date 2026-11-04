@@ -96,6 +96,8 @@ type (
 		id     int64
 		notice string
 		err    error
+		// label replaces "live" and "failed" at the end of the panel.
+		label string
 	}
 	noticeMsg string
 	// stoppedMsg names the app that went offline, so the open app knows
@@ -361,9 +363,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		took := style.Muted.Render(" · " + duration(time.Since(m.runStarted)))
 		m.running = false
-		m.outputNote = style.Success.Render(style.SymbolDone+" live") + took
+		done, failed := "live", "failed"
+		if msg.label != "" {
+			done, failed = msg.label, msg.label
+		}
+		m.outputNote = style.Success.Render(style.SymbolDone+" "+done) + took
 		if msg.err != nil {
-			m.outputNote = style.Danger.Render(style.SymbolFailed+" failed") + took
+			m.outputNote = style.Danger.Render(style.SymbolFailed+" "+failed) + took
 		}
 	case editMsg:
 		return m, m.openEditor(msg)
@@ -1723,6 +1729,37 @@ func (m model) follow(name string, started client.Deploy, title string) tea.Msg 
 		}
 	}()
 	return outputMsg{id: id, title: title, lines: []string{}, follow: true}
+}
+
+// exec runs one command line in the app's main service and streams what it
+// writes into the output panel, line by line.
+func (m model) exec(name, line string) tea.Msg {
+	program := m.shared.program
+	id := m.shared.outputs.Add(1)
+	go func() {
+		partial := ""
+		result, err := m.api.Exec(m.ctx, name, "", nil, line, 0, func(piece string) {
+			lines := strings.Split(partial+piece, "\n")
+			partial = lines[len(lines)-1]
+			for _, text := range lines[:len(lines)-1] {
+				program.Send(lineMsg{id, strings.TrimSuffix(text, "\r")})
+			}
+		})
+		if partial != "" {
+			program.Send(lineMsg{id, partial})
+		}
+		switch {
+		case err != nil:
+			program.Send(followDoneMsg{id: id, err: err, label: "failed"})
+		case result.TimedOut:
+			program.Send(followDoneMsg{id: id, err: fmt.Errorf("stopped waiting for %s; it may still run in %s, t restarts the app", line, result.Service), label: "timed out"})
+		case result.ExitCode != 0:
+			program.Send(followDoneMsg{id: id, err: fmt.Errorf("%s exited with %d in %s", line, result.ExitCode, result.Service), label: fmt.Sprintf("exit %d", result.ExitCode)})
+		default:
+			program.Send(followDoneMsg{id: id, notice: fmt.Sprintf("%s ran in %s", line, result.Service), label: "exit 0"})
+		}
+	}()
+	return outputMsg{id: id, title: "exec in " + name, note: style.Muted.Render(line), lines: []string{}, follow: true}
 }
 
 // writeMsg is a query that tried to change data; it waits for a yes.

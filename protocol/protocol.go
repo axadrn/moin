@@ -101,6 +101,14 @@ const (
 	// metrics.
 	TypeMetrics MessageType = "metrics"
 
+	// TypeExecStart runs one command in a container of an app (ExecStart).
+	// The agent answers with TypeExecOutput messages as the command writes,
+	// then one TypeExecDone, all with the request's ID. An agent that does
+	// not know it answers TypeError.
+	TypeExecStart  MessageType = "exec.start"
+	TypeExecOutput MessageType = "exec.output"
+	TypeExecDone   MessageType = "exec.done"
+
 	// TypeOK answers a request that has no result.
 	TypeOK MessageType = "ok"
 	// TypeError answers a request that failed (Error).
@@ -169,6 +177,8 @@ type Rules struct {
 	BackupsTo string `json:"backups_to,omitempty"`
 	// NetworkLocked refuses changes to the tunnel, Tailscale and firewall.
 	NetworkLocked bool `json:"network_locked,omitempty"`
+	// ExecOff refuses running commands in containers.
+	ExecOff bool `json:"exec_off,omitempty"`
 }
 
 // Lines are the rules as written in the rules file, for every surface to
@@ -192,6 +202,9 @@ func (r *Rules) Lines() []string {
 	}
 	if r.NetworkLocked {
 		lines = append(lines, "network: locked")
+	}
+	if r.ExecOff {
+		lines = append(lines, "exec: off")
 	}
 	return lines
 }
@@ -409,6 +422,40 @@ func (c *Config) UnmarshalJSON(body []byte) error {
 	}
 	return nil
 }
+
+// ExecStart runs Argv in a container of Service of App, as a list: no shell
+// reads it. The agent stops it after Timeout seconds.
+type ExecStart struct {
+	App     string   `json:"app"`
+	Service string   `json:"service"`
+	Argv    []string `json:"argv"`
+	Timeout int      `json:"timeout"`
+}
+
+// ExecOutput is a piece of what the command wrote, stdout and stderr as
+// they came.
+type ExecOutput struct {
+	Data string `json:"data"`
+}
+
+// ExecDone ends a run: the exit code, or the error that kept the command
+// from running. Truncated says the output passed ExecMaxOutput and the rest
+// was dropped; TimedOut that the agent stopped it.
+type ExecDone struct {
+	ExitCode  int    `json:"exit_code"`
+	Truncated bool   `json:"truncated,omitempty"`
+	TimedOut  bool   `json:"timed_out,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+const (
+	// ExecMaxOutput is how much a run may write before the rest is dropped.
+	ExecMaxOutput = 1 << 20
+	// ExecTimeout is how long a run may take unless asked otherwise, and
+	// ExecMaxTimeout how long it may take at most, in seconds.
+	ExecTimeout    = 10 * 60
+	ExecMaxTimeout = 60 * 60
+)
 
 // LogsRequest asks for the last Tail lines of every container of an app.
 type LogsRequest struct {

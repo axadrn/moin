@@ -75,6 +75,7 @@ Deploys
   deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
   rollback           Start an earlier release again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
+  exec               Run a command in a container, no shell: exec [app] [--service web] -- rails db:migrate
 
 Domains
   domains            List domains and their DNS: domains [app]
@@ -315,6 +316,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return registry(ctx, rest, stdin, stdout)
 	case "run":
 		return runWithEnv(ctx, rest, stdin, stdout)
+	case "exec":
+		return execCommand(ctx, rest, stdout)
 	case "agent":
 		return agentCommand(ctx, rest, stdin, stdout)
 	}

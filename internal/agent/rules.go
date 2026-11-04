@@ -53,14 +53,17 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 		}
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 		switch key {
-		case "data", "logs":
+		case "data", "logs", "exec":
 			if value != "on" && value != "off" {
 				return nil, wrong(key + " is on or off")
 			}
-			if key == "data" {
+			switch key {
+			case "data":
 				rules.DataOff = value == "off"
-			} else {
+			case "logs":
 				rules.LogsOff = value == "off"
+			default:
+				rules.ExecOff = value == "off"
 			}
 		case "network":
 			if value != "open" && value != "locked" {
@@ -82,7 +85,7 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			}
 			rules.BackupsTo = value
 		default:
-			return nil, wrong("unknown rule; the rules are data, logs, deploy-from, backups-to and network")
+			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to and network")
 		}
 	}
 	return rules, nil

@@ -73,6 +73,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `install_catalog_app` | installs a catalog app on a server | write |
 | `update_app` | sets a catalog app to a release and deploys it | write |
 | `get_logs` | the last container lines | read |
+| `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | write |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |

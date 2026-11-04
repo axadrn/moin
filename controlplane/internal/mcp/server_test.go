@@ -42,7 +42,7 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"add_alert_destination", "add_bucket", "add_server", "back_up_app", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "edit_bucket", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_env", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_server", "rename_workspace", "reorder_apps", "reorder_servers", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_agent_updates", "set_app_bucket", "set_backup_settings", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime_check", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_agent", "update_app", "update_control_plane", "whoami"}
+	want := []string{"add_alert_destination", "add_bucket", "add_server", "back_up_app", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_env", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_server", "rename_workspace", "reorder_apps", "reorder_servers", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_agent_updates", "set_app_bucket", "set_backup_settings", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime_check", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_agent", "update_app", "update_control_plane", "whoami"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
@@ -439,5 +439,22 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	// box-1 is offline: its apps go with it.
 	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"})); strings.Join(removed.Apps, ",") != "blog,shop" || !strings.Contains(removed.Message, "apps went with it") {
 		t.Fatalf("removed an offline server with apps = %+v", removed)
+	}
+}
+
+// TestExecCommandIsForOwnersAndAdmins: a member's token may not run a
+// command, and a command a shell would need quoting for is refused.
+func TestExecCommandIsForOwnersAndAdmins(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "execs")
+	upgrade(t, env, owner)
+	member := connectHTTP(t, env, addMember(t, env, owner, "runner", model.WorkspaceRoleMember, "read", "write"))
+	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"name": "exec-1"}))
+	toolError(t, call(t, member, "exec_command", map[string]any{"app": "blog", "command": "ls /data"}), "forbidden")
+	token, _ := createToken(t, env, owner, "read", "write")
+	session := connectMemory(t, env.server, owner, token)
+	fields := toolError(t, call(t, session, "exec_command", map[string]any{"app": "blog", "command": `echo "open`}), "validation_failed").Fields
+	if fields["command"] == "" {
+		t.Errorf("fields = %v", fields)
 	}
 }

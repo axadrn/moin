@@ -161,6 +161,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PUT /api/v1/registries/{host}", m.InWorkspace(h.Apps.SetRegistry), TokenWrite},
 		{"DELETE /api/v1/registries/{host}", m.InWorkspace(h.Apps.DeleteRegistry), TokenWrite},
 		{"GET /api/v1/apps/{app}/logs", m.InWorkspace(h.Apps.Logs), TokenRead},
+		{"POST /api/v1/apps/{app}/exec", m.InWorkspace(h.Apps.Exec), TokenWrite},
 		{"GET /api/v1/apps/{app}/databases", m.InWorkspace(h.Apps.Databases), TokenRead},
 		{"GET /api/v1/apps/{app}/databases/tables", m.InWorkspace(h.Apps.Tables), TokenRead},
 		{"GET /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.Rows), TokenWrite},

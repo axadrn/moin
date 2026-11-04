@@ -150,6 +150,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("get_logs", "Get app logs",
 		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getLogs)))
+	mcpsdk.AddTool(server, add("exec_command", "Run a command in a container",
+		"Runs one command in a container of an app, such as rails db:migrate or ls /data, and returns its output (the last 64 KB) and exit code. No shell reads it: wrap pipes and variables in sh -c '...'. Only owners and admins may, and a server can forbid it with exec: off in its rules. Ask the user before a command that changes data. Needs a token with read and write access.",
+		change(true, false)), Write(changes(services, tools.exec)))
 	mcpsdk.AddTool(server, add("get_env", "Get env vars",
 		"Returns the env vars of an app in plain text. Reading secrets is as strong as writing them. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.getEnv)))

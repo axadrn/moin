@@ -502,7 +502,7 @@ var tabNames = []string{"servers", "apps", "activity", "team", "settings"}
 
 // commandNames are what tab completes on the command line.
 func commandNames() []string {
-	names := append([]string{"catalog", "e", "help", "instant", "noh", "open", "q", "status", "tabnext", "tabprevious"}, tabNames...)
+	names := append([]string{"catalog", "e", "exec", "help", "instant", "noh", "open", "q", "status", "tabnext", "tabprevious"}, tabNames...)
 	for name := range commandKeys {
 		names = append(names, name)
 	}
@@ -594,6 +594,21 @@ func (m model) command(input string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.instant(app.Name, args)
+	}
+	// :exec runs the rest of the line in the app's main service, no shell.
+	if name == "exec" {
+		app, ok := m.currentApp()
+		line := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input), "exec"))
+		switch {
+		case !ok || m.tab != tabApps:
+			m.err = errors.New("pick an app first, then :exec <command>")
+			return m, nil
+		case line == "":
+			m.err = errors.New("give a command: :exec rails db:migrate")
+			return m, nil
+		}
+		m.panelFocus = true
+		return m, func() tea.Msg { return m.exec(app.Name, line) }
 	}
 	// :update on an app from the catalog sets it to the newest release,
 	// or the version given.
@@ -690,6 +705,7 @@ var helpEntries = [][2]string{
 	{"tab", "completes a command"},
 	{"", "Output panel"},
 	{"L", "shows the logs, ready to scroll"},
+	{":exec <command>", "runs a command in the app's main service, no shell"},
 	{"ctrl+w", "moves between the list and the panel"},
 	{"j k  ctrl+d ctrl+u", "scroll"},
 	{"gg G", "the top, the end; G follows new lines"},

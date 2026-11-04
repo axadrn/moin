@@ -75,6 +75,12 @@ type agentSession struct {
 	send        func(protocol.Message) error
 	// waiting maps request IDs to the requests waiting for their answer.
 	waiting map[string]chan protocol.Message
+	// streams maps request IDs to the requests whose answer comes in
+	// pieces, such as a command's output.
+	streams map[string]chan protocol.Message
+	// gone closes when the session ends, so a stream stops waiting.
+	gone     chan struct{}
+	goneOnce sync.Once
 }
 
 func NewServerService(servers repository.ServerRepository, audit repository.WorkspaceAuditRepository, appURL string) *ServerService {
@@ -303,7 +309,7 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	if err != nil {
 		slog.Error("store agent hello failed", "error", err, "server_id", server.ID)
 	}
-	session := &agentSession{workspaceID: server.WorkspaceID, kick: kick, send: send, waiting: map[string]chan protocol.Message{}}
+	session := &agentSession{workspaceID: server.WorkspaceID, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
 	s.mu.Lock()
 	previous := s.sessions[server.ID]
 	s.sessions[server.ID] = session
@@ -321,6 +327,7 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	go s.autoUpdate(server.WorkspaceID)
 
 	return func() {
+		session.goneOnce.Do(func() { close(session.gone) })
 		s.mu.Lock()
 		current := s.sessions[server.ID] == session
 		if current {
@@ -493,15 +500,76 @@ func (s *ServerService) Request(ctx context.Context, serverID string, messageTyp
 	}
 }
 
+// Stream sends a request whose answer comes in pieces: every message the
+// agent sends with the request's ID goes to receive, until receive says
+// done, the context ends or the agent goes. An error answer returns an
+// *AgentError.
+func (s *ServerService) Stream(ctx context.Context, serverID string, messageType protocol.MessageType, data any, receive func(protocol.Message) (done bool, err error)) error {
+	message, err := protocol.NewMessage(messageType, data)
+	if err != nil {
+		return err
+	}
+	message.RequestID = randomToken()[:20]
+	pieces := make(chan protocol.Message, 256)
+	s.mu.Lock()
+	session := s.sessions[serverID]
+	if session != nil {
+		session.streams[message.RequestID] = pieces
+	}
+	s.mu.Unlock()
+	if session == nil {
+		return ErrServerOffline
+	}
+	defer func() {
+		s.mu.Lock()
+		delete(session.streams, message.RequestID)
+		s.mu.Unlock()
+	}()
+	if err := session.send(message); err != nil {
+		return ErrServerOffline
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("the agent did not finish: %w", ctx.Err())
+		case <-session.gone:
+			return ErrServerOffline
+		case reply := <-pieces:
+			if reply.Type == protocol.TypeError {
+				var agentErr protocol.Error
+				_ = reply.Decode(&agentErr)
+				return &AgentError{Message: agentErr.Message}
+			}
+			done, err := receive(reply)
+			if err != nil || done {
+				return err
+			}
+		}
+	}
+}
+
 // Receive takes one message the agent of a server sent.
 func (s *ServerService) Receive(serverID string, message protocol.Message) {
 	s.mu.Lock()
-	var answer chan protocol.Message
+	var answer, stream chan protocol.Message
+	var gone chan struct{}
 	if session := s.sessions[serverID]; session != nil && message.RequestID != "" {
 		answer = session.waiting[message.RequestID]
+		stream = session.streams[message.RequestID]
+		gone = session.gone
 	}
 	handle := s.onMessage
 	s.mu.Unlock()
+	if stream != nil {
+		// A piece of a stream is never dropped while its reader keeps up;
+		// one that stopped reading for long loses the rest.
+		select {
+		case stream <- message:
+		case <-gone:
+		case <-time.After(10 * time.Second):
+		}
+		return
+	}
 	if answer != nil {
 		select {
 		case answer <- message:

@@ -2167,6 +2167,82 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/apps/{app}/exec:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    post:
+      tags: [Apps]
+      operationId: execApp
+      summary: Run a command
+      description: >-
+        Runs one command in a container of the app, through its server's
+        agent, and streams what it writes as server-sent events: `output`
+        with `{"data": "..."}` for each piece, then `done` with the exit
+        code, or `error` with the error envelope. No shell reads the
+        command: pass it as a list of words, and wrap pipes or variables in
+        `["sh", "-c", "..."]`. Owners and admins only. Output stops after
+        1 MB (`truncated`). The activity records the command, with the
+        app's env values masked, and the exit code, never the output. A
+        server with `exec: off` in its rules refuses it.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: array
+                  items:
+                    type: string
+                  description: The command and its arguments, such as ["rails", "db:migrate"].
+                line:
+                  type: string
+                  description: >-
+                    The command as one line, used when `command` is empty: split into words
+                    the way a shell quotes them, with no variables, globs or pipes.
+                service:
+                  type: string
+                  description: The compose service to run it in. Default the app's main service.
+                timeout:
+                  type: integer
+                  minimum: 0
+                  maximum: 3600
+                  description: Seconds before the agent stops waiting. Default 600, at most 3600.
+      responses:
+        '200':
+          description: >-
+            The event stream. The last event is `done` with `service`,
+            `exit_code`, and `truncated` and `timed_out` when true, or
+            `error` with `{"error": {"code", "message"}}`.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`forbidden`: only owners and admins run commands.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline`, or `not_live` when no service is named and the app has no release.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.command` or `fields.line`.'
+        '424':
+          $ref: '#/components/responses/AgentError'
+          description: '`agent_error`, such as a server whose rules say `exec: off`, or an agent too old to run commands.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/apps/{app}/databases:
     parameters:
       - $ref: '#/components/parameters/AppName'

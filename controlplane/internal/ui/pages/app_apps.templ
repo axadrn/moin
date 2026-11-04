@@ -401,6 +401,7 @@ templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
 					<div id="app-logs" class="px-6 text-sm text-muted-foreground">Not loaded yet.</div>
 				}
 			</div>
+			@appExec(app, deploys)
 			<div hx-get={ appPath + "/repo" } hx-trigger="load" hx-swap="outerHTML">
 				@AppRepo(RepoView{App: app})
 			</div>

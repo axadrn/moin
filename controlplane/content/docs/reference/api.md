@@ -64,6 +64,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/redeploy` | builds the newest source again, or runs the newest image again |
 | `POST /api/v1/apps/{app}/rollback` | starts an earlier release again |
 | `GET /api/v1/apps/{app}/logs` | container logs |
+| `POST /api/v1/apps/{app}/exec` | [runs a command](/docs/guides/exec) as server-sent events: `output` pieces, then `done` with `exit_code`, `timed_out` and `truncated`; takes `{"command": [...]}` or `{"line": "..."}`, `service` and `timeout` in seconds (owner or admin) |
 | `PUT /api/v1/servers/{id}/security` | Cloudflare Tunnel, SSH on Tailscale, firewall |
 | `GET /api/v1/alert-destinations` · `POST` · `DELETE /{name}` | where [alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) go besides email: Slack, Discord, Telegram or a webhook; `POST` takes `{"kind", "name", "url"}`, or `bot_token` and `chat_id` for Telegram, and `events`; a webhook answers with its `signing_secret` once (owner or admin to change) |
 | `POST /api/v1/alert-destinations/{name}/test` | sends a test alert; `424` with `alert_send_failed` and the reason when the destination refuses it (owner or admin) |

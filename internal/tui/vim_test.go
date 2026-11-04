@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -139,6 +140,18 @@ func TestCommandLine(t *testing.T) {
 	}
 	if m := command(frames()["servers"], "e blog"); m.tab != tabApps || m.appSelected != 1 {
 		t.Errorf(":e blog: tab %d, app %d", m.tab, m.appSelected)
+	}
+	if m := command(frames()["servers"], "exec ls /data"); m.err == nil || !strings.Contains(m.err.Error(), "pick an app") {
+		t.Errorf(":exec on servers says %v", m.err)
+	}
+	if m := command(frames()["apps"], "exec"); m.err == nil || !strings.Contains(m.err.Error(), "give a command") {
+		t.Errorf(":exec alone says %v", m.err)
+	}
+	m = frames()["apps"]
+	m.outputID, m.running = 7, true
+	next, _ := m.Update(followDoneMsg{id: 7, err: errors.New("ls exited with 2 in web"), label: "exit 2"})
+	if m = next.(model); m.running || !strings.Contains(strip(m.outputNote), "exit 2") {
+		t.Errorf("an exec that failed ends with %q", strip(m.outputNote))
 	}
 }
 

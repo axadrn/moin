@@ -479,6 +479,25 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			return
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeExecStart:
+		var start protocol.ExecStart
+		if err := message.Decode(&start); err != nil {
+			fail(err)
+			return
+		}
+		if rules != nil && rules.ExecOff {
+			fail(refused(r.rulesFile, "exec: off"))
+			return
+		}
+		slog.Info("exec", "app", start.App, "service", start.Service)
+		done, err := r.apps.runExec(ctx, start, func(data string) {
+			r.send(protocol.TypeExecOutput, message.RequestID, protocol.ExecOutput{Data: data})
+		})
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeExecDone, message.RequestID, done)
 	case protocol.TypeAgentUpdate:
 		var update protocol.AgentUpdate
 		if err := message.Decode(&update); err != nil {

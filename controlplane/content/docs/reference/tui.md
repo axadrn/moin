@@ -84,6 +84,7 @@ The TUI moves like vim, and `?` shows every key.
 | `u` or `:uptime` | apps | shows the uptime of every domain and the last outages; `enter` checks again, `pause <domain>` or `resume <domain>` pauses or resumes a check, `<domain> /health` sets its path, `<domain> default` goes back to the health path or `/` |
 | `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
 | `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |
+| `:exec <command>` | apps | [runs a command](/docs/guides/exec) in the app's main service, no shell, and shows its output and exit code |
 | `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, or `edit` for all of them as one `.env` in `$EDITOR`, then `enter` |
 | `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
 | `b` | apps | shows the backups with the bucket of each snapshot; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `<snapshot> <bucket>` restores a snapshot from an older bucket, `bucket <name>` moves the app's uploads and new backups to a bucket after `y` (`bucket -` to the default), `on` or `off` turns the snapshot before every change on or off |

@@ -323,7 +323,12 @@ var errStreamDone = errors.New("stream done")
 // data, until ctx ends, fn returns an error or the stream breaks. fn returns
 // errStreamDone to end it without an error.
 func (c *Client) stream(ctx context.Context, path string, fn func(event string, data []byte) error) error {
-	request, err := c.request(ctx, http.MethodGet, path, nil)
+	return c.streamRequest(ctx, http.MethodGet, path, nil, fn)
+}
+
+// streamRequest is stream for any method, with a JSON body.
+func (c *Client) streamRequest(ctx context.Context, method, path string, body any, fn func(event string, data []byte) error) error {
+	request, err := c.request(ctx, method, path, body)
 	if err != nil {
 		return err
 	}

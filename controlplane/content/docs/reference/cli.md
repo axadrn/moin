@@ -49,6 +49,7 @@ order: 1
 | `ops registry rm <host> [--yes]` | removes a login |
 | `ops rollback [app] [v<number>] [--yes]` | starts an earlier release again; without a number the one before the live one |
 | `ops logs [--tail 200] [app]` | prints container logs |
+| `ops exec [app] [--service web] [--timeout 10m] -- <command>` | [runs a command](/docs/guides/exec) in a container, no shell; exits with its code, `124` after the timeout (owner or admin) |
 | `ops domains [app]` | lists domains and their DNS |
 | `ops domains add [--service <service>] <domain> ...` | adds domains, to another service of compose.yml with `--service` |
 | `ops domains rm [--service <service>] <domain> ... [--yes]` | removes domains |

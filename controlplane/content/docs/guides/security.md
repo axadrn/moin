@@ -158,6 +158,7 @@ Write one rule per line into `/etc/ops/rules`:
 # /etc/ops/rules
 data: off
 logs: off
+exec: off
 deploy-from: github.com/<owner>/*, ghcr.io/<owner>/*
 backups-to: <endpoint-host>/<bucket-name>
 network: locked
@@ -167,6 +168,7 @@ network: locked
 | --- | --- |
 | `data: off` | reading tables, running SQL and editing rows through ops |
 | `logs: off` | reading container logs through ops; logs often hold what your users sent |
+| `exec: off` | [running commands](/docs/guides/exec) in containers through ops |
 | `deploy-from: <sources>` | deploys from anywhere else, see below |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to the tunnel, SSH on Tailscale and the firewall. Set them up first, then lock them |
@@ -207,4 +209,4 @@ A refused request says why, on every surface: `refused by the rules of this serv
 
 ### Why it matters
 
-`data: off` and `logs: off` keep your users' data from passing through ops. `deploy-from` is the other half: without it, whoever controls ops could deploy code that copies your database. With both, a break-in at ops reads nothing and runs nothing of its own on your server.
+`data: off` and `logs: off` keep your users' data from passing through ops. `deploy-from` and `exec: off` are the other half: without them, whoever controls ops could deploy code, or run a command, that copies your database. With all of them, a break-in at ops reads nothing and runs nothing of its own on your server.
