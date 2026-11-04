@@ -24,6 +24,7 @@ import (
 type App struct {
 	Cfg                 *config.Config
 	DB                  *sqlx.DB
+	MetricsDB           *sqlx.DB
 	AuthService         *service.AuthService
 	UserService         *service.UserService
 	EmailService        *service.EmailService
@@ -67,6 +68,16 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
+	// Metrics live in metrics.db next to it, without a backup.
+	metrics, err := db.OpenMetrics(db.MetricsConnection(cfg.DBConnection))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if !initialized {
+			_ = metrics.Close()
+		}
+	}()
 
 	users := repository.NewUserRepository(database)
 	tokens := repository.NewTokenRepository(database)
@@ -128,9 +139,9 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("initialize secrets: %w", err)
 	}
 	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
-	appService := service.NewAppService(repository.NewAppRepository(database), serverService, secrets)
+	appService := service.NewAppService(repository.NewAppRepository(database, metrics), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
-	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
+	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database, metrics), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
 	// The hosted plane posts alerts only to public addresses.
 	if cfg.Billing && !cfg.IsDevelopment() {
 		alertService.AllowOnlyPublicTargets()
@@ -164,7 +175,7 @@ func New(cfg *config.Config) (*App, error) {
 		adminService.UsePlans(subscriptions, workspaceAuditEvents)
 	}
 	application := &App{
-		Cfg: cfg, DB: database, AuthService: auth, UserService: userService,
+		Cfg: cfg, DB: database, MetricsDB: metrics, AuthService: auth, UserService: userService,
 		EmailService:        email,
 		LegalService:        service.NewLegalService(content.Root, cfg.SupportEmail),
 		DocsService:         service.NewDocsService(content.Root, cfg.AppURL),
@@ -189,6 +200,9 @@ func New(cfg *config.Config) (*App, error) {
 }
 
 func (a *App) Close() error {
+	if a.MetricsDB != nil {
+		_ = a.MetricsDB.Close()
+	}
 	if a.DB != nil {
 		return a.DB.Close()
 	}

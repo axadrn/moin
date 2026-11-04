@@ -3,6 +3,22 @@ title: Changelog
 description: What shipped in ops, newest first.
 ---
 
+## v1.0.0-beta.6
+
+November 4, 2026
+
+**In short:** agents built from a commit now update themselves too, so their metrics arrive, and metrics move to a file of their own to keep the database small.
+
+### Changed
+- **Metrics in their own file**: metrics live in `metrics.db` next to the database, without a backup. The database stays small and a restore fast; the charts of the last hours start over once.
+
+### Fixed
+- **Agents that never updated**: an agent built from a commit instead of a release, such as one installed from `main`, now updates itself like any older agent.
+- **Metrics page**: no longer tells you to update agents by hand; they update themselves.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Agents update themselves.
+
 ## v1.0.0-beta.5
 
 November 4, 2026

@@ -19,5 +19,9 @@ func NewDatabase(t testing.TB) *sqlx.DB {
 	if err := db.RunMigrations(database.DB); err != nil {
 		t.Fatalf("run test migrations: %v", err)
 	}
+	// Tests keep the metrics in the same file; production has metrics.db.
+	if err := db.CreateMetrics(database); err != nil {
+		t.Fatalf("create test metrics tables: %v", err)
+	}
 	return database
 }

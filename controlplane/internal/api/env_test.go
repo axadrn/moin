@@ -104,7 +104,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	if err != nil {
 		t.Fatal(err)
 	}
-	alerts := service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database), repository.NewAlertDestinations(database), audit, box)
+	alerts := service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database, database), repository.NewAlertDestinations(database), audit, box)
 	handlers := api.Handlers{
 		Version:     api.NewVersionHandler(environment.updates, servers),
 		Meta:        api.NewMetaHandler(testSupportEmail),

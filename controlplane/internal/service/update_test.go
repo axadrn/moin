@@ -207,3 +207,25 @@ func TestUpdateStartAndSettle(t *testing.T) {
 		t.Fatalf("rolled back info = %+v", info)
 	}
 }
+
+// TestAgentBehind: an agent built from a commit, not a release, updates to
+// the release; a development control plane updates nobody.
+func TestAgentBehind(t *testing.T) {
+	for _, test := range []struct {
+		release, agent string
+		behind         bool
+	}{
+		{"v1.0.0-beta.6", "v1.0.0-beta.5", true},
+		{"v1.0.0-beta.6", "v1.0.0-beta.6", false},
+		{"v1.0.0-beta.6", "v1.0.0-beta.7", false},
+		{"v1.0.0-beta.6", "b4be272", true},
+		{"v1.0.0-beta.6", "dev", true},
+		{"v1.0.0-beta.6", "", true},
+		{"dev", "b4be272", false},
+		{"b4be272", "v1.0.0", false},
+	} {
+		if got := AgentBehind(test.release, test.agent); got != test.behind {
+			t.Errorf("AgentBehind(%q, %q) = %v, want %v", test.release, test.agent, got, test.behind)
+		}
+	}
+}

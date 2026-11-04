@@ -54,7 +54,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 			}
 		}
 		if len(rows) == 0 {
-			@emptyState("No metrics yet", "The agent sends them every 15 seconds while the app runs. An agent from before metrics sends none: update it on the Servers page.", "ops metrics "+view.App.Name)
+			@emptyState("No metrics yet", "The agent sends them every 15 seconds while the app runs. An older agent starts once it has updated itself.", "ops metrics "+view.App.Name)
 		} else {
 			<div class="grid gap-6 lg:grid-cols-2">
 				@metricsPanel("CPU", "The app's share of the whole server.", metricsChartProps{ID: "app-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Deploys: true})
@@ -203,7 +203,7 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 			}
 		}
 		if len(rows) == 0 {
-			@emptyState("No metrics yet", "The agent sends them every 15 seconds. An agent from before metrics sends none: update it on the Servers page.", "ops metrics --server "+view.Server.Name)
+			@emptyState("No metrics yet", "The agent sends them every 15 seconds. An older agent starts once it has updated itself.", "ops metrics --server "+view.Server.Name)
 		} else {
 			<div class="grid gap-6 lg:grid-cols-2">
 				@metricsPanel("CPU", "The busy share of all cores.", metricsChartProps{ID: "server-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Domain: []any{0, 100}})

@@ -194,6 +194,8 @@ Once a day it also asks GitHub for the newest release, see [Updates](#updates). 
 
 The control plane keeps its own SQLite database safe the way it keeps your apps' databases: every change goes to its bucket within seconds (`S3_BUCKET`, folder `controlplane/litestream`), with Litestream. In production this is on by default; `BACKUP_DATABASE=false` turns it off.
 
+Next to it, `metrics.db` holds the [metrics](/docs/guides/metrics). It has no backup and may get lost: the charts start over, nothing else.
+
 ## Uptime checks
 
 The control plane checks every domain of every app once a minute, like the hosted one ([Uptime](/docs/guides/uptime)). In production this is on by default; `UPTIME_CHECKS=false` turns it off. In development it is off, so no real domain gets called, and `UPTIME_CHECKS=true` turns it on.

@@ -149,6 +149,16 @@ func (s *ServerService) UpdateAgentsTo(version string) {
 	s.mu.Unlock()
 }
 
+// AgentBehind reports whether an agent should update to the control plane's
+// release: it runs an older release, or a build without one, such as a
+// commit like b4be272, which would otherwise never update.
+func AgentBehind(release, agent string) bool {
+	if parseVersion(release) == nil {
+		return false
+	}
+	return parseVersion(agent) == nil || NewerVersion(release, agent)
+}
+
 // autoUpdate updates the agents of a workspace that are behind, one at a
 // time. An agent that refuses, such as during a deploy, is tried again when
 // it connects next. One that does not come back stops it for the workspace
@@ -179,7 +189,7 @@ func (s *ServerService) autoUpdate(workspaceID string) {
 		}
 		var next *model.Server
 		for index, server := range servers {
-			if server.Online && server.Rules == "" && !tried[server.ID] && NewerVersion(version, server.AgentVersion) {
+			if server.Online && server.Rules == "" && !tried[server.ID] && AgentBehind(version, server.AgentVersion) {
 				next = &servers[index]
 				break
 			}

@@ -65,14 +65,14 @@ func newEnvironment(t *testing.T) *environment {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env.services.Apps = service.NewAppService(repository.NewAppRepository(database), env.services.Servers, box)
+	env.services.Apps = service.NewAppService(repository.NewAppRepository(database, database), env.services.Servers, box)
 	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/ops/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** Updates in one click."}`))
 	}))
 	t.Cleanup(releases.Close)
 	env.updates = t.TempDir()
 	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, env.updates, true, true, []string{"ada@example.com"}, repository.NewWorkspaceAuditRepository(database))
-	env.services.Alerts = service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database), repository.NewAlertDestinations(database), repository.NewWorkspaceAuditRepository(database), box)
+	env.services.Alerts = service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database, database), repository.NewAlertDestinations(database), repository.NewWorkspaceAuditRepository(database), box)
 	env.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
 	tokenAuth := middleware.APITokenAuth(env.tokens, env.services.Users)
 	env.server = mcp.NewServer(env.services)

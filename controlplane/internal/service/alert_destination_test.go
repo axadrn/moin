@@ -90,7 +90,7 @@ func newAlertFixture(t *testing.T) alertFixture {
 	t.Helper()
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
-	apps := repository.NewAppRepository(database)
+	apps := repository.NewAppRepository(database, database)
 	audit := repository.NewWorkspaceAuditRepository(database)
 	alerts := NewAlertService(NewEmailService(testutil.NewMemoryMailer(), "https://ops.example.com", "ops"), repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), apps, repository.NewAlertDestinations(database), audit, testBox(t))
 	servers := NewServerService(repository.NewServerRepository(database), audit, "https://ops.example.com")

@@ -65,7 +65,7 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps := NewAppService(repository.NewAppRepository(database), servers, box)
+	apps := NewAppService(repository.NewAppRepository(database, database), servers, box)
 	// A bucket for uploads and backups, stored without the check.
 	err = apps.apps.CreateBucket(model.Bucket{ID: "bucket-owner", WorkspaceID: owner.WorkspaceID, Name: "default", IsDefault: true, Endpoint: "https://s3.example.com", Region: "auto", Bucket: "owner", AccessKey: "key", SecretKey: box.Seal("secret", owner.WorkspaceID+"/backups")})
 	if err != nil {
