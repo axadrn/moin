@@ -18,7 +18,7 @@ x-ops:
   domains: [<domain>, www.<domain>]
   canonical: <domain>          # the others redirect here
   protect: true                # ask for the password set in ops
-  database: /data/app.db       # must sit on a volume, or the deploy fails
+  database: /data/app.db       # a SQLite file on a volume, or postgres-<service>
 
 services:
   web:

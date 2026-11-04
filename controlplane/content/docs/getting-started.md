@@ -148,7 +148,7 @@ ops shows the address of your server and the DNS record to set. Set it where you
 ## What next
 
 - Settings and secrets for your app: [Env vars](/docs/guides/env).
-- Your database, backed up every second: [Backups](/docs/guides/backups).
+- Your database, SQLite or Postgres, every change backed up and checked daily: [Backups](/docs/guides/backups).
 - Close every port of the server: [Security](/docs/guides/security).
 - Deploy every push to GitHub: [GitHub](/docs/guides/github).
 - Bring your team: [Team and activity](/docs/guides/team).

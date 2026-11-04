@@ -1,12 +1,14 @@
 ---
 title: "Data"
-description: "Browse, edit and query the SQLite database of an app"
+description: "Browse, edit and query the database of an app, SQLite or Postgres"
 order: 6
 ---
 
-ops reads your app's SQLite database live from its server. You can browse tables, edit a cell, add or delete a row and run SQL. Nothing is copied to ops: every read goes to the server and back.
+ops reads your app's database live from its server, SQLite or Postgres. You can browse tables, edit a cell, add or delete a row and run SQL. Nothing is copied to ops: every read goes to the server and back.
 
-ops finds the database by itself: every SQLite file on a [volume](/docs/guides/deploy#your-data-survives-every-deploy) of the live release, up to three folders deep. When there are several, name one with `x-ops.database` in [the repo](/docs/guides/config), or pick one with `--db <path>` in the CLI.
+ops finds the database by itself: every SQLite file on a [volume](/docs/guides/deploy#your-data-survives-every-deploy) of the live release, up to three folders deep, and every service that runs [Postgres](/docs/guides/backups#postgres), named `postgres-<service>`. When there are several, name one with `x-ops.database` in [the repo](/docs/guides/config), or pick one with `--db <path>` or `--db postgres-db` in the CLI.
+
+For Postgres, ops runs `psql` inside your Postgres container over its local socket: no password leaves the container. It shows the tables of the `public` schema. Every value you type travels as a psql variable, never as SQL. Rows of a Postgres table are not edited cell by cell yet: change them with SQL, which takes a snapshot first like every edit.
 
 ## See the tables
 
@@ -75,7 +77,7 @@ The API adds a row with `POST` and deletes one with `DELETE` on the same path, a
 
 ## Reads cannot change anything
 
-A query opens the database read-only. A statement that would change data fails, so a typo cannot delete rows. To change data you say so, as above. Every change runs in one transaction.
+A query opens the database read-only; on Postgres it runs in a `READ ONLY` transaction and as one statement. A statement that would change data fails, so a typo cannot delete rows. To change data you say so, as above. Every change runs in one transaction.
 
 More from the CLI:
 
@@ -101,6 +103,8 @@ Rows are your users' data, as sensitive as secrets. The API and MCP need a token
 
 The app keeps SQLite on a volume, as `/data/app.db` in the compose file ops writes. WAL mode is best: your app and ops then read and write at the same time without waiting. Your app turns it on with `PRAGMA journal_mode=WAL`.
 
-The data page says the app has no database? Then the live release keeps no SQLite file on a volume. Check that the database file sits in a mounted folder, such as `/data`, and deploy again. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
+Postgres needs the official image or one built on it (`postgres`, `postgis/postgis`, `pgvector/pgvector`, `timescale/timescaledb`), running.
+
+The data page says the app has no database? Then the live release keeps no SQLite file on a volume and runs no Postgres. Check that the database file sits in a mounted folder, such as `/data`, and deploy again. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
 
 With a bucket set up, every change you make here gets a snapshot first, so one restore undoes it: see [A snapshot before every change](/docs/guides/backups#a-snapshot-before-every-change).

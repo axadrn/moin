@@ -430,7 +430,7 @@ templ HomeBackups() {
 				With { brand.Name }, each is a click to undo.
 			</p>
 			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-2">
-				@homeFact("Every second", "Every change goes to your bucket. Go back to any second of the last week.", "")
+				@homeFact("Every change", "In your bucket within a second for SQLite, a minute for Postgres. Go back to any second of the last week.", "")
 				@homeFact("Before every change", "A full copy before every deploy and every edit.", "")
 				@homeFact("Proven every day", "Each backup is restored and checked, every day. Not just “job ran”.", "live")
 				@homeFact("Your bucket", "R2, S3, B2 or Hetzner. Your backups never pass through us.", "")
@@ -746,8 +746,7 @@ templ HomeNext() {
 		<div class={ homeWrap }>
 			<h2 class={ typeH2 }>This is just the start.</h2>
 			<p class={ typeLead, "mt-6 max-w-2xl" }>Every database. Every provider. Nothing anyone else can read.</p>
-			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4">
-				@homeNextStep("Postgres", "Every change backed up, checked daily, and the data browser.")
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
 				@homeNextStep("Servers in one click", "Create them at Hetzner, DigitalOcean and more, right from ops.")
 				@homeNextStep("Zero trust", "Secrets only on your servers, end to end encrypted.")
 				@homeNextStep("Signed commands", "Your servers only obey changes you signed.")

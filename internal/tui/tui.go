@@ -1774,6 +1774,9 @@ func backupsOutput(id int64, name string, list client.AppBackups) outputMsg {
 		if database.Since != nil && database.ReplicatedAt != nil {
 			lines = append(lines, style.Muted.Render("point in time "+database.Since.UTC().Format("2006-01-02 15:04:05")+" to "+database.ReplicatedAt.UTC().Format("15:04:05")+" UTC"))
 		}
+		if database.Note != "" {
+			lines = append(lines, style.Muted.Render(database.Note))
+		}
 		rows := [][]any{}
 		for _, snapshot := range database.Snapshots {
 			rows = append(rows, []any{snapshot.ID, snapshot.Reason, duration(now.Sub(snapshot.CreatedAt)) + " ago", snapshot.Bucket})

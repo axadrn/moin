@@ -67,7 +67,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; repos ops reads |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | the branches of a repo, the default first |
 | `PUT` · `DELETE /api/v1/apps/{app}/repo` | links or unlinks a GitHub repo and branch |
-| `GET /api/v1/apps/{app}/databases` | SQLite databases of the live release |
+| `GET /api/v1/apps/{app}/databases` | Databases of the live release: SQLite files and Postgres services |
 | `GET /api/v1/apps/{app}/databases/tables` | tables, columns, row counts, schema and migration |
 | `GET` · `POST` · `PATCH` · `DELETE /api/v1/apps/{app}/databases/rows` | browse, add, edit and delete rows |
 | `POST /api/v1/apps/{app}/databases/query` | runs SQL; `write: true` for changes |

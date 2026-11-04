@@ -267,6 +267,9 @@ func printBackups(w io.Writer, list client.AppBackups) {
 		if database.Since != nil && database.ReplicatedAt != nil {
 			fmt.Fprintf(w, "  point in time %s to %s UTC\n", database.Since.UTC().Format("2006-01-02 15:04:05"), database.ReplicatedAt.UTC().Format("2006-01-02 15:04:05"))
 		}
+		if database.Note != "" {
+			fmt.Fprintln(w, style.Muted.Render("  "+database.Note))
+		}
 		rows := [][]string{}
 		for _, snapshot := range database.Snapshots {
 			rows = append(rows, []string{snapshot.ID, snapshot.Reason, byteSize(snapshot.Size), since(snapshot.CreatedAt, now), dash(snapshot.Bucket)})

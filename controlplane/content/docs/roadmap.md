@@ -11,8 +11,8 @@ ops is in beta. It works and runs real sites today, and it keeps growing. No dat
 What you get today, on every surface: the web, the CLI, the terminal UI, the API and MCP.
 
 - **Deploys** from your repo, a GitHub branch or commit, or an image from CI. A failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
-- **Backups** of every SQLite change into your own bucket, a snapshot before every change ops makes and a restore check every day. [Backups](/docs/guides/backups)
-- **Data**: browse tables, edit rows and run SQL on the live database. [Data](/docs/guides/data)
+- **Backups** of every SQLite and Postgres change into your own bucket, a full copy before every change ops makes and a restore check every day. [Backups](/docs/guides/backups)
+- **Data**: browse tables, edit rows and run SQL on the live database, SQLite or Postgres. [Data](/docs/guides/data)
 - **Domains** with HTTPS, and a password in front if you like. [Domains](/docs/guides/domains)
 - **Uptime checks, built in**: every domain checked from the outside once a minute from the first deploy on, nothing to set up; down and back up in the activity log. [Uptime](/docs/guides/uptime)
 - **Alerts by mail, Slack, Discord, Telegram and webhooks**: when a site goes down or comes back, a server goes offline or a deploy fails, with a test for every destination and signed webhooks. [Alerts](/docs/guides/alerts)
@@ -28,7 +28,9 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 ## Next
 
-- **Postgres**: every change backed up, a daily restore check and the data browser, like SQLite has today. [#29](https://github.com/axadrn/ops/issues/29)
+- **Servers in one click**: create them at Hetzner, DigitalOcean, Vultr and UpCloud, right from ops. [#1](https://github.com/axadrn/ops/issues/1)
+
+MySQL and MariaDB run like any service; ops backups for them come when customers ask.
 
 ## Later
 

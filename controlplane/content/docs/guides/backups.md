@@ -1,16 +1,25 @@
 ---
 title: "Backups"
-description: "Every change of every SQLite database in your own bucket, restored to any second"
+description: "Two backups of every SQLite and Postgres database in your own bucket, checked every day"
 order: 7
 ---
 
-ops backs up every SQLite database of your apps into your own bucket, two ways at once, and checks every day that the backups restore. A bucket is a folder in an online storage service such as Cloudflare R2 or AWS S3; [Your bucket](/docs/guides/bucket) explains why ops uses one.
+Two backups. Always.
 
-- **Continuous.** The agent copies every change to your bucket about once a second, with [Litestream](https://litestream.io). You can restore to any point in time of the last 7 days: any second, such as 14:01:00 yesterday.
-- **Snapshots.** A snapshot is a full copy of the database at one moment, gzipped. ops takes one before every deploy, before every restore, before every change you make through ops, and whenever you ask. It keeps the newest 50 per database.
-- **Restore checks.** Once a day the agent restores the newest state into a temporary file and runs SQLite's integrity check on it. The app shows when it last passed.
+- **Every change.** In your bucket within a second for SQLite, within a minute for Postgres. Go back to any second of the last 7 days.
+- **Full copies.** Before every deploy, restore and edit, and every hour for Postgres. The newest 50 stay.
+- **Checked daily.** Every day ops restores your backup and checks it. The app shows when it last passed.
 
-Everything runs in the agent on your server. Your data goes from your server to your bucket and never through ops.
+Why both? Every change lets you go back to 14:01, one minute before the wrong `DELETE`. A full copy is one file you can open anywhere, even without ops.
+
+Everything runs in the agent on your server. Your data goes from your server to your bucket, never through ops. A bucket is a folder in an online storage service such as Cloudflare R2 or AWS S3; [Your bucket](/docs/guides/bucket) explains why ops uses one.
+
+| | SQLite | Postgres |
+| --- | --- | --- |
+| Every change | [Litestream](https://litestream.io), within a second | [WAL-G](https://github.com/wal-g/wal-g), within a minute |
+| Full copies | the file, gzipped | `pg_dump`, also every hour |
+| Daily check | restore into a file, `PRAGMA integrity_check` | restore into a throwaway Postgres, count the tables |
+| ops finds it | a SQLite file on a volume | a service that runs `postgres`, `postgis/postgis`, `pgvector/pgvector` or `timescale/timescaledb` |
 
 ## Set up the bucket
 
@@ -127,9 +136,9 @@ API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-A point in time comes from the app's bucket: after a move it reaches back to the move. Times are in UTC, not your local time. A time without a day, like `14:01`, means today. In the API and MCP, send the time as `at`.
+A point in time comes from the app's bucket: after a move it reaches back to the move. Times are in UTC, not your local time. A time without a day, like `14:01`, means today. In the API and MCP, send the time as `at`. For Postgres the window starts at the oldest base backup and ends at the newest piece of the log in the bucket.
 
-If the app has more than one database, the CLI restores the one you name with `--db /data/app.db`.
+If the app has more than one database, the CLI restores the one you name with `--db /data/app.db` or `--db postgres-db`.
 
 ## What a restore does
 
@@ -168,8 +177,41 @@ MCP: remove_bucket
 
 ops refuses a bucket that apps still use or that keeps older backups of an app, and names the apps: move them to another bucket first. [Remove a bucket](/docs/guides/bucket#remove-a-bucket) has the rules. ops asks you to type the bucket's name first; `--yes` skips it in scripts.
 
+## Postgres
+
+ops backs up every service of an app that runs Postgres, with nothing to set up: no password, no change to your `compose.yml`.
+
+```yaml
+services:
+  web:
+    build: .
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/shop
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
+```
+
+In ops the database is `postgres-<service>`, here `postgres-db`: in the bucket, on the Backups tab, and in `--db postgres-db` on the CLI.
+
+- **Every change.** Next to the Postgres container the agent runs WAL-G in a small companion container that shares its network. It streams every change as Postgres writes it and uploads each finished piece of the log. Once a minute, if there were writes, ops closes the current piece, so a quiet database is in the bucket within a minute too. A full base backup runs every day and before every deploy; WAL-G deletes what the 7 days no longer need.
+- **Full copies.** `pg_dump` in its custom format, every hour and before every deploy, restore and edit. Open one anywhere with `pg_restore`.
+- **Checked daily.** ops restores the newest copy into a throwaway Postgres of the same image, with no network, and checks that every table came back.
+- **Restore to a point in time.** ops takes a full copy first, rebuilds the data in a new volume from the base backup and the log up to your second, and only when that worked stops the app, swaps the data in and starts the app again. If anything fails before the swap, nothing changed.
+
+Requirements: the data is on a volume, as above, and the image is Debian-based, like `postgres:17`. WAL-G does not run on Alpine images such as `postgres:17-alpine`: they get full copies and the daily check, and the Backups tab says so.
+
+In the bucket the database's folder holds `walg/` (every change and the base backups) next to `snapshots/`.
+
 ## Requirements
 
 The app keeps SQLite on a volume and uses WAL mode, as most apps do. WAL mode is a SQLite setting that lets two programs read and write at the same time; your app turns it on with `PRAGMA journal_mode=WAL`. Only the agent runs Litestream for a database: do not run a second Litestream for the same file.
 
-No database shows up? See [Data](/docs/guides/data#requirements): ops only finds SQLite files on a volume of the live release.
+No database shows up? See [Data](/docs/guides/data#requirements): ops finds SQLite files on a volume of the live release and services that run Postgres. For Postgres, see [Postgres](#postgres).

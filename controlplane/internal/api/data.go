@@ -52,7 +52,7 @@ type RowRequest struct {
 	Value    *string `json:"value"`
 }
 
-// Databases lists the SQLite databases of the app's live release.
+// Databases lists the databases of the app's live release: SQLite files and Postgres services.
 func (h *AppsHandler) Databases(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	_, databases, err := h.apps.Databases(workspace.ID, r.PathValue("app"))

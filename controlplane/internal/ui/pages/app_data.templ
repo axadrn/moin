@@ -49,13 +49,13 @@ templ AppData(view DataView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " data", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Data"}}}) {
 		@panelPage(templ.Attributes{"data-app-data": view.App.Name}) {
-			@appHeader(view.App, "data", "The SQLite database on "+view.App.ServerName+", read live. Edits write straight to it.")
+			@appHeader(view.App, "data", "The database on "+view.App.ServerName+", SQLite or Postgres, read live. Edits write straight to it.")
 			if view.Error != "" {
 				<div role="alert">
 					@emptyState("The data could not be read", view.Error, "")
 				</div>
 			} else if len(view.Databases) == 0 {
-				@emptyStateWith("No SQLite database yet", noDatabase(), "ops deploy "+view.App.Name)
+				@emptyStateWith("No database yet", noDatabase(), "ops deploy "+view.App.Name)
 			} else {
 				<div class="grid items-stretch gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
 					@dataSidebar(view)
@@ -684,5 +684,5 @@ func isBlob(column protocol.DBColumn) bool {
 }
 
 templ noDatabase() {
-	ops finds SQLite files on the volumes of the live release. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>.
+	ops finds SQLite files on the volumes of the live release and every service that runs Postgres. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>, or runs <code class="font-mono">postgres:17</code>.
 }

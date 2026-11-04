@@ -82,7 +82,7 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
 	mcpsdk.AddTool(server, add("get_app", "Get an app",
-		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile or Go; service; port; SQLite databases; the x-ops block). Needs the read scope.",
+		"Returns an app with its 20 newest deploys: status, errors, and what the agent detected (compose, Dockerfile or Go; service; port; databases, SQLite and Postgres; the x-ops block). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, add("create_app", "Create an app",
 		"Creates an app on a server. Deploys come from `ops deploy` in the repo, which can also create the app. Needs a token with read and write access.",
@@ -154,13 +154,13 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Makes env every env var of an app, all at once, like one .env file: new and changed keys are set, keys not in env are removed. Show the user what changes first: get_env, then compare. Returns the keys added, changed and removed. They reach the app with its next restart_app or deploy. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.replaceEnv)))
 	mcpsdk.AddTool(server, add("list_tables", "List database tables",
-		"Lists the tables and views of an app's SQLite database with their columns and row counts, read from its server. Needs the read scope.",
+		"Lists the tables and views of an app's database, SQLite or Postgres, with their columns and row counts, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listTables)))
 	mcpsdk.AddTool(server, add("query_database", "Query a database",
-		"Runs one read-only SQL statement with positional parameters on an app's SQLite database and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
+		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.queryDatabase)))
 	mcpsdk.AddTool(server, add("execute_sql", "Change a database",
-		"Runs one SQL statement that changes an app's SQLite database (INSERT, UPDATE, DELETE, CREATE, ...) in one transaction and returns the changed rows. Take a backup first for anything you cannot undo. Needs a token with read and write access.",
+		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. Take a backup first for anything you cannot undo. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.executeSQL)))
 	mcpsdk.AddTool(server, add("get_backups", "List backups",
 		"Lists the snapshots of every database of an app, the window a point in time restore can reach and the newest restore drill. Needs the read scope.",

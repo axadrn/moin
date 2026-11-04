@@ -198,7 +198,7 @@ The data folder holds two files:
 
 | File | What is in it | Backup |
 | --- | --- | --- |
-| `app.db` (the name in `DB_CONNECTION`) | everything that must not get lost: users, apps, deploys, settings, the state of each uptime check and every outage | every second, to your bucket |
+| `app.db` (the name in `DB_CONNECTION`) | everything that must not get lost: users, apps, deploys, settings, the state of each uptime check and every outage | every change, in your bucket within a second |
 | `history.db` | everything that is a chart over time: [metrics](/docs/guides/metrics) and [uptime](/docs/guides/uptime) per hour | none |
 
 The rule: what an alert or a decision depends on goes in the database; what is a chart goes in `history.db`. History grows back by itself, so losing `history.db` costs old charts, nothing else. The database stays small, its backup cheap and a restore fast.

@@ -98,7 +98,8 @@ What each folder holds:
 
 - **uploads:** your code on its way to the server. Temporary: deleted as soon as the server has it, and anything left over is deleted after 24 hours.
 - **litestream:** every change as it happens, so you can go back to any second of the last 7 days.
-- **snapshots:** full copies before every deploy and change, the last 50. Each one is a plain gzipped SQLite file.
+- **snapshots:** full copies before every deploy and change, the last 50. Each one is a plain gzipped SQLite file, or for Postgres a `pg_dump` you open with `pg_restore`.
+- **walg:** for Postgres, every change and the base backups, kept by [WAL-G](https://github.com/wal-g/wal-g) for 7 days.
 
 The **Buckets** page shows your workspace's folder in each bucket. The **Backups** tab of an app shows the app's folder and its bucket.
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/axadrn/ops/controlplane/internal/model"
+	"github.com/axadrn/ops/protocol"
 )
 
 func TestReadOnlyError(t *testing.T) {
@@ -18,6 +19,26 @@ func TestReadOnlyError(t *testing.T) {
 	}
 	if err := readOnlyError(nil); err != nil {
 		t.Fatalf("nil = %v", err)
+	}
+	postgres := &AgentError{Message: "ERROR:  cannot execute UPDATE in a read-only transaction"}
+	if err := readOnlyError(postgres); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("Postgres answer = %v, want ErrReadOnly", err)
+	}
+}
+
+// TestNewestFirst: a table without rowid pages by its primary key, newest
+// first; a view or a table without one keeps the database's order.
+func TestNewestFirst(t *testing.T) {
+	table := protocol.DBTable{Name: "orders", Type: "table", Columns: []protocol.DBColumn{{Name: "shop", PrimaryKey: true}, {Name: `we"ird`, PrimaryKey: true}, {Name: "total"}}}
+	if got := newestFirst(table); got != ` ORDER BY "shop" DESC, "we""ird" DESC` {
+		t.Errorf("newestFirst = %q", got)
+	}
+	table.Type = "view"
+	if got := newestFirst(table); got != "" {
+		t.Errorf("view: %q", got)
+	}
+	if got := newestFirst(protocol.DBTable{Type: "table", Columns: []protocol.DBColumn{{Name: "a"}}}); got != "" {
+		t.Errorf("no key: %q", got)
 	}
 }
 

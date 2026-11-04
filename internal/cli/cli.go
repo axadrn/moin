@@ -108,7 +108,7 @@ CI
   registry rm        Remove a login: registry rm <host> [--yes]
 
 Data
-  db                 Tables, rows and migration of the app's SQLite database: db [app]
+  db                 Tables, rows and migration of the app's database, SQLite or Postgres: db [app]
   db rows            A page of a table, newest first: db rows orders [--limit 20] [--offset 20]
   db schema          The CREATE statements: db schema [table]
   sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"

@@ -61,9 +61,9 @@ tags:
   - name: Apps
     description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the agent detects compose.yml, a Dockerfile or a Go module, reads the optional `x-ops` block, builds, starts and checks it. Env vars are stored encrypted. Everything in the ops endpoints belongs to the workspace of the API token.'
   - name: Data
-    description: Browse, edit and query the SQLite databases of an app on its server.
+    description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
-    description: Continuous backups and snapshots of every SQLite database into your own S3-compatible bucket, with restore and daily restore drills.
+    description: Continuous backups and snapshots of every SQLite and Postgres database into your own S3-compatible bucket, with restore to a snapshot or a point in time and daily restore drills.
   - name: Uptime
     description: The control plane checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: Alerts
@@ -1928,7 +1928,7 @@ paths:
       tags: [Data]
       operationId: getAppDatabases
       summary: List databases
-      description: The SQLite databases the agent found on the volumes of the live release.
+      description: The databases of the live release, SQLite files the agent found on its volumes and services that run Postgres.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1981,7 +1981,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2038,7 +2038,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2070,7 +2070,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2105,7 +2105,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, `not_editable` for views and WITHOUT ROWID tables.'
@@ -2140,7 +2140,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, `not_editable` for views and WITHOUT ROWID tables.'
@@ -2180,7 +2180,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no SQLite database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, or `read_only_query` when a read without `write` changes data.'
@@ -4898,9 +4898,17 @@ components:
             properties:
               path:
                 type: string
-                description: Inside the container.
+                description: A SQLite file inside the container, or `postgres-<service>` for a Postgres service.
               host_path:
                 type: string
+                description: The SQLite file on the server, empty for Postgres.
+              kind:
+                type: string
+                enum: [postgres]
+                description: '`postgres` for a Postgres service; absent for SQLite.'
+              service:
+                type: string
+                description: The compose service that runs Postgres.
         config:
           type: object
           description: The `x-ops` block of compose.yml.
@@ -5683,7 +5691,7 @@ components:
                       type: string
                     reason:
                       type: string
-                      description: manual, before-v4, before-sql, before-restore.
+                      description: manual, hourly (Postgres), before-v4, before-sql, before-restore.
                     size:
                       type: integer
                     created_at:
@@ -5706,6 +5714,13 @@ components:
                 description: The newest restore drill that passed the integrity check.
               error:
                 type: string
+              kind:
+                type: string
+                enum: [postgres]
+                description: '`postgres` for a Postgres service; absent for SQLite.'
+              note:
+                type: string
+                description: What the database lacks, such as a point in time window for a Postgres image WAL-G does not run in.
     Integrations:
       type: object
       required: [cloudflare, cloudflare_account, tailscale]

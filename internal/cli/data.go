@@ -15,7 +15,7 @@ import (
 	"github.com/axadrn/ops/internal/style"
 )
 
-// db shows an app's SQLite database: its tables, or a page of rows.
+// db shows an app's database, SQLite or Postgres: its tables, or a page of rows.
 func db(ctx context.Context, args []string, stdout io.Writer) error {
 	command := "tables"
 	if len(args) > 0 && slices.Contains([]string{"tables", "ls", "rows", "schema"}, args[0]) {

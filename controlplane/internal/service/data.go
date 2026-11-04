@@ -15,9 +15,9 @@ import (
 const dataTimeout = 40 * time.Second
 
 var (
-	ErrNoDatabase = errors.New("the live release has no SQLite database on a volume")
+	ErrNoDatabase = errors.New("the live release has no database: no SQLite file on a volume, no Postgres service")
 	ErrNoTable    = errors.New("the database has no such table")
-	ErrNoRowID    = errors.New("rows of views and WITHOUT ROWID tables cannot be edited here: use SQL")
+	ErrNoRowID    = errors.New("rows of Postgres tables, views and WITHOUT ROWID tables cannot be edited here: use SQL")
 	ErrNoColumn   = errors.New("the table has no such column")
 	ErrSQL        = errors.New("the query is empty")
 	ErrReadOnly   = errors.New("a read query tried to change data")
@@ -32,7 +32,7 @@ type Rows struct {
 	Limit  int
 }
 
-// Databases returns the SQLite databases of the app's live release, as the
+// Databases returns the databases of the app's live release, as the
 // agent found them.
 func (s *AppService) Databases(workspaceID, idOrName string) (*model.App, []protocol.Database, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
@@ -116,11 +116,11 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	return result, err
 }
 
-// readOnlyError turns SQLite's answer to a write on the read-only handle a
-// read opens into ErrReadOnly.
+// readOnlyError turns the answer to a write in a read into ErrReadOnly:
+// SQLite's read-only handle, or Postgres's READ ONLY transaction.
 func readOnlyError(err error) error {
 	var agentErr *AgentError
-	if errors.As(err, &agentErr) && strings.Contains(agentErr.Message, "readonly database") {
+	if errors.As(err, &agentErr) && (strings.Contains(agentErr.Message, "readonly database") || strings.Contains(agentErr.Message, "in a read-only transaction")) {
 		return ErrReadOnly
 	}
 	return err
@@ -137,7 +137,7 @@ func (s *AppService) Rows(ctx context.Context, workspaceID, idOrName, database, 
 		return Rows{}, ErrNoTable
 	}
 	page := Rows{Table: tables.Tables[index], Offset: max(offset, 0), Limit: min(max(limit, 1), 500)}
-	sql := `SELECT * FROM ` + quoteName(table) + ` LIMIT ? OFFSET ?`
+	sql := `SELECT * FROM ` + quoteName(table) + newestFirst(page.Table) + ` LIMIT ? OFFSET ?`
 	if page.Table.RowID {
 		sql = `SELECT rowid, * FROM ` + quoteName(table) + ` ORDER BY rowid DESC LIMIT ? OFFSET ?`
 	}
@@ -194,6 +194,22 @@ func (s *AppService) editable(ctx context.Context, workspaceID, idOrName, databa
 }
 
 func quoteName(name string) string { return `"` + strings.ReplaceAll(name, `"`, `""`) + `"` }
+
+// newestFirst orders a table without rowid by its primary key, newest
+// first, so pages stay put: Postgres tables and WITHOUT ROWID tables. A
+// table without one keeps the order the database gives.
+func newestFirst(table protocol.DBTable) string {
+	keys := []string{}
+	for _, column := range table.Columns {
+		if column.PrimaryKey {
+			keys = append(keys, quoteName(column.Name)+" DESC")
+		}
+	}
+	if len(keys) == 0 || table.Type != "table" {
+		return ""
+	}
+	return " ORDER BY " + strings.Join(keys, ", ")
+}
 
 // InsertRow adds a row to a table. Columns missing from values get their
 // default.
