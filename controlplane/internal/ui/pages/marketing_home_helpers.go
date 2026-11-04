@@ -138,7 +138,7 @@ var compareGroups = []compareGroup{
 	}},
 	{"Your data", []compareRow{
 		{"Keeps your code and data", []compareCell{yes("Never", "your bucket, your server"), yes("No"), yes("No"), yes("No"), no("Yes", "on their disks"), no("Yes", "on their disks"), no("Yes", "on their disks"), no("Yes", "on their disks"), yes("No")}, false},
-		{"SQLite backups", []compareCell{yes("Every second", "restore to any second"), part("Scheduled"), part("Scheduled", "volume backups"), unsaid(), no("Not possible", "the disk resets daily"), part("Daily", "disk snapshot"), part("Daily", "volume backup"), part("Daily", "volume snapshot"), unsaid()}, false},
+		{"SQLite backups", []compareCell{yes("Every change", "in your bucket within a second, restore to any second"), part("Scheduled"), part("Scheduled", "volume backups"), unsaid(), no("Not possible", "the disk resets daily"), part("Daily", "disk snapshot"), part("Daily", "volume backup"), part("Daily", "volume snapshot"), unsaid()}, false},
 		{"Restore tested every day", []compareCell{yes("Yes", "a real restore, daily"), no("No"), no("No"), unsaid(), no("No"), no("No"), no("No"), no("No"), unsaid()}, false},
 		{"Browse and edit live data", []compareCell{yes("Yes", "SQLite, read and write"), part("Add-on", "pgAdmin or CloudBeaver"), unsaid(), no("No"), part("Postgres only"), no("No"), part("Tables", "of its databases"), unsaid(), unsaid()}, false},
 	}},
