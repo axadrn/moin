@@ -40,7 +40,7 @@ templ AppRouting(view RoutingView) {
 			Heading:     "app-domains-heading",
 			Title:       "Domains",
 			Description: "The addresses the app answers on, with HTTPS. Other domains redirect to the canonical one.",
-			Action:      docsLink("/docs/guides/domains", "How it works"),
+			Docs:        "/docs/guides/domains",
 		}) {
 			<div class="flex flex-col gap-6">
 				if checks := domainRows(view); len(checks) > 0 {

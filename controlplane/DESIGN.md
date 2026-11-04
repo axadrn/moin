@@ -184,7 +184,9 @@ Rules every page follows:
 - **Cards.** Every block is a `card.Card`, one per topic, built with
   `@panel(panelProps{...}) { body }`: `card.Header` with `card.Title`
   (section title), an optional `card.Description` (one muted sentence) and at most
-  one `card.Action` (a small button or a "How it works" link). The card's own
+  one `card.Action` (a small button). The guide that explains the card is
+  `Docs`: a muted ghost book icon right of the title, "How it works" in its
+  tooltip and `aria-label` (`docsButton`), never a text link. The card's own
   spacing (24 px) stays; never pass paddings, heights or radii to a card.
   The body is `Body: ""` (padded text and forms), `panelBodyRows` (row lists:
   rows bring `px-3`, so their text lines up with the title) or
