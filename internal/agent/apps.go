@@ -43,7 +43,9 @@ import (
 const (
 	maxSourceSize = 200 << 20
 	waitTimeout   = 120 * time.Second
-	healthTimeout = 30 * time.Second
+	// healthTimeout is as long as compose waits: a JVM app such as Metabase
+	// takes a minute or more to answer on its first start.
+	healthTimeout = 120 * time.Second
 )
 
 var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
@@ -424,7 +426,14 @@ func (a *apps) checkHealth(ctx context.Context, container string, port int, path
 	}
 	url := fmt.Sprintf("http://%s:%d/%s", ips[0], port, strings.TrimPrefix(path, "/"))
 	logf("health check %s", url)
-	client := http.Client{Timeout: 3 * time.Second}
+	return healthy(ctx, url, path)
+}
+
+// healthy calls url until it answers below 500, for up to healthTimeout.
+func healthy(ctx context.Context, url, path string) error {
+	// A redirect answers too: an app that sends http to its https domain,
+	// like Ghost, runs; following it would leave the container's address.
+	client := http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	deadline := time.Now().Add(healthTimeout)
 	var last string
 	for time.Now().Before(deadline) {
