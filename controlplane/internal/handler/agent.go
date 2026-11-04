@@ -26,7 +26,7 @@ const (
 	agentPingTimeout  = 10 * time.Second
 )
 
-// AgentHandler is the surface the ops agent dials into. It is not part of
+// AgentHandler is the surface the moin agent dials into. It is not part of
 // /api/v1: agents authenticate with their own tokens, never with a user's.
 type AgentHandler struct {
 	servers   *service.ServerService

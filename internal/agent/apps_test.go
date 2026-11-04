@@ -227,7 +227,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 
 	gone := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": filepath.Join(source, "gone")}}}}
 	err := a.rebuildMissing(context.Background(), gone, map[string]string{"web": "ops-blog-web:3"}, "web", false, logf)
-	if err == nil || !strings.Contains(err.Error(), "deploy again with ops deploy") {
+	if err == nil || !strings.Contains(err.Error(), "deploy again with moin deploy") {
 		t.Fatalf("err = %v", err)
 	}
 }
