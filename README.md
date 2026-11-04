@@ -1,21 +1,19 @@
-# moin
+# moin.
 
-Deploy SQLite apps to servers you own. Deploys, backups, data and logs in one binary: web, CLI, terminal UI and MCP.
+Deploy anything. Lose nothing. Any app on any server you own, every SQLite and Postgres change backed up and checked every day. Web, CLI, terminal UI and MCP.
 
 ```bash
 moin login              # sign in with an API token
 moin servers add web-1  # prints the one-line install for your server
-moin deploy             # ship the current directory
+moin deploy             # ✓ moin. your app is live
 moin                    # the live terminal UI
 ```
 
 The agent on your server only dials out. Nothing listens for moin.
 
-"moin" is a working name and may change soon. Servers, the CLI and agents will move over by themselves; see the [FAQ](https://moin.run/docs/faq).
-
 ## Documentation
 
-Everything else is in the docs, under `/docs` in the control plane: [moin.run/docs](https://moin.run/docs). They are the source of truth.
+Everything else is in the docs: [moin.run/docs](https://moin.run/docs), or `/docs` on your own control plane. They are the source of truth.
 
 ## Build
 
