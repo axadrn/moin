@@ -54,6 +54,7 @@ templ Home(network model.Network) {
 			}
 			@HomeNext()
 			@HomeFAQ()
+			@HomeWhy()
 			@HomeStart()
 		</main>
 	}
@@ -122,7 +123,6 @@ templ HomeHero() {
 			@homeStage()
 		</div>
 		@stageScript()
-		@whyMoinScript()
 	</section>
 }
 
@@ -167,22 +167,6 @@ templ homeStageTab(name, label string) {
 // thin line filling under the tab. It waits while the pointer is on the
 // stage or the stage is off screen, stops for good once someone picks a
 // tab, and never runs for reduced motion.
-// whyMoinScript opens a FAQ question when the address names its anchor,
-// such as #why-moin from the line under the hero buttons.
-templ whyMoinScript() {
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			const open = () => {
-				const item = location.hash && document.getElementById(location.hash.slice(1));
-				const trigger = item && item.querySelector("[data-slot=accordion-trigger]");
-				if (trigger && trigger.getAttribute("aria-expanded") !== "true") trigger.click();
-			};
-			addEventListener("hashchange", open);
-			open();
-		})();
-	</script>
-}
-
 templ stageScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
@@ -720,6 +704,29 @@ templ homeStep(number, title, text string) {
 	}
 }
 
+// ---------------------------------------------------------------- why moin
+// HomeWhy is the story of the name, right before the last call to start: the
+// hero links here with "Read the story". It ends on the promise of the hero.
+templ HomeWhy() {
+	<section id="why-moin" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			<div class={ homeSurface, "px-6 py-14 sm:px-14 sm:py-20" }>
+				@blocks.Wordmark("text-[clamp(4rem,13vw,9.5rem)] leading-none")
+				<p class="mt-8 text-lg text-muted-foreground sm:text-xl">
+					<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
+				</p>
+				<div class={ typeLead, "mt-10 max-w-2xl space-y-6 text-foreground" }>
+					<p>I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing.</p>
+					<p>Your apps are containers too. moin ships them to your servers and keeps every change to their data.</p>
+				</div>
+				<p class={ typeH2, "mt-12" }>
+					Deploy anything. <span class="text-muted-foreground/60">Lose nothing.</span>
+				</p>
+			</div>
+		</div>
+	</section>
+}
+
 // ---------------------------------------------------------------- pricing
 // HomePricing puts the free self-hosted moin next to the hosted one: the same
 // product, so the rows say what running it takes. Both cards have the same
@@ -870,10 +877,6 @@ templ HomeFAQ() {
 				@homeQuestion("Where are my env vars?") {
 					Encrypted with us today. Next, only on your servers. Then end-to-end, so we cannot read them at all.
 				}
-				@homeQuestionID("why-moin", "Why moin?") {
-					<span class="block"><strong class="font-semibold text-foreground">moin</strong> /mɔɪn/ <em>interjection, northern German.</em> Hello. Said in Hamburg at any hour, in one word, by people who don't waste words.</span>
-					<span class="mt-4 block">I grew up in Hamburg, one of Europe's biggest container ports. Your apps run in containers too: packed once, shipped to any server, each one sealed off from the next. moin is the harbour master. It puts them on your servers, sends a copy of every change to your bucket, and checks every day that nothing got lost.</span>
-				}
 				@homeQuestion("Can my team use it?") {
 					Yes, for free. <a href="/docs/guides/team" class="text-foreground underline underline-offset-4 hover:text-foreground">Invite them</a> and everyone deploys to the same servers. The <a href="/docs/guides/activity" class="text-foreground underline underline-offset-4 hover:text-foreground">activity log</a> shows who deployed, restored or changed what, from the web, the CLI, an agent or GitHub.
 				}
@@ -897,15 +900,7 @@ templ HomeFAQ() {
 }
 
 templ homeQuestion(question string) {
-	@homeQuestionID("", question) {
-		{ children... }
-	}
-}
-
-// homeQuestionID is a question with an anchor: a link to #<id> scrolls to it
-// and opens it (whyMoinScript).
-templ homeQuestionID(id string, question string) {
-	@accordion.Item(accordion.ItemProps{ID: id, Class: "scroll-mt-28"}) {
+	@accordion.Item() {
 		@accordion.Trigger(accordion.TriggerProps{Class: "items-center gap-6 rounded-none px-4 py-5 text-base font-semibold hover:no-underline sm:px-5 sm:py-6 **:data-[slot=accordion-trigger-icon]:hidden"}) {
 			{ question }
 			@icon.Plus(icon.Props{Class: "ml-auto size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-45"})
