@@ -170,6 +170,9 @@ func New(cfg *config.Config) (*App, error) {
 		appService.AllowOnlyPublicBuckets()
 	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
+	if cfg.SameServer {
+		appService.ProxyOnFirstConnect()
+	}
 	// Operators run ops as a service: only the hosted control plane has
 	// them. On a self-hosted one, ADMIN_EMAILS only says who may sign up.
 	var operators []string

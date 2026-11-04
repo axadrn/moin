@@ -76,6 +76,9 @@ type AppService struct {
 	now        func() time.Time
 	// publicBucketsOnly refuses buckets on private or local addresses.
 	publicBucketsOnly bool
+	// proxyOnFirstConnect sends a server its config the first time its
+	// agent connects, which starts the proxy; see ProxyOnFirstConnect.
+	proxyOnFirstConnect bool
 	uptime            *uptimeChecker
 	metrics           *metricsStore
 

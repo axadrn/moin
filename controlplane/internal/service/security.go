@@ -225,11 +225,20 @@ func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	if err != nil {
 		return
 	}
-	if !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftOver(SecurityReport(*server)) {
+	report := SecurityReport(*server)
+	first := s.proxyOnFirstConnect && report == nil
+	if !first && !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftOver(report) {
 		return
 	}
 	s.configureServer(context.Background(), server, nil)
 	s.servers.notify(workspaceID)
+}
+
+// ProxyOnFirstConnect has a server start its proxy as soon as its agent
+// first connects, not at its first app with a domain: for a control plane
+// on the same server as its apps, which the proxy serves too.
+func (s *AppService) ProxyOnFirstConnect() {
+	s.proxyOnFirstConnect = true
 }
 
 // leftOver says whether the agent last set up a firewall, a tunnel or SSH

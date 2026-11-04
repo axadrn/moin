@@ -95,6 +95,10 @@ type Config struct {
 	// the newest release, so admins see when an update is out. The hosted
 	// one never asks: the Deploy workflow updates it.
 	UpdateCheck bool
+	// SameServer says the control plane runs on the same server as its
+	// apps, set up by install.sh: a server's agent starts the proxy on its
+	// first connect, since the proxy serves the control plane too.
+	SameServer bool
 	// Payment, Stripe
 	StripeSecretKey         string
 	StripeWebhookSecret     string
@@ -202,6 +206,7 @@ func Load() (*Config, error) {
 	// plane starts without one and says so.
 	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction() && cfg.S3Bucket != "")
 	cfg.UptimeChecks = r.boolean("UPTIME_CHECKS", cfg.IsProduction())
+	cfg.SameServer = r.boolean("SAME_SERVER", false)
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
 	cfg.GitHubClientSecret = r.string("GITHUB_CLIENT_SECRET", "")
