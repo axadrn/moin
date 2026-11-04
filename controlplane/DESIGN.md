@@ -184,7 +184,9 @@ Rules every page follows:
 - **Cards.** Every block is a `card.Card`, one per topic, built with
   `@panel(panelProps{...}) { body }`: `card.Header` with `card.Title`
   (section title), an optional `card.Description` (one muted sentence) and at most
-  one `card.Action` (a small button or a "How it works" link). The card's own
+  one `card.Action` (a small button). The guide that explains the card is
+  `Docs`: a muted ghost book icon right of the title, "How it works" in its
+  tooltip and `aria-label` (`docsButton`), never a text link. The card's own
   spacing (24 px) stays; never pass paddings, heights or radii to a card.
   The body is `Body: ""` (padded text and forms), `panelBodyRows` (row lists:
   rows bring `px-3`, so their text lines up with the title) or
@@ -251,7 +253,10 @@ in `internal/handler/feedback.go` and `@fieldHint` in
   why, in one sentence. The page stays as it was.
 - **If a control saves itself** (a switch, a cell of the data browser):
   its new state is the answer, no toast. If saving fails, it goes back (the
-  cell turns red) and a toast says why.
+  cell turns red) and a toast says why. A switch is a `@switchForm` with a
+  `@savedSwitch`: it posts to its own endpoint, which saves only that one
+  setting through one service method and answers the form as stored; the
+  switch is disabled while it saves.
 - **If something was copied**: the copy icon turns into a check for a
   moment. The button keeps its size and its label.
 - **If a state lasts** while the page is open (trial ended, read-only

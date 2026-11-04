@@ -15,6 +15,10 @@ type UptimeRepository interface {
 	// UptimeChecks returns the stored checks of every app.
 	UptimeChecks() ([]model.UptimeCheck, error)
 	SaveUptimeCheck(check model.UptimeCheck) error
+	// SaveUptimeState stores what the checks found, the state and since,
+	// and leaves the path and the pause as the user set them: a check that
+	// finishes after a change must not undo it.
+	SaveUptimeState(check model.UptimeCheck) error
 	DeleteUptimeCheck(appID, domain string) error
 	// AddUptimeHours adds counts to their hours, all in one transaction.
 	// Counts of an app that is gone are dropped.
@@ -57,6 +61,15 @@ func (r *appRepository) SaveUptimeCheck(check model.UptimeCheck) error {
 		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
 		ON CONFLICT (app_id, domain) DO UPDATE SET path = excluded.path, paused = excluded.paused,
 			state = excluded.state, since = excluded.since
+	`, check.AppID, check.Domain, check.Path, check.Paused, check.State, check.Since)
+	return err
+}
+
+func (r *appRepository) SaveUptimeState(check model.UptimeCheck) error {
+	_, err := r.db.Exec(`
+		INSERT INTO uptime_checks (app_id, domain, path, paused, state, since)
+		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
+		ON CONFLICT (app_id, domain) DO UPDATE SET state = excluded.state, since = excluded.since
 	`, check.AppID, check.Domain, check.Path, check.Paused, check.State, check.Since)
 	return err
 }

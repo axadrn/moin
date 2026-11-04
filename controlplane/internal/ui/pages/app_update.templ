@@ -8,7 +8,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/internal/build"
 )
@@ -32,7 +31,7 @@ templ UpdateNotice(info model.VersionInfo) {
 		data-update-notice
 	>
 		if info.Admin {
-			switch {
+			switch  {
 				case running:
 					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-update-state": update.State}}) {
 						@alert.Title() {
@@ -95,11 +94,9 @@ templ UpdateNotice(info model.VersionInfo) {
 	</div>
 }
 
-// AgentUpdatesForm is the switch for automatic agent updates. A change
-// saves itself; a failed save answers the form as stored, so it flips back.
+// AgentUpdatesForm is the switch for automatic agent updates.
 templ AgentUpdatesForm(on bool) {
-	<form id="agent-updates-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/servers/agent-updates" } hx-trigger="change" hx-swap="none">
-		@csrf.Token()
+	@switchForm("agent-updates-form", ctxkeys.AppBasePath(ctx)+"/servers/agent-updates") {
 		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 			@field.Content() {
 				@field.Label(field.LabelProps{For: "agent-updates"}) {
@@ -109,7 +106,7 @@ templ AgentUpdatesForm(on bool) {
 					{ "Agents update to the control plane's version, " + build.Version + ", by themselves. One server at a time, never during a deploy. Your apps keep running." }
 				}
 			}
-			@switchcomp.Switch(switchcomp.Props{ID: "agent-updates", Name: "on", Value: "1", DefaultChecked: on})
+			@savedSwitch("agent-updates", on)
 		}
-	</form>
+	}
 }

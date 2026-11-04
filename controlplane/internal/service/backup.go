@@ -303,6 +303,9 @@ func (s *AppService) SetSnapshotBeforeChanges(actor Actor, idOrName string, on b
 	if err != nil {
 		return nil, err
 	}
+	if app.SnapshotBeforeChanges == on {
+		return app, nil
+	}
 	err = s.apps.SetSnapshotBeforeChanges(app.ID, on)
 	if err != nil {
 		return nil, err

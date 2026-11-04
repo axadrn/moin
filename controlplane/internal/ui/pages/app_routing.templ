@@ -12,7 +12,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"github.com/axadrn/moin/protocol"
@@ -41,7 +40,7 @@ templ AppRouting(view RoutingView) {
 			Heading:     "app-domains-heading",
 			Title:       "Domains",
 			Description: "The addresses the app answers on, with HTTPS. Other domains redirect to the canonical one.",
-			Action:      docsLink("/docs/guides/domains", "How it works"),
+			Docs:        "/docs/guides/domains",
 		}) {
 			<div class="flex flex-col gap-6">
 				if checks := domainRows(view); len(checks) > 0 {
@@ -267,14 +266,14 @@ templ instantPanel(view RoutingView, routingPath string) {
 									Show password
 								}
 							}
-							<form hx-post={ routingPath + "/instant-password" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML">
+							<form hx-post={ routingPath + "/instant-password" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
 								@csrf.Token()
 								<input type="hidden" name="password" value="1"/>
 								@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
 									@field.Label(field.LabelProps{For: "instant-password-on"}) {
 										Password
 									}
-									@switchcomp.Switch(switchcomp.Props{ID: "instant-password-on", Name: "on", Value: "1", DefaultChecked: !view.Instant.Open})
+									@savedSwitch("instant-password-on", !view.Instant.Open)
 								}
 							</form>
 						</div>

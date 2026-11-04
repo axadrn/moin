@@ -53,17 +53,20 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 	toastDone(w, r, database+" restored", "The app runs again. The state before is a snapshot.")
 }
 
-// BackupSettings turns the snapshot before every change on or off. The
-// switch says it; when saving fails, it flips back to what is stored.
+// BackupSettings turns the snapshot before every change on or off and
+// answers the switch as stored, so a failed save flips it back.
 func (h *AppsHandler) BackupSettings(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.SetSnapshotBeforeChanges(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
-	if err == nil {
-		return
+	app, err := h.apps.SetSnapshotBeforeChanges(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
+	if err != nil {
+		stored, getErr := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+		if getErr != nil {
+			failed(w, r, "Setting not saved", err, nil)
+			return
+		}
+		app = stored
+		toastError(w, r, "Setting not saved", errorMessage(err))
 	}
-	toastFailed(w, r, "Setting not saved", errorMessage(err))
-	if app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app")); err == nil {
-		renderOOB(w, r, pages.BackupSettingsForm(*app), "outerHTML:#backup-settings-form")
-	}
+	render(w, r, pages.BackupSettingsForm(*app))
 }
 
 // SetAppBucket moves the app's uploads and new backups to another bucket.

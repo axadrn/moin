@@ -405,7 +405,7 @@ func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 	}
 	for _, check := range reset {
 		_ = s.apps.EndUptimeOutage(check.AppID, check.Domain, now)
-		if err := s.apps.SaveUptimeCheck(check); err != nil {
+		if err := s.apps.SaveUptimeState(check); err != nil {
 			slog.Error("store uptime check failed", "error", err)
 		}
 	}
@@ -528,7 +528,7 @@ func (s *AppService) finishUptime(job uptimeJob, result uptimeResult) {
 	if check.State == before.State {
 		return
 	}
-	err := s.apps.SaveUptimeCheck(check)
+	err := s.apps.SaveUptimeState(check)
 	if err != nil {
 		slog.Error("store uptime state failed", "error", err)
 	}
@@ -793,6 +793,12 @@ func (s *AppService) SetUptimeCheck(actor Actor, idOrName, domain string, path *
 	if check != before {
 		err = s.apps.SaveUptimeCheck(check)
 		if err != nil {
+			// What is not stored does not count: the page and the checks
+			// keep what the database has.
+			u.mu.Lock()
+			state.check.Path, state.check.Paused = before.Path, before.Paused
+			state.path = cmp.Or(before.Path, health)
+			u.mu.Unlock()
 			return nil, UptimeDomain{}, err
 		}
 	}
