@@ -12,7 +12,7 @@ import (
 
 func startDeviceLogin(t *testing.T, environment *apiEnvironment) api.DeviceLogin {
 	t.Helper()
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/device", body: `{"hostname":"laptop"}`})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/device", body: `{"hostname":"host-1"}`})
 	expectStatus(t, recorder, http.StatusOK)
 	return decodeBody[api.DeviceLogin](t, recorder)
 }
@@ -43,7 +43,7 @@ func TestDeviceLoginOverTheAPI(t *testing.T) {
 	recorder := pollDeviceLogin(t, environment, approved.DeviceCode)
 	expectStatus(t, recorder, http.StatusOK)
 	token := decodeBody[api.DeviceToken](t, recorder)
-	if !rawAPITokenPattern.MatchString(token.AccessToken) || token.TokenType != "Bearer" || token.APIToken.Kind != "device" || token.APIToken.Name != "CLI on laptop" {
+	if !rawAPITokenPattern.MatchString(token.AccessToken) || token.TokenType != "Bearer" || token.APIToken.Kind != "device" || token.APIToken.Name != "CLI on host-1" {
 		t.Fatalf("token = %+v", token)
 	}
 	if token.ExpiresIn < 89*24*3600 {

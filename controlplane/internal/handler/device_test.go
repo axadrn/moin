@@ -58,7 +58,7 @@ func deviceCookie(recorder *httptest.ResponseRecorder) *http.Cookie {
 
 func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 	test := newDeviceHandlerTest(t)
-	started, err := test.logins.Start("laptop")
+	started, err := test.logins.Start("host-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 	recorder = httptest.NewRecorder()
 	test.handler.Show(recorder, deviceRequest(http.MethodGet, want, nil, test.owner.User))
 	body := recorder.Body.String()
-	if recorder.Code != http.StatusOK || !strings.Contains(body, "moin CLI on laptop") || !strings.Contains(body, started.UserCode) || !strings.Contains(body, "Approve") {
+	if recorder.Code != http.StatusOK || !strings.Contains(body, "moin CLI on host-1") || !strings.Contains(body, started.UserCode) || !strings.Contains(body, "Approve") {
 		t.Fatalf("signed in: status %d, body %s", recorder.Code, body)
 	}
 	if cookie := deviceCookie(recorder); cookie == nil || cookie.MaxAge >= 0 {
@@ -96,7 +96,7 @@ func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 
 func TestDevicePageApproves(t *testing.T) {
 	test := newDeviceHandlerTest(t)
-	started, err := test.logins.Start("laptop")
+	started, err := test.logins.Start("host-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestDevicePageApproves(t *testing.T) {
 
 func TestDevicePageDenies(t *testing.T) {
 	test := newDeviceHandlerTest(t)
-	started, err := test.logins.Start("laptop")
+	started, err := test.logins.Start("host-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestDevicePageRefusesWrongCodesAndWorkspaces(t *testing.T) {
 		t.Fatalf("no code: status %d, body %s", recorder.Code, recorder.Body.String())
 	}
 
-	started, err := test.logins.Start("laptop")
+	started, err := test.logins.Start("host-1")
 	if err != nil {
 		t.Fatal(err)
 	}
