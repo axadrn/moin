@@ -77,6 +77,7 @@ API: GET /api/v1/account/sessions
 ```surfaces
 Web: `/device`, **Approve** or **Deny**
 CLI: moin login [--url <url>]
+TUI: `moin` without a login shows the code and opens the browser
 API: POST /api/v1/auth/device, then POST /api/v1/auth/device/token
 ```
 
@@ -84,7 +85,7 @@ Without a browser on the machine, over SSH for example, moin prints the address 
 
 Only approve a code you started yourself. Someone who sends you a link to `/device` wants your access.
 
-The login is a token of its own for this computer: read and write, bound to the workspace you picked, named like **CLI on dev-01**, and marked **browser login** under **Settings**, **Tokens**. It ends after 90 days without use; every use starts the 90 days again. Logging in again on the same computer replaces its last login. The TUI uses the same login. The API answers the polls with the codes of RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token` and `invalid_grant`.
+The login is a token of its own for this computer: read and write, bound to the workspace you picked, named like **CLI on dev-01**, and marked **browser login** under **Settings**, **Tokens**. It ends after 90 days without use; every use starts the 90 days again. Logging in again on the same computer replaces its last login. The TUI uses the same login, and without one it starts this login itself: it shows the code, opens the browser and lands on the dashboard. The API answers the polls with the codes of RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token` and `invalid_grant`.
 
 MCP has no login: agents send a personal API token, see [MCP](/docs/guides/mcp).
 
