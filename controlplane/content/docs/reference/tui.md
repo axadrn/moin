@@ -18,7 +18,7 @@ Every view fills the screen. The header says where you are, the footer which key
 - **`?`** shows the keys of the place you are in.
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
 
-A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word.
+A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word. A switch, a paused check or an env var changes on the screen at once; if the control plane refuses it, the footer says why in red and the tab loads what is true again.
 
 ## Views
 

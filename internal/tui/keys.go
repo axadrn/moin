@@ -7,6 +7,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -335,7 +336,11 @@ func (m model) appKey(s string) (tea.Model, tea.Cmd) {
 			return m.openRestore(), nil
 		case "a":
 			if m.app.backups != nil {
-				return m, m.setSnapshots(a.Name, !m.app.backups.SnapshotBeforeChanges)
+				// it flips at once; a refusal loads the truth again
+				b := *m.app.backups
+				b.SnapshotBeforeChanges = !b.SnapshotBeforeChanges
+				m.app.backups = &b
+				return m, m.setSnapshots(a.Name, b.SnapshotBeforeChanges)
 			}
 		}
 	case tEnv:
@@ -359,12 +364,28 @@ func (m model) appKey(s string) (tea.Model, tea.Cmd) {
 					m.fail(fmt.Errorf("type KEY=value"))
 					return m, nil
 				}
+				env := maps.Clone(m.app.env)
+				if env == nil {
+					env = map[string]string{}
+				}
+				env[key] = val
+				m.app.env = env
 				return m, m.setEnv(m.cur.app, map[string]string{key: val}, nil)
 			}), nil
 		case "x":
 			if len(keys) > 0 {
 				k := keys[m.at("env", len(keys))]
-				return m.ask1("Remove "+k+" from "+a.Name+"?", "The next deploy runs without it.", "remove", true, m.setEnv(a.Name, nil, []string{k})), nil
+				return m.ask1("Remove "+k+" from "+a.Name+"?", "The next deploy runs without it.", "remove", true, func() tea.Msg {
+					return optimisticMsg{do: func(m model) model {
+						if m.app.name != a.Name {
+							return m
+						}
+						env := maps.Clone(m.app.env)
+						delete(env, k)
+						m.app.env = env
+						return m
+					}, cmd: m.setEnv(a.Name, nil, []string{k})}
+				}), nil
 			}
 		case "E":
 			return m, m.editEnv(a.Name)
@@ -444,6 +465,10 @@ func (m model) appKey(s string) (tea.Model, tea.Cmd) {
 		switch s {
 		case "p":
 			paused := !ud.Paused
+			up := *m.app.uptime
+			up.Domains = slices.Clone(up.Domains)
+			up.Domains[m.at("uptime", len(doms))].Paused = paused
+			m.app.uptime = &up
 			return m, m.setUptime(a.Name, ud.Domain, nil, &paused)
 		case "c":
 			return m.input("Check path of "+ud.Domain, "like /health · empty goes back to the default", ud.Path, func(m model, v string) (model, tea.Cmd) {

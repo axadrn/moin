@@ -295,6 +295,15 @@ type (
 	}
 	noticeMsg string
 	errMsg    struct{ err error }
+	// undoMsg is a change the view showed at once that the control plane
+	// refused: it says why and loads the truth again.
+	undoMsg struct{ err error }
+	// optimisticMsg shows a change at once, then sends it; the remove of
+	// an env var after its question.
+	optimisticMsg struct {
+		do  func(m model) model
+		cmd tea.Cmd
+	}
 	// reloadMsg loads the open tab again after a change.
 	reloadMsg  struct{ notice string }
 	stoppedMsg string
@@ -556,6 +565,11 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.say(string(msg))
 	case errMsg:
 		m.fail(msg.err)
+	case undoMsg:
+		m.fail(msg.err)
+		return m, m.openTab()
+	case optimisticMsg:
+		return msg.do(m), msg.cmd
 	case editMsg:
 		return m, m.openEditor(msg)
 	case editedMsg:
