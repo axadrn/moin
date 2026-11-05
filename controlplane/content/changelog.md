@@ -3,6 +3,35 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.25
+
+November 5, 2026
+
+**In short:** a new terminal UI, `moin login` through the browser and a new home page: the fastest way to run your apps, from any screen.
+
+### New
+- **A new terminal UI**: `moin` opens a dashboard of your apps and servers, `space` shows everything you can do, `space space` searches apps, servers and actions, `esc` goes back.
+- **Instant start**: the terminal UI shows your last view at once and refreshes behind it; switches and env changes show before the server answers.
+- **Log in through the browser**: `moin login` and the terminal UI show a code, you approve it in the browser with GitHub, an email link or your password, done. No token to copy.
+- **Your computers under Tokens**: each browser login shows as "CLI on <computer name>", ends after 90 days without use, and you can sign it out one by one.
+- **Where things work**: a docs page lists every feature for web, CLI, terminal UI, API and MCP, with the reason where one is missing.
+- **A new home page**: one calm screen with a wall of app containers, then everything moin does in tabs, live in two minutes, security, backups, four ways in and a comparison.
+- **Built in the open**: the home page shows how often moin ships, read from the changelog.
+
+### Changed
+- **One promise everywhere**: Deploy anything. Lose nothing. Your apps on your servers. Every change backed up. Every restore tested. Home, sign-in, docs, CLI and catalog say the same.
+- **Deploy now**: the main button says Deploy now everywhere, instead of Get started or Start free.
+- **Calmer navbar**: on a phone only the logo and the menu; Apps has no New badge; GitHub stars show from 1,000 on.
+- **Comparison in black and white**: color only means status now.
+- **`moin login` in a terminal**: it always goes through the browser; pass a token with `--token`, on stdin or as `MOIN_TOKEN`.
+- **Setup in the web**: the terminal UI covers daily work; team, billing, adding servers, GitHub, the catalog and SQL open the right page in the browser.
+
+### Fixed
+- **http on your tailnet**: the CLI connects over plain http to short tailnet names like your server's name, not only to IP addresses.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
+
 ## v1.0.0-beta.24
 
 November 5, 2026
