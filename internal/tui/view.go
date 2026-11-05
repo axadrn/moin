@@ -125,6 +125,8 @@ func (m model) header(u ui) []string {
 	switch {
 	case m.offline != nil:
 		conn = u.bad(dot + " reconnecting")
+	case !m.loaded && m.cached:
+		conn = u.warn(spinner[m.frame%len(spinner)]) + " " + u.muted("last seen · connecting")
 	case !m.loaded:
 		conn = u.warn(spinner[m.frame%len(spinner)]) + " " + u.muted("connecting")
 	}

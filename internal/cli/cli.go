@@ -31,7 +31,7 @@ Usage
 
 Account
   login              Log in through the browser: login [--url <url>]; --token <token> or the token on stdin for CI
-  logout             Forget the token on this machine
+  logout             Forget the token and what the TUI kept on this machine
   status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
   activity           Who deployed, restored or changed what: activity [--limit 30]
   alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]; also lists the destinations
@@ -246,6 +246,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		err := client.RemoveConfig()
 		if err != nil {
+			return err
+		}
+		if err := tui.ForgetCache(); err != nil {
 			return err
 		}
 		done(stdout, "Logged out")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -384,6 +385,61 @@ func TestOpeningAnotherAppDropsTheOldData(t *testing.T) {
 	m, _ = update(m, envMsg{"shop", map[string]string{"A": "1"}})
 	if m.app.env != nil {
 		t.Fatal("a late answer for shop does not show in blog")
+	}
+}
+
+func TestComingBackToAnAppShowsItsDataAtOnce(t *testing.T) {
+	m := fixture(120, 40).withApp("shop", tEnv)
+	m, _ = m.openApp("blog", tEnv)
+	m, _ = m.back()
+	if m.app.name != "shop" || m.app.env["STRIPE_KEY"] == "" || m.app.detail == nil {
+		t.Fatal("shop shows what it showed when you left it")
+	}
+	if m.shown {
+		t.Error("the values are hidden again")
+	}
+}
+
+func TestTheCacheShowsTheLastStateAtStart(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	m := fixture(120, 40).remember("shop logs")
+	m.cacheID = cacheKey(m.url, "pat_test")
+	if err := m.saveCache(); err != nil {
+		t.Fatal(err)
+	}
+	path, _ := cachePath(m.cacheID)
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("the cache is readable only by you: %v %v", info.Mode(), err)
+	}
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "pat_test") || strings.Contains(string(data), "sk_live") {
+		t.Error("the cache holds no token and no env values")
+	}
+
+	next := newModel(context.Background(), Options{Config: client.Config{URL: m.url, Token: "pat_test"}})
+	next.auth, next.cacheID, next.now = nil, m.cacheID, m.now
+	next = next.restoreCache()
+	if len(next.apps) != len(m.apps) || len(next.servers) != len(m.servers) || next.ws.name != "acme" || next.recent[0] != "shop logs" {
+		t.Fatalf("the next start shows the last state: %d apps, %d servers, %q", len(next.apps), len(next.servers), next.ws.name)
+	}
+	if !next.cached || next.loaded || next.live {
+		t.Fatal("the last state is marked as cached until the control plane answers")
+	}
+	frame := checkFrame(t, "cached", next)
+	if !strings.Contains(frame, "last seen") || !strings.Contains(frame, "Checking everything") || !strings.Contains(frame, "shop") {
+		t.Errorf("a cached start says so and does not claim all is well:\n%s", frame)
+	}
+	next, _ = update(next, appsMsg(m.apps))
+	if next.cached || !next.loaded {
+		t.Error("the live list replaces the cache")
+	}
+
+	other := next
+	other.cacheID = cacheKey(m.url, "pat_other")
+	other.apps = nil
+	if other = other.restoreCache(); other.apps != nil {
+		t.Error("another login does not see the cache of this one")
 	}
 }
 

@@ -45,9 +45,12 @@ func Run(ctx context.Context, opts Options) error {
 		if err != nil {
 			return err
 		}
-		m = m.connect(api)
+		m = m.connect(api, cacheKey(opts.Config.URL, opts.Config.Token)).restoreCache()
 	}
-	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
+	final, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
+	if last, ok := final.(model); ok {
+		_ = last.saveCache() // a cache that cannot be written only costs the next start a moment
+	}
 	if ctx.Err() != nil {
 		return nil
 	}
@@ -163,12 +166,16 @@ type model struct {
 	frame int
 	now   func() time.Time
 
-	auth *auth // the sign-in view; nil once signed in
+	auth    *auth  // the sign-in view; nil once signed in
+	cacheID string // names the cache of this control plane and login
 
 	ws        workspace
 	apps      []client.App
 	servers   []client.Server
 	loaded    bool // the first app list came
+	cached    bool // what shows came from the cache of the last run
+	live      bool // the status came from the control plane, not the cache
+	wsLive    bool // the workspace came from the control plane
 	status    *client.Status
 	events    []client.Event
 	eventsEnd string
@@ -182,6 +189,7 @@ type model struct {
 	focus int // the dashboard panel with the cursor
 
 	app      appData
+	seen     map[string]appData // what other apps showed when you left them
 	srv      *client.ServerMetrics
 	out      stream
 	nextID   int64
@@ -211,15 +219,15 @@ func newModel(ctx context.Context, opts Options) model {
 	return model{
 		ctx: ctx, url: opts.Config.URL, dir: opts.Dir, login: opts.Login,
 		hub: make(chan tea.Msg, 256), w: 100, h: 30, pal: dark, now: time.Now,
-		cur: screen{v: vDash}, sel: map[string]int{}, cpu: map[string][]float64{}, usage: map[string]*client.ServerMetricsNow{},
+		cur: screen{v: vDash}, sel: map[string]int{}, seen: map[string]appData{}, cpu: map[string][]float64{}, usage: map[string]*client.ServerMetricsNow{},
 		auth: &auth{},
 	}
 }
 
-// connect is the model signed in with api.
-func (m model) connect(api *client.Client) model {
+// connect is the model signed in with api; key names its cache.
+func (m model) connect(api *client.Client, key string) model {
 	api.UseSurface("tui")
-	m.api = api
+	m.api, m.cacheID = api, key
 	m.auth = nil
 	return m
 }
@@ -416,13 +424,13 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.servers, m.offline = msg, nil
 	case appsMsg:
 		first, back := !m.loaded, m.offline != nil
-		m.apps, m.loaded, m.offline = msg, true, nil
+		m.apps, m.loaded, m.offline, m.cached = msg, true, nil, false
 		cmds := []tea.Cmd{}
 		if first {
 			cmds = append(cmds, m.loadUsage()...)
 		}
 		// after a start or a break, what loaded once may have failed
-		if m.ws.slug == "" || back {
+		if !m.wsLive || back {
 			cmds = append(cmds, m.loadWorkspace(), m.loadStatus(), m.loadEvents(""))
 		}
 		if back && len(m.app.errs) > 0 {
@@ -433,9 +441,9 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.offline = msg.err
 	case statusMsg:
 		s := client.Status(msg)
-		m.status = &s
+		m.status, m.live = &s, true
 	case workspaceMsg:
-		m.ws = workspace(msg)
+		m.ws, m.wsLive = workspace(msg), true
 	case eventsMsg:
 		if msg.older {
 			m.events = append(m.events, msg.page.Items...)
@@ -568,7 +576,16 @@ func (m model) open(s screen) (model, tea.Cmd) {
 // show makes s the current screen and loads what it needs.
 func (m model) show(s screen) (model, tea.Cmd) {
 	if s.app != "" && s.app != m.app.name {
+		// an app you come back to shows what it showed at once, and loads
+		// again behind it
+		if m.app.name != "" {
+			m.seen[m.app.name] = m.app
+		}
 		m.app = appData{name: s.app}
+		if seen, ok := m.seen[s.app]; ok {
+			seen.errs = nil // they load again
+			m.app = seen
+		}
 		m.logs = scroll{}
 		m.shown = false
 	}

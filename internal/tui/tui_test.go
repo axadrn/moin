@@ -26,7 +26,7 @@ func fixture(w, h int) model {
 	m.auth = nil
 	m.now = func() time.Time { return now }
 	m.w, m.h = w, h
-	m.loaded = true
+	m.loaded, m.live, m.wsLive = true, true, true
 	m.ws = workspace{slug: "acme", name: "acme", email: "ada@example.com", user: "Ada Lovelace", version: "v1.0.0"}
 	m.servers = []client.Server{
 		{ID: "s1", Name: "web-1", Online: true, OS: "linux", Arch: "arm64", Hostname: "web-1", AgentVersion: "v1.0.0", LastSeenAt: ago2(time.Second),

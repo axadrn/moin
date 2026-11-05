@@ -25,6 +25,7 @@ type (
 	// token.
 	signedInMsg struct {
 		api *client.Client
+		key string
 		err error
 	}
 )
@@ -48,7 +49,7 @@ func (m model) startLogin() tea.Cmd {
 			return
 		}
 		api, err := client.New(config)
-		m.send(signedInMsg{api: api, err: err})
+		m.send(signedInMsg{api: api, key: cacheKey(config.URL, config.Token), err: err})
 	}()
 	return nil
 }
@@ -69,7 +70,7 @@ func (m model) authUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.auth = &a
 			return m, nil
 		}
-		m = m.connect(msg.api)
+		m = m.connect(msg.api, msg.key)
 		return m, m.start()
 	}
 	return m, nil
