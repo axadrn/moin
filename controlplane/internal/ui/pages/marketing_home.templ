@@ -95,31 +95,34 @@ func homeStartLabel(ctx context.Context) string {
 
 
 // ---------------------------------------------------------------- hero
-// HomeHero is the promise in two lines, one line under it, two buttons,
-// and the product below. Nothing else.
+// HomeHero is the whole first screen, up behind the floating navbar: the
+// promise and the buttons centered on top, and a wall of containers across
+// the full width below, every container an app. The product follows below.
 templ HomeHero() {
-	<section class="pt-20 sm:pt-32">
-		<div class={ homeWrap, "flex flex-col items-center text-center" }>
-			<h1 class="text-[clamp(3rem,8.5vw,6.75rem)] leading-[0.98] font-semibold tracking-[-0.055em]">
+	<section class="-mt-[4.25rem] flex min-h-svh flex-col overflow-hidden sm:-mt-[4.75rem]">
+		<div class={ homeWrap, "flex flex-1 flex-col items-center justify-center pt-28 pb-10 text-center sm:pt-32" }>
+			<h1 class="font-display text-[clamp(3rem,6.5vw,6rem)] leading-[0.92] tracking-[-0.06em] text-balance">
 				<span class="block">Deploy anything.</span>
 				<span class="block text-muted-foreground/60">Lose nothing.</span>
 			</h1>
-			<p class="mt-8 text-xl text-muted-foreground sm:mt-10 sm:text-2xl">Any app. Any server.</p>
-			<p class="mt-3 text-base text-muted-foreground/70">Every SQLite and Postgres change backed up, checked every day.</p>
-			<div class="mt-10 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
+			<p class="mt-6 max-w-[40ch] text-lg leading-8 text-muted-foreground sm:text-xl">Every app in its own container. On a server you own.</p>
+			<div class="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
 				@homePrimary()
 				@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
 					Read the docs
 				}
 			</div>
-			<p class="mt-6 text-sm text-muted-foreground/70">
-				<span class="font-semibold text-muted-foreground">moin</span> /mɔɪn/ · hello, the Hamburg way.
-				<a href="#why-moin" class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Read the story →</a>
-			</p>
 		</div>
-		<div class={ homeWrap, "mt-20 sm:mt-28" }>
-			@homeStage()
+		<div class="h-[38svh] w-full shrink-0 sm:h-[44svh]">
+			@homeHarbor()
 		</div>
+	</section>
+	<section class={ homeWrap, "mt-20 sm:mt-28" }>
+		<p class="mb-10 text-center text-sm text-muted-foreground/70">
+			<span class="font-semibold text-muted-foreground">moin</span> /mɔɪn/ · hello, the Hamburg way.
+			<a href="#why-moin" class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Read the story →</a>
+		</p>
+		@homeStage()
 		@stageScript()
 	</section>
 }
