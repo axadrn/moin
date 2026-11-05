@@ -4,7 +4,7 @@ description: "Every view and key of moin without a command"
 order: 2
 ---
 
-Run `moin` in a repo. The terminal UI is for the daily work: see what runs, deploy, read the logs, roll back, back up and restore, change env vars, check domains, uptime and metrics, run a command. Everything updates live. Setup you do once, like billing, the team or a new server, opens the web app in your browser. [Where things work](/docs/reference/surfaces) lists what each place can do.
+Run `moin` in a repo. The terminal UI is for the daily work: see what runs, deploy, read the logs, roll back, back up and restore, change env vars, check domains, uptime and metrics, run a command. Everything updates live, and nothing waits for a spinner: `moin` starts with what it showed last time, marked **last seen** in the header until the control plane answers a moment later, and an app you come back to shows its tabs at once while they load again. It keeps that in your cache folder, readable only by you, without env values, logs or the token; `moin logout` removes it. Setup you do once, like billing, the team or a new server, opens the web app in your browser. [Where things work](/docs/reference/surfaces) lists what each place can do.
 
 Without a token, `moin` signs you in first: it shows a code, opens the browser to confirm it and lands on the dashboard. It saves the token where `moin login` does, so you sign in once for both. `esc` quits the sign-in.
 

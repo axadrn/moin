@@ -10,7 +10,7 @@ Every command of `moin`. [Where things work](/docs/reference/surfaces) shows wha
 | --- | --- |
 | `moin` | opens the terminal UI |
 | `moin login [--url <url>] [--web] [--token <token>]` | logs this computer in through the browser: prints a code, opens `/device` and waits until you approve it there; without a browser, open the printed address on any device. `--web` does it without a terminal too. For CI and scripts, `--token` or a token on stdin (`echo "$TOKEN" \| moin login`) skips the browser. `--url` defaults to the saved control plane, else `https://moin.run`. It must be https; plain http works only for localhost and your tailnet (`100.x` addresses, `*.ts.net`). See [Log in the CLI](/docs/guides/account#log-in-the-cli) |
-| `moin logout` | forgets it |
+| `moin logout` | forgets it, and what the terminal UI kept for its next start |
 | `moin alerts [on\|off]` | shows or sets whether you get a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in the workspaces you own or run as admin; on by default. See [Alerts](/docs/guides/alerts) |
 | `moin alerts add slack\|discord\|telegram\|webhook <name> [--chat <id>] [--events <events>]` | sends alerts to Slack, Discord, Telegram or a webhook too; the URL, or the bot token for Telegram, comes on stdin, `--chat` is the Telegram chat, `--events` a comma list like `uptime.down,deploy.failed` (default all). A webhook prints its signing secret once. `moin alerts` lists the destinations. Owners and admins. See [Alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) |
 | `moin alerts test <name>` | sends a test alert to a destination |

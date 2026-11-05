@@ -105,7 +105,9 @@ func (m model) firstName() string {
 
 // verdict is the one line under the greeting: all good, or what needs you.
 func (m model) verdict(u ui, w int) string {
-	if m.status == nil {
+	// the cache of the last run shows what ran, but not whether it is
+	// fine now
+	if m.status == nil || !m.live {
 		return u.faint(spinner[m.frame%len(spinner)]+" ") + u.muted("Checking everything …")
 	}
 	is := m.issues()
