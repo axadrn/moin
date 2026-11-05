@@ -29,14 +29,14 @@ func fixture(w, h int) model {
 	m.loaded = true
 	m.ws = workspace{slug: "acme", name: "acme", email: "ada@example.com", user: "Ada Lovelace", version: "v1.0.0"}
 	m.servers = []client.Server{
-		{ID: "s1", Name: "prod-01", Online: true, OS: "linux", Arch: "arm64", Hostname: "prod-01", AgentVersion: "v1.0.0", LastSeenAt: ago2(time.Second),
+		{ID: "s1", Name: "web-1", Online: true, OS: "linux", Arch: "arm64", Hostname: "web-1", AgentVersion: "v1.0.0", LastSeenAt: ago2(time.Second),
 			Security: &protocol.ServerConfigResult{Proxy: "traefik", Firewall: true, OpenPorts: []string{"80", "443"}}},
 		{ID: "s2", Name: "edge-02", Online: true, OS: "linux", Arch: "amd64", AgentVersion: "v0.9.8", LastSeenAt: ago2(time.Second)},
 		{ID: "s3", Name: "lab", Online: false, OS: "linux", Arch: "amd64", AgentVersion: "v1.0.0", LastSeenAt: ago2(3 * time.Hour)},
 	}
 	m.apps = []client.App{
-		{Name: "shop", ServerName: "prod-01", LatestNumber: 43, LatestStatus: "succeeded", LiveNumber: 43, Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Repo: "acme/shop", Branch: "main"},
-		{Name: "blog", ServerName: "prod-01", LatestNumber: 12, LatestStatus: "running", LiveNumber: 11, Domains: []string{"blog.example.com"}},
+		{Name: "shop", ServerName: "web-1", LatestNumber: 43, LatestStatus: "succeeded", LiveNumber: 43, Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Repo: "acme/shop", Branch: "main"},
+		{Name: "blog", ServerName: "web-1", LatestNumber: 12, LatestStatus: "running", LiveNumber: 11, Domains: []string{"blog.example.com"}},
 		{Name: "api", ServerName: "edge-02", LatestNumber: 7, LatestStatus: "failed", LiveNumber: 6, Domains: []string{"api.example.com"}},
 		{Name: "plausible", ServerName: "edge-02", LatestNumber: 3, LatestStatus: "succeeded", LiveNumber: 3, Catalog: "plausible", Instant: "https://plausible-acme.moin.app"},
 		{Name: "notes", ServerName: "lab", LatestNumber: 0},
@@ -49,10 +49,10 @@ func fixture(w, h int) model {
 	m.events = []client.Event{
 		{Actor: "ada@example.com", Summary: "deployed shop v43", Via: "cli", App: "shop", CreatedAt: now.Add(-2 * time.Minute)},
 		{Actor: "grace@example.com", Summary: "set 2 env vars of blog", Via: "web", App: "blog", CreatedAt: now.Add(-40 * time.Minute)},
-		{Actor: "ada@example.com", Summary: "updated the agent on prod-01", Via: "tui", Server: "prod-01", CreatedAt: now.Add(-3 * time.Hour)},
+		{Actor: "ada@example.com", Summary: "updated the agent on web-1", Via: "tui", Server: "web-1", CreatedAt: now.Add(-3 * time.Hour)},
 	}
-	m.usage["prod-01"] = &client.ServerMetricsNow{CPU: 12, MemoryUsed: 3 << 30, MemoryTotal: 8 << 30}
-	m.cpu["prod-01"] = []float64{5, 8, 12, 30, 22, 9, 12}
+	m.usage["web-1"] = &client.ServerMetricsNow{CPU: 12, MemoryUsed: 3 << 30, MemoryTotal: 8 << 30}
+	m.cpu["web-1"] = []float64{5, 8, 12, 30, 22, 9, 12}
 	return m
 }
 
@@ -72,11 +72,11 @@ func (m model) withApp(name string, t tab) model {
 	m.app.env = map[string]string{"DATABASE_URL": "postgres://x", "STRIPE_KEY": "sk_live_secret", "DEBUG": ""}
 	m.app.domains = []client.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}, {Domain: "www.shop.example.com", Points: false, Advice: "add an A record to 203.0.113.7"}}
 	m.app.instant = &client.Instant{URL: "https://shop-acme.moin.app"}
-	m.app.uptime = &client.Uptime{App: name, State: "up", Server: "prod-01", ServerOnline: true, Domains: []client.UptimeDomain{
+	m.app.uptime = &client.Uptime{App: name, State: "up", Server: "web-1", ServerOnline: true, Domains: []client.UptimeDomain{
 		{Domain: "shop.example.com", Path: "/", State: "up", CheckedAt: ago2(time.Minute), StatusCode: 200, ResponseMS: 41, Uptime24h: pct(100), Uptime7d: pct(99.98), Uptime30d: pct(99.9),
 			Outages: []client.Outage{{StartedAt: now.Add(-50 * time.Hour), EndedAt: ago2(50*time.Hour - 3*time.Minute), Reason: "502 Bad Gateway"}}},
 	}}
-	m.app.metrics = &client.AppMetrics{App: name, Server: "prod-01", ServerOnline: true, Now: &client.AppMetricsNow{At: now, CPU: 3.2, MemoryUsed: 180 << 20, MemoryLimit: 512 << 20, NetRx: 2048, NetTx: 9000, Containers: 2},
+	m.app.metrics = &client.AppMetrics{App: name, Server: "web-1", ServerOnline: true, Now: &client.AppMetricsNow{At: now, CPU: 3.2, MemoryUsed: 180 << 20, MemoryLimit: 512 << 20, NetRx: 2048, NetTx: 9000, Containers: 2},
 		Points: []client.MetricsPoint{{CPU: 1}, {CPU: 4}, {CPU: 2}, {CPU: 8}}}
 	return m
 }

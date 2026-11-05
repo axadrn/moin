@@ -132,7 +132,7 @@ func (s *APITokenService) CreateForDevice(userID, workspaceID, hostname string, 
 	return token, raw, nil
 }
 
-// DeviceTokenName names the token of a computer: "CLI on dev-01".
+// DeviceTokenName names the token of a computer: "CLI on laptop".
 func DeviceTokenName(hostname string) string {
 	hostname = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {

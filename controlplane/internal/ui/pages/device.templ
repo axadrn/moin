@@ -32,7 +32,7 @@ type DeviceView struct {
 	WorkspaceError string
 }
 
-// deviceName is how the page names the computer: "moin CLI on dev-01".
+// deviceName is how the page names the computer: "moin CLI on laptop".
 func deviceName(login *model.DeviceLogin) string {
 	if login == nil || login.Hostname == "" {
 		return brand.Name + " CLI"

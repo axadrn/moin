@@ -416,7 +416,7 @@ paths:
       description: |
         Answers the token once the user approved the login, exactly once. The token is a
         personal API token of the kind `device`, read and write, bound to the workspace the
-        user picked, named after the computer ("CLI on dev-01"). It expires 90 days after its
+        user picked, named after the computer ("CLI on laptop"). It expires 90 days after its
         last use; each use extends it. It shows under Settings, Tokens and is revoked there.
         Until then the answer is 400 with a code of RFC 8628, section 3.5:
         `authorization_pending` (poll again after `interval`), `slow_down` (add 5 seconds to

@@ -40,7 +40,7 @@ func newDeviceLoginEnvironment(t *testing.T) deviceLoginEnvironment {
 
 func (e deviceLoginEnvironment) start(t *testing.T) StartedDeviceLogin {
 	t.Helper()
-	started, err := e.logins.Start("dev-01")
+	started, err := e.logins.Start("laptop")
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -70,7 +70,7 @@ func TestDeviceLoginGivesTheTokenOnceAfterApproval(t *testing.T) {
 
 	// The user types the code in any case, with or without the dash.
 	pending, err := e.logins.Pending(strings.ToLower(strings.ReplaceAll(started.UserCode, "-", "")))
-	if err != nil || pending.Hostname != "dev-01" {
+	if err != nil || pending.Hostname != "laptop" {
 		t.Fatalf("Pending() = %+v, %v", pending, err)
 	}
 	_, err = e.logins.Approve(e.user.User.ID, started.UserCode, e.user.Workspace.ID)
@@ -85,7 +85,7 @@ func TestDeviceLoginGivesTheTokenOnceAfterApproval(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll after approval error = %v", err)
 	}
-	if !strings.HasPrefix(raw, APITokenMarker) || token.Name != "CLI on dev-01" || !token.IsDevice() || !token.CanWrite() || token.WorkspaceID != e.user.Workspace.ID {
+	if !strings.HasPrefix(raw, APITokenMarker) || token.Name != "CLI on laptop" || !token.IsDevice() || !token.CanWrite() || token.WorkspaceID != e.user.Workspace.ID {
 		t.Fatalf("token = %+v, raw %q", token, raw)
 	}
 	if token.ExpiresAt == nil || !token.ExpiresAt.Equal(e.clock.now.Add(model.DeviceTokenIdle)) {
@@ -188,7 +188,7 @@ func TestDeviceLoginRefusesWrongCodes(t *testing.T) {
 
 func TestDeviceTokenUseExtendsItsExpiry(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)
-	_, raw, err := e.tokens.CreateForDevice(e.user.User.ID, e.user.Workspace.ID, "dev-01", Source{Via: ViaCLI})
+	_, raw, err := e.tokens.CreateForDevice(e.user.User.ID, e.user.Workspace.ID, "laptop", Source{Via: ViaCLI})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestDeviceTokenUseExtendsItsExpiry(t *testing.T) {
 
 func TestRevokedDeviceTokenIsRejected(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)
-	token, raw, err := e.tokens.CreateForDevice(e.user.User.ID, e.user.Workspace.ID, "dev-01", Source{Via: ViaCLI})
+	token, raw, err := e.tokens.CreateForDevice(e.user.User.ID, e.user.Workspace.ID, "laptop", Source{Via: ViaCLI})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestRevokedDeviceTokenIsRejected(t *testing.T) {
 
 func TestDeviceTokenName(t *testing.T) {
 	for hostname, want := range map[string]string{
-		"dev-01":                 "CLI on dev-01",
+		"laptop":                 "CLI on laptop",
 		"  ":                     "CLI",
 		"bad\x00\nhost":          "CLI on badhost",
 		strings.Repeat("a", 100): "CLI on " + strings.Repeat("a", 57),
@@ -263,7 +263,7 @@ func TestDeviceLoginReplacesTheComputersLastLogin(t *testing.T) {
 		return token, raw
 	}
 	_, firstRaw := login()
-	personal, personalRaw, err := e.tokens.Create(e.user.User.ID, CreateAPITokenInput{Name: "CLI on dev-01", WorkspaceID: e.user.Workspace.ID})
+	personal, personalRaw, err := e.tokens.Create(e.user.User.ID, CreateAPITokenInput{Name: "CLI on laptop", WorkspaceID: e.user.Workspace.ID})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
