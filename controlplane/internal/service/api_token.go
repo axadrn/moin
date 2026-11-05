@@ -80,11 +80,65 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 	if input.ExpiresInDays < 0 || input.ExpiresInDays > MaxAPITokenExpiryDays {
 		return nil, "", ErrAPITokenExpiry
 	}
-	err = s.requireMembership(userID, input.WorkspaceID)
+	now := s.now().UTC()
+	token := &model.APIToken{
+		UserID:      userID,
+		WorkspaceID: input.WorkspaceID,
+		Name:        name,
+		Scopes:      scopes,
+		Kind:        model.APITokenKindPersonal,
+		CreatedAt:   now,
+	}
+	if input.ExpiresInDays > 0 {
+		expiresAt := now.Add(time.Duration(input.ExpiresInDays) * 24 * time.Hour)
+		token.ExpiresAt = &expiresAt
+	}
+	return s.issue(token, input.Source)
+}
+
+// CreateForDevice stores the token of a computer that signed in with
+// `moin login` in the browser: read and write, named after the computer, and
+// expiring DeviceTokenIdle after its last use.
+func (s *APITokenService) CreateForDevice(userID, workspaceID, hostname string, source Source) (*model.APIToken, string, error) {
+	now := s.now().UTC()
+	expiresAt := now.Add(model.DeviceTokenIdle)
+	return s.issue(&model.APIToken{
+		CreatedAt:   now,
+		UserID:      userID,
+		WorkspaceID: workspaceID,
+		Name:        DeviceTokenName(hostname),
+		Scopes:      model.APITokenScopeRead + "," + model.APITokenScopeWrite,
+		Kind:        model.APITokenKindDevice,
+		ExpiresAt:   &expiresAt,
+	}, source)
+}
+
+// DeviceTokenName names the token of a computer: "CLI on dev-01".
+func DeviceTokenName(hostname string) string {
+	hostname = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(hostname))
+	if hostname == "" {
+		return "CLI"
+	}
+	name := "CLI on " + hostname
+	if runes := []rune(name); len(runes) > maxAPITokenNameLength {
+		name = string(runes[:maxAPITokenNameLength])
+	}
+	return strings.TrimSpace(name)
+}
+
+// issue checks the workspace and the limit, makes the raw token and stores
+// the token, which comes with everything but its ID, hash and prefix.
+func (s *APITokenService) issue(token *model.APIToken, source Source) (*model.APIToken, string, error) {
+	err := s.requireMembership(token.UserID, token.WorkspaceID)
 	if err != nil {
 		return nil, "", err
 	}
-	count, err := s.tokens.CountByUserID(userID)
+	count, err := s.tokens.CountByUserID(token.UserID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -99,21 +153,9 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 	}
 	body := strings.ToLower(apiTokenEncoding.EncodeToString(secret))
 	raw := APITokenMarker + body
-	now := s.now().UTC()
-	token := &model.APIToken{
-		ID:          uuid.New().String(),
-		UserID:      userID,
-		WorkspaceID: input.WorkspaceID,
-		Name:        name,
-		TokenHash:   hashToken(raw),
-		Prefix:      body[:apiTokenPrefixLength],
-		Scopes:      scopes,
-		CreatedAt:   now,
-	}
-	if input.ExpiresInDays > 0 {
-		expiresAt := now.Add(time.Duration(input.ExpiresInDays) * 24 * time.Hour)
-		token.ExpiresAt = &expiresAt
-	}
+	token.ID = uuid.New().String()
+	token.TokenHash = hashToken(raw)
+	token.Prefix = body[:apiTokenPrefixLength]
 	err = s.tokens.Create(token)
 	if err != nil {
 		return nil, "", err
@@ -122,7 +164,11 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 	if token.ExpiresAt != nil {
 		expires = token.ExpiresAt.Format(time.RFC3339)
 	}
-	s.record(userID, input.Source, "api_token.created", *token, map[string]string{"scopes": token.Scopes, "expires": expires, "prefix": token.Prefix})
+	details := map[string]string{"scopes": token.Scopes, "expires": expires, "prefix": token.Prefix}
+	if token.IsDevice() {
+		details["kind"] = token.Kind
+	}
+	s.record(token.UserID, source, "api_token.created", *token, details)
 	return token, raw, nil
 }
 
@@ -196,17 +242,26 @@ func (s *APITokenService) Authenticate(raw string) (*model.APIToken, error) {
 }
 
 // TouchLastUsed records a use of the token, at most once per minute so busy
-// clients do not write on every request.
+// clients do not write on every request. A device token lives
+// DeviceTokenIdle from this use on.
 func (s *APITokenService) TouchLastUsed(token *model.APIToken, now time.Time) {
 	if token.LastUsedAt != nil && now.Sub(*token.LastUsedAt) < apiTokenTouchInterval {
 		return
 	}
-	err := s.tokens.TouchLastUsed(token.ID, now)
+	var expiresAt *time.Time
+	if token.IsDevice() {
+		slid := now.Add(model.DeviceTokenIdle)
+		expiresAt = &slid
+	}
+	err := s.tokens.TouchLastUsed(token.ID, now, expiresAt)
 	if err != nil {
 		slog.Warn("failed to record api token use", "error", err, "token_id", token.ID)
 		return
 	}
 	token.LastUsedAt = &now
+	if expiresAt != nil {
+		token.ExpiresAt = expiresAt
+	}
 }
 
 func (s *APITokenService) requireMembership(userID, workspaceID string) error {

@@ -377,6 +377,9 @@ func (e WorkspaceAuditEvent) Summary() string {
 	case "github.disconnected":
 		return "uninstalled the moin GitHub App from " + target
 	case "api_token.created":
+		if d["kind"] == APITokenKindDevice {
+			return "logged in " + d["name"] + " from the browser, with read and write access"
+		}
 		return "created the API token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
 	case "api_token.revoked":
 		return "revoked the API token " + d["name"]

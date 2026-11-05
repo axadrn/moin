@@ -45,16 +45,26 @@ func RequestSource(ctx context.Context) Source {
 	source := Source{Via: ViaWeb, IP: client.IP, UserAgent: client.UserAgent}
 	if token := ctxkeys.APIToken(ctx); token != nil {
 		source.Token = token.Name
-		switch {
-		case strings.HasPrefix(client.UserAgent, build.Name+"-cli/"):
-			source.Via = ViaCLI
-		case strings.HasPrefix(client.UserAgent, build.Name+"-tui/"):
-			source.Via = ViaTUI
-		default:
-			source.Via = ViaAPI
-		}
+		source.Via = viaOf(client.UserAgent)
 	}
 	return source
+}
+
+// ClientSource is how a request without a session came in: the CLI and the
+// TUI name themselves in the user agent, everything else is the API.
+func ClientSource(ctx context.Context) Source {
+	client := ctxkeys.ClientOf(ctx)
+	return Source{Via: viaOf(client.UserAgent), IP: client.IP, UserAgent: client.UserAgent}
+}
+
+func viaOf(userAgent string) string {
+	switch {
+	case strings.HasPrefix(userAgent, build.Name+"-cli/"):
+		return ViaCLI
+	case strings.HasPrefix(userAgent, build.Name+"-tui/"):
+		return ViaTUI
+	}
+	return ViaAPI
 }
 
 // Actor is who changes something in a workspace: a member through the web,
