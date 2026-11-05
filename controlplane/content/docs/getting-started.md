@@ -143,7 +143,7 @@ moin shows the address of your server and the DNS record to set. Set it where yo
 
 - No code of your own? Install n8n, Umami, Open WebUI and 44 more in one click: [Catalog](/docs/guides/catalog).
 - Settings and secrets for your app: [Env vars](/docs/guides/env).
-- Your database, SQLite or Postgres, every change backed up and checked daily: [Backups](/docs/guides/backups).
+- Your database, SQLite or Postgres, every change backed up, every restore tested: [Backups](/docs/guides/backups).
 - Close every port of the server: [Security](/docs/guides/security).
 - Deploy every push to GitHub: [GitHub](/docs/guides/github).
 - Run a migration or make the first admin: [Run a command](/docs/guides/exec).

@@ -1,6 +1,6 @@
 # moin.
 
-Deploy anything. Lose nothing. Any app on any server you own, every SQLite and Postgres change backed up and checked every day. Web, CLI, terminal UI and MCP.
+Deploy anything. Lose nothing. Your apps on your servers. Every change backed up. Every restore tested. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
 
 ```bash
 moin login              # log in through the browser
