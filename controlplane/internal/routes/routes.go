@@ -83,6 +83,8 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
 	mux.HandleFunc("GET /{$}", home.HomePage)
+	mux.HandleFunc("GET /a", home.HomeA)
+	mux.HandleFunc("GET /b", home.HomeB)
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)

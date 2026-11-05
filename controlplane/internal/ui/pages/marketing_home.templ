@@ -32,14 +32,18 @@ const (
 	homeSurface = "rounded-4xl bg-card"
 )
 
-templ Home(network model.Network) {
+// Home is the landing page. hero picks the wall under the headline while
+// two compete: "a" the square containers, "b" the long ones. The root shows
+// a; /a and /b show one each and stay out of search.
+templ Home(network model.Network, hero string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy to servers you own",
 		Description: brand.Name + " deploys any app to servers you own, backs up every change of its SQLite or Postgres database to your bucket, checks the restore every day and lets you edit the data live. 47 open-source apps in one click, HTTPS before you have a domain, uptime checks built in. Web, CLI, terminal UI and MCP.",
 		Path:        ctxkeys.URLPath(ctx),
+		NoIndex:     ctxkeys.URLPath(ctx) != "/",
 	}) {
 		<main>
-			@HomeHero()
+			@HomeHero(hero)
 			if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 				@HomeLive(network)
 			}
@@ -72,49 +76,52 @@ const homeAnchor = "scroll-mt-23 sm:scroll-mt-25"
 // homeSection is the one gap between the sections of the home page.
 const homeSection = "mt-28 sm:mt-36"
 
-// homePrimary is the one main button of the page: the free trial, or sign
-// in while sign-up is closed and on a self-hosted moin.
+// homePrimary is the one main button of the page: Deploy now, or Sign in
+// while sign-up is closed. That it starts free is told on the sign-up page
+// and the pricing.
 templ homePrimary() {
 	@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: homeCTA}) {
 		{ homeStartLabel(ctx) }
-		@icon.ArrowRight(icon.Props{Class: "size-4"})
 	}
 }
 
 func homeStartLabel(ctx context.Context) string {
 	cfg := ctxkeys.RenderConfig(ctx)
-	switch {
-	case !cfg.Billing:
-		return "Get started"
-	case cfg.SignupsOpen:
-		return "Start free trial"
-	default:
+	if cfg.Billing && !cfg.SignupsOpen {
 		return "Sign in"
 	}
+	return "Deploy now"
 }
 
 
 // ---------------------------------------------------------------- hero
-// HomeHero is the whole first screen, up behind the floating navbar: the
-// promise and the buttons centered on top, and a wall of containers across
-// the full width below, every container an app. The product follows below.
-templ HomeHero() {
+// HomeHero is the whole first screen, up behind the floating navbar, whose
+// height its top padding adds back, so the copy sits centered between the
+// navbar and the wall: the
+// promise and the two buttons side by side on top (the docs one only
+// from 340 px, so they never wrap), and a wall of containers across the full width below, every
+// container an app. The product follows below.
+templ HomeHero(hero string) {
 	<section class="-mt-[4.25rem] flex min-h-svh flex-col overflow-hidden sm:-mt-[4.75rem]">
-		<div class={ homeWrap, "flex flex-1 flex-col items-center justify-center pt-28 pb-10 text-center sm:pt-32" }>
-			<h1 class="font-display text-[clamp(3rem,6.5vw,6rem)] leading-[0.92] tracking-[-0.06em] text-balance">
-				<span class="block">Deploy anything.</span>
+		<div class={ homeWrap, "flex flex-1 flex-col items-center justify-center pt-[calc(4.25rem+2rem)] pb-8 text-center sm:pt-[calc(4.75rem+2.5rem)] sm:pb-10" }>
+			<h1 class="font-display text-[12vw] leading-[0.95] tracking-[-0.06em] sm:text-[clamp(3rem,5.4vw,5.75rem)] sm:font-bold sm:tracking-[-0.05em]">
+				<span class="block">Deploy <br class="sm:hidden"/>anything.</span>
 				<span class="block text-muted-foreground/60">Lose nothing.</span>
 			</h1>
-			<p class="mt-6 max-w-[40ch] text-lg leading-8 text-muted-foreground sm:text-xl">Every app in its own container. On a server you own.</p>
-			<div class="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
+			<p class="mt-6 text-[length:clamp(1.125rem,1.5vw,1.375rem)] leading-snug text-muted-foreground max-sm:hidden">Every app in its own container. On a server you own.</p>
+			<div class="mt-8 flex justify-center gap-3 sm:mt-[2.4vw]">
 				@homePrimary()
-				@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA}) {
+				@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg, Class: homeCTA + " max-[339px]:hidden"}) {
 					Read the docs
 				}
 			</div>
 		</div>
-		<div class="h-[38svh] w-full shrink-0 sm:h-[44svh]">
-			@homeHarbor()
+		<div class="h-[42svh] w-full shrink-0 sm:h-[44svh]">
+			if hero == "b" {
+				@homeHarbor()
+			} else {
+				@homeSquare()
+			}
 		</div>
 	</section>
 	<section class={ homeWrap, "mt-20 sm:mt-28" }>

@@ -87,15 +87,17 @@ templ Navbar() {
 				<div class="hidden lg:block">
 					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
 				</div>
+				// On a phone the bar holds only the logo and the menu: the menu
+				// and the hero carry the way in.
 				if user != nil {
-					@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 gap-1.5"}) {
+					@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 gap-1.5 max-sm:hidden"}) {
 						Dashboard
 						@icon.ArrowRight(icon.Props{Class: "size-3.5"})
 					}
 				} else {
 					// One way in: /auth signs in and signs up alike.
-					@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1"}) {
-						Get started
+					@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 max-sm:hidden"}) {
+						Deploy now
 					}
 				}
 				@sheet.Sheet(sheet.Props{ID: "mobile-nav"}) {
@@ -141,7 +143,7 @@ templ MobileNav() {
 				}
 			} else {
 				@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
-					Get started
+					Deploy now
 				}
 			}
 			<div class="flex items-center justify-between pt-3">
