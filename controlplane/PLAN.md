@@ -232,13 +232,8 @@ Decided 2026-11-01, after research:
   look, next to Apache-licensed Coolify and Dokploy. A hosted clone is
   legal but must publish all of its code.
 - Contributions come in under Apache 2.0, signed off on every commit
-  (`CONTRIBUTING.md`, the pull request template). That keeps one move open:
-  if a paid hosted clone of moin gains traction, future versions can switch
-  to FSL-1.1-ALv2, which forbids a competing hosted service and turns into
-  Apache 2.0 after two years.
-- The name and logo are outside the license (`TRADEMARKS.md`). No
-  registration for now; register the name at the paid launch or at its
-  first misuse.
+  (`CONTRIBUTING.md`, the pull request template).
+- The name and logo are outside the license (`TRADEMARKS.md`).
 
 ## The name
 
