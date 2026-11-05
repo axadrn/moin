@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
@@ -22,7 +21,7 @@ func version(ctx context.Context, args []string, stdout io.Writer) error {
 	if err := noArguments("version", args); err != nil {
 		return err
 	}
-	fmt.Fprintln(stdout, build.Invoked(os.Args[0]), build.Version)
+	fmt.Fprintln(stdout, build.Name, build.Version)
 	config, err := client.LoadConfig()
 	if err != nil {
 		return nil

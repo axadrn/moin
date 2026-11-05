@@ -4,18 +4,15 @@ name: Deploy
 # workflow):
 #   1. test: the same checks as CI.
 #   2. box: build the control plane image, ghcr.io/axadrn/moin, which
-#      ops-01 and every self-hoster runs. Until 2026-12-04 the same image
-#      goes out as ghcr.io/axadrn/ops-controlplane too, for installs of the
-#      old name.
+#      moin-01 and every self-hoster runs.
 #   3. release: for a tag, the GitHub release with its notes from
 #      controlplane/content/changelog.md.
-#   4. deploy: through Tailscale, ops-01 gets the deploy files of this
+#   4. deploy: through Tailscale, moin-01 gets the deploy files of this
 #      commit in /opt/moin and runs update.sh with the new box. update.sh
 #      takes the passwords from 1Password on the server itself, so they
-#      never pass through GitHub; the first run moves the old layout
-#      (/opt/ops-controlplane, /etc/ops-controlplane) over.
+#      never pass through GitHub.
 # A push to main runs nothing. Forks only build: the deploy runs in
-# axadrn/moin alone (axadrn/ops before the rename). Nothing here is a secret; the passwords live in
+# axadrn/moin alone. Nothing here is a secret; the passwords live in
 # 1Password and reach the server through update.sh.
 on:
   push:
@@ -54,20 +51,14 @@ jobs:
         id: tags
         run: |
           image=ghcr.io/axadrn/moin
-          # The old name's image, until 2026-12-04.
-          legacy=ghcr.io/axadrn/ops-controlplane
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            tags=""
-            for name in "$image" "$legacy"; do
-              tags="${tags:+$tags,}${name}:${GITHUB_REF_NAME},${name}:stable,${name}:latest"
-            done
-            echo "tags=$tags" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:${GITHUB_REF_NAME},${image}:stable,${image}:latest" >> "$GITHUB_OUTPUT"
           else
             echo "version=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7},${legacy}:latest,${legacy}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -100,7 +91,7 @@ jobs:
 
   deploy:
     needs: box
-    if: github.repository == 'axadrn/moin' || github.repository == 'axadrn/ops'
+    if: github.repository == 'axadrn/moin'
     runs-on: ubuntu-24.04
     env:
       HOST: moin-01

@@ -22,11 +22,11 @@ import (
 // walgtest, with a local S3 (SeaweedFS) next to it. It writes rows at T1, more at
 // T2, restores to a time between them and checks that exactly the T1 rows
 // are back. Run with: go test -tags docker -run WALG ./internal/agent/
-// OPS_WALG_BINARY skips the download of WAL-G.
+// MOIN_WALG_BINARY skips the download of WAL-G.
 func TestWALGPointInTime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-	walgBinaryPath = os.Getenv("OPS_WALG_BINARY")
+	walgBinaryPath = os.Getenv("MOIN_WALG_BINARY")
 	defer func() { walgBinaryPath = "" }()
 
 	root := t.TempDir()
@@ -46,7 +46,7 @@ func TestWALGPointInTime(t *testing.T) {
 				"volumes":     []any{map[string]any{"type": "volume", "source": "pgdata", "target": "/var/lib/postgresql/data"}},
 			},
 		},
-		"volumes": map[string]any{"pgdata": map[string]any{"name": "ops-walgtest-pgdata"}},
+		"volumes": map[string]any{"pgdata": map[string]any{"name": "moin-walgtest-pgdata"}},
 	}
 	composeFile := filepath.Join(release, "compose.json")
 	saveJSON(composeFile, compose)
@@ -56,13 +56,13 @@ func TestWALGPointInTime(t *testing.T) {
 	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("4f6c1d2e-0000-4000-8000-000000000001"), 0o600)
 	down := func() {
 		exec.Command("docker", "compose", "-p", project(app), "-f", composeFile, "down", "-v").Run()
-		exec.Command("docker", "rm", "-f", companionName(app, "db"), "ops-walgtest-s3").Run()
+		exec.Command("docker", "rm", "-f", companionName(app, "db"), "moin-walgtest-s3").Run()
 	}
 	down()
 	defer down()
 	// A local S3 for this test only, outside the app: a restore stops and
 	// starts the app's services, never the bucket.
-	if out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", "ops-walgtest-s3", "-p", "19000:8333", "chrislusf/seaweedfs:latest", "server", "-s3", "-s3.port=8333", "-dir=/data").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", "moin-walgtest-s3", "-p", "19000:8333", "chrislusf/seaweedfs:latest", "server", "-s3", "-s3.port=8333", "-dir=/data").CombinedOutput(); err != nil {
 		t.Fatalf("s3: %v %s", err, out)
 	}
 	if out, err := exec.CommandContext(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "up", "-d").CombinedOutput(); err != nil {
@@ -72,7 +72,7 @@ func TestWALGPointInTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	storage := &protocol.BackupStorage{Endpoint: "http://" + strings.TrimSpace(string(gateway)) + ":19000", Region: "us-east-1", Bucket: "ops-test", Workspace: "ws1", AccessKey: "opstest", SecretKey: "opstestsecret", Name: "test"}
+	storage := &protocol.BackupStorage{Endpoint: "http://" + strings.TrimSpace(string(gateway)) + ":19000", Region: "us-east-1", Bucket: "moin-test", Workspace: "ws1", AccessKey: "opstest", SecretKey: "opstestsecret", Name: "test"}
 	client := s3Client(storage)
 	for deadline := time.Now().Add(time.Minute); ; {
 		_, err := client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(storage.Bucket)})
@@ -232,7 +232,7 @@ func TestWALGPointInTime(t *testing.T) {
 		t.Errorf("max_slot_wal_keep_size = %s, want 4GB", got)
 	}
 	// WAL-G stays down past a (here tiny) cap: Postgres drops its place,
-	// ops notices, starts a new companion and takes a new base backup.
+	// moin notices, starts a new companion and takes a new base backup.
 	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'moin_walg' AND restart_lsn IS NOT NULL;`) != "1"; {
 		if time.Now().After(deadline) {
 			t.Fatal("WAL-G never started streaming")

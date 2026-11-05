@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deplo
 It takes a few minutes and does it all:
 
 1. Installs Docker and security updates.
-2. Writes the settings to `/etc/ops-controlplane/env`, with a new `SECRETS_KEY`. Keep a copy of that key: it seals the secrets of your apps.
+2. Writes the settings to `/etc/moin-controlplane/env`, with a new `SECRETS_KEY`. Keep a copy of that key: it seals the secrets of your apps.
 3. Starts the control plane, and makes your account, a workspace and this server in it.
 4. Installs the agent, which reaches the control plane on this machine and starts the proxy for ports 80 and 443.
 5. Serves the control plane on your domain, with a certificate from Let's Encrypt, like any app.
@@ -58,18 +58,18 @@ It takes a few minutes and does it all:
 At the end it prints a sign-in link. Email and a bucket can come later: until email is set up, sign-in links go to the control plane's log, and this prints a new one:
 
 ```bash
-docker compose -f /opt/ops/compose.yml exec controlplane ./main sign-in-link
+docker compose -f /opt/moin/compose.yml exec controlplane ./main sign-in-link
 ```
 
-Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the control plane's own backup, then run `sh /opt/ops/update.sh`. Run the install command again any time: it keeps your settings and data.
+Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the control plane's own backup, then run `sh /opt/moin/update.sh`. Run the install command again any time: it keeps your settings and data.
 
 ### Move from one server to two
 
-1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/ops/update.sh`. Use a bucket no other control plane backs up to: its backup lives in the folder `controlplane/litestream`.
-2. Wait a few seconds, so the last change is in the bucket. Then, on the old server, stop the control plane and its updater: `docker compose -f /opt/ops/compose.yml --profile '*' down`. Your apps keep running, and the proxy still serves them.
+1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/moin/update.sh`. Use a bucket no other control plane backs up to: its backup lives in the folder `controlplane/litestream`.
+2. Wait a few seconds, so the last change is in the bucket. Then, on the old server, stop the control plane and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running, and the proxy still serves them.
 3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The same `SECRETS_KEY` matters most: it opens your apps' secrets. The control plane restores its database from the bucket on its first start: your account, workspaces, apps and API tokens are there. Point the domain at the new server.
 4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `moin servers install-command <server>` and run it on the old server: the agent now dials your domain, as the same server. Your apps keep running.
-5. Once all works, remove the old settings from the old server: `rm -r /opt/ops /etc/ops-controlplane /var/lib/ops-controlplane`.
+5. Once all works, remove the old settings from the old server: `rm -r /opt/moin /etc/moin-controlplane /var/lib/moin-controlplane`.
 
 ## Where to run it
 
@@ -102,7 +102,7 @@ cd moin/controlplane/deploy
 sh setup.sh
 ```
 
-**2. Write the settings** into `/etc/ops-controlplane/env`:
+**2. Write the settings** into `/etc/moin-controlplane/env`:
 
 ```bash
 APP_ENV=production
@@ -123,7 +123,7 @@ S3_ACCESS_KEY=
 S3_SECRET_KEY=
 ```
 
-`controlplane/.env.example` lists every setting. Keep the file readable by root only: `chmod 600 /etc/ops-controlplane/env`.
+`controlplane/.env.example` lists every setting. Keep the file readable by root only: `chmod 600 /etc/moin-controlplane/env`.
 
 **3. Start it:**
 
@@ -157,10 +157,10 @@ GitHub and CI outside your tailnet cannot reach the control plane, so **Deploy e
 
 ### Keep the settings in 1Password
 
-Instead of writing passwords into `/etc/ops-controlplane/env`, keep them in 1Password:
+Instead of writing passwords into `/etc/moin-controlplane/env`, keep them in 1Password:
 
-1. Create a 1Password service account that may read one vault, and put its token on the server: `/etc/ops-controlplane/op-token`, readable by root only.
-2. Write the settings as `/etc/ops-controlplane/env.tpl`, with references like `SECRETS_KEY={{ op://vault/item/field }}` in place of passwords.
+1. Create a 1Password service account that may read one vault, and put its token on the server: `/etc/moin-controlplane/op-token`, readable by root only.
+2. Write the settings as `/etc/moin-controlplane/env.tpl`, with references like `SECRETS_KEY={{ op://vault/item/field }}` in place of passwords.
 
 `update.sh` fills them in from 1Password on every start. A changed password counts after the next `update.sh`.
 
@@ -173,12 +173,12 @@ For deploys from GitHub, the control plane needs a GitHub App of its own. Create
 3. **Webhook URL:** `{APP_URL}/webhooks/github`, with a secret of your own.
 4. Generate a private key and a client secret.
 
-Put the key next to the settings as `/etc/ops-controlplane/github-app.pem`, add the rest to the settings and run `update.sh` again:
+Put the key next to the settings as `/etc/moin-controlplane/github-app.pem`, add the rest to the settings and run `update.sh` again:
 
 ```bash
 GITHUB_APP_ID=
 GITHUB_APP_SLUG=
-GITHUB_APP_PRIVATE_KEY_FILE=/run/ops-controlplane/github-app.pem
+GITHUB_APP_PRIVATE_KEY_FILE=/run/moin-controlplane/github-app.pem
 GITHUB_APP_WEBHOOK_SECRET=
 GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
@@ -254,7 +254,7 @@ When the control plane starts and finds no database, it restores the newest one 
 - Click **Update now**. Or run `moin update` in the CLI, or `u` on the settings tab of the TUI.
 - Or run `sh update.sh` on the server, as before.
 
-moin is away for about a minute. Your apps keep running. Before the database changes, moin keeps a copy of it next to it, like `/var/lib/ops-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
+moin is away for about a minute. Your apps keep running. Before the database changes, moin keeps a copy of it next to it, like `/var/lib/moin-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
 
 `moin version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
 
@@ -264,26 +264,10 @@ To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh`
 
 **The agents** update themselves to the version of the control plane, one server at a time, never during a deploy. Your apps keep running. See [Servers](/docs/guides/servers#updates).
 
-## From ops to moin
-
-A control plane installed as ops moves once, the next time you run the new `update.sh`. Get the new deploy files, then run it:
-
-```bash
-mkdir -p /opt/moin && cd /opt/moin
-for file in setup.sh compose.yml compose.same-server.yml update.sh updater.sh; do
-  curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/$file -o $file
-done
-sh update.sh
-```
-
-It stops the old control plane, copies `/etc/ops-controlplane` to `/etc/moin-controlplane` and `/var/lib/ops-controlplane` to `/var/lib/moin-controlplane`, and starts it from there with the image `ghcr.io/axadrn/moin`. The control plane is away for the copy. The old folders stay as they were: remove them once moin runs. The agent on the same server moves by itself, see [Servers](/docs/guides/servers#from-ops-to-moin).
-
-Until December 4, 2026 the old install keeps working without the move: `ghcr.io/axadrn/ops-controlplane` gets every release, `OPS_IMAGE` and `OPS_PULL` still work, and settings that point to `/run/ops-controlplane` still find their files.
-
 **The admin page.** `/admin` is for the addresses in `ADMIN_EMAILS` only: users, sessions, operator activity and **Update now**. Nobody else sees it. Your control plane counts only its own people; it never sees anyone else's.
 
-**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://ops.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old address**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
+**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old address**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
 
 ## Move or rebuild
 
-When the server dies or you move: prepare a new server with `setup.sh`, put your settings in `/etc/ops-controlplane/` again and run `update.sh`. The database comes back from the bucket by itself. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.
+When the server dies or you move: prepare a new server with `setup.sh`, put your settings in `/etc/moin-controlplane/` again and run `update.sh`. The database comes back from the bucket by itself. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.

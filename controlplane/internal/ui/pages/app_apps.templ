@@ -866,9 +866,9 @@ templ appScript(appName string) {
 			const copy = document.querySelector("[data-deploy-log-copy] [data-copy]");
 			// Everything bound to document stops when the page goes (DESIGN.md, Navigation).
 			// A run of this script on a new swap ends the one before.
-			if (window.opsAppPage) window.opsAppPage.abort();
+			if (window.moinAppPage) window.moinAppPage.abort();
 			const gone = new AbortController();
-			window.opsAppPage = gone;
+			window.moinAppPage = gone;
 			const on = { signal: gone.signal };
 			let stream = null;
 			let followed = 0;

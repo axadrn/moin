@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_apps_server_id ON apps(server_id);
 -- DEPLOYS
 -- One release of an app, numbered per app. A rollback has from_number and no
 -- source. detected is the JSON the agent reported: kind, service, port,
--- databases and the x-ops block.
+-- databases and the x-moin block.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS deploys (
     id TEXT PRIMARY KEY,

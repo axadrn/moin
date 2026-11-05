@@ -248,8 +248,8 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 
 // protect puts a password in front of an app, or takes it away with off.
 func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("protect", "protect [--user ops] [app], password on stdin; protect off [app] [--yes]").withApp().withYes()
-	user := flags.String("user", "ops", "username for the password prompt in the browser")
+	flags := newFlags("protect", "protect [--user moin] [app], password on stdin; protect off [app] [--yes]").withApp().withYes()
+	user := flags.String("user", "moin", "username for the password prompt in the browser")
 	if err := flags.parse(args); err != nil {
 		return err
 	}

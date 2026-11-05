@@ -53,7 +53,7 @@ func execMember(services Services, caller Caller) (*model.WorkspaceMember, error
 	return nil, repository.ErrWorkspaceNotFound
 }
 
-func (t opsTools) exec(ctx context.Context, caller Caller, input ExecInput) (ExecOutput, error) {
+func (t moinTools) exec(ctx context.Context, caller Caller, input ExecInput) (ExecOutput, error) {
 	argv, err := protocol.SplitCommand(input.Command)
 	if err != nil {
 		return ExecOutput{}, InvalidField("command", "The command: "+err.Error()+".")

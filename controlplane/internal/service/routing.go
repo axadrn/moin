@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -26,7 +27,7 @@ var servicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
 
 // instantUser is the username in front of an instant address that has no
 // password of the app.
-const instantUser = "ops"
+const instantUser = build.Name
 
 // SetServiceDomains replaces the domains of one of the app's services other
 // than the main one, then applies them like SetDomains. An empty list

@@ -26,14 +26,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
 // Every app lives in <state dir>/apps/<app>:
 //
 //	releases/<n>/src           the source of deploy n
-//	releases/<n>/compose.json  the resolved compose project ops runs, 0600
+//	releases/<n>/compose.json  the resolved compose project moin runs, 0600
 //	releases/<n>/kind          build, apply or failed, for prune
 //	current                    the number of the running release
 //	volumes/                   bind mounts that are not part of the repo
@@ -534,7 +533,7 @@ func (a *apps) resolve(ctx context.Context, app, src string, env map[string]stri
 	return config, detected, nil
 }
 
-// ownVolumes hands the data directories ops made for an app to the user
+// ownVolumes hands the data directories moin made for an app to the user
 // its service runs as. They are made by root, and an app that runs as
 // another user could not write its database to them.
 func (a *apps) ownVolumes(ctx context.Context, app, composeFile string, logf func(string, ...any)) {
@@ -832,7 +831,7 @@ func goDockerfile(src string, goMod []byte) string {
 	if match := goVersionPattern.FindSubmatch(goMod); match != nil {
 		version = string(match[1])
 	}
-	return fmt.Sprintf(`# Written by ops. Commit your own Dockerfile to change it.
+	return fmt.Sprintf(`# Written by moin. Commit your own Dockerfile to change it.
 FROM golang:%s-bookworm AS build
 WORKDIR /src
 COPY go.* ./
@@ -900,7 +899,7 @@ func exposedPort(src string) int {
 }
 
 // mainService is the service that gets the traffic: the one x-moin names, the
-// only one, or the only one ops builds.
+// only one, or the only one moin builds.
 func mainService(services map[string]any, config *protocol.Config) string {
 	if config != nil && config.Service != "" {
 		if _, ok := services[config.Service]; ok {
@@ -971,7 +970,7 @@ func mainPort(src string, service any, config *protocol.Config) int {
 // volumes exist only after the first start, so deploy asks again then. A
 // database that x-moin names but no mount holds fails the deploy: it would be
 // lost with the container.
-func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *protocol.Config) ([]protocol.Database, error) {
+func (a *apps) databases(ctx context.Context, composeFile string, moinConfig *protocol.Config) ([]protocol.Database, error) {
 	var config map[string]any
 	body, err := os.ReadFile(composeFile)
 	if err == nil {
@@ -984,8 +983,8 @@ func (a *apps) databases(ctx context.Context, composeFile string, opsConfig *pro
 	volumes, _ := config["volumes"].(map[string]any)
 	found := []protocol.Database{}
 	named := ""
-	if opsConfig != nil {
-		named = opsConfig.Database
+	if moinConfig != nil {
+		named = moinConfig.Database
 	}
 	namedOnMount := named == ""
 	for _, service := range services {
@@ -1147,8 +1146,7 @@ func (a *apps) prune(ctx context.Context, app string) {
 			used[image[1]] = true
 		}
 	}
-	// Images built under the old name keep their old tags.
-	images, err := a.output(ctx, "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}", "--filter", "reference="+project(app)+"-*", "--filter", "reference="+legacyProject(app)+"-*")
+	images, err := a.output(ctx, "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}", "--filter", "reference="+project(app)+"-*")
 	if err != nil {
 		return
 	}
@@ -1404,21 +1402,13 @@ func saveJSON(path string, value any) {
 	}
 }
 
-// configBlock is the agent's block of compose.yml: x-moin, or x-ops of the
-// old name while it works. x-moin wins when both are there. After the old
-// name stops working an x-ops block is an error, never quietly ignored: it
+// configBlock is the agent's block of compose.yml, x-moin. The block of
+// the name the product had before is an error, never quietly ignored: it
 // may hold the domains.
 func configBlock(config map[string]any) (any, string, error) {
-	key, legacyKey := "x-"+ourName, "x-"+legacy
-	if block, ok := config[key]; ok {
-		return block, key, nil
+	key := "x-" + ourName
+	if _, ok := config[protocol.OldConfigKey]; ok {
+		return nil, protocol.OldConfigKey, fmt.Errorf("compose.yml has an %s block: rename it to %s", protocol.OldConfigKey, key)
 	}
-	block, ok := config[legacyKey]
-	if !ok {
-		return nil, key, nil
-	}
-	if !build.Legacy() {
-		return nil, legacyKey, fmt.Errorf("compose.yml has an %s block: rename it to %s", legacyKey, key)
-	}
-	return block, legacyKey, nil
+	return config[key], key, nil
 }

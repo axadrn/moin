@@ -11,7 +11,7 @@ cp .env.example .env   # then fill in your own development bucket
 task dev               # the app on a free port
 ```
 
-Development uses a real bucket of its own, such as `ops-development` on R2, so
+Development uses a real bucket of its own, such as `moin-development` on R2, so
 it runs the same storage code as production.
 
 Without Cloudflare credentials, emails go to the log. The control plane and the `moin` binary are one Go module: a change to the agent, the CLI or the protocol shows up here right away.

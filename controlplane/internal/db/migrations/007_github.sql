@@ -1,8 +1,8 @@
 -- +goose Up
 -- ============================================================================
 -- GITHUB
--- The ops GitHub App. A user installs it on accounts and organizations;
--- ops stores each installation with the account it belongs to. An app can
+-- The moin GitHub App. A user installs it on accounts and organizations;
+-- moin stores each installation with the account it belongs to. An app can
 -- follow one repo and branch: deploys of a ref download that commit from
 -- GitHub, and with auto_deploy a push to the branch deploys it. Deploys
 -- remember the ref and commit they came from, for the commit status.

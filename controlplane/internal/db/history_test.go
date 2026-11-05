@@ -9,11 +9,11 @@ import (
 // TestHistoryConnection: history.db sits next to the database; one in memory
 // keeps its history in memory.
 func TestHistoryConnection(t *testing.T) {
-	got := HistoryConnection("./data/ops.db?_pragma=foreign_keys(1)")
+	got := HistoryConnection("./data/moin.db?_pragma=foreign_keys(1)")
 	if !strings.HasPrefix(got, filepath.Join("data", "history.db")+"?") {
 		t.Errorf("file database: %q", got)
 	}
-	if got := HistoryConnection("file:/var/lib/moin/ops.db"); !strings.HasPrefix(got, "/var/lib/moin/history.db?") {
+	if got := HistoryConnection("file:/var/lib/moin/moin.db"); !strings.HasPrefix(got, "/var/lib/moin/history.db?") {
 		t.Errorf("file: prefix: %q", got)
 	}
 	for _, memory := range []string{":memory:", "file::memory:?cache=shared", ""} {

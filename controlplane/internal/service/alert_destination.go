@@ -23,7 +23,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/google/uuid"
 )
 
@@ -52,9 +51,6 @@ const (
 	alertDestinationLimit = 20
 	// AlertSignatureHeader carries the HMAC-SHA256 of a webhook body.
 	AlertSignatureHeader = "X-Moin-Signature"
-	// legacySignatureHeader is the same under the old name, sent too
-	// until build.LegacyUntil so receivers have time to switch.
-	legacySignatureHeader = "X-Ops-Signature"
 )
 
 var (
@@ -280,11 +276,7 @@ func (s *AlertService) deliver(ctx context.Context, destination model.AlertDesti
 		}
 		return s.sender.post(ctx, target, message.Payload, func(body []byte) http.Header {
 			signature := Signature(signingSecret, body)
-			header := http.Header{AlertSignatureHeader: {signature}}
-			if build.Legacy() {
-				header.Set(legacySignatureHeader, signature)
-			}
-			return header
+			return http.Header{AlertSignatureHeader: {signature}}
 		}, target, signingSecret)
 	}
 	return &AlertSendError{Message: "unknown kind " + destination.Kind}

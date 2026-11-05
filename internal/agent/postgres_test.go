@@ -58,11 +58,11 @@ func TestPostgresImage(t *testing.T) {
 }
 
 // TestDatabasesFindsPostgres: a service that runs Postgres is a database,
-// keyed postgres-<service>, after the SQLite files; x-ops may name it.
+// keyed postgres-<service>, after the SQLite files; x-moin may name it.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
 	composeFile := filepath.Join(dir, "compose.json")
-	body := `{"services":{"web":{"image":"ops-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
+	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
 	if err := os.WriteFile(composeFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 		t.Error("snapshot file endings")
 	}
 	if _, err := a.databases(context.Background(), composeFile, &protocol.Config{Database: "postgres-nope"}); err == nil {
-		t.Error("x-ops naming a missing database passed")
+		t.Error("x-moin naming a missing database passed")
 	}
 }
 
@@ -220,7 +220,7 @@ func TestServiceImage(t *testing.T) {
 	if err := os.MkdirAll(release, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(release, "compose.json"), []byte(`{"services":{"db":{"image":"postgres:17"},"web":{"image":"ops-shop-web:3"}}}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(release, "compose.json"), []byte(`{"services":{"db":{"image":"postgres:17"},"web":{"image":"moin-shop-web:3"}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("3"), 0o644); err != nil {

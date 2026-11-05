@@ -11,7 +11,7 @@ import (
 
 // registerMetricsTools registers the tool that reads metrics.
 func registerMetricsTools(server *mcpsdk.Server, services Services) {
-	tools := opsTools{services: services}
+	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_metrics", Title: "Get metrics", Annotations: readOnly("Get metrics"),
 		Description: "Returns the metrics of an app or a server: the newest sample and points over a range (1h with every 15 second sample, 24h, 7d or 30d as averages). For an app: CPU as its share of the whole server in percent, memory used and its limit, network in and out in bytes per second, and the deploys that went live in the range, to tell what changed after a deploy. For a server: CPU of all cores in percent, memory, the data disk, network and load, and every app on it now, the one with the most memory first. Name the app or the server, not both. Needs the read scope.",
 	}, Read(member(services, tools.getMetrics)))
@@ -84,7 +84,7 @@ func bytesText(value uint64) string {
 	return fmt.Sprintf("%.1f %s", size, units[unit])
 }
 
-func (t opsTools) getMetrics(_ context.Context, caller Caller, input MetricsInput) (Metrics, error) {
+func (t moinTools) getMetrics(_ context.Context, caller Caller, input MetricsInput) (Metrics, error) {
 	switch {
 	case input.App != "" && input.Server != "":
 		return Metrics{}, InvalidField("server", "Name the app or the server, not both.")

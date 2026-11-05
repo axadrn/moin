@@ -46,10 +46,9 @@ func RequestSource(ctx context.Context) Source {
 	if token := ctxkeys.APIToken(ctx); token != nil {
 		source.Token = token.Name
 		switch {
-		// A CLI of the old name says so in its user agent.
-		case strings.HasPrefix(client.UserAgent, build.Name+"-cli/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-cli/"):
+		case strings.HasPrefix(client.UserAgent, build.Name+"-cli/"):
 			source.Via = ViaCLI
-		case strings.HasPrefix(client.UserAgent, build.Name+"-tui/"), strings.HasPrefix(client.UserAgent, build.LegacyName+"-tui/"):
+		case strings.HasPrefix(client.UserAgent, build.Name+"-tui/"):
 			source.Via = ViaTUI
 		default:
 			source.Via = ViaAPI

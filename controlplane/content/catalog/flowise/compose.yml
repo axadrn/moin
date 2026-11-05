@@ -6,7 +6,7 @@ x-moin:
 services:
   web:
     image: flowiseai/flowise:${VERSION}
-    # The image's user cannot write to the data folder ops mounts.
+    # The image's user cannot write to the data folder moin mounts.
     user: root
     environment:
       PORT: "3000"

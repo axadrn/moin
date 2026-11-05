@@ -37,19 +37,16 @@ RUN go tool templ generate
 # The moin binary that install.sh, cli.sh, CI and agent updates download
 # from /download, built from the same commit as the control plane, with
 # SHA256SUMS for checking a download by hand. It is the same in both boxes,
-# so it comes before anything of the target and is built once. Until
-# 2026-12-04 it is under the old name ops-* too: agents of the old name
-# update from there, and the new binary then moves them over.
+# so it comes before anything of the target and is built once.
 ARG VERSION=dev
 RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os="${target%/*}" arch="${target#*/}" && \
       CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
         -ldflags "-s -w -X github.com/axadrn/moin/internal/build.Version=$VERSION" \
-        -o "downloads/moin-$os-$arch" ../cmd/moin && \
-      cp "downloads/moin-$os-$arch" "downloads/ops-$os-$arch"; \
+        -o "downloads/moin-$os-$arch" ../cmd/moin; \
     done && \
-    (cd downloads && sha256sum moin-* ops-* > SHA256SUMS)
+    (cd downloads && sha256sum moin-* > SHA256SUMS)
 
 # The server, a static binary for the CPU of the box being built. It knows
 # its version, the one agents update to.

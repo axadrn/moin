@@ -62,7 +62,7 @@ What the repo has decides the input. The agent always gets a compose project.
 | only a `Dockerfile` | writes a one-service `compose.yml` |
 | nothing (Go app) | writes a `Dockerfile` and the `compose.yml` |
 
-The user's `compose.yml` stays untouched. moin writes `compose.ops.yml` next to
+The user's `compose.yml` stays untouched. moin writes `compose.moin.yml` next to
 it with the Traefik labels, the shared network and the database mount.
 
 1. `moin deploy` packs the working tree as a source tarball.
@@ -97,7 +97,7 @@ Optional. Without it, moin detects everything. With it, the repo is the truth.
   builds on the server. `moin deploy` uploads the working tree (git ls-files),
   a GitHub push webhook later fetches the tarball from GitHub. This replaces
   local builds and `docker save`: no cross-arch builds, no image uploads.
-- Push to deploy today: a GitHub Action that runs `moin deploy` with `OPS_TOKEN`.
+- Push to deploy today: a GitHub Action that runs `moin deploy` with `MOIN_TOKEN`.
 
 ## Two ways to build
 
@@ -128,7 +128,7 @@ it would be lost on the next one.
 ## Proxy
 
 Traefik as one shared container, configured through the labels in
-`compose.ops.yml`. Not part of the agent: an agent update never takes apps down.
+`compose.moin.yml`. Not part of the agent: an agent update never takes apps down.
 
 ## Routing
 
@@ -242,6 +242,6 @@ Decided 2026-11-01, after research:
 
 ## The name
 
-The product is moin, at moin.run, with the command `moin`. It was called ops
-until v1.0.0-beta.20; the old names (`ops`, `x-ops`, `OPS_*`, the old
-download paths and image) keep working until December 4, 2026.
+The product is moin, at moin.run, with the command `moin`. Since
+v1.0.0-beta.23 only the new names work; `x-ops` in compose.yml stops a
+deploy with a message to rename it to `x-moin`.
