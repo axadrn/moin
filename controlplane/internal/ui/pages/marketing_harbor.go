@@ -36,6 +36,9 @@ var harborLabels = map[[2]int]string{
 	{6, 1}: "rails",
 	{9, 1}: "golang",
 	{8, 2}: "deno",
+	{0, 0}: "php",
+	{5, 0}: "nextjs",
+	{7, 0}: "django",
 }
 
 // harborCodes are the owner codes printed next to each app, like the four
@@ -44,6 +47,7 @@ var harborCodes = map[string]string{
 	"node": "NODU 104421", "sqlite": "SQLU 207734", "postgres": "PGSU 310652", "python": "PYTU 418803",
 	"redis": "RDSU 520167", "bun": "BUNU 623390", "your-app": "APPU 100042", "rails": "RLSU 731248",
 	"golang": "GOLU 846501", "deno": "DNOU 952276",
+	"nextjs": "NXJU 118250", "php": "PHPU 224519", "django": "DJGU 437712",
 }
 
 // harborFront are the containers pulled out of the wall, by column and
