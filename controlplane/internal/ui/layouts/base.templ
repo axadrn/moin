@@ -124,7 +124,7 @@ templ seo(props SEOProps) {
 	<meta property="og:url" content={ baseURL + props.Path }/>
 	<meta property="og:site_name" content={ appName }/>
 	// OpenGraph Image
-	<meta property="og:image" content={ baseURL + "/assets/img/og.png?v=2" }/>
+	<meta property="og:image" content={ baseURL + tuiutils.ScriptURL("/assets/img/og.png") }/>
 	<meta property="og:image:width" content="1200"/>
 	<meta property="og:image:height" content="630"/>
 	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
@@ -132,7 +132,7 @@ templ seo(props SEOProps) {
 	<meta name="twitter:card" content="summary_large_image"/>
 	<meta name="twitter:title" content={ fullTitle }/>
 	<meta name="twitter:description" content={ props.Description }/>
-	<meta name="twitter:image" content={ baseURL + "/assets/img/og.png?v=2" }/>
+	<meta name="twitter:image" content={ baseURL + tuiutils.ScriptURL("/assets/img/og.png") }/>
 	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
 	// Theme Color
 	<meta name="theme-color" content="#000000"/>
