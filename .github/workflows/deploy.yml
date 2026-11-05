@@ -4,16 +4,14 @@ name: Deploy
 # workflow):
 #   1. test: the same checks as CI.
 #   2. box: build the control plane image, ghcr.io/axadrn/moin, which
-#      moin-01 and every self-hoster runs.
+#      the hosted control plane and every self-hoster runs.
 #   3. release: for a tag, the GitHub release with its notes from
 #      controlplane/content/changelog.md.
-#   4. deploy: through Tailscale, moin-01 gets the deploy files of this
-#      commit in /opt/moin and runs update.sh with the new box. update.sh
-#      takes the passwords from 1Password on the server itself, so they
-#      never pass through GitHub.
+#   4. deploy: through Tailscale, the hosted control plane gets the deploy
+#      files of this commit and runs update.sh with the new box.
 # A push to main runs nothing. Forks only build: the deploy runs in
-# axadrn/moin alone. Nothing here is a secret; the passwords live in
-# 1Password and reach the server through update.sh.
+# axadrn/moin alone, with the repository variables DEPLOY_HOST and
+# TS_CLIENT_ID. No secret passes through GitHub.
 on:
   push:
     tags: ["v*"]
@@ -94,10 +92,15 @@ jobs:
     if: github.repository == 'axadrn/moin'
     runs-on: ubuntu-24.04
     env:
-      HOST: moin-01
-      # Tailscale lets only workflows of this repo in with it, as tag:ci.
-      TS_CLIENT_ID: TA5fRdgvFU11CNTRL-kW36unrgMk11CNTRL
+      HOST: ${{ vars.DEPLOY_HOST }}
+      TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
     steps:
+      - name: Check the variables
+        run: |
+          if [ -z "$HOST" ] || [ -z "$TS_CLIENT_ID" ]; then
+            echo "set the repository variables DEPLOY_HOST and TS_CLIENT_ID (Settings, Secrets and variables, Actions, Variables)" >&2
+            exit 1
+          fi
       - name: Connect to the server through Tailscale
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
