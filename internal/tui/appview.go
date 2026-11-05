@@ -250,7 +250,7 @@ func (m model) logsTab(u ui, w, h int) string {
 	case m.logs.back > 0:
 		state = u.muted(fmt.Sprintf("↑ %d lines below · G follows", m.logs.back))
 	}
-	note := state + u.faint(fmt.Sprintf(" · %d lines", len(m.app.logs)))
+	note := state + u.faint(" · "+plural(len(m.app.logs), "line"))
 	if m.logs.filter != "" {
 		note = u.text("/"+m.logs.filter) + u.faint(fmt.Sprintf(" %d of %d", len(all), len(m.app.logs))) + u.faint(" · ") + state
 	}
@@ -633,7 +633,7 @@ func (m model) outView(u ui, w, h int) string {
 			body = loading(u)
 		}
 	}
-	note := u.faint(fmt.Sprintf("%d lines", len(o.lines)))
+	note := u.faint(plural(len(o.lines), "line"))
 	if m.text.back > 0 {
 		note = u.muted(fmt.Sprintf("↑ %d lines below", m.text.back))
 	}
