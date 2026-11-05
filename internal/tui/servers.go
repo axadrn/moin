@@ -206,14 +206,19 @@ func (m model) activityView(u ui, w, h int) string {
 	if len(m.events) == 0 {
 		return u.panel("Activity", "", []string{"", u.muted("Nothing happened yet.")}, w, h, true)
 	}
-	body := []string{u.row([]cell{u.head("when", 12, false), u.head("who", 16, false), u.head("what", 0, false), u.head("via", 5, false)}, iw, false)}
+	// who is as wide as the longest name, up to 16
+	ww := 3
+	for _, e := range m.events {
+		ww = max(ww, min(16, wid(shortActor(e.Actor))+1))
+	}
+	sw := max(10, iw-12-ww-4-3)
+	body := []string{u.row([]cell{u.head("when", 12, false), u.head("who", ww, false), u.head("what", sw, false), u.head("via", 0, false)}, iw, false)}
 	n := h - chrome - 1
 	at := m.at("activity", len(m.events))
 	start := max(0, min(at-n+1, len(m.events)-n))
-	sw := max(10, iw-12-16-5-3)
 	for i := start; i < len(m.events) && i < start+n; i++ {
 		e := m.events[i]
-		body = append(body, u.row([]cell{{u.faint(e.CreatedAt.Local().Format("Jan 2 15:04")), 12, false}, {u.text(shortActor(e.Actor)), 16, false}, {u.muted(e.Summary), sw, false}, {u.faint(e.Via), 5, false}}, iw, i == at))
+		body = append(body, u.row([]cell{{u.faint(e.CreatedAt.Local().Format("Jan 2 15:04")), 12, false}, {u.text(shortActor(e.Actor)), ww, false}, {u.muted(e.Summary), sw, false}, {u.faint(e.Via), 0, false}}, iw, i == at))
 	}
 	note := u.faint(fmt.Sprintf("%d events", len(m.events)))
 	if m.eventsEnd != "" {
