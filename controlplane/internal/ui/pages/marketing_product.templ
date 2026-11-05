@@ -1,0 +1,235 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/tabs"
+	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+)
+
+// homeProductTab is one tab of the product section: what it is called, the
+// promise in a few words, and the one sentence that keeps it.
+type homeProductTab struct {
+	Value, Label, Title, Text string
+}
+
+var homeProductTabs = []homeProductTab{
+	{"deploy", "Deploy", "Push. It runs.", "Any repo. A Dockerfile, a compose.yml or an image from your CI. Not healthy? The old version keeps serving."},
+	{"data", "Data", "Your data. Live.", "Browse every table. Edit a cell. Run SQL. SQLite or Postgres, live from your server. Every change takes a snapshot first."},
+	{"backups", "Backups", "Every change. Saved.", "SQLite within a second. Postgres within a minute. Into your own bucket. Restored and checked every day."},
+	{"domains", "Domains", "HTTPS from the first deploy.", "Every app gets an address with HTTPS at once. Behind a password. Add your domain when you are ready. Checked every minute. Alerts by email, Slack, Discord, Telegram or webhook."},
+	{"security", "Security", "Every door shut.", "The agent only dials out. No SSH key with us. Per server, one click each: a Cloudflare Tunnel instead of open ports. SSH only on Tailscale. A firewall."},
+	{"apps", "Apps", "47 apps in one click.", "n8n. Umami. Open WebUI. And 44 more. " + brand.Name + " makes the secrets and backs up the database. A new release? You hear it."},
+	{"agents", "Agents", "Your agent deploys too.", "Claude, Cursor or any MCP client. Deploy, roll back, read logs, run commands. With a token. Read-only if you like."},
+}
+
+// homeCatalogApps are a few apps of the catalog, by name, for the Apps tab.
+var homeCatalogApps = []string{"n8n", "Umami", "Open WebUI", "Ghost", "Plausible", "Vaultwarden", "Outline", "Grafana", "Uptime Kuma", "Nextcloud", "Metabase", "Ollama"}
+
+// ---------------------------------------------------------------- product
+// HomeProduct is the second screen: everything moin does, one tab each, a
+// promise and a sentence on the left, what you really see on the right.
+// The tabs move on by themselves until someone picks one (stageScript).
+templ HomeProduct() {
+	<section id="product" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			<h2 class={ typeH2, "max-w-[18ch]" }>Everything your app needs.</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Deploys. Data. Backups. Domains. Alerts. One tool on servers you own.</p>
+			@tabs.Tabs(tabs.Props{DefaultValue: homeProductTabs[0].Value, Class: "mt-12 gap-6 sm:mt-16", Attributes: templ.Attributes{"data-stage": true}}) {
+				<div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+					@tabs.List(tabs.ListProps{Class: "w-max gap-1 bg-card p-1 text-muted-foreground group-data-horizontal/tabs:h-auto", Attributes: templ.Attributes{"aria-label": "What " + brand.Name + " does"}}) {
+						for _, tab := range homeProductTabs {
+							@homeStageTab(tab.Value, tab.Label)
+						}
+					}
+				</div>
+				<div class="grid">
+					for _, tab := range homeProductTabs {
+						@tabs.Content(tabs.ContentProps{Value: tab.Value, Class: "col-start-1 row-start-1 transition-opacity duration-500 ease-out [&.hidden]:pointer-events-none [&.hidden]:invisible [&.hidden]:block [&.hidden]:opacity-0"}) {
+							@card.Card(card.Props{Class: utils.CN("gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid h-full grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16 lg:p-16"))}) {
+								<div>
+									<h3 class={ typeH3, "text-3xl tracking-[-0.03em] sm:text-4xl" }>{ tab.Title }</h3>
+									<p class={ typeText, "mt-4 max-w-md text-lg leading-8" }>{ tab.Text }</p>
+								</div>
+								<div class="min-w-0">
+									@homeProductPanel(tab.Value)
+								</div>
+							}
+						}
+					}
+				</div>
+			}
+			@stageScript()
+		</div>
+	</section>
+}
+
+// homeProductPanel is what a tab shows: real commands and their output,
+// the alert email, the catalog, an agent at work.
+templ homeProductPanel(value string) {
+	switch value {
+		case "deploy":
+			@homeTerminal() {
+				<p><span class="text-terminal-foreground/50">$ </span>moin deploy</p>
+				<p class="text-terminal-foreground/60">→ detected compose, service web on port 8080</p>
+				<p class="text-terminal-foreground/60">→ building</p>
+				<p class="text-terminal-foreground/60">→ snapshot of /data/app.db: 20261101T225716Z-before-v7</p>
+				<p class="text-terminal-foreground/60">→ starting</p>
+				<p class="text-live">✓ moin. shop is live <span class="text-terminal-foreground/50">v7 in 10s</span></p>
+			}
+		case "data":
+			@homeTerminal() {
+				<p><span class="text-terminal-foreground/50">$ </span>moin sql "SELECT status, count(*) FROM orders GROUP BY status"</p>
+				<p class="mt-2 text-terminal-foreground/50">STATUS      COUNT(*)</p>
+				<p>delivered   38</p>
+				<p>paid        126</p>
+				<p>shipped     74</p>
+				<p class="mt-4"><span class="text-terminal-foreground/50">$ </span>moin sql --write "UPDATE orders SET status = 'shipped' WHERE id = 412"</p>
+				<p class="text-live">✓ 1 row changed</p>
+			}
+		case "backups":
+			<div class="divide-y divide-border rounded-3xl bg-background px-1" aria-label="The backups of shop.db">
+				@homeFact("shop.db", "Newest backup", "1 second ago")
+				@homeFact("Restore check", "Restored and opened", "today, 04:12")
+				@homeFact("Before v7", "Full copy", "before the deploy")
+			</div>
+			@homeTerminal() {
+				<p><span class="text-terminal-foreground/50">$ </span>moin restore --at 14:01</p>
+				<p class="text-terminal-foreground/60">→ restoring shop; moin takes a snapshot of the current state first</p>
+			}
+		case "domains":
+			<div class="divide-y divide-border rounded-3xl bg-background px-1" aria-label="The addresses of shop and two alert emails">
+				@homeFact("https://shop.203-0-113-7.sslip.io", "Instant address", "HTTPS")
+				@homeFact("https://shop.example.com", "Your domain", "HTTPS")
+				@homeAlert("shop.example.com is down", "HTTP 502 · since 14:02", false)
+				@homeAlert("shop.example.com is back up", "down for 4 minutes", true)
+			</div>
+		case "security":
+			<div class="divide-y divide-border rounded-3xl bg-background px-1" aria-label="The security switches of a server">
+				@homeFact("Agent", "Dials out over HTTPS", "no open port")
+				@homeFact("Cloudflare Tunnel", "Ports 80 and 443 closed", "on")
+				@homeFact("SSH only on Tailscale", "Answers on your tailnet only", "on")
+				@homeFact("Firewall", "Drops everything else", "on")
+			</div>
+		case "apps":
+			<div class="rounded-3xl bg-background p-5 sm:p-6">
+				<ul class="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Apps in the catalog">
+					for _, app := range homeCatalogApps {
+						<li class="rounded-2xl bg-card px-4 py-3 text-base font-medium">{ app }</li>
+					}
+				</ul>
+				<a href="/apps" class="mt-5 inline-block text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">All 47 apps</a>
+			</div>
+		case "agents":
+			<div class="flex flex-col gap-3 rounded-3xl bg-background p-5 text-base leading-6 sm:p-6">
+				<p class="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background">shop is broken since the last deploy. Roll it back.</p>
+				<p class="self-start font-mono text-sm text-muted-foreground">rollback_app · shop</p>
+				<p class="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-card px-4 py-2.5">Rolled back. v14 of shop runs the release of v12, your data stays as it is.</p>
+			</div>
+	}
+}
+
+// homeTerminal is a block of commands and what they print.
+templ homeTerminal() {
+	<div class="moin-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground [&:not(:first-child)]:mt-3">
+		{ children... }
+	</div>
+}
+
+// homeFact is one line of a panel: what, a word about it, and its value.
+templ homeFact(name, label, value string) {
+	<div class="flex items-center gap-4 px-5 py-4">
+		<span class="min-w-0">
+			<span class="block truncate text-base font-semibold">{ name }</span>
+			<span class="block text-sm text-muted-foreground">{ label }</span>
+		</span>
+		<span class="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">{ value }</span>
+	</div>
+}
+
+// ---------------------------------------------------------------- security
+// HomeSecurity is what sets moin apart from every tool that holds a key to
+// your servers: the agent dials out, nothing gets in.
+templ HomeSecurity() {
+	<section id="security" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			<h2 class={ typeH2, "max-w-[16ch]" }>Nothing gets in.</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Other tools log in to your servers over SSH. { brand.Name } never does. A small agent on your server calls out. Only it decides what runs.</p>
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
+				@homePoint("No key to your servers.", "We hold no SSH key and no password to your servers. You need none either: moin exec runs a command in your container.")
+				@homePoint("No open port.", "The agent only dials out over HTTPS. Your firewall stays shut.")
+				@homePoint("Your rules. Your server.", "A file on the server says what moin may do there. One line turns data access off, even for us.")
+			</div>
+			<p class="mt-8">
+				<a href="/docs/guides/security" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">The security guide</a>
+			</p>
+		</div>
+	</section>
+}
+
+// homePoint is one point of a section in its own card: a title and a line.
+templ homePoint(title, text string) {
+	@card.Card(card.Props{Class: utils.CN("block h-full gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8"))}) {
+		<p class={ typeH3 }>{ title }</p>
+		<p class={ typeText, "mt-3" }>{ text }</p>
+	}
+}
+
+// ---------------------------------------------------------------- ways in
+// HomeWays is the rule that sets moin apart: every feature works in all
+// four ways in. Four quiet cards, each with a line of what it looks like,
+// and the activity log that sees every one of them.
+templ HomeWays() {
+	<section id="ways" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			<h2 class={ typeH2, "max-w-[16ch]" }>Four ways in.</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>
+				<span class="text-foreground">Click. Type. Press a key. Ask your agent.</span>
+				Every feature works in all four.
+			</p>
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4">
+				@homeWay("Browser.", "For you and your team.", "moin.run/app")
+				@homeWay("CLI.", "For scripts and CI.", "$ moin rollback v12")
+				@homeWay("Terminal UI.", "Everything live, one key away.", "$ moin")
+				@homeWay("Agent.", "Claude, Cursor and any MCP client.", "rollback_app · shop")
+			</div>
+			@card.Card(card.Props{Class: utils.CN("mt-3 gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16 lg:p-16"))}) {
+				<div>
+					<h3 class={ typeH3, "text-3xl tracking-[-0.03em] sm:text-4xl" }>Who did what. To the second.</h3>
+					<p class={ typeText, "mt-4 max-w-md text-lg leading-8" }>Every deploy, restore and change. And which way it came in. Never your secrets or your data.</p>
+				</div>
+				<div class="min-w-0 divide-y divide-border rounded-3xl bg-background px-1" aria-label="The activity log of a workspace">
+					@homeActivity("14:03:07", "ada@example.com", "CLI", "deployed shop v42")
+					@homeActivity("14:10:12", "ben@example.com", "Web", "set STRIPE_KEY in the env of shop")
+					@homeActivity("14:20:02", "GitHub", "GitHub", "deployed blog v7")
+					@homeActivity("14:25:44", "ada@example.com", "MCP", "ran UPDATE on orders in shop")
+				</div>
+			}
+			<p class="mt-8 flex flex-wrap gap-x-6 gap-y-2">
+				<a href="/docs/guides/activity" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">The activity log</a>
+				<a href="#compare" class="text-base text-muted-foreground underline underline-offset-4 hover:text-foreground">How others compare</a>
+			</p>
+		</div>
+	</section>
+}
+
+// homeWay is one way in: its name, who it is for, and a line of it.
+templ homeWay(title, text, sample string) {
+	@card.Card(card.Props{Class: utils.CN("flex h-full flex-col gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8"))}) {
+		<p class={ typeH3 }>{ title }</p>
+		<p class={ typeText, "mt-2" }>{ text }</p>
+		<p class="mt-auto truncate pt-6 font-mono text-sm text-foreground">{ sample }</p>
+	}
+}
+
+// homeActivity is one line of the activity log: when, who, which way in,
+// and what.
+templ homeActivity(when, who, via, what string) {
+	<div class="flex items-start gap-4 px-5 py-4">
+		<span class="w-16 shrink-0 font-mono text-sm text-muted-foreground tabular-nums">{ when }</span>
+		<span class="min-w-0">
+			<span class="block truncate text-base font-semibold">{ what }</span>
+			<span class="block truncate text-sm text-muted-foreground">{ who } · { via }</span>
+		</span>
+	</div>
+}

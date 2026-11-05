@@ -30,19 +30,6 @@ templ Wordmark(class ...string) {
 	</span>
 }
 
-// showNew puts the New badge on Apps in the navbar; set it false once the
-// catalog is not news anymore.
-const showNew = true
-
-// NewBadge marks Apps as new in the navbar.
-templ NewBadge() {
-	if showNew {
-		@badge.Badge(badge.Props{Class: "h-auto rounded-full bg-live/15 px-2 py-0.5 font-sans text-[11px] font-semibold leading-normal text-live"}) {
-			New
-		}
-	}
-}
-
 // BetaBadge says moin is in beta, next to the wordmark, centered on it with
 // items-center: Wordmark trims its box to its lowercase letters.
 templ BetaBadge(class string) {
@@ -54,6 +41,10 @@ templ BetaBadge(class string) {
 templ navLink(href, label string) {
 	<a href={ templ.SafeURL(href) } class="rounded-full px-3.5 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">{ label }</a>
 }
+
+// starsShowAt is how many GitHub stars it takes before the navbar shows
+// the count.
+const starsShowAt = 1000
 
 templ Navbar() {
 	{{ user := ctxkeys.User(ctx) }}
@@ -72,12 +63,16 @@ templ Navbar() {
 					@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "mx-2 h-4 data-vertical:self-auto"})
 					<a href="/apps" class="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14px] font-medium text-foreground transition-colors hover:bg-secondary">
 						Apps
-						@NewBadge()
 					</a>
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
+				// The star count shows from starsShowAt on: a small one says
+				// "nobody uses this", like the live numbers of the home page.
 				{{ stars := githubstars.Count() }}
+				if stars < starsShowAt {
+					{{ stars = 0 }}
+				}
 				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-10 items-center justify-center gap-1.5 rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:inline-flex", templ.KV("w-10", stars == 0), templ.KV("px-3.5", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
 					@icons.Github(icons.Props{Class: "size-[18px]"})
 					if stars > 0 {
