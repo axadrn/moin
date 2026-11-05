@@ -1,0 +1,170 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/controlplane/internal/brand"
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
+	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+)
+
+// DeviceView is the page where `moin login` is approved in the browser.
+// Without a pending login it asks for the code.
+type DeviceView struct {
+	// Code is the code as the terminal shows it, ABCD-EFGH.
+	Code string
+	// CodeError says why the code was not taken.
+	CodeError string
+	// Login is the pending login of Code, nil until a valid code is in.
+	Login *model.DeviceLogin
+	// Workspaces are the user's workspaces the computer can be let into.
+	Workspaces  []APITokenWorkspace
+	WorkspaceID string
+	// WorkspaceError says why the workspace was not taken.
+	WorkspaceError string
+}
+
+// deviceName is how the page names the computer: "moin CLI on dev-01".
+func deviceName(login *model.DeviceLogin) string {
+	if login == nil || login.Hostname == "" {
+		return brand.Name + " CLI"
+	}
+	return brand.Name + " CLI on " + login.Hostname
+}
+
+func (v DeviceView) workspaceItems() []selectcomp.ItemData {
+	items := make([]selectcomp.ItemData, 0, len(v.Workspaces))
+	for _, workspace := range v.Workspaces {
+		items = append(items, selectcomp.ItemData{Value: workspace.ID, Label: workspace.Name})
+	}
+	return items
+}
+
+templ devicePage(title, description string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Log in the CLI",
+		Description: "Approve a login of the " + brand.Name + " CLI",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard(title, description) {
+				{ children... }
+			}
+		}
+	}
+}
+
+// Device asks for the code of `moin login`, or, with a pending login,
+// whether to let the computer in.
+templ Device(view DeviceView) {
+	if view.Login == nil {
+		@devicePage("Log in the CLI", "Enter the code your terminal shows.") {
+			<form id="device-code-form" action="/device" method="GET">
+				@field.Group() {
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "code"}) {
+							Code
+						}
+						@input.Input(input.Props{
+							ID:          "code",
+							Name:        "code",
+							Type:        "text",
+							Value:       view.Code,
+							Placeholder: "ABCD-EFGH",
+							Class:       "font-mono",
+							Attributes:  templ.Attributes{"aria-invalid": strconv.FormatBool(view.CodeError != ""), "aria-describedby": "code-hint", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "maxlength": "16", "autofocus": ""},
+						})
+						@fieldHint("code", view.CodeError) {
+							{ "Run " + brand.Name + " login in a terminal to get one." }
+						}
+					}
+					@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
+						Continue
+					}
+				}
+			</form>
+		}
+	} else {
+		@devicePage("Log in "+deviceName(view.Login)+"?", "It gets read and write access, like you, until you revoke it under Settings, Tokens.") {
+			<form id="device-approve-form" action="/device/approve" method="POST">
+				@csrf.Token()
+				<input type="hidden" name="code" value={ view.Code }/>
+				@field.Group() {
+					<div class="flex flex-col items-center gap-1 rounded-2xl bg-muted px-6 py-4">
+						<p class="text-xs text-muted-foreground">Code</p>
+						<p class="font-mono text-2xl font-semibold tracking-tight" data-device-code>{ view.Code }</p>
+						<p class="text-xs text-muted-foreground">Only go on if your terminal shows the same code.</p>
+					</div>
+					<p class="text-sm text-muted-foreground">
+						You are signed in as <span class="font-medium text-foreground">{ ctxkeys.User(ctx).Email }</span>.
+					</p>
+					if len(view.Workspaces) > 1 {
+						@field.Field() {
+							@field.Label(field.LabelProps{For: "device-workspace"}) {
+								Workspace
+							}
+							@selectcomp.Select(selectcomp.Props{Name: "workspace_id", DefaultValue: view.WorkspaceID, Items: view.workspaceItems()}) {
+								@selectcomp.Trigger(selectcomp.TriggerProps{ID: "device-workspace", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(view.WorkspaceError != ""), "aria-describedby": "device-workspace-hint"}}) {
+									@selectcomp.Value()
+								}
+								@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+									@selectcomp.Group() {
+										for _, workspace := range view.Workspaces {
+											@selectcomp.Item(selectcomp.ItemProps{Value: workspace.ID}) {
+												{ workspace.Name }
+											}
+										}
+									}
+								}
+							}
+							@fieldHint("device-workspace", view.WorkspaceError) {
+								The CLI can only reach this workspace.
+							}
+						}
+					} else {
+						<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
+						for _, workspace := range view.Workspaces {
+							<p class="text-sm text-muted-foreground">
+								Workspace <span class="font-medium text-foreground">{ workspace.Name }</span>
+							</p>
+						}
+						if view.WorkspaceError != "" {
+							<p class="text-sm text-failed" role="alert">{ view.WorkspaceError }</p>
+						}
+					}
+					@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
+						Approve
+					}
+					@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: blocks.AuthSecondary, Attributes: templ.Attributes{"formaction": "/device/deny"}}) {
+						Deny
+					}
+				}
+			</form>
+		}
+	}
+}
+
+// DeviceDone says what became of the login: approved or denied.
+templ DeviceDone(login *model.DeviceLogin, approved bool) {
+	if approved {
+		@devicePage(deviceName(login)+" is logged in", "Go back to your terminal. You can close this tab.") {
+			@button.Button(button.Props{Size: button.SizeLg, Href: "/app", Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
+				{ "Open " + brand.Name }
+			}
+		}
+	} else {
+		@devicePage("Login denied", "The terminal stops waiting. Nothing got access.") {
+			@button.Button(button.Props{Size: button.SizeLg, Href: "/app", Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
+				{ "Open " + brand.Name }
+			}
+		}
+	}
+}

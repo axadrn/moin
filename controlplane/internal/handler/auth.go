@@ -269,6 +269,10 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		redirect(w, r, "/workspaces/invitations/"+pendingInvitation, http.StatusSeeOther)
 		return
 	}
+	if device, ok := pendingDevice(r); ok {
+		redirect(w, r, device, http.StatusSeeOther)
+		return
+	}
 	redirect(w, r, fmt.Sprintf("/app/%s/dashboard", workspace.Slug), http.StatusSeeOther)
 }
 
@@ -317,6 +321,10 @@ func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
 func (h *authHandler) redirectAfterAuth(w http.ResponseWriter, r *http.Request, user *model.User) {
 	if invitation, ok := h.pendingInvitationForUser(w, r, user); ok {
 		redirect(w, r, "/workspaces/invitations/"+invitation, http.StatusSeeOther)
+		return
+	}
+	if device, ok := pendingDevice(r); ok {
+		redirect(w, r, device, http.StatusSeeOther)
 		return
 	}
 	members, err := h.workspaceService.ListForUser(user.ID)

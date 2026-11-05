@@ -10,7 +10,18 @@ const (
 	APITokenScopeRead = "read"
 	// APITokenScopeWrite also lets a token change data.
 	APITokenScopeWrite = "write"
+
+	// APITokenKindPersonal is a token made in Settings, for scripts, CI
+	// and agents.
+	APITokenKindPersonal = "personal"
+	// APITokenKindDevice is the token of one computer, from `moin login`
+	// in the browser. It expires after DeviceTokenIdle without use.
+	APITokenKindDevice = "device"
 )
+
+// DeviceTokenIdle is how long a device token lives without being used.
+// Each use starts it again.
+const DeviceTokenIdle = 90 * 24 * time.Hour
 
 // APIToken is a personal API token. The raw token is shown once at creation
 // and only its SHA-256 hash is stored. Prefix is the start of the raw token
@@ -25,7 +36,9 @@ type APIToken struct {
 	TokenHash   string `db:"token_hash"`
 	Prefix      string `db:"prefix"`
 	// Scopes is "read" or "read,write".
-	Scopes     string     `db:"scopes"`
+	Scopes string `db:"scopes"`
+	// Kind is APITokenKindPersonal or APITokenKindDevice.
+	Kind       string     `db:"kind"`
 	LastUsedAt *time.Time `db:"last_used_at"`
 	ExpiresAt  *time.Time `db:"expires_at"`
 	CreatedAt  time.Time  `db:"created_at"`
@@ -54,4 +67,9 @@ func (t APIToken) CanWrite() bool {
 // IsExpired reports whether the token has an expiry that has passed.
 func (t APIToken) IsExpired(now time.Time) bool {
 	return t.ExpiresAt != nil && !t.ExpiresAt.After(now)
+}
+
+// IsDevice reports whether the token is a computer's login from the browser.
+func (t APIToken) IsDevice() bool {
+	return t.Kind == APITokenKindDevice
 }

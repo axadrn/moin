@@ -6,7 +6,7 @@ order: 12
 
 MCP (Model Context Protocol) is how AI agents such as Claude, Cursor or VS Code use tools. The control plane serves an MCP server at `/mcp`. Almost every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back my app and show me its logs"*. [Where things work](/docs/reference/surfaces) lists what stays in the web.
 
-Agents authenticate with a personal API token. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
+Agents authenticate with a personal API token. There is no login tool and no browser login for MCP, unlike `moin login` for the CLI: a token from Settings is all an agent needs. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
 
 ## Connect an agent
 

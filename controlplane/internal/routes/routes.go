@@ -122,6 +122,12 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /auth/logout", auth.Logout)
 	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
 	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
+	// moin login in the browser: the page signs in first by itself.
+	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Cfg)
+	deviceLimiter := middleware.RateLimitDeviceLogin(clientIPs)
+	mux.HandleFunc("GET /device", deviceLimiter(device.Show))
+	mux.HandleFunc("POST /device/approve", deviceLimiter(middleware.RequireAuth(device.Approve)))
+	mux.HandleFunc("POST /device/deny", deviceLimiter(middleware.RequireAuth(device.Deny)))
 	workspace := func(next http.HandlerFunc) http.HandlerFunc {
 		return middleware.RequireAuth(middleware.WithWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 	}
@@ -305,6 +311,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		Alerts:      api.NewAlertsHandler(app.AlertService),
 		Catalog:     api.NewCatalogHandler(app.CatalogService),
 		Status:      api.NewStatusHandler(app.StatusService),
+		Device:      api.NewDeviceHandler(app.DeviceLoginService, app.Cfg.AppURL),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -320,6 +327,8 @@ func SetupRoutes(app *app.App) http.Handler {
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
 			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 		},
+		RateLimitDevice:     deviceLimiter,
+		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
 	}
 	for _, route := range api.Routes(apiHandlers, apiMiddleware) {
 		mux.HandleFunc(route.Pattern, route.Handler)

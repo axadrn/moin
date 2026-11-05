@@ -186,6 +186,11 @@ templ APITokenList(view APITokensView) {
 								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
 									{ apiTokenAccessLabel(token) }
 								}
+								if token.IsDevice() {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										browser login
+									}
+								}
 								if token.IsExpired(view.Now) {
 									@badge.Badge(badge.Props{Class: "bg-failed/12 text-failed"}) {
 										expired

@@ -28,12 +28,17 @@ type Options struct {
 	// and the page to type it on, waits until the user confirmed, and saves
 	// the credentials where the CLI keeps them. Nil without one.
 	Login func(ctx context.Context, show func(userCode, verificationURL string)) error
+	// Browse opens a page in the browser; nil shows the address instead.
+	Browse func(url string) error
 }
 
 // Run opens the TUI until the user quits or ctx ends.
 func Run(ctx context.Context, opts Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if opts.Browse != nil {
+		openBrowser = opts.Browse
+	}
 	m := newModel(ctx, opts)
 	if opts.Config.Token != "" {
 		api, err := client.New(opts.Config)

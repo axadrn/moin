@@ -411,7 +411,9 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Authorization", "Bearer "+c.token)
+	if c.token != "" {
+		request.Header.Set("Authorization", "Bearer "+c.token)
+	}
 	request.Header.Set("User-Agent", build.Name+"-"+c.surface+"/"+build.Version)
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")

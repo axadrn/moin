@@ -31,6 +31,10 @@ type APIToken struct {
 	// apart.
 	Prefix string   `json:"prefix"`
 	Scopes []string `json:"scopes"`
+	// Kind is "personal" for a token made in Settings, "device" for the
+	// login of one computer with `moin login`, which expires 90 days after
+	// its last use.
+	Kind string `json:"kind"`
 	// WorkspaceID is the only workspace the token can reach.
 	WorkspaceID string     `json:"workspace_id"`
 	LastUsedAt  *time.Time `json:"last_used_at"`
@@ -126,6 +130,7 @@ func NewAPIToken(token model.APIToken, now time.Time) APIToken {
 		Name:        token.Name,
 		Prefix:      token.Prefix,
 		Scopes:      token.ScopeList(),
+		Kind:        token.Kind,
 		WorkspaceID: token.WorkspaceID,
 		LastUsedAt:  utcTime(token.LastUsedAt),
 		ExpiresAt:   utcTime(token.ExpiresAt),

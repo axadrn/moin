@@ -16,7 +16,9 @@ type APITokenRepository interface {
 	ByTokenHash(tokenHash string) (*model.APIToken, error)
 	ListByUserID(userID string) ([]model.APIToken, error)
 	CountByUserID(userID string) (int, error)
-	TouchLastUsed(id string, lastUsedAt time.Time) error
+	// TouchLastUsed records a use. A non-nil expiresAt also moves the
+	// expiry, for device tokens.
+	TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error
 	DeleteByIDForUser(id, userID string) error
 	DeleteByUserID(userID string) error
 }
@@ -32,8 +34,8 @@ func NewAPITokenRepository(db *sqlx.DB) APITokenRepository {
 func (r *apiTokenRepository) Create(token *model.APIToken) error {
 	_, err := r.db.Exec(`
 		INSERT INTO api_tokens (
-			id, user_id, workspace_id, name, token_hash, prefix, scopes, last_used_at, expires_at, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			id, user_id, workspace_id, name, token_hash, prefix, scopes, kind, last_used_at, expires_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`,
 		token.ID,
 		token.UserID,
@@ -42,6 +44,7 @@ func (r *apiTokenRepository) Create(token *model.APIToken) error {
 		token.TokenHash,
 		token.Prefix,
 		token.Scopes,
+		token.Kind,
 		token.LastUsedAt,
 		token.ExpiresAt,
 		token.CreatedAt,
@@ -78,7 +81,11 @@ func (r *apiTokenRepository) CountByUserID(userID string) (int, error) {
 	return count, err
 }
 
-func (r *apiTokenRepository) TouchLastUsed(id string, lastUsedAt time.Time) error {
+func (r *apiTokenRepository) TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error {
+	if expiresAt != nil {
+		_, err := r.db.Exec(`UPDATE api_tokens SET last_used_at = $1, expires_at = $2 WHERE id = $3`, lastUsedAt, *expiresAt, id)
+		return err
+	}
 	_, err := r.db.Exec(`UPDATE api_tokens SET last_used_at = $1 WHERE id = $2`, lastUsedAt, id)
 	return err
 }

@@ -43,28 +43,19 @@ export PATH="$HOME/.local/bin:$PATH"
 
 The commands on these pages name the control plane you read them on.
 
-## 3. Create a token
-
-The CLI signs in with a personal API token: a long password just for the CLI, scripts and AI agents.
-
-1. On the web, open **Settings** in the sidebar, then the **Tokens** tab.
-2. Press **Create token**.
-3. Give it a name, such as the name of your computer.
-4. Leave **Access** at **Read and write**. The CLI needs it to add servers and deploy.
-5. Pick how long it works. When it ends, make a new one and log in again.
-6. Press **Create token** and copy the token. moin shows it only once.
-
-The token belongs to your workspace. Teammates you invite later work in the same one. [Account and tokens](/docs/guides/account#create-an-api-token) has more.
-
-## 4. Log in
+## 3. Log in
 
 ```bash
 moin login --url https://moin.example.com
 ```
 
-Paste the token when it asks. `moin login --url https://moin.example.com --token <token>` works without the prompt.
+moin prints a code like `WDJB-MJHT` and opens your browser. Sign in there if you are not yet, check that the page shows the same code, and press **Approve**. The terminal says `Logged in as` with your name.
 
-## 5. Add a server
+No browser on this machine, for example over SSH? Open the address moin prints on any other device, your phone too, and approve it there.
+
+The login belongs to this computer and your workspace. It shows as **CLI on** and the computer's name under **Settings**, **Tokens**, and ends after 90 days without use. [Account and tokens](/docs/guides/account#log-in-the-cli) has more, and how CI logs in with a token.
+
+## 4. Add a server
 
 Pick a name for the server, such as `web-1`. moin gives you one command to run on it.
 
@@ -86,7 +77,7 @@ Not logged in as root? Put `sudo` before `sh`.
 
 It installs Docker when it is missing, which takes a few minutes. Then it installs the agent as the `moin-agent` service and connects it. `moin servers` now shows your server as `online`. The web shows the same under **Servers**, live. [Servers](/docs/guides/servers) has more.
 
-## 6. Add your bucket
+## 5. Add your bucket
 
 Your code and your backups go into your own bucket, never to us.
 
@@ -109,7 +100,7 @@ MCP: add_bucket
 
 The CLI asks for the secret key. moin writes a test file and deletes it, so a wrong key fails right away. [Your bucket](/docs/guides/bucket#add-it) has the details.
 
-## 7. Deploy
+## 6. Deploy
 
 Go to the folder of your app and run:
 
@@ -132,7 +123,7 @@ Deploy v1 of <app-name> started
 
 If the deploy fails, the log ends with the reason. Read it again any time with `moin deploys v1`. [Deploy](/docs/guides/deploy) explains what moin detects and how to change it.
 
-## 8. Open it
+## 7. Open it
 
 Your app is already online at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password in front: `moin instant --show` prints both. On a server behind a Cloudflare Tunnel there is none, since it needs ports 80 and 443.
 

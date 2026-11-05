@@ -4,7 +4,7 @@ description: "Your name, email, password, sessions and API tokens"
 order: 16
 ---
 
-**The short version:** your account lives under **Settings**. Change it on the web. The CLI, the TUI and agents work with a personal API token. A token with write access can change your name, picture and email alerts, never your email, password, sessions or tokens.
+**The short version:** your account lives under **Settings**. Change it on the web. `moin login` logs your computer in through the browser; CI, scripts and agents work with a personal API token. A token with write access can change your name, picture and email alerts, never your email, password, sessions or tokens.
 
 ## Sign up and sign in
 
@@ -70,9 +70,27 @@ API: GET /api/v1/account/sessions
 
 **Revoke** on a session ends it; **Sign out everywhere** ends all of them, this one too, after a question. In the API, `DELETE /api/v1/account/sessions/{id}` ends one, `DELETE /api/v1/account/sessions` all others.
 
+## Log in the CLI
+
+`moin login` logs this computer in through the browser, like `gh auth login`. It prints a code and opens the page `/device` of your control plane. Sign in there with any way you like, check that the page shows the same code, pick the workspace if you have more than one, and press **Approve**. The terminal says `Logged in as` with your name. **Deny** stops the login; nothing gets access.
+
+```surfaces
+Web: `/device`, **Approve** or **Deny**
+CLI: moin login [--url <url>]
+API: POST /api/v1/auth/device, then POST /api/v1/auth/device/token
+```
+
+Without a browser on the machine, over SSH for example, moin prints the address instead: open it on any other device, your phone too. `--web` starts the browser login even when stdin is not a terminal. The code is good for ten minutes and once.
+
+Only approve a code you started yourself. Someone who sends you a link to `/device` wants your access.
+
+The login is a token of its own for this computer: read and write, bound to the workspace you picked, named like **CLI on dev-01**, and marked **browser login** under **Settings**, **Tokens**. It ends after 90 days without use; every use starts the 90 days again. Logging in again on the same computer replaces its last login. The TUI uses the same login. The API answers the polls with the codes of RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token` and `invalid_grant`.
+
+MCP has no login: agents send a personal API token, see [MCP](/docs/guides/mcp).
+
 ## Create an API token
 
-The CLI, the TUI, the GitHub Action and agents sign in with a personal API token. Each token belongs to one workspace and can read, or read and write.
+CI, the GitHub Action, scripts and agents sign in with a personal API token. Each token belongs to one workspace and can read, or read and write.
 
 The dialog starts at **Read and write**, which the CLI needs. A read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
 
@@ -81,9 +99,11 @@ Web: **Settings**, **Tokens** tab, **Create token**
 API: POST /api/v1/account/tokens
 ```
 
-moin shows the token once. Then `moin login` on your computer asks for it.
+moin shows the token once. Give it to the CLI with `moin login --token <token>`, on stdin with `echo "$TOKEN" | moin login`, or as `MOIN_TOKEN` in CI.
 
 ## See your API tokens
+
+The list shows the tokens you made and the computers you logged in with `moin login`, with when each was last used and when it expires.
 
 ```surfaces
 Web: **Settings**, **Tokens** tab
@@ -92,7 +112,7 @@ API: GET /api/v1/account/tokens
 
 ## Revoke an API token
 
-Requests with it stop working right away. The web asks first. `moin logout` only forgets the token on your computer; it still works until you revoke it.
+Requests with it stop working right away. The web asks first. Revoke a computer's **CLI on** token when you lose it or stop using it. `moin logout` only forgets the token on your computer; it still works until you revoke it.
 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Revoke** on the token
