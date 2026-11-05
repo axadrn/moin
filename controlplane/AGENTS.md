@@ -4,7 +4,7 @@
 
 Add project-specific rules here. Keep generated defaults below this section easy to merge with future releases of the starter template.
 
-- This is the moin control plane. Read `PLAN.md` first: pieces, words, connection, slices.
+- This is the moin control plane. How moin works is in `content/docs`, the only source of truth.
 - The agent, CLI, TUI and the protocol package live at the root of this repo, one Go module for all. The repo is public: never commit secrets, `.env` files or anything private.
 - Every feature works in the web UI, the JSON API (with `openapi.yaml`), the CLI and an MCP tool; it is done when each one works end to end. The TUI covers the daily work and opens the web for setup. `content/docs/reference/surfaces.md` ("Where things work") lists what each surface does; update it with every feature.
 - Everything belongs to a workspace: moin services take the workspace ID to read and a `service.Actor` (workspace, user, how it came in) to change. Every change records itself in the activity with `record` (`internal/service/activity.go`), never with secret values or user data (see Activity in `DESIGN.md`), so the team sees who did what on the web, in `moin activity`, the TUI, the API and MCP.
