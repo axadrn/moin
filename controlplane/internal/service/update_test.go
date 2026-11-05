@@ -132,7 +132,7 @@ func TestUpdateStartAndSettle(t *testing.T) {
 	if err := updates.Check(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	actor := Actor{WorkspaceID: admin.Workspace.ID, UserID: "ada", Source: Source{Via: ViaCLI, Token: "laptop"}}
+	actor := Actor{WorkspaceID: admin.Workspace.ID, UserID: "ada", Source: Source{Via: ViaCLI, Token: "ci"}}
 
 	if _, err := updates.Start(Actor{WorkspaceID: member.Workspace.ID, UserID: "bob"}, member.User); !errors.Is(err, ErrUpdateNotAllowed) {
 		t.Fatalf("member Start = %v, want ErrUpdateNotAllowed", err)

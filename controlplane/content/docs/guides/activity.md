@@ -10,7 +10,7 @@ order: 15
 
 | When (UTC) | Who | Via | What |
 | --- | --- | --- | --- |
-| 2026-11-02 14:03:07 | ada@example.com | CLI, token laptop | deployed shop v42 from main at 3f2a9c1 |
+| 2026-11-02 14:03:07 | ada@example.com | CLI, token ci | deployed shop v42 from main at 3f2a9c1 |
 | 2026-11-02 14:03:51 | moin | moin | made v42 of shop live after 44s |
 | 2026-11-02 14:10:12 | ben@example.com | Web | set STRIPE_KEY in the env of shop |
 | 2026-11-02 14:12:30 | ben@example.com | Web | edited status of row 1182 in orders of shop |

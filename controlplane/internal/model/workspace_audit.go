@@ -111,7 +111,7 @@ func (e WorkspaceAuditEvent) Actor() string {
 }
 
 // ViaLabel names how a change came in, with the token it came with:
-// "CLI, token laptop".
+// "CLI, token ci".
 func (e WorkspaceAuditEvent) ViaLabel() string {
 	label := ""
 	switch e.Via {
