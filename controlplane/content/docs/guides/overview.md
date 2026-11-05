@@ -22,7 +22,7 @@ Below it: the counts (apps live, servers online, backups checked in the last 24 
 ```surfaces
 Web: **Overview**, the first item of the sidebar, or `g` then `o`
 CLI: moin status
-TUI: :status
+TUI: the dashboard, where `moin` starts
 API: GET /api/v1/status
 MCP: get_status
 ```

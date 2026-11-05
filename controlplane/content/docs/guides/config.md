@@ -31,7 +31,7 @@ services:
 
 Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
 
-The agent reports what it detected after every deploy: kind, service, port, databases and this block. The web UI shows it on the app page, the TUI on the app, `moin deploy` at the end and MCP in `get_app`.
+The agent reports what it detected after every deploy: kind, service, port, databases and this block. The web UI shows it on the app page, `moin deploy` at the end and MCP in `get_app`.
 
 Fields in `x-moin` win over the settings you make in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address). `database` picks the file the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
 

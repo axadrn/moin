@@ -4,6 +4,8 @@ description: "Every moin command"
 order: 1
 ---
 
+Every command of `moin`. [Where things work](/docs/reference/surfaces) shows what the CLI, the web, the terminal UI, the API and MCP each can do.
+
 | Command | Does |
 | --- | --- |
 | `moin` | opens the terminal UI |

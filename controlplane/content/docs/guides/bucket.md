@@ -37,7 +37,7 @@ CLI: moin buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, `b`, or `enter` on the **Bucket** row while there is none
+TUI: opens the web: `w`, then `k`
 API: POST /api/v1/buckets
 MCP: add_bucket
 ```
@@ -135,7 +135,7 @@ Lists every bucket, the default first, with the apps that use it and the apps th
 ```surfaces
 Web: **Buckets** in the sidebar
 CLI: moin buckets
-TUI: settings tab, a **Bucket** row per bucket
+TUI: opens the web: `w`, then `k`
 API: GET /api/v1/buckets
 MCP: list_buckets
 ```
@@ -148,7 +148,7 @@ Moves the uploads and the new backups of one app to another bucket. Without a ch
 Web: the app page, **Backups** tab, **Use another bucket**, then **Move**
 CLI: moin buckets use client-a [app]
 CLI: moin buckets use --default [app]
-TUI: on the app, `b`, type `bucket client-a` or `bucket -` for the default, `enter`; or `:bucket client-a`
+TUI: on the app, `W`, then the **Backups** tab in the web
 API: PUT /api/v1/apps/{app}/bucket
 MCP: set_app_bucket
 ```
@@ -173,7 +173,7 @@ Web: **Buckets** in the sidebar, **Change** on the bucket, then **Save bucket**;
 CLI: moin buckets edit client-a --name client-b
 CLI: moin buckets edit client-a --access-key <access-key>
 CLI: moin buckets default client-a
-TUI: settings tab, `enter` on the bucket; `D` or `:default` makes it the default
+TUI: opens the web: `w`, then `k`
 API: PUT /api/v1/buckets/{name}
 MCP: edit_bucket
 MCP: set_default_bucket
@@ -186,7 +186,7 @@ Removes a bucket from moin. What is in it stays there.
 ```surfaces
 Web: **Buckets** in the sidebar, **Remove** on the bucket, then type its name
 CLI: moin buckets rm client-a
-TUI: settings tab, `x` on the bucket, then type its name
+TUI: opens the web: `w`, then `k`
 API: DELETE /api/v1/buckets/{name}
 MCP: remove_bucket
 ```

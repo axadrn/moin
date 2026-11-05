@@ -25,7 +25,7 @@ Shows the values too, in plain text.
 ```surfaces
 Web: the app page, **Environment**, **Show values**
 CLI: moin env --show
-TUI: on the app, `e`, then type `show`
+TUI: on the app, `e`, then `v`
 API: GET /api/v1/apps/{app}/env
 MCP: get_env
 ```
@@ -53,7 +53,7 @@ Adds an env var or changes its value.
 ```surfaces
 Web: the app page, **Environment**, **Set**
 CLI: moin env set KEY=value
-TUI: on the app, `e`, then type `KEY=value`
+TUI: on the app, `e`, `a`, then type `KEY=value`
 API: PATCH /api/v1/apps/{app}/env
 MCP: set_env
 ```
@@ -67,7 +67,7 @@ Deletes an env var from the app.
 ```surfaces
 Web: the app page, **Environment**, the × next to the env var
 CLI: moin env rm KEY
-TUI: on the app, `e`, type `-KEY`, then `y`
+TUI: on the app, `e`, pick the key, `x`, then `y`
 API: PATCH /api/v1/apps/{app}/env
 MCP: set_env
 ```
@@ -81,7 +81,7 @@ Shows every env var as one `.env` file, `KEY=value` per line, so you can paste a
 ```surfaces
 Web: the app page, **Environment**, switch **Fields** to **Text**, then **Review changes**
 CLI: moin env push [file]
-TUI: on the app, `e`, then type `edit`: the text opens in `$EDITOR`
+TUI: on the app, `e`, then `E`: the text opens in `$EDITOR`
 API: PUT /api/v1/apps/{app}/env
 MCP: replace_env
 ```

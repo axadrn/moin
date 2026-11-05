@@ -13,16 +13,16 @@ Installs the moin GitHub App on your account or an organization, so moin may rea
 ```surfaces
 Web: the app page, **GitHub**, **Connect GitHub**
 CLI: moin github
-TUI: settings tab, **GitHub**, then `enter`
+TUI: opens the web: `w`, then `g`
 API: GET /api/v1/github
 MCP: get_github
 ```
 
-The CLI, the TUI, the API and MCP give you the link; connecting always happens on github.com. GitHub sends you back and the repos show up. The same command shows where the app is installed.
+The CLI, the API and MCP give you the link and the TUI opens it (`w`, then `g`); connecting always happens on github.com. GitHub sends you back and the repos show up. The same command shows where the app is installed.
 
 Already installed the app? Click **Connect GitHub** all the same. moin asks GitHub which accounts have the app and connects them. If none has it yet, GitHub asks you to install it. An account connected to another workspace stays there: disconnect it there first.
 
-To add another account or organization later, the CLI, the TUI, the API and MCP give a link that installs the app there.
+To add another account or organization later, the CLI, the API and MCP give a link that installs the app there.
 
 The app asks for the least it needs: read the contents of the repos you choose, and write commit statuses. It cannot push code.
 
@@ -33,12 +33,12 @@ Lists the repos moin may read, and where on GitHub you give it another one.
 ```surfaces
 Web: the app page, **GitHub**
 CLI: moin github repos
-TUI: on the app, `gh`
+TUI: on the app, `W` opens its GitHub panel in the web
 API: GET /api/v1/github/repos
 MCP: list_repos
 ```
 
-In the TUI, `g` on an app opens the GitHub panel: the repo the app follows and the repos moin may read.
+In the TUI, the app's header shows the repo and the branch it follows, and `B` deploys from it. Linking is setup: `W` opens the app's GitHub panel in the web.
 
 If you don't see your repo, moin may not read it yet. Under the list, every surface links to the settings page of each account on github.com where you choose the repos moin may read, and gives the link that installs the app on another account or organization. Add the repo there and come back: the web refreshes the list with **Refresh**, the others when you list again. With no repo yet, that link is the first step.
 
@@ -47,7 +47,7 @@ The branches of a repo, the default branch first:
 ```surfaces
 Web: the app page, **GitHub**, the **Branch** select after you choose the repo
 CLI: moin github branches <owner>/<repo>
-TUI: on the app, `gh`, then type `branches <owner>/<repo>`
+TUI: on the app, `W` opens its GitHub panel in the web
 API: GET /api/v1/github/repos/{owner}/{repo}/branches
 MCP: list_branches
 ```
@@ -59,12 +59,12 @@ Makes an app follow a repo and a branch. Deploy every push is on by default. A b
 ```surfaces
 Web: the app page, **GitHub**, choose the repo and the branch, **Deploy**
 CLI: moin link <owner>/<repo> --branch main
-TUI: on the app, `gh`, then type `link <owner>/<repo> main`
+TUI: on the app, `W` opens its GitHub panel in the web
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-In the web, **Deploy** links the repo and deploys the branch in one step. The CLI, the TUI, the API and MCP link first and then deploy, as below.
+In the web, **Deploy** links the repo and deploys the branch in one step. The CLI, the API and MCP link first and then deploy, as below.
 
 ## Deploy from GitHub
 
@@ -73,7 +73,7 @@ Deploys the linked branch, or any branch, tag or commit, without a checkout on y
 ```surfaces
 Web: the app page, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
 CLI: moin deploy --ref <ref>
-TUI: on the app, `gh`, type a branch, tag or commit or nothing, then `enter`
+TUI: on the app, `B`, type a branch, tag or commit or nothing, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_ref
 ```
@@ -87,12 +87,12 @@ Deploys each push to the linked branch by itself.
 ```surfaces
 Web: the app page, **GitHub**, **Deploy every push**
 CLI: moin link <owner>/<repo> --auto=false
-TUI: on the app, `gh`, then type `link <owner>/<repo> main manual`
+TUI: on the app, `W` opens its GitHub panel in the web
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-These turn it off; `moin link <owner>/<repo>` and `link <owner>/<repo>` in the TUI turn it on again. In the API and MCP it is `auto_deploy`. Linking the repo and branch the app follows already changes only this setting, without asking GitHub; the switch on the web does the same.
+These turn it off; `moin link <owner>/<repo>` turns it on again. In the API and MCP it is `auto_deploy`. Linking the repo and branch the app follows already changes only this setting, without asking GitHub; the switch on the web does the same.
 
 A push to another branch does nothing. A push that arrives while a deploy of the app still runs is skipped; the next push, or **Deploy**, picks up the newest commit.
 
@@ -103,7 +103,7 @@ Stops the app from following the repo. The app keeps running.
 ```surfaces
 Web: the app page, **GitHub**, **Unlink**
 CLI: moin unlink
-TUI: on the app, `gh`, then type `unlink`
+TUI: on the app, `W` opens its GitHub panel in the web
 API: DELETE /api/v1/apps/{app}/repo
 MCP: unlink_repo
 ```

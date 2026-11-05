@@ -15,7 +15,7 @@ Lists every server with its live status. Lists update by themselves everywhere.
 ```surfaces
 Web: **Servers**
 CLI: moin servers
-TUI: `moin`, then the **servers** tab
+TUI: `s` on the dashboard
 API: GET /api/v1/servers
 MCP: list_servers
 ```
@@ -35,7 +35,7 @@ Log in to the server as root, for example with `ssh root@<server-ip>`, and run t
 ```surfaces
 Web: **Servers**, **Add server**
 CLI: moin servers add <server-name>
-TUI: on the servers tab, `a`
+TUI: opens the web: `w`, then `a`
 API: POST /api/v1/servers
 MCP: add_server
 ```
@@ -47,7 +47,7 @@ The install command shows once: moin stores only a fingerprint of its token. If 
 ```surfaces
 Web: **Servers**, open the server, **New install command**
 CLI: moin servers install-command <server-name>
-TUI: on the server, `i`
+TUI: opens the web: `w`, then `a`
 API: POST /api/v1/servers/{id}/install
 MCP: new_install_command
 ```
@@ -59,7 +59,7 @@ Gives a server a new name. The rules are those of adding one: lowercase letters,
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**
 CLI: moin servers rename <server-name> <new-name>
-TUI: on the server, `cw` or `:rename`
+TUI: opens the web: `w`, then `a`
 API: PATCH /api/v1/servers/{id}
 MCP: rename_server
 ```
@@ -71,7 +71,7 @@ Servers show in the order you give them, the same for everyone in the workspace 
 ```surfaces
 Web: **Servers**, drag a server to its place
 CLI: moin servers move <server-name> up|down|top|bottom|<position>
-TUI: on the server, `K` or `J`, or `:move up` and `:move down`
+TUI: opens the web: `w`, then `a`
 API: PUT /api/v1/servers/order
 MCP: reorder_servers
 ```
@@ -91,7 +91,7 @@ Switch it off for your workspace with **Update agents automatically**:
 ```surfaces
 Web: **Servers**, **Agent updates**
 CLI: moin servers auto-update on|off
-TUI: settings tab, **Agent updates**, `enter`, or `:auto-update`
+TUI: opens the web: `w`, then `a`
 API: PUT /api/v1/agent-updates
 MCP: set_agent_updates
 ```
@@ -101,7 +101,7 @@ Update an agent by hand:
 ```surfaces
 Web: **Servers**, **Update agent** on the server
 CLI: moin servers update <server-name>
-TUI: on the server, `u`
+TUI: on the server, `u`, then `y`
 API: POST /api/v1/servers/{id}/update
 MCP: update_agent
 ```
@@ -119,12 +119,12 @@ Disconnects the agent and makes its token stop working.
 - **An online server with apps** cannot be removed: [remove the apps](/docs/guides/deploy#remove-an-app) first, so nothing keeps running unseen.
 - **An offline server** goes with its apps: a server that died, or whose agent moved elsewhere, can't remove them itself. Every surface names the apps that went, and the activity notes each one. The apps stay on the machine with their data if it comes back; remove them there with `moin agent uninstall --apps`.
 
-You cannot undo it, so moin asks you to type the server's name first: in the web dialog (the copy button next to the name helps), in the CLI and in the TUI. `--yes` skips it in scripts. An agent passes the name as `confirm`.
+You cannot undo it, so moin asks you to type the server's name first: in the web dialog (the copy button next to the name helps) and in the CLI. `--yes` skips it in scripts. An agent passes the name as `confirm`.
 
 ```surfaces
 Web: **Servers**, open the server, **Remove server**
 CLI: moin servers rm <server-name>
-TUI: on the server, `x`, then type its name
+TUI: opens the web: `w`, then `a`
 API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```

@@ -11,7 +11,7 @@ Shows the last lines your app printed, from every container of the app. Use it w
 ```surfaces
 Web: the app page, **Container logs**, **Load logs**
 CLI: moin logs <app-name>
-TUI: on the app, `L`; `j` `k` scroll, `G` follows the end, `/` searches
+TUI: on the app, `l`, live: `↑` `↓` scroll, `G` follows the end, `/` filters
 API: GET /api/v1/apps/{app}/logs
 MCP: get_logs
 ```

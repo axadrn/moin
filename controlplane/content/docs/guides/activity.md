@@ -48,7 +48,7 @@ Lists who changed what, newest first.
 ```surfaces
 Web: **Activity** in the sidebar
 CLI: moin activity
-TUI: the **activity** tab
+TUI: `a` on the dashboard, or `space v`
 API: GET /api/v1/activity
 MCP: list_activity
 ```
@@ -62,7 +62,7 @@ Narrow it to one app, one server or one member. A server shows its own changes a
 ```surfaces
 Web: **Activity**, pick an app, a server or a member, then **Filter**
 CLI: moin activity --app <app-name> --server <server-name> --user <email>
-TUI: on the activity tab, `f`; `c` clears it
+TUI: not here: it shows all of it; filter in the CLI or the web
 API: GET /api/v1/activity?app=<app-name>&server=<server-name>&user=<email>
 MCP: list_activity
 ```
@@ -74,7 +74,7 @@ Everything stays. Page back as far as you like.
 ```surfaces
 Web: **Activity**, **Show older** at the end
 CLI: moin activity --cursor <cursor>
-TUI: on the activity tab, `m`
+TUI: scroll down: older events load at the end
 API: GET /api/v1/activity?cursor=<next_cursor>
 MCP: list_activity
 ```

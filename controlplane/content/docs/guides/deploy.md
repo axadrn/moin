@@ -14,7 +14,7 @@ Sends the code in your current folder to the server, which builds and starts it.
 
 ```surfaces
 CLI: moin deploy
-TUI: on the app, `d`
+TUI: `D` on the dashboard or the app
 API: POST /api/v1/apps/{app}/uploads
 API: POST /api/v1/apps/{app}/deploys
 ```
@@ -65,7 +65,7 @@ Lists every app with its server and its live deploy.
 ```surfaces
 Web: **Apps**
 CLI: moin apps
-TUI: `moin`, then the **apps** tab
+TUI: the dashboard, where `moin` starts
 API: GET /api/v1/apps
 MCP: list_apps
 ```
@@ -77,7 +77,7 @@ Makes an empty app on a [server](/docs/guides/servers), ready for its first depl
 ```surfaces
 Web: **Apps**, **Add app**
 CLI: moin apps add --server <server-name> <app-name>
-TUI: on the apps tab, `a`
+TUI: opens the web: `w`, then `p`
 API: POST /api/v1/apps
 MCP: create_app
 ```
@@ -108,7 +108,7 @@ Shows the log of a deploy while it runs, step by step.
 ```surfaces
 Web: the app page, **Deploy log**
 CLI: moin deploy
-TUI: the output panel
+TUI: opens by itself when a deploy starts
 API: GET /api/v1/apps/{app}/deploys/{number}/events
 MCP: get_deploy
 ```
@@ -122,7 +122,7 @@ Lists the deploys of an app, newest first, with their status.
 ```surfaces
 Web: the app page, **Deploys**
 CLI: moin deploys <app-name>
-TUI: on the app, `enter`
+TUI: on the app, `d`
 API: GET /api/v1/apps/{app}
 MCP: get_app
 ```
@@ -134,7 +134,7 @@ Shows the full log of an earlier deploy. Every deploy keeps its log, a failed on
 ```surfaces
 Web: the app page, click the deploy under **Deploys**
 CLI: moin deploys v3
-TUI: on the app, pick the deploy with `↑` `↓`, then `enter`
+TUI: on the app, `d`, pick the deploy, then `enter`
 API: GET /api/v1/apps/{app}/deploys/{number}
 MCP: get_deploy
 ```
@@ -146,7 +146,7 @@ Builds the newest code again from the copy the server kept, with the env vars as
 ```surfaces
 Web: the app page, **Redeploy**
 CLI: moin redeploy <app-name>
-TUI: on the app, `R`
+TUI: on the app, `R`, then `y`
 API: POST /api/v1/apps/{app}/redeploy
 MCP: redeploy_app
 ```
@@ -162,7 +162,7 @@ If the app's images are gone from the server, for example after `docker image pr
 ```surfaces
 Web: the app page, **Restart**
 CLI: moin restart <app-name>
-TUI: on the app, `t`
+TUI: on the app, `T`, then `y`
 API: POST /api/v1/apps/{app}/restart
 MCP: restart_app
 ```
@@ -200,12 +200,12 @@ Starts an earlier successful deploy again, with the env vars it had. Use it when
 ```surfaces
 Web: the app page, **Roll back** on a deploy
 CLI: moin rollback v3
-TUI: on the app, `r`, then `y`
+TUI: on the app, `d`, pick the deploy, `r`, then `y`; `P` rolls back to the one before the live one
 API: POST /api/v1/apps/{app}/rollback
 MCP: rollback_app
 ```
 
-A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`moin rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` before `r` to choose one. In the API, send the deploy as `{"number": 3}`. The web, the CLI and the TUI ask first; in a script, add `--yes`.
+A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`moin rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` on the deploys tab before `r`; `P` takes the one before the live one. In the API, send the deploy as `{"number": 3}`. The web, the CLI and the TUI ask first; in a script, add `--yes`.
 
 ## Remove an app
 
@@ -214,7 +214,7 @@ Stops the app and removes its containers and images. Its volumes and data stay o
 ```surfaces
 Web: the app page, **Remove app**
 CLI: moin apps rm <app-name>
-TUI: on the app, `x`, then type its name
+TUI: opens the web: `w`, then `p`
 API: DELETE /api/v1/apps/{app}
 MCP: remove_app
 ```
@@ -228,7 +228,7 @@ Apps show in the order you give them, the same for everyone in the workspace and
 ```surfaces
 Web: **Apps**, drag an app to its place
 CLI: moin apps move <app-name> up|down|top|bottom|<position>
-TUI: on the app list, `K` or `J`, or `:move up` and `:move down`
+TUI: opens the web: `w`, then `p`
 API: PUT /api/v1/apps/order
 MCP: reorder_apps
 ```

@@ -38,7 +38,7 @@ For you, in every workspace:
 ```surfaces
 Web: **Settings**, **Profile** tab, **Email me alerts**
 CLI: moin alerts off, then moin alerts on; moin alerts shows it
-TUI: settings tab, **Email me alerts**, `enter`, or `:alerts`
+TUI: opens the web: `w`, then `s`
 API: PUT /api/v1/account/email-alerts {"on": false}
 MCP: set_email_alerts
 ```
@@ -68,7 +68,7 @@ Every member sees the destinations. Only **owners** and **admins** add, test and
 ```surfaces
 Web: **Alerts** in the sidebar (`g` then `l`), **Add a destination**
 CLI: moin alerts add slack team-chat, then the URL on stdin; moin alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
-TUI: settings tab, `C` or `:alert`
+TUI: opens the web: `w`, then `n`
 API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-chat", "url": "https://hooks.slack.com/services/…"}
 MCP: add_alert_destination
 ```
@@ -87,7 +87,7 @@ A test shows that the destination takes alerts, right after you add it or whenev
 ```surfaces
 Web: **Alerts**, **Send test** next to the destination
 CLI: moin alerts test team-chat
-TUI: settings tab, the destination, `T`, `enter` or `:test`
+TUI: opens the web: `w`, then `n`
 API: POST /api/v1/alert-destinations/team-chat/test
 MCP: test_alert_destination
 ```
@@ -103,7 +103,7 @@ Each destination gets 10 seconds per alert. One that does not take an alert is m
 ```surfaces
 Web: **Alerts**, **Remove** next to the destination
 CLI: moin alerts rm team-chat
-TUI: settings tab, the destination, `x`, then `y`
+TUI: opens the web: `w`, then `n`
 API: DELETE /api/v1/alert-destinations/team-chat
 MCP: remove_alert_destination
 ```
