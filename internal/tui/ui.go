@@ -18,6 +18,9 @@ type palette struct {
 	Fg, Muted, Faint, Line color.Color
 	Good, Warn, Bad        color.Color
 	SelBg, Raised, Float   color.Color
+	// mono is a terminal without colour, like NO_COLOR asks: a selected
+	// row gets a mark instead of its band.
+	mono bool
 }
 
 var (
@@ -311,14 +314,19 @@ func (u ui) panel(title, right string, body []string, w, h int, focus bool) stri
 		if i < len(body) {
 			l = body[i]
 		}
-		// a selected row paints the gutters with its band
-		g := "  "
+		// a selected row paints the gutters with its band, or without
+		// colour carries a mark in the left one
+		gl, gr := "  ", "  "
 		if strings.HasPrefix(l, "\x1b[48;") {
 			if end := strings.IndexByte(l, 'm'); end > 0 {
-				g = l[:end+1] + "  \x1b[m"
+				gl = l[:end+1] + "  \x1b[m"
+				gr = gl
+			}
+			if u.p.mono {
+				gl = u.strong("› ")
 			}
 		}
-		out = append(out, edge(b.Left)+" "+g+padR(l, iw)+g+" "+edge(b.Right))
+		out = append(out, edge(b.Left)+" "+gl+padR(l, iw)+gr+" "+edge(b.Right))
 	}
 	out = append(out, edge(b.BottomLeft+strings.Repeat(b.Bottom, max(0, w-2))+b.BottomRight))
 	return strings.Join(out, "\n")

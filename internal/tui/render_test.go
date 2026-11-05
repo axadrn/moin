@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 )
 
 // Every view and every layer fills the screen exactly, at small and large
@@ -61,16 +64,40 @@ func TestEveryFrameFitsTheScreen(t *testing.T) {
 		}},
 		{"login none", func(m model) model { m.auth = &auth{}; m.login = nil; return m }},
 	}
+	mono := dark
+	mono.mono = true
 	for _, size := range sizes {
-		for _, isLight := range []bool{false, true} {
+		for _, pal := range []palette{dark, light, mono} {
 			for _, c := range cases {
 				m := fixture(size[0], size[1])
-				if isLight {
-					m.pal = light
-				}
+				m.pal = pal
 				checkFrame(t, c.name, c.make(m))
 			}
 		}
+	}
+}
+
+// Without colour, as NO_COLOR asks, the selected row carries a mark, and
+// a status still reads by its dot and word.
+func TestNoColorMarksTheSelection(t *testing.T) {
+	m := fixture(100, 30)
+	m, _ = update(m, tea.ColorProfileMsg{Profile: colorprofile.ASCII})
+	m, _ = update(m, tea.BackgroundColorMsg{Color: light.Fg})
+	if !m.pal.mono {
+		t.Fatal("NO_COLOR stays after the background colour came")
+	}
+	frame := checkFrame(t, "mono", m)
+	if !strings.Contains(frame, "› shop") || strings.Contains(frame, "› blog") {
+		t.Errorf("the selected app has the mark, the others not:\n%s", frame)
+	}
+	for _, want := range []string{"● live v43", "○ new", "● failed v7"} {
+		if !strings.Contains(frame, want) {
+			t.Errorf("a status reads without colour: %q", want)
+		}
+	}
+	m, _ = update(m, tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
+	if strings.Contains(checkFrame(t, "colour", m), "› shop") {
+		t.Error("with colour the band marks the row")
 	}
 }
 

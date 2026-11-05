@@ -19,6 +19,8 @@ Every view fills the screen, from 80 by 24 up. The header says where you are, th
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
 - **The mouse** wheel scrolls what the arrows move, and a click on a tab of an app opens it. Hold `shift` to select text, as in other full-screen apps.
 
+Colour only ever says a status: green live, amber running, red failed, always next to a dot and a word. The TUI reads whether your terminal is dark or light and picks its colours for it. With `NO_COLOR` set, or in a terminal without colour, it draws in plain text and marks the selected row with `›`.
+
 A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word. A switch, a paused check or an env var changes on the screen at once; if the control plane refuses it, the footer says why in red and the tab loads what is true again.
 
 ## Views
