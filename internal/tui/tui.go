@@ -15,6 +15,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/charmbracelet/colorprofile"
 )
 
 // Options start the TUI.
@@ -347,10 +348,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 		return m, nil
 	case tea.BackgroundColorMsg:
+		mono := m.pal.mono
 		m.pal = dark
 		if !msg.IsDark() {
 			m.pal = light
 		}
+		m.pal.mono = mono
+		return m, nil
+	case tea.ColorProfileMsg:
+		// NO_COLOR, or a terminal without colour
+		m.pal.mono = msg.Profile == colorprofile.ASCII || msg.Profile == colorprofile.NoTTY
 		return m, nil
 	case tickMsg:
 		return m.tick()
