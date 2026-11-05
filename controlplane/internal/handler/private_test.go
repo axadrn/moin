@@ -36,7 +36,7 @@ func TestHomeIsTheLandingPageOnlyWithBilling(t *testing.T) {
 			}
 			recorder := httptest.NewRecorder()
 
-			NewHomeHandler(telemetry, test.billing).HomePage(recorder, request.WithContext(ctx))
+			NewHomeHandler(telemetry, test.billing, t.TempDir()).HomePage(recorder, request.WithContext(ctx))
 
 			if test.location == "" {
 				if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "<html") {

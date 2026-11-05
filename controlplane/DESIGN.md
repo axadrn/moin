@@ -39,10 +39,9 @@ chose this look from three candidates (moin Looks artifact).
   and long flat shadows give depth. `moin` appears only in the logo, never
   on a ship or a container. Light enough to read on both grounds, simple
   shapes, still. The hero is a wall of containers under the headline:
-  `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`. Two walls
-  compete until one wins: square containers at `/a` (also `/`,
-  `marketing_square.templ`) and long 20-foot containers, staggered, at `/b`
-  (`marketing_harbor.templ`). Both pages stay out of search.
+  `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
+  containers from the side, staggered, only your-app and two others pulled
+  out, the whole wall resting on the foot of the first screen.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small

@@ -28,13 +28,13 @@ var harborHeights = []int{1, 2, 2, 3, 2, 3, 3, 2, 3, 2}
 var harborLabels = map[[2]int]string{
 	{1, 1}: "node",
 	{2, 1}: "sqlite",
-	{3, 0}: "postgres",
+	{3, 1}: "postgres",
 	{3, 2}: "python",
 	{4, 1}: "redis",
-	{5, 0}: "bun",
+	{8, 1}: "bun",
 	{5, 2}: "your-app",
 	{6, 1}: "rails",
-	{7, 0}: "golang",
+	{9, 1}: "golang",
 	{8, 2}: "deno",
 }
 
@@ -47,9 +47,10 @@ var harborCodes = map[string]string{
 }
 
 // harborFront are the containers pulled out of the wall, by column and
-// tier, with how far they stand out. your-app stands out the most.
+// tier, with how far they stand out: your-app the most, and two quiet
+// ones, so the eye goes to your app.
 var harborFront = map[[2]int]int{
-	{0, 0}: 4, {2, 1}: 4, {5, 2}: 10, {6, 2}: 7, {7, 1}: 7, {9, 1}: 4,
+	{2, 1}: 4, {5, 2}: 10, {7, 1}: 6,
 }
 
 // harborShadowPerDepth is how long a shadow falls per unit a container
@@ -154,3 +155,5 @@ func harborSideBottom(x, y, d int) string {
 }
 
 func harborN(n int) string { return strconv.Itoa(n) }
+
+func harborF(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }

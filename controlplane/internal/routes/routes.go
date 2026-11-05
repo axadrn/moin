@@ -36,7 +36,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	securityHeaders := func(next http.Handler) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
 	}
-	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing)
+	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing, content.Root)
 	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
@@ -83,8 +83,6 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
 	mux.HandleFunc("GET /{$}", home.HomePage)
-	mux.HandleFunc("GET /a", home.HomeA)
-	mux.HandleFunc("GET /b", home.HomeB)
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)

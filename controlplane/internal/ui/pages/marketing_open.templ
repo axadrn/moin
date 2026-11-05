@@ -1,0 +1,68 @@
+package pages
+
+import (
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
+	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+)
+
+// HomeOpen is what the changelog says about how moin ships: how many
+// releases since the first, and the newest one. Read from the changelog on
+// every visit, so it is always true.
+type HomeOpen struct {
+	Releases int
+	Since    time.Time
+	Latest   service.Release
+}
+
+// NewHomeOpen counts the releases, newest first as the changelog lists them.
+func NewHomeOpen(releases []service.Release) HomeOpen {
+	if len(releases) == 0 {
+		return HomeOpen{}
+	}
+	return HomeOpen{Releases: len(releases), Since: releases[len(releases)-1].Date, Latest: releases[0]}
+}
+
+// ---------------------------------------------------------------- open
+// HomeOpenSection is the trust a young product can show without logos: the
+// code is open, and it ships often, counted from the real changelog.
+templ HomeOpenSection(open HomeOpen) {
+	if open.Releases > 0 {
+		<section id="open" class={ homeAnchor, homeSection }>
+			<div class={ homeWrap }>
+				<h2 class={ typeH2, "max-w-[16ch]" }>Built in the open.</h2>
+				<p class={ typeLead, "mt-6 max-w-2xl" }>
+					<span class="text-foreground">Every line on GitHub. Every release in the changelog.</span>
+					Read it. Run it. Change it.
+				</p>
+				<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
+					@homeOpenCard("Open source.", "AGPL-3.0. Host it yourself, free, with every feature.", "GitHub", blocks.GitHubURL)
+					@homeOpenCard(homeReleases(open.Releases), "Since "+open.Since.Format("January 2")+". Small steps, shipped often.", "Changelog", "/changelog")
+					@homeOpenCard(open.Latest.Version+".", strings.ReplaceAll(open.Latest.InShort, "`", ""), open.Latest.Date.Format("January 2, 2006"), "/changelog")
+				</div>
+			</div>
+		</section>
+	}
+}
+
+// homeOpenCard is one card of Built in the open: a title, a line, and a
+// link at the foot.
+templ homeOpenCard(title, text, link, href string) {
+	@card.Card(card.Props{Class: utils.CN("flex h-full flex-col gap-0 py-0 text-base overflow-visible", utils.CN(homeSurface, "p-7 sm:p-8"))}) {
+		<p class={ typeH3 }>{ title }</p>
+		<p class={ typeText, "mt-2" }>{ text }</p>
+		<a href={ templ.SafeURL(href) } class="mt-auto pt-6 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">{ link }</a>
+	}
+}
+
+func homeReleases(n int) string {
+	if n == 1 {
+		return "1 release."
+	}
+	return strconv.Itoa(n) + " releases."
+}
