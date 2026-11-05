@@ -18,6 +18,10 @@ const margin = 2
 func (m model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	if m.auth == nil {
+		// the sign-in leaves the mouse alone, to copy its address
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	v.WindowTitle = build.Name + "."
 	return v
 }

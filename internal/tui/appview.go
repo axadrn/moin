@@ -76,7 +76,39 @@ func (m model) errBody(u ui, e string, iw int) []string {
 // a rule under it with the open one drawn bright.
 func (m model) tabBar(u ui, w int) []string {
 	var top, under strings.Builder
-	// the roomiest padding that fits every tab
+	spans, pad := tabSpans(w)
+	side := strings.Repeat(" ", pad/2)
+	for i, sp := range spans {
+		if i > 0 {
+			top.WriteString(" ")
+			under.WriteString(u.rule(1))
+		}
+		t := sp.t
+		label := string(t) + " " + tabName(t)
+		cw := sp.x1 - sp.x0
+		if m.cur.tab == t {
+			top.WriteString(u.strong(center(label, cw)))
+			under.WriteString(u.fg(u.p.Fg, strings.Repeat("━", cw)))
+		} else {
+			top.WriteString(side + u.text(string(t)) + u.muted(" "+tabName(t)) + side)
+			under.WriteString(u.rule(cw))
+		}
+	}
+	if rest := w - wid(under.String()); rest > 0 {
+		under.WriteString(u.rule(rest))
+	}
+	return []string{top.String(), under.String()}
+}
+
+// tabSpan is where a tab sits in the tab bar, from x0 up to x1.
+type tabSpan struct {
+	t      tab
+	x0, x1 int
+}
+
+// tabSpans lays the tabs out in w with the roomiest padding that fits all
+// of them; on a very narrow screen the last ones drop.
+func tabSpans(w int) ([]tabSpan, int) {
 	pad := 4
 	for ; pad > 0; pad -= 2 {
 		total := len(tabs) - 1
@@ -87,32 +119,17 @@ func (m model) tabBar(u ui, w int) []string {
 			break
 		}
 	}
-	side := strings.Repeat(" ", pad/2)
-	used := 0
-	for i, t := range tabs {
-		label := string(t.t) + " " + t.name
-		cw := wid(label) + pad
-		if used+cw > w {
+	var out []tabSpan
+	x := 0
+	for _, t := range tabs {
+		cw := wid(string(t.t)+" "+t.name) + pad
+		if x+cw > w {
 			break
 		}
-		if m.cur.tab == t.t {
-			top.WriteString(u.strong(center(label, cw)))
-			under.WriteString(u.fg(u.p.Fg, strings.Repeat("━", cw)))
-		} else {
-			top.WriteString(side + u.text(string(t.t)) + u.muted(" "+t.name) + side)
-			under.WriteString(u.rule(cw))
-		}
-		used += cw
-		if i < len(tabs)-1 && used < w {
-			top.WriteString(" ")
-			under.WriteString(u.rule(1))
-			used++
-		}
+		out = append(out, tabSpan{t.t, x, x + cw})
+		x += cw + 1
 	}
-	if rest := w - wid(under.String()); rest > 0 {
-		under.WriteString(u.rule(rest))
-	}
-	return []string{top.String(), under.String()}
+	return out, pad
 }
 
 func loading(u ui) []string { return []string{"", u.faint("Loading …")} }

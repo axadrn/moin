@@ -639,6 +639,37 @@ func TestHelpShowsEveryKeyOfThePlaceAndScrolls(t *testing.T) {
 	}
 }
 
+func TestTheWheelScrollsAndAClickOpensATab(t *testing.T) {
+	m := fixture(120, 40)
+	m, _ = update(m, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if m.sel["apps"] != 1 {
+		t.Fatalf("the wheel moves the cursor, at %d", m.sel["apps"])
+	}
+	m = m.withApp("shop", tLogs)
+	m.app.logs = make([]string, 100)
+	m, _ = update(m, tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if m.logs.back != 3 {
+		t.Fatalf("a notch scrolls the logs three lines, back %d", m.logs.back)
+	}
+	frame := strings.Split(checkFrame(t, "logs", m), "\n")
+	x := strings.Index(frame[tabBarY], "m metrics")
+	if x < 0 {
+		t.Fatalf("the tab bar is not on line %d:\n%s", tabBarY, strings.Join(frame, "\n"))
+	}
+	m, _ = update(m, tea.MouseClickMsg{Button: tea.MouseLeft, X: x + 2, Y: tabBarY})
+	if m.cur.tab != tMetrics {
+		t.Fatalf("a click on metrics opens it, got %s", tabName(m.cur.tab))
+	}
+	if v := fixture(80, 24).View(); v.MouseMode != tea.MouseModeCellMotion {
+		t.Error("the mouse is on")
+	}
+	signIn := fixture(80, 24)
+	signIn.auth = &auth{}
+	if signIn.View().MouseMode != tea.MouseModeNone {
+		t.Error("the sign-in leaves the mouse to the terminal, to copy the address")
+	}
+}
+
 func TestSpaceSpaceSearches(t *testing.T) {
 	m := press(fixture(120, 40), "space")
 	_, groups := m.menuGroups()
