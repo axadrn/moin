@@ -19,7 +19,7 @@ Lists the tables of the database with their row counts.
 ```surfaces
 Web: the app page, **Data** tab
 CLI: moin db
-TUI: on the app, `s`
+TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
 MCP: list_tables
 ```
@@ -31,7 +31,7 @@ Shows the rows of one table, newest first.
 ```surfaces
 Web: the app page, **Data** tab, click a table
 CLI: moin db rows <table>
-TUI: on the app, `s`, then type `SELECT * FROM <table>`
+TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/rows
 MCP: query_database
 ```
@@ -45,7 +45,7 @@ Shows how a table is built: its `CREATE` statement and its indexes.
 ```surfaces
 Web: the app page, **Data** tab, a table, **Schema**
 CLI: moin db schema <table>
-TUI: on the app, `s`, then type `SELECT sql FROM sqlite_schema`
+TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
 MCP: list_tables
 ```
@@ -57,7 +57,7 @@ Runs a query on the live database. A query only reads, unless you say it may cha
 ```surfaces
 Web: the app page, **Data** tab, the **SQL** box, **Run**
 CLI: moin sql "SELECT status, count(*) FROM orders GROUP BY status"
-TUI: on the app, `s`, then type the query
+TUI: opens the web: `w`, then `d`
 API: POST /api/v1/apps/{app}/databases/query
 MCP: query_database
 ```
@@ -70,7 +70,7 @@ Edits a cell, adds a row or deletes one. With [backups](/docs/guides/backups) se
 Web: the app page, **Data** tab: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
 Web: or tick **Allow changes** in the **SQL** box
 CLI: moin sql --write "UPDATE settings SET value = 'on' WHERE key = 'maintenance'"
-TUI: on the app, `s`, type the query, then `y` when moin asks **This query changes data. Run it?**
+TUI: opens the web: `w`, then `d`
 API: PATCH /api/v1/apps/{app}/databases/rows
 MCP: execute_sql
 ```

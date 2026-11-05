@@ -71,7 +71,7 @@ Pick a name for the server, such as `web-1`. moin gives you one command to run o
 ```surfaces
 Web: **Servers**, **Add server**
 CLI: moin servers add <server-name>
-TUI: on the servers tab, `a`
+TUI: opens the web: `w`, then `a`
 API: POST /api/v1/servers
 MCP: add_server
 ```
@@ -102,7 +102,7 @@ CLI: moin buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, `b`
+TUI: opens the web: `w`, then `k`
 API: POST /api/v1/buckets
 MCP: add_bucket
 ```
@@ -141,7 +141,7 @@ For your visitors, give it a domain:
 ```surfaces
 Web: the app page, **Domains**, **Add domain**
 CLI: moin domains add <your-domain>
-TUI: on the app, `o`, then type the domain
+TUI: on the app, `o`, `a`, then type the domain
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```

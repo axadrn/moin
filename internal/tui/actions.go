@@ -85,20 +85,38 @@ type page struct {
 
 // webPages are the setup pages: rare work that wants a browser.
 func (m model) webPages() []page {
+	data := page{"d", "Data", "Browse and edit the rows of a database.", "/apps"}
+	if app := m.lastApp(); app != "" {
+		data = page{"d", "Data of " + app, "Browse and edit the rows of its databases.", "/apps/" + app + "/data"}
+	}
 	out := []page{
-		{"a", "Add a server", "An install command to run on the new machine.", "/servers"},
+		{"a", "Servers", "Add, rename, order and remove servers.", "/servers"},
+		{"p", "Apps", "Create, order and remove apps.", "/apps"},
 		{"c", "Catalog", "Pick an app and fill in its form once.", "/catalog"},
 		{"t", "Team", "Invite people and change roles.", "/workspace"},
 		{"g", "Connect GitHub", "GitHub asks for a browser to install the app.", "/github/install"},
 		{"k", "Buckets", "Where backups and uploads go.", "/bucket"},
 		{"n", "Alerts", "Slack, Discord, Telegram and webhooks.", "/alerts"},
-		{"d", "Data", "Browse and edit the rows of a database.", "/apps"},
+		data,
 		{"s", "Settings", "Your account, API tokens, registry logins.", "/settings"},
 	}
 	if !m.ws.selfHosted {
 		out = append(out, page{"b", "Billing", "Your card belongs to Stripe, not your terminal.", "/billing"})
 	}
 	return out
+}
+
+// lastApp is the app open now or under the web app view.
+func (m model) lastApp() string {
+	if m.cur.app != "" {
+		return m.cur.app
+	}
+	for i := len(m.stack) - 1; i >= 0; i-- {
+		if m.stack[i].app != "" {
+			return m.stack[i].app
+		}
+	}
+	return ""
 }
 
 // browse opens a page of the workspace in the web app.

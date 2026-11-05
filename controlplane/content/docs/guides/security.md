@@ -28,7 +28,7 @@ Adds the Cloudflare token or the Tailscale key. A new key replaces the old one; 
 Web: **Servers**, **Security** on the server, **Integrations**
 CLI: moin integrations cloudflare
 CLI: moin integrations tailscale
-TUI: settings tab, **Cloudflare token** or **Tailscale key**, then `enter`
+TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/integrations
 MCP: set_integrations
 ```
@@ -42,7 +42,7 @@ Shows whether a Cloudflare token and a Tailscale key are there, never the keys t
 ```surfaces
 Web: **Servers**, **Security** on the server, **Integrations**
 CLI: moin integrations
-TUI: settings tab
+TUI: on the server, `W` opens its security page in the web
 API: GET /api/v1/integrations
 MCP: get_integrations
 ```
@@ -55,7 +55,7 @@ Deletes a key from moin. Turn the tunnels off first: without the token moin cann
 Web: **Servers**, **Security** on the server, **Integrations**, then **Remove Cloudflare token** or **Remove Tailscale key**
 CLI: moin integrations rm cloudflare
 CLI: moin integrations rm tailscale
-TUI: settings tab, pick the key, `x`, then `y`
+TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/integrations
 MCP: set_integrations
 ```
@@ -76,7 +76,7 @@ Sends all web traffic of a server through Cloudflare and closes ports 80 and 443
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **Cloudflare Tunnel**, then **Apply**
 CLI: moin servers secure <server-name> --tunnel on
-TUI: on the server, `t`, then `y`
+TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
@@ -101,7 +101,7 @@ Lets SSH answer only on your tailnet, so nobody else on the internet can even tr
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **SSH only on Tailscale**, then **Apply**
 CLI: moin servers secure <server-name> --ssh tailscale
-TUI: on the server, `s`, then `y`
+TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
@@ -117,7 +117,7 @@ Drops every connection the server does not need. Turn it on for every server: wi
 ```surfaces
 Web: **Servers**, **Security** on the server, turn on **Firewall**, then **Apply**
 CLI: moin servers secure <server-name> --firewall on
-TUI: on the server, `f`, then `y`
+TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
@@ -137,7 +137,7 @@ Shows what the agent set up on a server: how traffic comes in, which ports are o
 ```surfaces
 Web: **Servers**, **Security** on the server, **What the agent set up**
 CLI: moin servers
-TUI: the ACCESS column on the servers tab
+TUI: on the server, **Access**
 API: GET /api/v1/servers
 MCP: list_servers
 ```
@@ -198,7 +198,7 @@ Shows the rules a server has, as its agent reported them.
 ```surfaces
 Web: **Servers**, **Security** on the server, **Rules**
 CLI: moin servers rules <server-name>
-TUI: the RULES column on the servers tab
+TUI: on the server, **Access**, under the rules
 API: GET /api/v1/servers
 MCP: list_servers
 ```

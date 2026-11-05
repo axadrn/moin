@@ -11,7 +11,7 @@ addresses, personal details.
 - One binary. `moin` is the TUI, `moin <command>` the CLI, `moin agent` the agent.
 - The agent only dials out. Never add a listener for moin.
 - Clients (CLI, TUI) only call the control plane API (`/api/v1`) and its SSE streams. They never talk to an agent.
-- Every feature works in all surfaces: web UI, CLI, TUI, the control plane API and an MCP tool. A feature is done when each one works end to end.
+- Every feature works in the web UI, the control plane API, the CLI and an MCP tool; it is done when each one works end to end. The TUI covers the daily work and opens the web for setup. The docs page "Where things work" (`controlplane/content/docs/reference/surfaces.md`) lists what each surface does; update it with every feature.
 - Every feature is documented in the control plane docs (`controlplane/content/docs`), the only source of truth. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands. `README.md` stays short and punchy, like shadcn/ui's: what moin is, the first commands, a pointer to the docs, the license. It never repeats the docs.
 - `protocol` is the contract with the control plane. Change it in a way old agents keep working, or bump `protocol.Version`.
 - The product name lives only in `internal/build.Name`.

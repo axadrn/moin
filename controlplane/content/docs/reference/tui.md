@@ -1,113 +1,85 @@
 ---
 title: "Terminal UI"
-description: "Every key of moin without a command"
+description: "Every view and key of moin without a command"
 order: 2
 ---
 
-Run `moin` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, a row per bucket with the apps that use it, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
+Run `moin` in a repo. The terminal UI is for the daily work: see what runs, deploy, read the logs, roll back, back up and restore, change env vars, check domains, uptime and metrics, run a command. Everything updates live. Setup you do once, like billing, the team or a new server, opens the web app in your browser. [Where things work](/docs/reference/surfaces) lists what each place can do.
 
-The header shows the tabs and the control plane, the footer only the keys
-that work in the place you are in. A question like "Stop <app-name>?" waits
-there for `y`; any other key cancels. Removing a server, an app or a
-bucket and a restore cannot be undone, so they ask you to type the name
-first, then `enter`; you can paste it. A form, such as a new app or a
-bucket, asks its fields one after the other: `enter` takes the answer or
-the value it names, `esc` cancels. An open app shows its deploys, what the
-agent detected and a panel with a deploy log, the logs or the env vars. The
-server list shows how each server is reached (ACCESS) and its own rules for
-moin (RULES), from `/etc/moin/rules` on it. Notices clear with the next key.
+Without a token, `moin` signs you in first: it shows a code, opens the browser to confirm it and lands on the dashboard. It saves the token where `moin login` does, so you sign in once for both. `esc` quits the sign-in.
 
-The team tab does what an API token may, like `moin team`: inviting,
-resending and revoking invitations and renaming need an admin or the owner. Changing roles,
-removing members, leaving and deleting the workspace are web only.
+## Moving around
 
-`esc` closes what is open and goes back; it never quits. Only `q`, `ZZ`,
-`:q` and `ctrl+c` quit.
+Every view fills the screen. The header says where you are, the footer which keys work there.
 
-## Vim keys
+- **`space`** opens the menu. It lists every action of the place you are in, grouped, each with one key: `space a s` opens the app `shop`, `space R` redeploys the open app. `backspace` goes up a level, `esc` closes it.
+- **`ctrl+k`** jumps anywhere: type a few letters of an app, a server, a view or an action, like `shop logs` or `redeploy api`, then `enter`. `/` does the same everywhere but in the logs.
+- **`esc`** always goes back one level and closes what is open first. `q` quits on the dashboard and goes back elsewhere; `ctrl+c` quits from anywhere.
+- **`?`** shows the keys of the place you are in.
+- **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
 
-The TUI moves like vim, and `?` shows every key.
+A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word.
 
-- **Move.** `j` `k` select, with a count like `5j`. `gg` and `G` go to the
-  first and the last row, `5G` or `:5` to row 5. `ctrl+d` `ctrl+u` move half
-  a page, `ctrl+f` `ctrl+b` a page. `l` goes into an app or a deploy's log,
-  `h` back out.
-- **Tabs.** `gt` and `tab` go to the next tab, `gT` and `shift+tab` to the
-  one before, `3gt` to the third.
-- **Search.** `/word`, then `enter`, finds a row, or a line in the logs. Case
-  counts only when the word has a capital letter. `n` and `N` find the next
-  and the one before, around the end; `:noh` forgets the search.
-- **Command line.** `:` runs any key by its name, on the place you are:
-  `:deploy`, `:restart`, `:logs`, `:hook off`, `:rename new-name`. `:e shop`
-  opens an app, `:apps` and the other tab names switch the tab. `tab`
-  completes a command.
-- **Logs.** `L` opens the logs, ready to scroll: `j` `k`, `ctrl+d` `ctrl+u`,
-  `gg` for the top. New lines keep coming without moving what you read; the
-  panel says how many are below, and `G` follows the end again. `ctrl+w`
-  moves between the list and the logs, `esc` back to the list.
-- **Inputs.** `ctrl+u` clears the line, `ctrl+w` deletes the last word.
+## Views
+
+| View | Shows |
+| --- | --- |
+| Dashboard | the start: apps live, servers online, backups checked and updates, then your apps with their status, the servers with CPU and memory, the recent activity and what needs you |
+| App | one app with seven tabs: deploys, logs, backups, env, domains, uptime and metrics |
+| Deploy | the log of one deploy, live while it runs |
+| Run | one command in a container of the app and what it writes |
+| Servers | every server with its status, system, agent, apps, access and when it was last seen |
+| Server | one server's CPU, memory and disk over a range, what its agent set up, its rules and its apps |
+| Activity | who did what in your workspace, newest first |
+| Web app | the setup pages, to open in the browser |
+
+## Keys
 
 | Key | Where | Does |
 | --- | --- | --- |
-| `tab` or `gt` | everywhere | switches between servers, apps, activity, team and settings; `shift+tab` or `gT` goes back |
-| `↑` `↓` or `k` `j` | lists | selects; `gg` `G` the first and last, `ctrl+d` `ctrl+u` half a page |
-| `/`, then `n` `N` | lists, logs | searches |
-| `:` | everywhere | the command line: `:q`, `:5`, `:e <app>`, `:<key name>` |
-| `?` | everywhere | shows every key |
-| `a` | servers | adds a server and shows its install command |
-| `t`, then `y` | servers | turns the Cloudflare Tunnel on or off |
-| `s`, then `y` | servers | turns SSH only on Tailscale on or off |
-| `cw` or `:rename` | servers | renames the selected server |
-| `K` `J` or `:move up` `:move down` | servers, apps | moves the selected server or app up or down in the order every list shows |
-| `i` | servers | shows a new one-time install command for the selected server; the old one stops working |
-| `u` | servers | updates the server's agent to the control plane's version |
-| `m` or `:metrics` | servers, apps | shows CPU, memory, disk and network now with a sparkline of the last hour, and for a server its apps by memory; the panel loads them again every 15 seconds while it shows them |
-| `f`, then `y` | servers | turns the firewall on or off |
-| `x`, then the name | servers, apps | removes the selected one; for a server, shows the command that removes its agent there |
-| `a` | apps | creates an app: its name, then its server |
-| `enter` or `l` | apps | opens the app with its deploys and databases |
-| `j` `k` | app | picks a deploy; `enter` or `l` shows its log |
-| `d` | apps | deploys the directory `moin` started in, when its app exists |
-| `gh` | apps | GitHub: shows the repo and the repos moin may read. `enter` deploys the linked branch, a branch, tag or commit deploys that, `link owner/repo [branch] [manual]` follows a repo (`manual`: no deploy on push), `branches owner/repo` lists its branches, `unlink` stops |
-| `R` | apps | redeploys the newest source or image |
-| `t` | apps | restarts the app with the current env and domains |
-| `S` | apps | stops the app, after `y`; starts a stopped one |
-| `i` | apps | deploys an image built in CI; type the image, then `enter` |
-| `:hook` | apps | asks first, then shows a new deploy hook URL for CI, once; the old one stops working |
-| `:hook off`, then `y` | apps | turns the deploy hook off; CI can no longer deploy |
-| `o` | apps | shows domains and DNS; type `<domain>` to add, `-<domain>` to remove (asks first), `=<domain>` for the canonical one, or `<service>:<domain>` to add one to another service of compose.yml |
-| `:instant` | apps | the instant address and its password; `:instant nip.io`, `:instant off`, `:instant open` or `:instant protect` changes it |
-| `p` | apps | password: type `user:password`, or `off` (asks first) |
-| `:status` | everywhere | is everything OK: what needs you, catalog updates and what runs, in the output panel |
-| `:catalog` | apps | lists the [catalog](/docs/guides/catalog); `:catalog <app>` shows its releases, `:catalog install <app> <server> [version]` installs it |
-| `:update [version]` | apps | sets the selected catalog app to the newest release, or the one given, and follows the deploy |
-| `u` or `:uptime` | apps | shows the uptime of every domain and the last outages; `enter` checks again, `pause <domain>` or `resume <domain>` pauses or resumes a check, `<domain> /health` sets its path, `<domain> default` goes back to the health path or `/` |
-| `r`, then `y` | apps | rolls back to the picked deploy, or without a pick to the one before the live one |
-| `L` | apps | shows the logs, ready to scroll and search; `G` follows the end |
-| `:exec <command>` | apps | [runs a command](/docs/guides/exec) in the app's main service, no shell, and shows its output and exit code |
-| `e` | apps | shows env keys; type `KEY=value` or `-KEY` (asks first), `show` or `hide` for the values, or `edit` for all of them as one `.env` in `$EDITOR`, then `enter` |
-| `s` | apps | shows the tables; type SQL, then `enter`. A change asks first, `y` runs it |
-| `b` | apps | shows the backups with the bucket of each snapshot; `enter` backs up now, a snapshot ID or a time like `14:01` restores once you typed the app's name, `<snapshot> <bucket>` restores a snapshot from an older bucket, `bucket <name>` moves the app's uploads and new backups to a bucket after `y` (`bucket -` to the default), `on` or `off` turns the snapshot before every change on or off |
-| `:bucket <name>` | apps | opens the backups with `bucket <name>` typed in, to send with `enter` |
-| `f` | activity | filters by app, server or member; empty fields keep everything |
-| `c` | activity | clears the filter |
-| `m` | activity | loads older events |
-| `a` | team | invites someone: the email, then `member` or `admin` |
-| `enter` | team | sends the selected invitation again |
-| `x`, then `y` | team | revokes the selected invitation |
-| `cw` or `:rename` | team | renames the workspace |
-| `enter` | settings | sets the selected one: a bucket (the secret key may stay empty to keep it), a key or a registry login; on GitHub it shows the install link |
-| `b` or `:bucket` | settings | adds a bucket: name, endpoint, region, bucket, folder, access key, secret key |
-| `D` or `:default` | settings | makes the selected bucket the default, after `y` |
-| `u` or `:update` | settings | updates a self-hosted control plane to the newest release, after `y`; for its admins |
-| `A` or `:auto-update` | settings | turns automatic agent updates on or off; `enter` on **Agent updates** does the same |
-| `E` or `:alerts` | settings | turns your [email alerts](/docs/guides/alerts) on or off; `enter` on **Email me alerts** does the same |
-| `C` or `:alert` | settings | adds an [alert destination](/docs/guides/alerts#slack-discord-telegram-and-webhooks): the kind, a name, the URL or Telegram bot token, the Telegram chat and the events |
-| `T`, `:test` or `enter` | settings | sends a test alert to the selected destination |
-| `a` | settings | adds a registry login |
-| `x`, then `y` | settings | removes a key, an alert destination or a registry login; a bucket asks for its name, and moin refuses one that apps use or that keeps older backups |
-| `ctrl+u` | inputs | clears what you typed; pasted text goes in on one line |
-| `ctrl+w` | inputs | deletes the last word |
-| `enter` | protect, GitHub, domains | sends what you typed; if moin refuses it, the input stays open with your text and the reason, to fix and send again |
-| `esc` or `h` | app | drops the pick, then back to the list |
-| `q`, `ZZ` or `:q` | everywhere | quits |
+| `space` | everywhere | the menu of every action here |
+| `ctrl+k` | everywhere | jumps to an app, server, view or action |
+| `esc` | everywhere | back one level |
+| `?` | everywhere | the keys of this place |
+| `q` | everywhere | quits on the dashboard, goes back elsewhere |
+| `tab` | dashboard | moves between apps, servers and what needs you |
+| `enter` | dashboard | opens the selected app, server or issue |
+| `s` `a` `w` | dashboard | the servers, the activity, the web app |
+| `D` | dashboard, app | deploys the directory `moin` started in to its app, after `y`; `moin deploy` creates a new app |
+| `d` `l` `b` `e` `o` `u` `m` | app | deploys, logs, backups, env, domains, uptime, metrics; `tab` and `←` `→` go to the next and the one before |
+| `R` | app | redeploys the newest source or image, after `y` |
+| `T` | app | restarts the live release with today's env and domains, after `y` |
+| `S` | app | stops the app, after `y`; starts a stopped one |
+| `P` | app | rolls back to the release before the live one, after `y` |
+| `I` | app | deploys an image built in CI: type it, then `enter` |
+| `B` | app | deploys a branch, tag or commit of the linked GitHub repo; empty deploys the linked branch |
+| `U` | app | updates a catalog app to its newest release, after `y` |
+| `N` | app | backs up the app's databases now |
+| `X` | app | [runs a command](/docs/guides/exec) in the main service, no shell; start it with `@service` for another one |
+| `W` | app, server | opens it in the web app |
+| `enter` | deploys | the log of the picked deploy, live while it runs |
+| `r` | deploys, deploy | rolls back to the picked deploy, after `y` |
+| `/` | logs | filters the lines while you type; `c` clears it |
+| `p` | logs | pauses and resumes; the logs load every three seconds |
+| `↑` `↓`, `G` | logs, deploy, run | scrolls back; `G` follows the end again |
+| `enter` | backups | restores the picked snapshot once you typed the app's name |
+| `t` | backups | restores to a point in time: `←` `→` an hour, `H` `L` a day, `↑` `↓` a minute, `tab` the database, `enter`, then the app's name |
+| `a` | backups | turns the snapshot before every change on or off |
+| `a` | env | sets `KEY=value`; `enter` edits the picked one |
+| `x` | env, domains | removes the picked one, after `y` |
+| `v` | env | shows or hides the values |
+| `E` | env | opens all env vars as one `.env` in `$EDITOR`, and asks before it saves what changed |
+| `a` | domains | adds a domain, or `service:domain` for another service of `compose.yml` |
+| `c` | domains | makes the picked domain the canonical one |
+| `p` | domains | password protection: `user:password`, or removes it after `y` |
+| `p` | uptime | pauses or resumes the check of the picked domain |
+| `c` | uptime | sets the path it checks, empty for the default |
+| `r` | uptime | checks again |
+| `[` `]` | metrics, server | the range: 1h, 24h, 7d, 30d |
+| `u` | servers, server | updates the agent to the control plane's version, after `y` |
+| `enter` | servers, activity | opens the server, or the app or server of the event |
+| `enter` or the letter | web app | opens the page in your browser |
+
+## In the web app
+
+These open in the browser from the web app view (`w` on the dashboard, or `space w`), signed in as you: add a server, the catalog, the team, connect GitHub, buckets, alert destinations, the data browser, your settings with API tokens and registry logins, and on moin.run your billing. The CLI, the API and MCP reach most of them too; [Where things work](/docs/reference/surfaces) says which.

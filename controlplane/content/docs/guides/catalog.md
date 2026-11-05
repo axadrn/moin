@@ -18,7 +18,7 @@ The public catalog is at [/apps](/apps), one page per app.
 ```surfaces
 Web: Apps, From the catalog; or /apps on the site
 CLI: moin catalog, then moin catalog umami for its releases
-TUI: :catalog, then :catalog umami
+TUI: opens the web: `w`, then `c`
 API: GET /api/v1/catalog, GET /api/v1/catalog/{slug}
 MCP: list_catalog, get_catalog_app
 ```
@@ -30,7 +30,7 @@ Creates the app on the server, generates its secrets, sets `VERSION` and deploys
 ```surfaces
 Web: Apps, From the catalog, the app, Install
 CLI: moin catalog install umami --server web-1 [--version 3.4.1] [--name stats] [--domain stats.example.com]
-TUI: :catalog install umami web-1 [3.4.1]
+TUI: opens the web: `w`, then `c`
 API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
@@ -44,7 +44,7 @@ The app page shows when a newer release is out, such as "Umami 3.4.1 is out, rel
 ```surfaces
 Web: the app page, the catalog panel, Update
 CLI: moin update umami [--version 3.4.1]
-TUI: on the app, :update [version]
+TUI: on the app, `U`, then `y`
 API: POST /api/v1/apps/{app}/update
 MCP: update_app
 ```

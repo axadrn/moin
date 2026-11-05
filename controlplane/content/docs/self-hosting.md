@@ -251,7 +251,7 @@ When the control plane starts and finds no database, it restores the newest one 
 
 **The control plane.** Once a day it asks GitHub for the newest release. When one is out, the admins in `ADMIN_EMAILS` see a note at the top of the web UI: the version, what is new in one line, and a link to the release notes. Then:
 
-- Click **Update now**. Or run `moin update` in the CLI, or `u` on the settings tab of the TUI.
+- Click **Update now**. Or run `moin update` in the CLI.
 - Or run `sh update.sh` on the server, as before.
 
 moin is away for about a minute. Your apps keep running. Before the database changes, moin keeps a copy of it next to it, like `/var/lib/moin-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.

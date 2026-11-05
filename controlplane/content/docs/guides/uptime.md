@@ -19,7 +19,7 @@ Per domain: the state, uptime over the last 24 hours, 7 and 30 days, the newest 
 ```surfaces
 Web: the app, **Uptime** tab
 CLI: moin uptime <app-name>
-TUI: on the app, `u`; `enter` checks again
+TUI: on the app, `u`; `r` checks again
 API: GET /api/v1/apps/{app}/uptime
 MCP: get_uptime
 ```
@@ -41,7 +41,7 @@ Checks a path like `/health` instead of the health path or `/`. `default` goes b
 ```surfaces
 Web: the app, **Uptime**, the domain's **Path**, then **Save path**
 CLI: moin uptime path blog.de /health
-TUI: on the app, `u`, then `blog.de /health` and `enter`
+TUI: on the app, `u`, pick the domain, `c`, type `/health`, then `enter`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"path": "/health"}
 MCP: set_uptime_check
 ```
@@ -53,7 +53,7 @@ For maintenance, or a domain whose DNS is not set yet. A paused check counts nei
 ```surfaces
 Web: the app, **Uptime**, the domain's **Uptime check** switch
 CLI: moin uptime pause blog.de, then moin uptime resume blog.de
-TUI: on the app, `u`, then `pause blog.de` or `resume blog.de`
+TUI: on the app, `u`, pick the domain, then `p`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"paused": true}
 MCP: set_uptime_check
 ```

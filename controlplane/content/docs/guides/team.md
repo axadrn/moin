@@ -42,7 +42,7 @@ Lists the members of the workspace and the invitations that wait for an answer.
 ```surfaces
 Web: **Team**
 CLI: moin team
-TUI: the **team** tab
+TUI: opens the web: `w`, then `t`
 API: GET /api/v1/workspaces/{slug}
 MCP: get_workspace
 ```
@@ -54,7 +54,7 @@ Sends an email that lets someone join the workspace. The invitation works for se
 ```surfaces
 Web: **Team**, **Invite a teammate**, **Send invite**
 CLI: moin team invite <email>
-TUI: on the team tab, `a`
+TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
 ```
@@ -68,7 +68,7 @@ Sends the email again, for example when it landed in spam.
 ```surfaces
 Web: **Team**, **Pending invitations**, **Resend**
 CLI: moin team resend <email>
-TUI: on the team tab, pick the invitation, then `enter`
+TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
 MCP: resend_invitation
 ```
@@ -82,7 +82,7 @@ Takes an invitation back before someone accepts it.
 ```surfaces
 Web: **Team**, **Pending invitations**, **Revoke**
 CLI: moin team revoke <email>
-TUI: on the team tab, pick the invitation, `x`, then `y`
+TUI: opens the web: `w`, then `t`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
 MCP: revoke_invitation
 ```
@@ -94,7 +94,7 @@ Changes the name everyone in the workspace sees.
 ```surfaces
 Web: **Team**, **Workspace name**, **Save**
 CLI: moin team rename "<workspace-name>"
-TUI: on the team tab, `cw` or `:rename`
+TUI: opens the web: `w`, then `t`
 API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
 ```

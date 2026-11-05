@@ -4,7 +4,7 @@ description: "The JSON API under /api/v1"
 order: 3
 ---
 
-The CLI and the terminal UI use this API, and so can your own scripts. Its OpenAPI 3.1 document is served at [`/api/v1/openapi.yaml`](/api/v1/openapi.yaml).
+The CLI and the terminal UI use this API, and so can your own scripts. [Where things work](/docs/reference/surfaces) shows which endpoints answer only a signed-in browser. Its OpenAPI 3.1 document is served at [`/api/v1/openapi.yaml`](/api/v1/openapi.yaml).
 
 Send a personal API token as `Authorization: Bearer pat_…`. The token belongs to one workspace, and every endpoint below works in it. Errors are `{"error":{"code","message","fields"}}` with stable codes such as `server_offline`, `deploy_running` and `no_rollback`.
 

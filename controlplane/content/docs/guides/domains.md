@@ -22,7 +22,7 @@ A password guards it by default, so a fresh app is not open to the whole interne
 ```surfaces
 Web: the app page, **Instant address**, **Show password**
 CLI: moin instant --show
-TUI: on the app, `:instant`
+TUI: on the app, `o`: the instant address
 API: GET /api/v1/apps/{app}/instant?show=true
 MCP: get_instant
 ```
@@ -32,7 +32,7 @@ Pick another provider if one is down, take the password away, or turn the addres
 ```surfaces
 Web: the app page, **Instant address**, **Provider** or the **Password** switch
 CLI: moin instant nip.io, moin instant open, moin instant protect, moin instant off
-TUI: on the app, `:instant nip.io`, `:instant open`, `:instant protect` or `:instant off`
+TUI: on the app, `W`
 API: PUT /api/v1/apps/{app}/instant
 MCP: set_instant
 ```
@@ -51,7 +51,7 @@ Puts your app on your own domain, with HTTPS.
 ```surfaces
 Web: the app page, **Domains**, **Add domain**
 CLI: moin domains add <domain> www.<domain>
-TUI: on the app, `o`, then type the domain
+TUI: on the app, `o`, `a`, then type the domain
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
@@ -89,7 +89,7 @@ Takes a domain off the app. It stops answering for this app.
 ```surfaces
 Web: the app page, **Domains**, the × next to the domain
 CLI: moin domains rm <domain>
-TUI: on the app, `o`, then type `-` and the domain, then `y`
+TUI: on the app, `o`, pick the domain, `x`, then `y`
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
@@ -103,7 +103,7 @@ Picks one domain as the main one. The others redirect to it for good, so visitor
 ```surfaces
 Web: the app page, **Domains**, **Make canonical** on a domain
 CLI: moin domains canonical <domain>
-TUI: on the app, `o`, then type `=` and the domain
+TUI: on the app, `o`, pick the domain, then `c`
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
@@ -117,7 +117,7 @@ Puts a username and password in front of an app, for example for a staging app o
 ```surfaces
 Web: the app page, **Password**, **Protect with password**
 CLI: moin protect --user <username>
-TUI: on the app, `p`, then type `<username>:<password>`
+TUI: on the app, `o`, `p`, then type `<username>:<password>`
 API: PUT /api/v1/apps/{app}/protection
 MCP: set_protection
 ```
@@ -131,7 +131,7 @@ Makes the app public again.
 ```surfaces
 Web: the app page, **Password**, **Remove password**
 CLI: moin protect off
-TUI: on the app, `p`, type `off`, then `y`
+TUI: on the app, `o`, `p`, then `y`
 API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
@@ -145,7 +145,7 @@ An app of several services, such as a `web` and an `api` in one compose.yml, can
 ```surfaces
 Web: the app page, **Domains**, the domain and its service, **Add domain**
 CLI: moin domains add --service api api.<domain>
-TUI: on the app, `o`, then type `api:api.<domain>`
+TUI: on the app, `o`, `a`, then type `api:api.<domain>`
 API: PUT /api/v1/apps/{app}/domains with "service": "api"
 MCP: set_domains with service
 ```

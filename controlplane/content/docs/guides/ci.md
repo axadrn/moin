@@ -21,7 +21,7 @@ Lets your servers pull private images. A registry is where CI stores the images 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Registries**, **Save login**
 CLI: moin registry set ghcr.io <username>
-TUI: settings tab, `a`
+TUI: opens the web: `w`, then `s`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
@@ -35,7 +35,7 @@ Lists the saved logins, without their passwords.
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Registries**
 CLI: moin registry
-TUI: settings tab
+TUI: opens the web: `w`, then `s`
 API: GET /api/v1/registries
 MCP: list_registries
 ```
@@ -47,7 +47,7 @@ Deletes a saved login. Servers can then no longer pull private images from that 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Registries**, **Remove** on the login
 CLI: moin registry rm ghcr.io
-TUI: settings tab, pick the login, `x`, then `y`
+TUI: opens the web: `w`, then `s`
 API: DELETE /api/v1/registries/{host}
 MCP: remove_registry
 ```
@@ -59,7 +59,7 @@ Gives you a secret URL that deploys an image when CI calls it.
 ```surfaces
 Web: the app page, **Deploy from CI**, **Show**, **Deploy hook**, **New deploy hook**
 CLI: moin hook <app-name>
-TUI: on the app, `:hook`, then `y` to replace a hook
+TUI: on the app, `W` opens **Deploy from CI** in the web
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
@@ -73,7 +73,7 @@ Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop
 ```surfaces
 Web: the app page, **Deploy from CI**, **Deploy hook**, **Turn off**
 CLI: moin hook off <app-name>
-TUI: on the app, `:hook off`, then `y`
+TUI: on the app, `W` opens **Deploy from CI** in the web
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
 ```
@@ -136,7 +136,7 @@ Deploys an image that is already in a registry, without CI.
 ```surfaces
 Web: the app page, **Deploy from CI**, **Show**, **Deploy an image**, **Deploy image**
 CLI: moin deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
-TUI: on the app, `i`, type the image, then `enter`
+TUI: on the app, `I`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_image
 ```

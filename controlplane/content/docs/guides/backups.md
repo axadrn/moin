@@ -32,7 +32,7 @@ CLI: moin buckets add default \
   --region auto \
   --bucket <bucket-name> \
   --access-key <access-key>
-TUI: settings tab, `b`
+TUI: opens the web: `w`, then `k`
 API: POST /api/v1/buckets
 MCP: add_bucket
 ```
@@ -67,7 +67,7 @@ Shows which buckets moin uses, without their secret keys, and which apps use eac
 ```surfaces
 Web: **Buckets** in the sidebar
 CLI: moin buckets
-TUI: settings tab
+TUI: opens the web: `w`, then `k`
 API: GET /api/v1/buckets
 MCP: list_buckets
 ```
@@ -79,7 +79,7 @@ Its uploads and new backups go to the other bucket; its older backups stay where
 ```surfaces
 Web: the app page, **Backups** tab, **Use another bucket**
 CLI: moin buckets use client-a [app]
-TUI: on the app, `b`, then `bucket client-a`
+TUI: opens the web: `w`, then `k`
 API: PUT /api/v1/apps/{app}/bucket
 MCP: set_app_bucket
 ```
@@ -103,7 +103,7 @@ Takes a snapshot right now, for example before you try something risky.
 ```surfaces
 Web: the app page, **Backups** tab, **Back up now**
 CLI: moin backup
-TUI: on the app, `b`, then `enter`
+TUI: on the app, `N`
 API: POST /api/v1/apps/{app}/backups
 MCP: back_up_app
 ```
@@ -117,12 +117,12 @@ A snapshot ID is the time it was taken, then why, like `20261031T143638Z-manual`
 ```surfaces
 Web: the app page, **Backups** tab, **Restore** on a snapshot
 CLI: moin restore <snapshot-id>
-TUI: on the app, `b`, type the snapshot ID, `enter`, then the app name
+TUI: on the app, `b`, pick the snapshot, `enter`, then type the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-A snapshot in an older bucket, from before the app moved, restores from that bucket: the web knows it, the CLI takes `--bucket <bucket>`, the TUI `<snapshot-id> <bucket>`, the API and MCP `bucket`.
+A snapshot in an older bucket, from before the app moved, restores from that bucket: the web knows it, the CLI takes `--bucket <bucket>`, the TUI takes it from the snapshot you pick, the API and MCP `bucket`.
 
 ## Restore to a point in time
 
@@ -131,7 +131,7 @@ Puts the database back to any second of the last 7 days. Deleted the wrong rows 
 ```surfaces
 Web: the app page, **Backups** tab, **Restore to a point in time**: pick the day and the time, then **Restore to this time**
 CLI: moin restore --at "2026-10-31 14:01:00"
-TUI: on the app, `b`, type `14:01`, `enter`, then the app name
+TUI: on the app, `b`, then `t`: pick the moment, `enter`, then type the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
@@ -156,7 +156,7 @@ Takes a snapshot before moin changes anything, so a bad migration or a wrong `UP
 Web: the app page, **Backups** tab, **Snapshot before every change**
 CLI: moin backups auto off
 CLI: moin backups auto on
-TUI: on the app, `b`, then `on` or `off`
+TUI: on the app, `b`, then `a`
 API: PUT /api/v1/apps/{app}/backups/settings
 MCP: set_backup_settings
 ```
@@ -170,7 +170,7 @@ Removing a bucket from moin stops its backups. What is in the bucket stays there
 ```surfaces
 Web: **Buckets** in the sidebar, **Remove** on the bucket
 CLI: moin buckets rm <name>
-TUI: settings tab, `x` on the bucket, then type its name
+TUI: opens the web: `w`, then `k`
 API: DELETE /api/v1/buckets/{name}
 MCP: remove_bucket
 ```

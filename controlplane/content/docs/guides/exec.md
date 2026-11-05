@@ -11,7 +11,7 @@ Runs one command in a container of your app and shows what it prints as it comes
 ```surfaces
 Web: the app page, **Run a command**
 CLI: moin exec [app] [--service web] -- <command>
-TUI: on the app, `:exec <command>`
+TUI: on the app, `X`, then type the command
 API: POST /api/v1/apps/{app}/exec
 MCP: exec_command
 ```

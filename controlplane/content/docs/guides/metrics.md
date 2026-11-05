@@ -20,7 +20,7 @@ The newest numbers, and a chart per number over the last hour, 24 hours, 7 or 30
 ```surfaces
 Web: the server's **Metrics** tab, from **Metrics** on its card; the app's **Metrics** tab
 CLI: moin metrics <app-name>, or moin metrics --server web-1; --range 24h
-TUI: on a server or an app, `m` or `:metrics`; the panel stays live
+TUI: on the app, `m`, or on a server; `[` `]` change the range
 API: GET /api/v1/apps/{app}/metrics?range=1h, GET /api/v1/servers/{id}/metrics?range=24h
 MCP: get_metrics
 ```
