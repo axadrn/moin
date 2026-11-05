@@ -247,3 +247,39 @@ func TestDeviceTokenName(t *testing.T) {
 		}
 	}
 }
+
+func TestDeviceLoginReplacesTheComputersLastLogin(t *testing.T) {
+	e := newDeviceLoginEnvironment(t)
+	login := func() (*model.APIToken, string) {
+		t.Helper()
+		started := e.start(t)
+		if _, err := e.logins.Approve(e.user.User.ID, started.UserCode, e.user.Workspace.ID); err != nil {
+			t.Fatalf("Approve() error = %v", err)
+		}
+		token, raw, err := e.poll(started)
+		if err != nil {
+			t.Fatalf("poll error = %v", err)
+		}
+		return token, raw
+	}
+	_, firstRaw := login()
+	personal, personalRaw, err := e.tokens.Create(e.user.User.ID, CreateAPITokenInput{Name: "CLI on dev-01", WorkspaceID: e.user.Workspace.ID})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	second, secondRaw := login()
+
+	if _, err := e.tokens.Authenticate(firstRaw); err == nil {
+		t.Fatal("the first login still works after logging in again")
+	}
+	if token, err := e.tokens.Authenticate(secondRaw); err != nil || token.ID != second.ID {
+		t.Fatalf("the new login = %+v, %v", token, err)
+	}
+	if token, err := e.tokens.Authenticate(personalRaw); err != nil || token.ID != personal.ID {
+		t.Fatalf("a personal token with the same name was revoked: %+v, %v", token, err)
+	}
+	tokens, err := e.tokens.List(e.user.User.ID)
+	if err != nil || len(tokens) != 2 {
+		t.Fatalf("List() = %d tokens, %v, want the new login and the personal token", len(tokens), err)
+	}
+}

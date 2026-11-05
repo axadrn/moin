@@ -98,19 +98,38 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 
 // CreateForDevice stores the token of a computer that signed in with
 // `moin login` in the browser: read and write, named after the computer, and
-// expiring DeviceTokenIdle after its last use.
+// expiring DeviceTokenIdle after its last use. It replaces the computer's
+// previous login, so logging in again never piles up tokens.
 func (s *APITokenService) CreateForDevice(userID, workspaceID, hostname string, source Source) (*model.APIToken, string, error) {
 	now := s.now().UTC()
 	expiresAt := now.Add(model.DeviceTokenIdle)
-	return s.issue(&model.APIToken{
+	name := DeviceTokenName(hostname)
+	old, err := s.tokens.ListByUserID(userID)
+	if err != nil {
+		return nil, "", err
+	}
+	token, raw, err := s.issue(&model.APIToken{
 		CreatedAt:   now,
 		UserID:      userID,
 		WorkspaceID: workspaceID,
-		Name:        DeviceTokenName(hostname),
+		Name:        name,
 		Scopes:      model.APITokenScopeRead + "," + model.APITokenScopeWrite,
 		Kind:        model.APITokenKindDevice,
 		ExpiresAt:   &expiresAt,
 	}, source)
+	if err != nil {
+		return nil, "", err
+	}
+	// A computer has one login: logging in again replaces the last one.
+	for _, previous := range old {
+		if previous.IsDevice() && previous.Name == name {
+			err = s.Revoke(userID, previous.ID, source)
+			if err != nil {
+				return nil, "", err
+			}
+		}
+	}
+	return token, raw, nil
 }
 
 // DeviceTokenName names the token of a computer: "CLI on dev-01".
