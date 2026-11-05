@@ -34,7 +34,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 
 - **Servers in one click**: create them at Hetzner, DigitalOcean, Vultr and UpCloud, right from moin. [#1](https://github.com/axadrn/moin/issues/1)
 
-- **MySQL backups**: every change backed up and checked daily, like Postgres, so WordPress and the other MySQL apps of the catalog lose nothing either.
+- **MySQL backups**: every change backed up and every restore tested, like Postgres, so WordPress and the other MySQL apps of the catalog lose nothing either.
 
 MongoDB, ClickHouse and the rest run like any service; moin backups for them come when you ask for them.
 

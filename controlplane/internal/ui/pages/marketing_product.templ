@@ -16,7 +16,7 @@ type homeProductTab struct {
 var homeProductTabs = []homeProductTab{
 	{"deploy", "Deploy", "Push. It runs.", "Any repo. A Dockerfile, a compose.yml or an image from your CI. Not healthy? The old version keeps serving."},
 	{"data", "Data", "Your data. Live.", "Browse every table. Edit a cell. Run SQL. SQLite or Postgres, live from your server. Every change takes a snapshot first."},
-	{"backups", "Backups", "Every change. Saved.", "SQLite within a second. Postgres within a minute. Into your own bucket. Restored and checked every day."},
+	{"backups", "Backups", "Every change. Saved.", "SQLite within a second. Postgres within a minute. Into your own bucket. Restored and tested every day."},
 	{"domains", "Domains", "HTTPS from the first deploy.", "Every app gets an address with HTTPS at once. Behind a password. Add your domain when you are ready. Checked every minute. Alerts by email, Slack, Discord, Telegram or webhook."},
 	{"security", "Security", "Every door shut.", "The agent only dials out. No SSH key with us. Per server, one click each: a Cloudflare Tunnel instead of open ports. SSH only on Tailscale. A firewall."},
 	{"apps", "Apps", "47 apps in one click.", "n8n. Umami. Open WebUI. And 44 more. " + brand.Name + " makes the secrets and backs up the database. A new release? You hear it."},
@@ -34,7 +34,7 @@ templ HomeProduct() {
 	<section id="product" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
 			<h2 class={ typeH2, "max-w-[18ch]" }>Everything your app needs.</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>Deploys. Data. Backups. Domains. Alerts. One tool on servers you own.</p>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Deploys. Data. Backups. Domains. Alerts. One tool, on your servers.</p>
 			@tabs.Tabs(tabs.Props{DefaultValue: homeProductTabs[0].Value, Class: "mt-12 gap-6 sm:mt-16", Attributes: templ.Attributes{"data-stage": true}}) {
 				<div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
 					@tabs.List(tabs.ListProps{Class: "w-max gap-1 bg-card p-1 text-muted-foreground group-data-horizontal/tabs:h-auto", Attributes: templ.Attributes{"aria-label": "What " + brand.Name + " does"}}) {
