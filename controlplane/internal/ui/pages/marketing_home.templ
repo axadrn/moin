@@ -37,7 +37,7 @@ const (
 templ Home(network model.Network, open HomeOpen) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
-		Description: "Your apps on servers you own. Every SQLite and Postgres change backed up, every restore tested. Open source, with web, CLI, terminal UI and MCP.",
+		Description: brand.Description,
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
 		<main>
@@ -248,7 +248,7 @@ templ HomeBackups() {
 			<h2 class={ typeH2, "max-w-[14ch]" }>Never lose a row.</h2>
 			<p class={ typeLead, "mt-6 max-w-2xl" }>
 				<span class="text-foreground">A backup nobody restored is a guess.</span>
-				SQLite within a second. Postgres within a minute. Restored and checked every day.
+				SQLite within a second. Postgres within a minute. Restored and tested every day.
 			</p>
 			// Sources, read November 4, 2026:
 			// AWS: "RDS uploads transaction logs for DB instances to Amazon S3

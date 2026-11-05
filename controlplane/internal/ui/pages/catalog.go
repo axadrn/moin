@@ -199,7 +199,7 @@ func releasedShort(version catalog.Version, now time.Time) string {
 // databaseSentence says in words what moin does for the app's database.
 func databaseSentence(entry catalog.Entry) string {
 	if entry.BackedUp() {
-		return "moin backs up every change, checked daily"
+		return "Every change backed up, every restore tested"
 	}
 	if entry.Database == "mysql" {
 		return "Runs on MySQL: moin backups for MySQL come next"
