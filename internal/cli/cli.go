@@ -342,15 +342,11 @@ func openTUI(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	api, err := client.New(config)
-	if err != nil {
-		return err
-	}
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	return tui.Run(ctx, api, config.URL, dir)
+	return tui.Run(ctx, tui.Options{Config: config, Dir: dir})
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {

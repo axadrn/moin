@@ -1,6 +1,7 @@
 package tui
 
-// The env vars of an app as one .env text in the editor: `e`, then `edit`.
+// The env vars of an app as one .env text in the editor: `E` on the env
+// tab.
 
 import (
 	"errors"
@@ -30,8 +31,9 @@ type (
 // editEnv writes the env vars of an app to a file only you can read, for
 // the editor.
 func (m model) editEnv(name string) tea.Cmd {
+	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		env, err := m.api.Env(m.ctx, name)
+		env, err := api.Env(ctx, name)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -78,32 +80,31 @@ func (m model) edited(msg editedMsg) (model, tea.Cmd) {
 		err = msg.err
 	}
 	if err != nil {
-		m.err = fmt.Errorf("the editor: %w; nothing changed", err)
+		m.fail(fmt.Errorf("the editor: %w; nothing changed", err))
 		return m, nil
 	}
 	next, err := dotenv.Parse(string(text))
 	if err != nil {
-		m.err = errors.New(err.Error() + "; nothing changed. Type edit to try again")
+		m.fail(errors.New(err.Error() + "; nothing changed. E tries again"))
 		return m, nil
 	}
 	change := dotenv.Diff(msg.env, next)
 	if change.None() {
-		m.notice = "Nothing changed in the env vars of " + msg.app
+		m.say("Nothing changed in the env vars of " + msg.app)
 		return m, nil
 	}
 	question := "Replace the env vars of " + msg.app + "?"
-	return m.confirmFirst(question, "It "+change.String()+".", "replace", len(change.Removed) > 0, m.replaceEnv(msg.app, next)), nil
+	return m.ask1(question, "It "+change.String()+".", "replace", len(change.Removed) > 0, m.replaceEnv(msg.app, next)), nil
 }
 
 // replaceEnv sends the env vars and shows them.
 func (m model) replaceEnv(name string, env map[string]string) tea.Cmd {
+	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		change, err := m.api.ReplaceEnv(m.ctx, name, env)
+		change, err := api.ReplaceEnv(ctx, name, env)
 		if err != nil {
 			return errMsg{err}
 		}
-		output := m.envOutput(name, env, false)
-		output.note = "it " + change.String() + " · the next deploy gets them"
-		return output
+		return reloadMsg{notice: "Saved: it " + change.String() + ". The next deploy gets them"}
 	}
 }
