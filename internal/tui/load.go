@@ -353,7 +353,7 @@ func (m model) setSnapshots(app string, on bool) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
 		if err := api.SetSnapshotBeforeChanges(ctx, app, on); err != nil {
-			return errMsg{err}
+			return undoMsg{err}
 		}
 		word := "off"
 		if on {
@@ -368,7 +368,7 @@ func (m model) setEnv(app string, set map[string]string, unset []string) tea.Cmd
 	return func() tea.Msg {
 		env, err := api.SetEnv(ctx, app, set, unset)
 		if err != nil {
-			return errMsg{err}
+			return undoMsg{err}
 		}
 		return tea.BatchMsg{
 			func() tea.Msg { return envMsg{app, env} },
@@ -426,7 +426,7 @@ func (m model) setUptime(app, domain string, path *string, paused *bool) tea.Cmd
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
 		if _, err := api.SetUptimeCheck(ctx, app, domain, path, paused); err != nil {
-			return errMsg{err}
+			return undoMsg{err}
 		}
 		return reloadMsg{notice: "Saved the check of " + domain}
 	}

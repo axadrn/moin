@@ -354,6 +354,38 @@ func TestEnvSetAndRemove(t *testing.T) {
 	}
 }
 
+// A toggle or an env var shows at once; a refusal says why and loads the
+// truth again.
+func TestChangesShowAtOnce(t *testing.T) {
+	m := press(fixture(120, 40).withApp("shop", tEnv), "a", "K", "=", "v")
+	m, _ = update(m, keyMsg("enter"))
+	if m.app.env["K"] != "v" {
+		t.Fatal("a new env var shows before the control plane answers")
+	}
+	m = press(m, "x")
+	m, cmd := update(m, keyMsg("y"))
+	if cmd == nil {
+		t.Fatal("y removes it")
+	}
+	m, _ = update(m, cmd())
+	if _, ok := m.app.env["DATABASE_URL"]; ok {
+		t.Fatal("the removed var goes at once")
+	}
+
+	m = press(fixture(120, 40).withApp("shop", tBackups), "a")
+	if m.app.backups.SnapshotBeforeChanges {
+		t.Fatal("a flips the snapshot before changes at once")
+	}
+	m = press(fixture(120, 40).withApp("shop", tUptime), "p")
+	if !m.app.uptime.Domains[0].Paused {
+		t.Fatal("p pauses the check at once")
+	}
+	m, _ = update(m, undoMsg{errors.New("not allowed")})
+	if !m.noticeErr || !strings.Contains(m.notice, "not allowed") {
+		t.Error("a refusal says why")
+	}
+}
+
 func TestStartedDeployOpensItsLog(t *testing.T) {
 	m := fixture(120, 40).withApp("shop", tDeploys)
 	m, _ = update(m, startedMsg{app: "shop", deploy: client.Deploy{Number: 44, Status: "running"}, title: "redeploy v44"})
