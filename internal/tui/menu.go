@@ -5,6 +5,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -267,26 +268,108 @@ func fuzzy(q, s string) (int, []int, bool) {
 	return score, pos, true
 }
 
-// hits are the entries that match the query, the best first.
+// match scores q against s like fuzzy, but the words of q may also come
+// in any order, each in another word of s: "logs shop" finds "shop logs".
+// The order as typed always ranks first.
+func match(q, s string) (int, []int, bool) {
+	if sc, pos, ok := fuzzy(q, s); ok {
+		return sc + 100, pos, true
+	}
+	words := strings.Fields(q)
+	if len(words) < 2 {
+		return 0, nil, false
+	}
+	// the words of s with the rune index each starts at
+	type part struct {
+		text string
+		at   int
+	}
+	var parts []part
+	at := 0
+	for _, f := range strings.Split(s, " ") {
+		if f != "" {
+			parts = append(parts, part{f, at})
+		}
+		at += len([]rune(f)) + 1
+	}
+	used := make([]bool, len(parts))
+	total := 0
+	var pos []int
+	for _, w := range words {
+		best, bestScore := -1, 0
+		var bestPos []int
+		for i, p := range parts {
+			if used[i] {
+				continue
+			}
+			if sc, ps, ok := fuzzy(w, p.text); ok && (best < 0 || sc > bestScore) {
+				best, bestScore, bestPos = i, sc, ps
+			}
+		}
+		if best < 0 {
+			return 0, nil, false
+		}
+		used[best] = true
+		total += bestScore
+		for _, p := range bestPos {
+			pos = append(pos, parts[best].at+p)
+		}
+	}
+	return total, pos, true
+}
+
+// recentMax is how many picks the search remembers.
+const recentMax = 8
+
+// remember puts a pick first in the recent ones.
+func (m model) remember(title string) model {
+	rest := slices.DeleteFunc(slices.Clone(m.recent), func(t string) bool { return t == title })
+	m.recent = append([]string{title}, rest...)
+	if len(m.recent) > recentMax {
+		m.recent = m.recent[:recentMax]
+	}
+	return m
+}
+
+// hits are the entries that match the query, the best first. Without a
+// query they are the recent picks, then every app, server and view; with
+// one, a recent pick wins a tie.
 func (m model) hits() []hit {
 	q := ""
 	if m.pick != nil {
-		q = m.pick.query
+		q = strings.TrimSpace(m.pick.query)
+	}
+	entries := m.entries()
+	if q == "" {
+		var out []hit
+		seen := map[string]bool{}
+		for _, title := range m.recent {
+			for _, e := range entries {
+				if e.title == title && !seen[title] {
+					out = append(out, hit{e: e})
+					seen[title] = true
+				}
+			}
+		}
+		for _, e := range entries {
+			if (e.kind == "app" || e.kind == "server" || e.kind == "view") && !seen[e.title] {
+				out = append(out, hit{e: e})
+			}
+		}
+		return out
 	}
 	var out []hit
-	for _, e := range m.entries() {
-		if q == "" && e.kind != "app" && e.kind != "server" && e.kind != "view" {
-			continue
-		}
-		sc, pos, ok := fuzzy(q, e.title)
+	for _, e := range entries {
+		sc, pos, ok := match(q, e.title)
 		if !ok {
 			continue
 		}
+		if i := slices.Index(m.recent, e.title); i >= 0 {
+			sc += recentMax - i
+		}
 		out = append(out, hit{e, sc, pos})
 	}
-	if q != "" {
-		sort.SliceStable(out, func(i, j int) bool { return out[i].score > out[j].score })
-	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].score > out[j].score })
 	return out
 }
 
@@ -300,7 +383,7 @@ func (m model) pickKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		hs := m.hits()
 		m.pick = nil
 		if p.at < len(hs) {
-			return hs[p.at].e.do(m)
+			return hs[p.at].e.do(m.remember(hs[p.at].e.title))
 		}
 		return m, nil
 	case "down", "ctrl+n", "ctrl+j", "tab":
