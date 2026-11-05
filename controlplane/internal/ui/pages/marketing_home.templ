@@ -219,7 +219,7 @@ templ HomeStart() {
 			<h2 class={ typeH2, "max-w-[16ch]" }>Live in two minutes.</h2>
 			<p class={ typeLead, "mt-6 max-w-2xl" }>
 				<span class="text-foreground">No Dockerfile needed.</span>
-				Node. Bun. Python. Ruby. PHP. Go. Rust. { brand.Name } reads your repo and builds it.
+				Node. Bun. Python. Ruby. PHP. Go. Rust. { brand.Name } reads your repo and builds it on your server. Or in your CI.
 			</p>
 			<ol class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
 				@homeStep("1", "Sign in.", "With GitHub or your email.", "moin login")
@@ -578,7 +578,7 @@ templ HomeFAQ() {
 					Any Linux server or VPS, at any provider: Hetzner, DigitalOcean, AWS, your own hardware. One line sets it up.
 				}
 				@homeQuestion("Where does my code go?") {
-					Into your own bucket, then to your server. Never to us. From GitHub it goes straight to your server.
+					Into your own bucket, then to your server, which builds it. Never to us. From GitHub it goes straight to your server. Or build the image in CI, and your server only pulls it.
 				}
 				@homeQuestion("Can you see my data?") {
 					Only what you open, and we never store it. Want none at all? One line on your server turns data access off, even for us.
