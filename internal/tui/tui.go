@@ -204,6 +204,7 @@ type model struct {
 	pick    *picker
 	recent  []string // the titles of the last picks of the search, newest first
 	help    bool
+	helpTop int // the first line the keys layer shows
 	prompt  *prompt
 	ask     *confirm
 	restore *restore
@@ -368,7 +369,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) tick() (tea.Model, tea.Cmd) {
 	m.frame++
 	cmds := []tea.Cmd{tick()}
-	if m.notice != "" && m.frame-m.noticeAt > 16 {
+	// a result stays 8 seconds, an error 20, to read it
+	life := 16
+	if m.noticeErr {
+		life = 40
+	}
+	if m.notice != "" && m.frame-m.noticeAt > life {
 		m.notice = ""
 	}
 	if m.api == nil {

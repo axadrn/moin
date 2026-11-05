@@ -10,12 +10,12 @@ Without a token, `moin` signs you in first: it shows a code, opens the browser t
 
 ## Moving around
 
-Every view fills the screen. The header says where you are, the footer which keys work there.
+Every view fills the screen, from 80 by 24 up. The header says where you are, the footer the keys you need most there, and results and errors: a result for a few seconds, an error in red a little longer.
 
 - **`space`** opens the menu. It lists every action of the place you are in, grouped, each with one key: `space a s` opens the app `shop`, `space R` redeploys the open app. `backspace` goes up a level, `esc` closes it.
 - **`space space`** searches, like the leader key of LazyVim or Doom Emacs: type a few letters of an app, a server, a view or an action, like `shop logs` or `redeploy api`, then `enter`. The words may come in any order, the letters it matched show bold, and what you picked last comes first. `ctrl+k` does the same from anywhere, and `/` everywhere but in the logs.
 - **`esc`** always goes back one level and closes what is open first. `q` quits on the dashboard and goes back elsewhere; `ctrl+c` quits from anywhere.
-- **`?`** shows the keys of the place you are in.
+- **`?`** shows every key of the place you are in, grouped, and the ones that work everywhere; on a small screen `↑` `↓` scroll them.
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
 
 A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word. A switch, a paused check or an env var changes on the screen at once; if the control plane refuses it, the footer says why in red and the tab loads what is true again.
@@ -40,7 +40,7 @@ A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be u
 | `space` | everywhere | the menu of every action here |
 | `space space`, `ctrl+k` or `/` | everywhere | searches every app, server, view and action |
 | `esc` | everywhere | back one level |
-| `?` | everywhere | the keys of this place |
+| `?` | everywhere | every key of this place |
 | `q` | everywhere | quits on the dashboard, goes back elsewhere |
 | `tab` | dashboard | moves between apps, servers and what needs you |
 | `enter` | dashboard | opens the selected app, server or issue |

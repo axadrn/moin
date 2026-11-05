@@ -76,10 +76,22 @@ func (m model) errBody(u ui, e string, iw int) []string {
 // a rule under it with the open one drawn bright.
 func (m model) tabBar(u ui, w int) []string {
 	var top, under strings.Builder
+	// the roomiest padding that fits every tab
+	pad := 4
+	for ; pad > 0; pad -= 2 {
+		total := len(tabs) - 1
+		for _, t := range tabs {
+			total += wid(string(t.t)+" "+t.name) + pad
+		}
+		if total <= w {
+			break
+		}
+	}
+	side := strings.Repeat(" ", pad/2)
 	used := 0
 	for i, t := range tabs {
 		label := string(t.t) + " " + t.name
-		cw := wid(label) + 4
+		cw := wid(label) + pad
 		if used+cw > w {
 			break
 		}
@@ -87,7 +99,7 @@ func (m model) tabBar(u ui, w int) []string {
 			top.WriteString(u.strong(center(label, cw)))
 			under.WriteString(u.fg(u.p.Fg, strings.Repeat("━", cw)))
 		} else {
-			top.WriteString("  " + u.text(string(t.t)) + u.muted(" "+t.name) + "  ")
+			top.WriteString(side + u.text(string(t.t)) + u.muted(" "+t.name) + side)
 			under.WriteString(u.rule(cw))
 		}
 		used += cw

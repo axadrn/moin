@@ -610,6 +610,35 @@ func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 	}
 }
 
+func TestHelpShowsEveryKeyOfThePlaceAndScrolls(t *testing.T) {
+	m := press(fixture(160, 45).withApp("shop", tEnv), "?")
+	frame := checkFrame(t, "help", m)
+	for _, a := range m.appActions("shop") {
+		if !strings.Contains(frame, a.label) {
+			t.Errorf("the keys of an app lack %q", a.label)
+		}
+	}
+	for _, want := range []string{"Env", "set KEY=value", "all in $EDITOR", "Tabs", "metrics", "Everywhere", "space space"} {
+		if !strings.Contains(frame, want) {
+			t.Errorf("the keys lack %q", want)
+		}
+	}
+	small := press(fixture(80, 24).withApp("shop", tEnv), "?")
+	if !strings.Contains(checkFrame(t, "help small", small), "↑↓ more") {
+		t.Fatal("a small screen says there are more keys")
+	}
+	scrolled := press(small, "G")
+	if scrolled.helpTop == 0 || !scrolled.help {
+		t.Fatal("G scrolls the keys to the end")
+	}
+	if f := checkFrame(t, "help end", scrolled); !strings.Contains(f, "ctrl+c") {
+		t.Errorf("the end of the keys shows the last one:\n%s", f)
+	}
+	if m := press(scrolled, "esc"); m.help || m.helpTop != 0 {
+		t.Error("esc closes the keys and they open at the top again")
+	}
+}
+
 func TestSpaceSpaceSearches(t *testing.T) {
 	m := press(fixture(120, 40), "space")
 	_, groups := m.menuGroups()
