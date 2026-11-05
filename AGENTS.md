@@ -2,7 +2,7 @@
 
 All of moin in one repo, open source under AGPL-3.0: the `moin` binary (agent,
 CLI, TUI) at the root and the control plane in `controlplane/`, with its own
-`AGENTS.md`. `controlplane/PLAN.md` is the plan for both. Never commit
+`AGENTS.md`. Never commit
 secrets, customer data, `.env` files or anything private: names of companies,
 addresses, personal details.
 

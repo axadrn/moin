@@ -2,7 +2,7 @@
 
 The hosted side of moin: accounts, billing, servers, apps, deploys, backups and data. Agents on the users' servers dial in over one WebSocket. The agent, CLI, TUI and protocol are at the root of this repo.
 
-Read `PLAN.md` for what we build and `DESIGN.md` for how it looks. Product docs are in `content/docs`, served at `/docs`: the only source of truth for how moin works.
+Read `DESIGN.md` for how it looks. Product docs are in `content/docs`, served at `/docs`: the only source of truth for how moin works.
 
 ## Develop
 
