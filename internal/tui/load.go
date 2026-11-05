@@ -48,9 +48,11 @@ func (m model) loadWorkspace() tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
 		var ws workspace
-		if team, err := api.Team(ctx); err == nil {
-			ws.slug, ws.name = team.Workspace.Slug, team.Workspace.Name
+		team, err := api.Team(ctx)
+		if err != nil {
+			return nil
 		}
+		ws.slug, ws.name = team.Workspace.Slug, team.Workspace.Name
 		if account, err := api.Account(ctx); err == nil {
 			ws.email, ws.user = account.Email, account.Name
 		}
@@ -77,6 +79,9 @@ func (m model) loadEvents(cursor string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
 		page, err := api.Activity(ctx, client.ActivityQuery{Cursor: cursor, Limit: 50})
+		if err != nil && cursor == "" {
+			return nil // the header says when the control plane is away
+		}
 		if err != nil {
 			return errMsg{err}
 		}

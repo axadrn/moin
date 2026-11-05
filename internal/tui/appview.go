@@ -69,7 +69,7 @@ func (m model) errBody(u ui, e string, iw int) []string {
 	for _, l := range wrap(e, iw) {
 		body = append(body, u.bad(l))
 	}
-	return append(body, "", u.faint("It loads again when you come back to this tab."))
+	return append(body, "", u.faint("It loads again when you come back to this tab, or when the connection is back."))
 }
 
 // tabBar is the row of tabs, the key letter of each a touch brighter, and
