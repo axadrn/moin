@@ -243,7 +243,7 @@ func (m model) openIssue(i issue) (tea.Model, tea.Cmd) {
 	case i.server != "":
 		return m.open(screen{v: vServer, server: i.server})
 	case i.path != "":
-		return m.browseURL(m.url + i.path)
+		return m.browse(i.path)
 	}
 	return m, nil
 }
