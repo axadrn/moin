@@ -4,7 +4,7 @@ description: "What moin is and how its pieces fit"
 order: 1
 ---
 
-moin deploys your apps to servers you own, backs up every change of their SQLite or Postgres database to your own bucket, checks the restore every day and lets you edit the data live. You use it from the browser, the `moin` CLI (commands you type), the `moin` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
+Deploy anything. Lose nothing. moin deploys your apps to your servers, backs up every change of their SQLite or Postgres database to your own bucket, tests a restore every day and lets you edit the data live. You use it from the browser, the `moin` CLI (commands you type), the `moin` terminal UI (a screen in your terminal you drive with keys) and any AI agent through MCP. All four do the same work, and so does the [API](/docs/reference/api) for your own scripts. Your account and the roles of your team change only on the web.
 
 New here? Read [How moin works in 2 minutes](#how-moin-works-in-2-minutes) below, then [Getting Started](/docs/getting-started).
 
