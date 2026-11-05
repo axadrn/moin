@@ -14,12 +14,16 @@ func (m model) serversView(u ui, w, h int) string {
 	if len(m.servers) == 0 {
 		return u.panel("Servers", "", []string{"", u.muted("No servers yet. Add one in the web app: w on the dashboard.")}, w, h, true)
 	}
-	system, wide := iw >= 80, iw >= 104
+	system, wide := iw >= 80, iw >= 108
+	aw := 8
+	for _, s := range m.servers {
+		aw = max(aw, min(wid(s.AgentVersion)+3, 18))
+	}
 	cols := []cell{u.head("server", 14, false), u.head("status", 11, false)}
 	if system {
 		cols = append(cols, u.head("system", 13, false))
 	}
-	cols = append(cols, u.head("agent", 12, false), u.head("apps", 4, true))
+	cols = append(cols, u.head("agent", aw, false), u.head("apps", 4, true))
 	if wide {
 		cols = append(cols, u.head("", 1, false), u.head("access", 24, false))
 	}
@@ -40,7 +44,7 @@ func (m model) serversView(u ui, w, h int) string {
 		if system {
 			cells = append(cells, cell{u.muted(s.System()), 13, false})
 		}
-		cells = append(cells, cell{agent, 12, false}, cell{u.text(fmt.Sprint(m.appCount(s.Name))), 4, true})
+		cells = append(cells, cell{agent, aw, false}, cell{u.text(fmt.Sprint(m.appCount(s.Name))), 4, true})
 		if wide {
 			cells = append(cells, cell{"", 1, false}, cell{u.muted(s.Access()), 24, false})
 		}

@@ -141,7 +141,7 @@ func (m model) authView(u ui, w, h int) []string {
 			"",
 			u.warn(spin) + " " + u.muted("Waiting for the browser …"),
 			"",
-			u.keys(kb{"o", "open again"}, kb{"esc", "quit"}),
+			u.keys(kb{"o", "open the browser"}, kb{"esc", "quit"}),
 		}
 	}
 	cw := min(64, w-4)
