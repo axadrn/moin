@@ -29,8 +29,17 @@ chose this look from three candidates (moin Looks artifact).
   close to a rounded edge.
 - **Alive.** Live dots pulse softly, running states blink, changes swap in
   place without layout jumps. Reduced motion turns it off.
-- Real product, real output, no illustrations. The landing page keeps its
-  floating pill navbar.
+- Real product, real output. The landing page keeps its floating pill
+  navbar.
+- **The harbor.** moin is Hamburg, and shipping containers are app
+  containers. The landing page may draw that, as hand-built SVG only (no
+  generated images): simple containers (a steel face and its ribs) with
+  the app they carry stencilled big, like `postgres`. Grays from the tokens
+  draw the scene, the user's app in ink; color stays status
+  and long flat shadows give depth. `moin` appears only in the logo, never
+  on a ship or a container. Light enough to read on both grounds, simple
+  shapes, still. The hero is a wall of containers under the headline:
+  `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small

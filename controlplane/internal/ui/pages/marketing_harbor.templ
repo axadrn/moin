@@ -1,0 +1,78 @@
+package pages
+
+// homeHarbor is the still wall of containers under the headline: every
+// container is an app, your-app among them in ink. Some containers are
+// pulled out of the wall by one of three steps; light from the top right
+// gives them shaded sides and a shadow down to the left, as long as they
+// stand out.
+templ homeHarbor() {
+	<svg
+		viewBox={ "0 0 " + harborN(harborW) + " " + harborN(harborH) }
+		preserveAspectRatio="xMidYMax slice"
+		class="block h-full w-full select-none"
+		role="img"
+		aria-label="A wall of shipping containers, each an app: postgres, redis, node, python and your-app. Some stand out of the wall."
+	>
+		<defs>
+			<clipPath id="harbor-wall">
+				for _, b := range harborBoxes {
+					if b.Depth == 0 {
+						<rect x={ harborN(b.X) } y={ harborN(b.Y) } width={ harborN(harborBox) } height={ harborN(harborBox) }></rect>
+					}
+				}
+			</clipPath>
+			<linearGradient id="harbor-shade" x1="1" y1="0" x2="0" y2="1">
+				<stop offset="0" stop-color="#000" class="[stop-opacity:0.28] dark:[stop-opacity:0.7]"></stop>
+				<stop offset="1" stop-color="#000" stop-opacity="0"></stop>
+			</linearGradient>
+		</defs>
+		for _, b := range harborBoxes {
+			if b.Depth == 0 {
+				@harborContainer(b.X, b.Y, b.Tone, b.Ink)
+				@harborLabel(b.X, b.Y, b.Ref, b.Ink)
+			}
+		}
+		<g clip-path="url(#harbor-wall)" fill="url(#harbor-shade)">
+			for _, b := range harborBoxes {
+				if b.Depth > 0 {
+					<polygon points={ harborShadow(b.X, b.Y, b.Depth) }></polygon>
+				}
+			}
+		</g>
+		for _, b := range harborBoxes {
+			if b.Depth > 0 {
+				<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class={ harborTone(b.Tone) }></polygon>
+				<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class="fill-black/25 dark:fill-black/55"></polygon>
+				<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class={ harborTone(b.Tone) }></polygon>
+				<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class="fill-black/40 dark:fill-black/70"></polygon>
+				@harborContainer(b.X+b.Depth, b.Y-b.Depth, b.Tone, b.Ink)
+				@harborLabel(b.X+b.Depth, b.Y-b.Depth, b.Ref, b.Ink)
+			}
+		}
+	</svg>
+}
+
+// harborContainer is one container, kept simple: a steel face and its
+// ribs. ink draws it in the foreground color.
+templ harborContainer(x, y int, tone string, ink bool) {
+	if ink {
+		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBox) } height={ harborN(harborBox) } class="fill-foreground"></rect>
+	} else {
+		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBox) } height={ harborN(harborBox) } class={ harborTone(tone) }></rect>
+		if tone == "c" {
+			<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBox) } height={ harborN(harborBox) } class="fill-foreground/[0.08]"></rect>
+		}
+	}
+	<g class={ templ.KV("fill-background/[0.16]", ink), templ.KV("fill-foreground/[0.09]", !ink) }>
+		for _, r := range harborRibs(x) {
+			<rect x={ harborN(r) } y={ harborN(y + 4) } width="3" height={ harborN(harborBox - 8) }></rect>
+		}
+	</g>
+}
+
+// harborLabel is the app stencilled on a container, if it carries one.
+templ harborLabel(x, y int, ref string, ink bool) {
+	if ref != "" {
+		<text x={ harborN(x + 8) } y={ harborN(y + harborBox - 12) } class={ "font-mono text-[18px] font-bold tracking-[-0.02em]", templ.KV("fill-background", ink), templ.KV("fill-foreground/80", !ink) }>{ ref }</text>
+	}
+}
