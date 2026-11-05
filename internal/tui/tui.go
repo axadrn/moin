@@ -1,9 +1,9 @@
 // Package tui is what `moin` opens without a command: full-screen views of
 // the daily work, live from the control plane. It starts on the dashboard;
-// `space` opens the menu, `ctrl+k` jumps anywhere, `esc` goes back.
+// `space` opens the menu, `space space` or `ctrl+k` searches, `esc` goes back.
 //
 // tui.go holds the state and the message loop, keys.go the keys, load.go
-// the calls to the control plane, menu.go the menu and the jump list, and
+// the calls to the control plane, menu.go the menu and the search, and
 // the view files draw it.
 package tui
 

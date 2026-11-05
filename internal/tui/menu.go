@@ -1,6 +1,7 @@
 package tui
 
-// The which-key menu on `space` and the jump list on `ctrl+k`.
+// The which-key menu on `space` and the search on `space space`, `ctrl+k`
+// and `/`.
 
 import (
 	"fmt"
@@ -53,12 +54,12 @@ func (m model) menuGroups() (string, []menuGroup) {
 		}
 	}
 	goTo := menuGroup{"Go to", []menuItem{
+		{key: "space", label: "search", do: func(m model) (tea.Model, tea.Cmd) { return m.openPicker(), nil }},
 		{key: "h", label: "dashboard", do: func(m model) (tea.Model, tea.Cmd) { return m.home() }},
 		{key: "a", label: "apps", sub: "a"},
 		{key: "s", label: "servers", do: func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vServers}) }},
 		{key: "v", label: "activity", do: func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vActivity}) }},
 		{key: "w", label: "web app", sub: "w"},
-		{key: "k", label: "jump to …", do: func(m model) (tea.Model, tea.Cmd) { return m.openPicker(), nil }},
 	}}
 	groups := []menuGroup{goTo}
 	if app := m.cur.app; app != "" {
@@ -88,9 +89,12 @@ func (m model) menuGroups() (string, []menuGroup) {
 
 func (m model) menuKey(s string) (tea.Model, tea.Cmd) {
 	switch s {
-	case "esc", "space":
+	case "esc":
 		m.menuOn, m.menu = false, nil
 		return m, nil
+	case "space":
+		// space space searches, like the leader key of LazyVim and Doom
+		return m.openPicker(), nil
 	case "backspace":
 		if len(m.menu) > 0 {
 			m.menu = m.menu[:len(m.menu)-1]
@@ -144,7 +148,7 @@ func assignKeys(names []string) map[string]string {
 	return out
 }
 
-// picker is the jump list: a query over every app, server, view and action.
+// picker is the search: a query over every app, server, view and action.
 type picker struct {
 	query string
 	at    int
@@ -161,7 +165,7 @@ func (m model) openPicker() model {
 	return m
 }
 
-// entries are everything the jump list can reach.
+// entries are everything the search can reach.
 func (m model) entries() []entry {
 	var out []entry
 	for _, a := range m.apps {
@@ -183,7 +187,7 @@ func (m model) entries() []entry {
 		name := a.Name
 		for _, t := range tabs {
 			t := t
-			out = append(out, entry{t.name, name + " " + t.name, "", func(m model) (tea.Model, tea.Cmd) { return m.openApp(name, t.t) }})
+			out = append(out, entry{"tab", name + " " + t.name, "", func(m model) (tea.Model, tea.Cmd) { return m.openApp(name, t.t) }})
 		}
 		for _, ac := range m.appActions(name) {
 			ac := ac

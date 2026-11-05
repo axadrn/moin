@@ -13,7 +13,7 @@ Without a token, `moin` signs you in first: it shows a code, opens the browser t
 Every view fills the screen. The header says where you are, the footer which keys work there.
 
 - **`space`** opens the menu. It lists every action of the place you are in, grouped, each with one key: `space a s` opens the app `shop`, `space R` redeploys the open app. `backspace` goes up a level, `esc` closes it.
-- **`ctrl+k`** jumps anywhere: type a few letters of an app, a server, a view or an action, like `shop logs` or `redeploy api`, then `enter`. `/` does the same everywhere but in the logs.
+- **`space space`** searches, like the leader key of LazyVim or Doom Emacs: type a few letters of an app, a server, a view or an action, like `shop logs` or `redeploy api`, then `enter`. `ctrl+k` does the same from anywhere, and `/` everywhere but in the logs.
 - **`esc`** always goes back one level and closes what is open first. `q` quits on the dashboard and goes back elsewhere; `ctrl+c` quits from anywhere.
 - **`?`** shows the keys of the place you are in.
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
@@ -38,7 +38,7 @@ A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be u
 | Key | Where | Does |
 | --- | --- | --- |
 | `space` | everywhere | the menu of every action here |
-| `ctrl+k` | everywhere | jumps to an app, server, view or action |
+| `space space`, `ctrl+k` or `/` | everywhere | searches every app, server, view and action |
 | `esc` | everywhere | back one level |
 | `?` | everywhere | the keys of this place |
 | `q` | everywhere | quits on the dashboard, goes back elsewhere |

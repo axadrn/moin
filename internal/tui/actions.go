@@ -1,7 +1,7 @@
 package tui
 
-// What you can do to an app, in one list for its keys, the menu, the jump
-// list and the help; and the pages that stay in the web app.
+// What you can do to an app, in one list for its keys, the menu, the
+// search and the help; and the pages that stay in the web app.
 
 import (
 	"errors"
