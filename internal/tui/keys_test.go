@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -487,6 +488,37 @@ func TestAssignKeysGivesEveryNameOne(t *testing.T) {
 	}
 	if keys["shop"] != "s" || keys["api"] != "a" {
 		t.Errorf("first letters first: %v", keys)
+	}
+}
+
+func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
+	m := press(fixture(120, 40), "ctrl+k", "l", "o", "g", "s", "space", "b", "l", "o", "g")
+	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
+		t.Fatalf("logs blog finds blog logs, got %v", titles(hs))
+	}
+	if _, pos, _ := match("lo bl", "blog logs"); fmt.Sprint(pos) != "[5 6 0 1]" {
+		t.Errorf("the highlight follows each word: %v", pos)
+	}
+	if _, _, ok := match("logs zz", "blog logs"); ok {
+		t.Error("every word has to match")
+	}
+	inOrder, _, _ := match("blog lo", "blog logs")
+	anyOrder, _, _ := match("lo blog", "blog logs")
+	if inOrder <= anyOrder {
+		t.Errorf("the order as typed scores best: %d <= %d", inOrder, anyOrder)
+	}
+	m = press(m, "enter", "esc", "ctrl+k")
+	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
+		t.Fatalf("without a query the last pick comes first, got %v", titles(hs))
+	}
+	if n := len(m.hits()); n != len(m.apps)+len(m.servers)+4+1 {
+		t.Errorf("recent, then the apps, servers and views, each once: %d", n)
+	}
+	for i := range 12 {
+		m = m.remember(fmt.Sprint("x", i))
+	}
+	if len(m.recent) != recentMax || m.recent[0] != "x11" {
+		t.Errorf("the search keeps the %d newest picks: %v", recentMax, m.recent)
 	}
 }
 

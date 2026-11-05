@@ -194,6 +194,7 @@ type model struct {
 	menu    []string // the which-key path; nil when closed
 	menuOn  bool
 	pick    *picker
+	recent  []string // the titles of the last picks of the search, newest first
 	help    bool
 	prompt  *prompt
 	ask     *confirm
