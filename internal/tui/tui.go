@@ -1,2000 +1,679 @@
-// Package tui is what `moin` opens without a command. It shows the same data
-// as the web UI and the CLI, live from the control plane. This file holds the
-// state, the keys and the commands; view.go draws it.
+// Package tui is what `moin` opens without a command: full-screen views of
+// the daily work, live from the control plane. It starts on the dashboard;
+// `space` opens the menu, `ctrl+k` jumps anywhere, `esc` goes back.
+//
+// tui.go holds the state and the message loop, keys.go the keys, load.go
+// the calls to the control plane, menu.go the menu and the jump list, and
+// the view files draw it.
 package tui
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"fmt"
-	"slices"
-	"strconv"
-	"strings"
-	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
-	"github.com/axadrn/moin/internal/style"
-	"github.com/axadrn/moin/protocol"
 )
 
-// Run opens the TUI until the user quits or ctx ends. dir is where `d`
-// deploys from.
-func Run(ctx context.Context, api *client.Client, url, dir string) error {
+// Options start the TUI.
+type Options struct {
+	// Config is where the control plane is and the token, as `moin login`
+	// saved it. Without a token the TUI signs in first.
+	Config client.Config
+	// Dir is the directory the TUI started in, which `D` deploys.
+	Dir string
+	// Login signs in with the browser: it calls show with the code to type
+	// and the page to type it on, waits until the user confirmed, and saves
+	// the credentials where the CLI keeps them. Nil without one.
+	Login func(ctx context.Context, show func(userCode, verificationURL string)) error
+}
+
+// Run opens the TUI until the user quits or ctx ends.
+func Run(ctx context.Context, opts Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	api.UseSurface("tui")
-	shared := &shared{}
-	program := tea.NewProgram(model{api: api, url: url, dir: dir, ctx: ctx, shared: shared, loading: true}, tea.WithContext(ctx))
-	shared.program = program
-	go watch(ctx, program, func(ctx context.Context) error {
-		return api.WatchServers(ctx, func(servers []client.Server) { program.Send(serversMsg(servers)) })
-	})
-	go watch(ctx, program, func(ctx context.Context) error {
-		return api.WatchApps(ctx, func(apps []client.App) { program.Send(appsMsg(apps)) })
-	})
-	// A self-hosted control plane tells when a newer release is out.
-	go func() {
-		version, err := api.Version(ctx)
-		if err == nil && version.UpdateAvailable {
-			program.Send(noticeMsg(build.Name + " " + version.Latest + " is out: " + version.Summary + " See the settings tab"))
+	m := newModel(ctx, opts)
+	if opts.Config.Token != "" {
+		api, err := client.New(opts.Config)
+		if err != nil {
+			return err
 		}
-	}()
-	_, err := program.Run()
+		m = m.connect(api)
+	}
+	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	if ctx.Err() != nil {
 		return nil
 	}
 	return err
 }
 
-// watch runs a stream and reconnects when it breaks.
-func watch(ctx context.Context, program *tea.Program, stream func(context.Context) error) {
-	for ctx.Err() == nil {
-		err := stream(ctx)
-		if ctx.Err() != nil {
-			return
-		}
-		program.Send(streamErrMsg{err})
-		select {
-		case <-ctx.Done():
-		case <-time.After(2 * time.Second):
-		}
-	}
-}
-
-type (
-	serversMsg []client.Server
-	appsMsg    []client.App
-	eventsMsg  client.ActivityPage
-	errMsg     struct{ err error }
-	// streamErrMsg means a live stream broke; it reconnects by itself.
-	streamErrMsg struct{ err error }
-	addedMsg     client.NewServer
-	removedMsg   removedServer
-	installMsg   client.NewServer
-	detailMsg    client.AppDetail
-	// outputMsg replaces the output panel. follow means a deploy streams
-	// into it.
-	outputMsg struct {
-		id     int64
-		title  string
-		note   string
-		lines  []string
-		follow bool
-	}
-	// lineMsg adds one line to the output panel it belongs to.
-	lineMsg struct {
-		id   int64
-		line string
-	}
-	// followDoneMsg ends the deploy in an output panel.
-	followDoneMsg struct {
-		id     int64
-		notice string
-		err    error
-		// label replaces "live" and "failed" at the end of the panel.
-		label string
-	}
-	noticeMsg string
-	// stoppedMsg names the app that went offline, so the open app knows
-	// before the live list says so.
-	stoppedMsg string
-	tickMsg    time.Time
-	// settingsMsg is what the settings tab shows.
-	settingsMsg settings
-)
-
-type tab int
+// view is a kind of full-screen view.
+type view int
 
 const (
-	tabServers tab = iota
-	tabApps
-	tabActivity
-	tabTeam
-	tabSettings
+	vDash view = iota
+	vApp
+	vDeploy
+	vExec
+	vServers
+	vServer
+	vActivity
+	vWeb
 )
 
-// tabs is how many tabs the header shows.
-const tabs = 5
-
-type mode int
+// tab is a part of the app view, named by its key.
+type tab byte
 
 const (
-	modeList mode = iota
-	modeAdd
-	modeConfirmStop
-	modeConfirmRollback
-	modeEnv
-	modeImage
-	modeDomains
-	modeProtect
-	modeSQL
-	modeConfirmWrite
-	modeBackups
-	modeUptime
-	modeConfirmSecurity
-	// modeForm asks the fields of m.form one after the other.
-	modeForm
-	// modeConfirm waits for a yes to m.confirm.
-	modeConfirm
-	// modeConfirmName waits for the name m.confirm asks for, typed out,
-	// before something big that cannot be undone.
-	modeConfirmName
-	modeGitHub
-	// modeSearch types a search after /, modeCommand a command after :.
-	modeSearch
-	modeCommand
-	// modeHelp shows every key.
-	modeHelp
+	tDeploys tab = 'd'
+	tLogs    tab = 'l'
+	tBackups tab = 'b'
+	tEnv     tab = 'e'
+	tDomains tab = 'o'
+	tUptime  tab = 'u'
+	tMetrics tab = 'm'
 )
 
-// form asks for a few values in turn and hands them to submit.
-type form struct {
-	title  string
-	fields []formField
-	step   int
-	values []string
-	submit func(values []string) tea.Cmd
+var tabs = []struct {
+	t    tab
+	name string
+}{{tDeploys, "deploys"}, {tLogs, "logs"}, {tBackups, "backups"}, {tEnv, "env"}, {tDomains, "domains"}, {tUptime, "uptime"}, {tMetrics, "metrics"}}
+
+func tabName(t tab) string {
+	for _, x := range tabs {
+		if x.t == t {
+			return x.name
+		}
+	}
+	return ""
 }
 
-// formField is one question of a form. An empty answer takes value; a
-// field that is not optional needs one of the two. check, if set, refuses a
-// wrong answer and the field asks again.
-type formField struct {
-	label, hint, value string
-	secret, optional   bool
-	check              func(value string) error
+// screen is one place on the navigation stack.
+type screen struct {
+	v      view
+	app    string
+	tab    tab
+	server string
+	deploy int
 }
 
-// confirmation is a question that runs its command after a yes, and goes
-// back to the mode it came from either way.
-type confirmation struct {
-	question, detail, verb string
-	// name is what modeConfirmName wants typed.
-	name   string
-	danger bool
-	back   mode
-	run    tea.Cmd
+// workspace is who and where the token is.
+type workspace struct {
+	slug, name, email, user string
+	version                 string
+	selfHosted              bool
 }
 
-// shared is what every copy of the model points to.
-type shared struct {
-	// program lets commands send messages after they returned, such as the
-	// lines of a deploy they follow.
-	program *tea.Program
-	// outputs numbers the output panels, so the lines of a deploy never land
-	// in the logs opened after it.
-	outputs atomic.Int64
-	// panelKeep is how many lines the output panel showed last, so the
-	// keys scroll it by pages of its size.
-	panelKeep int
+// appData is what the open app shows. It belongs to one app and is
+// dropped when another opens.
+type appData struct {
+	name    string
+	detail  *client.AppDetail
+	logs    []string
+	logsAt  time.Time
+	backups *client.AppBackups
+	env     map[string]string
+	domains []client.DomainCheck
+	instant *client.Instant
+	uptime  *client.Uptime
+	metrics *client.AppMetrics
+	// errs hold why a tab could not load, by tab.
+	errs map[tab]string
+}
+
+// stream is output that comes in while you watch: a deploy log or a
+// command. id drops lines of one you left.
+type stream struct {
+	id      int64
+	app     string
+	number  int
+	title   string
+	lines   []string
+	running bool
+	status  string // succeeded, failed, or a label like "exit 0"
+	err     string
+	deploy  *client.Deploy
+}
+
+// scroll is where a long text is: 0 follows the end, else the lines from
+// the end the view stays above.
+type scroll struct {
+	back   int
+	paused bool
+	filter string
 }
 
 type model struct {
-	api    *client.Client
-	url    string
-	dir    string
-	ctx    context.Context
-	shared *shared
+	ctx   context.Context
+	api   *client.Client
+	url   string
+	dir   string
+	hub   chan tea.Msg
+	login func(ctx context.Context, show func(userCode, verificationURL string)) error
 
-	tab  tab
-	mode mode
-	// events is the activity of the workspace, newest first, as far as it
-	// is loaded; activityNext loads older ones. activityFilter narrows it to
-	// one app, server or member.
-	events         []client.Event
-	activityNext   string
-	activityFilter client.ActivityQuery
-	width          int
-	height         int
-	err            error
-	notice         string
-	loading        bool
-	// offline is the error of a broken live stream until it reconnects.
-	offline error
-	// frame turns the spinner while a deploy runs.
+	w, h  int
+	pal   palette
 	frame int
+	now   func() time.Time
 
-	servers  []client.Server
-	selected int
-	input    string
-	added    *client.NewServer
-	// again marks added as a new install command for a server moin has.
-	again   bool
-	removed *removedServer
-	// pendingSQL is a query that changes data, waiting for a yes.
-	pendingSQL string
-	// pendingSecurity is a change of a server's access, waiting for a yes.
-	pendingSecurity securityChange
-	// pendingRollback is the deploy a rollback goes to, 0 for the one
-	// before the live one.
-	pendingRollback int
-	form            form
-	confirm         confirmation
+	auth *auth // the sign-in view; nil once signed in
 
-	apps        []client.App
-	appSelected int
-	// detail is the open app; nil shows the app list.
-	detail *client.AppDetail
-	// deployPick is the number of the deploy picked in the open app's
-	// history, 0 for none.
-	deployPick  int
-	envShown    bool
-	outputID    int64
-	outputTitle string
-	outputNote  string
-	output      []string
-	// running is set while a deploy streams into the output panel; runStep
-	// is its newest step.
-	running    bool
-	runStarted time.Time
-	runStep    string
+	ws        workspace
+	apps      []client.App
+	servers   []client.Server
+	loaded    bool // the first app list came
+	status    *client.Status
+	events    []client.Event
+	eventsEnd string
+	cpu       map[string][]float64
+	usage     map[string]*client.ServerMetricsNow
+	offline   error // the live stream broke
 
-	settings        settings
-	settingSelected int
+	cur   screen
+	stack []screen
+	sel   map[string]int
+	focus int // the dashboard panel with the cursor
 
-	team         client.Team
-	teamErr      error
-	teamSelected int
+	app      appData
+	srv      *client.ServerMetrics
+	out      stream
+	nextID   int64
+	logs     scroll
+	execLine string
+	text     scroll // the deploy and exec output
+	shown    bool   // env values visible
+	rng      int    // metrics range, an index into ranges
 
-	// The vim keys: a count like the 5 of 5j, a first key waiting for its
-	// second like the g of gg, the last search and where it matched in the
-	// panel (1 + the line, 0 for none), the output panel having the keys
-	// and how many of its lines are below what it shows, the selected
-	// event and the top line of help.
-	count            int
-	pending          string
-	search           string
-	panelMatch       int
-	panelFocus       bool
-	outputScroll     int
-	activitySelected int
-	helpTop          int
+	menu    []string // the which-key path; nil when closed
+	menuOn  bool
+	pick    *picker
+	help    bool
+	prompt  *prompt
+	ask     *confirm
+	restore *restore
+
+	notice    string
+	noticeErr bool
+	noticeAt  int
+}
+
+var ranges = []string{"1h", "24h", "7d", "30d"}
+
+func newModel(ctx context.Context, opts Options) model {
+	return model{
+		ctx: ctx, url: opts.Config.URL, dir: opts.Dir, login: opts.Login,
+		hub: make(chan tea.Msg, 256), w: 100, h: 30, pal: dark, now: time.Now,
+		cur: screen{v: vDash}, sel: map[string]int{}, cpu: map[string][]float64{}, usage: map[string]*client.ServerMetricsNow{},
+		auth: &auth{},
+	}
+}
+
+// connect is the model signed in with api.
+func (m model) connect(api *client.Client) model {
+	api.UseSurface("tui")
+	m.api = api
+	m.auth = nil
+	return m
+}
+
+type (
+	tickMsg      time.Time
+	hubMsg       struct{ msg tea.Msg }
+	serversMsg   []client.Server
+	appsMsg      []client.App
+	offlineMsg   struct{ err error }
+	statusMsg    client.Status
+	workspaceMsg workspace
+	eventsMsg    struct {
+		page  client.ActivityPage
+		older bool
+	}
+	usageMsg struct {
+		server string
+		m      client.ServerMetrics
+	}
+	serverMetricsMsg client.ServerMetrics
+	detailMsg        client.AppDetail
+	logsMsg          struct {
+		app   string
+		lines []string
+	}
+	backupsMsg struct {
+		app string
+		b   client.AppBackups
+	}
+	envMsg struct {
+		app string
+		env map[string]string
+	}
+	domainsMsg struct {
+		app     string
+		checks  []client.DomainCheck
+		instant *client.Instant
+	}
+	uptimeMsg     client.Uptime
+	appMetricsMsg client.AppMetrics
+	// tabErrMsg is why a tab of an app could not load.
+	tabErrMsg struct {
+		app string
+		tab tab
+		err error
+	}
+	// startedMsg is a deploy an action started; the TUI follows it.
+	startedMsg struct {
+		app    string
+		deploy client.Deploy
+		title  string
+	}
+	deployMsg client.Deploy
+	lineMsg   struct {
+		id   int64
+		line string
+	}
+	doneMsg struct {
+		id     int64
+		status string
+		err    error
+		notice string
+		deploy *client.Deploy
+	}
+	noticeMsg string
+	errMsg    struct{ err error }
+	// reloadMsg loads the open tab again after a change.
+	reloadMsg  struct{ notice string }
+	stoppedMsg string
+)
+
+func tick() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+// listen waits for the next message the background streams sent.
+func (m model) listen() tea.Cmd {
+	hub := m.hub
+	return func() tea.Msg { return hubMsg{<-hub} }
+}
+
+// send hands a message from a goroutine to the loop.
+func (m model) send(msg tea.Msg) {
+	select {
+	case m.hub <- msg:
+	case <-m.ctx.Done():
+	}
 }
 
 func (m model) Init() tea.Cmd {
-	return tick(time.Second)
-}
-
-// tick redraws once a second so "last seen" stays current, and faster while
-// a deploy runs so the spinner turns. Only one tick is ever waiting.
-func tick(every time.Duration) tea.Cmd {
-	return tea.Tick(every, func(t time.Time) tea.Msg { return tickMsg(t) })
+	cmds := []tea.Cmd{tick(), m.listen(), tea.RequestBackgroundColor}
+	if m.auth != nil {
+		cmds = append(cmds, m.startLogin())
+	} else {
+		cmds = append(cmds, m.start())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case hubMsg:
+		next, cmd := m.Update(msg.msg)
+		return next, tea.Batch(cmd, next.(model).listen())
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
+		m.w, m.h = msg.Width, msg.Height
+		return m, nil
+	case tea.BackgroundColorMsg:
+		m.pal = dark
+		if !msg.IsDark() {
+			m.pal = light
+		}
+		return m, nil
 	case tickMsg:
-		if m.running {
-			m.frame++
-			return m, tick(120 * time.Millisecond)
+		return m.tick()
+	case tea.KeyPressMsg:
+		return m.key(msg)
+	case tea.PasteMsg:
+		return m.paste(msg.Content), nil
+	}
+	if m.auth != nil {
+		return m.authUpdate(msg)
+	}
+	return m.data(msg)
+}
+
+// tick moves the pulse and reloads what the open view shows live.
+func (m model) tick() (tea.Model, tea.Cmd) {
+	m.frame++
+	cmds := []tea.Cmd{tick()}
+	if m.notice != "" && m.frame-m.noticeAt > 16 {
+		m.notice = ""
+	}
+	if m.api == nil {
+		return m, tea.Batch(cmds...)
+	}
+	every := func(n int) bool { return m.frame%n == 0 }
+	if every(60) {
+		cmds = append(cmds, m.loadStatus(), m.loadEvents(""))
+	}
+	if every(30) && m.cur.v == vDash {
+		cmds = append(cmds, m.loadUsage()...)
+	}
+	switch m.cur.v {
+	case vApp:
+		switch m.cur.tab {
+		case tLogs:
+			if every(6) && !m.logs.paused {
+				cmds = append(cmds, m.loadLogs(m.cur.app))
+			}
+		case tMetrics:
+			if every(30) {
+				cmds = append(cmds, m.loadAppMetrics(m.cur.app))
+			}
+		case tUptime:
+			if every(60) {
+				cmds = append(cmds, m.loadUptime(m.cur.app))
+			}
 		}
-		return m, tick(time.Second)
+	case vServer:
+		if every(30) {
+			cmds = append(cmds, m.loadServerMetrics(m.cur.server))
+		}
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m *model) say(s string) {
+	m.notice, m.noticeErr, m.noticeAt = s, false, m.frame
+}
+
+func (m *model) fail(err error) {
+	if err == nil {
+		return
+	}
+	m.notice, m.noticeErr, m.noticeAt = err.Error(), true, m.frame
+}
+
+// data takes what the control plane answered.
+func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 	case serversMsg:
-		m.servers, m.loading, m.offline = msg, false, nil
-		m.selected = min(m.selected, max(len(m.servers)-1, 0))
-		if m.tab == tabActivity {
-			return m, m.loadActivity()
-		}
-		// A key stored or removed elsewhere comes with the servers.
-		if m.tab == tabSettings {
-			return m, m.loadSettings()
-		}
+		m.servers, m.offline = msg, nil
 	case appsMsg:
-		m.apps, m.offline = msg, nil
-		m.appSelected = min(m.appSelected, max(len(m.apps)-1, 0))
-		if m.tab == tabActivity {
-			return m, m.loadActivity()
+		first := !m.loaded
+		m.apps, m.loaded, m.offline = msg, true, nil
+		if first {
+			return m, tea.Batch(m.loadUsage()...)
 		}
-		if m.tab == tabSettings {
-			return m, m.loadSettings()
-		}
-		if m.detail != nil {
-			return m, m.loadDetail(m.detail.App.Name)
-		}
+	case offlineMsg:
+		m.offline = msg.err
+	case statusMsg:
+		s := client.Status(msg)
+		m.status = &s
+	case workspaceMsg:
+		m.ws = workspace(msg)
 	case eventsMsg:
-		m.events, m.activityNext = msg.Items, msg.Next
-		m.activitySelected = min(m.activitySelected, max(len(m.events)-1, 0))
-	case olderEventsMsg:
-		m.events, m.activityNext = append(slices.Clone(m.events), msg.Items...), msg.Next
-	case activityFilterMsg:
-		m.activityFilter = client.ActivityQuery(msg)
-		return m, m.loadActivity()
-	case teamMsg:
-		m.team, m.teamErr = msg.team, msg.err
-		m.teamSelected = min(m.teamSelected, max(len(m.teamRows())-1, 0))
-	case settingsMsg:
-		m.settings = settings(msg)
-		m.settingSelected = min(m.settingSelected, max(len(m.settingRows())-1, 0))
+		if msg.older {
+			m.events = append(m.events, msg.page.Items...)
+		} else {
+			m.events = msg.page.Items
+		}
+		m.eventsEnd = msg.page.Next
+	case usageMsg:
+		var cpu []float64
+		for _, p := range msg.m.Points {
+			cpu = append(cpu, p.CPU)
+		}
+		m.cpu[msg.server] = cpu
+		m.usage[msg.server] = msg.m.Now
+	case serverMetricsMsg:
+		s := client.ServerMetrics(msg)
+		if s.Server == m.cur.server {
+			m.srv = &s
+		}
 	case detailMsg:
-		detail := client.AppDetail(msg)
-		m.detail = &detail
-	case metricsLoadedMsg, metricsRefreshMsg:
-		return m.metricsUpdate(msg)
-	case outputMsg:
-		m.outputID, m.outputTitle, m.outputNote, m.output = msg.id, msg.title, msg.note, msg.lines
-		m.outputScroll, m.panelMatch = 0, 0
-		m.running, m.runStep = msg.follow, "waiting for the server"
-		if msg.follow {
-			m.runStarted = time.Now()
+		if msg.App.Name == m.app.name {
+			d := client.AppDetail(msg)
+			m.app.detail = &d
+		}
+	case logsMsg:
+		if msg.app == m.app.name {
+			m.app.logs, m.app.logsAt = msg.lines, m.now()
+			delete(m.app.errs, tLogs)
+		}
+	case backupsMsg:
+		if msg.app == m.app.name {
+			m.app.backups = &msg.b
+			delete(m.app.errs, tBackups)
+		}
+	case envMsg:
+		if msg.app == m.app.name {
+			m.app.env = msg.env
+			delete(m.app.errs, tEnv)
+		}
+	case domainsMsg:
+		if msg.app == m.app.name {
+			m.app.domains, m.app.instant = msg.checks, msg.instant
+			delete(m.app.errs, tDomains)
+		}
+	case uptimeMsg:
+		if msg.App == m.app.name {
+			u := client.Uptime(msg)
+			m.app.uptime = &u
+			delete(m.app.errs, tUptime)
+		}
+	case appMetricsMsg:
+		if msg.App == m.app.name {
+			a := client.AppMetrics(msg)
+			m.app.metrics = &a
+			delete(m.app.errs, tMetrics)
+		}
+	case tabErrMsg:
+		if msg.app == m.app.name {
+			if m.app.errs == nil {
+				m.app.errs = map[tab]string{}
+			}
+			m.app.errs[msg.tab] = msg.err.Error()
+		}
+	case startedMsg:
+		return m.follow(msg)
+	case deployMsg:
+		d := client.Deploy(msg)
+		if m.cur.v == vDeploy && m.out.number == d.Number && !m.out.running {
+			m.out.deploy = &d
+			m.out.lines = d.Log
+			m.out.status = d.Status
+			m.out.err = d.Error
 		}
 	case lineMsg:
-		if msg.id == m.outputID {
-			m.output = append(m.output, msg.line)
-			// Scrolled up, the panel stays on the lines it shows.
-			if text, _ := style.LogLine(msg.line); m.outputScroll > 0 && (text != "" || !m.isDeployOutput()) {
-				m.outputScroll++
+		if msg.id == m.out.id {
+			m.out.lines = append(m.out.lines, msg.line)
+		}
+	case doneMsg:
+		if msg.id == m.out.id {
+			m.out.running = false
+			m.out.status = msg.status
+			if msg.deploy != nil {
+				m.out.deploy = msg.deploy
 			}
-			if text, step := style.LogLine(msg.line); step {
-				m.runStep = text
+			if msg.err != nil {
+				m.out.err = msg.err.Error()
 			}
 		}
-	case followDoneMsg:
-		// The result shows even when the panel moved on to something else.
-		m.notice, m.err = msg.notice, msg.err
-		if msg.id != m.outputID {
-			return m, nil
-		}
-		took := style.Muted.Render(" · " + duration(time.Since(m.runStarted)))
-		m.running = false
-		done, failed := "live", "failed"
-		if msg.label != "" {
-			done, failed = msg.label, msg.label
-		}
-		m.outputNote = style.Success.Render(style.SymbolDone+" "+done) + took
 		if msg.err != nil {
-			m.outputNote = style.Danger.Render(style.SymbolFailed+" "+failed) + took
+			m.fail(msg.err)
+		} else if msg.notice != "" {
+			m.say(msg.notice)
 		}
+		if m.out.app != "" {
+			return m, m.loadDetail(m.out.app)
+		}
+	case stoppedMsg:
+		for i := range m.apps {
+			if m.apps[i].Name == string(msg) {
+				m.apps[i].Stopped = true
+			}
+		}
+		m.say(string(msg) + " is stopped. S starts it again")
+	case reloadMsg:
+		if msg.notice != "" {
+			m.say(msg.notice)
+		}
+		return m, m.openTab()
+	case noticeMsg:
+		m.say(string(msg))
+	case errMsg:
+		m.fail(msg.err)
 	case editMsg:
 		return m, m.openEditor(msg)
 	case editedMsg:
 		return m.edited(msg)
-	case noticeMsg:
-		m.notice = string(msg)
-	case stoppedMsg:
-		name := string(msg)
-		m.notice = name + " stopped. Press S to start it again"
-		m.apps = slices.Clone(m.apps)
-		for i := range m.apps {
-			if m.apps[i].Name == name {
-				m.apps[i].Stopped = true
-			}
-		}
-		if m.detail != nil && m.detail.App.Name == name {
-			detail := *m.detail
-			detail.App.Stopped = true
-			m.detail = &detail
-		}
-	case closedMsg:
-		if m.mode == msg.mode {
-			m.mode, m.input = modeList, ""
-		}
-		return m.Update(msg.msg)
-	case errMsg:
-		m.err = msg.err
-	case streamErrMsg:
-		m.offline = msg.err
-	case writeMsg:
-		m.mode, m.pendingSQL = modeConfirmWrite, string(msg)
-	case addedMsg:
-		added := client.NewServer(msg)
-		m.added, m.again, m.removed, m.mode, m.input = &added, false, nil, modeList, ""
-	case installMsg:
-		added := client.NewServer(msg)
-		m.added, m.again, m.removed = &added, true, nil
-	case removedMsg:
-		removed := removedServer(msg)
-		m.removed, m.added = &removed, nil
-	case tea.KeyPressMsg:
-		return m.key(msg)
-	case tea.PasteMsg:
-		// Pasted text, like a token or SQL, goes into the open input on one line.
-		if m.typing() {
-			m.input += strings.Join(strings.FieldsFunc(msg.Content, func(r rune) bool { return r == '\n' || r == '\r' }), " ")
-		}
 	}
 	return m, nil
 }
 
-func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-	if key == "ctrl+c" {
-		return m, tea.Quit
-	}
-	// Notices and errors stay until the next key.
-	m.notice, m.err = "", nil
-	if key == "ctrl+u" && m.typing() {
-		m.input = ""
+// open goes one level deeper.
+func (m model) open(s screen) (model, tea.Cmd) {
+	if s == m.cur {
 		return m, nil
 	}
-	if key == "ctrl+w" && m.typing() {
-		m.input = dropWord(m.input)
-		return m, nil
-	}
-	switch m.mode {
-	case modeSearch, modeCommand:
-		return m.lineKey(msg)
-	case modeAdd:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			return m, m.addServer(strings.TrimSpace(m.input))
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeConfirmStop:
-		m.mode = modeList
-		if app, ok := m.currentApp(); key == "y" && ok {
-			m.notice = "stopping " + app.Name + "…"
-			return m, m.stop(app.Name)
-		}
-		return m, nil
-	case modeConfirmRollback:
-		m.mode = modeList
-		if app, ok := m.currentApp(); key == "y" && ok {
-			return m, m.rollback(app.Name, m.pendingRollback)
-		}
-		return m, nil
-	case modeEnv:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			input := strings.TrimSpace(m.input)
-			m.input = ""
-			if input == "show" || input == "hide" {
-				m.envShown = input == "show"
-				return m, m.showEnv(app.Name, m.envShown)
-			}
-			if input == "edit" {
-				return m, m.editEnv(app.Name)
-			}
-			if key, ok := strings.CutPrefix(input, "-"); ok {
-				return m.confirmFirst("Remove "+key+" from "+app.Name+"?", "The next deploy or restart drops it.", "remove", true, m.changeEnv(app.Name, input, m.envShown)), nil
-			}
-			return m, m.changeEnv(app.Name, input, m.envShown)
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeDomains, modeProtect:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			// The input stays open with the text until the change worked.
-			app, _ := m.currentApp()
-			input := strings.TrimSpace(m.input)
-			if domain, ok := strings.CutPrefix(input, "-"); ok && m.mode == modeDomains {
-				return m.confirmFirst("Remove "+domain+" from "+app.Name+"?", "Visitors there stop reaching it.", "remove", true, m.closing(m.changeDomains(app, input))), nil
-			}
-			if m.mode == modeDomains {
-				return m, m.closing(m.changeDomains(app, input))
-			}
-			if input == "off" && app.Protected {
-				return m.confirmFirst("Take the password away from "+app.Name+"?", "Anyone with the link can open it again.", "remove", true, m.closing(m.changeProtect(app.Name, input))), nil
-			}
-			return m, m.closing(m.changeProtect(app.Name, input))
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeSQL:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			query := strings.TrimSpace(m.input)
-			if query == "" {
-				return m, nil
-			}
-			return m, m.runSQL(app.Name, query, false)
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeBackups:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			target := strings.TrimSpace(m.input)
-			m.input = ""
-			if target == "" {
-				return m, m.backUp(app.Name)
-			}
-			if target == "on" || target == "off" {
-				return m, m.setSnapshots(app.Name, target == "on")
-			}
-			if bucket, ok := strings.CutPrefix(target, "bucket "); ok {
-				bucket = strings.TrimSpace(bucket)
-				to := "the bucket " + bucket
-				if bucket == "-" {
-					bucket, to = "", "the default bucket"
-				}
-				return m.confirmFirst("Move the uploads and new backups of "+app.Name+" to "+to+"?", "Its older backups stay where they are; the backups list keeps them and a restore reads them from there.", "move", false, m.setAppBucket(app.Name, bucket)), nil
-			}
-			// A snapshot in an older bucket comes with the bucket's name.
-			from := ""
-			if snapshot, bucket, found := strings.Cut(target, " "); found && protocol.ValidSnapshotID(snapshot) {
-				target, from = snapshot, strings.TrimSpace(bucket)
-			}
-			// Ask for the name only for something that can be restored.
-			if _, _, ok := restoreTarget(target); !ok {
-				m.input = target
-				m.err = fmt.Errorf("%q is neither a snapshot ID nor a time like 14:02", target)
-				return m, nil
-			}
-			where := ""
-			if from != "" {
-				where = " from the bucket " + from
-			}
-			return m.confirmName("Restore "+app.Name+" to "+target+where+"?", "It replaces the data there now; "+build.Name+" takes a snapshot of it first.", app.Name, m.restore(app.Name, target, from)), nil
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeUptime:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			input := strings.TrimSpace(m.input)
-			m.input = ""
-			if input == "" {
-				return m, m.showUptime(app.Name)
-			}
-			return m, m.changeUptime(app.Name, input)
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeConfirmSecurity:
-		m.mode = modeList
-		if key == "y" {
-			return m, m.applySecurity(m.pendingSecurity)
-		}
-		return m, nil
-	case modeConfirm:
-		m.mode = m.confirm.back
-		if key == "y" {
-			return m, m.confirm.run
-		}
-		return m, nil
-	case modeConfirmName:
-		switch key {
-		case "esc":
-			m.mode, m.input = m.confirm.back, ""
-		case "enter":
-			typed := strings.TrimSpace(m.input)
-			m.mode, m.input = m.confirm.back, ""
-			if typed != m.confirm.name {
-				m.err = fmt.Errorf("that is not %s; nothing changed", m.confirm.name)
-				return m, nil
-			}
-			return m, m.confirm.run
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeForm:
-		return m.formKey(msg)
-	case modeGitHub:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			return m, m.closing(m.github(app, strings.TrimSpace(m.input)))
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	case modeConfirmWrite:
-		m.mode = modeSQL
-		if app, ok := m.currentApp(); key == "y" && ok {
-			return m, m.runSQL(app.Name, m.pendingSQL, true)
-		}
-		return m, nil
-	case modeImage:
-		switch key {
-		case "esc":
-			m.mode, m.input = modeList, ""
-		case "enter":
-			app, _ := m.currentApp()
-			image := strings.TrimSpace(m.input)
-			m.mode, m.input = modeList, ""
-			if image == "" {
-				return m, nil
-			}
-			return m, m.deployImage(app.Name, image)
-		case "backspace":
-			m.input = dropLast(m.input)
-		default:
-			m.input += msg.Text
-		}
-		return m, nil
-	}
-
-	m, cmd, key := m.vim(key)
-	if key == "" {
-		return m, cmd
-	}
-	return m.tabKey(key)
+	m.stack = append(m.stack, m.cur)
+	return m.show(s)
 }
 
-// tabKey is a key of the place in view, after the vim keys had theirs.
-func (m model) tabKey(key string) (tea.Model, tea.Cmd) {
-	switch key {
-	case "q":
-		return m, tea.Quit
-	case "esc":
-		// Esc closes what is open and never quits.
-		switch {
-		case m.added != nil || m.removed != nil:
-			m.added, m.removed = nil, nil
-		case m.detail != nil && m.deployPick != 0:
-			m.deployPick = 0
-		case m.detail != nil:
-			m.detail = nil
-			m = m.closePanel()
-		case m.tab == tabApps:
-			m = m.closePanel()
-		}
-		return m, nil
-	case "tab":
-		return m.toTab((m.tab + 1) % tabs)
+// show makes s the current screen and loads what it needs.
+func (m model) show(s screen) (model, tea.Cmd) {
+	if s.app != "" && s.app != m.app.name {
+		m.app = appData{name: s.app}
+		m.logs = scroll{}
+		m.shown = false
 	}
-	switch m.tab {
-	case tabServers:
-		return m.serverKey(key)
-	case tabActivity:
-		return m.activityKey(key)
-	case tabTeam:
-		return m.teamKey(key)
-	case tabSettings:
-		return m.settingKey(key)
+	if s.v == vApp && s.tab == 0 {
+		s.tab = tDeploys
 	}
-	return m.appKey(key)
+	if s.v != m.cur.v || s.server != m.cur.server {
+		m.srv = nil
+	}
+	m.cur = s
+	return m, m.enter()
 }
 
-// formKey types into the open form; enter takes the answer and asks the
-// next field, after the last one it sends the form.
-func (m model) formKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode, m.input = modeList, ""
-	case "enter":
-		field := m.form.fields[m.form.step]
-		value := strings.TrimSpace(m.input)
-		if value == "" {
-			value = field.value
-		}
-		if value == "" && !field.optional {
-			m.err = fmt.Errorf("%s is needed", strings.ToLower(field.label))
+// back goes one level up; on the dashboard it stays.
+func (m model) back() (model, tea.Cmd) {
+	if len(m.stack) == 0 {
+		if m.cur.v == vDash {
 			return m, nil
 		}
-		if field.check != nil {
-			if err := field.check(value); err != nil {
-				m.err = err
-				return m, nil
-			}
-		}
-		m.input = ""
-		m.form.values = append(slices.Clone(m.form.values), value)
-		m.form.step++
-		if m.form.step < len(m.form.fields) {
-			return m, nil
-		}
-		m.mode = modeList
-		return m, m.form.submit(m.form.values)
-	case "backspace":
-		m.input = dropLast(m.input)
-	default:
-		m.input += msg.Text
+		return m.show(screen{v: vDash})
 	}
-	return m, nil
+	s := m.stack[len(m.stack)-1]
+	m.stack = m.stack[:len(m.stack)-1]
+	return m.show(s)
 }
 
-// closedMsg is the answer of a command run from the input of mode: it
-// worked, so the input closes.
-type closedMsg struct {
-	mode mode
-	msg  tea.Msg
+// home empties the stack.
+func (m model) home() (model, tea.Cmd) {
+	m.stack = nil
+	return m.show(screen{v: vDash})
 }
 
-// closing runs cmd from the open input and closes the input once cmd
-// worked. After an error the typed text stays, to fix and send again.
-func (m model) closing(cmd tea.Cmd) tea.Cmd {
-	mode := m.mode
-	return func() tea.Msg {
-		msg := cmd()
-		if _, failed := msg.(errMsg); failed {
-			return msg
-		}
-		return closedMsg{mode: mode, msg: msg}
+// openApp opens an app at a tab; inside the same app it only switches.
+func (m model) openApp(name string, t tab) (model, tea.Cmd) {
+	if m.cur.v == vApp && m.cur.app == name {
+		return m.switchTab(t)
 	}
+	return m.open(screen{v: vApp, app: name, tab: t})
 }
 
-// ask opens a form.
-func (m model) ask(title string, submit func([]string) tea.Cmd, fields ...formField) model {
-	m.mode, m.input = modeForm, ""
-	m.form = form{title: title, fields: fields, submit: submit}
-	return m
-}
-
-// confirmFirst asks a question before run.
-func (m model) confirmFirst(question, detail, verb string, danger bool, run tea.Cmd) model {
-	m.confirm = confirmation{question: question, detail: detail, verb: verb, danger: danger, back: m.mode, run: run}
-	m.mode = modeConfirm
-	return m
-}
-
-// confirmName asks for name, typed out, before run: for removing a server,
-// an app or the bucket and for a restore.
-func (m model) confirmName(question, detail, name string, run tea.Cmd) model {
-	m.confirm = confirmation{question: question, detail: detail, name: name, danger: true, back: m.mode, run: run}
-	m.mode, m.input = modeConfirmName, ""
-	return m
-}
-
-// typing reports whether the footer holds a text input.
-func (m model) typing() bool {
-	switch m.mode {
-	case modeAdd, modeEnv, modeImage, modeDomains, modeProtect, modeSQL, modeBackups, modeUptime, modeForm, modeGitHub, modeConfirmName, modeSearch, modeCommand:
-		return true
+func (m model) switchTab(t tab) (model, tea.Cmd) {
+	if m.cur.tab == t {
+		return m, nil
 	}
-	return false
+	m.cur.tab = t
+	return m, m.openTab()
 }
 
-// closePanel empties the output panel.
-func (m model) closePanel() model {
-	m.output, m.outputTitle, m.outputNote, m.outputID, m.running = nil, "", "", 0, false
-	m.panelFocus, m.outputScroll, m.panelMatch = false, 0, 0
-	return m
-}
-
-func dropLast(text string) string {
-	runes := []rune(text)
-	if len(runes) == 0 {
-		return text
+// enter loads what the current screen shows.
+func (m model) enter() tea.Cmd {
+	if m.api == nil {
+		return nil
 	}
-	return string(runes[:len(runes)-1])
-}
-
-func (m model) serverKey(key string) (tea.Model, tea.Cmd) {
-	switch key {
-	case "K", "J":
-		return m.moveServer(key == "K")
-	case "a":
-		m.mode, m.added, m.removed = modeAdd, nil, nil
-	case "x":
-		if m.selected < len(m.servers) {
-			server := m.servers[m.selected]
-			detail := "Its agent is disconnected; the agent stays on the machine until you uninstall it."
-			var apps []string
-			for _, app := range m.apps {
-				if app.ServerName == server.Name {
-					apps = append(apps, app.Name)
-				}
-			}
-			if len(apps) > 0 && !server.Online {
-				detail = "It is offline, so its apps go with it: " + strings.Join(apps, ", ") + ". They stay on the server if it comes back."
-			}
-			return m.confirmName("Remove "+server.Name+"?", detail, server.Name, m.removeServer(server.ID, server.Name)), nil
+	switch m.cur.v {
+	case vDash:
+		return tea.Batch(append(m.loadUsage(), m.loadStatus(), m.loadEvents(""))...)
+	case vApp:
+		return tea.Batch(m.loadDetail(m.cur.app), m.openTab())
+	case vDeploy:
+		if m.out.running && m.out.number == m.cur.deploy && m.out.app == m.cur.app {
+			return nil
 		}
-	case "i":
-		if m.selected < len(m.servers) {
-			server := m.servers[m.selected]
-			return m, m.newInstallCommand(server.ID)
-		}
-	case "cw":
-		if m.selected < len(m.servers) {
-			server := m.servers[m.selected]
-			return m.ask("Rename "+server.Name, func(values []string) tea.Cmd {
-				return m.renameServer(server.ID, server.Name, values[0])
-			}, formField{label: "Name", value: server.Name, hint: placeholder(server.Name, "lowercase letters, digits and dashes"), check: func(name string) error {
-				// A name from before the rule may stay as it is.
-				if name == server.Name {
-					return nil
-				}
-				return checkName(name)
-			}}), nil
-		}
-	case "u":
-		if m.selected < len(m.servers) {
-			server := m.servers[m.selected]
-			m.notice = "updating the agent of " + server.Name + "…"
-			return m, m.updateAgent(server)
-		}
-	case "m":
-		if m.selected < len(m.servers) {
-			return m, m.showMetrics("", m.servers[m.selected].ID)
-		}
-	case "t", "f", "s":
-		if m.selected < len(m.servers) {
-			server := m.servers[m.selected]
-			change := securityChange{server: server, security: client.Security{Tunnel: server.Tunnel, SSHTailscale: server.SSHTailscale, Firewall: server.Firewall}}
-			if key == "t" {
-				change.security.Tunnel = !server.Tunnel
-				change.question = "Route " + server.Name + " through a Cloudflare Tunnel?"
-				change.detail = "Ports 80 and 443 close; moin points your domains at the tunnel."
-				if server.Tunnel {
-					change.question, change.detail = "Take "+server.Name+" off the tunnel?", "Traefik takes ports 80 and 443 again; point your domains at the server."
-				}
-			} else if key == "s" {
-				change.security.SSHTailscale = !server.SSHTailscale
-				change.question, change.detail = "Let "+server.Name+" answer SSH only on your tailnet?", "Port 22 closes once Tailscale is up; keep another way in, such as your provider's console."
-				if server.SSHTailscale {
-					change.question, change.detail = "Open SSH on "+server.Name+" to the internet again?", "Port 22 answers on every interface."
-				}
-			} else {
-				change.security.Firewall = !server.Firewall
-				change.question, change.detail = "Turn on the firewall of "+server.Name+"?", "Every inbound connection it does not need is dropped."
-				if server.Firewall {
-					change.question, change.detail = "Turn off the firewall of "+server.Name+"?", "Every port is reachable again."
-				}
-			}
-			m.mode, m.pendingSecurity = modeConfirmSecurity, change
-		}
-	}
-	return m, nil
-}
-
-// securityChange is a server's new access settings and the question
-// that asks for them.
-type securityChange struct {
-	server           client.Server
-	security         client.Security
-	question, detail string
-}
-
-// applySecurity sends the settings and says what the agent set up.
-func (m model) applySecurity(change securityChange) tea.Cmd {
-	return func() tea.Msg {
-		secured, err := m.api.SetSecurity(m.ctx, change.server.ID, change.security)
-		if err != nil {
-			return errMsg{err}
-		}
-		notice := "applied to " + secured.Name + ": " + secured.Access()
-		if secured.Security != nil && len(secured.Security.Problems) > 0 {
-			return errMsg{fmt.Errorf("%s; %s", notice, strings.Join(secured.Security.Problems, "; "))}
-		}
-		return noticeMsg(notice)
-	}
-}
-
-// updateAgent puts the control plane's version of the agent on a server
-// and waits until it is back.
-func (m model) updateAgent(server client.Server) tea.Cmd {
-	return func() tea.Msg {
-		updated, err := m.api.UpdateAgent(m.ctx, server.ID)
-		if err != nil {
-			return errMsg{err}
-		}
-		return noticeMsg("the agent of " + updated.Name + " runs " + updated.AgentVersion)
-	}
-}
-
-func (m model) appKey(key string) (tea.Model, tea.Cmd) {
-	if m.detail == nil {
-		switch key {
-		case "enter":
-			if app, ok := m.currentApp(); ok {
-				m = m.closePanel()
-				m.deployPick = 0
-				return m, m.loadDetail(app.Name)
-			}
-			return m, nil
-		case "a":
-			return m.addAppForm(), nil
-		case "K", "J":
-			return m.moveApp(key == "K")
-		}
-	} else {
-		switch key {
-		case "enter":
-			if m.deployPick != 0 {
-				m.panelFocus = true
-				return m, m.deployLog(m.detail.App.Name, m.deployPick)
-			}
-			return m, nil
-		}
-	}
-	app, ok := m.currentApp()
-	switch key {
-	case "d":
-		if m.hasApp(client.AppName("", m.dir)) {
-			return m, m.deploy()
-		}
-	case "L":
-		if ok {
-			m.panelFocus = true
-			return m, m.logs(app.Name)
-		}
-	case "r":
-		if ok {
-			if m.detail != nil && m.deployPick != 0 && m.deployPick == app.LiveNumber {
-				m.err = fmt.Errorf("v%d is live already: pick an older deploy", app.LiveNumber)
-				return m, nil
-			}
-			m.mode, m.pendingRollback = modeConfirmRollback, 0
-			if m.detail != nil {
-				m.pendingRollback = m.deployPick
-			}
-		}
-	case "R":
-		if ok {
-			return m, m.redeploy(app.Name)
-		}
-	case "t":
-		if ok {
-			return m, m.restart(app.Name, false)
-		}
-	case "S":
-		if ok && app.Stopped {
-			return m, m.restart(app.Name, true)
-		}
-		if ok {
-			m.mode = modeConfirmStop
-		}
-	case "e":
-		if ok {
-			m.mode, m.input, m.envShown = modeEnv, "", false
-			return m, m.showEnv(app.Name, false)
-		}
-	case "i":
-		if ok {
-			m.mode, m.input = modeImage, ""
-		}
-	case "hook off":
-		if ok && app.Hook {
-			name := app.Name
-			return m.confirmFirst("Turn off the deploy hook of "+name+"?", "Its URL stops working; CI can no longer deploy it.", "turn off", true, func() tea.Msg {
-				if err := m.api.RemoveDeployHook(m.ctx, name); err != nil {
-					return errMsg{err}
-				}
-				return noticeMsg("Turned off the deploy hook of " + name)
-			}), nil
-		}
-		if ok {
-			m.notice = "Nothing changed: " + app.Name + " has no deploy hook."
-		}
-	case "hook":
-		// The first hook replaces nothing, so it asks nothing.
-		if ok && !app.Hook {
-			return m, m.newHook(app.Name)
-		}
-		if ok {
-			return m.confirmFirst("Make a new deploy hook for "+app.Name+"?", "The old one stops working.", "replace", true, m.newHook(app.Name)), nil
-		}
-	case "o":
-		if ok {
-			m.mode, m.input = modeDomains, ""
-			return m, m.showDomains(app.Name)
-		}
-	case "p":
-		if ok {
-			m.mode, m.input = modeProtect, ""
-		}
-	case "s":
-		if ok {
-			m.mode, m.input = modeSQL, ""
-			return m, m.showTables(app.Name)
-		}
-	case "b":
-		if ok {
-			m.mode, m.input = modeBackups, ""
-			return m, m.showBackups(app.Name, "")
-		}
-	case "u":
-		if ok {
-			m.mode, m.input = modeUptime, ""
-			return m, m.showUptime(app.Name)
-		}
-	case "m":
-		if ok {
-			return m, m.showMetrics(app.Name, "")
-		}
-	case "gh":
-		if ok {
-			m.mode, m.input = modeGitHub, ""
-			return m, m.showGitHub(app)
-		}
-	case "x":
-		if ok {
-			m.detail = nil
-			return m.confirmName("Remove "+app.Name+"?", "Its containers stop and go; its data stays on the server.", app.Name, m.removeApp(app.Name)), nil
-		}
-	}
-	return m, nil
-}
-
-// hasApp reports whether the workspace has an app of that name.
-func (m model) hasApp(name string) bool {
-	return slices.ContainsFunc(m.apps, func(app client.App) bool { return app.Name == name })
-}
-
-// addAppForm asks for the name and the server of a new app. The name
-// defaults to the directory's app, the server to the only one there is.
-func (m model) addAppForm() model {
-	here := client.AppName("", m.dir)
-	if m.hasApp(here) {
-		here = ""
-	}
-	server := client.ReadLocalConfig(m.dir).Server
-	names := make([]string, 0, len(m.servers))
-	for _, s := range m.servers {
-		names = append(names, s.Name)
-	}
-	if server == "" && len(m.servers) == 1 {
-		server = m.servers[0].Name
-	}
-	hint := "one of " + strings.Join(names, ", ")
-	if len(names) == 0 {
-		hint = "add a server first, on the servers tab"
-	}
-	return m.ask("New app", func(values []string) tea.Cmd { return m.addApp(values[0], values[1]) },
-		formField{label: "Name", value: here, hint: placeholder(here, "lowercase letters, digits and dashes"), check: checkName},
-		formField{label: "Server", value: server, hint: placeholder(server, hint), check: m.checkServer},
-	)
-}
-
-// checkName asks again for an app or server name the control plane would
-// refuse.
-func checkName(name string) error {
-	if !protocol.ValidAppName(name) {
-		return fmt.Errorf("use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
+		return m.loadDeploy(m.cur.app, m.cur.deploy)
+	case vServer:
+		return m.loadServerMetrics(m.cur.server)
+	case vActivity:
+		return m.loadEvents("")
 	}
 	return nil
 }
 
-// checkServer asks again for a server that is not in the list.
-func (m model) checkServer(name string) error {
-	for _, server := range m.servers {
-		if server.Name == name || server.ID == name {
-			return nil
-		}
+// openTab loads the open tab of the app.
+func (m model) openTab() tea.Cmd {
+	if m.api == nil || m.cur.v != vApp {
+		return nil
 	}
-	return fmt.Errorf("there is no server %s: pick one from the servers tab", name)
+	a := m.cur.app
+	switch m.cur.tab {
+	case tDeploys:
+		return m.loadDetail(a)
+	case tLogs:
+		return m.loadLogs(a)
+	case tBackups:
+		return m.loadBackups(a)
+	case tEnv:
+		return m.loadEnv(a)
+	case tDomains:
+		return m.loadDomains(a)
+	case tUptime:
+		return m.loadUptime(a)
+	case tMetrics:
+		return m.loadAppMetrics(a)
+	}
+	return nil
 }
 
-// placeholder is what an empty answer takes, or a hint when there is none.
-func placeholder(value, hint string) string {
-	if value != "" {
-		return "enter takes " + value
-	}
-	return hint
+// follow opens the deploy an action started and streams its log.
+func (m model) follow(msg startedMsg) (tea.Model, tea.Cmd) {
+	m.nextID++
+	m.out = stream{id: m.nextID, app: msg.app, number: msg.deploy.Number, title: msg.title, running: true, status: "running"}
+	m.text = scroll{}
+	m, cmd := m.open(screen{v: vDeploy, app: msg.app, deploy: msg.deploy.Number})
+	return m, tea.Batch(cmd, m.followDeploy(m.out.id, msg.app, msg.deploy.Number))
 }
 
-func (m model) addApp(name, server string) tea.Cmd {
-	return func() tea.Msg {
-		app, err := m.api.AddApp(m.ctx, name, server)
-		if err != nil {
-			return errMsg{err}
+// findApp is the app by name from the live list.
+func (m model) findApp(name string) (client.App, bool) {
+	for _, a := range m.apps {
+		if a.Name == name {
+			return a, true
 		}
-		next := "Deploy it with i (an image), gh (GitHub) or " + build.Name + " deploy in its repo."
-		if app.Name == client.AppName("", m.dir) {
-			next = "Press d to deploy " + m.dir + "."
-		}
-		return noticeMsg("Added " + app.Name + " on " + app.ServerName + ". " + next)
-	}
-}
-
-// deployLog shows the log of one deploy; a running one streams on.
-func (m model) deployLog(name string, number int) tea.Cmd {
-	running := slices.ContainsFunc(m.detail.Deploys, func(deploy client.Deploy) bool {
-		return deploy.Number == number && deploy.Status == "running"
-	})
-	return func() tea.Msg {
-		if running {
-			return m.follow(name, client.Deploy{Number: number}, fmt.Sprintf("deploy v%d of %s", number, name))
-		}
-		var lines []string
-		done, err := m.api.FollowDeploy(m.ctx, name, number, func(line string) { lines = append(lines, line) })
-		if err != nil {
-			return errMsg{err}
-		}
-		note := style.Success.Render(style.SymbolDone + " " + done.Status)
-		if done.Status != "succeeded" {
-			note = style.Danger.Render(style.SymbolFailed + " " + done.Status)
-		}
-		if done.Error != "" {
-			lines = append(lines, done.Error)
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: fmt.Sprintf("log of v%d of %s", number, name), note: note, lines: lines}
-	}
-}
-
-// currentApp is the open app, or the selected one in the list.
-func (m model) currentApp() (client.App, bool) {
-	if m.detail != nil {
-		return m.detail.App, true
-	}
-	if m.appSelected < len(m.apps) {
-		return m.apps[m.appSelected], true
 	}
 	return client.App{}, false
 }
 
-func (m model) addServer(name string) tea.Cmd {
-	return func() tea.Msg {
-		created, err := m.api.AddServer(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
+func (m model) findServer(name string) (client.Server, bool) {
+	for _, s := range m.servers {
+		if s.Name == name {
+			return s, true
 		}
-		return addedMsg(created)
 	}
+	return client.Server{}, false
 }
 
-// removedServer is a server just removed and the command that removes its
-// agent on the machine.
-type removedServer struct {
-	name      string
-	uninstall string
-	// apps went with the server: it was offline.
-	apps []string
+// cursor moves the cursor of a list of n by d and keeps it inside.
+func (m model) cursor(name string, n, d int) model {
+	i := m.sel[name] + d
+	i = max(0, min(i, n-1))
+	m.sel[name] = i
+	return m
 }
 
-func (m model) removeServer(id, name string) tea.Cmd {
-	return func() tea.Msg {
-		removed, err := m.api.RemoveServer(m.ctx, id)
-		if err != nil {
-			return errMsg{err}
-		}
-		with := ""
-		if len(removed.Apps) > 0 {
-			with = ". It was offline, so its apps went with it: " + strings.Join(removed.Apps, ", ")
-		}
-		if removed.UninstallCommand == "" {
-			return noticeMsg(name + " removed" + with + ". Its agent never connected, so nothing is installed there")
-		}
-		return removedMsg{name: name, uninstall: removed.UninstallCommand, apps: removed.Apps}
-	}
-}
-
-func (m model) newInstallCommand(id string) tea.Cmd {
-	return func() tea.Msg {
-		created, err := m.api.NewInstallCommand(m.ctx, id)
-		if err != nil {
-			return errMsg{err}
-		}
-		return installMsg(created)
-	}
-}
-
-func (m model) renameServer(id, from, name string) tea.Cmd {
-	return func() tea.Msg {
-		renamed, err := m.api.RenameServer(m.ctx, id, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return noticeMsg("Renamed " + from + " to " + renamed.Name)
-	}
-}
-
-func (m model) removeApp(name string) tea.Cmd {
-	return func() tea.Msg {
-		err := m.api.RemoveApp(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return noticeMsg(name + " removed. Its data stays on the server")
-	}
-}
-
-func (m model) loadDetail(name string) tea.Cmd {
-	return func() tea.Msg {
-		detail, err := m.api.App(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return detailMsg(detail)
-	}
-}
-
-func (m model) logs(name string) tea.Cmd {
-	const tail = 200
-	return func() tea.Msg {
-		lines, err := m.api.Logs(m.ctx, name, tail)
-		if err != nil {
-			return errMsg{err}
-		}
-		if len(lines) == 0 {
-			lines = []string{name + " has written no log lines yet"}
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: "logs of " + name, note: style.Muted.Render(fmt.Sprintf("last %d lines per container", tail)), lines: lines}
-	}
-}
-
-// deploy packs the directory the TUI started in and follows the deploy in
-// the output panel. The app must exist; `moin deploy` creates new ones.
-func (m model) deploy() tea.Cmd {
-	name := client.AppName("", m.dir)
-	return func() tea.Msg {
-		var source bytes.Buffer
-		_, err := client.Pack(m.dir, &source)
-		if err != nil {
-			return errMsg{err}
-		}
-		started, err := m.api.Deploy(m.ctx, name, source.Bytes())
-		if client.IsNotFound(err) {
-			return errMsg{fmt.Errorf("no app %s yet: run `%s deploy` in %s once", name, build.Name, m.dir)}
-		}
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.follow(name, started, fmt.Sprintf("deploy v%d of %s", started.Number, name))
-	}
-}
-
-// deployImage deploys an image built elsewhere and follows it.
-func (m model) deployImage(name, image string) tea.Cmd {
-	return func() tea.Msg {
-		started, err := m.api.DeployImage(m.ctx, name, image)
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.follow(name, started, fmt.Sprintf("deploy v%d of %s", started.Number, name))
-	}
-}
-
-// deployRef deploys a branch, tag or commit of the app's GitHub repo, or
-// the linked branch for "".
-func (m model) deployRef(name, ref string) tea.Cmd {
-	return func() tea.Msg {
-		started, err := m.api.DeployRef(m.ctx, name, ref)
-		if err != nil {
-			return errMsg{err}
-		}
-		title := fmt.Sprintf("deploy v%d of %s", started.Number, name)
-		if started.Commit != "" {
-			title += " from " + started.Commit[:min(7, len(started.Commit))]
-		}
-		return m.follow(name, started, title)
-	}
-}
-
-// showGitHub fills the output panel with the repo the app follows and the
-// repos moin may read.
-func (m model) showGitHub(app client.App) tea.Cmd {
-	return func() tea.Msg {
-		repos, err := m.api.GitHubRepos(m.ctx)
-		lines := []string{}
-		switch {
-		case app.Repo == "":
-			lines = append(lines, app.Name+" follows no repo yet")
-		case app.AutoDeploy:
-			lines = append(lines, app.Name+" follows "+style.Bold.Render(app.Repo)+" on "+app.Branch+", and deploys every push")
-		default:
-			lines = append(lines, app.Name+" follows "+style.Bold.Render(app.Repo)+" on "+app.Branch+"; it deploys when you say so")
-		}
-		lines = append(lines, "")
-		switch {
-		case err != nil:
-			lines = append(lines, style.Muted.Render("repos: "+sentence(err.Error())))
-		case len(repos) == 0:
-			lines = append(lines, style.Muted.Render("No repos yet: install the moin GitHub App, see the settings tab."))
-		default:
-			rows := make([][]any, 0, len(repos))
-			for _, repo := range repos {
-				visibility := "public"
-				if repo.Private {
-					visibility = "private"
-				}
-				rows = append(rows, []any{repo.FullName, repo.DefaultBranch, visibility})
-			}
-			lines = append(lines, resultLines([]string{"repo", "branch", "visibility"}, rows)...)
-		}
-		if github, err := m.api.GitHub(m.ctx); err == nil && github.Enabled {
-			lines = append(lines, "", style.Muted.Render("Don't see your repo? Give "+build.Name+" access to it on GitHub:"))
-			for _, installation := range github.Installations {
-				lines = append(lines, "  "+installation.Account+"  "+style.Accent.Render(installation.SettingsURL))
-			}
-			if github.InstallURL != "" {
-				lines = append(lines, "  "+style.Muted.Render("another account")+"  "+style.Accent.Render(github.InstallURL))
-			}
-		}
-		note := "type link owner/repo [branch] [manual] to follow one · branches owner/repo lists its branches"
-		if app.Repo != "" {
-			note = "enter deploys " + app.Branch + " · a branch, tag or commit deploys that"
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: "GitHub of " + app.Name, note: style.Muted.Render(note), lines: lines}
-	}
-}
-
-// github answers the GitHub prompt: "" deploys the linked branch, "link
-// owner/repo [branch] [manual]" follows a repo, "unlink" stops, anything
-// else is a branch, tag or commit to deploy.
-func (m model) github(app client.App, input string) tea.Cmd {
-	fields := strings.Fields(input)
-	switch {
-	case len(fields) > 0 && fields[0] == "unlink":
-		return func() tea.Msg {
-			err := m.api.UnlinkRepo(m.ctx, app.Name)
-			if err != nil {
-				return errMsg{err}
-			}
-			return noticeMsg(app.Name + " follows no repo any more")
-		}
-	case len(fields) > 0 && fields[0] == "branches":
-		repo := app.Repo
-		if len(fields) > 1 {
-			repo = fields[1]
-		}
-		if repo == "" {
-			return func() tea.Msg { return errMsg{fmt.Errorf("type branches owner/repo")} }
-		}
-		return func() tea.Msg {
-			branches, err := m.api.GitHubBranches(m.ctx, repo)
-			if err != nil {
-				return errMsg{err}
-			}
-			lines := []string{}
-			for index, branch := range branches {
-				if index == 0 {
-					branch += style.Muted.Render("  default")
-				}
-				lines = append(lines, branch)
-			}
-			note := "type link " + repo + " <branch> [manual] to follow one"
-			return outputMsg{id: m.shared.outputs.Add(1), title: "Branches of " + repo, note: style.Muted.Render(note), lines: lines}
-		}
-	case len(fields) > 0 && fields[0] == "link":
-		if len(fields) < 2 {
-			return func() tea.Msg { return errMsg{fmt.Errorf("type link owner/repo, then optionally a branch and manual")} }
-		}
-		repo, branch, auto := fields[1], "", true
-		for _, field := range fields[2:] {
-			if field == "manual" {
-				auto = false
-			} else {
-				branch = field
-			}
-		}
-		return func() tea.Msg {
-			linked, err := m.api.LinkRepo(m.ctx, app.Name, repo, branch, auto)
-			if err != nil {
-				return errMsg{err}
-			}
-			notice := app.Name + " follows " + linked.Repo + " on " + linked.Branch
-			if linked.AutoDeploy {
-				return noticeMsg(notice + " and deploys every push. Press g, then enter, to deploy it now")
-			}
-			return noticeMsg(notice + ". Press g, then enter, to deploy it")
-		}
-	}
-	return m.deployRef(app.Name, input)
-}
-
-// showDomains fills the output panel with the domains and their DNS state.
-func (m model) showDomains(name string) tea.Cmd {
-	return func() tea.Msg {
-		checks, err := m.api.CheckDomains(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		lines := []string{}
-		advice, fromCompose := "", false
-		for _, check := range checks {
-			advice = check.Advice
-			fromCompose = fromCompose || check.FromCompose
-			state := "set DNS"
-			if check.Points {
-				state = "points here"
-			}
-			line := check.Domain + "   " + state
-			if check.Canonical {
-				line += "   canonical"
-			}
-			if check.Service != "" {
-				line += "   service " + check.Service
-			}
-			if check.FromCompose {
-				line += "   from compose.yml"
-			}
-			lines = append(lines, line)
-		}
-		if len(lines) == 0 {
-			lines = append(lines, "no domains yet")
-		}
-		if detail, err := m.api.App(m.ctx, name); err == nil {
-			if detail.App.Instant != "" {
-				lines = append(lines, "", detail.App.Instant+"   instant address · :instant to change it")
-			}
-		}
-		note := "type blog.de to add, -blog.de to remove, =blog.de for canonical, api:api.blog.de for the service api"
-		switch {
-		case fromCompose:
-			note = "x-moin.domains in compose.yml sets these: change them there and deploy"
-		case advice != "":
-			note = "set DNS: " + advice
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: "domains of " + name, note: style.Muted.Render(note), lines: lines}
-	}
-}
-
-// changeDomains adds blog.de, removes -blog.de or sets =blog.de canonical.
-func (m model) changeDomains(app client.App, input string) tea.Cmd {
-	return func() tea.Msg {
-		// api:api.blog.de adds a domain to the service api, -api:api.blog.de
-		// removes it: domains never hold a colon.
-		if service, domain, found := strings.Cut(strings.TrimPrefix(input, "-"), ":"); found {
-			list := slices.Clone(app.ServiceDomains[service])
-			if strings.HasPrefix(input, "-") {
-				list = slices.DeleteFunc(list, func(d string) bool { return d == domain })
-			} else {
-				list = append(list, domain)
-			}
-			return m.changed(app.Name, func() (client.Change, error) { return m.api.SetServiceDomains(m.ctx, app.Name, service, list) })
-		}
-		list, canonical := slices.Clone(app.Domains), app.Canonical
-		switch {
-		case strings.HasPrefix(input, "-"):
-			domain := strings.TrimPrefix(input, "-")
-			list = slices.DeleteFunc(list, func(d string) bool { return d == domain })
-			if canonical == domain {
-				canonical = ""
-			}
-		case strings.HasPrefix(input, "="):
-			canonical = strings.TrimPrefix(input, "=")
-			if canonical == "none" {
-				canonical = ""
-			}
-		case input != "":
-			list = append(list, input)
-		}
-		change, err := m.api.SetDomains(m.ctx, app.Name, list, canonical)
-		if err != nil {
-			return errMsg{err}
-		}
-		if change.Unchanged {
-			return noticeMsg("Nothing changed.")
-		}
-		if change.Deploy != nil {
-			return m.follow(app.Name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, app.Name))
-		}
-		return noticeMsg("Saved. " + app.Name + " takes it with its next deploy or start.")
-	}
-}
-
-// changed runs a change of an app and follows the deploy that applies it.
-func (m model) changed(name string, change func() (client.Change, error)) tea.Msg {
-	result, err := change()
-	if err != nil {
-		return errMsg{err}
-	}
-	if result.Unchanged {
-		return noticeMsg("Nothing changed.")
-	}
-	if result.Deploy != nil {
-		return m.follow(name, *result.Deploy, fmt.Sprintf("restart v%d of %s", result.Deploy.Number, name))
-	}
-	return noticeMsg("Saved. " + name + " takes it with its next deploy or start.")
-}
-
-// instant shows the instant address of the app with its password, or picks
-// its provider, off, open or protect.
-func (m model) instant(name string, args []string) tea.Cmd {
-	return func() tea.Msg {
-		if len(args) > 0 {
-			var msg tea.Msg
-			switch args[0] {
-			case "open", "protect":
-				open := args[0] == "open"
-				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, "", &open) })
-			default:
-				if args[0] != "off" && !slices.Contains(protocol.InstantProviders, args[0]) {
-					return errMsg{fmt.Errorf("pick sslip.io, nip.io, off, open or protect")}
-				}
-				msg = m.changed(name, func() (client.Change, error) { return m.api.SetInstant(m.ctx, name, args[0], nil) })
-			}
-			return msg
-		}
-		address, err := m.api.Instant(m.ctx, name, true)
-		if err != nil {
-			return errMsg{err}
-		}
-		lines := []string{}
-		if address.URL == "" {
-			lines = append(lines, "no instant address. "+address.Reason)
-		} else {
-			lines = append(lines, address.URL, "provider   "+address.Provider)
-			switch {
-			case address.Open:
-				lines = append(lines, "password   none: open to everyone")
-			case address.OwnPassword:
-				lines = append(lines, "password   the app's own, user "+address.User)
-			default:
-				lines = append(lines, "user       "+address.User, "password   "+address.Password)
-			}
-		}
-		note := ":instant sslip.io|nip.io|off picks the provider, :instant open|protect the password"
-		return outputMsg{id: m.shared.outputs.Add(1), title: "instant address of " + name, note: style.Muted.Render(note), lines: lines}
-	}
-}
-
-// changeProtect sets user:password, or turns protection off with "off".
-func (m model) changeProtect(name, input string) tea.Cmd {
-	return func() tea.Msg {
-		var change client.Change
-		var err error
-		if input == "off" {
-			change, err = m.api.RemoveProtection(m.ctx, name)
-		} else {
-			user, password, found := strings.Cut(input, ":")
-			if !found {
-				return errMsg{fmt.Errorf("type user:password, or off")}
-			}
-			change, err = m.api.SetProtection(m.ctx, name, user, password)
-		}
-		if err != nil {
-			return errMsg{err}
-		}
-		if change.Unchanged {
-			return noticeMsg("Nothing changed.")
-		}
-		if change.Deploy != nil {
-			return m.follow(name, *change.Deploy, fmt.Sprintf("restart v%d of %s", change.Deploy.Number, name))
-		}
-		return noticeMsg("Saved. " + name + " takes it with its next deploy or start.")
-	}
-}
-
-// newHook replaces the app's deploy hook and shows the new URL once.
-func (m model) newHook(name string) tea.Cmd {
-	return func() tea.Msg {
-		url, err := m.api.RotateDeployHook(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		lines := []string{url, "", "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + name + `:$GITHUB_SHA"`}
-		return outputMsg{id: m.shared.outputs.Add(1), title: "deploy hook of " + name, note: style.Warning.Render("shown once · the old one stops working"), lines: lines}
-	}
-}
-
-// restart starts the live release again with the current settings; start
-// runs a stopped app the same way.
-func (m model) restart(name string, start bool) tea.Cmd {
-	return func() tea.Msg {
-		run, verb := m.api.Restart, "restart"
-		if start {
-			run, verb = m.api.Start, "start"
-		}
-		started, err := run(m.ctx, name)
-		var apiErr *client.Error
-		if errors.As(err, &apiErr) && apiErr.Code == "already_running" {
-			return noticeMsg(name + " is already running. Nothing changed")
-		}
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.follow(name, started, fmt.Sprintf("%s v%d of %s", verb, started.Number, name))
-	}
-}
-
-// stop takes the app offline. The app list shows it stopped with its next
-// refresh.
-func (m model) stop(name string) tea.Cmd {
-	return func() tea.Msg {
-		err := m.api.Stop(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return stoppedMsg(name)
-	}
-}
-
-func (m model) redeploy(name string) tea.Cmd {
-	return func() tea.Msg {
-		started, err := m.api.Redeploy(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.follow(name, started, fmt.Sprintf("redeploy v%d of %s", started.Number, name))
-	}
-}
-
-// showEnv fills the output panel with the env vars; values stay hidden
-// unless shown is set.
-func (m model) showEnv(name string, shown bool) tea.Cmd {
-	return func() tea.Msg {
-		env, err := m.api.Env(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.envOutput(name, env, shown)
-	}
-}
-
-// changeEnv sets KEY=value or removes -KEY, then shows the env again.
-func (m model) changeEnv(name, input string, shown bool) tea.Cmd {
-	return func() tea.Msg {
-		var set map[string]string
-		var unset []string
-		if key, ok := strings.CutPrefix(input, "-"); ok {
-			unset = []string{key}
-		} else if key, value, ok := strings.Cut(input, "="); ok {
-			set = map[string]string{key: value}
-		} else {
-			return errMsg{fmt.Errorf("type KEY=value to set or -KEY to remove")}
-		}
-		env, err := m.api.SetEnv(m.ctx, name, set, unset)
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.envOutput(name, env, shown)
-	}
-}
-
-func (m model) envOutput(name string, env map[string]string, shown bool) outputMsg {
-	keys := make([]string, 0, len(env))
-	for key := range env {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	lines := make([]string, 0, len(keys))
-	for _, key := range keys {
-		value := "••••••"
-		if shown {
-			value = env[key]
-		}
-		lines = append(lines, key+"="+value)
-	}
-	if len(lines) == 0 {
-		lines = append(lines, "no env vars yet")
-	}
-	note := "values hidden · the next deploy gets changes"
-	if shown {
-		note = "values shown · the next deploy gets changes"
-	}
-	return outputMsg{id: m.shared.outputs.Add(1), title: "env of " + name, note: style.Muted.Render(note), lines: lines}
-}
-
-// rollback starts the images of deploy number again, or of the one before
-// the live one for 0.
-func (m model) rollback(name string, number int) tea.Cmd {
-	return func() tea.Msg {
-		started, err := m.api.Rollback(m.ctx, name, number)
-		if err != nil {
-			return errMsg{err}
-		}
-		return m.follow(name, started, fmt.Sprintf("rollback of %s to v%d", name, started.FromNumber))
-	}
-}
-
-// follow opens the output panel and streams the deploy into it.
-func (m model) follow(name string, started client.Deploy, title string) tea.Msg {
-	program := m.shared.program
-	id := m.shared.outputs.Add(1)
-	go func() {
-		done, err := m.api.FollowDeploy(m.ctx, name, started.Number, func(line string) {
-			program.Send(lineMsg{id, line})
-		})
-		switch {
-		case err != nil:
-			program.Send(followDoneMsg{id: id, err: err})
-		case done.Status != "succeeded":
-			program.Send(followDoneMsg{id: id, err: fmt.Errorf("v%d of %s failed: %s", done.Number, name, done.Error)})
-		default:
-			program.Send(followDoneMsg{id: id, notice: fmt.Sprintf("moin. %s is live, v%d", name, done.Number)})
-		}
-	}()
-	return outputMsg{id: id, title: title, lines: []string{}, follow: true}
-}
-
-// exec runs one command line in the app's main service and streams what it
-// writes into the output panel, line by line.
-func (m model) exec(name, line string) tea.Msg {
-	program := m.shared.program
-	id := m.shared.outputs.Add(1)
-	go func() {
-		partial := ""
-		result, err := m.api.Exec(m.ctx, name, "", nil, line, 0, func(piece string) {
-			lines := strings.Split(partial+piece, "\n")
-			partial = lines[len(lines)-1]
-			for _, text := range lines[:len(lines)-1] {
-				program.Send(lineMsg{id, strings.TrimSuffix(text, "\r")})
-			}
-		})
-		if partial != "" {
-			program.Send(lineMsg{id, partial})
-		}
-		switch {
-		case err != nil:
-			program.Send(followDoneMsg{id: id, err: err, label: "failed"})
-		case result.TimedOut:
-			program.Send(followDoneMsg{id: id, err: fmt.Errorf("stopped waiting for %s; it may still run in %s, t restarts the app", line, result.Service), label: "timed out"})
-		case result.ExitCode != 0:
-			program.Send(followDoneMsg{id: id, err: fmt.Errorf("%s exited with %d in %s", line, result.ExitCode, result.Service), label: fmt.Sprintf("exit %d", result.ExitCode)})
-		default:
-			program.Send(followDoneMsg{id: id, notice: fmt.Sprintf("%s ran in %s", line, result.Service), label: "exit 0"})
-		}
-	}()
-	return outputMsg{id: id, title: "exec in " + name, note: style.Muted.Render(line), lines: []string{}, follow: true}
-}
-
-// writeMsg is a query that tried to change data; it waits for a yes.
-type writeMsg string
-
-// showTables lists the tables of the app's database in the output panel.
-func (m model) showTables(name string) tea.Cmd {
-	return func() tea.Msg {
-		tables, err := m.api.Tables(m.ctx, name, "")
-		if err != nil {
-			return errMsg{err}
-		}
-		rows := [][]any{}
-		for _, table := range tables.Tables {
-			rows = append(rows, []any{table.Name, table.Type, float64(table.Rows)})
-		}
-		note := style.Muted.Render(tables.Database)
-		if tables.Migration != nil {
-			note += style.Muted.Render(" · " + tables.Migration.Tool + " at " + tables.Migration.Version)
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: "data of " + name, note: note, lines: resultLines([]string{"table", "type", "rows"}, rows)}
-	}
-}
-
-// runSQL runs a query. A read that would change data asks first.
-func (m model) runSQL(name, query string, write bool) tea.Cmd {
-	return func() tea.Msg {
-		result, err := m.api.Query(m.ctx, name, "", query, write, 200)
-		if !write && client.IsReadOnlyQuery(err) {
-			return writeMsg(query)
-		}
-		if err != nil {
-			return errMsg{err}
-		}
-		if write {
-			return noticeMsg(plural(int(result.Changes), "row") + " changed")
-		}
-		note := style.Muted.Render(plural(len(result.Rows), "row"))
-		if result.Truncated {
-			note += style.Muted.Render(", more not shown")
-		}
-		return outputMsg{id: m.shared.outputs.Add(1), title: query, note: note, lines: resultLines(result.Columns, result.Rows)}
-	}
-}
-
-// resultLines lays out rows as aligned columns under a muted header.
-func resultLines(columns []string, rows [][]any) []string {
-	cells := [][]string{make([]string, len(columns))}
-	for index, column := range columns {
-		cells[0][index] = strings.ToUpper(column)
-	}
-	for _, row := range rows {
-		line := make([]string, len(row))
-		for index, value := range row {
-			line[index] = cellText(value)
-		}
-		cells = append(cells, line)
-	}
-	widths := make([]int, len(columns))
-	for _, row := range cells {
-		for index, cell := range row {
-			if index < len(widths) {
-				widths[index] = max(widths[index], lipgloss.Width(cell))
-			}
-		}
-	}
-	lines := make([]string, 0, len(cells))
-	for number, row := range cells {
-		parts := make([]string, len(row))
-		for index, cell := range row {
-			parts[index] = cell + strings.Repeat(" ", max(widths[min(index, len(widths)-1)]-lipgloss.Width(cell), 0))
-		}
-		line := strings.TrimRight(strings.Join(parts, "  "), " ")
-		if number == 0 {
-			line = style.Muted.Render(line)
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-func cellText(value any) string {
-	switch value := value.(type) {
-	case nil:
-		return style.Muted.Render("NULL")
-	case float64:
-		if value == float64(int64(value)) {
-			return strconv.FormatInt(int64(value), 10)
-		}
-		return strconv.FormatFloat(value, 'g', -1, 64)
-	case string:
-		value = strings.ReplaceAll(value, "\n", " ")
-		if len([]rune(value)) > 40 {
-			return string([]rune(value)[:39]) + "…"
-		}
-		return value
-	}
-	return fmt.Sprint(value)
-}
-
-// showBackups lists the backups of an app in the output panel.
-func (m model) showBackups(name, notice string) tea.Cmd {
-	return func() tea.Msg {
-		list, err := m.api.Backups(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return backupsOutput(m.shared.outputs.Add(1), name, list)
-	}
-}
-
-func backupsOutput(id int64, name string, list client.AppBackups) outputMsg {
-	now := time.Now()
-	lines := []string{}
-	for _, database := range list.Databases {
-		head := style.Bold.Render(database.Database)
-		switch {
-		case database.Error != "":
-			head += "  " + style.Danger.Render(style.SymbolFailed+" "+database.Error)
-		case database.VerifiedAt != nil:
-			head += "  " + style.Success.Render(style.SymbolDone+" verified by restore "+duration(now.Sub(*database.VerifiedAt))+" ago")
-		}
-		lines = append(lines, head)
-		if database.Since != nil && database.ReplicatedAt != nil {
-			lines = append(lines, style.Muted.Render("point in time "+database.Since.UTC().Format("2006-01-02 15:04:05")+" to "+database.ReplicatedAt.UTC().Format("15:04:05")+" UTC"))
-		}
-		if database.Note != "" {
-			lines = append(lines, style.Muted.Render(database.Note))
-		}
-		rows := [][]any{}
-		for _, snapshot := range database.Snapshots {
-			rows = append(rows, []any{snapshot.ID, snapshot.Reason, duration(now.Sub(snapshot.CreatedAt)) + " ago", snapshot.Bucket})
-		}
-		lines = append(lines, resultLines([]string{"snapshot", "reason", "taken", "bucket"}, rows)...)
-		lines = append(lines, "")
-	}
-	if len(list.OlderBuckets) > 0 {
-		lines = append(lines, style.Muted.Render("older backups in "+strings.Join(list.OlderBuckets, ", ")+": restore one with <snapshot> <bucket>"))
-	}
-	text := "snapshot before every change: on"
-	if !list.SnapshotBeforeChanges {
-		text = "snapshot before every change: off"
-	}
-	if list.Bucket != "" {
-		text = "bucket " + list.Bucket + " · " + text
-	}
-	note := style.Muted.Render(text)
-	return outputMsg{id: id, title: "backups of " + name, note: note, lines: lines}
-}
-
-// setSnapshots turns the snapshot before every change on or off and shows
-// the backups again.
-func (m model) setSnapshots(name string, on bool) tea.Cmd {
-	return func() tea.Msg {
-		err := m.api.SetSnapshotBeforeChanges(m.ctx, name, on)
-		if err != nil {
-			return errMsg{err}
-		}
-		notice := noticeMsg("snapshot before every change: off")
-		if on {
-			notice = "snapshot before every change: on"
-		}
-		list, err := m.api.Backups(m.ctx, name)
-		if err != nil {
-			// The setting is saved; the list needs the server online.
-			return notice
-		}
-		m.shared.program.Send(notice)
-		return backupsOutput(m.shared.outputs.Add(1), name, list)
-	}
-}
-
-// backUp takes a snapshot and shows the backups again.
-func (m model) backUp(name string) tea.Cmd {
-	return func() tea.Msg {
-		list, err := m.api.BackUp(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		m.shared.program.Send(noticeMsg("snapshot taken"))
-		return backupsOutput(m.shared.outputs.Add(1), name, list)
-	}
-}
-
-// restore restores a snapshot ID, or a time in UTC.
-// restoreTarget reads a snapshot ID or a time in UTC; a time without a
-// date is today.
-func restoreTarget(target string) (snapshot string, at *time.Time, ok bool) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "15:04:05", "15:04"} {
-		parsed, err := time.Parse(layout, target)
-		if err != nil {
-			continue
-		}
-		if parsed.Year() == 0 {
-			now := time.Now().UTC()
-			parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
-		}
-		return "", &parsed, true
-	}
-	return target, nil, protocol.ValidSnapshotID(target)
-}
-
-// setAppBucket moves an app's uploads and new backups to a bucket, ""
-// for the default, and shows the backups again.
-func (m model) setAppBucket(name, bucket string) tea.Cmd {
-	return func() tea.Msg {
-		app, err := m.api.SetAppBucket(m.ctx, name, bucket)
-		if err != nil {
-			return errMsg{err}
-		}
-		to := "the default bucket"
-		if app.Bucket != "" {
-			to = app.Bucket
-		}
-		m.shared.program.Send(noticeMsg("uploads and new backups of " + name + " go to " + to + "; older backups stay where they are"))
-		list, err := m.api.Backups(m.ctx, name)
-		if err != nil {
-			return nil
-		}
-		return backupsOutput(m.shared.outputs.Add(1), name, list)
-	}
-}
-
-func (m model) restore(name, target, bucket string) tea.Cmd {
-	return func() tea.Msg {
-		snapshot, at, _ := restoreTarget(target)
-		err := m.api.Restore(m.ctx, name, "", snapshot, bucket, at)
-		if err != nil {
-			return errMsg{err}
-		}
-		m.shared.program.Send(noticeMsg("restored; " + name + " runs again"))
-		list, err := m.api.Backups(m.ctx, name)
-		if err != nil {
-			return errMsg{err}
-		}
-		return backupsOutput(m.shared.outputs.Add(1), name, list)
-	}
+func (m model) at(name string, n int) int {
+	return max(0, min(m.sel[name], n-1))
 }
