@@ -39,7 +39,7 @@ func CheckURL(raw string) error {
 var lookupHost = net.LookupHost
 
 // privateHost reports whether host is this machine or a tailnet address. A
-// short name like laptop counts when Tailscale's MagicDNS resolves it to
+// short name like host-1 counts when Tailscale's MagicDNS resolves it to
 // tailnet addresses only.
 func privateHost(host string) bool {
 	host = strings.ToLower(strings.TrimSuffix(host, "."))
