@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/config"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/service"
@@ -102,7 +103,7 @@ func (h *DeviceHandler) Deny(w http.ResponseWriter, r *http.Request) {
 
 // codeError shows the code form again with why the code was not taken.
 func (h *DeviceHandler) codeError(w http.ResponseWriter, r *http.Request, code string, err error) {
-	message := "No login waits for this code. It may have expired: run moin login again."
+	message := "No login waits for this code. It may have expired: run " + brand.Name + " login again."
 	if !errors.Is(err, service.ErrUserCodeNotFound) {
 		slog.Error("device login failed", "error", err)
 		message = "Something went wrong. Please try again."
