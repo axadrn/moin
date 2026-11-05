@@ -35,10 +35,7 @@ func (m model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case m.menuOn:
 		return m.menuKey(s)
 	case m.help:
-		if s == "esc" || s == "?" || s == "q" || s == "enter" {
-			m.help = false
-		}
-		return m, nil
+		return m.helpKey(s)
 	}
 	if m.cur.v == vExec {
 		return m.execKey(k)

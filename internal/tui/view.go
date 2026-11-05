@@ -67,8 +67,8 @@ func (m model) render() string {
 		pop := m.menuView(f, cw)
 		body = overlay(body, pop, margin, max(0, bh-len(lines(pop))))
 	case m.help:
-		pw := min(96, w-6)
-		pop := m.helpView(f, pw, bh-2)
+		pw, ph := m.helpSize()
+		pop := m.helpView(f, pw, ph)
 		body = overlay(body, pop, (w-pw)/2, 1)
 	}
 	all := append(append(head, body...), foot...)
@@ -189,7 +189,8 @@ func (m model) viewKeys() []kb {
 	case vDash:
 		return []kb{{"↑↓", "select"}, {"tab", "panel"}, {"enter", "open"}, {"s", "servers"}, {"a", "activity"}, {"q", "quit"}}
 	case vApp:
-		ks := []kb{{"d l b e o u m", "views"}}
+		// the tab bar names the keys of the tabs
+		var ks []kb
 		switch m.cur.tab {
 		case tDeploys:
 			ks = append(ks, kb{"enter", "log"}, kb{"r", "roll back"}, kb{"R", "redeploy"})
@@ -468,52 +469,4 @@ func (m model) restoreView(u ui, w int) string {
 		body = append(body, u.keys(kb{"←→", "hour"}, kb{"H L", "day"}, kb{"↑↓", "minute"}, kb{"enter", "restore"}, kb{"esc", "cancel"}))
 	}
 	return u.floating(u.panel("Restore "+r.app+" to a point in time", "", body, w, len(body)+chrome, true), w)
-}
-
-// help lists the keys that work everywhere and the ones of this place.
-func (m model) helpView(u ui, w, maxH int) string {
-	iw := inner(w)
-	global := []kb{
-		{"space", "the menu"},
-		{"space space", "search"},
-		{"ctrl+k /", "search"},
-		{"esc", "back one level"},
-		{"q", "quit, or back"},
-		{"?", "these keys"},
-		{"↑↓ j k", "move"},
-		{"g G", "first, last"},
-		{"ctrl+c", "quit from anywhere"},
-	}
-	m.help = false
-	here := m.viewKeys()
-	if m.cur.v == vApp {
-		for _, a := range m.appActions(m.cur.app) {
-			here = append(here, kb{a.key, a.label})
-		}
-	}
-	col := func(title string, ks []kb, cw int) string {
-		kw := 8
-		for _, k := range ks {
-			kw = max(kw, min(wid(k.k)+2, 16))
-		}
-		out := []string{u.faint(title), ""}
-		for _, k := range ks {
-			out = append(out, padR(u.strong(padR(k.k, kw))+u.muted(k.l), cw))
-		}
-		return strings.Join(out, "\n")
-	}
-	cw := (iw - 4) / 2
-	var body []string
-	if iw >= 60 {
-		body = lines(hjoin(4, col("Everywhere", global, cw), col("Here", here, cw)))
-	} else {
-		body = append(lines(col("Everywhere", global, iw)), "")
-		body = append(body, lines(col("Here", here, iw))...)
-	}
-	body = append([]string{""}, body...)
-	if len(body) > maxH-chrome-1 {
-		body = body[:max(0, maxH-chrome-1)]
-	}
-	body = append(body, "")
-	return u.floating(u.panel("Keys", u.faint("esc close"), body, w, len(body)+chrome, true), w)
 }
