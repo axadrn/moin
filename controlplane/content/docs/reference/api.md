@@ -22,7 +22,8 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
 | `POST /api/v1/account/password/set` · `DELETE /account/password` | sets the first password; removes it (*session*) |
 | `POST` · `DELETE /api/v1/account/avatar` | the profile picture |
-| `GET` · `POST /api/v1/account/tokens` · `DELETE /{id}` | personal API tokens (*session*) |
+| `POST /api/v1/auth/device` · `POST /api/v1/auth/device/token` | `moin login` through the browser (RFC 8628): start a login with `{"hostname"}`, then poll with `{"device_code"}` every `interval` seconds until it answers `access_token`; needs no token. See [Log in the CLI](/docs/guides/account#log-in-the-cli) |
+| `GET` · `POST /api/v1/account/tokens` · `DELETE /{id}` | personal API tokens and the computers logged in with `moin login`, `kind` `personal` or `device` (*session*) |
 | `GET /api/v1/account/sessions` · `DELETE /{id}` · `DELETE` | signed-in browsers; signs one or all others out (*session*) |
 | `GET /api/v1/activity` | who did what in the workspace, newest first, with `next_cursor`; `app`, `server` and `user` filter it |
 | `GET /api/v1/workspaces` · `POST` | the workspaces you are in; a new one (*session*) |

@@ -17,8 +17,8 @@ info:
     endpoint. The answer then sets the HttpOnly `session_token` cookie and carries no token,
     so scripts never see it. These sign-ins always need the `X-CSRF-Token` header.
 
-    Personal API tokens: a signed-in user creates them with `POST /api/v1/account/tokens`
-    and sends one as `Authorization: Bearer pat_...` from scripts, integrations and AI agents.
+    Personal API tokens: a signed-in user creates them with `POST /api/v1/account/tokens`,
+    or a CLI gets one by logging in through the browser (`POST /api/v1/auth/device`), and sends one as `Authorization: Bearer pat_...` from scripts, integrations and AI agents.
     A token acts for its user on the operations that list `apiTokenAuth`, with the scope the
     operation names: `read` for reads, `write` for changes. A token without that scope gets
     403 `insufficient_scope`, and a token on any other operation gets 403 `forbidden`.
@@ -369,6 +369,92 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/device:
+    post:
+      tags: [Auth]
+      operationId: startDeviceLogin
+      summary: Start a login in the browser
+      description: |
+        `moin login` without a token: the device authorization grant of RFC 8628. The answer
+        has the `device_code` the client keeps secret and the `user_code` the user confirms at
+        `verification_uri`, or opens `verification_uri_complete` directly. The page signs the
+        user in first with any sign-in method. Then poll `POST /api/v1/auth/device/token`
+        every `interval` seconds until it answers a token, or `expires_in` seconds pass.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceLoginRequest'
+      responses:
+        '200':
+          description: The login waits for the user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceLogin'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/device/token:
+    post:
+      tags: [Auth]
+      operationId: pollDeviceLogin
+      summary: Poll a login in the browser for its token
+      description: |
+        Answers the token once the user approved the login, exactly once. The token is a
+        personal API token of the kind `device`, read and write, bound to the workspace the
+        user picked, named after the computer ("CLI on dev-01"). It expires 90 days after its
+        last use; each use extends it. It shows under Settings, Tokens and is revoked there.
+        Until then the answer is 400 with a code of RFC 8628, section 3.5:
+        `authorization_pending` (poll again after `interval`), `slow_down` (add 5 seconds to
+        the interval, then poll again), `access_denied` (the user denied it),
+        `expired_token` (start again) or `invalid_grant` (an unknown code, or one that got its
+        token already).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceTokenRequest'
+      responses:
+        '200':
+          description: The login is approved. `access_token` is shown this one time only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceToken'
+        '400':
+          description: '`authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`, `unsupported_grant_type` or `invalid_body`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: '`token_limit`. The user has 50 API tokens; they revoke one and log in again.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4936,9 +5022,62 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Session'
+    DeviceLoginRequest:
+      type: object
+      properties:
+        hostname:
+          type: string
+          description: The computer's name, shown on the approval page and in the token's name. At most 50 characters are kept.
+    DeviceLogin:
+      type: object
+      required: [device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval]
+      properties:
+        device_code:
+          type: string
+          description: The secret the client polls with. Never show it.
+        user_code:
+          type: string
+          description: Eight letters and digits like `WDJB-MJHT`, without 0, O, 1, I and L. The user checks it on the page.
+        verification_uri:
+          type: string
+          description: '`APP_URL/device`, where the user types the code.'
+        verification_uri_complete:
+          type: string
+          description: '`APP_URL/device?code=...`, the page with the code filled in.'
+        expires_in:
+          type: integer
+          description: Seconds the codes stay valid, 600.
+        interval:
+          type: integer
+          description: Seconds to wait between polls, 5.
+    DeviceTokenRequest:
+      type: object
+      required: [device_code]
+      properties:
+        device_code:
+          type: string
+        grant_type:
+          type: string
+          enum: ['urn:ietf:params:oauth:grant-type:device_code']
+          description: Optional, as in RFC 8628.
+    DeviceToken:
+      type: object
+      required: [access_token, token_type, expires_in, api_token]
+      properties:
+        access_token:
+          type: string
+          description: The raw `pat_` token. Send it as `Authorization: Bearer`.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Seconds until it expires without use; each use starts them again.
+        api_token:
+          $ref: '#/components/schemas/APIToken'
     APIToken:
       type: object
-      required: [id, name, prefix, scopes, workspace_id, last_used_at, expires_at, expired, created_at]
+      required: [id, name, prefix, scopes, kind, workspace_id, last_used_at, expires_at, expired, created_at]
       properties:
         id:
           type: string
@@ -4953,6 +5092,10 @@ components:
             type: string
             enum: [read, write]
           description: '`["read"]` or `["read", "write"]`.'
+        kind:
+          type: string
+          enum: [personal, device]
+          description: '`personal` for a token made in Settings, `device` for the login of one computer with `moin login` in the browser, which expires 90 days after its last use.'
         workspace_id:
           type: string
           description: The only workspace the token can reach.

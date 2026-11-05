@@ -5,8 +5,6 @@ package tui
 
 import (
 	"errors"
-	"os/exec"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -137,26 +135,9 @@ func (m model) browseURL(url string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// openBrowser opens a URL in the default browser. Tests replace it.
-var openBrowser = func(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		if _, err := exec.LookPath("xdg-open"); err != nil {
-			return errors.New("no browser")
-		}
-		cmd = exec.Command("xdg-open", url)
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { _ = cmd.Wait() }()
-	return nil
-}
+// openBrowser opens a URL in the default browser; Options.Browse sets it
+// and tests replace it. Without one the TUI shows the address.
+var openBrowser = func(url string) error { return errors.New("no browser") }
 
 // snap is a snapshot with the database it belongs to.
 type snap struct {

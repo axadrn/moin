@@ -93,6 +93,9 @@ func apiTokenExpiry(token model.APIToken, now time.Time) string {
 	if token.IsExpired(now) {
 		return "Expired " + token.ExpiresAt.Local().Format("Jan 2, 2006")
 	}
+	if token.IsDevice() {
+		return "Expires " + token.ExpiresAt.Local().Format("Jan 2, 2006") + " unless used"
+	}
 	return "Expires " + token.ExpiresAt.Local().Format("Jan 2, 2006")
 }
 
