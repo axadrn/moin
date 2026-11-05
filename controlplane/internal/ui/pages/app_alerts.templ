@@ -206,8 +206,8 @@ templ alertDestinationForm() {
 		</form>
 		<script nonce={ templ.GetNonce(ctx) }>
 			(function() {
-				if (window.opsAlertForm) return;
-				window.opsAlertForm = true;
+				if (window.moinAlertForm) return;
+				window.moinAlertForm = true;
 				// The URL is for Slack, Discord and webhooks; the bot token and
 				// the chat ID for Telegram.
 				document.addEventListener("change", function(event) {

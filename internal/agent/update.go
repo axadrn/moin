@@ -60,7 +60,7 @@ func newUpdater(url string) *updater {
 // one rename. Nothing changes when a step fails.
 func (u *updater) install(ctx context.Context, update protocol.AgentUpdate) error {
 	if u.systemd == "" {
-		return fmt.Errorf("this agent does not run under systemd, so it cannot restart itself: update it on the server: %s", protocol.UpdateCommand(u.baseURL(), build.Name, runtime.GOARCH, ""))
+		return fmt.Errorf("this agent does not run under systemd, so it cannot restart itself: update it on the server: %s", protocol.UpdateCommand(u.baseURL(), build.Name, runtime.GOARCH))
 	}
 	if u.executable == "" {
 		return errors.New("cannot find the agent's own binary")

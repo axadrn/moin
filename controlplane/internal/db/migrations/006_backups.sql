@@ -5,7 +5,7 @@
 -- S3-compatible bucket: continuously with Litestream and as snapshots. One
 -- bucket per account; its secret key is sealed with AES-256-GCM under
 -- SECRETS_KEY, bound to the user. snapshot_before_changes takes a snapshot
--- before every change made through ops. backup_status keeps what the agent
+-- before every change made through moin. backup_status keeps what the agent
 -- last reported per database: the replication window and the newest
 -- restore drill.
 -- ============================================================================

@@ -315,7 +315,7 @@ func dockerClient() *http.Client {
 	}
 }
 
-// dockerContainer is a running container of an ops app, from
+// dockerContainer is a running container of a moin app, from
 // GET /containers/json.
 type dockerContainer struct {
 	ID     string            `json:"Id"`
@@ -363,7 +363,7 @@ func (s *sampler) containers(ctx context.Context, seconds float64, first bool, m
 	for index, container := range running {
 		app, ok := appOfProject(container.Labels["com.docker.compose.project"])
 		if !ok || !appIDPattern.MatchString(app) {
-			results[index].err = errors.New("not an ops app")
+			results[index].err = errors.New("not a moin app")
 			continue
 		}
 		wait.Go(func() {

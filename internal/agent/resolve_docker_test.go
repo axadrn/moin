@@ -12,7 +12,7 @@ import (
 )
 
 // TestResolveFillsVariables: ${VAR} in compose.yml takes the app's env var,
-// so a postgres service gets the password the app keeps in ops.
+// so a postgres service gets the password the app keeps in moin.
 func TestResolveFillsVariables(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src")

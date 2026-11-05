@@ -78,8 +78,8 @@ func runCLI(t *testing.T, api *fakeAPI, args ...string) (code int, stdout, stder
 	t.Cleanup(server.Close)
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("OPS_URL", server.URL)
-	t.Setenv("OPS_TOKEN", "ops_test")
+	t.Setenv("MOIN_URL", server.URL)
+	t.Setenv("MOIN_TOKEN", "pat_test")
 	t.Setenv("NO_COLOR", "1")
 	var out, errOut strings.Builder
 	code = Run(args, strings.NewReader(""), &out, &errOut)
@@ -184,7 +184,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 
 func TestErrorsSayWhatToDo(t *testing.T) {
 	code, _, stderr := runCLI(t, &fakeAPI{status: http.StatusUnauthorized}, "apps")
-	if code != 1 || !strings.Contains(stderr, "OPS_TOKEN") || strings.Contains(stderr, "..") {
+	if code != 1 || !strings.Contains(stderr, "MOIN_TOKEN") || strings.Contains(stderr, "..") {
 		t.Errorf("rejected token: code %d, stderr %q", code, stderr)
 	}
 
@@ -258,11 +258,11 @@ func TestHelpRunsNothing(t *testing.T) {
 				t.Setenv("HOME", t.TempDir())
 				t.Setenv("XDG_CONFIG_HOME", filepath.Dir(filepath.Dir(config)))
 				t.Setenv("NO_COLOR", "1")
-				t.Setenv("OPS_URL", "")
-				t.Setenv("OPS_TOKEN", "")
+				t.Setenv("MOIN_URL", "")
+				t.Setenv("MOIN_TOKEN", "")
 				if loggedIn {
-					t.Setenv("OPS_URL", server.URL)
-					t.Setenv("OPS_TOKEN", "ops_test")
+					t.Setenv("MOIN_URL", server.URL)
+					t.Setenv("MOIN_TOKEN", "pat_test")
 				}
 				var stdout, stderr strings.Builder
 				code := Run(args, strings.NewReader(""), &stdout, &stderr)
@@ -355,8 +355,8 @@ func TestLinkUnreadableRepo(t *testing.T) {
 	defer server.Close()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("OPS_URL", server.URL)
-	t.Setenv("OPS_TOKEN", "ops_test")
+	t.Setenv("MOIN_URL", server.URL)
+	t.Setenv("MOIN_TOKEN", "pat_test")
 	t.Setenv("NO_COLOR", "1")
 	var stdout, stderr strings.Builder
 	code := Run([]string{"link", "me/private", "--app", "shop"}, strings.NewReader(""), &stdout, &stderr)
@@ -425,7 +425,7 @@ func TestEnvRmMissing(t *testing.T) {
 // to a host on the internet.
 func TestLoginRefusesPlainHTTP(t *testing.T) {
 	api := &fakeAPI{}
-	code, _, stderr := runCLI(t, api, "login", "--url", "http://moin.example.com", "--token", "ops_test")
+	code, _, stderr := runCLI(t, api, "login", "--url", "http://moin.example.com", "--token", "pat_test")
 	if code == 0 || !strings.Contains(stderr, "https://moin.example.com") || len(api.requests) > 0 {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}

@@ -21,12 +21,12 @@ import (
 // TestRailpackDocker builds tiny Node and Python apps without a Dockerfile
 // the way a deploy does: generate, railpack prepare, compose config, finish
 // with a secret, compose build with the env, then runs the image on PORT
-// 8080 and asks it. It needs docker and OPS_RAILPACK_BINARY.
+// 8080 and asks it. It needs docker and MOIN_RAILPACK_BINARY.
 //
-//	OPS_RAILPACK_BINARY=/path/to/railpack go test -tags docker -run RailpackDocker ./internal/agent/
+//	MOIN_RAILPACK_BINARY=/path/to/railpack go test -tags docker -run RailpackDocker ./internal/agent/
 func TestRailpackDocker(t *testing.T) {
-	if os.Getenv("OPS_RAILPACK_BINARY") == "" {
-		t.Skip("set OPS_RAILPACK_BINARY to a railpack " + railpackVersion + " binary")
+	if os.Getenv("MOIN_RAILPACK_BINARY") == "" {
+		t.Skip("set MOIN_RAILPACK_BINARY to a railpack " + railpackVersion + " binary")
 	}
 	apps := map[string]map[string]string{
 		"node": {
@@ -83,7 +83,7 @@ func TestRailpackDocker(t *testing.T) {
 			}
 			image := fmt.Sprintf("%s-web:1", project(app))
 			t.Cleanup(func() { exec.Command("docker", "image", "rm", "-f", image).Run() })
-			container := "ops-rptest-" + name
+			container := "moin-rptest-" + name
 			exec.Command("docker", "rm", "-f", container).Run()
 			out, err := exec.Command("docker", "run", "-d", "--name", container, "-e", "PORT=8080", "-p", "127.0.0.1::8080", image).CombinedOutput()
 			if err != nil {

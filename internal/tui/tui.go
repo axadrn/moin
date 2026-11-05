@@ -1596,7 +1596,7 @@ func (m model) newHook(name string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		lines := []string{url, "", "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + name + `:$GITHUB_SHA"`}
+		lines := []string{url, "", "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + name + `:$GITHUB_SHA"`}
 		return outputMsg{id: m.shared.outputs.Add(1), title: "deploy hook of " + name, note: style.Warning.Render("shown once · the old one stops working"), lines: lines}
 	}
 }

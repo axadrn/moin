@@ -64,8 +64,8 @@ templ AppCommandMenu() {
 	@AppShortcuts()
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			if (window.opsCommand) return;
-			window.opsCommand = true;
+			if (window.moinCommand) return;
+			window.moinCommand = true;
 			const typing = (target) => target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select, [contenteditable]"));
 			let loaded = false;
 			// The apps, servers and buckets come once, on the first open.

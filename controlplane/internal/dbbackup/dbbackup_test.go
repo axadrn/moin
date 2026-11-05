@@ -26,13 +26,13 @@ func TestFile(t *testing.T) {
 }
 
 // TestBackupAndRestore needs an S3 endpoint with the bucket in
-// OPS_TEST_S3_BUCKET, such as gofakes3: OPS_TEST_S3=http://127.0.0.1:19000.
+// MOIN_TEST_S3_BUCKET, such as gofakes3: MOIN_TEST_S3=http://127.0.0.1:19000.
 func TestBackupAndRestore(t *testing.T) {
-	endpoint := os.Getenv("OPS_TEST_S3")
+	endpoint := os.Getenv("MOIN_TEST_S3")
 	if endpoint == "" {
-		t.Skip("set OPS_TEST_S3 to an S3 endpoint")
+		t.Skip("set MOIN_TEST_S3 to an S3 endpoint")
 	}
-	name := os.Getenv("OPS_TEST_S3_BUCKET")
+	name := os.Getenv("MOIN_TEST_S3_BUCKET")
 	if name == "" {
 		name = "moin-dev"
 	}

@@ -96,7 +96,7 @@ func explain(err error) string {
 	var apiErr *client.Error
 	switch {
 	case errors.Is(err, client.ErrNotLoggedIn):
-		return fmt.Sprintf("Not logged in. Run `%s login`, or set OPS_TOKEN in CI", build.Name)
+		return fmt.Sprintf("Not logged in. Run `%s login`, or set %s in CI", build.Name, client.TokenVariable)
 	case errors.As(err, &apiErr) && apiErr.Code == "not_found" && apiErr.Message == "The app was not found." && picked.name != "":
 		return fmt.Sprintf("There is no app %s; the name came from %s. Name another with --app, or see yours with `%s apps`", picked.name, picked.from, build.Name)
 	case errors.As(err, &apiErr) && apiErr.Code == "insufficient_scope":

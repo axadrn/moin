@@ -48,15 +48,12 @@ type State struct {
 	AgentToken string `json:"agent_token"`
 }
 
-// StateDir returns MOIN_STATE_DIR or DefaultStateDir. The unit of an agent
-// of the old name sets OPS_STATE_DIR to the old default: that agent moves
-// to DefaultStateDir (see migrate.go).
+// StateDir returns MOIN_STATE_DIR or DefaultStateDir.
 func StateDir() string {
-	dir := build.Getenv("STATE_DIR")
-	if dir == "" || dir == legacyStateDir {
-		return DefaultStateDir
+	if dir := build.Getenv("STATE_DIR"); dir != "" {
+		return dir
 	}
-	return dir
+	return DefaultStateDir
 }
 
 // LoadState reads the state from dir.
@@ -165,8 +162,6 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.security = newSecurity(dir, agent.apps)
 	agent.apps.proxyMode = agent.security.proxyMode
 	agent.updater = newUpdater(state.URL)
-	// What the old name left moves before anything else touches the apps.
-	newRename(dir, agent.apps, agent.security).run(ctx)
 	go agent.backups.drills(ctx)
 	go agent.backups.pgSnapshots(ctx)
 	go agent.backups.walgLoop(ctx)
@@ -523,7 +518,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		// A new binary could allow what the rules stop, so with rules only
 		// the owner updates it, on the server.
 		if rules != nil {
-			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH, "")))
+			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH)))
 			return
 		}
 		if r.deploying.Load() > 0 {

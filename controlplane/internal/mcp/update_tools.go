@@ -28,7 +28,7 @@ type AgentUpdatesOutput struct {
 // registerUpdateTools registers the tools for the version of the control
 // plane and the updates of it and of the agents.
 func registerUpdateTools(server *mcpsdk.Server, services Services) {
-	tools := opsTools{services: services}
+	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:  "get_version",
 		Title: "Get the version",
@@ -53,7 +53,7 @@ func registerUpdateTools(server *mcpsdk.Server, services Services) {
 	}, Write(member(services, tools.setAgentUpdates)))
 }
 
-func (t opsTools) getVersion(_ context.Context, caller Caller, _ NoInput) (VersionOutput, error) {
+func (t moinTools) getVersion(_ context.Context, caller Caller, _ NoInput) (VersionOutput, error) {
 	auto, err := t.services.Servers.AutoUpdateAgents(caller.Token.WorkspaceID)
 	if err != nil {
 		return VersionOutput{}, err
@@ -61,7 +61,7 @@ func (t opsTools) getVersion(_ context.Context, caller Caller, _ NoInput) (Versi
 	return VersionOutput{VersionInfo: api.NewVersion(t.services.Updates.Info(caller.User)), AutoUpdateAgents: auto}, nil
 }
 
-func (t opsTools) updateControlPlane(_ context.Context, caller Caller, _ NoInput) (VersionOutput, error) {
+func (t moinTools) updateControlPlane(_ context.Context, caller Caller, _ NoInput) (VersionOutput, error) {
 	info, err := t.services.Updates.Start(caller.actor(), caller.User)
 	if err != nil {
 		return VersionOutput{}, err
@@ -73,7 +73,7 @@ func (t opsTools) updateControlPlane(_ context.Context, caller Caller, _ NoInput
 	return VersionOutput{VersionInfo: api.NewVersion(info), AutoUpdateAgents: auto}, nil
 }
 
-func (t opsTools) setAgentUpdates(_ context.Context, caller Caller, input AgentUpdatesInput) (AgentUpdatesOutput, error) {
+func (t moinTools) setAgentUpdates(_ context.Context, caller Caller, input AgentUpdatesInput) (AgentUpdatesOutput, error) {
 	if err := t.services.Servers.SetAutoUpdateAgents(caller.actor(), input.Auto); err != nil {
 		return AgentUpdatesOutput{}, err
 	}

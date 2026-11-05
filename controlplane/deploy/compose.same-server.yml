@@ -3,7 +3,7 @@
 # control plane joins the proxy's network, and Traefik serves it on the
 # domain of APP_URL with a certificate from Let's Encrypt, like any app.
 # MOIN_DOMAIN and MOIN_PROXY_NETWORK come from update.sh: the network is
-# moin-proxy, or ops-proxy while the agent has not moved to its new name.
+# moin-proxy.
 # The router name has an underscore, which no app name has, so an app can
 # never take it over.
 services:

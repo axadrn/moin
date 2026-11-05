@@ -80,14 +80,14 @@ templ AppHook(appName, url string, on bool) {
 		if url == "" && on {
 			<p class="text-sm text-muted-foreground">A hook is on: CI can deploy { appName } with it. moin showed its URL once; if it is lost, make a new one.</p>
 		} else if url == "" {
-			<p class="text-sm text-muted-foreground">No hook yet. moin shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">OPS_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
+			<p class="text-sm text-muted-foreground">No hook yet. moin shows the URL once, when you create it. Store it as the CI secret <code class="font-mono text-foreground">MOIN_DEPLOY_HOOK</code>. A new hook replaces the old one.</p>
 		} else {
-			<p class="text-sm font-medium">Copy it now: moin shows it only this once. Store it as the CI secret <code class="font-mono">OPS_DEPLOY_HOOK</code>.</p>
+			<p class="text-sm font-medium">Copy it now: moin shows it only this once. Store it as the CI secret <code class="font-mono">MOIN_DEPLOY_HOOK</code>.</p>
 			<div data-deploy-hook>
 				@command(url)
 			</div>
 			<p class="text-sm text-muted-foreground">Then let CI call it after pushing the image:</p>
-			@command(`curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
+			@command(`curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
 		}
 		<div class="flex flex-wrap gap-2">
 			@newHookButton(appName, on)

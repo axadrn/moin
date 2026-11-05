@@ -74,7 +74,7 @@ func (s *ServerService) UpdateAgent(ctx context.Context, actor Actor, idOrName s
 	var agentErr *AgentError
 	if errors.As(err, &agentErr) && strings.Contains(agentErr.Message, `does not know "`+string(protocol.TypeAgentUpdate)+`"`) {
 		// Agents from before agent.update do not know it.
-		return nil, &AgentError{Message: "This agent is too old to update itself. Update it once on the server, as root: " + protocol.UpdateCommand(s.appURL, build.Name, server.Arch, build.LegacyWhileWorks())}
+		return nil, &AgentError{Message: "This agent is too old to update itself. Update it once on the server, as root: " + protocol.UpdateCommand(s.appURL, build.Name, server.Arch)}
 	}
 	if err != nil {
 		return nil, err

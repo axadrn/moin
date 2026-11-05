@@ -624,7 +624,7 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	done(stdout, "New deploy hook for %s. It is shown once; the old one stops working:", name)
 	fmt.Fprintf(stdout, "\n  %s\n\n", url)
-	hint(stdout, "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$OPS_DEPLOY_HOOK?image=ghcr.io/me/`+name+`:$GITHUB_SHA"`)
+	hint(stdout, "Store it as a CI secret and call it after pushing the image:", `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/`+name+`:$GITHUB_SHA"`)
 	return nil
 }
 
