@@ -386,6 +386,9 @@ func shortActor(actor string) string {
 func (m model) issuesPanel(u ui, w, h int, issues []issue) string {
 	iw := inner(w)
 	focus := m.focus == fIssues
+	if m.status == nil {
+		return u.panel("Needs you", "", loading(u), w, h, false)
+	}
 	if len(issues) == 0 {
 		return u.panel("Needs you", "", []string{"", u.good(dot) + " " + u.muted("Nothing. Every app answers, every backup is checked.")}, w, h, false)
 	}
