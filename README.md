@@ -3,7 +3,7 @@
 Deploy anything. Lose nothing. Any app on any server you own, every SQLite and Postgres change backed up and checked every day. Web, CLI, terminal UI and MCP.
 
 ```bash
-moin login              # sign in with an API token
+moin login              # log in through the browser
 moin servers add web-1  # prints the one-line install for your server
 moin deploy             # ✓ moin. your app is live
 moin                    # the live terminal UI

@@ -208,7 +208,7 @@ Sign up at your `APP_URL` with your address from `ADMIN_EMAILS`, then point the 
 moin login --url https://moin.example.com
 ```
 
-The install line for a server, the CLI, the terminal UI and MCP all talk to your control plane from then on. The rest of these docs apply as they are.
+It opens your browser to approve the login. The install line for a server, the CLI, the terminal UI and MCP all talk to your control plane from then on. The rest of these docs apply as they are.
 
 ## What it sends us
 

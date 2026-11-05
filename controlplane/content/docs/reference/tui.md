@@ -4,7 +4,7 @@ description: "Every key of moin without a command"
 order: 2
 ---
 
-Run `moin` in a repo. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, a row per bucket with the apps that use it, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
+Run `moin` in a repo, after [`moin login`](/docs/guides/account#log-in-the-cli): the TUI uses the same login. Everything updates live. The activity tab shows who did what in your workspace, to the second in your time zone, the team tab its members and open invitations, the settings tab what belongs to the workspace: the version of the control plane, agent updates, your email alerts, the alert destinations, the GitHub App, a row per bucket with the apps that use it, the Cloudflare token, the Tailscale key and the registry logins. When a newer release of a self-hosted control plane is out, the status line says so.
 
 The header shows the tabs and the control plane, the footer only the keys
 that work in the place you are in. A question like "Stop <app-name>?" waits

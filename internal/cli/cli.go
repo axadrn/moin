@@ -30,7 +30,7 @@ Usage
   moin <command>      Run one command
 
 Account
-  login              Sign in with a personal API token: login [--url <url>], token asked or on stdin
+  login              Log in through the browser: login [--url <url>]; --token <token> or the token on stdin for CI
   logout             Forget the token on this machine
   status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
   activity           Who deployed, restored or changed what: activity [--limit 30]
@@ -358,9 +358,10 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	flags := newFlags("login", "login [--url <control plane>] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
+	flags := newFlags("login", "login [--url <control plane>] [--web] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
 	baseURL := flags.String("url", config.URL, "control plane URL")
-	token := flags.String("token", "", "personal API token; without it "+build.Name+" asks for it, or reads it from stdin")
+	token := flags.String("token", "", "personal API token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
+	web := flags.Bool("web", false, "log in through the browser even without a terminal")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -373,20 +374,22 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 		return err
 	}
 	config.Token, config.TokenFromEnv = *token, false
-	if config.Token == "" {
-		if isTerminal(stdin) {
-			step(stdout, "Create a token with read and write access under Settings at %s", style.Bold.Render(config.URL+"/app"))
-			fmt.Fprint(stdout, style.Muted.Render(style.SymbolStep)+" Paste it here: ")
+	switch {
+	case config.Token != "":
+	case *web || isTerminal(stdin):
+		config, err = client.LoginInBrowser(ctx, config.URL, "cli", func(login client.DeviceLogin) {
+			showDeviceLogin(stdout, login)
+		})
+		if err != nil {
+			return err
 		}
-		config.Token, err = readSecret(stdin)
-		if isTerminal(stdin) {
-			fmt.Fprintln(stdout)
-		}
+	default:
+		config.Token, err = readLine(stdin)
 		if err != nil {
 			return err
 		}
 		if config.Token == "" {
-			return fmt.Errorf("no token. Create one under Settings at %s/app and paste it, or pass it with --token", config.URL)
+			return fmt.Errorf("no token on stdin. Run %s login in a terminal to log in through the browser, or pass a token with --token", build.Name)
 		}
 	}
 	api, err := client.New(config)
@@ -401,11 +404,27 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	done(stdout, "Logged in as %s %s", style.Bold.Render(account.Email), style.Muted.Render("on "+config.URL))
+	who := account.Email
+	if account.Name != "" {
+		who = account.Name + " (" + account.Email + ")"
+	}
+	done(stdout, "Logged in as %s %s", style.Bold.Render(who), style.Muted.Render("on "+config.URL))
 	if build.Getenv("TOKEN") != "" {
 		hint(stdout, client.TokenVariable+" is set and wins over this login. Use the new one with", "unset "+client.TokenVariable)
 	}
 	return nil
+}
+
+// showDeviceLogin prints the code and the page of a login in the browser,
+// and opens the page when it can.
+func showDeviceLogin(stdout io.Writer, login client.DeviceLogin) {
+	step(stdout, "Your code: %s", style.Bold.Render(login.UserCode))
+	if openBrowser(login.VerificationURIComplete) == nil {
+		step(stdout, "Opened %s in your browser. Check the code and approve it there.", login.VerificationURIComplete)
+	} else {
+		step(stdout, "Open %s in a browser, check the code and approve it.", style.Bold.Render(login.VerificationURIComplete))
+	}
+	step(stdout, "Waiting for the browser...")
 }
 
 // readSecret reads one line without echo from a terminal, or plainly from a pipe.
