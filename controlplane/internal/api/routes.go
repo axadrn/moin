@@ -32,6 +32,7 @@ type Handlers struct {
 	Alerts      *AlertsHandler
 	Catalog     *CatalogHandler
 	Status      *StatusHandler
+	Device      *DeviceHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -59,6 +60,10 @@ type Middleware struct {
 	// workspace of the API token, or for a session to the workspace its
 	// Moin-Workspace header names.
 	InWorkspace Wrap
+	// RateLimitDevice limits the logins `moin login` starts per client IP.
+	RateLimitDevice Wrap
+	// RateLimitDevicePoll limits the polls of `moin login` per client IP.
+	RateLimitDevicePoll Wrap
 }
 
 // Routes lists every endpoint under /api/v1. The router registers exactly
@@ -79,6 +84,8 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/auth/forgot-password", m.RateLimitAuthEmail(h.Auth.ForgotPassword), TokenDenied},
 		{"POST /api/v1/auth/forgot-password/verify", h.Auth.VerifyForgotPassword, TokenDenied},
 		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, TokenDenied},
+		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), TokenDenied},
+		{"POST /api/v1/auth/device/token", m.RateLimitDevicePoll(h.Device.Token), TokenDenied},
 		{"POST /api/v1/auth/onboarding", m.RequireAuth(h.Auth.CompleteOnboarding), TokenDenied},
 		{"POST /api/v1/auth/logout", m.RequireAuth(h.Auth.Logout), TokenDenied},
 		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), TokenRead},

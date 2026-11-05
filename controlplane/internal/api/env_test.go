@@ -37,6 +37,7 @@ type apiEnvironment struct {
 	users      *service.UserService
 	workspaces *service.WorkspaceService
 	tokens     *service.APITokenService
+	devices    *service.DeviceLoginService
 	files      *service.FileService
 	storage    *testutil.MemoryStorage
 	admin      *service.AdminService
@@ -93,6 +94,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	environment.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), environment.workspaces)
 	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
 	environment.auth.UseAPITokens(environment.tokens)
+	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.tokens)
 	environment.admin = service.NewAdminService(repository.NewAdminRepository(database), userRepository, environment.auth, []string{testAdminEmail})
 	adminHandler := api.NewAdminHandler(environment.admin)
 
@@ -118,6 +120,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces),
 		Alerts:      api.NewAlertsHandler(alerts),
 		Status:      api.NewStatusHandler(service.NewStatusService(service.NewAppService(repository.NewAppRepository(database, database), servers, box), servers, nil)),
+		Device:      api.NewDeviceHandler(environment.devices, "https://app.example.com"),
 	}
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -133,6 +136,8 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
 			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(environment.workspaces, subscriptions)(next))
 		},
+		RateLimitDevice:     middleware.RateLimitDeviceLogin(clientIPs),
+		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
 	}
 	environment.routes = api.Routes(handlers, routeMiddleware)
 	mux := http.NewServeMux()

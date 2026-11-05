@@ -34,12 +34,15 @@ func (m *memoryAPITokens) ListByUserID(string) ([]model.APIToken, error) { retur
 
 func (m *memoryAPITokens) CountByUserID(string) (int, error) { return len(m.byHash), nil }
 
-func (m *memoryAPITokens) TouchLastUsed(id string, lastUsedAt time.Time) error {
+func (m *memoryAPITokens) TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error {
 	m.touches++
 	for _, token := range m.byHash {
 		if token.ID == id {
 			used := lastUsedAt
 			token.LastUsedAt = &used
+			if expiresAt != nil {
+				token.ExpiresAt = expiresAt
+			}
 		}
 	}
 	return nil

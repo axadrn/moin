@@ -138,6 +138,18 @@ func RateLimitAuth(clientIPs ClientIPResolver) func(http.HandlerFunc) http.Handl
 	return RateLimit(clientIPs, 5, 15*time.Minute)
 }
 
+// RateLimitDeviceLogin limits `moin login` in the browser: starting a login
+// and opening or answering its code on the web, per client IP.
+func RateLimitDeviceLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
+	return RateLimit(clientIPs, 20, 15*time.Minute)
+}
+
+// RateLimitDevicePoll limits the polls of `moin login`: one every five
+// seconds, for a few computers behind one address.
+func RateLimitDevicePoll(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
+	return RateLimit(clientIPs, 120, time.Minute)
+}
+
 // RateLimit allows limit requests per window per client IP.
 func RateLimit(clientIPs ClientIPResolver, limit int, window time.Duration) func(http.HandlerFunc) http.HandlerFunc {
 	limiter := NewRateLimiter(limit, window)

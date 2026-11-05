@@ -41,6 +41,7 @@ type App struct {
 	UpdateService       *service.UpdateService
 	WorkspaceService    *service.WorkspaceService
 	APITokenService     *service.APITokenService
+	DeviceLoginService  *service.DeviceLoginService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
 	CatalogService      *service.CatalogService
@@ -214,14 +215,15 @@ func New(cfg *config.Config) (*App, error) {
 		TelemetryService: service.NewTelemetryService(repository.NewTelemetryRepository(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
 		// Only a self-hosted control plane offers updates; the Deploy
 		// workflow updates the hosted one.
-		UpdateService:    service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, workspaceAuditEvents),
-		WorkspaceService: workspaceService,
-		APITokenService:  apiTokenService,
-		ServerService:    serverService,
-		AppService:       appService,
-		CatalogService:   catalogService,
-		StatusService:    service.NewStatusService(appService, serverService, catalogService),
-		AlertService:     alertService,
+		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, workspaceAuditEvents),
+		WorkspaceService:   workspaceService,
+		APITokenService:    apiTokenService,
+		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), apiTokenService),
+		ServerService:      serverService,
+		AppService:         appService,
+		CatalogService:     catalogService,
+		StatusService:      service.NewStatusService(appService, serverService, catalogService),
+		AlertService:       alertService,
 	}
 	initialized = true
 	if cfg.Billing {
