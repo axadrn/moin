@@ -50,7 +50,7 @@ func TestEveryFrameFitsTheScreen(t *testing.T) {
 		}},
 		{"exec", func(m model) model { return press(m.withApp("shop", tDeploys), "X", "l", "s") }},
 		{"servers", func(m model) model { return press(m, "s") }},
-		{"server", func(m model) model { m, _ = m.open(screen{v: vServer, server: "prod-01"}); return m }},
+		{"server", func(m model) model { m, _ = m.open(screen{v: vServer, server: "web-1"}); return m }},
 		{"activity", func(m model) model { return press(m, "a") }},
 		{"web", func(m model) model { return press(m, "w") }},
 		{"empty", func(m model) model { m.apps, m.servers, m.events, m.status = nil, nil, nil, nil; return m }},
@@ -86,7 +86,7 @@ func TestDashboardShowsWhatRunsAndWhatNeedsYou(t *testing.T) {
 		"3 things need you", "api: v7 failed its health check",
 		"Apps live", "2 of 5", "Servers online", "2 of 3", "Backups checked", "4 of 4", "Updates",
 		"shop", "live v43", "deploying v12", "failed v7", "new", "shop.example.com",
-		"prod-01", "12%", "edge-02", "v0.9.8 ↑", "lab", "offline",
+		"web-1", "12%", "edge-02", "v0.9.8 ↑", "lab", "offline",
 		"Recent activity", "ada deployed shop v43",
 		"Needs you", "plausible", "Plausible 2.1 → 2.2",
 		"moin.", "acme › dashboard", "space menu",
@@ -99,7 +99,7 @@ func TestDashboardShowsWhatRunsAndWhatNeedsYou(t *testing.T) {
 
 func TestDashboardSmallStaysReadable(t *testing.T) {
 	frame := checkFrame(t, "dashboard", fixture(80, 24))
-	for _, want := range []string{"2/5 apps live", "shop", "prod-01"} {
+	for _, want := range []string{"2/5 apps live", "shop", "web-1"} {
 		if !strings.Contains(frame, want) {
 			t.Errorf("the small dashboard lacks %q", want)
 		}

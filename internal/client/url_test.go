@@ -36,14 +36,14 @@ func TestCheckURLRefusalReadsWell(t *testing.T) {
 
 func TestCheckURLShortTailnetName(t *testing.T) {
 	answers := map[string][]string{
-		"dev-01":  {"100.101.102.103", "fd7a:115c:a1e0::1"},
+		"laptop":  {"100.101.102.103", "fd7a:115c:a1e0::1"},
 		"printer": {"192.168.1.20"},
 		"mixed":   {"100.101.102.103", "203.0.113.9"},
 	}
 	defer func(original func(string) ([]string, error)) { lookupHost = original }(lookupHost)
 	lookupHost = func(host string) ([]string, error) { return answers[host], nil }
 
-	if err := CheckURL("http://dev-01:7331"); err != nil {
+	if err := CheckURL("http://laptop:7331"); err != nil {
 		t.Fatalf("a MagicDNS name of the tailnet: %v", err)
 	}
 	for _, host := range []string{"printer", "mixed", "unknown", "example.com"} {
