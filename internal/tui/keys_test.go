@@ -489,3 +489,28 @@ func TestAssignKeysGivesEveryNameOne(t *testing.T) {
 		t.Errorf("first letters first: %v", keys)
 	}
 }
+
+func TestSpaceSpaceSearches(t *testing.T) {
+	m := press(fixture(120, 40), "space")
+	_, groups := m.menuGroups()
+	if first := groups[0].items[0]; first.key != "space" || first.label != "search" {
+		t.Fatalf("the menu starts with space search, got %q %q", first.key, first.label)
+	}
+	m = press(m, "space")
+	if m.menuOn || m.pick == nil {
+		t.Fatalf("space space opens the search: menu %v, search %v", m.menuOn, m.pick != nil)
+	}
+	m = press(m, "esc", "space", "a", "space")
+	if m.menuOn || m.pick == nil {
+		t.Fatal("space searches from a submenu too")
+	}
+	for _, k := range []string{"ctrl+k", "/"} {
+		if press(fixture(120, 40), k).pick == nil {
+			t.Errorf("%s opens the search", k)
+		}
+	}
+	frame := checkFrame(t, "menu", press(fixture(120, 40), "space"))
+	if !strings.Contains(frame, "space  search") {
+		t.Errorf("the menu shows space  search:\n%s", frame)
+	}
+}

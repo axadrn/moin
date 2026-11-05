@@ -141,7 +141,7 @@ func (m model) header(u ui) []string {
 
 func (m model) footer(u ui) []string {
 	w := m.w
-	right := u.keys(kb{"space", "menu"}, kb{"ctrl+k", "jump"}, kb{"?", "keys"})
+	right := u.keys(kb{"space", "menu"}, kb{"ctrl+k", "search"}, kb{"?", "keys"})
 	l := u.keys(m.viewKeys()...)
 	if m.notice != "" {
 		mark := u.good(dot)
@@ -272,6 +272,12 @@ func (u ui) floating(s string, w int) string { return fill(s, u.p.Raised, w) }
 func (m model) menuView(u ui, w int) string {
 	title, groups := m.menuGroups()
 	iw := inner(w)
+	kw := 3
+	for _, g := range groups {
+		for _, it := range g.items {
+			kw = max(kw, wid(it.key))
+		}
+	}
 	colw := 24
 	if len(groups) > 1 {
 		colw = max(20, min(28, (iw-3*(len(groups)-1))/len(groups)))
@@ -286,7 +292,7 @@ func (m model) menuView(u ui, w int) string {
 			if it.sub != "" {
 				label = u.text(it.label) + u.faint(" ›")
 			}
-			col = append(col, padR(u.strong(padL(it.key, 3))+"  "+label, colw))
+			col = append(col, padR(u.strong(padL(it.key, kw))+"  "+label, colw))
 		}
 		cols = append(cols, strings.Join(col, "\n"))
 	}
@@ -340,7 +346,7 @@ func (m model) pickerView(u ui, w, maxH int) string {
 		body = append(body, "")
 	}
 	body = append(body, u.rule(iw), u.keys(kb{"↑↓", "move"}, kb{"enter", "open"}, kb{"esc", "close"}))
-	return u.floating(u.panel("Jump to", "", body, w, len(body)+chrome, true), w)
+	return u.floating(u.panel("Search", "", body, w, len(body)+chrome, true), w)
 }
 
 func highlight(u ui, s string, pos []int, sel bool) string {
@@ -467,7 +473,8 @@ func (m model) helpView(u ui, w, maxH int) string {
 	iw := inner(w)
 	global := []kb{
 		{"space", "the menu"},
-		{"ctrl+k", "jump anywhere"},
+		{"space space", "search"},
+		{"ctrl+k /", "search"},
 		{"esc", "back one level"},
 		{"q", "quit, or back"},
 		{"?", "these keys"},

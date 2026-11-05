@@ -43,7 +43,7 @@ moin has five places: the web app, the [CLI](/docs/reference/cli), the [terminal
 | Update a catalog app | ✓ | ✓ `update` | ✓ `U` | ✓ | ✓ |
 | Activity | ✓ | ✓ `activity` | ✓ | ✓ | ✓ |
 | Activity by app, server or member | ✓ | ✓ `--app`, `--server`, `--user` | Daily work wants all of it; filter in the CLI or the web. | ✓ | ✓ |
-| Jump to anything | ✓ command palette | Commands take the app by name. | ✓ `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
+| Jump to anything | ✓ command palette | Commands take the app by name. | ✓ `space space`, `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
 
 ## Setup
 

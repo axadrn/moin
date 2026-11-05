@@ -1,8 +1,9 @@
 package tui
 
 // Keys. The same key does the same thing in every view: `space` the menu,
-// `ctrl+k` the jump list, `?` the keys, `esc` back. Each view adds its own,
-// and the actions of an app work from every tab of it.
+// `space space`, `ctrl+k` or `/` the search, `?` the keys, `esc` back.
+// Each view adds its own, and the actions of an app work from every tab
+// of it.
 
 import (
 	"fmt"
