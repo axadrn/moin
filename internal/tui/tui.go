@@ -9,6 +9,8 @@ package tui
 
 import (
 	"context"
+	"errors"
+	"net"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -388,7 +390,17 @@ func (m *model) fail(err error) {
 	if err == nil {
 		return
 	}
-	m.notice, m.noticeErr, m.noticeAt = err.Error(), true, m.frame
+	m.notice, m.noticeErr, m.noticeAt = reason(err), true, m.frame
+}
+
+// reason is an error as a sentence; a control plane that does not answer
+// says so instead of the dial error.
+func reason(err error) string {
+	var op *net.OpError
+	if errors.As(err, &op) {
+		return "The control plane does not answer. This loads again when it is back."
+	}
+	return err.Error()
 }
 
 // data takes what the control plane answered.
@@ -397,11 +409,20 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case serversMsg:
 		m.servers, m.offline = msg, nil
 	case appsMsg:
-		first := !m.loaded
+		first, back := !m.loaded, m.offline != nil
 		m.apps, m.loaded, m.offline = msg, true, nil
+		cmds := []tea.Cmd{}
 		if first {
-			return m, tea.Batch(m.loadUsage()...)
+			cmds = append(cmds, m.loadUsage()...)
 		}
+		// after a start or a break, what loaded once may have failed
+		if m.ws.slug == "" || back {
+			cmds = append(cmds, m.loadWorkspace(), m.loadStatus(), m.loadEvents(""))
+		}
+		if back && len(m.app.errs) > 0 {
+			cmds = append(cmds, m.openTab())
+		}
+		return m, tea.Batch(cmds...)
 	case offlineMsg:
 		m.offline = msg.err
 	case statusMsg:
@@ -470,7 +491,7 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.app.errs == nil {
 				m.app.errs = map[tab]string{}
 			}
-			m.app.errs[msg.tab] = msg.err.Error()
+			m.app.errs[msg.tab] = reason(msg.err)
 		}
 	case startedMsg:
 		return m.follow(msg)
