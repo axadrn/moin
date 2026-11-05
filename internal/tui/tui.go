@@ -356,6 +356,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.tick()
 	case tea.KeyPressMsg:
 		return m.key(msg)
+	case tea.MouseClickMsg, tea.MouseWheelMsg:
+		return m.mouse(msg.(tea.MouseMsg))
 	case tea.PasteMsg:
 		return m.paste(msg.Content), nil
 	}

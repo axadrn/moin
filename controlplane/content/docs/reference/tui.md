@@ -17,6 +17,7 @@ Every view fills the screen, from 80 by 24 up. The header says where you are, th
 - **`esc`** always goes back one level and closes what is open first. `q` quits on the dashboard and goes back elsewhere; `ctrl+c` quits from anywhere.
 - **`?`** shows every key of the place you are in, grouped, and the ones that work everywhere; on a small screen `↑` `↓` scroll them.
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
+- **The mouse** wheel scrolls what the arrows move, and a click on a tab of an app opens it. Hold `shift` to select text, as in other full-screen apps.
 
 A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be undone, so it asks you to type the app's name first, then `enter`; you can paste it. A line to type into, like a new env var, takes `enter` and `esc`, `ctrl+u` clears it and `ctrl+w` deletes the last word. A switch, a paused check or an env var changes on the screen at once; if the control plane refuses it, the footer says why in red and the tab loads what is true again.
 
