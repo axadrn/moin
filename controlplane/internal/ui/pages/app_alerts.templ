@@ -189,7 +189,7 @@ templ alertDestinationForm() {
 				<div class="grid gap-3 sm:grid-cols-3">
 					for _, event := range model.AlertEvents {
 						@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-							@checkbox.Checkbox(checkbox.Props{ID: "alert-event-" + strings.ReplaceAll(event, ".", "-"), Name: "events", Value: event, DefaultChecked: true})
+							@checkbox.Checkbox(checkbox.Props{ID: "alert-event-" + strings.ReplaceAll(event, ".", "-"), Name: "events", Value: event, Checked: true})
 							@field.Label(field.LabelProps{For: "alert-event-" + strings.ReplaceAll(event, ".", "-"), Class: "font-normal"}) {
 								{ model.AlertEventLabel(event) }
 							}

@@ -109,7 +109,7 @@ templ repoLink(view RepoView) {
 				@RepoBranchField(view.Branches)
 			</div>
 			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-				@checkbox.Checkbox(checkbox.Props{ID: "link-auto-deploy", Name: "auto_deploy", Value: "1", DefaultChecked: true})
+				@checkbox.Checkbox(checkbox.Props{ID: "link-auto-deploy", Name: "auto_deploy", Value: "1", Checked: true})
 				@field.Label(field.LabelProps{For: "link-auto-deploy", Class: "font-normal"}) {
 					Deploy every push to the branch
 				}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -93,16 +94,22 @@ func (s *switches) app() *model.App {
 	return app
 }
 
-// switchOn says whether the answer renders the switch with the ID on.
+// switchOn says whether the answer renders the switch with the ID on: a
+// real checkbox, so its checked attribute is the whole truth.
 func switchOn(t *testing.T, body, id string) bool {
 	t.Helper()
-	start := strings.Index(body, `id="`+id+`-switch"`)
+	start := strings.Index(body, `id="`+id+`"`)
 	if start < 0 {
 		t.Fatalf("the answer has no switch %s: %s", id, body)
 	}
-	root := body[strings.LastIndex(body[:start], "<span"):]
-	root = root[:strings.Index(root, ">")]
-	return strings.Contains(root, `aria-checked="true"`)
+	input := body[strings.LastIndex(body[:start], "<input"):]
+	input = input[:strings.Index(input, ">")]
+	if !strings.Contains(input, `role="switch"`) {
+		t.Fatalf("the switch %s is not a real checkbox: %s", id, input)
+	}
+	// Only the attributes count, not the classes such as checked:bg-primary.
+	attributes := regexp.MustCompile(`class="[^"]*"`).ReplaceAllString(input, "")
+	return regexp.MustCompile(`\bchecked\b`).MatchString(attributes)
 }
 
 func activity(t *testing.T, s *switches, action string) int {
