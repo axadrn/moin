@@ -95,3 +95,9 @@ document.addEventListener("keydown", (event) => {
   field.focus();
   field.dispatchEvent(new Event("input", { bubbles: true }));
 });
+
+// A page back from the back-forward cache has its live streams closed
+// (pagehide): load it fresh.
+addEventListener("pageshow", (event) => {
+  if (event.persisted) location.reload();
+});

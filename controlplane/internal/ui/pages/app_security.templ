@@ -189,7 +189,9 @@ templ securityScript() {
 			events.addEventListener("servers", () => {
 				if (!waiting()) document.body.dispatchEvent(new Event("security-changed"));
 			});
-			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+			// Leaving the page closes the stream, so pages kept for the back
+			// button hold no connection.
+			addEventListener("pagehide", () => events.close());
 		})();
 	</script>
 }

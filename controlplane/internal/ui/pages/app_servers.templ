@@ -233,7 +233,9 @@ templ serversScript() {
 		(() => {
 			const events = new EventSource(`/api/v1/servers/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			events.addEventListener("servers", () => document.body.dispatchEvent(new Event("servers-changed")));
-			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+			// Leaving the page closes the stream, so pages kept for the back
+			// button hold no connection.
+			addEventListener("pagehide", () => events.close());
 			// The install command works once: when its agent is online it
 			// goes, the server says moin, and after a while that goes too.
 			const hideUsedCommand = () => {
