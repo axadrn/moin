@@ -7,14 +7,10 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
-// trialDaysLeft is how many days of the trial remain, at least 1 while it
-// runs.
+// trialDaysLeft rounds up: a trial that ends in five hours has one day left.
 func trialDaysLeft(ends *time.Time, now time.Time) int {
 	if ends == nil {
 		return 0
@@ -22,42 +18,40 @@ func trialDaysLeft(ends *time.Time, now time.Time) int {
 	return max(1, int(ends.Sub(now).Hours()/24+0.999))
 }
 
-// AppTrialCard shows how long the trial runs, or that the workspace is
-// read-only without a plan. It shows nothing with billing off or a plan.
+// AppTrialCard is one quiet line over the page while the trial runs or
+// after it ended, with Subscribe for whoever may pay.
 templ AppTrialCard() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
 	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
 		{{ current := subscription.Access() }}
 		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
-			@card.Card(card.Props{Class: "gap-2 px-4 py-3.5 text-sm shadow-none group-data-[collapsible=icon]:hidden", Attributes: templ.Attributes{"data-trial": string(current.State)}}) {
-				if current.State == access.StateTrial {
-					{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
-					<div class="flex items-center justify-between gap-2">
-						<p class="font-medium">Trial</p>
-						// The last week stands out in the running color of the
-						// status chips, so the end does not come as a surprise.
-						@badge.Badge(badge.Props{Class: utils.IfElse(days <= 7, "bg-running/14 text-running", "bg-secondary text-secondary-foreground"), Attributes: templ.Attributes{"data-trial-days": strconv.Itoa(days)}}) {
-							if days == 1 {
-								last day
-							} else {
-								{ strconv.Itoa(days) + " days left" }
-							}
-						}
-					</div>
-					<p class="text-xs text-muted-foreground">Everything works. Afterwards moin turns read-only; your apps keep running.</p>
-				} else {
-					<p class="font-medium">Read-only</p>
-					<p class="text-xs text-muted-foreground">Your trial has ended. Your apps keep running, and you can stop and start them.</p>
-				}
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-4xl bg-card px-6 py-4" data-trial={ string(current.State) }>
+				<p class="min-w-64 flex-1 text-sm">
+					if current.State == access.StateTrial {
+						{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
+						<span class="font-medium" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
+						<span class="text-muted-foreground">After it, moin turns read-only. Your apps keep running.</span>
+					} else {
+						<span class="font-medium">Your trial has ended.</span>
+						<span class="text-muted-foreground">Your apps keep running, and you can stop and start them.</span>
+					}
+				</p>
 				if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
-					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/billing", Size: button.SizeSm, Class: "mt-1 w-full"}) {
+					@kit.Button(kit.Primary, ctxkeys.AppBasePath(ctx)+"/billing", nil) {
 						Subscribe
 					}
 				} else {
-					<p class="text-xs text-muted-foreground">An owner subscribes under Billing.</p>
+					<p class="text-sm text-muted-foreground">An owner can subscribe.</p>
 				}
-			}
+			</div>
 		}
 	}
+}
+
+func trialLine(days int) string {
+	if days == 1 {
+		return "Last day of your trial."
+	}
+	return strconv.Itoa(days) + " days left in your trial."
 }

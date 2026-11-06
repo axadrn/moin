@@ -84,13 +84,16 @@ templ workspaceMenu(current *model.Workspace, workspaces []model.WorkspaceMember
 		}
 		for _, item := range workspaces {
 			@kit.MenuItem("/app/"+item.Slug+"/overview", templ.Attributes{"hx-boost": "false"}) {
-				<span class="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">{ workspaceInitial(item.Name) }</span>
+				<span class="flex size-6 shrink-0 items-center justify-center rounded-lg text-xs font-medium ring-1 ring-foreground/15">{ workspaceInitial(item.Name) }</span>
 				<span class="min-w-0 flex-1 truncate">{ item.Name }</span>
-				<span class="text-xs text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
-				if item.ID == current.ID {
-					@icon.Check(icon.Props{Class: "text-foreground!"})
-					<span class="sr-only">Current workspace</span>
-				}
+				<span class="text-sm text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
+				// The check has its place in every row, so the roles line up.
+				<span class="flex size-4 shrink-0 items-center justify-center">
+					if item.ID == current.ID {
+						@icon.Check(icon.Props{Class: "text-foreground!"})
+						<span class="sr-only">Current workspace</span>
+					}
+				</span>
 			}
 		}
 		@kit.MenuLine()
