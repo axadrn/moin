@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/textarea"
@@ -11,23 +12,10 @@ import (
 // envModes is the switch between one row per env var and one .env text.
 templ envModes(appName string, text bool) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
-	<div class="inline-flex rounded-md border p-0.5 text-xs" role="group" aria-label="Edit as">
-		for _, mode := range []struct {
-			label, path string
-			on          bool
-		}{{"Fields", envPath, !text}, {"Text", envPath + "?text=1", text}} {
-			<button
-				type="button"
-				class={ "rounded px-2 py-0.5", templ.KV("bg-muted font-medium text-foreground", mode.on), templ.KV("text-muted-foreground hover:text-foreground", !mode.on) }
-				aria-pressed={ boolString(mode.on) }
-				hx-get={ mode.path }
-				hx-target="#app-env"
-				hx-swap="outerHTML"
-			>
-				{ mode.label }
-			</button>
-		}
-	</div>
+	@kit.Segmented("env-modes", "Edit as", "", []kit.Segment{
+		{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+		{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+	})
 }
 
 func boolString(on bool) string {
@@ -42,8 +30,8 @@ func boolString(on bool) string {
 templ AppEnvText(appName, text, problem string) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
 	<div id="app-env" class="flex flex-col gap-3">
-		<div class="flex items-center justify-between gap-2 pl-3">
-			<span class="text-xs text-muted-foreground">KEY=value per line. A key you delete is removed.</span>
+		<div class="flex flex-wrap items-center justify-between gap-3 px-3">
+			<span class="text-sm text-muted-foreground">One KEY=value per line.</span>
 			@envModes(appName, true)
 		</div>
 		<form class="flex flex-col gap-2 px-3" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']">

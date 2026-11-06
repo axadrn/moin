@@ -91,7 +91,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), TokenRead},
 		{"PATCH /api/v1/account/name", m.RequireOnboarded(h.Account.UpdateName), TokenWrite},
 		{"PUT /api/v1/account/email-alerts", m.RequireOnboarded(h.Account.SetEmailAlerts), TokenWrite},
-		{"PUT /api/v1/account/sort", m.RequireOnboarded(h.Account.SetSort), TokenWrite},
 		{"PATCH /api/v1/account/email", m.RequireOnboarded(m.RateLimitEmailChanges(h.Account.ChangeEmail)), TokenDenied},
 		{"POST /api/v1/account/password", m.RequireOnboarded(h.Account.ChangePassword), TokenDenied},
 		{"POST /api/v1/account/password/set", m.RequireOnboarded(h.Account.SetPassword), TokenDenied},

@@ -15,18 +15,18 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// OverviewView is the workspace at a glance: what needs you, the apps and
-// the servers.
+// OverviewView is the workspace at a glance: what needs you, your pinned
+// apps and the ones deployed last. The full lists are /apps and /servers.
 type OverviewView struct {
 	Status  service.WorkspaceStatus
-	Apps    []model.App
 	Servers []model.Server
-	// Sort is how the member sorts the apps; Apps are in that order.
-	Sort string
+	Pinned  []model.App
+	Recent  []model.App
+	Apps    int
 }
 
-// Overview answers before it asks: "Everything runs." or what needs you,
-// then every app and server, quiet unless something is wrong.
+// Overview answers before it asks: "Everything runs." or what needs you.
+// Then what matters to you, and the way to everything else.
 templ Overview(view OverviewView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
@@ -53,30 +53,15 @@ templ Overview(view OverviewView) {
 						}
 					}
 				}
-				@templ.Fragment("overview-apps") {
-					<div id="overview-apps">
-						@kit.Section("Apps", overviewAppActions(basePath, view.Sort)) {
-							if len(view.Apps) == 0 {
-								@kit.List() {
-									@kit.Row("") {
-										@kit.RowText("No apps yet", "Deploy one from its folder with moin deploy, or pick one from the catalog.")
-									}
-								}
-							} else {
-								@kit.List() {
-									for i, app := range view.Apps {
-										if view.Sort == model.SortServer && (i == 0 || view.Apps[i-1].ServerName != app.ServerName) {
-											<p class="px-5 pt-3 pb-1 text-sm text-muted-foreground">{ app.ServerName }</p>
-										}
-										@kit.Row(basePath + "/apps/" + app.Name) {
-											@kit.RowText(app.Name, appNote(app, serverOnline(view.Servers, app.ServerID)))
-											@appState(app)
-										}
-									}
-								}
-							}
-						}
-					</div>
+				if len(view.Pinned) > 0 {
+					@kit.Section("Pinned", nil) {
+						@appRows(view.Pinned, view.Servers)
+					}
+				}
+				if len(view.Recent) > 0 {
+					@kit.Section("Deployed last", nil) {
+						@appRows(view.Recent, view.Servers)
+					}
 				}
 				if len(view.Status.Updates) > 0 {
 					@kit.Section("Updates", nil) {
@@ -89,19 +74,47 @@ templ Overview(view OverviewView) {
 						}
 					}
 				}
-				@kit.Section("Servers", overviewAllServers(basePath)) {
-					@kit.List() {
-						for _, server := range view.Servers {
-							@kit.Row(basePath + "/servers/" + server.ID + "/security") {
-								@kit.RowText(server.Name, serverNote(server, now))
-								@serverState(server)
-							}
-						}
+				@kit.List() {
+					@kit.Row(basePath + "/apps") {
+						@kit.RowText("All apps", "")
+						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(view.Apps) }</span>
+					}
+					@kit.Row(basePath + "/servers") {
+						@kit.RowText("All servers", serversLine(view.Servers, now))
+						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(len(view.Servers)) }</span>
 					}
 				}
 			}
 		}
 	}
+}
+
+// appRows are apps as rows of one list: the name, a second line only when
+// something is off, and their state mark.
+templ appRows(apps []model.App, servers []model.Server) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@kit.List() {
+		for _, app := range apps {
+			@kit.Row(basePath + "/apps/" + app.Name) {
+				@kit.RowText(app.Name, appNote(app, serverOnline(servers, app.ServerID)))
+				@appState(app)
+			}
+		}
+	}
+}
+
+// serversLine says the one thing to know about the servers, if any.
+func serversLine(servers []model.Server, now time.Time) string {
+	offline := 0
+	for _, server := range servers {
+		if !server.Online {
+			offline++
+		}
+	}
+	if offline > 0 {
+		return plural(offline, "server", "servers") + " offline"
+	}
+	return ""
 }
 
 // overviewHeadline is the answer to "is everything OK?".
@@ -184,35 +197,8 @@ func ifElse(ok bool, yes, no string) string {
 	return no
 }
 
-// overviewAllServers leads to every detail of the servers.
-templ overviewAllServers(basePath string) {
-	<a href={ templ.SafeURL(basePath + "/servers") } class="rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">All servers</a>
-}
 
-// overviewAppActions are next to the apps: how they are sorted, and a new
-// one.
-templ overviewAppActions(basePath, sort string) {
-	<div class="flex items-center gap-1">
-		@kit.Menu(kit.MenuProps{ID: "sort-menu", Label: "Sort the apps", End: true, Class: "h-9 px-3 text-sm font-medium text-muted-foreground hover:text-foreground"}, sortLabel(sort)) {
-			for _, way := range []struct{ Value, Label string }{{model.SortSmart, "Smart"}, {model.SortRecent, "Recently deployed"}, {model.SortServer, "By server"}} {
-				@kit.MenuItem("", templ.Attributes{"hx-post": basePath + "/sort", "hx-vals": `{"sort":"` + way.Value + `"}`, "hx-target": "#overview-apps", "hx-swap": "outerHTML", "aria-checked": strconv.FormatBool(way.Value == sort), "role": "menuitemradio"}) {
-					<span class="flex-1">{ way.Label }</span>
-					<span class="flex size-4 items-center justify-center">
-						if way.Value == sort {
-							@icon.Check(icon.Props{Class: "text-foreground!"})
-						}
-					</span>
-				}
-			}
-		}
-		@overviewNewApp(basePath)
-	</div>
-}
 
-templ sortLabel(sort string) {
-	@icon.ArrowUpDown(icon.Props{Class: "size-4"})
-	<span>{ map[string]string{model.SortSmart: "Smart", model.SortRecent: "Recent", model.SortServer: "By server"}[sort] }</span>
-}
 
 // overviewNewApp is the action next to the apps: start a new one.
 templ overviewNewApp(basePath string) {

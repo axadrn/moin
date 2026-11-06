@@ -19,10 +19,8 @@ type User struct {
 	// EmailAlerts mails the user when a site or a server goes down or
 	// comes back, or a deploy fails, in the workspaces they own or run as
 	// admin.
-	EmailAlerts bool `json:"email_alerts"`
-	// AppSort is how the user sorts the apps: smart, recent or server.
-	AppSort   string    `json:"app_sort"`
-	CreatedAt time.Time `json:"created_at"`
+	EmailAlerts bool      `json:"email_alerts"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // NewUser converts a user model into its public JSON shape.
@@ -33,7 +31,6 @@ func NewUser(user *model.User) User {
 		Name:        user.Name,
 		PasswordSet: user.HasPassword(),
 		EmailAlerts: user.EmailAlerts,
-		AppSort:     user.Sort(),
 		CreatedAt:   user.CreatedAt.UTC(),
 	}
 }

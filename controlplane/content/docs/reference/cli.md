@@ -35,7 +35,6 @@ Every command of `moin`. [Where things work](/docs/reference/surfaces) shows wha
 | `moin apps add --server <server> <name>` | adds an app |
 | `moin apps rm <app> [--yes]` | asks you to type its name, removes the app, keeps its data |
 | `moin apps pin [app]`, `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
-| `moin apps sort smart\|recent\|server` | sorts your apps, here, in the TUI and the web |
 | `moin deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |
 | `moin deploy --image <image> [app]` | deploys an image built in CI, with the compose file of an earlier deploy of the repo |
 | `moin redeploy [app]` | runs the newest source or image again |

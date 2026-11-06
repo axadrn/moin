@@ -48,7 +48,8 @@ func SearchItems(in SearchInput) []SearchItem {
 	}
 	places := []SearchItem{
 		{Title: "Overview", Hint: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
-		{Title: "New app", Hint: "deploy something new", Icon: icon.Plus, Href: in.Base + "/apps"},
+		{Title: "Apps", Hint: "every app", Icon: icon.Boxes, Href: in.Base + "/apps"},
+		{Title: "New app", Hint: "deploy something new", Icon: icon.Plus, Href: in.Base + "/apps/new"},
 		{Title: "Servers", Hint: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
 		{Title: "Catalog", Hint: "47 apps in one click", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
 		{Title: "Buckets", Hint: "where backups go", Icon: icon.Archive, Href: in.Base + "/bucket"},

@@ -29,6 +29,22 @@ func NewAppsHandler(apps *service.AppService, servers *service.ServerService, us
 	return &AppsHandler{apps: apps, servers: servers, users: users}
 }
 
+// AppsPage is every app, in the one order.
+func (h *AppsHandler) AppsPage(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	apps, err := h.apps.ListSorted(workspace.ID)
+	if err != nil {
+		renderError(w, "list apps failed", err)
+		return
+	}
+	servers, err := h.servers.List(workspace.ID)
+	if err != nil {
+		renderError(w, "list servers failed", err)
+		return
+	}
+	render(w, r, pages.Apps(apps, servers))
+}
+
 // NewPage is where an app starts: from a folder, GitHub or the catalog.
 func (h *AppsHandler) NewPage(w http.ResponseWriter, r *http.Request) {
 	servers, err := h.servers.List(ctxkeys.Workspace(r.Context()).ID)

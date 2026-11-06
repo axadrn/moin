@@ -13,12 +13,36 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
 )
+
+// Apps is every app of the workspace, in the one order: what needs you,
+// what deploys, pinned apps, then by name.
+templ Apps(apps []model.App, servers []model.Server) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@layouts.App("Apps") {
+		@panelPage() {
+			<header class="flex flex-wrap items-center justify-between gap-3 pt-2">
+				<h1 class="text-3xl font-semibold tracking-tight">Apps</h1>
+				@kit.Button(kit.Primary, basePath+"/apps/new", nil) {
+					New app
+				}
+			</header>
+			if len(apps) == 0 {
+				@kit.List() {
+					@kit.Row(basePath + "/apps/new") {
+						@kit.RowText("No apps yet", "Start one from your folder, GitHub or the catalog.")
+					}
+				}
+			} else {
+				@appRows(apps, servers)
+			}
+		}
+	}
+}
 
 // NewApp is where an app starts: from your folder, from GitHub, or from
 // the catalog. Each is one card; the overview lists the apps.
@@ -626,67 +650,49 @@ func parseLogLine(line string) logLine {
 templ AppEnv(appName string, keys []string, values map[string]string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ envPath := basePath + "/apps/" + appName + "/env" }}
-	<div id="app-env" class="flex flex-col gap-3">
-		<div class="flex items-center justify-between gap-2 pl-3">
-			<span class="text-xs text-muted-foreground tabular-nums">{ plural(len(keys), "variable", "variables") }</span>
-			<div class="flex items-center gap-2">
-				if len(keys) > 0 && len(values) == 0 {
-					@button.Button(button.Props{
-						Variant:    button.VariantGhost,
-						Size:       button.SizeXs,
-						Attributes: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML"},
-					}) {
-						@icon.Eye()
-						Show values
-					}
-				} else if len(keys) > 0 {
-					@button.Button(button.Props{
-						Variant:    button.VariantGhost,
-						Size:       button.SizeXs,
-						Attributes: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"},
-					}) {
-						@icon.EyeOff()
-						Hide values
-					}
+	<div id="app-env" class="flex flex-col gap-4">
+		<div class="flex flex-wrap items-center justify-between gap-3 px-3">
+			if len(keys) == 0 {
+				<span class="text-sm text-muted-foreground">No variables yet.</span>
+			} else if len(values) == 0 {
+				@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}) {
+					Show values
 				}
-				@envModes(appName, false)
-			</div>
+			} else {
+				@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}) {
+					Hide values
+				}
+			}
+			@envModes(appName, false)
 		</div>
 		if len(keys) > 0 {
 			<ul class="flex flex-col" role="list">
 				for _, key := range keys {
-					<li data-env={ key }>
-						@item.Item(item.Props{Size: item.SizeSm, Class: "group/env flex-nowrap py-1.5 pr-1.5 hover:bg-muted/60"}) {
-							<span class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
-							<span class="min-w-0 flex-1 truncate text-right font-mono text-sm text-muted-foreground">
-								if value, ok := values[key]; ok {
-									<span data-env-value class="text-foreground">{ value }</span>
-								} else {
-									<span aria-label="hidden">••••••</span>
-								}
-							</span>
-							@button.Button(button.Props{
-								Variant: button.VariantGhost,
-								Size:    button.SizeIconSm,
-								Class:   "text-muted-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/env:opacity-100",
-								Attributes: templ.Attributes{
-									"aria-label": "Remove " + key,
-									"title":      "Remove " + key,
-									"hx-delete":  envPath + "/" + key,
-									"hx-target":  "#app-env",
-									"hx-swap":    "outerHTML",
-									"hx-disable": "this",
-									"hx-confirm": "Remove " + key + "? The next deploy drops it.",
-								},
-							}) {
-								@icon.X()
+					<li data-env={ key } class="group/env flex min-h-12 items-center gap-3 rounded-2xl px-3 hover:bg-foreground/4">
+						<span class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
+						<span class="min-w-0 flex-1 truncate text-right font-mono text-sm text-muted-foreground">
+							if value, ok := values[key]; ok {
+								<span data-env-value class="text-foreground">{ value }</span>
+							} else {
+								<span aria-label="hidden">••••••</span>
 							}
-						}
+						</span>
+						<button
+							type="button"
+							aria-label={ "Remove " + key }
+							title={ "Remove " + key }
+							hx-delete={ envPath + "/" + key }
+							hx-target="#app-env"
+							hx-swap="outerHTML"
+							hx-disable="this"
+							hx-confirm={ "Remove " + key + "? The next deploy drops it." }
+							class="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/env:opacity-100"
+						>
+							@icon.X(icon.Props{Class: "size-4"})
+						</button>
 					</li>
 				}
 			</ul>
-		} else {
-			<p class="px-3 text-sm text-muted-foreground">No variables yet. Add the first one below.</p>
 		}
 		<form
 			class="flex flex-col gap-2 px-3 sm:flex-row"
@@ -696,12 +702,14 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 			hx-disable="find button[type='submit']"
 		>
 			@csrf.Token()
-			<label for="env-key" class="sr-only">Key</label>
-			@input.Input(input.Props{ID: "env-key", Name: "key", Type: "text", Placeholder: "KEY", Class: "font-mono sm:w-36 sm:shrink-0", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true}})
+			<label for="env-key" class="sr-only">Name</label>
+			<div class="sm:w-48 sm:shrink-0">
+				@kit.Input(templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "spellcheck": "false", "required": true})
+			</div>
 			<label for="env-value" class="sr-only">Value</label>
-			@input.Input(input.Props{ID: "env-value", Name: "value", Type: "password", Placeholder: "value", Class: "min-w-0 font-mono", Attributes: templ.Attributes{"autocomplete": "off"}})
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0"}) {
-				Set
+			@kit.Input(templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"})
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				Add
 			}
 		</form>
 	</div>

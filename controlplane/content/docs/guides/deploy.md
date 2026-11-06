@@ -221,9 +221,9 @@ MCP: remove_app
 
 You cannot undo it, so moin asks you to type the app's name first. `moin apps rm <app-name> --yes` skips that in scripts. An agent passes the name as `confirm`.
 
-## Pin and sort your apps
+## Pin your apps
 
-The overview puts what needs you first: a failed deploy, an app on an offline server. Then what is deploying, then your pinned apps, then the rest by name. Pin the apps you look at most.
+Pin the apps you look at most: the overview shows them right under what needs you.
 
 ```surfaces
 Web: the star next to the app's name
@@ -233,15 +233,7 @@ API: PUT /api/v1/apps/{app}/pin {"pinned": true}
 MCP: pin_app
 ```
 
-A pin is for the whole workspace. How the apps are sorted is yours: **Smart** as above, **Recently deployed** with the newest deploy first, or **By server**. The web, the TUI, the CLI, the API and MCP all show your choice.
-
-```surfaces
-Web: the overview, **Sort** next to Apps
-CLI: moin apps sort smart|recent|server
-TUI: follows the web
-API: PUT /api/v1/account/sort {"sort": "recent"}
-MCP: list_apps follows it
-```
+A pin is for the whole workspace. Everything else sorts itself the same way everywhere: what needs you first, then what deploys, then pinned apps, then the rest by name. The overview shows your pinned apps and the ones deployed last; **All apps** lists every one.
 
 ## Push to deploy with GitHub Actions
 

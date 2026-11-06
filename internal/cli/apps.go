@@ -97,22 +97,6 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			done(stdout, "Unpinned %s", style.Bold.Render(app.Name))
 		}
 		return nil
-	case "sort":
-		flags := newFlags("apps sort", "apps sort smart|recent|server")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 1 {
-			return flags.wrong()
-		}
-		if err := api.SetSort(ctx, flags.Arg(0)); err != nil {
-			return err
-		}
-		done(stdout, "Apps sorted %s, in the web and the TUI too", style.Bold.Render(flags.Arg(0)))
-		return nil
 	case "rm", "remove":
 		flags := newFlags("apps rm", "apps rm <app> [--yes]").withApp().withYes()
 		if err := flags.parse(args); err != nil {

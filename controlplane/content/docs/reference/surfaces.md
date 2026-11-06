@@ -18,7 +18,6 @@ moin has five places: the web app, the [CLI](/docs/reference/cli), the [terminal
 | Update an agent | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
 | Pin an app | ✓ the star | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
-| Sort the apps | ✓ | ✓ `apps sort` | follows your choice | ✓ | follows your choice |
 | Deploy this directory | Your files are on your machine, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An agent has no directory to upload. Use the CLI. |
 | Deploy an image from CI | ✓ | ✓ `deploy --image` | ✓ `I` | ✓ | ✓ |
 | Deploy a branch, tag or commit | ✓ | ✓ `deploy --ref` | ✓ `B` | ✓ | ✓ |

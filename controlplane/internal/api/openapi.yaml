@@ -633,50 +633,6 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/account/sort:
-    put:
-      tags: [Account]
-      operationId: setAppSort
-      summary: Sort the apps
-      description: How the signed-in user sorts the apps, in `GET /api/v1/apps`, its event stream, the web and the TUI. `smart` puts what needs you first, then what deploys, then pinned apps, then the rest by name; `recent` the newest deploy first; `server` by server. `app_sort` in `GET /api/v1/account` says how it is set.
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-        - apiTokenAuth: [write]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [sort]
-              properties:
-                sort:
-                  type: string
-                  enum: [smart, recent, server]
-      responses:
-        '200':
-          description: The setting.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  sort:
-                    type: string
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          description: '`validation_failed` with `fields.sort`.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
   /api/v1/account/email:
     patch:
       tags: [Account]
@@ -1326,7 +1282,7 @@ paths:
       tags: [Apps]
       operationId: listApps
       summary: List apps
-      description: In the order the caller sorts them (`PUT /api/v1/account/sort`), with the newest and the live deploy of each.
+      description: What needs you first (a failed deploy, an offline server), then what deploys, then pinned apps, then the rest by name, with the newest and the live deploy of each.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -4960,10 +4916,6 @@ components:
         email_alerts:
           type: boolean
           description: Mails when a site or a server goes down or comes back, or a deploy fails, in the workspaces the user owns or runs as admin. Set it with `PUT /api/v1/account/email-alerts`.
-        app_sort:
-          type: string
-          enum: [smart, recent, server]
-          description: How the user sorts the apps. Set it with `PUT /api/v1/account/sort`.
         created_at:
           type: string
           format: date-time

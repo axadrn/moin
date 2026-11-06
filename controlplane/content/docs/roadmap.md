@@ -24,7 +24,7 @@ What you get today, on every surface: the web, the CLI, the terminal UI, the API
 - **More than one bucket**: give each app its own bucket for uploads and backups, say one per client. [Bucket](/docs/guides/bucket)
 - **Updates in one click**: a self-hosted moin tells you when a release is out and updates itself; agents update themselves. [Self-hosting](/docs/self-hosting#updates)
 - **Env vars as one text**: switch between fields and a whole `.env` file. [Env vars](/docs/guides/env)
-- **What needs you comes first**: failed deploys and offline servers on top, then your pinned apps, sorted your way. [Pin and sort](/docs/guides/deploy#pin-and-sort-your-apps)
+- **What needs you comes first**: failed deploys and offline servers on top, then your pinned apps. [Pin your apps](/docs/guides/deploy#pin-your-apps)
 - **A terminal UI for the daily work**: a dashboard, `space` for every action, `space space` to search everything. [Terminal UI](/docs/reference/tui)
 - **Security**: a Cloudflare Tunnel instead of open ports, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
 - **Teams and the activity log**: who changed what, to the second. [Activity log](/docs/guides/activity)
