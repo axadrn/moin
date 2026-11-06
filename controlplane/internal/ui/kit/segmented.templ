@@ -15,7 +15,8 @@ type Segment struct {
 // Segmented is the one control for "one of these": the sections of an
 // app, Fields or Text, a time range. Pills in a pill, the open one lifted.
 // Target names the part of the page a choice swaps; put the control inside
-// it, so the open choice is lit after the swap. Empty swaps the page.
+// it, so the open choice is lit after the swap. The page keeps its scroll
+// (show:none; a boosted link would jump to the top). Empty swaps the page.
 templ Segmented(id, label, target string, segments []Segment) {
 	<nav id={ id } class="flex h-11 w-full max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] sm:w-fit" aria-label={ label }>
 		for _, s := range segments {
@@ -32,7 +33,7 @@ templ Segmented(id, label, target string, segments []Segment) {
 				if target != "" {
 					hx-target={ target }
 					hx-select={ target }
-					hx-swap="outerHTML transition:true"
+					hx-swap="outerHTML transition:true show:none"
 					hx-push-url="true"
 				}
 			>
