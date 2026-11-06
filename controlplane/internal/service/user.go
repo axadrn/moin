@@ -69,18 +69,6 @@ func (s *UserService) UpdateName(userID, name string) (*model.User, error) {
 	return s.ByID(userID)
 }
 
-// ErrSort is a way to sort the apps that moin does not have.
-var ErrSort = errors.New("sort must be smart, recent or server")
-
-// SetSort remembers how the user sorts the apps, the same in the web and
-// the TUI: model.SortSmart, model.SortRecent or model.SortServer.
-func (s *UserService) SetSort(userID, sort string) error {
-	if sort != model.SortSmart && sort != model.SortRecent && sort != model.SortServer {
-		return ErrSort
-	}
-	return s.userRepository.SetSort(userID, sort)
-}
-
 // SetEmailAlerts turns the email alerts of the user on or off: a mail
 // when a site goes down or comes back, a server goes offline or comes back,
 // or a deploy fails, in the workspaces they own or run as admin.

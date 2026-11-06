@@ -14,11 +14,3 @@ func (c *Client) SetPinned(ctx context.Context, app string, pinned bool) (App, e
 	}{pinned}, &out)
 	return out, err
 }
-
-// SetSort sorts the apps another way for the user: smart, recent or
-// server. Every list follows it, in the web too.
-func (c *Client) SetSort(ctx context.Context, sort string) error {
-	return c.do(ctx, http.MethodPut, "/api/v1/account/sort", struct {
-		Sort string `json:"sort"`
-	}{sort}, nil)
-}

@@ -652,7 +652,7 @@ func (l AppList) Summary() string {
 }
 
 func (t moinTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppList, error) {
-	apps, err := t.services.Apps.ListSorted(caller.Token.WorkspaceID, caller.User.Sort())
+	apps, err := t.services.Apps.ListSorted(caller.Token.WorkspaceID)
 	if err != nil {
 		return AppList{}, err
 	}

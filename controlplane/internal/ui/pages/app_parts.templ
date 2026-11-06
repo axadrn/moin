@@ -118,7 +118,10 @@ type panelProps struct {
 	Attrs templ.Attributes
 }
 
-// panel is a card with a title: one topic of a page.
+// panel is a card with a title: one topic of a page, the same shape as
+// kit.Card. The title sits left, a short line of fact under it, at most one
+// action right, and the body under them with one inner edge. Docs is not
+// shown: the page explains itself, and the docs explain concepts.
 templ panel(p panelProps) {
 	{{ attrs := templ.Attributes{"role": "region"} }}
 	for k, v := range p.Attrs {
@@ -127,34 +130,35 @@ templ panel(p panelProps) {
 	if p.Heading != "" {
 		{{ attrs["aria-labelledby"] = p.Heading }}
 	}
-	// Only an Action goes under the title on phones; the book alone stays
-	// right of it.
-	{{ stack := p.Action != nil }}
-	@card.Card(card.Props{ID: p.ID, Class: utils.CN("h-full min-w-0", p.Class), Attributes: attrs}) {
-		@card.Header(card.HeaderProps{Class: utils.IfElse(stack, panelHeaderStack, "")}) {
-			@card.Title(card.TitleProps{ID: p.Heading, Class: "flex min-w-0 items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				{ p.Title }
-			}
-			if p.Description != "" {
-				@card.Description() {
-					{ p.Description }
-				}
-			}
-			if p.Action != nil || p.Docs != "" {
-				@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-1", utils.IfElse(stack, panelActionStack, ""))}) {
-					if p.Docs != "" {
-						@docsButton(p.Docs, "How it works", utils.IfElse(stack, "max-sm:-ml-2", ""))
-					}
-					if p.Action != nil {
-						@p.Action
-					}
-				}
-			}
+	<section
+		if p.ID != "" {
+			id={ p.ID }
 		}
-		@card.Content(card.ContentProps{Class: panelBodyClass(p.Body)}) {
+		class={ utils.CN("flex h-full min-w-0 flex-col gap-4 rounded-4xl bg-card py-6", p.Class) }
+		{ attrs... }
+	>
+		<div class="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-6">
+			<div class="flex min-w-0 flex-col gap-0.5">
+				<h2
+					if p.Heading != "" {
+						id={ p.Heading }
+					}
+					class="text-base font-medium"
+				>{ p.Title }</h2>
+				if p.Description != "" {
+					<p class="text-sm text-muted-foreground">{ p.Description }</p>
+				}
+			</div>
+			if p.Action != nil {
+				<div class="flex flex-wrap items-center gap-2">
+					@p.Action
+				</div>
+			}
+		</div>
+		<div class={ panelBodyClass(p.Body) }>
 			{ children... }
-		}
-	}
+		</div>
+	</section>
 }
 
 func panelBodyClass(body panelBody) string {
@@ -162,9 +166,9 @@ func panelBodyClass(body panelBody) string {
 	case panelBodyRows:
 		return "min-w-0 px-3"
 	case panelBodyFlush:
-		return "flex min-h-0 min-w-0 flex-1 flex-col px-0"
+		return "flex min-h-0 min-w-0 flex-1 flex-col"
 	}
-	return "min-w-0"
+	return "min-w-0 px-6"
 }
 
 // statGrid is a row of up to four statCards of the same height.

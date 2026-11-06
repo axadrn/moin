@@ -21,7 +21,6 @@ type UserRepository interface {
 	ByEmail(email string) (*model.User, error)
 	Update(user *model.User) error
 	UpdateName(userID, name string, updatedAt time.Time) error
-	SetSort(userID, sort string) error
 	SetEmailAlerts(userID string, on bool) error
 	Delete(id string) error
 }
@@ -98,18 +97,6 @@ func (r *userRepository) UpdateName(userID, name string, updatedAt time.Time) er
 		return err
 	}
 	if rows == 0 {
-		return ErrUserNotFound
-	}
-	return nil
-}
-
-// SetSort stores how the user sorts the apps.
-func (r *userRepository) SetSort(userID, sort string) error {
-	result, err := r.db.Exec(`UPDATE users SET app_sort = $1 WHERE id = $2`, sort, userID)
-	if err != nil {
-		return err
-	}
-	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
 		return ErrUserNotFound
 	}
 	return nil

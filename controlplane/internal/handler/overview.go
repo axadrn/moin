@@ -3,6 +3,9 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"sort"
+
+	"github.com/axadrn/moin/controlplane/internal/model"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/service"
@@ -14,57 +17,59 @@ type OverviewHandler struct {
 	status  *service.StatusService
 	apps    *service.AppService
 	servers *service.ServerService
-	users   *service.UserService
 }
 
-func NewOverviewHandler(status *service.StatusService, apps *service.AppService, servers *service.ServerService, users *service.UserService) *OverviewHandler {
-	return &OverviewHandler{status: status, apps: apps, servers: servers, users: users}
+func NewOverviewHandler(status *service.StatusService, apps *service.AppService, servers *service.ServerService) *OverviewHandler {
+	return &OverviewHandler{status: status, apps: apps, servers: servers}
 }
 
-// Page shows what needs the member, then every app and server.
+// Page shows what needs the member, their pinned apps and the ones
+// deployed last.
 func (h *OverviewHandler) Page(w http.ResponseWriter, r *http.Request) {
-	view, ok := h.view(w, r, ctxkeys.User(r.Context()).Sort())
-	if ok {
-		render(w, r, pages.Overview(view))
-	}
-}
-
-// Sort sorts the apps another way for this member, on every surface, and
-// answers only the apps of the overview (a templ fragment), which htmx
-// swaps in place.
-func (h *OverviewHandler) Sort(w http.ResponseWriter, r *http.Request) {
-	how := r.FormValue("sort")
-	if err := h.users.SetSort(ctxkeys.User(r.Context()).ID, how); err != nil {
-		failed(w, r, "Sort not changed", err, nil)
-		return
-	}
-	if view, ok := h.view(w, r, how); ok {
-		renderFragment(w, r, pages.Overview(view), "overview-apps")
-	}
-}
-
-// view is everything the overview shows, the apps sorted how.
-func (h *OverviewHandler) view(w http.ResponseWriter, r *http.Request, how string) (pages.OverviewView, bool) {
 	member := ctxkeys.WorkspaceMember(r.Context())
-	view := pages.OverviewView{}
-	var err error
-	if view.Status, err = h.status.Status(member.WorkspaceID); err == nil {
-		if view.Apps, err = h.apps.List(member.WorkspaceID); err == nil {
-			view.Servers, err = h.servers.List(member.WorkspaceID)
-		}
-	}
-	if err == nil {
-		var last map[string]int64
-		if last, err = h.apps.LastDeploys(member.WorkspaceID); err == nil {
-			view.Sort = how
-			view.Apps = service.SortApps(view.Apps, view.Sort, view.Servers, last)
-		}
-	}
+	view, err := h.view(member.WorkspaceID)
 	if err != nil {
 		slog.Error("overview failed", "error", err, "workspace_id", member.WorkspaceID)
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "The overview didn't load", "Try again in a moment."))
-		return view, false
+		return
 	}
-	return view, true
+	render(w, r, pages.Overview(view))
+}
+
+// recentApps is how many apps the overview lists as deployed last.
+const recentApps = 5
+
+func (h *OverviewHandler) view(workspaceID string) (pages.OverviewView, error) {
+	view := pages.OverviewView{}
+	var err error
+	if view.Status, err = h.status.Status(workspaceID); err != nil {
+		return view, err
+	}
+	if view.Servers, err = h.servers.List(workspaceID); err != nil {
+		return view, err
+	}
+	apps, err := h.apps.List(workspaceID)
+	if err != nil {
+		return view, err
+	}
+	last, err := h.apps.LastDeploys(workspaceID)
+	if err != nil {
+		return view, err
+	}
+	view.Apps = len(apps)
+	for _, app := range service.SortApps(apps, view.Servers) {
+		if app.Pinned {
+			view.Pinned = append(view.Pinned, app)
+		}
+	}
+	recent := []model.App{}
+	for _, app := range apps {
+		if !app.Pinned && last[app.ID] > 0 {
+			recent = append(recent, app)
+		}
+	}
+	sort.SliceStable(recent, func(i, j int) bool { return last[recent[i].ID] > last[recent[j].ID] })
+	view.Recent = recent[:min(len(recent), recentApps)]
+	return view, nil
 }

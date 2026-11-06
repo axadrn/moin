@@ -63,7 +63,6 @@ Apps
   apps add           Add an app: apps add --server <server> <name>
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
-  apps sort          Sort the apps, here, in the TUI and the web: apps sort smart|recent|server
 
 Deploys
   deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]

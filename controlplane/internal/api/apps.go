@@ -219,8 +219,8 @@ func NewDeploys(deploys []model.Deploy, live int) []Deploy {
 	return out
 }
 
-func (h *AppsHandler) list(workspaceID, sort string) (AppList, error) {
-	apps, err := h.apps.ListSorted(workspaceID, sort)
+func (h *AppsHandler) list(workspaceID string) (AppList, error) {
+	apps, err := h.apps.ListSorted(workspaceID)
 	if err != nil {
 		return AppList{}, err
 	}
@@ -231,11 +231,11 @@ func (h *AppsHandler) list(workspaceID, sort string) (AppList, error) {
 	return AppList{Items: items}, nil
 }
 
-// List returns the apps in the order the caller sorts them (smart, recent
-// or server, PUT /api/v1/account/sort), the order every client shows.
+// List returns the apps in the order every client shows: what needs you,
+// what deploys, pinned apps, then the rest by name.
 func (h *AppsHandler) List(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	list, err := h.list(workspace.ID, ctxkeys.User(r.Context()).Sort())
+	list, err := h.list(workspace.ID)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -516,9 +516,8 @@ func (h *AppsHandler) Events(w http.ResponseWriter, r *http.Request) {
 	changes, unsubscribe := h.apps.Subscribe(workspace.ID)
 	defer unsubscribe()
 	events := startEvents(w)
-	sort := ctxkeys.User(r.Context()).Sort()
 	send := func() bool {
-		list, err := h.list(workspace.ID, sort)
+		list, err := h.list(workspace.ID)
 		if err != nil {
 			slog.Error("failed to list apps", "error", err, "workspace_id", workspace.ID)
 			return false

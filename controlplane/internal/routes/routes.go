@@ -134,14 +134,13 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app", middleware.RequireAuth(workspaceHandler.Redirect))
 	// Sign-ins and invitations lead to the dashboard, and a workspace's own
 	// address too: both are the overview.
-	overview := handler.NewOverviewHandler(app.StatusService, app.AppService, app.ServerService, app.UserService)
+	overview := handler.NewOverviewHandler(app.StatusService, app.AppService, app.ServerService)
 	toOverview := workspace(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/overview", http.StatusSeeOther)
 	})
 	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}/overview", workspace(overview.Page))
-	mux.HandleFunc("POST /app/{workspaceSlug}/sort", workspace(overview.Sort))
 	mux.HandleFunc("GET /app/{workspaceSlug}/search", workspace(handler.NewCommandHandler(app.AppService, app.ServerService).Search))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.SettingsPage))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
@@ -168,8 +167,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/catalog/{slug}/install", workspace(catalogPages.Install))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/catalog", workspace(catalogPages.UpdatePanel))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/update", workspace(catalogPages.Update))
-	// The overview lists the apps; /apps leads there, /apps/new starts one.
-	mux.HandleFunc("GET /app/{workspaceSlug}/apps", toOverview)
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps", workspace(apps.AppsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/new", workspace(apps.NewPage))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/pin", workspace(apps.SetPinned))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps", workspace(apps.Create))

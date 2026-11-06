@@ -7,6 +7,9 @@ type Segment struct {
 	Href   string
 	Key    string
 	Active bool
+	// Attrs swap a part of a card instead (hx-get, hx-target), when the
+	// address should stay.
+	Attrs templ.Attributes
 }
 
 // Segmented is the one control for "one of these": the sections of an
@@ -22,6 +25,7 @@ templ Segmented(id, label, target string, segments []Segment) {
 				if s.Active {
 					aria-current="page"
 				}
+				{ s.Attrs... }
 				if target != "" {
 					hx-target={ target }
 					hx-select={ target }
