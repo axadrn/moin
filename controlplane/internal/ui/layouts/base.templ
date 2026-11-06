@@ -44,6 +44,8 @@ templ Base(props ...SEOProps) {
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
 			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
+			// Server-sent events swap HTML as it streams (hx-sse:connect).
+			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
 			@components.Scripts()
 			<script defer nonce={ templ.GetNonce(ctx) } src={ tuiutils.ScriptURL("/assets/js/moin.js") }></script>
 			// Site-wide enhancements

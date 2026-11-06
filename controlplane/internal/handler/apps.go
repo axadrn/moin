@@ -99,6 +99,11 @@ func (h *AppsHandler) AppSection(section string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { h.appPage(w, r, section) }
 }
 
+// DeployPage is the Deploys section with the log of one deploy.
+func (h *AppsHandler) DeployPage(w http.ResponseWriter, r *http.Request) {
+	h.appPage(w, r, "deploys")
+}
+
 func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section string) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, deploys, err := h.apps.Deploys(workspace.ID, r.PathValue("app"), 20)
@@ -116,6 +121,7 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		return
 	}
 	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}
+	view.Selected, _ = strconv.Atoi(r.PathValue("number"))
 	switch section {
 	case "app":
 		if h.catalogs != nil {
@@ -130,7 +136,9 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 }
 
 // Detail answers the header and deploys of an app, for the reload after a
-// change. An app removed meanwhile sends the page to the list.
+// change. n is the deploy whose log shows (0 the newest); shown, when the
+// page follows the newest, the one it shows now, so a new deploy takes the
+// log. An app removed meanwhile sends the page to the list.
 func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, deploys, err := h.apps.Deploys(workspace.ID, r.PathValue("app"), 20)
@@ -142,7 +150,10 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load app failed", err)
 		return
 	}
-	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber)))
+	selected, _ := strconv.Atoi(r.URL.Query().Get("n"))
+	shown, err := strconv.Atoi(r.URL.Query().Get("shown"))
+	follow := selected == 0 && err == nil
+	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber), selected, follow, shown))
 }
 
 // Rollback starts the release of an earlier deploy again. The page follows
