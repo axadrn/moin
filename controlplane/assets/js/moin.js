@@ -101,3 +101,10 @@ document.addEventListener("keydown", (event) => {
 addEventListener("pageshow", (event) => {
   if (event.persisted) location.reload();
 });
+
+// hx-sse 4.0.0 aborts a stream it closes on purpose (hx-sse:close, a page
+// left) and leaves that abort unhandled. It is not an error: keep it out of
+// the console.
+addEventListener("unhandledrejection", (event) => {
+  if (event.reason?.name === "AbortError") event.preventDefault();
+});

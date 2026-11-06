@@ -176,6 +176,9 @@ type AppPageView struct {
 	// them, so the page comes whole.
 	Catalog *CatalogUpdateView
 	Uptime  *UptimeView
+	// Selected is the deploy whose log the Deploys section shows; 0 shows
+	// the newest and follows the next one that starts.
+	Selected int
 }
 
 // AppPage is an app: the head stays, the section under it answers one
@@ -188,7 +191,7 @@ templ AppPage(view AppPageView) {
 			@appSection(app.Name, view.Section) {
 				switch view.Section {
 					case "deploys":
-						@appDeploysSection(app, view.Deploys)
+						@appDeploysSection(app, view.Deploys, view.Selected, view.Selected == 0)
 					case "addresses":
 						@appAddressesSection(view)
 					case "logs":
@@ -200,7 +203,9 @@ templ AppPage(view AppPageView) {
 				}
 			}
 		}
-		@appsScript()
+		// The app's changes come as the event "apps"; parts that show them
+		// reload on it (hx-trigger "apps from:body").
+		<div hx-sse:connect={ "/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug } hidden></div>
 	}
 }
 
@@ -256,28 +261,17 @@ func appAddresses(app model.App) []string {
 
 // appDeploysSection answers "how does code get in?": the versions, the log
 // of the one picked, GitHub and CI.
-templ appDeploysSection(app model.App, deploys []api.Deploy) {
+templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follow bool) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	@appFacts(app, deploys)
 	<div class="grid items-stretch gap-4 lg:grid-cols-2">
-		@appDeploys(app, deploys)
-		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(), Body: panelBodyFlush}) {
-			<div
-				id="deploy-log"
-				class="moin-term moin-term-lines max-h-[32rem] flex-1 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:min-h-72"
-				data-deploy-log
-				tabindex="0"
-				aria-label="Deploy log"
-			>
-				<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet.</p>
-			</div>
-		}
+		@appDeploys(app, deploys, selected, follow)
+		@DeployLogPanel(app, selectedDeploy(deploys, selected), follow, false)
 	</div>
 	<div hx-get={ appPath + "/repo" } hx-trigger="load" hx-swap="outerHTML">
 		@AppRepo(RepoView{App: app})
 	</div>
 	@appCI(app.Name, app.DeployHookHash != nil)
-	@appScript(app.Name)
 }
 
 // appAddressesSection answers "where is it reached?": the instant address
@@ -344,16 +338,6 @@ func appLastDeployLine(deploys []api.Deploy) string {
 	return "Last deploy " + ago(deploys[0].CreatedAt, time.Now())
 }
 
-
-// deployLogActions is the version the log shows, its state and the copy button.
-templ deployLogActions() {
-	<span id="deploy-log-version" class="text-xs text-muted-foreground tabular-nums"></span>
-	<span id="deploy-log-state" class="flex"></span>
-	<span data-deploy-log-copy class="contents">
-		@copyButton("", "", "Copy the log")
-	</span>
-}
-
 templ loadLogsButton(appPath string) {
 	@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": appPath + "/logs/lines", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"}) {
 		Reload
@@ -363,11 +347,15 @@ templ loadLogsButton(appPath string) {
 // AppDetail is the status, the facts and the deploys of an app. The page
 // reloads it on every change the app event stream reports, and follows a
 // running deploy.
-templ AppDetail(app model.App, deploys []api.Deploy) {
+templ AppDetail(app model.App, deploys []api.Deploy, selected int, follow bool, shown int) {
 	@appSummary(app)
 	@appPower(app)
 	@appFacts(app, deploys)
-	@appDeploys(app, deploys)
+	@appDeploys(app, deploys, selected, follow)
+	// Following the newest deploy, a new one takes the log.
+	if follow && len(deploys) > 0 && deploys[0].Number != shown {
+		@DeployLogPanel(app, &deploys[0], true, true)
+	}
 }
 
 // appPower stops a running app or starts a stopped one.
@@ -471,9 +459,8 @@ func lastTook(deploys []api.Deploy) (string, int) {
 }
 
 // appDeploys is the deploys, newest first. A row shows its log on click.
-templ appDeploys(app model.App, deploys []api.Deploy) {
+templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ now := time.Now() }}
 	@panel(panelProps{
 		ID:          "app-detail",
 		Heading:     "deploys-heading",
@@ -483,8 +470,8 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 		Body:        panelBodyRows,
 		Attrs: templ.Attributes{
 			"hx-swap-oob":        "true",
-			"hx-get":             basePath + "/apps/" + app.Name + "/detail",
-			"hx-trigger":         "apps-changed from:body",
+			"hx-get":             detailHref(basePath, app.Name, selected, follow, deploys),
+			"hx-trigger":         "apps from:body",
 			"hx-swap":            "none",
 			"data-latest-number": strconv.Itoa(app.LatestNumber),
 			"data-latest-status": app.LatestStatus,
@@ -496,83 +483,89 @@ templ appDeploys(app model.App, deploys []api.Deploy) {
 			</div>
 		} else {
 			<ol class="flex flex-col gap-1" role="list">
-				for i, deploy := range deploys {
-					<li
-						data-deploy={ strconv.Itoa(deploy.Number) }
-						data-extra?={ i >= deploysShown }
-						class="group/deploy"
-					>
-						@item.Item(item.Props{Size: item.SizeSm, Class: "relative flex-nowrap items-start hover:bg-muted/60 group-data-selected/deploy:bg-muted"}) {
-							@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
-								<span class="flex min-w-0 items-center gap-3">
-									@button.Button(button.Props{
-										Variant: button.VariantLink,
-										// The version opens the log; its ::after covers the row.
-										Class:      "h-auto p-0 font-semibold text-foreground tabular-nums after:absolute after:inset-0 after:rounded-2xl hover:no-underline",
-										Attributes: templ.Attributes{"data-follow-deploy": strconv.Itoa(deploy.Number), "aria-label": fmt.Sprintf("Show the log of v%d", deploy.Number)},
-									}) {
-										{ fmt.Sprintf("v%d", deploy.Number) }
-									}
-									@deployStatus(deploy, app.LiveNumber)
-								</span>
-								if deploy.Commit != "" {
-									@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs", Attributes: templ.Attributes{"title": deploy.CommitMessage, "data-deploy-commit": true}}) {
-										<span class="font-mono text-foreground">{ shortCommit(deploy.Commit) }</span>
-										{ deploy.CommitMessage }
-									}
-								}
-								if deploy.FromNumber > 0 {
-									@item.Description(item.DescriptionProps{Class: "text-xs"}) {
-										{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }
-									}
-								}
-								if deploy.Error != "" {
-									@item.Description(item.DescriptionProps{Class: "text-xs text-failed", Attributes: templ.Attributes{"title": deploy.Error}}) {
-										{ deploy.Error }
-									}
-								}
-							}
-							@item.Actions(item.ActionsProps{Class: "relative h-5 shrink-0"}) {
-								<span class={ "text-xs whitespace-nowrap text-muted-foreground tabular-nums", templ.KV("sm:group-hover/deploy:invisible sm:group-data-selected/deploy:invisible sm:group-has-[button:focus-visible]/deploy:invisible", canRollBack(app, deploy)) } title={ stamp(deploy.CreatedAt) }>
-									{ ago(deploy.CreatedAt, now) }
-									if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
-										· { d }
-									}
-								</span>
-								if canRollBack(app, deploy) {
-									@button.Button(button.Props{
-										Variant: button.VariantSecondary,
-										Size:    button.SizeXs,
-										Class:   "z-10 max-sm:relative sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 sm:invisible sm:group-hover/deploy:visible sm:group-data-selected/deploy:visible sm:focus-visible:visible",
-										Attributes: templ.Attributes{
-											"hx-post":    basePath + "/apps/" + app.Name + "/rollback",
-											"hx-vals":    fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
-											"hx-swap":    "none",
-											"hx-disable": "this",
-											"hx-confirm": fmt.Sprintf("Start the release of v%d again?", deploy.Number),
-											"title":      fmt.Sprintf("Release v%d again", deploy.Number),
-										},
-									}) {
-										Roll back
-									}
-								}
-							}
-						}
-					</li>
+				for _, deploy := range deploys[:min(len(deploys), deploysShown)] {
+					@deployRow(app, deploys, deploy, selected)
 				}
 			</ol>
 			if len(deploys) > deploysShown {
-				@button.Button(button.Props{
-					Variant:    button.VariantGhost,
-					Size:       button.SizeSm,
-					Class:      "mt-1 w-full text-muted-foreground",
-					Attributes: templ.Attributes{"data-show-all": true},
-				}) {
-					{ fmt.Sprintf("Show %d older", len(deploys)-deploysShown) }
-				}
+				<details class="group/older">
+					<summary class="mt-1 flex h-9 cursor-pointer list-none items-center justify-center rounded-full text-sm text-muted-foreground hover:bg-muted group-open/older:hidden [&::-webkit-details-marker]:hidden">
+						{ fmt.Sprintf("Show %d older", len(deploys)-deploysShown) }
+					</summary>
+					<ol class="flex flex-col gap-1" role="list">
+						for _, deploy := range deploys[deploysShown:] {
+							@deployRow(app, deploys, deploy, selected)
+						}
+					</ol>
+				</details>
 			}
 		}
 	}
+}
+
+// deployRow is one deploy: its version (a link to its log), state, commit
+// and age, and Roll back where it can.
+templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected int) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<li
+		data-deploy={ strconv.Itoa(deploy.Number) }
+		data-selected?={ deploy.Number == selectedNumber(deploys, selected) }
+		class="group/deploy"
+	>
+		@item.Item(item.Props{Size: item.SizeSm, Class: "relative flex-nowrap items-start hover:bg-muted/60 group-data-selected/deploy:bg-muted"}) {
+			@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
+				<span class="flex min-w-0 items-center gap-3">
+					// The version opens its log; its ::after covers the row.
+					<a href={ templ.SafeURL(deployHref(basePath, app.Name, deploys, deploy.Number)) } class="font-semibold text-foreground tabular-nums outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-3 focus-visible:after:ring-ring/30" aria-label={ fmt.Sprintf("Show the log of v%d", deploy.Number) }>
+						{ fmt.Sprintf("v%d", deploy.Number) }
+					</a>
+					@deployStatus(deploy, app.LiveNumber)
+				</span>
+				if deploy.Commit != "" {
+					@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs", Attributes: templ.Attributes{"title": deploy.CommitMessage, "data-deploy-commit": true}}) {
+						<span class="font-mono text-foreground">{ shortCommit(deploy.Commit) }</span>
+						{ deploy.CommitMessage }
+					}
+				}
+				if deploy.FromNumber > 0 {
+					@item.Description(item.DescriptionProps{Class: "text-xs"}) {
+						{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }
+					}
+				}
+				if deploy.Error != "" {
+					@item.Description(item.DescriptionProps{Class: "text-xs text-failed", Attributes: templ.Attributes{"title": deploy.Error}}) {
+						{ deploy.Error }
+					}
+				}
+			}
+			@item.Actions(item.ActionsProps{Class: "relative h-5 shrink-0"}) {
+				<span class={ "text-xs whitespace-nowrap text-muted-foreground tabular-nums", templ.KV("sm:group-hover/deploy:invisible sm:group-data-selected/deploy:invisible sm:group-has-[button:focus-visible]/deploy:invisible", canRollBack(app, deploy)) } title={ stamp(deploy.CreatedAt) }>
+					{ ago(deploy.CreatedAt, now) }
+					if d := took(deploy.CreatedAt, deploy.FinishedAt); d != "" {
+						· { d }
+					}
+				</span>
+				if canRollBack(app, deploy) {
+					@button.Button(button.Props{
+						Variant: button.VariantSecondary,
+						Size:    button.SizeXs,
+						Class:   "z-10 max-sm:relative sm:absolute sm:top-1/2 sm:right-0 sm:-translate-y-1/2 sm:invisible sm:group-hover/deploy:visible sm:group-data-selected/deploy:visible sm:focus-visible:visible",
+						Attributes: templ.Attributes{
+							"hx-post":    basePath + "/apps/" + app.Name + "/rollback",
+							"hx-vals":    fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"hx-confirm": fmt.Sprintf("Start the release of v%d again?", deploy.Number),
+							"title":      fmt.Sprintf("Release v%d again", deploy.Number),
+						},
+					}) {
+						Roll back
+					}
+				}
+			}
+		}
+	</li>
 }
 
 // canRollBack is whether a deploy can be released again: it succeeded, is not
@@ -617,17 +610,20 @@ templ AppLogs(lines []string, message string) {
 	} else if len(lines) == 0 {
 		<div id="app-logs" class="px-6 text-sm text-muted-foreground">No log lines yet.</div>
 	} else {
-		<div id="app-logs" class="moin-term moin-term-lines max-h-[30rem] overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" data-app-logs tabindex="0" aria-label="Container logs">
-			for _, line := range lines {
-				{{ entry := parseLogLine(line) }}
-				<div class="moin-term-line moin-term-log">
-					if entry.Service != "" {
-						<span class="moin-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
-						<span class="moin-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
-					}
-					<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
-				</div>
-			}
+		// Newest at the bottom and in view (flex-col-reverse), no script.
+		<div id="app-logs" class="flex max-h-[30rem] flex-col-reverse overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" tabindex="0" aria-label="Container logs">
+			<div class="moin-term moin-term-lines">
+				for _, line := range lines {
+					{{ entry := parseLogLine(line) }}
+					<div class="moin-term-line moin-term-log">
+						if entry.Service != "" {
+							<span class="moin-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
+							<span class="moin-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
+						}
+						<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
+					</div>
+				}
+			</div>
 		</div>
 	}
 }
@@ -726,226 +722,6 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 			}
 		</form>
 	</div>
-}
-
-// appsScript reloads apps whenever the event stream reports a change.
-templ appsScript() {
-	<script nonce={ templ.GetNonce(ctx) } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
-		(() => {
-			const events = new EventSource(`/api/v1/apps/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
-			events.addEventListener("apps", () => document.body.dispatchEvent(new Event("apps-changed")));
-			// Leaving the page closes the stream, so pages kept for the back
-			// button hold no connection.
-			addEventListener("pagehide", () => events.close());
-		})();
-	</script>
-}
-
-// appScript follows deploy logs: the newest deploy on load, a running one as
-// soon as it shows up, and the one whose row was clicked. Lines show as they
-// come; the log keeps to the bottom unless you scroll up. The agent's steps
-// show; the tool output between two steps folds into one line that opens on
-// click, and errors in it stay visible.
-templ appScript(appName string) {
-	<script nonce={ templ.GetNonce(ctx) } data-app={ appName } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
-		(() => {
-			const app = document.currentScript.dataset.app;
-			const workspace = document.currentScript.dataset.workspace;
-			const log = document.getElementById("deploy-log");
-			const version = document.getElementById("deploy-log-version");
-			const state = document.getElementById("deploy-log-state");
-			const copy = document.querySelector("[data-deploy-log-copy] [data-copy]");
-			// Everything bound to document stops when the page goes (DESIGN.md, Navigation).
-			// A run of this script on a new swap ends the one before.
-			if (window.moinAppPage) window.moinAppPage.abort();
-			const gone = new AbortController();
-			window.moinAppPage = gone;
-			const on = { signal: gone.signal };
-			let stream = null;
-			addEventListener("pagehide", () => stream?.close());
-			let followed = 0;
-			let queue = [];
-			let frame = 0;
-			let raw = [];
-			let fold = null;
-			let step = "";
-			let showAll = false;
-			const isOutput = (line) => !line.trim() || /^\s|^#\d|^\[/.test(line);
-			const isError = (line) => /\b(error|failed|fatal)\b/i.test(line);
-			const kindOf = (line) => {
-				if (isOutput(line)) return isError(line) ? "err" : "out";
-				if (/^v\d+ is live$/.test(line)) return "ok";
-				if (isError(line)) return "err";
-				return "step";
-			};
-			const shorten = (path) => {
-				const parts = path.split("/").filter(Boolean);
-				return parts.length > 3 ? "…/" + parts.slice(-3).join("/") : path;
-			};
-			const row = (text, kind, number) => {
-				const div = document.createElement("div");
-				div.className = "moin-term-line";
-				div.dataset.kind = kind;
-				div.dataset.n = number;
-				const span = document.createElement("span");
-				const path = kind === "step" && text.match(/^(.*\S)\s+\((\/[^)\s]{24,})\)$/);
-				if (path) {
-					const host = document.createElement("span");
-					host.className = "moin-term-dim";
-					host.title = path[2];
-					host.textContent = ` (${shorten(path[2])})`;
-					span.append(path[1], host);
-				} else {
-					span.textContent = text;
-				}
-				div.appendChild(span);
-				return div;
-			};
-			const label = (group) => {
-				const count = group.querySelectorAll(".moin-term-line").length;
-				const what = { building: "build", starting: "compose", pulling: "pull" }[group.dataset.step] || "output";
-				group.firstChild.lastChild.textContent = `${count} ${what} ${count === 1 ? "line" : "lines"}`;
-			};
-			const newFold = () => {
-				const group = document.createElement("div");
-				group.className = "moin-term-fold";
-				group.dataset.step = step;
-				const toggle = document.createElement("button");
-				toggle.type = "button";
-				toggle.className = "moin-term-toggle";
-				toggle.setAttribute("aria-expanded", "false");
-				const arrow = document.createElement("span");
-				arrow.className = "moin-term-arrow";
-				arrow.setAttribute("aria-hidden", "true");
-				arrow.textContent = "▸";
-				toggle.append(arrow, document.createElement("span"));
-				group.appendChild(toggle);
-				return group;
-			};
-			const flush = () => {
-				frame = 0;
-				if (!queue.length) return;
-				const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
-				const touched = new Set();
-				for (const [text, forced] of queue) {
-					raw.push(text);
-					const kind = forced || kindOf(text);
-					if (!forced && isOutput(text)) {
-						if (!fold) {
-							fold = newFold();
-							log.appendChild(fold);
-						}
-						if (text.trim()) fold.appendChild(row(text, kind, raw.length));
-						touched.add(fold);
-					} else {
-						fold = null;
-						step = text.trim().split(/\s+/)[0];
-						log.appendChild(row(text, kind, raw.length));
-					}
-				}
-				queue = [];
-				touched.forEach(label);
-				if (copy) copy.dataset.copy = raw.join("\n");
-				if (stick) log.scrollTop = log.scrollHeight;
-			};
-			const add = (text, kind) => {
-				queue.push([text, kind]);
-				if (!frame) frame = requestAnimationFrame(flush);
-			};
-			const chips = {
-				running: ["bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "moin-dot-run bg-running"],
-				live: ["bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "moin-dot-live bg-live"],
-				failed: ["bg-failed/15 text-[color-mix(in_oklab,var(--failed),var(--foreground)_12%)]", "bg-failed"],
-			};
-			const show = (text, kind) => {
-				const [chip, dot] = chips[kind] || ["bg-muted text-muted-foreground", "bg-muted-foreground"];
-				state.className = "inline-flex h-7 items-center gap-2 rounded-full pr-3 pl-2.5 text-[0.8125rem] font-semibold " + chip;
-				const mark = document.createElement("span");
-				mark.className = "inline-block size-2 rounded-full " + dot;
-				state.replaceChildren(mark, document.createTextNode(text));
-			};
-			const select = () => {
-				const detail = document.getElementById("app-detail");
-				if (detail && showAll) detail.dataset.all = "";
-				document.querySelectorAll("[data-deploy]").forEach((item) => {
-					if (Number(item.dataset.deploy) === followed) item.dataset.selected = "true";
-					else delete item.dataset.selected;
-				});
-			};
-			const follow = (number) => {
-				if (stream) stream.close();
-				if (frame) cancelAnimationFrame(frame);
-				frame = 0;
-				followed = number;
-				queue = [];
-				raw = [];
-				fold = null;
-				step = "";
-				log.replaceChildren();
-				log.scrollTop = 0;
-				log.dataset.following = number;
-				delete log.dataset.done;
-				version.textContent = `v${number}`;
-				show("following", "running");
-				select();
-				stream = new EventSource(`/api/v1/apps/${encodeURIComponent(app)}/deploys/${number}/events?workspace=${encodeURIComponent(workspace)}`);
-				stream.addEventListener("line", (event) => add(JSON.parse(event.data).line));
-				stream.addEventListener("done", (event) => {
-					const deploy = JSON.parse(event.data);
-					if (frame) cancelAnimationFrame(frame);
-					flush();
-					const end = deploy.status === "succeeded" ? `v${deploy.number} is live` : deploy.status === "failed" ? `v${deploy.number} failed: ${deploy.error}` : "";
-					if (end && raw[raw.length - 1] !== end) {
-						add(end, deploy.status === "succeeded" ? "ok" : "err");
-						flush();
-					}
-					log.dataset.done = deploy.status;
-					show(deploy.status === "running" ? "stopped following" : deploy.status, { succeeded: "live", failed: "failed" }[deploy.status]);
-					stream.close();
-					stream = null;
-				});
-			};
-			const check = () => {
-				const detail = document.getElementById("app-detail");
-				if (!detail) return;
-				const number = Number(detail.dataset.latestNumber);
-				if (number > 0 && (followed === 0 || (detail.dataset.latestStatus === "running" && number !== followed))) follow(number);
-				else select();
-			};
-			document.addEventListener("click", (event) => {
-				const toggle = event.target.closest(".moin-term-toggle");
-				if (toggle) {
-					const group = toggle.parentElement;
-					const open = !group.hasAttribute("data-open");
-					group.toggleAttribute("data-open", open);
-					toggle.setAttribute("aria-expanded", String(open));
-					return;
-				}
-				const more = event.target.closest("[data-show-all]");
-				if (more) {
-					showAll = true;
-					select();
-					return;
-				}
-				const button = event.target.closest("[data-follow-deploy]");
-				if (button) follow(Number(button.dataset.followDeploy));
-			}, on);
-			document.addEventListener("htmx:after:swap", () => {
-				check();
-				const logs = document.querySelector("[data-app-logs]:not([data-scrolled])");
-				if (logs) {
-					logs.scrollTop = logs.scrollHeight;
-					logs.dataset.scrolled = "";
-				}
-			}, on);
-			check();
-			document.addEventListener("htmx:before:history:update", () => gone.abort(), { once: true });
-			gone.signal.addEventListener("abort", () => {
-				if (stream) stream.close();
-				if (frame) cancelAnimationFrame(frame);
-			});
-		})();
-	</script>
 }
 
 // shortPath keeps the last three parts of a long path: …/volumes/data/app.db.
