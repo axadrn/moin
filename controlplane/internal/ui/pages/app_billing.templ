@@ -1,16 +1,14 @@
 package pages
 
 import (
+	"strconv"
+
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/tabs"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
@@ -18,9 +16,12 @@ templ Billing() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ workspace := ctxkeys.Workspace(ctx) }}
 	{{ basePath := "/app/" + workspace.Slug }}
-	@layouts.App("Billing") {
+	@layouts.App("Plan") {
 		@panelPage() {
-			@pageHeader("Billing", "The plan of "+workspace.Name+", the next invoice and the payment details.")
+			<header class="flex flex-col gap-1 pt-2">
+				<h1 class="text-3xl font-semibold tracking-tight">Plan</h1>
+				<p class="text-muted-foreground">One price for { workspace.Name }, the whole team included.</p>
+			</header>
 			@billingCurrent(subscription, basePath)
 			// The offer shows while there is something to buy: in the trial
 			// and when the workspace is read-only, not on a plan it has.
@@ -35,25 +36,17 @@ templ Billing() {
 	}
 }
 
-// billingCurrent is the plan the workspace has now: its status, what it
-// costs, the next date that matters and the way to the Stripe portal.
+// billingCurrent is the plan the workspace has now, in one row: its name and
+// state, what it costs and the date that matters, and Manage when Stripe
+// keeps the details.
 templ billingCurrent(subscription *model.Subscription, basePath string) {
-	@card.Card(card.Props{Class: "min-w-0"}) {
-		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
-			@card.Title(card.TitleProps{Class: "flex min-w-0 flex-wrap items-center gap-2 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				{ planName(subscription.PlanID) }
-				@billingStatus(subscription)
-			}
-			if line := billingLine(subscription); line != "" {
-				@card.Description() {
-					{ line }
-				}
-			}
+	@kit.List() {
+		@kit.Row("") {
+			@kit.RowText(planName(subscription.PlanID), billingLine(subscription))
+			@billingStatus(subscription)
 			if subscription.ProviderCustomerID != nil {
-				@card.Action(card.ActionProps{Class: panelActionStack}) {
-					@button.Button(button.Props{Href: basePath + "/billing/manage", Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: templ.Attributes{"hx-boost": "false"}}) {
-						Manage subscription
-					}
+				@kit.Button(kit.Secondary, basePath+"/billing/manage", templ.Attributes{"hx-boost": "false"}) {
+					Manage
 				}
 			}
 		}
@@ -72,125 +65,84 @@ func billingState(subscription *model.Subscription) (status.Kind, string) {
 	switch subscription.Status {
 	case model.SubscriptionStatusActive:
 		if subscription.PlanID == model.SubscriptionPlanFree {
-			return status.KindIdle, "read-only"
+			return status.KindIdle, "Read-only"
 		}
-		return status.KindLive, "active"
+		return status.KindLive, "Active"
 	case model.SubscriptionStatusTrialing:
-		return status.KindRunning, "trial"
+		return status.KindRunning, "Trial"
 	case model.SubscriptionStatusPastDue:
-		return status.KindWaiting, "payment due"
+		return status.KindWaiting, "Payment due"
 	case model.SubscriptionStatusIncomplete:
-		return status.KindIdle, "payment pending"
+		return status.KindIdle, "Payment pending"
 	case model.SubscriptionStatusCancelled:
-		return status.KindFailed, "cancelled"
+		return status.KindFailed, "Cancelled"
 	}
-	return status.KindFailed, "ended"
+	return status.KindFailed, "Ended"
 }
 
 // billingLine says what the plan costs and the date that matters next.
 func billingLine(subscription *model.Subscription) string {
-	date := func() string { return subscription.CurrentPeriodEnd.Format("January 2, 2006") }
+	date := func() string { return subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
 	switch {
 	case subscription.Status == model.SubscriptionStatusTrialing && subscription.CurrentPeriodEnd != nil:
-		return "Everything is unlocked until " + date() + ". After that the workspace turns read-only until you subscribe."
+		return "Everything works until " + date() + ". Then moin turns read-only until you subscribe."
 	case subscription.PlanID == model.SubscriptionPlanFree:
-		return "Read-only: your apps keep running and you can stop and start them. Subscribe to deploy and change things again."
+		return "Your apps keep running. Subscribe to deploy again."
 	case subscription.Status == model.SubscriptionStatusCancelled && subscription.CurrentPeriodEnd != nil:
-		return subscription.FormatPrice() + ", cancelled. Everything works until " + date() + "."
+		return subscription.FormatPrice() + ", cancelled. Works until " + date() + "."
 	case subscription.CurrentPeriodEnd != nil:
-		return subscription.FormatPrice() + ", per workspace. Next invoice on " + date() + "."
+		return subscription.FormatPrice() + ". Next invoice " + date() + "."
 	}
 	return subscription.FormatPrice()
 }
 
-// billingOffer is the plan to buy: yearly first, the price, one button to
-// Stripe Checkout and what it includes.
+// billingOffer is the plan to buy, like a subscription sheet: the interval,
+// one price, one line of what it includes, one button. The interval is a
+// pair of radio buttons; CSS shows the price that goes with the checked one.
 templ billingOffer(plan access.Plan, basePath string) {
-	@panel(panelProps{
-		Title:       plan.Name,
-		Description: "One price per workspace, for the whole team.",
-		Docs:        "/docs/guides/account#billing",
-		Action:      billingInterval(),
-		Class:       "pricing-card",
-	}) {
-		<div class="flex flex-col gap-6">
-			<div class="price-yearly flex flex-col gap-2">
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "self-start"}) {
-					Save { model.FormatPlanPrice(12*plan.MonthlyPrice - plan.YearlyPrice) } a year
-				}
-				@planPrice(model.FormatPlanPrice(plan.YearlyPrice), "a year, per workspace")
-			</div>
-			<div class="price-monthly hidden">
-				@planPrice(model.FormatPlanPrice(plan.MonthlyPrice), "a month, per workspace")
-			</div>
-			<form
-				action={ templ.SafeURL(basePath + "/billing/checkout") }
-				method="POST"
-				class="flex flex-col items-start gap-2"
-				hx-post={ basePath + "/billing/checkout" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@csrf.Token()
-				<input type="hidden" name="plan_id" value={ plan.ID }/>
-				<input type="hidden" name="interval" value="yearly"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Attributes: templ.Attributes{"data-subscribe": true}}) {
-					<span class="price-yearly">Subscribe for { model.FormatPlanPrice(plan.YearlyPrice) } a year</span>
-					<span class="price-monthly hidden">Subscribe for { model.FormatPlanPrice(plan.MonthlyPrice) } a month</span>
-				}
-				<p class="text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
-			</form>
-			@planBenefits(plan)
+	<form
+		action={ templ.SafeURL(basePath + "/billing/checkout") }
+		method="POST"
+		hx-post={ basePath + "/billing/checkout" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+		class="group/offer flex flex-col items-start gap-6 rounded-4xl bg-card p-6 sm:p-8"
+		data-offer
+	>
+		@csrf.Token()
+		<input type="hidden" name="plan_id" value={ plan.ID }/>
+		<div class="flex w-full flex-wrap items-center justify-between gap-4">
+			<h2 class="text-base font-medium">{ plan.Name }</h2>
+			@kit.Choice("interval", "Pay", []kit.Option{{Value: "yearly", Label: "Yearly"}, {Value: "monthly", Label: "Monthly"}}, "yearly")
 		</div>
-		<script nonce={ templ.GetNonce(ctx) }>
-			(function() {
-				const card = document.currentScript.closest('.pricing-card');
-				card.addEventListener('click', function(event) {
-					const trigger = event.target.closest('[data-billing-interval]');
-					if (!trigger) return;
-					const interval = trigger.getAttribute('data-billing-interval');
-					card.querySelectorAll('.price-monthly').forEach(function(el) { el.classList.toggle('hidden', interval !== 'monthly'); });
-					card.querySelectorAll('.price-yearly').forEach(function(el) { el.classList.toggle('hidden', interval !== 'yearly'); });
-					card.querySelector('input[name="interval"]').value = interval;
-				});
-			})();
-		</script>
-	}
-}
-
-// billingInterval switches the offer between the yearly and the monthly
-// price.
-templ billingInterval() {
-	@tabs.Tabs(tabs.Props{DefaultValue: "yearly"}) {
-		@tabs.List() {
-			@tabs.Trigger(tabs.TriggerProps{Value: "yearly", Attributes: templ.Attributes{"data-billing-interval": "yearly"}}) {
-				Yearly
+		<div class="flex flex-col gap-1">
+			<p class="flex items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:hidden">
+				<span class="text-3xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
+				<span class="text-muted-foreground">a year</span>
+				<span class="text-sm font-medium text-live">Save { yearlySaving(plan) }</span>
+			</p>
+			<p class="hidden items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:flex">
+				<span class="text-3xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+				<span class="text-muted-foreground">a month</span>
+			</p>
+			<p class="text-muted-foreground">Unlimited servers, apps and teammates.</p>
+		</div>
+		<div class="flex flex-col items-start gap-3">
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-subscribe": true}) {
+				Subscribe
 			}
-			@tabs.Trigger(tabs.TriggerProps{Value: "monthly", Attributes: templ.Attributes{"data-billing-interval": "monthly"}}) {
-				Monthly
-			}
-		}
+			<p class="text-sm text-muted-foreground">Plus tax where it applies. Cancel any time.</p>
+		</div>
+	</form>
+}
+
+// yearlySaving is how much less a year costs than twelve months, in percent.
+func yearlySaving(plan access.Plan) string {
+	months := 12 * plan.MonthlyPrice
+	if months == 0 {
+		return ""
 	}
-}
-
-// planPrice is a price in the number size with what it buys.
-templ planPrice(price, per string) {
-	<p class="flex flex-wrap items-baseline gap-x-2">
-		<span class="text-2xl font-semibold tracking-tight tabular-nums">{ price }</span>
-		<span class="text-sm text-muted-foreground">{ per }</span>
-	</p>
-}
-
-// planBenefits is what a plan includes, two columns from phones up.
-templ planBenefits(plan access.Plan) {
-	<ul class="grid gap-3 sm:grid-cols-2">
-		for _, benefit := range plan.Benefits {
-			<li class="flex items-start gap-2 text-sm">
-				@icon.Check(icon.Props{Class: "mt-0.5 size-4 shrink-0 text-live"})
-				<span>{ benefit }</span>
-			</li>
-		}
-	</ul>
+	return strconv.Itoa((months-plan.YearlyPrice)*100/months) + " %"
 }
 
 // billingOffers says whether to show the plan to buy: not while a paid,
