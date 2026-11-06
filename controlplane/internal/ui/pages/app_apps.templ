@@ -125,28 +125,28 @@ templ appStatus(app model.App) {
 	<span data-status class="inline-flex min-w-0 flex-wrap items-center gap-2">
 		switch  {
 			case app.LatestNumber == 0:
-				@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindIdle}) {
 					new
 				}
 			case app.LatestStatus == model.DeployRunning:
-				@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindRunning}) {
 					{ fmt.Sprintf("deploying v%d", app.LatestNumber) }
 				}
 			case app.Stopped:
-				@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindIdle}) {
 					{ fmt.Sprintf("stopped v%d", app.LiveNumber) }
 				}
 			case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
-				@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindFailed}) {
 					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 				}
 				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("v%d live", app.LiveNumber) }</span>
 			case app.LatestStatus == model.DeployFailed:
-				@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindFailed}) {
 					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 				}
 			default:
-				@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+				@status.Status(status.Props{Kind: status.KindLive}) {
 					{ fmt.Sprintf("live v%d", app.LiveNumber) }
 				}
 		}
@@ -182,15 +182,9 @@ type AppPageView struct {
 // question (appSections).
 templ AppPage(view AppPageView) {
 	{{ app := view.App }}
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	@layouts.App(app.Name) {
 		@panelPage(templ.Attributes{"data-app-page": app.Name}) {
-			@appHeader(app, view.Section) {
-				@appPower(app)
-				@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true, "title": "Build the newest source again"}) {
-					Deploy
-				}
-			}
+			@appHeader(app, view.Section)
 			@appSection(app.Name, view.Section) {
 				switch view.Section {
 					case "deploys":
@@ -381,26 +375,20 @@ templ appPower(app model.App) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<span id="app-power" hx-swap-oob="true" class="contents">
 		if app.Stopped {
-			@button.Button(button.Props{
-				Variant: button.VariantSecondary,
-				Attributes: templ.Attributes{
-					"hx-post":    basePath + "/apps/" + app.Name + "/start",
-					"hx-swap":    "none",
-					"hx-disable": "this",
-					"title":      "Run the app again with the env and domains as they are now",
-				},
+			@kit.Button(kit.Secondary, "", templ.Attributes{
+				"hx-post":    basePath + "/apps/" + app.Name + "/start",
+				"hx-swap":    "none",
+				"hx-disable": "this",
+				"title":      "Run the app again with the env and domains as they are now",
 			}) {
 				Start
 			}
 		} else if app.LiveNumber > 0 {
-			@button.Button(button.Props{
-				Variant: button.VariantSecondary,
-				Attributes: templ.Attributes{
-					"hx-post":    basePath + "/apps/" + app.Name + "/stop",
-					"hx-swap":    "none",
-					"hx-disable": "this",
-					"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
-				},
+			@kit.Button(kit.Secondary, "", templ.Attributes{
+				"hx-post":    basePath + "/apps/" + app.Name + "/stop",
+				"hx-swap":    "none",
+				"hx-disable": "this",
+				"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
 			}) {
 				Stop
 			}

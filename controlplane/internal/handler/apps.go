@@ -77,7 +77,6 @@ func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.PinButton(*stored))
 }
 
-
 // Create adds an app and answers the reset form. The event stream reloads the table.
 // Create adds an app and opens its page.
 func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {

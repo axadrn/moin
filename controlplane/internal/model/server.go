@@ -32,7 +32,7 @@ type Server struct {
 	Security     string `db:"security"`
 	// Rules are the server's own rules for moin, as JSON; see
 	// service.ServerRules.
-	Rules string `db:"rules"`
+	Rules     string    `db:"rules"`
 	CreatedAt time.Time `db:"created_at"`
 	Online    bool      `db:"-"`
 }
