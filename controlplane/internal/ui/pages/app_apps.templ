@@ -186,7 +186,7 @@ templ AppPage(view AppPageView) {
 					Deploy
 				}
 			}
-			@appSection() {
+			@appSection(app.Name, view.Section) {
 				switch view.Section {
 					case "deploys":
 						@appDeploysSection(app, view.Deploys)
@@ -205,27 +205,53 @@ templ AppPage(view AppPageView) {
 	}
 }
 
-// appHomeSection answers "does it run?": the live version, where it is
-// reached, and the way to each part.
+// appHomeSection answers "does it run?" with facts: what runs since when,
+// where it is reached, and how it does. The tabs above lead on; nothing here
+// repeats them.
 templ appHomeSection(app model.App, deploys []api.Deploy) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	if app.Catalog != "" {
 		<div hx-get={ appPath + "/catalog" } hx-trigger="load" hx-swap="outerHTML"></div>
 	}
+	@kit.Section("Runs", nil) {
+		@kit.List() {
+			@kit.Row("") {
+				@kit.RowText(appLiveLine(app), appLastDeployLine(deploys))
+			}
+		}
+	}
+	@kit.Section("Addresses", nil) {
+		@kit.List() {
+			for _, address := range appAddresses(app) {
+				@kit.Row("") {
+					<a href={ templ.SafeURL("https://" + address) } target="_blank" rel="noopener" class="min-w-0 flex-1 truncate font-medium hover:underline hover:underline-offset-4">{ address }</a>
+				}
+			}
+			if len(appAddresses(app)) == 0 {
+				@kit.Row("") {
+					@kit.RowText("No address yet", "")
+					@kit.Button(kit.Secondary, appPath+"/addresses", nil) {
+						Add a domain
+					}
+				}
+			}
+		}
+	}
 	@kit.List() {
-		@kit.Row(appPath + "/deploys") {
-			@kit.RowText(appLiveLine(app), appLastDeployLine(deploys))
-		}
-		@kit.Row(appPath + "/addresses") {
-			@kit.RowText(appAddressLine(app), "Addresses")
-		}
 		@kit.Row(appPath + "/metrics") {
 			@kit.RowText("Metrics", "CPU, memory and network")
 		}
-		@kit.Row(appPath + "/data") {
-			@kit.RowText("Data", "Tables, SQL and backups")
-		}
 	}
+}
+
+// appAddresses are where the app answers: its domains, then its instant
+// address.
+func appAddresses(app model.App) []string {
+	addresses := app.DomainList()
+	if app.InstantHost != "" {
+		addresses = append(addresses, app.InstantHost)
+	}
+	return addresses
 }
 
 // appDeploysSection answers "how does code get in?": the versions, the log
@@ -316,15 +342,6 @@ func appLastDeployLine(deploys []api.Deploy) string {
 	return "Last deploy " + ago(deploys[0].CreatedAt, time.Now())
 }
 
-func appAddressLine(app model.App) string {
-	if domains := app.DomainList(); len(domains) > 0 {
-		return domains[0]
-	}
-	if app.InstantHost != "" {
-		return app.InstantHost
-	}
-	return "No address yet"
-}
 
 // deployLogActions is the version the log shows, its state and the copy button.
 templ deployLogActions() {

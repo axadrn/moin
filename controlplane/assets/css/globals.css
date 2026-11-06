@@ -221,6 +221,17 @@
   html:has(dialog:modal) {
     overflow: hidden;
   }
+  /* A swap fades in 120 ms instead of a hard cut. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 120ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none;
+    }
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings:

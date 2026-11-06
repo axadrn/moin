@@ -14,8 +14,8 @@ type Segment struct {
 
 // Segmented is the one control for "one of these": the sections of an
 // app, Fields or Text, a time range. Pills in a pill, the open one lifted.
-// Target names the part of the page a choice swaps, and the control itself
-// (its id) comes along, so the open choice is lit; empty swaps the page.
+// Target names the part of the page a choice swaps; put the control inside
+// it, so the open choice is lit after the swap. Empty swaps the page.
 templ Segmented(id, label, target string, segments []Segment) {
 	<nav id={ id } class="flex h-11 w-full max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] sm:w-fit" aria-label={ label }>
 		for _, s := range segments {
@@ -26,11 +26,13 @@ templ Segmented(id, label, target string, segments []Segment) {
 					aria-current="page"
 				}
 				{ s.Attrs... }
+				if s.Key != "" {
+					data-key={ s.Key }
+				}
 				if target != "" {
 					hx-target={ target }
 					hx-select={ target }
-					hx-select-oob={ "#" + id }
-					hx-swap="outerHTML"
+					hx-swap="outerHTML transition:true"
 					hx-push-url="true"
 				}
 			>

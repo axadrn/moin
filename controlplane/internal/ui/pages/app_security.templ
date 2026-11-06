@@ -76,7 +76,7 @@ templ ServerSecurity(view SecurityView) {
 			@panel(panelProps{
 				Title:       "Install command",
 				Docs:        "/docs/guides/servers#a-new-install-command",
-				Description: "A new one-time install command, if you lost the first one or move the agent to another machine. The old command stops working; the agent that registers with the new one takes over.",
+				Description: "A new one-time command. The old one stops working.",
 			}) {
 				<div>
 					@button.Button(button.Props{
@@ -87,7 +87,7 @@ templ ServerSecurity(view SecurityView) {
 					}
 				</div>
 			}
-			@panel(panelProps{Title: "Name", Docs: "/docs/guides/servers#rename-a-server", Description: "Lowercase letters, digits and dashes, unique in the workspace. The apps on the server stay on it."}) {
+			@panel(panelProps{Title: "Name", Docs: "/docs/guides/servers#rename-a-server", Description: "Lowercase letters, digits and dashes."}) {
 				<form
 					class="flex flex-col gap-2 sm:flex-row"
 					hx-post={ basePath + "/servers/" + view.Server.ID + "/name" }
@@ -129,7 +129,7 @@ templ ServerSecurity(view SecurityView) {
 // only add or replace a key; a stored key has its own remove button.
 templ securityKeys(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Integrations", Docs: "/docs/guides/security#keys", Description: "The keys the switches need. One set for all servers of this workspace, stored encrypted."}) {
+	@panel(panelProps{Title: "Integrations", Docs: "/docs/guides/security#keys", Description: "For every server of this workspace, stored encrypted."}) {
 		<form class="flex flex-col gap-6" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
 			@csrf.Token()
 			<div class="grid items-start gap-3 lg:grid-cols-2">
@@ -199,7 +199,7 @@ templ securityScript() {
 templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
 	<div id="security-state" class="flex flex-col gap-6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
-		@panel(panelProps{Title: "Access", Description: "How the internet reaches this server. Nothing changes until you press Apply.", Docs: "/docs/guides/security"}) {
+		@panel(panelProps{Title: "Access", Description: "How the internet reaches this server.", Docs: "/docs/guides/security"}) {
 			<form class="flex flex-col gap-6" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
 				@csrf.Token()
 				// What the page showed: Apply changes only the switches flipped here

@@ -477,7 +477,6 @@ templ CatalogInstall(view CatalogInstallView) {
 // runs, the newest, and the way to another one.
 templ CatalogUpdate(view CatalogUpdateView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ now := time.Now() }}
 	<div id="catalog-update" data-catalog-update>
 		@card.Card(card.Props{Class: utils.CN("min-w-0 gap-0 p-5 sm:p-6", utils.IfElse(view.Newer, "ring-live/40", ""))}) {
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -485,15 +484,15 @@ templ CatalogUpdate(view CatalogUpdateView) {
 					@catalogTile(view.Entry, "size-11 text-lg")
 					<div class="min-w-0">
 						if view.Newer {
-							<p class="font-semibold">{ view.Entry.Name } { view.Latest.Tag } is out <span class="font-normal text-muted-foreground">{ released(view.Latest, now) }</span></p>
+							<p class="font-medium">{ view.Entry.Name } { view.Latest.Tag } is out</p>
 						} else {
-							<p class="font-semibold">{ view.Entry.Name } { view.Version }</p>
+							<p class="font-medium">{ view.Entry.Name } { view.Version }</p>
 						}
 						<p class="text-sm text-muted-foreground">
 							if note := view.Entry.DatabaseNote(); note != "" {
-								Runs { view.Version }, from the catalog. <span data-catalog-database-note>{ note }</span>
+								You run { view.Version }. <span data-catalog-database-note>{ note }</span>
 							} else {
-								Runs { view.Version }, from the catalog. An update snapshots its database first.
+								You run { view.Version }. A snapshot comes first.
 							}
 						</p>
 					</div>

@@ -47,6 +47,12 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 		IsOwner:   member != nil && member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(r.Context()).Billing,
 	})
 	query := r.URL.Query().Get("q")
+	found := pages.MatchSearch(items, query, 14)
+	// Nothing typed: what you can do here comes first (which-key).
+	if query == "" {
+		here := pages.HereItems(pages.SearchInput{Base: ctxkeys.AppBasePath(r.Context()), Here: r.URL.Query().Get("here"), Apps: apps, CanChange: h.servers.RequireChanges(workspace.ID) == nil})
+		found = append(here, found...)
+	}
 	w.Header().Set("Cache-Control", "no-store")
-	render(w, r, pages.SearchResults(pages.MatchSearch(items, query, 14), query))
+	render(w, r, pages.SearchResults(found, query))
 }

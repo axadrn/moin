@@ -51,7 +51,7 @@ templ AppData(view DataView) {
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " data", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Data"}}}) {
 		@panelPage(templ.Attributes{"data-app-data": view.App.Name}) {
 			@appHeader(view.App, "data")
-			@appSection() {
+			@appSection(view.App.Name, "data") {
 				@dataNav(view.App.Name, "browse")
 				if view.Error != "" {
 					<div role="alert">
@@ -65,7 +65,7 @@ templ AppData(view DataView) {
 						if view.Table != nil {
 							@dataTable(view)
 						} else {
-							@panel(panelProps{Title: "No tables yet", Docs: "/docs/guides/data#the-schema-belongs-to-your-code", Description: "Tables come from the migrations in your repo and show up here after the next deploy."}) {
+							@panel(panelProps{Title: "No tables yet", Docs: "/docs/guides/data#the-schema-belongs-to-your-code", Description: "Tables come from your migrations, after the next deploy."}) {
 								@emptyHint("Or create one with SQL below.", "")
 							}
 						}

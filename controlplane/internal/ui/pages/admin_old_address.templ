@@ -20,7 +20,7 @@ templ AdminOldAddress(report *model.OldAddress) {
 				@statCard("Can it go?", oldAddressVerdict(report), "after "+strconv.Itoa(report.QuietDays)+" quiet days")
 			</dl>
 			if len(report.Rows) > 0 {
-				@panel(panelProps{Title: "By day", Description: "Agents, the CLI and webhooks still on the old address. Browsers go on to the new one."}) {
+				@panel(panelProps{Title: "By day", Description: "Agents, the CLI and webhooks still on the old address."}) {
 					<div class="-mx-6">
 						@table.Table() {
 							@table.Header() {

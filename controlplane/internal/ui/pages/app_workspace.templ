@@ -40,7 +40,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	@panelPage(templ.Attributes{"id": "workspace-content", "hx-swap-oob": "true"}) {
 		@pageHeader("Team", "Everyone in "+workspace.Name+" works on the same servers and apps. Owners handle billing, admins invite. Teams are free.")
 		if viewer.Can(model.WorkspacePermissionManageMembers) {
-			@panel(panelProps{Title: "Invite a teammate", Docs: "/docs/guides/team#invite-someone", Description: "They get an email with a link to join. Invitations expire after seven days."}) {
+			@panel(panelProps{Title: "Invite a teammate", Docs: "/docs/guides/team#invite-someone", Description: "Invitations expire after 7 days."}) {
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/invitations") }
 					method="POST"

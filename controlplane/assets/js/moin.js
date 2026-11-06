@@ -110,3 +110,16 @@ document.addEventListener("mouseover", (event) => {
   const option = event.target.closest("[data-select] [popover] label");
   if (option && !option.contains(document.activeElement)) option.querySelector("input").focus({ preventScroll: true });
 });
+
+// space shows what you can do here, like the TUI: the search, already
+// narrowed to the app the page is about.
+document.addEventListener("keydown", (event) => {
+  if (event.key !== " " || typing(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+  const field = searchField();
+  const page = document.querySelector("[data-app-page]");
+  if (!field || event.target.closest("button, a, [role=menuitem], [role=option]")) return;
+  event.preventDefault();
+  field.value = page ? page.dataset.appPage + " " : "";
+  field.focus();
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+});

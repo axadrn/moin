@@ -149,6 +149,13 @@ templ appShellScript() {
 					return;
 				}
 				leader = 0;
+				// A section key of the page (data-key on its tab) opens it.
+				const section = document.querySelector(`[data-key="${CSS.escape(event.key)}"]`);
+				if (section) {
+					event.preventDefault();
+					section.click();
+					return;
+				}
 				if (event.key === "n") {
 					const field = document.querySelector("[data-hotkey-focus]");
 					if (field) {

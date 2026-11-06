@@ -22,7 +22,7 @@ templ SettingsAPITokensSection(view APITokensView) {
 		ID:          "settings-api-tokens",
 		Title:       "API tokens",
 		Docs:        "/docs/guides/account#create-an-api-token",
-		Description: "Let the CLI, scripts and AI agents use moin as you. Treat a token like a password.",
+		Description: "For the CLI, scripts and AI agents. Keep them like passwords.",
 		Action:      APITokenCreateDialog(view),
 		Body:        panelBodyRows,
 	}) {
