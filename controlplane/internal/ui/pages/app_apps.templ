@@ -734,7 +734,9 @@ templ appsScript() {
 		(() => {
 			const events = new EventSource(`/api/v1/apps/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			events.addEventListener("apps", () => document.body.dispatchEvent(new Event("apps-changed")));
-			document.addEventListener("htmx:before:history:update", () => events.close(), { once: true });
+			// Leaving the page closes the stream, so pages kept for the back
+			// button hold no connection.
+			addEventListener("pagehide", () => events.close());
 		})();
 	</script>
 }
@@ -760,6 +762,7 @@ templ appScript(appName string) {
 			window.moinAppPage = gone;
 			const on = { signal: gone.signal };
 			let stream = null;
+			addEventListener("pagehide", () => stream?.close());
 			let followed = 0;
 			let queue = [];
 			let frame = 0;
