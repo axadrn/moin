@@ -1,0 +1,39 @@
+package kit
+
+// Input is a text field: a pill as high as a button, so a field and its
+// button sit on one line. 16 px text on phones, so iOS does not zoom in.
+// Attributes carry id, name, type, value, placeholder and htmx.
+templ Input(attributes templ.Attributes) {
+	<input class={ inputClass } { attributes... }/>
+}
+
+const inputClass = "h-11 w-full min-w-0 rounded-full bg-muted px-5 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-40 aria-invalid:ring-3 aria-invalid:ring-failed/30 sm:text-sm"
+
+// TextArea is a field for many lines, like a whole .env file.
+templ TextArea(attributes templ.Attributes) {
+	<textarea class="min-h-40 w-full rounded-3xl bg-muted px-5 py-4 font-mono text-base outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm" { attributes... }>
+		{ children... }
+	</textarea>
+}
+
+// Field puts a label over its control, and a hint or an error under it.
+templ Field(label, forID, hint string) {
+	<div class="flex flex-col gap-2">
+		<label for={ forID } class="px-1 text-sm font-medium">{ label }</label>
+		{ children... }
+		if hint != "" {
+			<p class="px-1 text-sm text-muted-foreground" data-field-hint={ forID }>
+				<span data-hint-text>{ hint }</span>
+				<span data-hint-error class="text-failed"></span>
+			</p>
+		}
+	</div>
+}
+
+// Inline puts a field and its button on one line, and stacks them on a
+// narrow phone.
+templ Inline() {
+	<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+		{ children... }
+	</div>
+}

@@ -1,129 +1,221 @@
 package pages
 
 import (
-	"context"
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// OverviewView is the workspace at a glance: the status and the newest
-// changes, if the member may see them.
+// OverviewView is the workspace at a glance: what needs you, the apps and
+// the servers.
 type OverviewView struct {
-	Status   service.WorkspaceStatus
-	Activity []model.WorkspaceAuditEvent
-	// SeeActivity says the member may read the activity.
-	SeeActivity bool
+	Status  service.WorkspaceStatus
+	Apps    []model.App
+	Servers []model.Server
 }
 
-// overviewTitle greets the member by first name, the moin moment of the
-// panel: Moin, Ada. Without a name it is the page's name.
-func overviewTitle(ctx context.Context) string {
-	user := ctxkeys.User(ctx)
-	if user == nil || strings.TrimSpace(user.Name) == "" {
-		return "Overview"
-	}
-	return "Moin, " + strings.Fields(user.Name)[0]
-}
-
-// Overview answers one question: is everything OK? What needs you first,
-// then what could be newer, then what happened.
+// Overview answers before it asks: "Everything runs." or what needs you,
+// then every app and server, quiet unless something is wrong.
 templ Overview(view OverviewView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Overview") {
 		@panelPage() {
-			@pageHeader(overviewTitle(ctx), "Is everything OK? What needs you, what could be newer and what happened last.")
-			if view.Status.OK() {
-				@overviewAllGood(view.Status)
+			<header class="flex flex-col gap-1 pt-2">
+				<h1 class="text-3xl font-semibold tracking-tight text-balance" data-overview-headline>{ overviewHeadline(view) }</h1>
+				<p class="text-muted-foreground">{ overviewSummary(view.Status) }</p>
+			</header>
+			if len(view.Servers) == 0 {
+				@overviewStart(basePath)
 			} else {
-				@overviewIssues(view.Status.Issues)
-			}
-			@statGrid(templ.Attributes{"data-overview-counts": true}) {
-				@statCard("Apps live", strconv.Itoa(view.Status.AppsLive), "of "+plural(view.Status.Apps, "app", "apps"))
-				@statCard("Servers online", strconv.Itoa(view.Status.ServersOnline), "of "+strconv.Itoa(view.Status.Servers))
-				@statCard("Backups checked", strconv.Itoa(view.Status.BackupsChecked), "of "+plural(view.Status.Databases, "database", "databases")+", last 24 h")
-				@statCard("Updates", strconv.Itoa(len(view.Status.Updates)), overviewUpdatesNote(len(view.Status.Updates)))
-			}
-			if len(view.Status.Updates) > 0 {
-				@overviewUpdates(view.Status.Updates)
-			}
-			if view.SeeActivity && len(view.Activity) > 0 {
-				@panel(panelProps{Title: "Last changes", Docs: "/docs/guides/activity", Action: overviewAllActivity(), Body: panelBodyRows}) {
-					<ol class="flex flex-col gap-1" data-overview-activity>
-						@ActivityRows(ActivityView{Events: view.Activity})
-					</ol>
+				if !view.Status.OK() {
+					@kit.Section("Needs you", nil) {
+						@kit.List() {
+							for _, issue := range view.Status.Issues {
+								@kit.Row(basePath + issue.Path) {
+									<span class={ "flex size-8 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
+										@overviewIssueIcon(issue.Kind)
+									</span>
+									@kit.RowText(issue.Target, issue.Detail)
+								}
+							}
+						}
+					}
+				}
+				@kit.Section("Apps", overviewNewApp(basePath)) {
+					if len(view.Apps) == 0 {
+						@kit.List() {
+							@kit.Row("") {
+								@kit.RowText("No apps yet", "Deploy one from its folder with moin deploy, or pick one from the catalog.")
+							}
+						}
+					} else {
+						@kit.List() {
+							for _, app := range overviewOrder(view.Apps) {
+								@kit.Row(basePath + "/apps/" + app.Name) {
+									@kit.RowText(app.Name, appNote(app))
+									@appState(app)
+								}
+							}
+						}
+					}
+				}
+				if len(view.Status.Updates) > 0 {
+					@kit.Section("Updates", nil) {
+						@kit.List() {
+							for _, update := range view.Status.Updates {
+								@kit.Row(basePath + "/apps/" + update.App) {
+									@kit.RowText(update.App, update.Name+" "+update.Version+" → "+update.Latest)
+								}
+							}
+						}
+					}
+				}
+				@kit.Section("Servers", nil) {
+					@kit.List() {
+						for _, server := range view.Servers {
+							@kit.Row(basePath + "/servers/" + server.ID + "/security") {
+								@kit.RowText(server.Name, serverNote(server))
+								if !server.Online {
+									@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+										Offline
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-// overviewAllGood is the calm answer when nothing needs you.
-templ overviewAllGood(status service.WorkspaceStatus) {
-	@card.Card(card.Props{Class: "flex-row items-center gap-5 px-6 py-6 sm:px-8", Attributes: templ.Attributes{"data-overview-ok": true}}) {
-		<span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-live/15 text-live" aria-hidden="true">
-			@icon.Check(icon.Props{Class: "size-5 stroke-3"})
-		</span>
-		<div class="min-w-0">
-			<p class="text-xl font-semibold tracking-[-0.02em]">All good.</p>
-			<p class="mt-0.5 text-sm text-muted-foreground">
-				{ plural(status.AppsLive, "app", "apps") } live, { plural(status.ServersOnline, "server", "servers") } online, { plural(status.BackupsChecked, "backup", "backups") } checked today.
-			</p>
-		</div>
+// overviewHeadline is the answer to "is everything OK?".
+func overviewHeadline(view OverviewView) string {
+	switch {
+	case len(view.Servers) == 0:
+		return "Let's ship your first app."
+	case view.Status.OK():
+		return "Everything runs."
+	case len(view.Status.Issues) == 1:
+		return view.Status.Issues[0].Target + " needs you."
 	}
+	return strconv.Itoa(len(view.Status.Issues)) + " things need you."
 }
 
-// overviewIssues is what needs you, most urgent first, each a link to where
-// to fix it.
-templ overviewIssues(issues []service.StatusIssue) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: overviewNeedsTitle(len(issues)), Body: panelBodyRows, Attrs: templ.Attributes{"data-overview-issues": true}}) {
-		<ul class="flex flex-col gap-1" role="list">
-			for _, issue := range issues {
-				<li>
-					<a href={ templ.SafeURL(basePath + issue.Path) } class="group/issue flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring" data-issue={ issue.Kind }>
-						<span class={ "flex size-8 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
-							@overviewIssueIcon(issue.Kind)
-						</span>
-						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm font-medium">{ issue.Target }</span>
-							<span class="block truncate text-xs text-muted-foreground">{ issue.Detail }</span>
-						</span>
-						@icon.ChevronRight(icon.Props{Class: "size-4 shrink-0 text-muted-foreground transition-transform group-hover/issue:translate-x-0.5"})
-					</a>
-				</li>
+// overviewSummary is the one line under it.
+func overviewSummary(s service.WorkspaceStatus) string {
+	parts := []string{plural(s.Apps, "app", "apps"), plural(s.Servers, "server", "servers")}
+	switch {
+	case s.Databases == 0:
+	case s.BackupsChecked == s.Databases:
+		parts = append(parts, "every backup checked today")
+	default:
+		parts = append(parts, strconv.Itoa(s.BackupsChecked)+" of "+plural(s.Databases, "backup", "backups")+" checked today")
+	}
+	return strings.Join(parts, " · ")
+}
+
+// overviewOrder puts what needs you first, then what is deploying, then
+// the rest by name.
+func overviewOrder(apps []model.App) []model.App {
+	rank := func(app model.App) int {
+		switch {
+		case app.LatestStatus == model.DeployFailed:
+			return 0
+		case app.LatestStatus == model.DeployRunning:
+			return 1
+		}
+		return 2
+	}
+	ordered := append([]model.App(nil), apps...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if rank(ordered[i]) != rank(ordered[j]) {
+			return rank(ordered[i]) < rank(ordered[j])
+		}
+		return ordered[i].Name < ordered[j].Name
+	})
+	return ordered
+}
+
+// appNote is the second line of an app, only when there is something to say.
+func appNote(app model.App) string {
+	switch {
+	case app.LatestNumber == 0:
+		return "Not deployed yet"
+	case app.LatestStatus == model.DeployRunning:
+		return fmt.Sprintf("Deploying v%d", app.LatestNumber)
+	case app.Stopped:
+		return "Stopped"
+	case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
+		return fmt.Sprintf("v%d failed, v%d still runs", app.LatestNumber, app.LiveNumber)
+	case app.LatestStatus == model.DeployFailed:
+		return fmt.Sprintf("v%d failed", app.LatestNumber)
+	}
+	return ""
+}
+
+// appState is the mark at the end of an app's row: a quiet dot when it
+// runs, a word when it does not.
+templ appState(app model.App) {
+	switch {
+		case app.LatestNumber == 0 || app.Stopped:
+			@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
+				{ ifElse(app.Stopped, "Stopped", "New") }
 			}
-		</ul>
-	}
-}
-
-// overviewUpdates are the catalog apps a newer release is out for.
-templ overviewUpdates(updates []service.StatusUpdate) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Updates", Docs: "/docs/guides/catalog", Body: panelBodyRows, Attrs: templ.Attributes{"data-overview-updates": true}}) {
-		<ul class="flex flex-col gap-1" role="list">
-			for _, update := range updates {
-				<li>
-					<a href={ templ.SafeURL(basePath + "/apps/" + update.App) } class="group/update flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring">
-						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm font-medium">{ update.App }</span>
-							<span class="block truncate text-xs text-muted-foreground">{ update.Name } <span class="font-mono">{ update.Version }</span> → <span class="font-mono text-foreground">{ update.Latest }</span></span>
-						</span>
-						@icon.ChevronRight(icon.Props{Class: "size-4 shrink-0 text-muted-foreground transition-transform group-hover/update:translate-x-0.5"})
-					</a>
-				</li>
+		case app.LatestStatus == model.DeployRunning:
+			@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
+				Deploying
 			}
-		</ul>
+		case app.LatestStatus == model.DeployFailed:
+			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+				Failed
+			}
+		default:
+			<span class="flex size-8 shrink-0 items-center justify-center" title="Live">
+				@status.Symbol(status.KindLive)
+				<span class="sr-only">Live</span>
+			</span>
 	}
 }
 
-templ overviewAllActivity() {
-	<a href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/activity") } class="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">All activity</a>
+func serverNote(server model.Server) string {
+	if server.Online {
+		return ""
+	}
+	return "Its apps may be down"
+}
+
+func ifElse(ok bool, yes, no string) string {
+	if ok {
+		return yes
+	}
+	return no
+}
+
+// overviewNewApp is the action next to the apps: start a new one.
+templ overviewNewApp(basePath string) {
+	<a href={ templ.SafeURL(basePath + "/apps") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
+}
+
+// overviewStart is the first visit: no server yet.
+templ overviewStart(basePath string) {
+	@kit.List() {
+		@kit.Row(basePath + "/servers") {
+			<span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background" aria-hidden="true">
+				@icon.Server(icon.Props{Class: "size-5"})
+			</span>
+			@kit.RowText("Connect your first server", "Any Linux box you own. One command, no open port.")
+		}
+	}
 }
 
 templ overviewIssueIcon(kind string) {
@@ -152,16 +244,5 @@ func overviewIssueTone(kind string) string {
 	return "bg-failed/12 text-failed"
 }
 
-func overviewNeedsTitle(n int) string {
-	if n == 1 {
-		return "1 thing needs you"
-	}
-	return strconv.Itoa(n) + " things need you"
-}
 
-func overviewUpdatesNote(n int) string {
-	if n == 0 {
-		return "everything current"
-	}
-	return "newer releases out"
-}
+

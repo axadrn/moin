@@ -29,7 +29,7 @@ templ Menu(p MenuProps, button templ.Component) {
 		id={ p.ID }
 		role="menu"
 		aria-label={ p.Label }
-		class="m-0 min-w-60 rounded-3xl bg-popover p-1.5 text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/10"
+		class="m-0 min-w-60 flex-col gap-0.5 rounded-3xl bg-popover p-1.5 text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/10 open:flex"
 		style={ templ.SafeCSS(menuPlace(p)) }
 	>
 		{ children... }
@@ -58,7 +58,9 @@ templ MenuItem(href string, attributes templ.Attributes) {
 	}
 }
 
-const menuItemClass = "flex items-center gap-3 rounded-2xl px-3 py-2.5 outline-none hover:bg-muted focus-visible:bg-muted [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
+// Only the focused item is lit: moin.js moves the focus with the mouse, so
+// the mouse and the keyboard never light two items at once.
+const menuItemClass = "flex items-center gap-3 rounded-2xl px-3 py-2.5 outline-none focus:bg-muted [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
 
 // MenuLabel is a quiet heading over a few items.
 templ MenuLabel() {

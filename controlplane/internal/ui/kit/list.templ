@@ -1,0 +1,52 @@
+package kit
+
+// Section is a block of a page: a quiet title, an action at its end, and
+// what is under it.
+templ Section(title string, action templ.Component) {
+	<section class="flex flex-col gap-2">
+		<div class="flex min-h-8 items-end justify-between gap-3 px-1">
+			<h2 class="text-sm font-medium text-muted-foreground">{ title }</h2>
+			if action != nil {
+				@action
+			}
+		</div>
+		{ children... }
+	</section>
+}
+
+// List is a group of rows on one card, like a list in iOS Settings. Rows
+// are separated by a line that starts where their text starts.
+templ List() {
+	<div class="overflow-hidden rounded-4xl bg-card" role="list">
+		{ children... }
+	</div>
+}
+
+// Row is one line of a List. With an href the whole row is a link and ends
+// in a chevron. The first child is the main part; status and actions go
+// after it.
+templ Row(href string) {
+	if href != "" {
+		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + " outline-none hover:bg-muted/50 focus-visible:bg-muted/50" }>
+			{ children... }
+			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+		</a>
+	} else {
+		<div role="listitem" class={ rowClass }>
+			{ children... }
+		</div>
+	}
+}
+
+const rowClass = "relative flex min-h-14 items-center gap-3 px-5 py-3 [&+&]:before:absolute [&+&]:before:inset-x-5 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-border"
+
+// RowText is the main part of a Row: a name, and a second line only when
+// there is something to say.
+templ RowText(name, note string) {
+	<div class="min-w-0 flex-1">
+		<div class="truncate font-medium">{ name }</div>
+		if note != "" {
+			<div class="truncate text-sm text-muted-foreground">{ note }</div>
+		}
+	</div>
+}

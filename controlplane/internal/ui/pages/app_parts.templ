@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
@@ -25,7 +26,7 @@ templ panelPage(attrs ...templ.Attributes) {
 	if len(attrs) > 0 {
 		{{ a = attrs[0] }}
 	}
-	<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-6 pb-20 sm:px-6 lg:px-8" { a... }>
+	<div class={ kit.Page, "flex flex-col gap-6 pt-6 pb-20" } { a... }>
 		{ children... }
 	</div>
 }
