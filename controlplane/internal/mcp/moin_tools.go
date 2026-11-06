@@ -75,9 +75,6 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("update_agent", "Update the agent of a server",
 		"Has the agent of a server download the moin binary this control plane serves, check its SHA-256, swap it in and restart, and returns the server once the new agent is back, within three minutes. list_servers shows each agent's version; get it to the control plane's. The agent refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.updateAgent)))
-	mcpsdk.AddTool(server, add("reorder_servers", "Order the servers",
-		"Puts the servers of the workspace in a new order and returns them in it. order names every server once, by name or ID; list_servers gives the current order. Every list shows it: the web, the CLI, the TUI, the API and list_servers. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.reorderServers)))
 	mcpsdk.AddTool(server, add("list_apps", "List apps",
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
@@ -90,9 +87,9 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, add("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeApp)))
-	mcpsdk.AddTool(server, add("reorder_apps", "Order the apps",
-		"Puts the apps of the workspace in a new order and returns them in it. order names every app once, by name or ID; list_apps gives the current order. Every list shows it: the web and its sidebar, the CLI, the TUI, the API and list_apps. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.reorderApps)))
+	mcpsdk.AddTool(server, add("pin_app", "Pin or unpin an app",
+		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.pinApp)))
 	mcpsdk.AddTool(server, add("get_deploy", "Get a deploy",
 		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getDeploy)))
@@ -655,7 +652,7 @@ func (l AppList) Summary() string {
 }
 
 func (t moinTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppList, error) {
-	apps, err := t.services.Apps.List(caller.Token.WorkspaceID)
+	apps, err := t.services.Apps.ListSorted(caller.Token.WorkspaceID, caller.User.Sort())
 	if err != nil {
 		return AppList{}, err
 	}
@@ -666,49 +663,30 @@ func (t moinTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppLis
 	return list, nil
 }
 
-// OrderInput is the input of reorder_apps and reorder_servers.
-type OrderInput struct {
-	Order []string `json:"order" jsonschema:"every app or server of the workspace once, by name or ID, in the new order"`
+// PinInput is the input of pin_app.
+type PinInput struct {
+	App    string `json:"app" jsonschema:"the app's name or ID"`
+	Pinned bool   `json:"pinned" jsonschema:"true pins the app, false unpins it"`
 }
 
-func (t moinTools) reorderApps(_ context.Context, caller Caller, input OrderInput) (AppList, error) {
-	apps, err := t.services.Apps.Reorder(caller.actor(), input.Order)
+// PinnedApp is the output of pin_app.
+type PinnedApp struct {
+	api.App
+}
+
+func (a PinnedApp) Summary() string {
+	if a.Pinned {
+		return "Pinned " + a.Name + ". Lists show it above the apps that run fine."
+	}
+	return "Unpinned " + a.Name + "."
+}
+
+func (t moinTools) pinApp(_ context.Context, caller Caller, input PinInput) (PinnedApp, error) {
+	app, err := t.services.Apps.SetPinned(caller.actor(), input.App, input.Pinned)
 	if err != nil {
-		return AppList{}, err
+		return PinnedApp{}, err
 	}
-	list := AppList{api.AppList{Items: make([]api.App, 0, len(apps))}}
-	for _, app := range apps {
-		list.Items = append(list.Items, api.NewApp(app))
-	}
-	return list, nil
-}
-
-// ServerOrder is the output of reorder_servers.
-type ServerOrder struct {
-	api.ServerList
-}
-
-func (o ServerOrder) Summary() string {
-	names := make([]string, 0, len(o.Items))
-	for _, server := range o.Items {
-		names = append(names, server.Name)
-	}
-	if len(names) == 0 {
-		return "No servers yet."
-	}
-	return "The servers in their order: " + strings.Join(names, ", ") + "."
-}
-
-func (t moinTools) reorderServers(_ context.Context, caller Caller, input OrderInput) (ServerOrder, error) {
-	servers, err := t.services.Servers.Reorder(caller.actor(), input.Order)
-	if err != nil {
-		return ServerOrder{}, err
-	}
-	list := ServerOrder{api.ServerList{Items: make([]api.Server, 0, len(servers))}}
-	for _, server := range servers {
-		list.Items = append(list.Items, api.NewServer(server))
-	}
-	return list, nil
+	return PinnedApp{api.NewApp(*app)}, nil
 }
 
 // AppDetail is the output of get_app.

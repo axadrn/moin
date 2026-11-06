@@ -221,21 +221,27 @@ MCP: remove_app
 
 You cannot undo it, so moin asks you to type the app's name first. `moin apps rm <app-name> --yes` skips that in scripts. An agent passes the name as `confirm`.
 
-## Order your apps
+## Pin and sort your apps
 
-Apps show in the order you give them, the same for everyone in the workspace and everywhere: the apps page and the sidebar, the CLI, the TUI, the API and MCP. A new app goes to the end.
+The overview puts what needs you first: a failed deploy, an app on an offline server. Then what is deploying, then your pinned apps, then the rest by name. Pin the apps you look at most.
 
 ```surfaces
-Web: **Apps**, drag an app to its place
-CLI: moin apps move <app-name> up|down|top|bottom|<position>
-TUI: opens the web: `w`, then `p`
-API: PUT /api/v1/apps/order
-MCP: reorder_apps
+Web: the star next to the app's name
+CLI: moin apps pin <app-name>, moin apps unpin <app-name>
+TUI: on the app, `*`
+API: PUT /api/v1/apps/{app}/pin {"pinned": true}
+MCP: pin_app
 ```
 
-With a mouse you drag the whole app; on a phone you drag the grip at its left, so the page still scrolls. On the keyboard, Alt and the up or down arrow move the app in focus. The API and MCP take every app once, by name or ID, in the new order: `{"order": ["blog", "shop"]}`. The activity records each new order once.
+A pin is for the whole workspace. How the apps are sorted is yours: **Smart** as above, **Recently deployed** with the newest deploy first, or **By server**. The web, the TUI, the CLI, the API and MCP all show your choice.
 
-**List** and **Grid** above the apps switch how the page shows them: one row each, or cards side by side. moin remembers your choice for you on every device; the rest of the team keeps theirs.
+```surfaces
+Web: the overview, **Sort** next to Apps
+CLI: moin apps sort smart|recent|server
+TUI: follows the web
+API: PUT /api/v1/account/sort {"sort": "recent"}
+MCP: list_apps follows it
+```
 
 ## Push to deploy with GitHub Actions
 

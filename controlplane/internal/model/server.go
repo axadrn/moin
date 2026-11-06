@@ -33,8 +33,6 @@ type Server struct {
 	// Rules are the server's own rules for moin, as JSON; see
 	// service.ServerRules.
 	Rules string `db:"rules"`
-	// Position is the place of the server in the workspace's order, from 0.
-	Position  int       `db:"position"`
 	CreatedAt time.Time `db:"created_at"`
 	Online    bool      `db:"-"`
 }

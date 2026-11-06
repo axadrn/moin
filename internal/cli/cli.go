@@ -50,7 +50,6 @@ Servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--yes]
   servers rename     Rename a server: servers rename web-1 shop-1
-  servers move       Change the order: servers move web-1 up|down|top|bottom|<position>
   servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
   servers update     Update the agent to the control plane's version now: servers update [web-1]
   servers auto-update  Agents update by themselves, on by default: servers auto-update [on|off]
@@ -63,7 +62,8 @@ Apps
   apps               List apps; one app with its domains and deploys: apps <app>
   apps add           Add an app: apps add --server <server> <name>
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
-  apps move          Change the order: apps move blog up|down|top|bottom|<position>
+  apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
+  apps sort          Sort the apps, here, in the TUI and the web: apps sort smart|recent|server
 
 Deploys
   deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
@@ -565,8 +565,6 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		}
 		done(stdout, "Renamed %s to %s", flags.Arg(0), style.Bold.Render(renamed.Name))
 		return nil
-	case "move":
-		return moveServer(ctx, api, apiErr, args, stdout)
 	case "rm", "remove":
 		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
 		if err := flags.parse(args); err != nil {

@@ -1,9 +1,8 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -11,7 +10,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -148,149 +146,53 @@ templ ServerList(servers []model.Server) {
 		hx-get={ basePath + "/servers/list" }
 		hx-trigger="servers-changed from:body"
 		hx-swap="none"
-		class="flex flex-col gap-4"
 	>
-		if len(servers) == 0 {
-			@emptyState("No servers yet", "Add a server, then run the install command moin gives you on it. Or add one from your terminal:", "moin servers add web-1") {
-				@docsLink("/docs/getting-started", "Getting started")
+		@kit.List() {
+			if len(servers) == 0 {
+				@kit.Row("") {
+					@kit.RowText("No servers yet", "Add one above, then run its install command on the server.")
+				}
 			}
-		} else {
-			<div class="flex flex-wrap items-center justify-between gap-3">
-				<h2 id="servers-heading" class="text-base font-semibold">Your servers</h2>
-				<div class="flex items-center gap-3">
-					<p class="text-xs text-muted-foreground tabular-nums">{ serversSummary(servers) }</p>
-					@viewSwitch("servers")
-				</div>
-			</div>
-			@orderForm("servers") {
-				if pageView(ctx, "servers") == model.ViewList {
-					<ul class="flex flex-col gap-2" role="list" aria-labelledby="servers-heading" data-sortable-list>
-						for _, server := range servers {
-							<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
-								@card.Card(card.Props{Class: listCard}) {
-									@orderHandle(server.Name)
-									@serverRow(server, basePath, now)
-								}
-							</li>
-						}
-					</ul>
-				} else {
-					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="servers-heading" data-sortable-list>
-						for _, server := range servers {
-							<li data-server={ server.Name } data-online?={ server.Online } class="min-w-0">
-								@serverCard(server, basePath, now)
-							</li>
-						}
-					</ul>
+			for _, server := range servers {
+				@kit.Row(basePath + "/servers/" + server.ID + "/security") {
+					@kit.RowText(server.Name, serverNote(server, now))
+					@serverState(server)
 				}
 			}
 		}
 	</div>
 }
 
-// agentPending marks an agent behind the control plane; it updates itself
-// on its next connect.
-templ agentPending() {
-	@badge.Badge(badge.Props{Class: "h-auto rounded-full bg-amber-500/15 px-2 py-0 text-[11px] font-medium text-amber-600 dark:text-amber-400", Attributes: templ.Attributes{"data-agent-outdated": true, "title": "Updates to " + build.Version + " by itself"}}) {
-		update pending
+// serverNote is the second line of a server: only what needs saying.
+func serverNote(server model.Server, now time.Time) string {
+	switch {
+	case server.LastSeenAt == nil:
+		return "Its agent never connected. Run the install command on it."
+	case !server.Online:
+		return "Last seen " + serverLastSeen(server, now)
+	case agentOutdated(server):
+		return "Its agent updates to " + build.Version + " by itself"
 	}
+	return ""
 }
 
-// serverRow is a server in the list: its name, system and agent, when it
-// was last seen and its state, linking to its page.
-templ serverRow(server model.Server, basePath string, now time.Time) {
-	@item.Item(item.Props{Href: basePath + "/servers/" + server.ID + "/security", Size: item.SizeSm, Class: "group/server grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_8rem_7rem_1rem]"}) {
-		@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
-			@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
-				{ server.Name }
+// serverState is the mark at the end of a server's row: a dot while it is
+// online, a word when it is not.
+templ serverState(server model.Server) {
+	switch {
+		case server.Online:
+			<span class="flex size-8 shrink-0 items-center justify-center" title="Online">
+				@status.Symbol(status.KindLive)
+				<span class="sr-only">Online</span>
+			</span>
+		case server.LastSeenAt == nil:
+			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
+				Waiting
 			}
-			@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
-				if system := serverSystem(server); system != "" {
-					{ system }
-					<span aria-hidden="true">·</span>
-				}
-				if server.AgentVersion != "" {
-					agent { server.AgentVersion }
-					if server.Online && agentOutdated(server) {
-						@agentPending()
-					}
-					<span aria-hidden="true">·</span>
-				}
-				{ serverReach(server) }
+		default:
+			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+				Offline
 			}
-		}
-		<span class="flex min-w-0 justify-end md:justify-start">
-			@serverStatus(server)
-		</span>
-		<span class="hidden text-xs text-muted-foreground tabular-nums md:block" title={ serverLastSeenTitle(server) }>{ serverLastSeen(server, now) }</span>
-		@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/server:translate-x-0.5 group-hover/server:text-foreground md:block"})
-	}
-}
-
-// serverCard is one server: its name and state, three facts, how it is
-// reached, and the way to its page. Its grip drags it.
-templ serverCard(server model.Server, basePath string, now time.Time) {
-	{{ serverPath := basePath + "/servers/" + server.ID + "/security" }}
-	@card.Card(card.Props{Class: "h-full min-w-0"}) {
-		@card.Header() {
-			@card.Title(card.TitleProps{Class: "-ml-2 flex min-w-0 items-center gap-1 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
-				@orderHandle(server.Name)
-				<a href={ templ.SafeURL(serverPath) } class="truncate hover:underline hover:underline-offset-4">{ server.Name }</a>
-			}
-			@card.Action() {
-				@serverStatus(server)
-			}
-		}
-		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col gap-4"}) {
-			<dl class="flex flex-wrap gap-x-8 gap-y-3">
-				@serverFact("System", serverSystem(server), serverSystem(server))
-				@serverFact("Agent", server.AgentVersion, server.AgentVersion)
-				@serverFact("Last seen", serverLastSeen(server, now), serverLastSeenTitle(server))
-			</dl>
-			@serverAccess(server)
-			if server.LastSeenAt == nil {
-				<p class="text-xs text-muted-foreground">Its agent never connected. Run the install command on the server. Lost it? Remove the server on its page and add it again.</p>
-			}
-			if server.Online && agentOutdated(server) {
-				<p class="flex items-center gap-2 text-xs text-muted-foreground">
-					@agentPending()
-					The control plane runs { build.Version }.
-				</p>
-			}
-		}
-		@card.Footer(card.FooterProps{Class: "mt-auto gap-2"}) {
-			@button.Button(button.Props{
-				Href:       basePath + "/servers/" + server.ID + "/metrics",
-				Variant:    button.VariantSecondary,
-				Size:       button.SizeSm,
-				Attributes: templ.Attributes{"data-metrics-link": true},
-			}) {
-				@icon.ChartLine()
-				Metrics
-			}
-			@button.Button(button.Props{
-				Href:       serverPath,
-				Variant:    button.VariantSecondary,
-				Size:       button.SizeSm,
-				Attributes: templ.Attributes{"data-security-link": true},
-			}) {
-				@icon.Shield()
-				Security
-			}
-			if server.Online && agentOutdated(server) {
-				@button.Button(button.Props{
-					Variant: button.VariantSecondary,
-					Size:    button.SizeSm,
-					Attributes: templ.Attributes{
-						"hx-post":    basePath + "/servers/" + server.ID + "/update",
-						"hx-swap":    "none",
-						"hx-disable": "this",
-					},
-				}) {
-					Update agent
-				}
-			}
-		}
 	}
 }
 

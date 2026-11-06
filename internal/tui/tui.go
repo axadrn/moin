@@ -309,6 +309,10 @@ type (
 	// reloadMsg loads the open tab again after a change.
 	reloadMsg  struct{ notice string }
 	stoppedMsg string
+	pinnedMsg  struct {
+		app string
+		on  bool
+	}
 )
 
 func tick() tea.Cmd {
@@ -563,6 +567,17 @@ func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.out.app != "" {
 			return m, m.loadDetail(m.out.app)
+		}
+	case pinnedMsg:
+		for i := range m.apps {
+			if m.apps[i].Name == msg.app {
+				m.apps[i].Pinned = msg.on
+			}
+		}
+		if msg.on {
+			m.say(msg.app + " is pinned. * unpins it")
+		} else {
+			m.say(msg.app + " is unpinned")
 		}
 	case stoppedMsg:
 		for i := range m.apps {

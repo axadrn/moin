@@ -50,10 +50,12 @@ type App struct {
 	// runs it again.
 	Stopped bool `json:"stopped"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
-	Repo                  string `json:"repo"`
-	Branch                string `json:"branch"`
-	AutoDeploy            bool   `json:"auto_deploy"`
-	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
+	Repo       string `json:"repo"`
+	Branch     string `json:"branch"`
+	AutoDeploy bool   `json:"auto_deploy"`
+	// Pinned keeps the app above the others that run fine, in every list.
+	Pinned                bool `json:"pinned"`
+	SnapshotBeforeChanges bool `json:"snapshot_before_changes"`
 	// Bucket is the bucket the app uploads and backs up to; empty uses
 	// the workspace's default bucket.
 	Bucket string `json:"bucket"`
@@ -153,6 +155,7 @@ func NewApp(app model.App) App {
 		Repo:                  app.Repo,
 		Branch:                app.Branch,
 		AutoDeploy:            app.AutoDeploy,
+		Pinned:                app.Pinned,
 		SnapshotBeforeChanges: app.SnapshotBeforeChanges,
 		Hook:                  app.DeployHookHash != nil,
 		Bucket:                app.BucketName,
@@ -216,8 +219,8 @@ func NewDeploys(deploys []model.Deploy, live int) []Deploy {
 	return out
 }
 
-func (h *AppsHandler) list(workspaceID string) (AppList, error) {
-	apps, err := h.apps.List(workspaceID)
+func (h *AppsHandler) list(workspaceID, sort string) (AppList, error) {
+	apps, err := h.apps.ListSorted(workspaceID, sort)
 	if err != nil {
 		return AppList{}, err
 	}
@@ -228,10 +231,11 @@ func (h *AppsHandler) list(workspaceID string) (AppList, error) {
 	return AppList{Items: items}, nil
 }
 
-// List returns the apps by name.
+// List returns the apps in the order the caller sorts them (smart, recent
+// or server, PUT /api/v1/account/sort), the order every client shows.
 func (h *AppsHandler) List(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	list, err := h.list(workspace.ID)
+	list, err := h.list(workspace.ID, ctxkeys.User(r.Context()).Sort())
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -512,8 +516,9 @@ func (h *AppsHandler) Events(w http.ResponseWriter, r *http.Request) {
 	changes, unsubscribe := h.apps.Subscribe(workspace.ID)
 	defer unsubscribe()
 	events := startEvents(w)
+	sort := ctxkeys.User(r.Context()).Sort()
 	send := func() bool {
-		list, err := h.list(workspace.ID)
+		list, err := h.list(workspace.ID, sort)
 		if err != nil {
 			slog.Error("failed to list apps", "error", err, "workspace_id", workspace.ID)
 			return false
@@ -879,3 +884,23 @@ func actor(r *http.Request) service.Actor {
 
 // source is how a request came in: the web, the CLI, the TUI or the API.
 func source(r *http.Request) service.Source { return service.RequestSource(r.Context()) }
+
+// SetPinned pins or unpins an app: {"pinned": true}.
+func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Pinned *bool `json:"pinned"`
+	}
+	if !Decode(w, r, &body) {
+		return
+	}
+	if body.Pinned == nil {
+		ValidationError(w, map[string]string{"pinned": "Say true or false."})
+		return
+	}
+	app, err := h.apps.SetPinned(actor(r), r.PathValue("app"), *body.Pinned)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewApp(*app))
+}

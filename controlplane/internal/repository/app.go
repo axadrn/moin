@@ -26,8 +26,10 @@ type AppRepository interface {
 	ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.App, error)
 	ByID(id string) (*model.App, error)
 	ListByWorkspaceID(workspaceID string) ([]model.App, error)
-	// SetOrder puts the apps of a workspace in the order of ids, every one once.
-	SetOrder(workspaceID string, ids []string) error
+	// SetPinned pins or unpins an app.
+	SetPinned(appID string, on bool) error
+	// LastDeploys is the time of each app's newest deploy, by app ID.
+	LastDeploys(workspaceID string) (map[string]int64, error)
 	DeleteForWorkspace(id, workspaceID string) error
 
 	// CreateDeploy numbers the deploy after the newest one of its app.
@@ -102,8 +104,8 @@ const appSelect = `
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *appRepository) Create(app *model.App) error {
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, position, created_at)
-		VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(position), -1) + 1 FROM apps WHERE workspace_id = $2), $5)`,
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, created_at)
+		VALUES ($1, $2, $3, $4, $5)`,
 		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
@@ -133,7 +135,7 @@ func (r *appRepository) ByID(id string) (*model.App, error) {
 
 func (r *appRepository) ListByWorkspaceID(workspaceID string) ([]model.App, error) {
 	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.position, a.name, a.id`, workspaceID)
+	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
 	return apps, err
 }
 
@@ -417,4 +419,26 @@ func (r *appRepository) AppsForPush(installationID int64, repo, branch string) (
 	apps := []model.App{}
 	err := r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1 AND lower(a.repo) = lower($2) AND a.branch = $3 AND a.auto_deploy = 1`, installationID, repo, branch)
 	return apps, err
+}
+
+func (r *appRepository) SetPinned(appID string, on bool) error {
+	_, err := r.db.Exec(`UPDATE apps SET pinned = $1 WHERE id = $2`, on, appID)
+	return err
+}
+
+func (r *appRepository) LastDeploys(workspaceID string) (map[string]int64, error) {
+	var rows []struct {
+		AppID     string    `db:"app_id"`
+		CreatedAt time.Time `db:"created_at"`
+	}
+	err := r.db.Select(&rows, `SELECT d.app_id, d.created_at FROM deploys d JOIN apps a ON a.id = d.app_id
+		WHERE a.workspace_id = $1 AND d.number = (SELECT MAX(number) FROM deploys WHERE app_id = d.app_id)`, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	last := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		last[row.AppID] = row.CreatedAt.Unix()
+	}
+	return last, nil
 }

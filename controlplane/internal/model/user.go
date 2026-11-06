@@ -15,10 +15,9 @@ type User struct {
 	Name            string     `db:"name"`
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at"`
-	// AppsView and ServersView are how the user sees the Apps and Servers
-	// pages: ViewList, ViewGrid, or empty for the page's default.
-	AppsView    string `db:"apps_view"`
-	ServersView string `db:"servers_view"`
+	// AppSort is how the user sorts the apps: SortSmart, SortRecent or
+	// SortServer. The same in the web and the TUI.
+	AppSort string `db:"app_sort"`
 	// EmailAlerts sends the user a mail when a site goes down or comes
 	// back, a server goes offline or comes back, or a deploy fails, in the
 	// workspaces they own or run as admin. On by default.
@@ -29,23 +28,21 @@ type User struct {
 	PasswordSet bool   `db:"-"`
 }
 
-// The ways the Apps and Servers pages show their items.
+// The ways to sort the apps. Smart puts what needs you first, then what
+// deploys, then the pinned apps, then the rest by name. Recent puts the
+// newest deploy first. Server groups the apps by their server.
 const (
-	ViewList = "list"
-	ViewGrid = "grid"
+	SortSmart  = "smart"
+	SortRecent = "recent"
+	SortServer = "server"
 )
 
-// View is how the user sees the "apps" or the "servers" page: apps as a
-// list and servers as a grid, unless they picked the other.
-func (u *User) View(page string) string {
-	view, fallback := u.AppsView, ViewList
-	if page == "servers" {
-		view, fallback = u.ServersView, ViewGrid
+// Sort is how the user sorts the apps, smart unless they picked another.
+func (u *User) Sort() string {
+	if u.AppSort == SortRecent || u.AppSort == SortServer {
+		return u.AppSort
 	}
-	if view == ViewList || view == ViewGrid {
-		return view
-	}
-	return fallback
+	return SortSmart
 }
 
 func (u *User) HasPassword() bool {

@@ -276,6 +276,18 @@ func (m model) startApp(app string) tea.Cmd {
 	return m.started(app, "start", func() (client.Deploy, error) { return m.api.Start(m.ctx, app) })
 }
 
+// pin pins an app or unpins it; the app list then comes again in the new
+// order, the same as on the web.
+func (m model) pin(app string, on bool) tea.Cmd {
+	api, ctx := m.api, m.ctx
+	return func() tea.Msg {
+		if _, err := api.SetPinned(ctx, app, on); err != nil {
+			return errMsg{err}
+		}
+		return pinnedMsg{app: app, on: on}
+	}
+}
+
 func (m model) stopApp(app string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {

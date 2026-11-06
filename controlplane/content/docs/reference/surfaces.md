@@ -17,6 +17,8 @@ moin has five places: the web app, the [CLI](/docs/reference/cli), the [terminal
 | Server metrics, 1h to 30d | ✓ | ✓ `metrics --server` | ✓ | ✓ | ✓ |
 | Update an agent | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
+| Pin an app | ✓ the star | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
+| Sort the apps | ✓ | ✓ `apps sort` | follows your choice | ✓ | follows your choice |
 | Deploy this directory | Your files are on your machine, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An agent has no directory to upload. Use the CLI. |
 | Deploy an image from CI | ✓ | ✓ `deploy --image` | ✓ `I` | ✓ | ✓ |
 | Deploy a branch, tag or commit | ✓ | ✓ `deploy --ref` | ✓ `B` | ✓ | ✓ |
@@ -52,13 +54,13 @@ The terminal UI opens these in your browser: `w` on the dashboard, or `space w`.
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
 | Add a server, install command | ✓ | ✓ `servers add` | Setup: opens the web. | ✓ | ✓ |
-| Rename, order, remove a server | ✓ | ✓ | Setup: opens the web. | ✓ | ✓ |
+| Rename, remove a server | ✓ | ✓ | Setup: opens the web. | ✓ | ✓ |
 | Tunnel, SSH on Tailscale, firewall | ✓ | ✓ `servers secure` | Shows what the agent set up; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
 | Cloudflare token, Tailscale key | ✓ | ✓ `integrations` | Setup: opens the web. | ✓ | ✓ |
 | Agent auto-update | ✓ | ✓ `servers auto-update` | Setup: opens the web. | ✓ | ✓ |
 | Uninstall the agent | It runs on the server, not in a browser. | ✓ `agent uninstall`, on the server | It runs on the server. | It runs on the server. | It runs on the server. |
-| Create, order, remove an app | ✓ | ✓ `apps add`, `deploy` | Setup: opens the web. `moin deploy` creates one too. | ✓ | ✓ |
+| Create, remove an app | ✓ | ✓ `apps add`, `deploy` | Setup: opens the web. `moin deploy` creates one too. | ✓ | ✓ |
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Setup: opens the web. | ✓ | ✓ |

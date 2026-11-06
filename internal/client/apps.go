@@ -39,6 +39,7 @@ type App struct {
 	Repo                  string `json:"repo"`
 	Branch                string `json:"branch"`
 	AutoDeploy            bool   `json:"auto_deploy"`
+	Pinned                bool   `json:"pinned"`
 	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`

@@ -64,22 +64,6 @@ API: PATCH /api/v1/servers/{id}
 MCP: rename_server
 ```
 
-## Order your servers
-
-Servers show in the order you give them, the same for everyone in the workspace and everywhere: the web, the CLI, the TUI, the API and MCP. A new server goes to the end.
-
-```surfaces
-Web: **Servers**, drag a server to its place
-CLI: moin servers move <server-name> up|down|top|bottom|<position>
-TUI: opens the web: `w`, then `a`
-API: PUT /api/v1/servers/order
-MCP: reorder_servers
-```
-
-With a mouse you drag the whole server; on a phone you drag the grip at its left, so the page still scrolls. On the keyboard, Alt and the up or down arrow move the server in focus. The API and MCP take every server once, by name or ID, in the new order: `{"order": ["web-1", "db-1"]}`. The activity records each new order once.
-
-**List** and **Grid** above the servers switch how the page shows them: cards side by side, or one row each. moin remembers your choice for you on every device; the rest of the team keeps theirs.
-
 ## Updates
 
 **The control plane.** On our hosted control plane we update it, you do nothing. On your own, moin tells you when a release is out and updates with one click, see [Self-hosting](/docs/self-hosting#updates).

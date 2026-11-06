@@ -19,6 +19,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/version/update` | updates a self-hosted control plane to the newest release (admins in `ADMIN_EMAILS`); follow it with `GET /api/v1/version` |
 | `GET /api/v1/account` · `PATCH /account/name` | the signed-in account; its name |
 | `PUT /api/v1/account/email-alerts` | turns your [email alerts](/docs/guides/alerts) on or off `{"on": false}`; `GET /api/v1/account` has them as `email_alerts` |
+| `PUT /api/v1/account/sort` | sorts your apps `{"sort": "smart"}`, `recent` or `server`; `GET /api/v1/apps` and every client follow it, `GET /api/v1/account` has it as `app_sort` |
 | `PATCH /api/v1/account/email` · `POST /account/password` · `DELETE /account` | email, password, deleting the account (*session*) |
 | `POST /api/v1/account/password/set` · `DELETE /account/password` | sets the first password; removes it (*session*) |
 | `POST` · `DELETE /api/v1/account/avatar` | the profile picture |
@@ -43,7 +44,6 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `GET /api/v1/servers/events` | server list as server-sent events |
 | `POST /api/v1/servers/{id}/install` | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | renames a server `{"name": "…"}` |
-| `PUT /api/v1/servers/order` | puts the servers in a new order `{"order": ["web-1", "db-1"]}`, every server once, by name or ID; answers the list in it |
 | `DELETE /api/v1/servers/{id}` | removes a server; answers the `uninstall_command` that removes its agent there, empty when no agent ever connected, and the `apps` that went with an offline server |
 | `POST /api/v1/servers/{id}/update` | updates the agent to the control plane's version |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | CPU, memory, disk, network and load of the server now and over a range, and its apps now, the most memory first |
@@ -54,7 +54,7 @@ A user can hold 20 server-sent event streams open at once, across all `…/event
 | `POST /api/v1/apps/{app}/update` | sets a catalog app to a release `{"version": "3.4.1"}`, the newest when empty, and deploys it |
 | `GET /api/v1/apps` · `POST` · `GET /{app}` · `DELETE /{app}` | apps |
 | `GET /api/v1/apps/events` | app list as server-sent events |
-| `PUT /api/v1/apps/order` | puts the apps in a new order `{"order": ["blog", "shop"]}`, every app once, by name or ID; answers the list in it |
+| `PUT /api/v1/apps/{app}/pin` | pins an app `{"pinned": true}` or unpins it; lists show pinned apps above the others that run fine |
 | `POST /api/v1/apps/{app}/uploads` | a link that takes the source straight into your bucket |
 | `POST /api/v1/apps/{app}/deploys` | deploys an upload `{"upload": "…", "sha256": "…"}`, an image `{"image": "…"}` built in CI, or `{"ref": "main"}` from GitHub |
 | `POST /api/v1/apps/{app}/hook` | a new deploy hook URL, shown once |

@@ -26,7 +26,6 @@ Every command of `moin`. [Where things work](/docs/reference/surfaces) shows wha
 | `moin servers add [name]` | adds a server, prints its install command; without a name it gets one like `brave-otter` |
 | `moin servers install-command <name>` | prints a new one-time install command; the old one stops working |
 | `moin servers rename <name> <new name>` | renames a server; its apps stay on it |
-| `moin servers move <name> up\|down\|top\|bottom\|<position>` | moves a server in the order every list shows; a position counts from 1 |
 | `moin servers rm <name> [--yes]` | asks you to type its name, removes the server and prints the command that removes its agent there |
 | `moin servers update [name]` | updates the agent to the control plane's version now; without a name every online server whose agent differs |
 | `moin servers auto-update [on\|off]` | shows or sets whether agents update to the control plane's version by themselves; on by default |
@@ -35,7 +34,8 @@ Every command of `moin`. [Where things work](/docs/reference/surfaces) shows wha
 | `moin apps <app>` | one app: its state, server, domains, password, repo and deploys; `moin app <app>` works too |
 | `moin apps add --server <server> <name>` | adds an app |
 | `moin apps rm <app> [--yes]` | asks you to type its name, removes the app, keeps its data |
-| `moin apps move <app> up\|down\|top\|bottom\|<position>` | moves an app in the order every list and the sidebar show; a position counts from 1 |
+| `moin apps pin [app]`, `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
+| `moin apps sort smart\|recent\|server` | sorts your apps, here, in the TUI and the web |
 | `moin deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory |
 | `moin deploy --image <image> [app]` | deploys an image built in CI, with the compose file of an earlier deploy of the repo |
 | `moin redeploy [app]` | runs the newest source or image again |

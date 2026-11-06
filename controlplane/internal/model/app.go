@@ -12,8 +12,8 @@ type App struct {
 	WorkspaceID string `db:"workspace_id"`
 	ServerID    string `db:"server_id"`
 	Name        string `db:"name"`
-	// Position is the place of the app in the workspace's order, from 0.
-	Position       int       `db:"position"`
+	// Pinned keeps the app above the others that run fine.
+	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`
 	DeployHookHash *string   `db:"deploy_hook_hash"`
 	// Domains is a JSON array; use DomainList.

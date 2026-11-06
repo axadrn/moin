@@ -633,6 +633,50 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/account/sort:
+    put:
+      tags: [Account]
+      operationId: setAppSort
+      summary: Sort the apps
+      description: How the signed-in user sorts the apps, in `GET /api/v1/apps`, its event stream, the web and the TUI. `smart` puts what needs you first, then what deploys, then pinned apps, then the rest by name; `recent` the newest deploy first; `server` by server. `app_sort` in `GET /api/v1/account` says how it is set.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sort]
+              properties:
+                sort:
+                  type: string
+                  enum: [smart, recent, server]
+      responses:
+        '200':
+          description: The setting.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sort:
+                    type: string
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          description: '`validation_failed` with `fields.sort`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/account/email:
     patch:
       tags: [Account]
@@ -947,7 +991,7 @@ paths:
       tags: [Servers]
       operationId: listServers
       summary: List servers
-      description: In the order of the workspace, set with `PUT /api/v1/servers/order`. New servers go to the end.
+      description: By name.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -998,43 +1042,6 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.name`.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/servers/order:
-    put:
-      tags: [Servers]
-      operationId: reorderServers
-      summary: Order the servers
-      description: Puts the servers of the workspace in a new order, which every list shows. `order` names every server once. The activity records it once.
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-        - apiTokenAuth: [write]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderRequest'
-      responses:
-        '200':
-          description: The servers in their new order.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServerList'
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.order`: it misses a server, names one twice or names one the workspace does not have.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -1319,7 +1326,7 @@ paths:
       tags: [Apps]
       operationId: listApps
       summary: List apps
-      description: In the order of the workspace, set with `PUT /api/v1/apps/order`, with the newest and the live deploy of each. New apps go to the end.
+      description: In the order the caller sorts them (`PUT /api/v1/account/sort`), with the newest and the live deploy of each.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1376,40 +1383,47 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/apps/order:
+  /api/v1/apps/{app}/pin:
     put:
       tags: [Apps]
-      operationId: reorderApps
-      summary: Order the apps
-      description: Puts the apps of the workspace in a new order, which every list and the sidebar show. `order` names every app once. The activity records it once.
+      operationId: setAppPinned
+      summary: Pin or unpin an app
+      description: With `pinned` true, every list of the workspace shows the app above the others that run fine, on every surface. The activity records it.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
+      parameters:
+        - $ref: '#/components/parameters/AppName'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OrderRequest'
+              type: object
+              required: [pinned]
+              properties:
+                pinned:
+                  type: boolean
       responses:
         '200':
-          description: The apps in their new order.
+          description: The app.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AppList'
+                $ref: '#/components/schemas/App'
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.order`: it misses an app, names one twice or names one the workspace does not have.'
+          description: '`validation_failed` with `fields.pinned`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4946,6 +4960,10 @@ components:
         email_alerts:
           type: boolean
           description: Mails when a site or a server goes down or comes back, or a deploy fails, in the workspaces the user owns or runs as admin. Set it with `PUT /api/v1/account/email-alerts`.
+        app_sort:
+          type: string
+          enum: [smart, recent, server]
+          description: How the user sorts the apps. Set it with `PUT /api/v1/account/sort`.
         created_at:
           type: string
           format: date-time
@@ -5207,15 +5225,6 @@ components:
           type: string
           maxLength: 64
           description: Empty or left out gets a name like `brave-otter`.
-    OrderRequest:
-      type: object
-      required: [order]
-      properties:
-        order:
-          type: array
-          description: Every app or server of the workspace once, by name or ID, in the new order.
-          items:
-            type: string
     RenameServerRequest:
       type: object
       required: [name]
@@ -5309,6 +5318,9 @@ components:
         auto_deploy:
           type: boolean
           description: Every push to the branch deploys.
+        pinned:
+          type: boolean
+          description: Lists show the app above the others that run fine. Set it with `PUT /api/v1/apps/{app}/pin`.
         snapshot_before_changes:
           type: boolean
           description: A snapshot before every change made through moin.

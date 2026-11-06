@@ -54,6 +54,14 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// The mouse picks what it points at, so only one answer is ever lit.
+document.addEventListener("mouseover", (event) => {
+  const option = event.target.closest("#search-results [role=option]");
+  if (option && option.getAttribute("aria-selected") !== "true") pick(option);
+  const item = event.target.closest("[popover] [role=menuitem]");
+  if (item && document.activeElement !== item) item.focus({ preventScroll: true });
+});
+
 document.addEventListener("htmx:after:swap", (event) => {
   if (event.target.id === "search-results") searchField()?.setAttribute("aria-expanded", String(answers().length > 0));
 });
@@ -73,4 +81,32 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "?" && !typing(event.target) && !event.metaKey && !event.ctrlKey) {
     document.getElementById("app-shortcuts")?.showModal();
   }
+});
+
+// A Select is a popover of radio buttons. Picking one writes its label into
+// the button; a click or Enter closes the list. The mouse focuses what it
+// points at, so one option is lit at a time.
+document.addEventListener("change", (event) => {
+  const select = event.target.closest("[data-select]");
+  if (!select || event.target.type !== "radio") return;
+  select.querySelector("[data-select-label]").textContent = event.target.closest("label").textContent.trim();
+});
+
+document.addEventListener("click", (event) => {
+  const option = event.target.closest("[data-select] [popover] label");
+  if (option) requestAnimationFrame(() => option.closest("[popover]").hidePopover());
+});
+
+document.addEventListener("keydown", (event) => {
+  const list = event.target.closest?.("[data-select] [popover]");
+  if (list && event.key === "Enter") {
+    event.preventDefault();
+    list.hidePopover();
+    list.closest("[data-select]").querySelector("button").focus();
+  }
+});
+
+document.addEventListener("mouseover", (event) => {
+  const option = event.target.closest("[data-select] [popover] label");
+  if (option && !option.contains(document.activeElement)) option.querySelector("input").focus({ preventScroll: true });
 });

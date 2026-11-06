@@ -49,7 +49,6 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no agent ever connected, and the `apps` that went with an offline server | write, destructive |
 | `new_install_command` | a new one-time install command for a server | write, destructive |
 | `rename_server` | renames a server | write |
-| `reorder_servers` | puts the servers in a new order; `order` names every server once | write |
 | `update_agent` | puts the control plane's agent version on a server | write |
 | `set_agent_updates` | turns automatic agent updates on or off | write |
 | `get_version` | the control plane's version, the newest release and whether agents update by themselves | read |
@@ -58,7 +57,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |
 | `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
-| `reorder_apps` | puts the apps in a new order; `order` names every app once | write |
+| `pin_app` | pins an app or unpins it with `pinned` false | write |
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |
 | `deploy_image` | deploys an image built in CI | write |
