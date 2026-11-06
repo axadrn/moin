@@ -134,7 +134,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app", middleware.RequireAuth(workspaceHandler.Redirect))
 	// Sign-ins and invitations lead to the dashboard, and a workspace's own
 	// address too: both are the overview.
-	overview := handler.NewOverviewHandler(app.StatusService, app.WorkspaceService)
+	overview := handler.NewOverviewHandler(app.StatusService, app.AppService, app.ServerService)
 	toOverview := workspace(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/overview", http.StatusSeeOther)
 	})

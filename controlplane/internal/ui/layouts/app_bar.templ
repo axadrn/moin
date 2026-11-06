@@ -18,7 +18,7 @@ templ AppBar() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ user := ctxkeys.User(ctx) }}
 	<header id="app-bar" class="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl" data-app-base={ basePath }>
-		<div class="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3 sm:gap-3">
+		<div class={ kit.Page, "flex items-center gap-2 py-3 sm:gap-3" }>
 			<a href={ templ.SafeURL(basePath + "/overview") } class="flex shrink-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
 				@blocks.Wordmark("text-xl leading-none")
 			</a>
@@ -65,7 +65,7 @@ templ appSearch(basePath string) {
 			id="search-results"
 			role="listbox"
 			aria-label="Results"
-			class="absolute inset-x-0 top-12 max-h-[min(70vh,32rem)] overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 empty:hidden"
+			class="absolute inset-x-0 top-13 flex max-h-[min(70vh,32rem)] flex-col gap-0.5 overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 empty:hidden"
 		></div>
 	</div>
 }

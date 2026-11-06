@@ -1,0 +1,36 @@
+package kit
+
+// Kind is how much a button stands out. One Primary per screen: the thing
+// you came to do.
+type Kind string
+
+const (
+	Primary   Kind = "primary"
+	Secondary Kind = "secondary"
+	Danger    Kind = "danger"
+)
+
+// Button is a pill, 44 px high, the same everywhere. With an href it is a
+// link that looks like a button. Attributes carry htmx and the type.
+templ Button(kind Kind, href string, attributes templ.Attributes) {
+	if href != "" {
+		<a href={ templ.SafeURL(href) } class={ buttonClass(kind) } { attributes... }>
+			{ children... }
+		</a>
+	} else {
+		<button class={ buttonClass(kind) } { attributes... }>
+			{ children... }
+		</button>
+	}
+}
+
+func buttonClass(kind Kind) string {
+	base := "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0 "
+	switch kind {
+	case Primary:
+		return base + "bg-primary text-primary-foreground hover:bg-primary/85"
+	case Danger:
+		return base + "bg-muted text-failed hover:bg-failed/10"
+	}
+	return base + "bg-muted text-foreground hover:bg-muted/70"
+}

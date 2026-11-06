@@ -1,6 +1,7 @@
 package layouts
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
@@ -11,7 +12,7 @@ templ Admin(title string) {
 	@Base(SEOProps{Title: title, Description: "Operator administration", Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
 		<div class="min-h-screen bg-background">
 			<header class="sticky top-0 z-20 border-b bg-background">
-				<div class="mx-auto flex h-12 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+				<div class={ kit.Page, "flex h-12 items-center gap-3" }>
 					<a href="/admin" class="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
 						@blocks.Wordmark("text-[1.125rem] leading-none")
 						<span class="text-sm font-medium text-muted-foreground">Admin</span>
@@ -25,7 +26,7 @@ templ Admin(title string) {
 					</div>
 				</div>
 			</header>
-			<main class="mx-auto w-full max-w-7xl px-4 pt-6 pb-16 sm:px-6 lg:px-8 lg:pt-8">
+			<main class={ kit.Page, "pt-6 pb-16" }>
 				{ children... }
 			</main>
 		</div>
