@@ -1,0 +1,13 @@
+package kit
+
+// Avatar is a round picture, or the initials when there is none.
+templ Avatar(src, name, initials, class string) {
+	<span class={ "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold text-foreground select-none", class }>
+		if src != "" {
+			<img src={ src } alt={ name } class="size-full object-cover"/>
+		} else {
+			<span aria-hidden="true">{ initials }</span>
+			<span class="sr-only">{ name }</span>
+		}
+	</span>
+}

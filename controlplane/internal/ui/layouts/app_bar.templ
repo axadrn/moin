@@ -1,0 +1,212 @@
+package layouts
+
+import (
+	"strings"
+	"unicode/utf8"
+
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/internal/build"
+)
+
+// AppBar is the one bar of the control panel, instead of a sidebar: the
+// wordmark home, the workspace, the search that goes everywhere, and you.
+templ AppBar() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ user := ctxkeys.User(ctx) }}
+	<header id="app-bar" class="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl" data-app-base={ basePath }>
+		<div class="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3 sm:gap-3">
+			<a href={ templ.SafeURL(basePath + "/overview") } class="flex shrink-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
+				@blocks.Wordmark("text-xl leading-none")
+			</a>
+			if workspace := ctxkeys.Workspace(ctx); workspace != nil {
+				<div id="bar-workspace" class="contents">
+					@workspaceMenu(workspace, ctxkeys.Workspaces(ctx))
+				</div>
+			}
+			@appSearch(basePath)
+			if user != nil {
+				@userMenu(user)
+			}
+		</div>
+	</header>
+}
+
+// appSearch is the search: what you type goes to the server, which answers
+// the apps, servers, places and actions that match (htmx active search).
+// moin.js moves through the answers with the arrow keys.
+templ appSearch(basePath string) {
+	<div class="relative min-w-0 flex-1" data-search>
+		<label for="search" class="sr-only">Search or run a command</label>
+		@icon.Search(icon.Props{Class: "pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"})
+		<input
+			id="search"
+			name="q"
+			type="search"
+			autocomplete="off"
+			spellcheck="false"
+			placeholder="Search, or type: deploy shop"
+			role="combobox"
+			aria-expanded="false"
+			aria-controls="search-results"
+			aria-autocomplete="list"
+			hx-get={ basePath + "/search" }
+			hx-trigger="input changed delay:80ms, focus"
+			hx-target="#search-results"
+			hx-swap="innerHTML"
+			hx-sync="this:replace"
+			class="h-11 w-full rounded-full border border-border bg-card pr-14 pl-10 text-sm outline-none placeholder:text-muted-foreground focus:border-foreground [&::-webkit-search-cancel-button]:hidden"
+		/>
+		<kbd class="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded-md bg-muted px-1.5 font-mono text-xs text-muted-foreground sm:block">/</kbd>
+		<div
+			id="search-results"
+			role="listbox"
+			aria-label="Results"
+			class="absolute inset-x-0 top-12 max-h-[min(70vh,32rem)] overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 empty:hidden"
+		></div>
+	</div>
+}
+
+// WorkspaceUpdate is what a renamed workspace swaps into the bar.
+templ WorkspaceUpdate(current *model.Workspace, workspaces []model.WorkspaceMembership) {
+	<div id="bar-workspace" class="contents" hx-swap-oob="true">
+		@workspaceMenu(current, workspaces)
+	</div>
+}
+
+templ workspaceMenu(current *model.Workspace, workspaces []model.WorkspaceMembership) {
+	@kit.Menu(kit.MenuProps{ID: "workspace-menu", Label: "Switch workspace", Class: "h-11 shrink-0 bg-muted pr-3 pl-2 text-sm font-medium hover:bg-muted/70"}, workspaceButton(current)) {
+		@kit.MenuLabel() {
+			Workspaces
+		}
+		for _, item := range workspaces {
+			@kit.MenuItem("/app/"+item.Slug+"/overview", templ.Attributes{"hx-boost": "false"}) {
+				<span class="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">{ workspaceInitial(item.Name) }</span>
+				<span class="min-w-0 flex-1 truncate">{ item.Name }</span>
+				<span class="text-xs text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
+				if item.ID == current.ID {
+					@icon.Check(icon.Props{Class: "text-foreground!"})
+					<span class="sr-only">Current workspace</span>
+				}
+			}
+		}
+		@kit.MenuLine()
+		@kit.MenuItem("/app/"+current.Slug+"/workspace", nil) {
+			@icon.Users()
+			Team
+		}
+		@kit.MenuItem("/workspaces/new", templ.Attributes{"hx-boost": "false"}) {
+			@icon.Plus()
+			New workspace
+		}
+	}
+}
+
+templ workspaceButton(current *model.Workspace) {
+	<span class="flex size-8 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">{ workspaceInitial(current.Name) }</span>
+	<span class="hidden max-w-36 truncate sm:block">{ current.Name }</span>
+	@icon.ChevronDown(icon.Props{Class: "hidden size-4 text-muted-foreground sm:block"})
+}
+
+templ userMenu(user *model.User) {
+	{{ member := ctxkeys.WorkspaceMember(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@kit.Menu(kit.MenuProps{ID: "user-menu", Label: "Your account", End: true, Class: "shrink-0"}, userButton(user)) {
+		@UserMenuLabel(user)
+		@kit.MenuLine()
+		@kit.MenuItem(basePath+"/settings", nil) {
+			@icon.Settings()
+			Settings
+		}
+		if member != nil && member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(ctx).Billing {
+			@kit.MenuItem(basePath+"/billing", nil) {
+				@icon.CreditCard()
+				<span>Billing</span>
+			}
+		}
+		if ctxkeys.IsAdmin(ctx) {
+			@kit.MenuItem("/admin", templ.Attributes{"hx-boost": "false"}) {
+				@icon.Shield()
+				Admin
+			}
+		}
+		@kit.MenuItem("", templ.Attributes{"data-theme-switcher": "true", "data-menu-keep": "true"}) {
+			@icon.SunMoon()
+			Theme
+		}
+		@kit.MenuLine()
+		@kit.MenuItem("/docs", templ.Attributes{"target": "_blank", "rel": "noopener"}) {
+			@icon.BookOpen()
+			Docs
+		}
+		@kit.MenuItem("mailto:"+ctxkeys.RenderConfig(ctx).SupportEmail, nil) {
+			@icon.LifeBuoy()
+			Support
+		}
+		@kit.MenuItem("/changelog", templ.Attributes{"target": "_blank", "rel": "noopener", "data-changelog": build.Version}) {
+			@icon.Tag()
+			<span class="flex-1">Changelog</span>
+			<span data-changelog-dot hidden class="rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background">New</span>
+			<span class="font-mono text-xs text-muted-foreground">{ build.Version }</span>
+		}
+		@kit.MenuLine()
+		@kit.MenuItem("", templ.Attributes{"hx-post": "/auth/logout", "hx-swap": "none", "data-logout": "true"}) {
+			@icon.LogOut()
+			Sign out
+		}
+	}
+}
+
+templ userButton(user *model.User) {
+	@UserAvatar(user)
+}
+
+// UserAvatar and UserMenuLabel carry ids, so a changed name or picture
+// swaps them in place (IdentityUpdates).
+templ UserAvatar(user *model.User) {
+	<span id="bar-avatar" class="contents">
+		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-11")
+	</span>
+}
+
+templ UserMenuLabel(user *model.User) {
+	<div id="user-menu-label" class="flex items-center gap-3 px-3 py-2">
+		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-9")
+		<div class="grid min-w-0 leading-tight">
+			<span class="truncate font-medium">{ user.Name }</span>
+			<span class="truncate text-xs text-muted-foreground">{ user.Email }</span>
+		</div>
+	</div>
+}
+
+// IdentityUpdates is what a changed name or picture swaps into the bar.
+templ IdentityUpdates(user *model.User) {
+	<span id="bar-avatar" class="contents" hx-swap-oob="true">
+		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-11")
+	</span>
+	<div id="user-menu-label" class="flex items-center gap-3 px-3 py-2" hx-swap-oob="true">
+		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-9")
+		<div class="grid min-w-0 leading-tight">
+			<span class="truncate font-medium">{ user.Name }</span>
+			<span class="truncate text-xs text-muted-foreground">{ user.Email }</span>
+		</div>
+	</div>
+}
+
+func workspaceInitial(name string) string {
+	first, _ := utf8.DecodeRuneInString(name)
+	return strings.ToUpper(string(first))
+}
+
+func userInitials(user *model.User) string {
+	words := strings.Fields(user.Name)
+	if len(words) < 2 {
+		return user.Initial()
+	}
+	first, _ := utf8.DecodeRuneInString(words[0])
+	last, _ := utf8.DecodeRuneInString(words[len(words)-1])
+	return strings.ToUpper(string(first) + string(last))
+}

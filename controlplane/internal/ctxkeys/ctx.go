@@ -11,17 +11,16 @@ import (
 type contextKey string
 
 const (
-	UserKey             contextKey = "user"
-	SubscriptionKey     contextKey = "subscription"
-	WorkspaceKey        contextKey = "workspace"
-	WorkspaceMemberKey  contextKey = "member"
-	WorkspacesKey       contextKey = "workspaces"
-	SessionKey          contextKey = "session"
-	URLPathKey          contextKey = "url_path"
-	RenderConfigKey     contextKey = "render_config"
-	CSRFTokenKey        contextKey = "csrf_token"
-	AdminKey            contextKey = "admin"
-	SidebarCollapsedKey contextKey = "sidebar_collapsed"
+	UserKey            contextKey = "user"
+	SubscriptionKey    contextKey = "subscription"
+	WorkspaceKey       contextKey = "workspace"
+	WorkspaceMemberKey contextKey = "member"
+	WorkspacesKey      contextKey = "workspaces"
+	SessionKey         contextKey = "session"
+	URLPathKey         contextKey = "url_path"
+	RenderConfigKey    contextKey = "render_config"
+	CSRFTokenKey       contextKey = "csrf_token"
+	AdminKey           contextKey = "admin"
 )
 
 func User(ctx context.Context) *model.User {
@@ -112,15 +111,4 @@ func CSRFToken(ctx context.Context) string {
 
 func WithCSRFToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, CSRFTokenKey, token)
-}
-
-// SidebarCollapsed is whether the control panel sidebar was collapsed to
-// icons on the last page, so the next one renders it the same way.
-func SidebarCollapsed(ctx context.Context) bool {
-	collapsed, _ := ctx.Value(SidebarCollapsedKey).(bool)
-	return collapsed
-}
-
-func WithSidebarCollapsed(ctx context.Context, collapsed bool) context.Context {
-	return context.WithValue(ctx, SidebarCollapsedKey, collapsed)
 }

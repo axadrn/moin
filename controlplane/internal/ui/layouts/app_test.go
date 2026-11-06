@@ -49,20 +49,19 @@ func TestAppLayoutShowsAdminLinkOnlyToOperators(t *testing.T) {
 	}
 }
 
-func TestAppLayoutRendersTheSidebarAsItWasLeft(t *testing.T) {
-	expanded := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	if !strings.Contains(expanded, `data-state="expanded"`) || !strings.Contains(expanded, `data-templ-collapsible="icon"`) {
-		t.Fatal("the sidebar does not start expanded and collapsible to icons")
-	}
-	for _, hook := range []string{`id="sidebar-workspace"`, `id="sidebar-avatar"`, `id="sidebar-user-name"`, `id="dropdown-user-label"`, "data-app-base=", `data-sidebar="rail"`, `hx-post="/auth/logout"`} {
-		if !strings.Contains(expanded, hook) {
-			t.Fatalf("the sidebar lost %s", hook)
+// The panel has one bar and no sidebar: the bar carries what the search,
+// the menus and the identity updates need.
+func TestAppLayoutHasTheBarAndNoSidebar(t *testing.T) {
+	page := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
+	for _, hook := range []string{`id="app-bar"`, `id="bar-workspace"`, `id="bar-avatar"`, `id="user-menu-label"`, `id="search"`, `id="search-results"`, "data-app-base=", `hx-post="/auth/logout"`, `popovertarget="user-menu"`, `id="app-shortcuts"`} {
+		if !strings.Contains(page, hook) {
+			t.Fatalf("the bar lost %s", hook)
 		}
 	}
-
-	collapsed := renderApp(t, ctxkeys.WithSidebarCollapsed(appContext(model.WorkspaceRoleOwner, 1), true))
-	if !strings.Contains(collapsed, `data-state="collapsed"`) || !strings.Contains(collapsed, `data-collapsible="icon"`) {
-		t.Fatal("a collapsed sidebar renders expanded")
+	for _, gone := range []string{`data-slot="sidebar`, "window.templ.sidebar", "app-command"} {
+		if strings.Contains(page, gone) {
+			t.Fatalf("the panel still has %s", gone)
+		}
 	}
 }
 

@@ -5,11 +5,12 @@ import (
 	"net/http"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
-// CommandHandler answers what ⌘K lists past the pages.
+// CommandHandler answers the search in the bar.
 type CommandHandler struct {
 	apps    *service.AppService
 	servers *service.ServerService
@@ -19,24 +20,33 @@ func NewCommandHandler(apps *service.AppService, servers *service.ServerService)
 	return &CommandHandler{apps: apps, servers: servers}
 }
 
-// Items are the workspace's apps with their actions, servers and buckets,
-// loaded on the first open of ⌘K.
-func (h *CommandHandler) Items(w http.ResponseWriter, r *http.Request) {
+// Search answers what matches q: apps, servers, buckets, places and
+// actions, as the list under the search field (htmx active search).
+func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	apps, err := h.apps.List(workspace.ID)
 	if err != nil {
-		slog.Error("command items failed", "error", err, "workspace_id", workspace.ID)
+		slog.Error("search failed", "error", err, "workspace_id", workspace.ID)
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
 	}
 	servers, err := h.servers.List(workspace.ID)
 	if err != nil {
-		slog.Error("command items failed", "error", err, "workspace_id", workspace.ID)
+		slog.Error("search failed", "error", err, "workspace_id", workspace.ID)
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
 	}
 	buckets, _ := h.apps.Buckets(workspace.ID)
-	view := pages.CommandItemsView{Apps: apps, Servers: servers, Buckets: buckets, CanChange: h.servers.RequireChanges(workspace.ID) == nil}
+	member := ctxkeys.WorkspaceMember(r.Context())
+	items := pages.SearchItems(pages.SearchInput{
+		Base:      ctxkeys.AppBasePath(r.Context()),
+		Apps:      apps,
+		Servers:   servers,
+		Buckets:   buckets,
+		CanChange: h.servers.RequireChanges(workspace.ID) == nil,
+		IsOwner:   member != nil && member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(r.Context()).Billing,
+	})
+	query := r.URL.Query().Get("q")
 	w.Header().Set("Cache-Control", "no-store")
-	render(w, r, pages.CommandItems(view))
+	render(w, r, pages.SearchResults(pages.MatchSearch(items, query, 14), query))
 }

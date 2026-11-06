@@ -1,154 +1,27 @@
 package layouts
 
-import (
-	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	commandmenu "github.com/axadrn/moin/controlplane/internal/ui/components/command"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/dialog"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/kbd"
-)
+import "github.com/axadrn/moin/controlplane/internal/ui/components/kbd"
 
-// commandPlace is a place ⌘K jumps to, with its go-to key.
-type commandPlace struct {
-	Title, Path, Key string
-	Icon             func(...icon.Props) templ.Component
-}
-
-// commandPlaces are the pages of the panel, the same as the sidebar's.
-var commandPlaces = []commandPlace{
-	{"Overview", "/overview", "O", icon.Gauge},
-	{"Apps", "/apps", "A", icon.Boxes},
-	{"Servers", "/servers", "S", icon.Server},
-	{"Buckets", "/bucket", "B", icon.Archive},
-	{"Activity", "/activity", "Y", icon.Activity},
-	{"Team", "/workspace", "T", icon.Users},
-	{"Alerts", "/alerts", "L", icon.Bell},
-	{"Settings", "/settings", ",", icon.Settings},
-	{"Catalog", "/catalog", "", icon.LayoutGrid},
-}
-
-// AppCommandMenu is ⌘K: jump to a page, an app, a server or a bucket, and
-// run an app's deploy, restart or roll back after a confirm. The apps,
-// servers and buckets load on the first open, so no page carries them.
-templ AppCommandMenu() {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@commandmenu.Dialog(commandmenu.DialogProps{
-		ID:          "app-command",
-		Title:       "Jump to",
-		Description: "Pages, apps, servers and buckets, and what you can do with an app",
-		Class:       "top-[15%] sm:max-w-lg",
-	}) {
-		@commandmenu.Command(commandmenu.Props{ID: "app-command-menu", Label: "Jump to"}) {
-			@commandmenu.Input(commandmenu.InputProps{Placeholder: "Jump to an app, a server, a page…"})
-			@commandmenu.List(commandmenu.ListProps{Class: "min-h-80"}) {
-				@commandmenu.Empty() {
-					Nothing found.
-				}
-				@commandmenu.Group(commandmenu.GroupProps{Heading: "Go to"}) {
-					for _, place := range commandPlaces {
-						@commandmenu.Item(commandmenu.ItemProps{Value: "go " + place.Title, Attributes: templ.Attributes{"data-href": basePath + place.Path}}) {
-							@place.Icon()
-							<span class="truncate">{ place.Title }</span>
-							if place.Key != "" {
-								@commandmenu.Shortcut() {
-									{ "G " + place.Key }
-								}
-							}
-						}
-					}
-				}
-				<div class="contents" id="app-command-items" data-src={ basePath + "/command" }></div>
-			}
-		}
-	}
-	@AppShortcuts()
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			if (window.moinCommand) return;
-			window.moinCommand = true;
-			const typing = (target) => target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select, [contenteditable]"));
-			let loaded = false;
-			// The apps, servers and buckets come once, on the first open.
-			const load = async () => {
-				const holder = document.getElementById("app-command-items");
-				if (loaded || !holder) return;
-				loaded = true;
-				try {
-					const response = await fetch(holder.dataset.src, { headers: { "HX-Request": "true" } });
-					if (!response.ok) throw new Error(response.status);
-					holder.innerHTML = await response.text();
-					// htmx wires the action buttons, which post like those
-					// on the app page.
-					if (window.htmx && window.htmx.process) window.htmx.process(holder);
-					const input = document.querySelector("#app-command-menu input");
-					if (input) input.dispatchEvent(new Event("input", { bubbles: true }));
-				} catch {
-					loaded = false;
-				}
-			};
-			const open = () => {
-				load();
-				window.templ.dialog.open("app-command");
-			};
-			document.addEventListener("keydown", (event) => {
-				if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
-					event.preventDefault();
-					if (window.templ.dialog.isOpen && window.templ.dialog.isOpen("app-command")) window.templ.dialog.close("app-command");
-					else open();
-					return;
-				}
-				if (event.key === "?" && !event.metaKey && !event.ctrlKey && !typing(event.target)) {
-					event.preventDefault();
-					window.templ.dialog.open("app-shortcuts");
-				}
-			});
-			document.addEventListener("click", (event) => {
-				if (event.target.closest("[data-command-open]")) open();
-			});
-			// Enter or a click: a page goes there; an action asks first, then
-			// runs like its button on the app page.
-			document.addEventListener("command-select", (event) => {
-				const item = event.target instanceof Element && event.target.closest("#app-command-menu [data-href], #app-command-menu [data-command-action]");
-				if (!item) return;
-				window.templ.dialog.close("app-command");
-				if (item.dataset.href) {
-					const link = document.querySelector(`#sidebar-nav a[href="${item.dataset.href}"]`);
-					if (link) link.click();
-					else location.assign(item.dataset.href);
-					return;
-				}
-				const action = item.querySelector("[data-command-run]");
-				if (action) setTimeout(() => action.click(), 120);
-			});
-		})();
-	</script>
-}
-
-// AppShortcuts is the dialog ? opens: every key of the panel.
+// AppShortcuts is the dialog ? opens: every key of the panel, the same as
+// in the terminal UI.
 templ AppShortcuts() {
-	@dialog.Dialog(dialog.Props{ID: "app-shortcuts"}) {
-		@dialog.Content(dialog.ContentProps{Class: "sm:max-w-md"}) {
-			@dialog.Header() {
-				@dialog.Title() {
-					Keyboard shortcuts
-				}
-				@dialog.Description() {
-					Anywhere in the panel, unless you are typing.
-				}
-			}
-			<dl class="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 text-sm" data-shortcuts>
-				@shortcut([]string{"⌘", "K"}, "Jump to an app, a server or a page")
-				@shortcut([]string{"?"}, "This list")
-				for _, place := range commandPlaces {
-					if place.Key != "" {
-						@shortcut([]string{"G", place.Key}, place.Title)
-					}
-				}
-				@shortcut([]string{"/"}, "Search or the page's main field")
-				@shortcut([]string{"Esc"}, "Close, or leave a field")
-			</dl>
-		}
-	}
+	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop:bg-black/30 backdrop:backdrop-blur-sm">
+		<h2 id="app-shortcuts-title" class="text-base font-medium">Keyboard shortcuts</h2>
+		<p class="mt-1 text-sm text-muted-foreground">Anywhere in the panel, unless you are typing. The same as in the terminal UI.</p>
+		<dl class="mt-5 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 text-sm">
+			@shortcut([]string{"/"}, "Search, or run anything")
+			@shortcut([]string{"⌘", "K"}, "The same")
+			@shortcut([]string{"G", "H"}, "Overview")
+			@shortcut([]string{"G", "S"}, "Servers")
+			@shortcut([]string{"G", "Y"}, "Activity")
+			@shortcut([]string{"G", ","}, "Settings")
+			@shortcut([]string{"?"}, "This list")
+			@shortcut([]string{"Esc"}, "Close, or leave a field")
+		</dl>
+		<form method="dialog" class="mt-6 flex justify-end">
+			<button class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Done</button>
+		</form>
+	</dialog>
 }
 
 templ shortcut(keys []string, label string) {

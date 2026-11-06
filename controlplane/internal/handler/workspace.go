@@ -224,7 +224,7 @@ func (h *WorkspaceHandler) renderWorkspaceAction(w http.ResponseWriter, r *http.
 	r = r.WithContext(ctx)
 
 	render(w, r, pages.WorkspaceContent(members, invitations))
-	render(w, r, layouts.WorkspaceIdentity(workspace, workspaces))
+	render(w, r, layouts.WorkspaceUpdate(workspace, workspaces))
 	toastDone(w, r, title, description)
 }
 

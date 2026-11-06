@@ -141,7 +141,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}/overview", workspace(overview.Page))
-	mux.HandleFunc("GET /app/{workspaceSlug}/command", workspace(handler.NewCommandHandler(app.AppService, app.ServerService).Items))
+	mux.HandleFunc("GET /app/{workspaceSlug}/search", workspace(handler.NewCommandHandler(app.AppService, app.ServerService).Search))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.SettingsPage))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
@@ -365,6 +365,5 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
 		middleware.WithURLPath,
-		middleware.WithSidebarState,
 	)
 }

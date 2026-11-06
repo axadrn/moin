@@ -1,0 +1,162 @@
+package pages
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+)
+
+// SearchItem is one answer of the search in the bar: a place to go to, or
+// an action that posts after a confirm.
+type SearchItem struct {
+	Group string
+	Title string
+	Hint  string
+	Icon  func(...icon.Props) templ.Component
+	Href  string
+	// Post, with Confirm and Accept, makes the item an action.
+	Post    string
+	Confirm string
+	Accept  string
+}
+
+// SearchInput is what the search knows about the workspace.
+type SearchInput struct {
+	Base      string
+	Apps      []model.App
+	Servers   []model.Server
+	Buckets   []service.Bucket
+	CanChange bool
+	IsOwner   bool
+}
+
+// SearchItems is everything the search can find, in the order it lists
+// them: apps first, then servers, places, and what you can do.
+func SearchItems(in SearchInput) []SearchItem {
+	items := []SearchItem{}
+	for _, app := range in.Apps {
+		items = append(items, SearchItem{Group: "Apps", Title: app.Name, Hint: app.ServerName, Icon: icon.Box, Href: in.Base + "/apps/" + app.Name})
+	}
+	for _, server := range in.Servers {
+		items = append(items, SearchItem{Group: "Servers", Title: server.Name, Icon: icon.Server, Href: in.Base + "/servers/" + server.ID + "/security"})
+	}
+	for _, bucket := range in.Buckets {
+		items = append(items, SearchItem{Group: "Buckets", Title: bucket.Name, Icon: icon.Archive, Href: in.Base + "/bucket"})
+	}
+	places := []SearchItem{
+		{Title: "Overview", Hint: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
+		{Title: "New app", Hint: "deploy something new", Icon: icon.Plus, Href: in.Base + "/apps"},
+		{Title: "Servers", Hint: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
+		{Title: "Catalog", Hint: "47 apps in one click", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
+		{Title: "Buckets", Hint: "where backups go", Icon: icon.Archive, Href: in.Base + "/bucket"},
+		{Title: "Activity", Hint: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
+		{Title: "Team", Hint: "members and invitations", Icon: icon.Users, Href: in.Base + "/workspace"},
+		{Title: "Alerts", Hint: "mail, Slack, Discord, Telegram", Icon: icon.Bell, Href: in.Base + "/alerts"},
+		{Title: "Settings", Hint: "G ,", Icon: icon.Settings, Href: in.Base + "/settings"},
+	}
+	if in.IsOwner {
+		places = append(places, SearchItem{Title: "Billing", Hint: "your plan", Icon: icon.CreditCard, Href: in.Base + "/billing"})
+	}
+	for _, place := range places {
+		place.Group = "Go to"
+		items = append(items, place)
+	}
+	for _, app := range in.Apps {
+		path := in.Base + "/apps/" + app.Name
+		items = append(items, SearchItem{Group: "Do", Title: "Logs of " + app.Name, Icon: icon.ScrollText, Href: path + "/logs"})
+		if !in.CanChange {
+			continue
+		}
+		if app.LatestNumber > 0 {
+			items = append(items,
+				SearchItem{Group: "Do", Title: "Deploy " + app.Name, Hint: "build the newest source", Icon: icon.Rocket, Post: path + "/redeploy", Confirm: "Build the newest source of " + app.Name + " again and release it?", Accept: "Deploy"},
+				SearchItem{Group: "Do", Title: "Restart " + app.Name, Hint: "no build", Icon: icon.RotateCw, Post: path + "/restart", Confirm: "Start the live release of " + app.Name + " again? No build, the env and domains as they are now.", Accept: "Restart"},
+			)
+		}
+		if app.LiveNumber > 1 {
+			items = append(items, SearchItem{Group: "Do", Title: "Roll back " + app.Name, Hint: "to v" + strconv.Itoa(app.LiveNumber-1), Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Release the version of " + app.Name + " before the live one again?", Accept: "Roll back"})
+		}
+		items = append(items, SearchItem{Group: "Do", Title: "Back up " + app.Name + " now", Icon: icon.DatabaseBackup, Href: path + "/backups"})
+	}
+	return items
+}
+
+// MatchSearch keeps the items that have every word of the query, at most
+// limit of them. An empty query lists the apps, servers and places.
+func MatchSearch(items []SearchItem, query string, limit int) []SearchItem {
+	words := strings.Fields(strings.ToLower(query))
+	found := []SearchItem{}
+	for _, item := range items {
+		if len(words) == 0 && item.Group == "Do" {
+			continue
+		}
+		text := strings.ToLower(item.Title + " " + item.Group)
+		all := true
+		for _, word := range words {
+			if !strings.Contains(text, word) {
+				all = false
+				break
+			}
+		}
+		if all {
+			found = append(found, item)
+		}
+		if len(found) == limit {
+			break
+		}
+	}
+	return found
+}
+
+// SearchResults is the list under the search field. The first answer is
+// picked, so Enter opens it.
+templ SearchResults(items []SearchItem, query string) {
+	if len(items) == 0 {
+		<p class="px-4 py-6 text-center text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
+	}
+	for i, item := range items {
+		if i == 0 || items[i-1].Group != item.Group {
+			<div class="px-3 pt-2.5 pb-1 text-xs font-medium text-muted-foreground" role="presentation">{ item.Group }</div>
+		}
+		if item.Post != "" {
+			<button
+				type="button"
+				id={ "search-" + strconv.Itoa(i) }
+				role="option"
+				aria-selected={ strconv.FormatBool(i == 0) }
+				class={ searchOptionClass }
+				hx-post={ item.Post }
+				hx-swap="none"
+				hx-confirm={ item.Confirm }
+				data-confirm-action={ item.Accept }
+			>
+				@searchOption(item)
+			</button>
+		} else {
+			<a
+				id={ "search-" + strconv.Itoa(i) }
+				role="option"
+				aria-selected={ strconv.FormatBool(i == 0) }
+				href={ templ.SafeURL(item.Href) }
+				class={ searchOptionClass }
+			>
+				@searchOption(item)
+			</a>
+		}
+	}
+}
+
+const searchOptionClass = "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm outline-none aria-selected:bg-muted hover:bg-muted/60"
+
+templ searchOption(item SearchItem) {
+	<span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted [&_svg]:size-4">
+		@item.Icon()
+	</span>
+	<span class="min-w-0 flex-1 truncate font-medium">{ item.Title }</span>
+	if item.Hint != "" {
+		<span class="shrink-0 truncate text-xs text-muted-foreground">{ item.Hint }</span>
+	}
+}
