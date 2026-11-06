@@ -14,14 +14,37 @@ type OverviewHandler struct {
 	status  *service.StatusService
 	apps    *service.AppService
 	servers *service.ServerService
+	users   *service.UserService
 }
 
-func NewOverviewHandler(status *service.StatusService, apps *service.AppService, servers *service.ServerService) *OverviewHandler {
-	return &OverviewHandler{status: status, apps: apps, servers: servers}
+func NewOverviewHandler(status *service.StatusService, apps *service.AppService, servers *service.ServerService, users *service.UserService) *OverviewHandler {
+	return &OverviewHandler{status: status, apps: apps, servers: servers, users: users}
 }
 
 // Page shows what needs the member, then every app and server.
 func (h *OverviewHandler) Page(w http.ResponseWriter, r *http.Request) {
+	view, ok := h.view(w, r, ctxkeys.User(r.Context()).Sort())
+	if ok {
+		render(w, r, pages.Overview(view))
+	}
+}
+
+// Sort sorts the apps another way for this member, on every surface, and
+// answers only the apps of the overview (a templ fragment), which htmx
+// swaps in place.
+func (h *OverviewHandler) Sort(w http.ResponseWriter, r *http.Request) {
+	how := r.FormValue("sort")
+	if err := h.users.SetSort(ctxkeys.User(r.Context()).ID, how); err != nil {
+		failed(w, r, "Sort not changed", err, nil)
+		return
+	}
+	if view, ok := h.view(w, r, how); ok {
+		renderFragment(w, r, pages.Overview(view), "overview-apps")
+	}
+}
+
+// view is everything the overview shows, the apps sorted how.
+func (h *OverviewHandler) view(w http.ResponseWriter, r *http.Request, how string) (pages.OverviewView, bool) {
 	member := ctxkeys.WorkspaceMember(r.Context())
 	view := pages.OverviewView{}
 	var err error
@@ -30,11 +53,18 @@ func (h *OverviewHandler) Page(w http.ResponseWriter, r *http.Request) {
 			view.Servers, err = h.servers.List(member.WorkspaceID)
 		}
 	}
+	if err == nil {
+		var last map[string]int64
+		if last, err = h.apps.LastDeploys(member.WorkspaceID); err == nil {
+			view.Sort = how
+			view.Apps = service.SortApps(view.Apps, view.Sort, view.Servers, last)
+		}
+	}
 	if err != nil {
 		slog.Error("overview failed", "error", err, "workspace_id", member.WorkspaceID)
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "The overview didn't load", "Try again in a moment."))
-		return
+		return view, false
 	}
-	render(w, r, pages.Overview(view))
+	return view, true
 }

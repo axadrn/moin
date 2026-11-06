@@ -29,73 +29,40 @@ func NewAppsHandler(apps *service.AppService, servers *service.ServerService, us
 	return &AppsHandler{apps: apps, servers: servers, users: users}
 }
 
-func (h *AppsHandler) AppsPage(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	apps, err := h.apps.List(workspace.ID)
-	if err != nil {
-		renderError(w, "list apps failed", err)
-		return
-	}
-	servers, err := h.servers.List(workspace.ID)
+// NewPage is where an app starts: from a folder, GitHub or the catalog.
+func (h *AppsHandler) NewPage(w http.ResponseWriter, r *http.Request) {
+	servers, err := h.servers.List(ctxkeys.Workspace(r.Context()).ID)
 	if err != nil {
 		renderError(w, "list servers failed", err)
 		return
 	}
-	render(w, r, pages.Apps(pages.AppsView{Apps: apps, Servers: servers, Newest: h.newestDeploys(workspace.ID, apps)}))
+	render(w, r, pages.NewApp(servers))
 }
 
-// List answers the app table, for the reload after a change.
-func (h *AppsHandler) List(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	apps, err := h.apps.List(workspace.ID)
-	if err != nil {
-		renderError(w, "list apps failed", err)
+// SetPinned pins or unpins the app (the checkbox on=1). The star already
+// shows the change, so a save answers nothing; a failed one puts the star
+// back as stored.
+func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.SetPinned(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
+	if err == nil {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	servers, err := h.servers.List(workspace.ID)
-	if err != nil {
-		renderError(w, "list servers failed", err)
+	stored, getErr := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	if getErr != nil {
+		failed(w, r, "Pin not changed", err, nil)
 		return
 	}
-	render(w, r, pages.AppList(pages.AppsView{Apps: apps, Servers: servers, Newest: h.newestDeploys(workspace.ID, apps)}))
+	w.Header().Set("HX-Retarget", "#pin-form")
+	w.Header().Set("HX-Reswap", "outerHTML")
+	toastError(w, r, "Pin not changed", errorMessage(err))
+	render(w, r, pages.PinButton(*stored))
 }
 
-// newestDeploys is the newest deploy of every app that has one, with the
-// service the last good deploy detected, for the list's service and time
-// columns. An app it cannot read just shows less.
-func (h *AppsHandler) newestDeploys(workspaceID string, apps []model.App) map[string]api.Deploy {
-	newest := make(map[string]api.Deploy, len(apps))
-	for _, app := range apps {
-		if app.LatestNumber == 0 {
-			continue
-		}
-		_, deploys, err := h.apps.Deploys(workspaceID, app.ID, 10)
-		if err != nil || len(deploys) == 0 {
-			continue
-		}
-		deploy := api.NewDeploy(deploys[0])
-		// A deploy still running has not detected anything yet; show what runs.
-		for _, earlier := range deploys[1:] {
-			if deploy.Detected != nil {
-				break
-			}
-			if earlier.Status == model.DeploySucceeded {
-				deploy.Detected = api.NewDeploy(earlier).Detected
-			}
-		}
-		newest[app.ID] = deploy
-	}
-	return newest
-}
 
 // Create adds an app and answers the reset form. The event stream reloads the table.
+// Create adds an app and opens its page.
 func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	servers, err := h.servers.List(workspace.ID)
-	if err != nil {
-		renderError(w, "list servers failed", err)
-		return
-	}
 	app, err := h.apps.Create(actor(r), r.FormValue("name"), r.FormValue("server"))
 	if errors.Is(err, repository.ErrServerNotFound) {
 		fieldError(w, "App not added", "app-server", "Choose a server.")
@@ -105,8 +72,8 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "App not added", err, map[string]string{"name": "app-name"})
 		return
 	}
-	render(w, r, pages.AppAddForm(servers))
-	toastDone(w, r, app.Name+" added", "Run moin deploy "+app.Name+" in its repo to ship it.")
+	toastDone(w, r, app.Name+" added", "Link its repo, or run moin deploy "+app.Name+" in its folder.")
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
 }
 
 func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {

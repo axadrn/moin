@@ -68,6 +68,11 @@ func (m model) appActions(name string) []action {
 			return m.ask1("Update "+name+"?", "It installs the newest release of "+a.Catalog+". A snapshot comes first when that is on.", "update", false, m.updateCatalogApp(name)), nil
 		}})
 	}
+	pinWord := "pin"
+	if a.Pinned {
+		pinWord = "unpin"
+	}
+	out = append(out, action{"*", pinWord, func(m model) (tea.Model, tea.Cmd) { return m, m.pin(name, !a.Pinned) }})
 	out = append(out,
 		action{"N", "back up now", func(m model) (tea.Model, tea.Cmd) { return m, m.backUp(name) }},
 		action{"X", "run a command", func(m model) (tea.Model, tea.Cmd) { return m.openExec(name) }},

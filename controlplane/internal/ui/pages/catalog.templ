@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/controlplane/internal/ui/utils"
@@ -79,24 +79,7 @@ templ catalogBody(view CatalogView, heading templ.Component) {
 				}
 			</nav>
 			<div class="lg:hidden" data-catalog-category-select>
-				<label for="catalog-category" class="sr-only">Category</label>
-				@selectcomp.Select(selectcomp.Props{Name: "category-select", DefaultValue: categorySlug(view.Category), Items: categoryItems(view)}) {
-					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-category", Class: "w-full"}) {
-						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "All categories"})
-					}
-					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-						@selectcomp.Group() {
-							@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
-								All categories <span class="text-muted-foreground">{ strconv.Itoa(view.Total) }</span>
-							}
-							for _, category := range view.Categories {
-								@selectcomp.Item(selectcomp.ItemProps{Value: categorySlug(category)}) {
-									{ category } <span class="text-muted-foreground">{ strconv.Itoa(view.Counts[category]) }</span>
-								}
-							}
-						}
-					}
-				}
+				@kit.Select(kit.SelectProps{ID: "catalog-category", Name: "category-select", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
 			</div>
 		</aside>
 		<section class="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-2" aria-label="Apps">
@@ -441,39 +424,13 @@ templ CatalogInstall(view CatalogInstallView) {
 								@field.Label(field.LabelProps{For: "catalog-version"}) {
 									Version
 								}
-								@selectcomp.Select(selectcomp.Props{Name: "version", DefaultValue: firstVersion(view.App.Versions), Items: versionItems(view.App.Versions), Disabled: len(view.App.Versions) == 0}) {
-									@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-version", Class: "w-full"}) {
-										@selectcomp.Value(selectcomp.ValueProps{Placeholder: "The newest release"})
-									}
-									@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-										@selectcomp.Group() {
-											for _, version := range view.App.Versions {
-												@selectcomp.Item(selectcomp.ItemProps{Value: version.Tag}) {
-													{ version.Tag }
-												}
-											}
-										}
-									}
-								}
+								@kit.Select(kit.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
 							}
 							@field.Field(field.Props{Class: "gap-1.5"}) {
 								@field.Label(field.LabelProps{For: "catalog-server"}) {
 									Server
 								}
-								@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: view.Servers[0].Name, Items: appAddServerItems(view.Servers)}) {
-									@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-server", Class: "w-full"}) {
-										@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Server"})
-									}
-									@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-										@selectcomp.Group() {
-											for _, server := range view.Servers {
-												@selectcomp.Item(selectcomp.ItemProps{Value: server.Name}) {
-													{ server.Name }
-												}
-											}
-										}
-									}
-								}
+								@kit.Select(kit.SelectProps{ID: "catalog-server", Name: "server", Label: "Server", Options: serverOptions(view.Servers)})
 							}
 							@field.Field(field.Props{Class: "gap-1.5"}) {
 								@field.Label(field.LabelProps{For: "catalog-name"}) {
@@ -550,20 +507,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 				>
 					@csrf.Token()
 					<label for="catalog-update-version" class="sr-only">Version</label>
-					@selectcomp.Select(selectcomp.Props{Name: "version", DefaultValue: firstVersion(view.Versions), Items: versionItems(view.Versions), Disabled: len(view.Versions) == 0}) {
-						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "catalog-update-version", Class: "w-full sm:w-40"}) {
-							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Version"})
-						}
-						@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignEnd}) {
-							@selectcomp.Group() {
-								for _, version := range view.Versions {
-									@selectcomp.Item(selectcomp.ItemProps{Value: version.Tag}) {
-										{ version.Tag }
-									}
-								}
-							}
-						}
-					}
+					@kit.Select(kit.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Disabled: len(view.Versions) == 0})
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: utils.IfElse(view.Newer, button.VariantDefault, button.VariantSecondary), Attributes: templ.Attributes{"data-catalog-update-submit": true}}) {
 						if view.Newer {
 							Update

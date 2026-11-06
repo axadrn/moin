@@ -281,7 +281,11 @@ func (m model) appsPanel(u ui, w, h int, wide bool) string {
 		if word == "deploying" {
 			chip = u.warn(spinner[m.frame%len(spinner)] + " " + label)
 		}
-		cells := []cell{{u.strong(a.Name), 16, false}, {chip, 16, false}}
+		name := u.strong(a.Name)
+		if a.Pinned {
+			name += " " + u.muted("★")
+		}
+		cells := []cell{{name, 16, false}, {chip, 16, false}}
 		if wide {
 			cells = append(cells, cell{u.muted(a.ServerName), 12, false})
 		}

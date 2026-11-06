@@ -226,3 +226,19 @@ func (h *AccountHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	NoContent(w)
 }
+
+// SetSort sets how the user sorts the apps, the same in the web and the TUI.
+func (h *AccountHandler) SetSort(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	var body struct {
+		Sort string `json:"sort"`
+	}
+	if !Decode(w, r, &body) {
+		return
+	}
+	if err := h.userService.SetSort(user.ID, body.Sort); err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]string{"sort": body.Sort})
+}

@@ -69,16 +69,16 @@ func (s *UserService) UpdateName(userID, name string) (*model.User, error) {
 	return s.ByID(userID)
 }
 
-// ErrView is a page or a view the Apps and Servers pages do not have.
-var ErrView = errors.New("view must be list or grid, for apps or servers")
+// ErrSort is a way to sort the apps that moin does not have.
+var ErrSort = errors.New("sort must be smart, recent or server")
 
-// SetView remembers how the user sees the "apps" or the "servers" page:
-// model.ViewList or model.ViewGrid.
-func (s *UserService) SetView(userID, page, view string) error {
-	if (page != "apps" && page != "servers") || (view != model.ViewList && view != model.ViewGrid) {
-		return ErrView
+// SetSort remembers how the user sorts the apps, the same in the web and
+// the TUI: model.SortSmart, model.SortRecent or model.SortServer.
+func (s *UserService) SetSort(userID, sort string) error {
+	if sort != model.SortSmart && sort != model.SortRecent && sort != model.SortServer {
+		return ErrSort
 	}
-	return s.userRepository.SetView(userID, page, view)
+	return s.userRepository.SetSort(userID, sort)
 }
 
 // SetEmailAlerts turns the email alerts of the user on or off: a mail

@@ -1,6 +1,8 @@
 package pages
 
 import (
+
+	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
@@ -24,6 +26,7 @@ func appKind(app model.App) status.Kind {
 templ appHeader(app model.App, tab, description string) {
 	<div class="flex flex-col gap-6">
 		@statusHeader(app.Name, appHeaderChip(app, tab), description) {
+			@PinButton(app)
 			{ children... }
 		}
 		@appTabs(app.Name, tab)
@@ -50,4 +53,18 @@ templ appTabs(appName, active string) {
 		@tabLink(appPath+"/uptime", "Uptime", active == "uptime", nil)
 		@tabLink(appPath+"/metrics", "Metrics", active == "metrics", nil)
 	}
+}
+
+// PinButton is the star by an app: a real checkbox, so the browser fills
+// the star the moment you click, and htmx saves it without swapping
+// anything (DESIGN.md, Feedback). Pinned apps stay above the others that
+// run fine, in every list.
+templ PinButton(app model.App) {
+	<form id="pin-form" class="contents" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin" } hx-trigger="change" hx-swap="none">
+		@csrf.Token()
+		<label class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/5 hover:text-foreground has-checked:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/30" title="Pin it above the others">
+			<input type="checkbox" name="on" value="1" checked?={ app.Pinned } autocomplete="off" class="peer sr-only" aria-label={ "Pin " + app.Name } data-pin/>
+			<svg aria-hidden="true" viewBox="0 0 24 24" class="size-5 fill-none peer-checked:fill-current"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg>
+		</label>
+	</form>
 }

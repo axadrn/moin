@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"strconv"
@@ -11,294 +12,87 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"github.com/axadrn/moin/protocol"
 )
 
-// AppsView is what the apps page shows: the apps, the servers they run on
-// and the newest deploy of every app by app ID.
-type AppsView struct {
-	Apps    []model.App
-	Servers []model.Server
-	Newest  map[string]api.Deploy
-}
-
-templ Apps(view AppsView) {
-	@layouts.App("Apps") {
+// NewApp is where an app starts: from your folder, from GitHub, or from
+// the catalog. Each is one card; the overview lists the apps.
+templ NewApp(servers []model.Server) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@layouts.App("New app") {
 		@panelPage() {
-			@pageHeader("Apps", "Docker Compose projects on your servers. The first moin deploy in a repo creates its app.") {
-				<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-					@AppAddForm(view.Servers)
-					@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/catalog", Variant: button.VariantSecondary, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-link": true}}) {
-						@icon.LayoutGrid(icon.Props{Class: "size-4"})
-						From the catalog
+			<header class="flex flex-col gap-1 pt-2">
+				<h1 class="text-3xl font-semibold tracking-tight">New app</h1>
+				<p class="text-muted-foreground">Three ways to start. Pick the one that fits.</p>
+			</header>
+			if len(servers) == 0 {
+				@kit.List() {
+					@kit.Row(basePath + "/servers") {
+						@kit.RowText("Connect a server first", "Apps run on your servers. One command, no open port.")
 					}
-				</div>
+				}
+			} else {
+				@kit.Card("From your folder", nil) {
+					@kit.Quiet() {
+						Run this in the folder of your app. It finds compose.yml, a Dockerfile or a Go module and builds on your server.
+					}
+					@kit.Command("moin deploy")
+				}
+				@kit.Card("From GitHub", nil) {
+					@kit.Quiet() {
+						Name it and pick its server. Then link its repo, and every push deploys.
+					}
+					@AppAddForm(servers)
+				}
+				@kit.Card("From the catalog", nil) {
+					@kit.Quiet() {
+						Umami, n8n, Ghost and 44 more, the newest release in one click.
+					}
+					<div>
+						@kit.Button(kit.Secondary, basePath+"/catalog", templ.Attributes{"data-catalog-link": true}) {
+							Open the catalog
+						}
+					</div>
+				}
 			}
-			@AppList(view)
 		}
-		@appsScript()
 	}
 }
 
-// AppAddForm is the add form. A request replaces it to reset it after the
-// app was added; a wrong name keeps it as it is (DESIGN.md, Feedback).
+// AppAddForm names a new app and picks its server; the new app's page
+// opens once it is added.
 templ AppAddForm(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<form
 		id="app-add-form"
-		hx-swap-oob="true"
-		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
+		class="flex flex-col gap-2 sm:flex-row"
 		hx-post={ basePath + "/apps" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
 		<label for="app-name" class="sr-only">App name</label>
-		@input.Input(input.Props{
-			ID:          "app-name",
-			Name:        "name",
-			Type:        "text",
-			Placeholder: "New app, e.g. blog",
-			Class:       "min-w-0 font-mono placeholder:font-sans sm:w-56",
-			Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
-		})
-		<div class="flex gap-2">
-			<label for="app-server" class="sr-only">Server</label>
-			@selectcomp.Select(selectcomp.Props{Name: "server", DefaultValue: appAddServer(servers), Items: appAddServerItems(servers), Disabled: len(servers) == 0}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app-server", Class: "min-w-0 flex-1 sm:w-36 sm:flex-none"}) {
-					@selectcomp.Value(selectcomp.ValueProps{Placeholder: "No server"})
-				}
-				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					@selectcomp.Group() {
-						@selectcomp.Label() {
-							Servers
-						}
-						for _, option := range servers {
-							@selectcomp.Item(selectcomp.ItemProps{Value: option.Name}) {
-								{ option.Name }
-							}
-						}
-					}
-				}
-			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Disabled: len(servers) == 0}) {
-				@icon.Plus(icon.Props{Class: "size-4"})
-				Add app
+		@kit.Input(templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like blog", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+		<div class="flex gap-2 sm:w-64">
+			@kit.Select(kit.SelectProps{ID: "app-server", Name: "server", Label: "Server", Options: serverOptions(servers)})
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				Add
 			}
 		</div>
 	</form>
 }
 
-// appAddServer is the server the add form selects: the first, like a
-// native select without a selected option.
-func appAddServer(servers []model.Server) string {
-	if len(servers) > 0 {
-		return servers[0].Name
-	}
-	return ""
-}
-
-func appAddServerItems(servers []model.Server) []selectcomp.ItemData {
-	items := make([]selectcomp.ItemData, 0, len(servers))
-	for _, option := range servers {
-		items = append(items, selectcomp.ItemData{Value: option.Name, Label: option.Name})
-	}
-	return items
-}
-
-// AppList is the numbers and the apps. The page reloads it on every change
-// the app event stream reports.
-templ AppList(view AppsView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ now := time.Now() }}
-	<div
-		id="app-list"
-		hx-swap-oob="true"
-		hx-get={ basePath + "/apps/list" }
-		hx-trigger="apps-changed from:body"
-		hx-swap="none"
-		class="flex flex-col gap-6"
-	>
-		if len(view.Apps) == 0 {
-			@emptyState("No apps yet", "Run moin deploy in the repo of an app. It finds compose.yml, a Dockerfile or a Go module, builds on your server and creates the app.", "moin deploy") {
-				@docsLink("/docs/guides/deploy", "How it works")
-			}
-		} else {
-			{{ live, deploying, failed := appCounts(view.Apps) }}
-			@statGrid() {
-				@statCard("Live", strconv.Itoa(live), "of "+plural(len(view.Apps), "app", "apps"))
-				@statCard("Deploying", strconv.Itoa(deploying), "right now")
-				@statCard("Failed", strconv.Itoa(failed), failedNote(failed))
-				@statCard("Servers online", strconv.Itoa(onlineServers(view.Servers)), "of "+strconv.Itoa(len(view.Servers)))
-			}
-			<div class="flex flex-wrap items-center justify-between gap-3">
-				<h2 id="apps-heading" class="text-base font-semibold">All apps</h2>
-				@appListActions(len(view.Apps))
-			</div>
-			@orderForm("apps") {
-				if pageView(ctx, "apps") == model.ViewGrid {
-					<ul class="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" role="list" aria-labelledby="apps-heading" data-sortable-list>
-						for _, app := range view.Apps {
-							{{ newest, hasNewest := view.Newest[app.ID] }}
-							<li data-app={ app.Name } class="min-w-0">
-								@appCard(app, newest, hasNewest, now)
-							</li>
-						}
-					</ul>
-				} else {
-					<ul class="flex flex-col gap-2" role="list" aria-labelledby="apps-heading" data-sortable-list>
-						for _, app := range view.Apps {
-							{{ newest, hasNewest := view.Newest[app.ID] }}
-							<li data-app={ app.Name } class="min-w-0">
-								@card.Card(card.Props{Class: listCard}) {
-									@orderHandle(app.Name)
-									@appRow(app, newest, hasNewest, now)
-								}
-							</li>
-						}
-					</ul>
-				}
-			}
-		}
-	</div>
-}
-
-// appListActions is the number of apps and the view switch right of the
-// list title.
-templ appListActions(n int) {
-	<div class="flex items-center gap-3">
-		@appCount(n)
-		@viewSwitch("apps")
-	</div>
-}
-
-// appCard is an app in the grid: its name and state, where it runs, its
-// last deploy, and the way to its page. Its grip drags it.
-templ appCard(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	@card.Card(card.Props{Class: "h-full min-w-0"}) {
-		@card.Header() {
-			@card.Title(card.TitleProps{Class: "-ml-2 flex min-w-0 items-center gap-1 text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "3"}}) {
-				@orderHandle(app.Name)
-				<a href={ templ.SafeURL(appPath) } class="truncate hover:underline hover:underline-offset-4">{ app.Name }</a>
-			}
-			@card.Action() {
-				@appStatus(app)
-			}
-		}
-		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col gap-4"}) {
-			<dl class="flex flex-wrap gap-x-8 gap-y-3">
-				@serverFact("Server", app.ServerName, app.ServerName)
-				if hasNewest && newest.Detected != nil {
-					@serverFact("Service", newest.Detected.Service+":"+strconv.Itoa(newest.Detected.Port), newest.Detected.Built())
-				}
-				if hasNewest {
-					@serverFact("Last deploy", ago(newest.CreatedAt, now), stamp(newest.CreatedAt))
-				} else {
-					@serverFact("Last deploy", "never", "Never deployed")
-				}
-			</dl>
-		}
-		@card.Footer(card.FooterProps{Class: "mt-auto gap-2"}) {
-			@button.Button(button.Props{Href: appPath, Variant: button.VariantSecondary, Size: button.SizeSm}) {
-				Open
-			}
-		}
-	}
-}
-
-// appRow is an app in the list, like a server in its list: its name, what
-// runs and where, its state and last deploy, linking to its page.
-templ appRow(app model.App, newest api.Deploy, hasNewest bool, now time.Time) {
-	@item.Item(item.Props{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name, Size: item.SizeSm, Class: "group/app grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-4 px-2.75 md:grid-cols-[minmax(0,1fr)_8rem_7rem_1rem]"}) {
-		@item.Content(item.ContentProps{Class: "min-w-0 gap-0.5"}) {
-			@item.Title(item.TitleProps{Class: "max-w-full truncate"}) {
-				{ app.Name }
-			}
-			@item.Description(item.DescriptionProps{Class: "line-clamp-1 text-xs"}) {
-				if hasNewest && newest.Detected != nil {
-					<span class="font-mono">{ newest.Detected.Service }:{ strconv.Itoa(newest.Detected.Port) }</span>
-					<span aria-hidden="true">·</span>
-					{ newest.Detected.Built() }
-					<span aria-hidden="true">·</span>
-				}
-				on { app.ServerName }
-			}
-		}
-		<span class="flex min-w-0 justify-end md:justify-start">
-			@appStatus(app)
-		</span>
-		<span class="hidden text-xs text-muted-foreground tabular-nums md:block">
-			if hasNewest {
-				<span title={ stamp(newest.CreatedAt) }>{ ago(newest.CreatedAt, now) }</span>
-			} else {
-				never deployed
-			}
-		</span>
-		@icon.ChevronRight(icon.Props{Class: "hidden size-4 text-muted-foreground transition-transform group-hover/app:translate-x-0.5 group-hover/app:text-foreground md:block"})
-	}
-}
-
-// appCount is the number of apps right of the list title.
-templ appCount(n int) {
-	<span class="text-xs text-muted-foreground tabular-nums">{ plural(n, "app", "apps") }</span>
-}
-
-func failedNote(failed int) string {
-	if failed == 0 {
-		return "none failing"
-	}
-	return "newest deploy failed"
-}
-
-func appCounts(apps []model.App) (live, deploying, failed int) {
-	for _, app := range apps {
-		switch {
-		case app.LatestStatus == model.DeployRunning:
-			deploying++
-		case app.LatestStatus == model.DeployFailed:
-			failed++
-		}
-		if app.LiveNumber > 0 && !app.Stopped {
-			live++
-		}
-	}
-	return live, deploying, failed
-}
-
-func onlineServers(servers []model.Server) int {
-	online := 0
+func serverOptions(servers []model.Server) []kit.Option {
+	options := make([]kit.Option, 0, len(servers))
 	for _, server := range servers {
-		if server.Online {
-			online++
-		}
+		options = append(options, kit.Option{Value: server.Name, Label: server.Name})
 	}
-	return online
-}
-
-// serverKind is the status symbol of the server an app runs on.
-func serverKind(servers []model.Server, id string) status.Kind {
-	for _, server := range servers {
-		if server.ID != id {
-			continue
-		}
-		switch {
-		case server.Online:
-			return status.KindLive
-		case server.LastSeenAt == nil:
-			return status.KindWaiting
-		}
-		return status.KindFailed
-	}
-	return status.KindIdle
+	return options
 }
 
 // appStatus is the chip of an app: its newest deploy, and the live one when

@@ -22,8 +22,6 @@ type ServerRepository interface {
 	ByInstallTokenHash(hash string) (*model.Server, error)
 	ByAgentTokenHash(hash string) (*model.Server, error)
 	ListByWorkspaceID(workspaceID string) ([]model.Server, error)
-	// SetOrder puts the servers of a workspace in the order of ids, every one once.
-	SetOrder(workspaceID string, ids []string) error
 	Register(id, agentTokenHash string, hello model.Server) error
 	UpdateHello(id string, hello model.Server) error
 	TouchLastSeen(id string, at time.Time) error
@@ -69,8 +67,8 @@ func NewServerRepository(db *sqlx.DB) ServerRepository {
 
 func (r *serverRepository) Create(server *model.Server) error {
 	_, err := r.db.Exec(`
-		INSERT INTO servers (id, workspace_id, name, install_token_hash, install_expires_at, position, created_at)
-		VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(position), -1) + 1 FROM servers WHERE workspace_id = $2), $6)
+		INSERT INTO servers (id, workspace_id, name, install_token_hash, install_expires_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`, server.ID, server.WorkspaceID, server.Name, server.InstallTokenHash, server.InstallExpiresAt, server.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: servers.workspace_id, servers.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateServer
@@ -107,7 +105,7 @@ func (r *serverRepository) ByAgentTokenHash(hash string) (*model.Server, error) 
 // ListByWorkspaceID returns the servers of a user by name.
 func (r *serverRepository) ListByWorkspaceID(workspaceID string) ([]model.Server, error) {
 	servers := []model.Server{}
-	err := r.db.Select(&servers, `SELECT * FROM servers WHERE workspace_id = $1 ORDER BY position, name, id`, workspaceID)
+	err := r.db.Select(&servers, `SELECT * FROM servers WHERE workspace_id = $1 ORDER BY name, id`, workspaceID)
 	return servers, err
 }
 

@@ -2,16 +2,16 @@ package pages
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
@@ -21,12 +21,15 @@ type OverviewView struct {
 	Status  service.WorkspaceStatus
 	Apps    []model.App
 	Servers []model.Server
+	// Sort is how the member sorts the apps; Apps are in that order.
+	Sort string
 }
 
 // Overview answers before it asks: "Everything runs." or what needs you,
 // then every app and server, quiet unless something is wrong.
 templ Overview(view OverviewView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
 	@layouts.App("Overview") {
 		@panelPage() {
 			<header class="flex flex-col gap-1 pt-2">
@@ -50,23 +53,30 @@ templ Overview(view OverviewView) {
 						}
 					}
 				}
-				@kit.Section("Apps", overviewNewApp(basePath)) {
-					if len(view.Apps) == 0 {
-						@kit.List() {
-							@kit.Row("") {
-								@kit.RowText("No apps yet", "Deploy one from its folder with moin deploy, or pick one from the catalog.")
-							}
-						}
-					} else {
-						@kit.List() {
-							for _, app := range overviewOrder(view.Apps) {
-								@kit.Row(basePath + "/apps/" + app.Name) {
-									@kit.RowText(app.Name, appNote(app))
-									@appState(app)
+				@templ.Fragment("overview-apps") {
+					<div id="overview-apps">
+						@kit.Section("Apps", overviewAppActions(basePath, view.Sort)) {
+							if len(view.Apps) == 0 {
+								@kit.List() {
+									@kit.Row("") {
+										@kit.RowText("No apps yet", "Deploy one from its folder with moin deploy, or pick one from the catalog.")
+									}
+								}
+							} else {
+								@kit.List() {
+									for i, app := range view.Apps {
+										if view.Sort == model.SortServer && (i == 0 || view.Apps[i-1].ServerName != app.ServerName) {
+											<p class="px-5 pt-3 pb-1 text-sm text-muted-foreground">{ app.ServerName }</p>
+										}
+										@kit.Row(basePath + "/apps/" + app.Name) {
+											@kit.RowText(app.Name, appNote(app, serverOnline(view.Servers, app.ServerID)))
+											@appState(app)
+										}
+									}
 								}
 							}
 						}
-					}
+					</div>
 				}
 				if len(view.Status.Updates) > 0 {
 					@kit.Section("Updates", nil) {
@@ -79,16 +89,12 @@ templ Overview(view OverviewView) {
 						}
 					}
 				}
-				@kit.Section("Servers", nil) {
+				@kit.Section("Servers", overviewAllServers(basePath)) {
 					@kit.List() {
 						for _, server := range view.Servers {
 							@kit.Row(basePath + "/servers/" + server.ID + "/security") {
-								@kit.RowText(server.Name, serverNote(server))
-								if !server.Online {
-									@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
-										Offline
-									}
-								}
+								@kit.RowText(server.Name, serverNote(server, now))
+								@serverState(server)
 							}
 						}
 					}
@@ -124,60 +130,44 @@ func overviewSummary(s service.WorkspaceStatus) string {
 	return strings.Join(parts, " · ")
 }
 
-// overviewOrder puts what needs you first, then what is deploying, then
-// the rest by name.
-func overviewOrder(apps []model.App) []model.App {
-	rank := func(app model.App) int {
-		switch {
-		case app.LatestStatus == model.DeployFailed:
-			return 0
-		case app.LatestStatus == model.DeployRunning:
-			return 1
-		}
-		return 2
-	}
-	ordered := append([]model.App(nil), apps...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		if rank(ordered[i]) != rank(ordered[j]) {
-			return rank(ordered[i]) < rank(ordered[j])
-		}
-		return ordered[i].Name < ordered[j].Name
-	})
-	return ordered
-}
-
-// appNote is the second line of an app, only when there is something to say.
-func appNote(app model.App) string {
+// appNote is the second line of an app: only what its state mark does not
+// say already.
+func appNote(app model.App, serverOnline bool) string {
 	switch {
-	case app.LatestNumber == 0:
-		return "Not deployed yet"
-	case app.LatestStatus == model.DeployRunning:
-		return fmt.Sprintf("Deploying v%d", app.LatestNumber)
-	case app.Stopped:
-		return "Stopped"
-	case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
-		return fmt.Sprintf("v%d failed, v%d still runs", app.LatestNumber, app.LiveNumber)
+	case !serverOnline:
+		return app.ServerName + " is offline"
+	case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0 && !app.Stopped:
+		return fmt.Sprintf("v%d still runs", app.LiveNumber)
 	case app.LatestStatus == model.DeployFailed:
-		return fmt.Sprintf("v%d failed", app.LatestNumber)
+		return "Nothing runs"
 	}
 	return ""
+}
+
+func serverOnline(servers []model.Server, id string) bool {
+	for _, server := range servers {
+		if server.ID == id {
+			return server.Online
+		}
+	}
+	return true
 }
 
 // appState is the mark at the end of an app's row: a quiet dot when it
 // runs, a word when it does not.
 templ appState(app model.App) {
-	switch {
+	switch  {
 		case app.LatestNumber == 0 || app.Stopped:
 			@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
 				{ ifElse(app.Stopped, "Stopped", "New") }
 			}
 		case app.LatestStatus == model.DeployRunning:
 			@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
-				Deploying
+				{ fmt.Sprintf("Deploying v%d", app.LatestNumber) }
 			}
 		case app.LatestStatus == model.DeployFailed:
 			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
-				Failed
+				{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 			}
 		default:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Live">
@@ -187,13 +177,6 @@ templ appState(app model.App) {
 	}
 }
 
-func serverNote(server model.Server) string {
-	if server.Online {
-		return ""
-	}
-	return "Its apps may be down"
-}
-
 func ifElse(ok bool, yes, no string) string {
 	if ok {
 		return yes
@@ -201,9 +184,39 @@ func ifElse(ok bool, yes, no string) string {
 	return no
 }
 
+// overviewAllServers leads to every detail of the servers.
+templ overviewAllServers(basePath string) {
+	<a href={ templ.SafeURL(basePath + "/servers") } class="rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">All servers</a>
+}
+
+// overviewAppActions are next to the apps: how they are sorted, and a new
+// one.
+templ overviewAppActions(basePath, sort string) {
+	<div class="flex items-center gap-1">
+		@kit.Menu(kit.MenuProps{ID: "sort-menu", Label: "Sort the apps", End: true, Class: "h-9 px-3 text-sm font-medium text-muted-foreground hover:text-foreground"}, sortLabel(sort)) {
+			for _, way := range []struct{ Value, Label string }{{model.SortSmart, "Smart"}, {model.SortRecent, "Recently deployed"}, {model.SortServer, "By server"}} {
+				@kit.MenuItem("", templ.Attributes{"hx-post": basePath + "/sort", "hx-vals": `{"sort":"` + way.Value + `"}`, "hx-target": "#overview-apps", "hx-swap": "outerHTML", "aria-checked": strconv.FormatBool(way.Value == sort), "role": "menuitemradio"}) {
+					<span class="flex-1">{ way.Label }</span>
+					<span class="flex size-4 items-center justify-center">
+						if way.Value == sort {
+							@icon.Check(icon.Props{Class: "text-foreground!"})
+						}
+					</span>
+				}
+			}
+		}
+		@overviewNewApp(basePath)
+	</div>
+}
+
+templ sortLabel(sort string) {
+	@icon.ArrowUpDown(icon.Props{Class: "size-4"})
+	<span>{ map[string]string{model.SortSmart: "Smart", model.SortRecent: "Recent", model.SortServer: "By server"}[sort] }</span>
+}
+
 // overviewNewApp is the action next to the apps: start a new one.
 templ overviewNewApp(basePath string) {
-	<a href={ templ.SafeURL(basePath + "/apps") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
+	<a href={ templ.SafeURL(basePath + "/apps/new") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
 }
 
 // overviewStart is the first visit: no server yet.
@@ -243,6 +256,3 @@ func overviewIssueTone(kind string) string {
 	}
 	return "bg-failed/12 text-failed"
 }
-
-
-

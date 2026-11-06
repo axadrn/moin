@@ -21,7 +21,7 @@ type UserRepository interface {
 	ByEmail(email string) (*model.User, error)
 	Update(user *model.User) error
 	UpdateName(userID, name string, updatedAt time.Time) error
-	SetView(userID, page, view string) error
+	SetSort(userID, sort string) error
 	SetEmailAlerts(userID string, on bool) error
 	Delete(id string) error
 }
@@ -103,13 +103,9 @@ func (r *userRepository) UpdateName(userID, name string, updatedAt time.Time) er
 	return nil
 }
 
-// SetView stores how the user sees the "apps" or the "servers" page.
-func (r *userRepository) SetView(userID, page, view string) error {
-	column := "apps_view"
-	if page == "servers" {
-		column = "servers_view"
-	}
-	result, err := r.db.Exec(`UPDATE users SET `+column+` = $1 WHERE id = $2`, view, userID)
+// SetSort stores how the user sorts the apps.
+func (r *userRepository) SetSort(userID, sort string) error {
+	result, err := r.db.Exec(`UPDATE users SET app_sort = $1 WHERE id = $2`, sort, userID)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 // CatalogEntryView is a catalog app with its releases, newest first.
@@ -47,12 +47,12 @@ type CatalogView struct {
 
 // categoryItems are the categories for the select on small screens, with
 // their counts, All first.
-func categoryItems(view CatalogView) []selectcomp.ItemData {
-	items := []selectcomp.ItemData{{Value: "", Label: "All categories " + strconv.Itoa(view.Total)}}
+func categoryOptions(view CatalogView) []kit.Option {
+	options := []kit.Option{{Value: "", Label: "All categories"}}
 	for _, category := range view.Categories {
-		items = append(items, selectcomp.ItemData{Value: categorySlug(category), Label: category + " " + strconv.Itoa(view.Counts[category])})
+		options = append(options, kit.Option{Value: categorySlug(category), Label: category})
 	}
-	return items
+	return options
 }
 
 // The orders of the catalog.
@@ -229,12 +229,12 @@ func catalogJSONLD(view CatalogEntryView, url string) string {
 }
 
 // versionItems are the releases for the version select, newest first.
-func versionItems(versions []catalog.Version) []selectcomp.ItemData {
-	items := make([]selectcomp.ItemData, 0, len(versions))
+func versionOptions(versions []catalog.Version) []kit.Option {
+	options := make([]kit.Option, 0, len(versions))
 	for _, version := range versions {
-		items = append(items, selectcomp.ItemData{Value: version.Tag, Label: version.Tag})
+		options = append(options, kit.Option{Value: version.Tag, Label: version.Tag})
 	}
-	return items
+	return options
 }
 
 // shownVersions are the newest releases a page lists.

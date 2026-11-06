@@ -14,10 +14,10 @@ templ Section(title string, action templ.Component) {
 	</section>
 }
 
-// List is a group of rows on one card, like a list in iOS Settings. Rows
-// are separated by a line that starts where their text starts.
+// List is a group of rows on one card. No lines between the rows: their
+// height keeps them apart, and a hovered row lights up inside the card.
 templ List() {
-	<div class="overflow-hidden rounded-4xl bg-card" role="list">
+	<div class="flex flex-col rounded-4xl bg-card p-1.5" role="list">
 		{ children... }
 	</div>
 }
@@ -27,7 +27,7 @@ templ List() {
 // after it.
 templ Row(href string) {
 	if href != "" {
-		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + " outline-none hover:bg-muted/50 focus-visible:bg-muted/50" }>
+		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + " outline-none hover:bg-foreground/4 focus-visible:bg-foreground/4 active:bg-foreground/7" }>
 			{ children... }
 			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 		</a>
@@ -38,7 +38,7 @@ templ Row(href string) {
 	}
 }
 
-const rowClass = "relative flex min-h-14 items-center gap-3 px-5 py-3 [&+&]:before:absolute [&+&]:before:inset-x-5 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-border"
+const rowClass = "relative flex min-h-16 items-center gap-3 rounded-3xl px-5 py-3"
 
 // RowText is the main part of a Row: a name, and a second line only when
 // there is something to say.

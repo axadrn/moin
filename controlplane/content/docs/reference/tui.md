@@ -58,6 +58,7 @@ A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be u
 | `B` | app | deploys a branch, tag or commit of the linked GitHub repo; empty deploys the linked branch |
 | `U` | app | updates a catalog app to its newest release, after `y` |
 | `N` | app | backs up the app's databases now |
+| `*` | app | pins the app, or unpins it: pinned apps stay above the others that run fine |
 | `X` | app | [runs a command](/docs/guides/exec) in the main service, no shell; start it with `@service` for another one |
 | `W` | app, server | opens it in the web app |
 | `enter` | deploys | the log of the picked deploy, live while it runs |
