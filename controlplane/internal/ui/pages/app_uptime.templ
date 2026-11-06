@@ -32,7 +32,7 @@ templ AppUptime(view UptimeView) {
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " uptime", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Uptime"}}}) {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
 			@appHeader(view.App, "addresses")
-			@appSection() {
+			@appSection(view.App.Name, "addresses") {
 				<div id="app-uptime" class="flex flex-col gap-6">
 					if !view.Uptime.ServerOnline && view.App.ServerName != "" {
 						@stateAlert(templ.Attributes{"data-server-offline": true}) {

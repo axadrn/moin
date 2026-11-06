@@ -39,7 +39,7 @@ templ AdminDashboardContent(data *model.AdminDashboard) {
 			@statCard("Sessions", strconv.Itoa(data.Metrics.ActiveSessions), "")
 		</dl>
 		if data.Network != nil {
-			@panel(panelProps{Title: "Network", Description: "Everything moin runs right now: this control plane and every self-hosted one that reported in the last fifteen minutes."}) {
+			@panel(panelProps{Title: "Network", Description: "This control plane and every self-hosted one, last 15 minutes."}) {
 				<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
 					@statCard("Deploys", strconv.Itoa(data.Network.Deploys), "all time")
 					@statCard("Apps", strconv.Itoa(data.Network.Apps), "")
@@ -185,7 +185,7 @@ templ AdminDashboardContent(data *model.AdminDashboard) {
 				</div>
 			</div>
 		}
-		@panel(panelProps{Title: "Operator activity", Description: "Security, workspace deletion, and subscription events, kept for 180 days."}) {
+		@panel(panelProps{Title: "Operator activity", Description: "Kept 180 days."}) {
 				if len(data.Events) == 0 {
 					@emptyHint("Nothing yet. Security and administrative events show up here.", "")
 				} else {

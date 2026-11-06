@@ -55,7 +55,7 @@ templ AppBackups(view BackupsView) {
 					</form>
 				}
 			}
-			@appSection() {
+			@appSection(view.App.Name, "data") {
 				@dataNav(view.App.Name, "backups")
 				<div id="app-backups" class="flex flex-col gap-6">
 					if view.Error != "" {

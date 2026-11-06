@@ -34,7 +34,7 @@ templ appCI(appName string, hook bool) {
 				@panel(panelProps{
 					Heading:     "app-image-heading",
 					Title:       "Deploy an image",
-					Description: "Ship an image built in CI or anywhere else. The server keeps the compose file of the live release and only pulls the new image.",
+					Description: "moin pulls an image from CI and swaps it in.",
 					Docs:        "/docs/guides/ci#deploy-an-image-by-hand",
 				}) {
 					<form
@@ -64,7 +64,7 @@ templ appCI(appName string, hook bool) {
 					Heading:     "app-hook-heading",
 					Title:       "Deploy hook",
 					Docs:        "/docs/guides/ci#2-create-a-deploy-hook",
-					Description: "A secret URL your CI calls after it pushed the image. moin then deploys that image.",
+					Description: "Your CI calls it after it pushed the image.",
 				}) {
 					@AppHook(appName, "", hook)
 				}

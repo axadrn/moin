@@ -15,6 +15,8 @@ type SearchItem struct {
 	Group string
 	Title string
 	Hint  string
+	// Key is the key that does the same without the search.
+	Key   string
 	Icon  func(...icon.Props) templ.Component
 	Href  string
 	// Post, with Confirm and Accept, makes the item an action.
@@ -25,7 +27,9 @@ type SearchItem struct {
 
 // SearchInput is what the search knows about the workspace.
 type SearchInput struct {
-	Base      string
+	Base string
+	// Here is the app the page is about, for the "Here" answers.
+	Here      string
 	Apps      []model.App
 	Servers   []model.Server
 	Buckets   []service.Bucket
@@ -47,16 +51,16 @@ func SearchItems(in SearchInput) []SearchItem {
 		items = append(items, SearchItem{Group: "Buckets", Title: bucket.Name, Icon: icon.Archive, Href: in.Base + "/bucket"})
 	}
 	places := []SearchItem{
-		{Title: "Overview", Hint: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
-		{Title: "Apps", Hint: "every app", Icon: icon.Boxes, Href: in.Base + "/apps"},
+		{Title: "Overview", Key: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
+		{Title: "Apps", Key: "G A", Icon: icon.Boxes, Href: in.Base + "/apps"},
 		{Title: "New app", Hint: "deploy something new", Icon: icon.Plus, Href: in.Base + "/apps/new"},
-		{Title: "Servers", Hint: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
+		{Title: "Servers", Key: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
 		{Title: "Catalog", Hint: "47 apps in one click", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
-		{Title: "Buckets", Hint: "where backups go", Icon: icon.Archive, Href: in.Base + "/bucket"},
-		{Title: "Activity", Hint: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
-		{Title: "Team", Hint: "members and invitations", Icon: icon.Users, Href: in.Base + "/workspace"},
-		{Title: "Alerts", Hint: "mail, Slack, Discord, Telegram", Icon: icon.Bell, Href: in.Base + "/alerts"},
-		{Title: "Settings", Hint: "G ,", Icon: icon.Settings, Href: in.Base + "/settings"},
+		{Title: "Buckets", Key: "G B", Icon: icon.Archive, Href: in.Base + "/bucket"},
+		{Title: "Activity", Key: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
+		{Title: "Team", Key: "G T", Icon: icon.Users, Href: in.Base + "/workspace"},
+		{Title: "Alerts", Key: "G L", Icon: icon.Bell, Href: in.Base + "/alerts"},
+		{Title: "Settings", Key: "G ,", Icon: icon.Settings, Href: in.Base + "/settings"},
 	}
 	if in.IsOwner {
 		places = append(places, SearchItem{Title: "Billing", Hint: "your plan", Icon: icon.CreditCard, Href: in.Base + "/billing"})
@@ -83,6 +87,33 @@ func SearchItems(in SearchInput) []SearchItem {
 		items = append(items, SearchItem{Group: "Do", Title: "Back up " + app.Name + " now", Icon: icon.DatabaseBackup, Href: path + "/backups"})
 	}
 	return items
+}
+
+// HereItems are what you can do on the page you are on: the sections and the
+// actions of its app, with their keys. space shows them (which-key).
+func HereItems(in SearchInput) []SearchItem {
+	for _, app := range in.Apps {
+		if app.Name != in.Here {
+			continue
+		}
+		path := in.Base + "/apps/" + app.Name
+		group := "Here · " + app.Name
+		items := []SearchItem{
+			{Group: group, Title: "Deploys", Key: "D", Icon: icon.Rocket, Href: path + "/deploys"},
+			{Group: group, Title: "Addresses", Key: "O", Icon: icon.Globe, Href: path + "/addresses"},
+			{Group: group, Title: "Logs", Key: "L", Icon: icon.ScrollText, Href: path + "/logs"},
+			{Group: group, Title: "Data", Key: "B", Icon: icon.Database, Href: path + "/data"},
+			{Group: group, Title: "Settings", Key: "E", Icon: icon.Settings, Href: path + "/settings"},
+		}
+		for _, item := range SearchItems(SearchInput{Base: in.Base, Apps: []model.App{app}, CanChange: in.CanChange}) {
+			if item.Group == "Do" && item.Href != path+"/logs" {
+				item.Group = group
+				items = append(items, item)
+			}
+		}
+		return items
+	}
+	return nil
 }
 
 // MatchSearch keeps the items that have every word of the query, at most
@@ -159,6 +190,9 @@ templ searchOption(item SearchItem) {
 	</span>
 	<span class="min-w-0 flex-1 truncate font-medium">{ item.Title }</span>
 	if item.Hint != "" {
-		<span class="shrink-0 truncate text-xs text-muted-foreground">{ item.Hint }</span>
+		<span class="shrink-0 truncate text-sm text-muted-foreground">{ item.Hint }</span>
+	}
+	if item.Key != "" {
+		<kbd class="shrink-0 rounded-md bg-muted px-1.5 font-mono text-xs text-muted-foreground">{ item.Key }</kbd>
 	}
 }

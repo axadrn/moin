@@ -35,8 +35,7 @@ var appSections = []struct{ ID, Label, Path, Key string }{
 }
 
 // appHeader is the head of every section of an app: its name, the star, its
-// state and the actions, then the sections. It stays put: a section swaps
-// only #app-section under it.
+// state and the actions. It stays put; appSection under it swaps.
 templ appHeader(app model.App, section string) {
 	<div class="flex flex-col gap-5 pt-2">
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-3">
@@ -47,7 +46,6 @@ templ appHeader(app model.App, section string) {
 				{ children... }
 			</div>
 		</div>
-		@appTabs(app.Name, section)
 	</div>
 }
 
@@ -62,11 +60,16 @@ templ appTabs(appName, active string) {
 	@kit.Segmented("app-tabs", appName, "#app-section", segments)
 }
 
-// appSection holds what a section shows. It keeps a height, so a short
-// section does not pull the page up.
-templ appSection() {
-	<div id="app-section" class="flex min-h-[60vh] flex-col gap-6">
-		{ children... }
+// appSection is the part of an app page a tab swaps: the tabs, then what
+// the section shows. The tabs come along, so the open one is lit, and stand
+// where they stood. It keeps a height, so a short section does not pull the
+// page up.
+templ appSection(appName, section string) {
+	<div id="app-section" class="flex flex-col gap-6">
+		@appTabs(appName, section)
+		<div class="flex min-h-[60vh] flex-col gap-6">
+			{ children... }
+		</div>
 	</div>
 }
 

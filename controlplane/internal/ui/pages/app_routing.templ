@@ -39,7 +39,7 @@ templ AppRouting(view RoutingView) {
 		@panel(panelProps{
 			Heading:     "app-domains-heading",
 			Title:       "Domains",
-			Description: "The addresses the app answers on, with HTTPS. Other domains redirect to the canonical one.",
+			Description: "With HTTPS. The others lead to the main one.",
 			Docs:        "/docs/guides/domains",
 		}) {
 			<div class="flex flex-col gap-6">
@@ -74,7 +74,7 @@ templ AppRouting(view RoutingView) {
 			Heading:     "app-password-heading",
 			Title:       "Password",
 			Docs:        "/docs/guides/domains#protect-with-a-password",
-			Description: "Ask visitors for a username and password before they see the app. Good for staging and previews.",
+			Description: "A username and password before the app.",
 			Action:      protectStatus(view.App),
 		}) {
 			if view.App.Protect != "" {
@@ -207,7 +207,7 @@ templ instantPanel(view RoutingView, routingPath string) {
 		Heading:     "app-instant-heading",
 		Title:       "Instant address",
 		Docs:        "/docs/guides/domains#instant-address",
-		Description: "An address with HTTPS made from the server's IP, so the app answers before it has a domain.",
+		Description: "HTTPS before the app has a domain.",
 		Class:       "lg:col-span-2",
 	}) {
 		if view.Instant.Provider == "" {

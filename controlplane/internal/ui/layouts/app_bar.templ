@@ -54,12 +54,14 @@ templ appSearch(basePath string) {
 			aria-controls="search-results"
 			aria-autocomplete="list"
 			hx-get={ basePath + "/search" }
+			hx-include="#search-here"
 			hx-trigger="input changed delay:80ms, focus"
 			hx-target="#search-results"
 			hx-swap="innerHTML"
 			hx-sync="this:replace"
 			class="h-11 w-full rounded-full border border-border bg-card pr-14 pl-10 text-sm outline-none placeholder:text-muted-foreground focus:border-foreground [&::-webkit-search-cancel-button]:hidden"
 		/>
+		<input type="hidden" id="search-here" name="here" value=""/>
 		<kbd class="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded-md bg-muted px-1.5 font-mono text-xs text-muted-foreground sm:block">/</kbd>
 		<div
 			id="search-results"

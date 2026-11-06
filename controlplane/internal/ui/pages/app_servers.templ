@@ -95,7 +95,7 @@ templ ServerAdded(added AddedServer) {
 			@panel(panelProps{
 				Heading:     "server-added-heading",
 				Title:       "Install the agent on " + added.Name,
-				Description: "Run this command on the server as root, or put sudo before sh. It works once, within the next hour. It shows only now: moin stores just a fingerprint of it.",
+				Description: "Run it on the server as root. It works once, for an hour, and shows only now.",
 				Docs:        "/docs/guides/servers#add-a-server",
 			}) {
 				<div class="flex flex-col gap-4">
@@ -128,7 +128,7 @@ templ serverRemoved(removed RemovedServer) {
 		Heading:     "server-removed-heading",
 		Title:       removed.Name + " is removed",
 		Docs:        "/docs/guides/servers#remove-a-server",
-		Description: "Its agent is disconnected but still installed. Run this on the server as root, or put sudo in front, to remove it. The apps there keep running with their data; add --apps to remove them too.",
+		Description: "Run it on the server as root. Its apps keep running; --apps removes them too.",
 		Attrs:       templ.Attributes{"data-server-removed": removed.Name},
 	}) {
 		@command(removed.Command)

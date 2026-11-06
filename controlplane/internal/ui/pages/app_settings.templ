@@ -27,7 +27,7 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 		if passwordRemoved {
 			@toast.Toast(toast.Props{
 				Title:       "Password removed",
-				Description: "For your safety the password was removed. Set a new one below if you like.",
+				Description: "The password was removed. Set a new one if you like.",
 				Type:        toast.TypeInfo,
 				Timeout:     8000,
 			})
@@ -178,7 +178,7 @@ templ SettingsNameSection(user *model.User) {
 
 templ SettingsEmailSection(user *model.User) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@panel(panelProps{Title: "Email", Docs: "/docs/guides/account#change-your-email", Description: "Where sign-in links and notices go. A new address gets a link to confirm it."}) {
+	@panel(panelProps{Title: "Email", Docs: "/docs/guides/account#change-your-email", Description: "Sign-in links and notices go here."}) {
 		<form
 			class="flex flex-col gap-2 sm:flex-row"
 			hx-patch={ basePath + "/account/email" }
