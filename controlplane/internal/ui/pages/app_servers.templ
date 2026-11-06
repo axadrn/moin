@@ -2,10 +2,8 @@ package pages
 
 import (
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -40,9 +38,6 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 				if canAdd {
 					@ServerAddForm()
 				}
-			}
-			if !canAdd {
-				@subscribeCard()
 			}
 			<div id="server-added" class="empty:hidden">
 				if removed != nil {
@@ -420,62 +415,4 @@ func serverLastSeen(server model.Server, now time.Time) string {
 	return fmt.Sprintf("%dd ago", int(age.Hours()/24))
 }
 
-// subscribeCard is what a read-only workspace sees above its servers: that
-// it is read-only, the plan to buy and the way to Stripe Checkout. It has the
-// shape of the offer on the billing page.
-templ subscribeCard() {
-	for _, plan := range access.Product.Plans {
-		if plan.Purchasable {
-			@subscribeOffer(plan)
-		}
-	}
-}
 
-templ subscribeOffer(plan access.Plan) {
-	{{ checkout := ctxkeys.AppBasePath(ctx) + "/billing/checkout" }}
-	@panel(panelProps{
-		Title:       "This workspace is read-only",
-		Docs:        "/docs/faq#how-does-the-hosted-trial-work",
-		Description: "Your apps keep running. Subscribe to " + plan.Name + " to add servers and deploy again.",
-		Attrs:       templ.Attributes{"data-subscribe": true},
-	}) {
-		<div class="flex flex-col gap-6">
-			<div class="flex flex-col gap-2">
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "self-start"}) {
-					Save { model.FormatPlanPrice(12*plan.MonthlyPrice - plan.YearlyPrice) } a year
-				}
-				@planPrice(model.FormatPlanPrice(plan.YearlyPrice), "a year, per workspace")
-			</div>
-			<div class="flex flex-col items-start gap-2">
-				<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-					@subscribeButton(checkout, plan.ID, "yearly", true) {
-						Subscribe for { model.FormatPlanPrice(plan.YearlyPrice) } a year
-					}
-					@subscribeButton(checkout, plan.ID, "monthly", false) {
-						or { model.FormatPlanPrice(plan.MonthlyPrice) } a month
-					}
-				</div>
-				<p class="text-xs text-muted-foreground">Plus sales tax or VAT where it applies, shown at checkout. Cancel any time.</p>
-			</div>
-			@planBenefits(plan)
-		</div>
-	}
-}
-
-// subscribeButton starts Stripe Checkout for one interval. The yearly one is
-// the primary action.
-templ subscribeButton(checkout, planID, interval string, primary bool) {
-	<form action={ templ.SafeURL(checkout) } method="POST" hx-post={ checkout } hx-swap="none" hx-disable="find button[type='submit']">
-		@csrf.Token()
-		<input type="hidden" name="plan_id" value={ planID }/>
-		<input type="hidden" name="interval" value={ interval }/>
-		@button.Button(button.Props{
-			Type:       button.TypeSubmit,
-			Variant:    utils.IfElse(primary, button.VariantDefault, button.VariantGhost),
-			Class:      "w-full sm:w-auto",
-			Attributes: templ.Attributes{"data-subscribe-" + interval: true},
-		}) {
-			{ children... }
-		}
-	</form>
-}
