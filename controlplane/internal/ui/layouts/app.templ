@@ -2,8 +2,6 @@ package layouts
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/sidebar"
 )
 
 // Crumb is one step of the path in the top bar. The last one has no link.
@@ -25,8 +23,8 @@ templ App(title string) {
 	}
 }
 
-// AppShell is the control panel: the sidebar with the places, the top bar
-// with the path, and the page.
+// AppShell is the control panel: the bar on top, the page under it. No
+// sidebar: the search in the bar goes everywhere (DESIGN.md, Navigation).
 templ AppShell(p AppProps) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{
@@ -35,140 +33,33 @@ templ AppShell(p AppProps) {
 		Path:        ctxkeys.URLPath(ctx),
 		Boost:       appBoost,
 	}) {
-		@sidebar.Provider(sidebar.ProviderProps{
-			ID:                 "app-sidebar",
-			Class:              "bg-background",
-			DisableDefaultOpen: ctxkeys.SidebarCollapsed(ctx),
-			Attributes:         templ.Attributes{"style": "--sidebar-width: 16rem; --sidebar-width-icon: 3rem; --header-height: 3.5rem;"},
-		}) {
-			@sidebar.Sidebar(sidebar.Props{Collapsible: sidebar.CollapsibleIcon}) {
-				@sidebar.Header() {
-					@AppSidebarIdentity()
-				}
-				@sidebar.Content() {
-					<div id="sidebar-nav" class="contents">
-						@AppSidebarNavigation()
-					</div>
-				}
-				@sidebar.Footer() {
-					@AppTrialCard()
-					{{ user := ctxkeys.User(ctx) }}
-					if user != nil {
-						@AppSidebarUser(user)
-					}
-				}
-				@sidebar.Rail()
-			}
-			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background"}) {
-				@blocks.AppHeader(blocks.AppHeaderProps{Title: p.Title, Crumbs: appCrumbs(p)})
-				// A new release of a self-hosted control plane, for its admins.
-				// It loads once per page and stays through boosted swaps.
-				if ctxkeys.Workspace(ctx) != nil && !ctxkeys.RenderConfig(ctx).Billing {
-					<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
-				}
-				<div id="main" class="flex-1">
-					{ children... }
-				</div>
-			}
+		@AppBar()
+		// A new release of a self-hosted control plane, for its admins.
+		// It loads once per page and stays through boosted swaps.
+		if ctxkeys.Workspace(ctx) != nil && !ctxkeys.RenderConfig(ctx).Billing {
+			<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
 		}
+		<div id="main">
+			<div class="mx-auto max-w-5xl px-4 pt-4 empty:hidden">
+				@AppTrialCard()
+			</div>
+			{ children... }
+		</div>
+		@AppShortcuts()
 		@appShellScript()
-		@AppCommandMenu()
-		@sortableScript()
-		@sidebarMenuSides()
 	}
 }
 
-// sortableScript lets [data-sortable-list] be ordered by drag and drop, as
-// in the htmx drag-to-reorder pattern: Sortable.js moves the items, and its
-// end event, which bubbles, sends the form around the list, whose hidden
-// inputs carry the new order. With a mouse the whole item drags; on a touch
-// screen only its grip, so the page still scrolls. On the keyboard, Alt and
-// an arrow key move the focused item. The list waits while the form is out
-// and starts again on the list the answer swaps in.
-templ sortableScript() {
-	<script src="/assets/js/sortable-1.15.6.6d0a831f.min.js"></script>
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			if (window.moinSortable) return;
-			window.moinSortable = true;
-			const touch = window.matchMedia("(pointer: coarse)").matches;
-			const start = (root) => {
-				if (!root.querySelectorAll) return;
-				const lists = [...root.querySelectorAll("[data-sortable-list]")];
-				if (root.matches?.("[data-sortable-list]")) lists.push(root);
-				for (const list of lists) {
-					if (Sortable.get(list)) continue;
-					new Sortable(list, {
-						animation: 150,
-						handle: touch ? "[data-drag-handle]" : null,
-						ghostClass: "opacity-40",
-						onEnd() {
-							this.option("disabled", true);
-						},
-					});
-				}
-			};
-			start(document);
-			document.addEventListener("htmx:after:process", (event) => start(event.target));
-			document.addEventListener("keydown", (event) => {
-				if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-				const item = event.target.closest?.("[data-sortable-list] > *");
-				const form = item?.closest("[data-order-form]");
-				if (!form) return;
-				const other = event.key === "ArrowUp" ? item.previousElementSibling : item.nextElementSibling;
-				event.preventDefault();
-				if (!other) return;
-				other.insertAdjacentElement(event.key === "ArrowUp" ? "beforebegin" : "afterend", item);
-				event.target.focus();
-				form.requestSubmit();
-			});
-			document.addEventListener("htmx:finally:request", (event) => {
-				// A list the answer did not replace takes drags again.
-				const list = event.target.querySelector?.("[data-sortable-list]");
-				if (list?.isConnected) Sortable.get(list)?.option("disabled", false);
-			});
-		})();
-	</script>
-}
-
-// sidebarMenuSides is the pendant of useSidebar().isMobile in shadcn's
-// sidebar-07: the workspace and user menus open to the right of the
-// sidebar, and below their button on phones. A menu reads its side when it
-// opens; the menus are looked up each time, as the workspace one is swapped
-// in place after a rename.
-templ sidebarMenuSides() {
-	<script type="module" nonce={ templ.GetNonce(ctx) }>
-		window.templ.sidebar.onMobileChange((isMobile) => {
-			for (const id of ["sidebar-workspace-menu", "sidebar-user-menu"]) {
-				// The id names the menu popup, its positioner holds the side.
-				document.getElementById(id)?.parentElement?.setAttribute("data-templ-side", isMobile ? "bottom" : "right");
-			}
-		});
-	</script>
-}
-
-func appCrumbs(p AppProps) []blocks.Crumb {
-	crumbs := make([]blocks.Crumb, 0, len(p.Crumbs)+1)
-	for _, crumb := range p.Crumbs {
-		crumbs = append(crumbs, blocks.Crumb{Label: crumb.Label, Href: crumb.Href})
-	}
-	if len(crumbs) == 0 {
-		crumbs = append(crumbs, blocks.Crumb{Label: p.Title})
-	}
-	return crumbs
-}
-
-// appBoost makes every link and form of the panel swap only #main, and
-// brings the sidebar places and the top bar of the new page along, so the
-// active place and the path stay right. Links that change the context opt
-// out with hx-boost="false" (DESIGN.md, Navigation).
-const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML","selectOOB":"#sidebar-nav,#app-header"}`
+// appBoost makes every link and form of the panel swap only #main; the bar
+// stays. Links that change the context opt out with hx-boost="false"
+// (DESIGN.md, Navigation).
+const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML"}`
 
 // appShellScript adds what every page of the panel shares: copy buttons
 // ([data-copy] copies its value, or the value or text of the element its
 // data-copy-target selects, and is marked data-copied for a moment, so its
-// icon turns into a check without changing its size), the go-to keys (g then a, s, b, y, t or ,) and / or n to
-// focus the page's main field ([data-hotkey-focus]).
+// icon turns into a check without changing its size), the go-to keys (g then h, s, b, y, t, l or ,) and n to
+// focus the page's main field ([data-hotkey-focus]). / is the search (moin.js).
 templ appShellScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
@@ -235,11 +126,7 @@ templ appShellScript() {
 				event.preventDefault();
 				location.replace(ctx.response?.raw?.url || ctx.request.action);
 			});
-			// On phones the sidebar sheet closes once the new page is in.
-			document.addEventListener("htmx:after:swap", (event) => {
-				if (event.detail.ctx.request.headers["HX-Boosted"] === "true") window.templ.sidebar.setOpenMobile(false);
-			});
-			const places = { o: "/overview", a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
+			const places = { h: "/overview", o: "/overview", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
 			let leader = 0;
 			document.addEventListener("keydown", (event) => {
 				if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
@@ -257,15 +144,11 @@ templ appShellScript() {
 					event.preventDefault();
 					const base = document.querySelector("[data-app-base]");
 					if (!base) return;
-					// The sidebar link swaps the page like a click on it.
-					const url = base.dataset.appBase + places[event.key];
-					const link = document.querySelector(`#sidebar-nav a[href="${url}"]`);
-					if (link) link.click();
-					else location.assign(url);
+					location.assign(base.dataset.appBase + places[event.key]);
 					return;
 				}
 				leader = 0;
-				if (event.key === "/" || event.key === "n") {
+				if (event.key === "n") {
 					const field = document.querySelector("[data-hotkey-focus]");
 					if (field) {
 						event.preventDefault();

@@ -93,7 +93,6 @@ templ ServerSecurity(view SecurityView) {
 					hx-post={ basePath + "/servers/" + view.Server.ID + "/name" }
 					hx-target="#main"
 					hx-select="#main"
-					hx-select-oob="#app-header"
 					hx-swap="outerHTML"
 					hx-disable="find button[type='submit']"
 					data-rename-server

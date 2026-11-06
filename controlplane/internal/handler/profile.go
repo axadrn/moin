@@ -32,7 +32,7 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 		toastFailed(w, r, "Name not saved", "Something went wrong. Please try again.")
 		return
 	}
-	render(w, r, layouts.SidebarIdentityUpdates(updatedUser))
+	render(w, r, layouts.IdentityUpdates(updatedUser))
 	toastDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
 }
 

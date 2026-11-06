@@ -213,6 +213,14 @@
   ::selection {
     @apply bg-selection text-selection-foreground;
   }
+  /* The scrollbar always has its place, so a page that gets shorter or
+     longer never shifts sideways. A modal dialog keeps the page still. */
+  html {
+    scrollbar-gutter: stable;
+  }
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings:

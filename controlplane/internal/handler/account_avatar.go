@@ -50,7 +50,7 @@ func (h *AccountHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	if updatedUser != nil {
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-display")
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-form")
-		render(w, r, layouts.SidebarIdentityUpdates(updatedUser))
+		render(w, r, layouts.IdentityUpdates(updatedUser))
 	}
 }
 
@@ -70,7 +70,7 @@ func (h *AccountHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
 	if updatedUser != nil {
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-display")
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-form")
-		render(w, r, layouts.SidebarIdentityUpdates(updatedUser))
+		render(w, r, layouts.IdentityUpdates(updatedUser))
 	}
 }
 
