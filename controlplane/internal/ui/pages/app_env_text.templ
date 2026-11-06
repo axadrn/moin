@@ -12,7 +12,7 @@ import (
 // envModes is the switch between one row per env var and one .env text.
 templ envModes(appName string, text bool) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
-	@kit.Segmented("env-modes", "Edit as", "", []kit.Segment{
+	@kit.Segmented("env-modes", "Edit as", []kit.Segment{
 		{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
 		{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
 	})

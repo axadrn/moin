@@ -63,7 +63,7 @@ templ AppRepo(view RepoView) {
 templ repoConnect(view RepoView) {
 	<div class="flex flex-col items-start gap-3">
 		<p class="text-sm text-muted-foreground">First connect GitHub and choose the repos moin may read.</p>
-		@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name, Attributes: templ.Attributes{"data-connect-github": true, "hx-boost": "false"}}) {
+		@button.Button(button.Props{Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name, Attributes: templ.Attributes{"data-connect-github": true}}) {
 			@icons.Github(icons.Props{Class: "size-4"})
 			Connect GitHub
 		}
@@ -167,7 +167,7 @@ templ repoAccess(view RepoView, primary bool) {
 				Variant:    utils.IfElse(primary, button.VariantDefault, button.VariantLink),
 				Size:       utils.IfElse(primary, button.SizeDefault, button.SizeSm),
 				Class:      utils.IfElse(primary, "", "h-auto px-0"),
-				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "hx-boost": "false", "data-github-settings": installation.Account},
+				Attributes: templ.Attributes{"target": "_blank", "rel": "noopener", "data-github-settings": installation.Account},
 			}) {
 				@icons.Github(icons.Props{Class: "size-4"})
 				Give moin access on { installation.Account }

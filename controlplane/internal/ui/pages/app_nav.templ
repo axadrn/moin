@@ -49,40 +49,35 @@ templ appHeader(app model.App, section string) {
 	</div>
 }
 
-// appTabs are the sections of an app as a segmented control. A choice swaps
-// only the section under it and keeps its place in the history.
+// appTabs are the sections of an app as a segmented control, each a link
+// to its page.
 templ appTabs(appName, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
 	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
 	for _, s := range appSections {
 		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
 	}
-	@kit.Segmented("app-tabs", appName, "#app-section", segments)
+	@kit.Segmented("app-tabs", appName, segments)
 }
 
-// appSection is the part of an app page a tab swaps: the tabs, then what
-// the section shows. The tabs come along, so the open one is lit, and stand
-// where they stood. It keeps a height, so a short section does not pull the
-// page up.
+// appSection is the tabs, then what the open section shows.
 templ appSection(appName, section string) {
 	<div id="app-section" class="flex flex-col gap-6">
 		@appTabs(appName, section)
-		<div class="flex min-h-[60vh] flex-col gap-6">
-			{ children... }
-		</div>
+		{ children... }
 	</div>
 }
 
-// PinButton is the star by an app: a real checkbox, so the browser fills
-// the star the moment you click, and htmx saves it without swapping
-// anything (DESIGN.md, Feedback). Pinned apps stay above the others that
-// run fine, in every list.
+// PinButton pins an app above the others that run fine, in every list:
+// a real checkbox drawn as a pill that says Pin, and Pinned once checked.
+// htmx saves it without swapping anything (DESIGN.md, Feedback).
 templ PinButton(app model.App) {
 	<form id="pin-form" class="contents" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin" } hx-trigger="change" hx-swap="none">
 		@csrf.Token()
-		<label class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/5 hover:text-foreground has-checked:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/30" title="Pin it above the others">
+		<label class="flex h-8 shrink-0 cursor-pointer items-center rounded-full bg-muted px-3 text-sm font-medium text-muted-foreground hover:text-foreground has-checked:bg-foreground has-checked:text-background has-focus-visible:ring-3 has-focus-visible:ring-ring/30">
 			<input type="checkbox" name="on" value="1" checked?={ app.Pinned } autocomplete="off" class="peer sr-only" aria-label={ "Pin " + app.Name } data-pin/>
-			<svg aria-hidden="true" viewBox="0 0 24 24" class="size-5 fill-none peer-checked:fill-current"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg>
+			<span class="peer-checked:hidden">Pin</span>
+			<span class="hidden peer-checked:inline">Pinned</span>
 		</label>
 	</form>
 }
@@ -90,7 +85,7 @@ templ PinButton(app model.App) {
 // dataNav switches the Data section between its tables and its backups.
 templ dataNav(appName, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
-	@kit.Segmented("data-tabs", "Data", "#app-section", []kit.Segment{
+	@kit.Segmented("data-tabs", "Data", []kit.Segment{
 		{Label: "Browse", Href: appPath + "/data", Active: active == "browse"},
 		{Label: "Backups", Href: appPath + "/backups", Active: active == "backups"},
 	})

@@ -43,7 +43,7 @@ func newSwitches(t *testing.T) *switches {
 	servers := service.NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
 	apps := service.NewAppService(repository.NewAppRepository(database, database), servers, box)
 	users := service.NewUserService(repository.NewUserRepository(database), nil, nil, nil)
-	s := &switches{t: t, database: database, ada: ada, apps: apps, servers: servers, users: users, handler: NewAppsHandler(apps, servers, users)}
+	s := &switches{t: t, database: database, ada: ada, apps: apps, servers: servers, users: users, handler: NewAppsHandler(apps, servers, users, nil)}
 	server, _, err := servers.Create(s.actor(), "web-1")
 	if err != nil {
 		t.Fatal(err)

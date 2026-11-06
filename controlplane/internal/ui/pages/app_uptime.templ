@@ -33,22 +33,28 @@ templ AppUptime(view UptimeView) {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
 			@appHeader(view.App, "addresses")
 			@appSection(view.App.Name, "addresses") {
-				<div id="app-uptime" class="flex flex-col gap-6">
-					if !view.Uptime.ServerOnline && view.App.ServerName != "" {
-						@stateAlert(templ.Attributes{"data-server-offline": true}) {
-							The server { view.App.ServerName } is offline: its agent does not answer. The activity says since when.
-						}
-					}
-					if len(view.Uptime.Domains) == 0 {
-						@emptyState("No domains to check", "Add a domain to the app and deploy it; from then on moin checks it every minute.", "moin domains add blog.de")
-					}
-					for _, domain := range view.Uptime.Domains {
-						@uptimeDomain(view, domain)
-					}
-				</div>
+				@AppUptimeBody(view)
 			}
 		}
 	}
+}
+
+// AppUptimeBody is the checks of every domain, on the Addresses section
+// and as the answer to a change of a check.
+templ AppUptimeBody(view UptimeView) {
+	<div id="app-uptime" class="flex flex-col gap-6">
+		if !view.Uptime.ServerOnline && view.App.ServerName != "" {
+			@stateAlert(templ.Attributes{"data-server-offline": true}) {
+				The server { view.App.ServerName } is offline: its agent does not answer. The activity says since when.
+			}
+		}
+		if len(view.Uptime.Domains) == 0 {
+			@emptyState("No domains to check", "Add a domain to the app and deploy it; from then on moin checks it every minute.", "moin domains add blog.de")
+		}
+		for _, domain := range view.Uptime.Domains {
+			@uptimeDomain(view, domain)
+		}
+	</div>
 }
 
 // uptimeDomain is one domain: its state, the numbers, the outages and the
