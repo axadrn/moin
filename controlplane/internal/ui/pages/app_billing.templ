@@ -45,7 +45,7 @@ templ billingCurrent(subscription *model.Subscription, basePath string) {
 			@kit.RowText(planName(subscription.PlanID), billingLine(subscription))
 			@billingStatus(subscription)
 			if subscription.ProviderCustomerID != nil {
-				@kit.Button(kit.Secondary, basePath+"/billing/manage", templ.Attributes{"hx-boost": "false"}) {
+				@kit.Button(kit.Secondary, basePath+"/billing/manage", nil) {
 					Manage
 				}
 			}

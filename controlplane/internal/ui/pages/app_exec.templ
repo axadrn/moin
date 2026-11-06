@@ -50,7 +50,6 @@ templ appExec(app model.App, deploys []api.Deploy) {
 			@panel(panelProps{Heading: "app-exec-heading", Title: "Run a command", Docs: "/docs/guides/exec", Description: "One command in a container on " + app.ServerName + ", like rails db:migrate. No shell: wrap pipes in sh -c '…'. The activity keeps the command, never the output."}) {
 				<form
 					class="flex flex-col gap-3"
-					hx-boost="false"
 					data-exec-form
 					data-exec-url={ "/api/v1/apps/" + app.Name + "/exec?workspace=" + ctxkeys.Workspace(ctx).Slug }
 				>

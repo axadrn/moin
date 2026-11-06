@@ -171,6 +171,11 @@ type AppPageView struct {
 	// Section is app, deploys, addresses, logs or settings; data has its
 	// own page.
 	Section string
+	// Catalog is the update card of a catalog app (App section), Uptime the
+	// checks of its domains (Addresses): filled for the section that shows
+	// them, so the page comes whole.
+	Catalog *CatalogUpdateView
+	Uptime  *UptimeView
 }
 
 // AppPage is an app: the head stays, the section under it answers one
@@ -191,13 +196,13 @@ templ AppPage(view AppPageView) {
 					case "deploys":
 						@appDeploysSection(app, view.Deploys)
 					case "addresses":
-						@appAddressesSection(app)
+						@appAddressesSection(view)
 					case "logs":
 						@appLogsSection(app, view.Deploys)
 					case "settings":
 						@appSettingsSection(app, view.EnvKeys)
 					default:
-						@appHomeSection(app, view.Deploys)
+						@appHomeSection(view)
 				}
 			}
 		}
@@ -208,10 +213,11 @@ templ AppPage(view AppPageView) {
 // appHomeSection answers "does it run?" with facts: what runs since when,
 // where it is reached, and how it does. The tabs above lead on; nothing here
 // repeats them.
-templ appHomeSection(app model.App, deploys []api.Deploy) {
+templ appHomeSection(view AppPageView) {
+	{{ app, deploys := view.App, view.Deploys }}
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	if app.Catalog != "" {
-		<div hx-get={ appPath + "/catalog" } hx-trigger="load" hx-swap="outerHTML"></div>
+	if view.Catalog != nil {
+		@CatalogUpdate(*view.Catalog)
 	}
 	@kit.Section("Runs", nil) {
 		@kit.List() {
@@ -282,12 +288,14 @@ templ appDeploysSection(app model.App, deploys []api.Deploy) {
 
 // appAddressesSection answers "where is it reached?": the instant address
 // and the domains in one place, with the password and the uptime checks.
-templ appAddressesSection(app model.App) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+templ appAddressesSection(view AppPageView) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	<div hx-get={ appPath + "/routing" } hx-trigger="load" hx-swap="outerHTML">
-		@AppRouting(RoutingView{App: app})
+		@AppRouting(RoutingView{App: view.App})
 	</div>
-	<div hx-get={ appPath + "/uptime" } hx-trigger="load" hx-select="#app-uptime" hx-swap="outerHTML"></div>
+	if view.Uptime != nil {
+		@AppUptimeBody(*view.Uptime)
+	}
 }
 
 // appLogsSection answers "what happens in it?": the container logs, and a

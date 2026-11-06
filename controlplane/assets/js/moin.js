@@ -83,34 +83,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// A Select is a popover of radio buttons. Picking one writes its label into
-// the button; a click or Enter closes the list. The mouse focuses what it
-// points at, so one option is lit at a time.
-document.addEventListener("change", (event) => {
-  const select = event.target.closest("[data-select]");
-  if (!select || event.target.type !== "radio") return;
-  select.querySelector("[data-select-label]").textContent = event.target.closest("label").textContent.trim();
-});
-
-document.addEventListener("click", (event) => {
-  const option = event.target.closest("[data-select] [popover] label");
-  if (option) requestAnimationFrame(() => option.closest("[popover]").hidePopover());
-});
-
-document.addEventListener("keydown", (event) => {
-  const list = event.target.closest?.("[data-select] [popover]");
-  if (list && event.key === "Enter") {
-    event.preventDefault();
-    list.hidePopover();
-    list.closest("[data-select]").querySelector("button").focus();
-  }
-});
-
-document.addEventListener("mouseover", (event) => {
-  const option = event.target.closest("[data-select] [popover] label");
-  if (option && !option.contains(document.activeElement)) option.querySelector("input").focus({ preventScroll: true });
-});
-
 // space shows what you can do here, like the TUI: the search, already
 // narrowed to the app the page is about.
 document.addEventListener("keydown", (event) => {

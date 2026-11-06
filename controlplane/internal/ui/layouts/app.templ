@@ -26,17 +26,17 @@ templ App(title string) {
 
 // AppShell is the control panel: the bar on top, the page under it. No
 // sidebar: the search in the bar goes everywhere (DESIGN.md, Navigation).
+// Every link loads a whole page; the browser keeps the old one on screen
+// until the new one is painted and fades between them (globals.css).
 templ AppShell(p AppProps) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{
 		Title:       p.Title,
 		Description: "The moin control panel",
 		Path:        ctxkeys.URLPath(ctx),
-		Boost:       appBoost,
 	}) {
 		@AppBar()
 		// A new release of a self-hosted control plane, for its admins.
-		// It loads once per page and stays through boosted swaps.
 		if ctxkeys.Workspace(ctx) != nil && !ctxkeys.RenderConfig(ctx).Billing {
 			<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
 		}
@@ -50,11 +50,6 @@ templ AppShell(p AppProps) {
 		@appShellScript()
 	}
 }
-
-// appBoost makes every link and form of the panel swap only #main; the bar
-// stays. Links that change the context opt out with hx-boost="false"
-// (DESIGN.md, Navigation).
-const appBoost = `{"target":"#main","select":"#main","swap":"outerHTML"}`
 
 // appShellScript adds what every page of the panel shares: copy buttons
 // ([data-copy] copies its value, or the value or text of the element its
@@ -111,21 +106,6 @@ templ appShellScript() {
 				button.dataset.copied = "";
 				clearTimeout(button.copyTimer);
 				button.copyTimer = setTimeout(() => delete button.dataset.copied, 1400);
-			});
-			// A boosted answer is a whole page: its parts marked hx-swap-oob
-			// for their own fragment answers stay in place in #main instead of
-			// being pulled out of it.
-			document.addEventListener("htmx:after:request", (event) => {
-				const ctx = event.detail.ctx;
-				if (ctx.request.headers["HX-Boosted"] === "true") ctx.text = ctx.text.replaceAll(/ hx-swap-oob="[^"]*"/g, "");
-			});
-			// A boosted link to a page outside the panel (no #main) loads as
-			// a full page instead of swapping in nothing.
-			document.addEventListener("htmx:before:swap", (event) => {
-				const ctx = event.detail.ctx;
-				if (ctx.request.headers["HX-Boosted"] !== "true" || ctx.text.includes('id="main"')) return;
-				event.preventDefault();
-				location.replace(ctx.response?.raw?.url || ctx.request.action);
 			});
 			const places = { h: "/overview", o: "/overview", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
 			let leader = 0;

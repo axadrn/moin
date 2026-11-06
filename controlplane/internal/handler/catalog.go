@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
@@ -154,15 +155,23 @@ func (h *CatalogHandler) UpdatePanel(w http.ResponseWriter, r *http.Request) {
 	if err != nil || app == nil {
 		return
 	}
-	info, ok := h.catalog.Info(workspace.ID, app)
-	if !ok {
-		return
+	if view := catalogUpdate(h.catalog, workspace.ID, app); view != nil {
+		render(w, r, pages.CatalogUpdate(*view))
 	}
-	versions := h.catalog.Store().Versions(info.Entry.Slug)
+}
+
+// catalogUpdate is the update card of an app from the catalog, nil for
+// any other app.
+func catalogUpdate(catalogs *service.CatalogService, workspaceID string, app *model.App) *pages.CatalogUpdateView {
+	info, ok := catalogs.Info(workspaceID, app)
+	if !ok {
+		return nil
+	}
+	versions := catalogs.Store().Versions(info.Entry.Slug)
 	if info.Version != "" && !slices.ContainsFunc(versions, func(version catalog.Version) bool { return version.Tag == info.Version }) {
 		versions = append([]catalog.Version{{Tag: info.Version}}, versions...)
 	}
-	render(w, r, pages.CatalogUpdate(pages.CatalogUpdateView{App: *app, Entry: info.Entry, Version: info.Version, Latest: info.Latest, Newer: info.Newer, Versions: versions}))
+	return &pages.CatalogUpdateView{App: *app, Entry: info.Entry, Version: info.Version, Latest: info.Latest, Newer: info.Newer, Versions: versions}
 }
 
 // Update deploys the app in the picked version and reloads its page.

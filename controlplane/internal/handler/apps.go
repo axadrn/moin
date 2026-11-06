@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -20,13 +21,14 @@ import (
 // AppsHandler is the apps pages of the web UI. Deploys come from `moin
 // deploy`; the web UI follows them, rolls back, shows logs and keeps env vars.
 type AppsHandler struct {
-	apps    *service.AppService
-	servers *service.ServerService
-	users   *service.UserService
+	apps     *service.AppService
+	servers  *service.ServerService
+	users    *service.UserService
+	catalogs *service.CatalogService
 }
 
-func NewAppsHandler(apps *service.AppService, servers *service.ServerService, users *service.UserService) *AppsHandler {
-	return &AppsHandler{apps: apps, servers: servers, users: users}
+func NewAppsHandler(apps *service.AppService, servers *service.ServerService, users *service.UserService, catalogs *service.CatalogService) *AppsHandler {
+	return &AppsHandler{apps: apps, servers: servers, users: users, catalogs: catalogs}
 }
 
 // AppsPage is every app, in the one order.
@@ -93,7 +95,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // AppSection answers one section of an app (app, deploys, addresses, logs
-// or settings) as a whole page; a tab swaps #app-section out of it.
+// or settings) as a whole page.
 func (h *AppsHandler) AppSection(section string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { h.appPage(w, r, section) }
 }
@@ -114,7 +116,18 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		renderError(w, "load env failed", err)
 		return
 	}
-	render(w, r, pages.AppPage(pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}))
+	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}
+	switch section {
+	case "app":
+		if h.catalogs != nil {
+			view.Catalog = catalogUpdate(h.catalogs, workspace.ID, app)
+		}
+	case "addresses":
+		if _, uptime, err := h.apps.Uptime(workspace.ID, app.Name); err == nil {
+			view.Uptime = &pages.UptimeView{App: *app, Uptime: uptime, Now: time.Now()}
+		}
+	}
+	render(w, r, pages.AppPage(view))
 }
 
 // Detail answers the header and deploys of an app, for the reload after a

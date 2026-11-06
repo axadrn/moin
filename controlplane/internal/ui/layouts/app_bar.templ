@@ -85,7 +85,7 @@ templ workspaceMenu(current *model.Workspace, workspaces []model.WorkspaceMember
 			Workspaces
 		}
 		for _, item := range workspaces {
-			@kit.MenuItem("/app/"+item.Slug+"/overview", templ.Attributes{"hx-boost": "false"}) {
+			@kit.MenuItem("/app/"+item.Slug+"/overview", nil) {
 				<span class="flex size-6 shrink-0 items-center justify-center rounded-lg text-xs font-medium ring-1 ring-foreground/15">{ workspaceInitial(item.Name) }</span>
 				<span class="min-w-0 flex-1 truncate">{ item.Name }</span>
 				<span class="text-sm text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
@@ -103,7 +103,7 @@ templ workspaceMenu(current *model.Workspace, workspaces []model.WorkspaceMember
 			@icon.Users()
 			Team
 		}
-		@kit.MenuItem("/workspaces/new", templ.Attributes{"hx-boost": "false"}) {
+		@kit.MenuItem("/workspaces/new", nil) {
 			@icon.Plus()
 			New workspace
 		}
@@ -133,7 +133,7 @@ templ userMenu(user *model.User) {
 			}
 		}
 		if ctxkeys.IsAdmin(ctx) {
-			@kit.MenuItem("/admin", templ.Attributes{"hx-boost": "false"}) {
+			@kit.MenuItem("/admin", nil) {
 				@icon.Shield()
 				Admin
 			}

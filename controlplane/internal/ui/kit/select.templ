@@ -11,13 +11,23 @@ type SelectProps struct {
 	Disabled bool
 }
 
-// Select picks one of a list inside a form. The button shows the choice and
-// opens the list under it: a native popover of radio buttons, drawn like
-// our menus, the same on every device. The checked radio is the value the
-// form sends, and a change on it is a change of the form (hx-trigger
-// "change" works). moin.js writes the picked label into the button and
-// closes the list.
+// Select picks one of a list inside a form, the same on every device: the
+// button shows the choice and opens a native popover of radio buttons under
+// it, drawn like our menus. The checked radio is the value the form sends;
+// a change on it is a change of the form (hx-trigger "change" works).
+// Escape and a click outside close it natively; its script writes the
+// picked label into the button and closes the list on a pick.
 templ Select(p SelectProps) {
+	@selectOnce.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			document.addEventListener("change", (event) => {
+				const select = event.target.closest("[data-select]");
+				if (!select || event.target.type !== "radio") return;
+				select.querySelector("[data-select-label]").textContent = event.target.closest("label").textContent.trim();
+				select.querySelector("[popover]").hidePopover();
+			});
+		</script>
+	}
 	<div class="relative w-full min-w-0" data-select>
 		<button
 			type="button"
@@ -50,6 +60,9 @@ templ Select(p SelectProps) {
 		</div>
 	</div>
 }
+
+// selectOnce puts the script of Select on a page once, however many it has.
+var selectOnce = templ.NewOnceHandle()
 
 // selectValue is the option picked: the given value, or the first option,
 // so the form always sends one.

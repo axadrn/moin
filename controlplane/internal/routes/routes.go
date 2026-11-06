@@ -160,7 +160,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/{workspaceSlug}/update", workspace(updates.Notice))
 	mux.HandleFunc("POST /app/{workspaceSlug}/update", workspace(updates.Start))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/install", workspace(servers.NewInstall))
-	apps := handler.NewAppsHandler(app.AppService, app.ServerService, app.UserService)
+	apps := handler.NewAppsHandler(app.AppService, app.ServerService, app.UserService, app.CatalogService)
 	mux.HandleFunc("GET /apps/{slug}/install", middleware.RequireAuth(catalogPages.Start))
 	mux.HandleFunc("GET /app/{workspaceSlug}/catalog", workspace(catalogPages.InApp))
 	mux.HandleFunc("GET /app/{workspaceSlug}/catalog/{slug}", workspace(catalogPages.InstallPage))
