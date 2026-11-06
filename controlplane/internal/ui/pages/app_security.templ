@@ -271,7 +271,7 @@ templ securityToggle(name, title, text string, on, locked bool, lockedText strin
 				<span class="text-xs text-running">{ lockedText }</span>
 			}
 		</span>
-		@switchcomp.Switch(switchcomp.Props{Name: name, Value: "1", DefaultChecked: on, Disabled: locked && !on, Class: "mt-0.5"})
+		@switchcomp.Switch(switchcomp.Props{Name: name, Value: "1", Checked: on, Disabled: locked && !on, Class: "mt-0.5"})
 	</label>
 }
 

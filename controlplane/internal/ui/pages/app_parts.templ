@@ -310,10 +310,10 @@ templ switchForm(id, action string) {
 	</form>
 }
 
-// savedSwitch is the switch of a switchForm. Its root carries an id too,
-// so the focus stays on it when the answer swaps the form.
+// savedSwitch is the switch of a switchForm. Its id keeps the focus on it
+// when the answer swaps the form.
 templ savedSwitch(id string, on bool) {
-	@switchcomp.Switch(switchcomp.Props{ID: id, Name: "on", Value: "1", DefaultChecked: on, Attributes: templ.Attributes{"id": id + "-switch"}})
+	@switchcomp.Switch(switchcomp.Props{ID: id, Name: "on", Value: "1", Checked: on})
 }
 
 // docsLink is the quiet link from an empty state to its guide.
