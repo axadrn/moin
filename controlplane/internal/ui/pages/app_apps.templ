@@ -1,9 +1,9 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"strconv"
 	"strings"
 	"time"
@@ -139,89 +139,167 @@ func plural(n int, one, many string) string {
 // panelHeadClasses is the head of a card on pages not yet on panel.
 const panelHeadClasses = "flex min-h-14 items-center justify-between gap-3 px-5 pt-4 pb-1.5"
 
-templ AppPage(app model.App, deploys []api.Deploy, envKeys []string) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ appPath := basePath + "/apps/" + app.Name }}
-	@layouts.AppShell(layouts.AppProps{Title: app.Name, Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: app.Name}}}) {
+// AppPageView is an app and the section of it to show.
+type AppPageView struct {
+	App     model.App
+	Deploys []api.Deploy
+	EnvKeys []string
+	// Section is app, deploys, addresses, logs or settings; data has its
+	// own page.
+	Section string
+}
+
+// AppPage is an app: the head stays, the section under it answers one
+// question (appSections).
+templ AppPage(view AppPageView) {
+	{{ app := view.App }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	@layouts.App(app.Name) {
 		@panelPage(templ.Attributes{"data-app-page": app.Name}) {
-			@appHeader(app, "overview", "Runs on "+app.ServerName+". Deploy a new version with moin deploy "+app.Name+" in its repo.") {
-				@button.Button(button.Props{
-					Variant: button.VariantSecondary,
-					Attributes: templ.Attributes{
-						"hx-post":    appPath + "/restart",
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"title":      "Start the live release again with the env and domains as they are now, without a build",
-					},
-				}) {
-					Restart
-				}
+			@appHeader(app, view.Section) {
 				@appPower(app)
-				@button.Button(button.Props{
-					Attributes: templ.Attributes{
-						"hx-post":       appPath + "/redeploy",
-						"hx-swap":       "none",
-						"hx-disable":    "this",
-						"data-redeploy": true,
-						"title":         "Build the newest source again",
-					},
-				}) {
-					Redeploy
+				@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true, "title": "Build the newest source again"}) {
+					Deploy
 				}
 			}
-			if app.Catalog != "" {
-				<div hx-get={ appPath + "/catalog" } hx-trigger="load" hx-swap="outerHTML"></div>
-			}
-			@appFacts(app, deploys)
-			<div class="grid items-stretch gap-4 lg:grid-cols-2">
-				@appDeploys(app, deploys)
-				@panel(panelProps{Heading: "deploy-log-heading", Title: "Deploy log", Docs: "/docs/guides/deploy#follow-a-deploy", Description: "The steps of the deploy picked under Deploys.", Action: deployLogActions(), Body: panelBodyFlush}) {
-					<div
-						id="deploy-log"
-						class="moin-term moin-term-lines max-h-[32rem] flex-1 lg:min-h-72 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-						data-deploy-log
-						tabindex="0"
-						aria-label="Deploy log"
-					>
-						<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet. Deploy from GitHub below, or run <span class="font-mono text-foreground">moin deploy { app.Name }</span> in its repo.</p>
-					</div>
-				}
-			</div>
-			<div class="grid items-stretch gap-4 lg:grid-cols-2">
-				@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Docs: "/docs/guides/env", Description: "Stored encrypted. The next deploy or restart hands them to the app.", Body: panelBodyRows}) {
-					@AppEnv(app.Name, envKeys, nil)
-				}
-				@panel(panelProps{Heading: "app-logs-heading", Title: "Container logs", Docs: "/docs/guides/logs", Description: "The last 200 lines of every container on " + app.ServerName + ". Same as moin logs " + app.Name + ".", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
-					<div id="app-logs" class="px-6 text-sm text-muted-foreground">Not loaded yet.</div>
-				}
-			</div>
-			@appExec(app, deploys)
-			<div hx-get={ appPath + "/repo" } hx-trigger="load" hx-swap="outerHTML">
-				@AppRepo(RepoView{App: app})
-			</div>
-			<div hx-get={ appPath + "/routing" } hx-trigger="load" hx-swap="outerHTML">
-				@AppRouting(RoutingView{App: app})
-			</div>
-			@appCI(app.Name, app.DeployHookHash != nil)
-			@dangerPanel("Remove "+app.Name, "Its containers stop and are removed. Its data stays on the server.", "/docs/guides/deploy#remove-an-app") {
-				@button.Button(button.Props{
-					Variant: button.VariantDestructive,
-					Attributes: templ.Attributes{
-						"hx-delete":         appPath,
-						"hx-swap":           "none",
-						"hx-disable":        "this",
-						"hx-confirm":        "Remove " + app.Name + "? Its containers stop and are removed. Its data stays on the server.",
-						"data-confirm-name": app.Name,
-						"data-remove-app":   true,
-					},
-				}) {
-					Remove app
+			@appSection() {
+				switch view.Section {
+					case "deploys":
+						@appDeploysSection(app, view.Deploys)
+					case "addresses":
+						@appAddressesSection(app)
+					case "logs":
+						@appLogsSection(app, view.Deploys)
+					case "settings":
+						@appSettingsSection(app, view.EnvKeys)
+					default:
+						@appHomeSection(app, view.Deploys)
 				}
 			}
 		}
 		@appsScript()
-		@appScript(app.Name)
 	}
+}
+
+// appHomeSection answers "does it run?": the live version, where it is
+// reached, and the way to each part.
+templ appHomeSection(app model.App, deploys []api.Deploy) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	if app.Catalog != "" {
+		<div hx-get={ appPath + "/catalog" } hx-trigger="load" hx-swap="outerHTML"></div>
+	}
+	@kit.List() {
+		@kit.Row(appPath + "/deploys") {
+			@kit.RowText(appLiveLine(app), appLastDeployLine(deploys))
+		}
+		@kit.Row(appPath + "/addresses") {
+			@kit.RowText(appAddressLine(app), "Addresses")
+		}
+		@kit.Row(appPath + "/metrics") {
+			@kit.RowText("Metrics", "CPU, memory and network")
+		}
+		@kit.Row(appPath + "/data") {
+			@kit.RowText("Data", "Tables, SQL and backups")
+		}
+	}
+}
+
+// appDeploysSection answers "how does code get in?": the versions, the log
+// of the one picked, GitHub and CI.
+templ appDeploysSection(app model.App, deploys []api.Deploy) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	@appFacts(app, deploys)
+	<div class="grid items-stretch gap-4 lg:grid-cols-2">
+		@appDeploys(app, deploys)
+		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(), Body: panelBodyFlush}) {
+			<div
+				id="deploy-log"
+				class="moin-term moin-term-lines max-h-[32rem] flex-1 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:min-h-72"
+				data-deploy-log
+				tabindex="0"
+				aria-label="Deploy log"
+			>
+				<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet.</p>
+			</div>
+		}
+	</div>
+	<div hx-get={ appPath + "/repo" } hx-trigger="load" hx-swap="outerHTML">
+		@AppRepo(RepoView{App: app})
+	</div>
+	@appCI(app.Name, app.DeployHookHash != nil)
+	@appScript(app.Name)
+}
+
+// appAddressesSection answers "where is it reached?": the instant address
+// and the domains in one place, with the password and the uptime checks.
+templ appAddressesSection(app model.App) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	<div hx-get={ appPath + "/routing" } hx-trigger="load" hx-swap="outerHTML">
+		@AppRouting(RoutingView{App: app})
+	</div>
+	<div hx-get={ appPath + "/uptime" } hx-trigger="load" hx-select="#app-uptime" hx-swap="outerHTML"></div>
+}
+
+// appLogsSection answers "what happens in it?": the container logs, and a
+// command to run in it.
+templ appLogsSection(app model.App, deploys []api.Deploy) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	@panel(panelProps{Heading: "app-logs-heading", Title: "Logs", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
+		<div id="app-logs" hx-get={ appPath + "/logs/lines" } hx-trigger="load" hx-swap="outerHTML" class="px-6 text-sm text-muted-foreground">Loading…</div>
+	}
+	@appExec(app, deploys)
+}
+
+// appSettingsSection answers "how is it set up?": its env and the way out.
+templ appSettingsSection(app model.App, envKeys []string) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Body: panelBodyRows}) {
+		@AppEnv(app.Name, envKeys, nil)
+	}
+	@kit.Card("Remove "+app.Name, nil) {
+		@kit.Quiet() {
+			Its containers stop and go. Its data stays on the server.
+		}
+		<div>
+			@kit.Button(kit.Danger, "", templ.Attributes{
+				"hx-delete":         appPath,
+				"hx-swap":           "none",
+				"hx-disable":        "this",
+				"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
+				"data-confirm-name": app.Name,
+				"data-remove-app":   true,
+			}) {
+				Remove app
+			}
+		</div>
+	}
+}
+
+func appLiveLine(app model.App) string {
+	switch {
+	case app.LiveNumber == 0:
+		return "Not deployed yet"
+	case app.Stopped:
+		return fmt.Sprintf("v%d, stopped", app.LiveNumber)
+	}
+	return fmt.Sprintf("v%d runs", app.LiveNumber)
+}
+
+func appLastDeployLine(deploys []api.Deploy) string {
+	if len(deploys) == 0 {
+		return "Deploy it with moin deploy"
+	}
+	return "Last deploy " + ago(deploys[0].CreatedAt, time.Now())
+}
+
+func appAddressLine(app model.App) string {
+	if domains := app.DomainList(); len(domains) > 0 {
+		return domains[0]
+	}
+	if app.InstantHost != "" {
+		return app.InstantHost
+	}
+	return "No address yet"
 }
 
 // deployLogActions is the version the log shows, its state and the copy button.
@@ -234,12 +312,8 @@ templ deployLogActions() {
 }
 
 templ loadLogsButton(appPath string) {
-	@button.Button(button.Props{
-		Variant:    button.VariantSecondary,
-		Size:       button.SizeSm,
-		Attributes: templ.Attributes{"hx-get": appPath + "/logs", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"},
-	}) {
-		Load logs
+	@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": appPath + "/logs/lines", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"}) {
+		Reload
 	}
 }
 

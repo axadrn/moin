@@ -1,11 +1,12 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
+	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
 // appKind is the status symbol of an app: its newest deploy.
@@ -21,38 +22,52 @@ func appKind(app model.App) status.Kind {
 	return status.KindLive
 }
 
-// appHeader is the head of every page of an app: its name, the status chip,
-// one line, the actions (children) and the tabs.
-templ appHeader(app model.App, tab, description string) {
-	<div class="flex flex-col gap-6">
-		@statusHeader(app.Name, appHeaderChip(app, tab), description) {
+// appSections are the parts of an app, each one question: does it run,
+// how does code get in, where is it reached, what happens in it, what is in
+// its database, how is it set up. The TUI has the same ones and keys.
+var appSections = []struct{ ID, Label, Path, Key string }{
+	{"app", "App", "", ""},
+	{"deploys", "Deploys", "/deploys", "d"},
+	{"addresses", "Addresses", "/addresses", "o"},
+	{"logs", "Logs", "/logs", "l"},
+	{"data", "Data", "/data", "b"},
+	{"settings", "Settings", "/settings", "e"},
+}
+
+// appHeader is the head of every section of an app: its name, the star, its
+// state and the actions, then the sections. It stays put: a section swaps
+// only #app-section under it.
+templ appHeader(app model.App, section string) {
+	<div class="flex flex-col gap-5 pt-2">
+		<div class="flex flex-wrap items-center gap-x-2 gap-y-3">
+			<h1 class="mr-1 text-3xl font-semibold tracking-tight">{ app.Name }</h1>
 			@PinButton(app)
-			{ children... }
-		}
-		@appTabs(app.Name, tab)
+			@appSummary(app)
+			<div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+				{ children... }
+			</div>
+		</div>
+		@appTabs(app.Name, section)
 	</div>
 }
 
-// appHeaderChip is the status of the app next to its name: the overview
-// keeps it in step with the deploys, the other tabs show it as it was.
-func appHeaderChip(app model.App, tab string) templ.Component {
-	if tab == "overview" {
-		return appSummary(app)
-	}
-	return appStatus(app)
-}
-
-// appTabs switches between the pages of an app: plain links the boost
-// swaps into #main, as a segmented control.
+// appTabs are the sections of an app as a segmented control. A choice swaps
+// only the section under it and keeps its place in the history.
 templ appTabs(appName, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
-	@tabNav("App") {
-		@tabLink(appPath, "Overview", active == "overview", nil)
-		@tabLink(appPath+"/data", "Data", active == "data", nil)
-		@tabLink(appPath+"/backups", "Backups", active == "backups", nil)
-		@tabLink(appPath+"/uptime", "Uptime", active == "uptime", nil)
-		@tabLink(appPath+"/metrics", "Metrics", active == "metrics", nil)
+	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
+	for _, s := range appSections {
+		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
 	}
+	@kit.Segmented("app-tabs", appName, "#app-section", segments)
+}
+
+// appSection holds what a section shows. It keeps a height, so a short
+// section does not pull the page up.
+templ appSection() {
+	<div id="app-section" class="flex min-h-[60vh] flex-col gap-6">
+		{ children... }
+	</div>
 }
 
 // PinButton is the star by an app: a real checkbox, so the browser fills
@@ -67,4 +82,13 @@ templ PinButton(app model.App) {
 			<svg aria-hidden="true" viewBox="0 0 24 24" class="size-5 fill-none peer-checked:fill-current"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path></svg>
 		</label>
 	</form>
+}
+
+// dataNav switches the Data section between its tables and its backups.
+templ dataNav(appName, active string) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
+	@kit.Segmented("data-tabs", "Data", "#app-section", []kit.Segment{
+		{Label: "Browse", Href: appPath + "/data", Active: active == "browse"},
+		{Label: "Backups", Href: appPath + "/backups", Active: active == "backups"},
+	})
 }

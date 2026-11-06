@@ -21,8 +21,10 @@ templ AppMetricsPage(view AppMetricsView) {
 	{{ path := basePath + "/apps/" + view.App.Name + "/metrics" }}
 	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " metrics", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Metrics"}}}) {
 		@panelPage(templ.Attributes{"data-app-metrics": view.App.Name}) {
-			@appHeader(view.App, "metrics", "CPU, memory and network of the app's containers, sampled every 15 seconds by the agent. A dot on the line is a deploy that went live.")
-			@appMetricsPanel(view, path)
+			@appHeader(view.App, "app")
+			@appSection() {
+				@appMetricsPanel(view, path)
+			}
 		}
 	}
 }
