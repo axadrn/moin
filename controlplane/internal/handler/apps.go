@@ -76,7 +76,13 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
 }
 
-func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {
+// AppSection answers one section of an app (app, deploys, addresses, logs
+// or settings) as a whole page; a tab swaps #app-section out of it.
+func (h *AppsHandler) AppSection(section string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { h.appPage(w, r, section) }
+}
+
+func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section string) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, deploys, err := h.apps.Deploys(workspace.ID, r.PathValue("app"), 20)
 	if errors.Is(err, repository.ErrAppNotFound) {
@@ -92,7 +98,7 @@ func (h *AppsHandler) AppPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load env failed", err)
 		return
 	}
-	render(w, r, pages.AppPage(*app, api.NewDeploys(deploys, app.LiveNumber), sortedKeys(env)))
+	render(w, r, pages.AppPage(pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}))
 }
 
 // Detail answers the header and deploys of an app, for the reload after a
