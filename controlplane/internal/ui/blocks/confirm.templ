@@ -1,12 +1,6 @@
 package blocks
 
-import (
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/dialog"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-)
+import "github.com/axadrn/moin/controlplane/internal/ui/kit"
 
 // ConfirmDialog asks before every request whose element has hx-confirm
 // (DESIGN.md, Asking first). The question is the hx-confirm text: up to the
@@ -16,34 +10,21 @@ import (
 // once that name is typed, for what is big and cannot be undone; the name
 // has a copy button.
 templ ConfirmDialog() {
-	@dialog.Dialog(dialog.Props{ID: "confirm-dialog"}) {
-		@dialog.Content(dialog.ContentProps{HideCloseButton: true}) {
-			@dialog.Header() {
-				@dialog.Title(dialog.TitleProps{Attributes: templ.Attributes{"data-confirm-question": true}})
-				@dialog.Description(dialog.DescriptionProps{Attributes: templ.Attributes{"data-confirm-detail": true}})
-			}
-			<div class="flex flex-col gap-2" data-confirm-typed hidden>
-				@field.Label(field.LabelProps{For: "confirm-name"}) {
-					<span>Type <span class="font-mono font-semibold" data-confirm-name></span> to confirm</span>
-					@button.Button(button.Props{
-						Variant:    button.VariantGhost,
-						Size:       button.SizeIconSm,
-						Class:      "group/copy text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
-						Attributes: templ.Attributes{"data-copy": "", "data-confirm-copy": true, "aria-label": "Copy the name", "title": "Copy the name"},
-					}) {
-						@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
-						@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
-					}
-				}
-				@input.Input(input.Props{ID: "confirm-name", Type: "text", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "data-confirm-input": true}})
+	@kit.Dialog("confirm-dialog", "", "") {
+		<div class="flex flex-col gap-3" data-confirm-typed hidden>
+			<div data-confirm-shown>
+				@kit.Command("")
 			</div>
-			@dialog.Footer() {
-				@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: dialog.Close(ctx)}) {
-					Cancel
-				}
-				@button.Button(button.Props{Variant: button.VariantDestructive, Attributes: templ.Attributes{"data-confirm-accept": true}}) {
-					Continue
-				}
+			@kit.Field("Type it to confirm", "confirm-name", "") {
+				@kit.Input(templ.Attributes{"id": "confirm-name", "type": "text", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "data-confirm-input": true})
+			}
+		</div>
+		@kit.DialogButtons() {
+			@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+				Cancel
+			}
+			@kit.Button(kit.Danger, "", templ.Attributes{"type": "button", "data-confirm-accept": true}) {
+				Continue
 			}
 		}
 	}
@@ -61,14 +42,14 @@ templ confirmScript() {
 			const popup = () => document.getElementById("confirm-dialog");
 			const part = (name) => popup().querySelector("[data-confirm-" + name + "]");
 			document.addEventListener("htmx:confirm", (event) => {
-				if (!popup() || !window.templ?.dialog) return;
+				if (!popup()) return;
 				event.preventDefault();
 				const { ctx, issueRequest, dropRequest } = event.detail;
 				pending?.drop();
 				const text = ctx.confirm || "";
 				const split = text.indexOf("? ");
-				part("question").textContent = split < 0 ? text : text.slice(0, split + 1);
-				part("detail").textContent = split < 0 ? "" : text.slice(split + 2);
+				popup().querySelector("[data-dialog-title]").textContent = split < 0 ? text : text.slice(0, split + 1);
+				popup().querySelector("[data-dialog-note]").textContent = split < 0 ? "" : text.slice(split + 2);
 				const source = ctx.sourceEvent?.submitter || event.target;
 				const label = source.closest("[data-confirm-action]")?.dataset.confirmAction || (source.matches("button") ? source.textContent.trim() : "");
 				const accept = part("accept");
@@ -76,14 +57,16 @@ templ confirmScript() {
 				const name = event.target.closest("[data-confirm-name]")?.dataset.confirmName || "";
 				const typed = part("typed");
 				typed.hidden = name === "";
-				part("name").textContent = name;
-				part("copy").dataset.copy = name;
+				// The name shows with its copy button (kit.Command).
+				part("shown").querySelector("code").textContent = name;
+				part("shown").querySelector("[data-copy]").dataset.copy = name;
 				const field = part("input");
 				field.value = "";
 				accept.disabled = name !== "";
 				pending = { name, accepted: false, issue: issueRequest, drop: dropRequest };
-				window.templ.dialog.open(popup());
-				if (name) setTimeout(() => field.focus(), 50);
+				popup().showModal();
+				if (name) field.focus();
+				else accept.focus();
 			});
 			document.addEventListener("input", (event) => {
 				if (pending && event.target.matches("[data-confirm-input]")) part("accept").disabled = event.target.value.trim() !== pending.name;
@@ -91,7 +74,7 @@ templ confirmScript() {
 			const accept = () => {
 				if (!pending || part("accept").disabled) return;
 				pending.accepted = true;
-				window.templ.dialog.close(popup());
+				popup().close();
 			};
 			document.addEventListener("click", (event) => {
 				if (event.target.closest("[data-confirm-accept]")) accept();
@@ -104,12 +87,12 @@ templ confirmScript() {
 			});
 			// The dialog closed: by the button, Cancel, Escape or a click
 			// outside. Only the button lets the request go.
-			document.addEventListener("dialog-close", (event) => {
+			document.addEventListener("close", (event) => {
 				if (!pending || event.target !== popup()) return;
 				const done = pending;
 				pending = null;
 				done.accepted ? done.issue() : done.drop();
-			});
+			}, true);
 		})();
 	</script>
 }

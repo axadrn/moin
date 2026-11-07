@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -53,28 +52,28 @@ templ billingCurrent(subscription *model.Subscription, basePath string) {
 // billingStatus is the state of the subscription as a status chip.
 templ billingStatus(subscription *model.Subscription) {
 	{{ kind, word := billingState(subscription) }}
-	@status.Status(status.Props{Kind: kind, Chip: true}) {
+	@kit.Chip(kind) {
 		{ word }
 	}
 }
 
-func billingState(subscription *model.Subscription) (status.Kind, string) {
+func billingState(subscription *model.Subscription) (kit.State, string) {
 	switch subscription.Status {
 	case model.SubscriptionStatusActive:
 		if subscription.PlanID == model.SubscriptionPlanFree {
-			return status.KindIdle, "Read-only"
+			return kit.StateIdle, "Read-only"
 		}
-		return status.KindLive, "Active"
+		return kit.StateLive, "Active"
 	case model.SubscriptionStatusTrialing:
-		return status.KindRunning, "Trial"
+		return kit.StateRunning, "Trial"
 	case model.SubscriptionStatusPastDue:
-		return status.KindWaiting, "Payment due"
+		return kit.StateWaiting, "Payment due"
 	case model.SubscriptionStatusIncomplete:
-		return status.KindIdle, "Payment pending"
+		return kit.StateIdle, "Payment pending"
 	case model.SubscriptionStatusCancelled:
-		return status.KindFailed, "Cancelled"
+		return kit.StateFailed, "Cancelled"
 	}
-	return status.KindFailed, "Ended"
+	return kit.StateFailed, "Ended"
 }
 
 // billingLine says what the plan costs and the date that matters next.

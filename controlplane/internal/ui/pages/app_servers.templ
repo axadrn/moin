@@ -6,7 +6,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -96,7 +95,7 @@ templ ServerAdded(added AddedServer) {
 			<div data-install-command>
 				@kit.Command(added.Command)
 			</div>
-			@status.Status(status.Props{Kind: status.KindWaiting}) {
+			@kit.Status(kit.StateWaiting, nil) {
 				Waiting for the agent
 			}
 		}
@@ -109,7 +108,7 @@ templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
 		@kit.List() {
 			@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/new") {
-				@status.Symbol(status.KindLive)
+				@kit.Dot(kit.StateLive)
 				@kit.RowText(name+" is online", "Deploy an app to it")
 			}
 		}
@@ -182,15 +181,15 @@ templ serverState(server model.Server) {
 	switch  {
 		case server.Online:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Online">
-				@status.Symbol(status.KindLive)
+				@kit.Dot(kit.StateLive)
 				<span class="sr-only">Online</span>
 			</span>
 		case server.LastSeenAt == nil:
-			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
+			@kit.Chip(kit.StateWaiting) {
 				Waiting
 			}
 		default:
-			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+			@kit.Chip(kit.StateFailed) {
 				Offline
 			}
 	}
@@ -200,15 +199,15 @@ templ serverState(server model.Server) {
 templ serverStatus(server model.Server) {
 	switch  {
 		case server.Online:
-			@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
+			@kit.Chip(kit.StateLive) {
 				Online
 			}
 		case server.LastSeenAt == nil:
-			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
+			@kit.Chip(kit.StateWaiting) {
 				Waiting
 			}
 		default:
-			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+			@kit.Chip(kit.StateFailed) {
 				Offline
 			}
 	}

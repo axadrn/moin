@@ -5,7 +5,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
-	"github.com/axadrn/moin/controlplane/internal/ui/icons"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -70,7 +69,7 @@ templ repoAction(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	if view.Enabled && !view.Connected {
 		@kit.Button(kit.Primary, ctxkeys.AppBasePath(ctx)+"/github/install?next="+appPath+"/deploys", templ.Attributes{"data-connect-github": true}) {
-			@icons.Github(icons.Props{Class: "size-4"})
+			@kit.IconGitHub("size-4")
 			Connect GitHub
 		}
 	} else if view.Enabled && view.App.Repo != "" {

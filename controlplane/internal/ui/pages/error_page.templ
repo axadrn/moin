@@ -3,7 +3,6 @@ package pages
 import (
 	"strconv"
 
-	"github.com/axadrn/moin/controlplane/internal/ui/components"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -22,7 +21,6 @@ templ ErrorPage(status int, title, description string) {
 				document.documentElement.classList.toggle('dark', dark);
 			</script>
 			<link href="/assets/css/output.css" rel="stylesheet"/>
-			@components.Scripts()
 		</head>
 		<body class="style-nova min-h-screen">
 			@StatusScreen(title, description, strconv.Itoa(status)+" "+title)

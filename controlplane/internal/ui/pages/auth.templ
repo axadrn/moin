@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/config"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/icons"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -24,7 +23,7 @@ templ Auth(errorMsg string) {
 		@authStack() {
 			if github {
 				@kit.Button(kit.Primary, "/auth/github", nil) {
-					@icons.Github(icons.Props{Class: "size-4"})
+					@kit.IconGitHub("size-4")
 					Continue with GitHub
 				}
 				@authOr()
@@ -32,7 +31,7 @@ templ Auth(errorMsg string) {
 			@AuthMagicLinkForm(errorMsg)
 			if config.GoogleOAuthEnabled {
 				@kit.Button(kit.Secondary, "/auth/google", nil) {
-					@icons.Google(icons.Props{Class: "size-4"})
+					@kit.IconGoogle("size-4")
 					Continue with Google
 				}
 			}
