@@ -1,4 +1,9 @@
-# moin.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/hero-dark.svg">
+    <img src=".github/assets/hero-light.svg" alt="moin." width="720">
+  </picture>
+</p>
 
 Deploy anything. Lose nothing. Your apps on your servers. Every change backed up. Every restore tested. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
 
