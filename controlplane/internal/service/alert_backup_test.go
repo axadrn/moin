@@ -169,7 +169,7 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 		t.Errorf("slack backup.recovered = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "drill.failed", "shop", map[string]string{"database": "data/app.db", "error": "restore drill failed: integrity check"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Restore check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore drill failed: integrity check\nThe newest backup did not restore cleanly. Take a snapshot now and look: moin backups shop\n<"+backups+"|Open in moin>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Daily check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore drill failed: integrity check\nThe daily check could not go back to the newest state. Download a copy now and look: moin backups shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack drill.failed = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "drill.recovered", "shop", map[string]string{"database": "data/app.db"}, at)

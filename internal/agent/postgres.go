@@ -84,6 +84,38 @@ func (a *apps) serviceImage(app, service string) string {
 	return config.Services[service].Image
 }
 
+// serviceEnv is the environment of a service in the app's live release,
+// as KEY=value lines; compose files give it as a map or a list.
+func (a *apps) serviceEnv(app, service string) []string {
+	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, a.current(app)), "compose.json"))
+	if err != nil {
+		return nil
+	}
+	var config struct {
+		Services map[string]struct {
+			Environment json.RawMessage `json:"environment"`
+		} `json:"services"`
+	}
+	if json.Unmarshal(body, &config) != nil {
+		return nil
+	}
+	raw := config.Services[service].Environment
+	var list []string
+	if json.Unmarshal(raw, &list) == nil {
+		return list
+	}
+	var values map[string]*string
+	if json.Unmarshal(raw, &values) != nil {
+		return nil
+	}
+	for name, value := range values {
+		if value != nil {
+			list = append(list, name+"="+*value)
+		}
+	}
+	return list
+}
+
 // errPostgresDown is a Postgres service that is not running, such as one
 // that restarts over and over.
 var errPostgresDown = errors.New("not running")
@@ -260,12 +292,8 @@ func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database p
 		return result, err
 	}
 	if request.Write {
-		if request.Snapshot && a.backups != nil {
-			err = a.backups.snapshotBefore(ctx, request.App, "before-sql", nil)
-			if err != nil {
-				return result, err
-			}
-		}
+		before := time.Now().UTC()
+		result.Before = &before
 		out, err := target.psql(ctx, pgStatementTimeout+"BEGIN;\n"+sql+"\n;\nCOMMIT;\n", vars, true)
 		if err != nil {
 			return result, err
@@ -652,72 +680,4 @@ func (t pgTarget) restoreDump(ctx context.Context, file string) error {
 	}
 	defer in.Close()
 	return t.exec(ctx, in, io.Discard, "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error", "-h", pgSocket, "-U", t.user, "-d", t.database)
-}
-
-// pgDrill restores a dump into a throwaway container of the same image, on
-// no network, and checks that it holds as many tables as the dump lists.
-func (a *apps) pgDrill(ctx context.Context, image, file string) error {
-	out, err := a.output(ctx, "docker", "run", "-d", "--rm", "--network", "none", "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "-e", "POSTGRES_PASSWORD=drill", "--label", labelDrill+"=true", image)
-	if err != nil {
-		return fmt.Errorf("start a drill container: %w", err)
-	}
-	container := pgTarget{container: strings.TrimSpace(out), image: image, user: "postgres", database: "postgres"}
-	defer func() { _, _ = a.output(context.Background(), "docker", "rm", "-f", container.container) }()
-	// The image's first start runs a temporary server on the socket only;
-	// the real one also listens on TCP, which the loopback reaches.
-	ready := false
-	for deadline := time.Now().Add(2 * time.Minute); time.Now().Before(deadline); {
-		if container.exec(ctx, nil, io.Discard, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "postgres") == nil {
-			ready = true
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Second):
-		}
-	}
-	if !ready {
-		return errors.New("the drill container did not start")
-	}
-	_, err = a.output(ctx, "docker", "cp", file, container.container+":/tmp/drill.dump")
-	if err != nil {
-		return fmt.Errorf("copy the snapshot: %w", err)
-	}
-	var list bytes.Buffer
-	err = container.exec(ctx, nil, &list, "pg_restore", "-l", "/tmp/drill.dump")
-	if err != nil {
-		return fmt.Errorf("read the snapshot: %w", err)
-	}
-	want := pgDumpTables(list.String())
-	err = container.exec(ctx, nil, io.Discard, "pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "-h", pgSocket, "-U", "postgres", "-d", "postgres", "/tmp/drill.dump")
-	if err != nil {
-		return fmt.Errorf("restore: %w", err)
-	}
-	got, err := container.psql(ctx, `SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema');`, nil, false)
-	if err != nil {
-		return err
-	}
-	if count, _ := strconv.Atoi(strings.TrimSpace(got)); count != want {
-		return fmt.Errorf("the snapshot lists %d tables, the restore holds %d", want, count)
-	}
-	return nil
-}
-
-// pgDumpTables counts the tables the table of contents of a dump lists,
-// pg_restore -l lines like "215; 1259 16386 TABLE public users postgres".
-func pgDumpTables(list string) int {
-	count := 0
-	for _, line := range strings.Split(list, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), ";") {
-			continue
-		}
-		if _, rest, ok := strings.Cut(line, "; "); ok {
-			fields := strings.Fields(rest)
-			if len(fields) >= 4 && fields[2] == "TABLE" && fields[3] != "DATA" {
-				count++
-			}
-		}
-	}
-	return count
 }

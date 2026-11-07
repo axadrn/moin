@@ -61,10 +61,13 @@ type apps struct {
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
+	// befores is the moment just before each running deploy started its
+	// new release over an older one, by deploy ID, for deploy.done.
+	befores map[string]time.Time
 }
 
 func newApps(dir string, send func(protocol.MessageType, string, any)) *apps {
-	return &apps{dir: filepath.Join(dir, "apps"), send: send, locks: map[string]*sync.Mutex{}}
+	return &apps{dir: filepath.Join(dir, "apps"), send: send, locks: map[string]*sync.Mutex{}, befores: map[string]time.Time{}}
 }
 
 // lock serializes everything that touches one app.
@@ -129,6 +132,12 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 	done := protocol.DeployDone{DeployID: start.DeployID}
 	detected, err := a.runDeploy(ctx, start, logf)
 	done.Detected = detected
+	a.mu.Lock()
+	if before, ok := a.befores[start.DeployID]; ok {
+		done.Before = &before
+		delete(a.befores, start.DeployID)
+	}
+	a.mu.Unlock()
 	if err != nil {
 		done.Error = err.Error()
 		logf("deploy failed: %s", err)
@@ -275,15 +284,12 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	a.ownVolumes(ctx, start.App, composeFile, logf)
 
 	previous := a.current(start.App)
-	if a.backups != nil && previous > 0 && start.Snapshot {
-		err = a.backups.snapshotBefore(ctx, start.App, fmt.Sprintf("before-v%d", start.Number), logf)
-		if err != nil {
-			return detected, err
-		}
-		err = a.backups.walgBefore(ctx, start.App, logf)
-		if err != nil {
-			return detected, err
-		}
+	if previous > 0 && len(a.runningDatabases(start.App)) > 0 {
+		// The control plane remembers this moment: a restore can go back
+		// to just before the new release touched the data.
+		a.mu.Lock()
+		a.befores[start.DeployID] = time.Now().UTC()
+		a.mu.Unlock()
 	}
 	logf("starting")
 	// A restart brings nothing new, so compose would leave the containers
@@ -322,7 +328,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
-			a.backups.walgOnce(ctx)
+			a.backups.recordAll(ctx)
 		}()
 	}
 	a.prune(ctx, start.App)
@@ -1064,7 +1070,7 @@ func postgresImage(image string) bool {
 
 // sqliteFiles returns the files under dir, three levels deep, that are
 // SQLite databases: the magic string and a valid page size in the 100 byte
-// header. Copies of snapshots being taken do not count.
+// header. Full copies being taken do not count.
 func sqliteFiles(dir string) []string {
 	files := []string{}
 	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
@@ -1072,8 +1078,8 @@ func sqliteFiles(dir string) []string {
 			return nil
 		}
 		if entry.IsDir() {
-			// A snapshot being taken copies the database there.
-			if strings.HasPrefix(entry.Name(), snapshotFolderPrefix) {
+			// A full copy being taken copies the database there.
+			if strings.HasPrefix(entry.Name(), copyFolderPrefix) || strings.HasPrefix(entry.Name(), oldCopyFolderPrefix) {
 				return filepath.SkipDir
 			}
 			if relative, _ := filepath.Rel(dir, path); strings.Count(relative, string(filepath.Separator)) >= 3 {

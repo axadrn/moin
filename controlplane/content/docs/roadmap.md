@@ -12,7 +12,7 @@ moin is in beta: it runs real sites today and keeps growing. No dates: "next" is
 On every surface: web, CLI, terminal UI, API and MCP.
 
 - **Deploys** from your repo, a GitHub branch or commit, or an image from CI, with or without a Dockerfile; a failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
-- **Backups** of every SQLite and Postgres change in your own bucket, restore to any second of 7 days, a full backup before every change, a restore check every day. [Backups](/docs/guides/backups)
+- **Backups** of every SQLite and Postgres change in your own bucket for 7 days: go back to any minute, undo a restore, download a copy, and a check every day that going back works. [Backups](/docs/guides/backups)
 - **Data**: browse, edit and query the live database. [Data](/docs/guides/data)
 - **Domains** with HTTPS and a password, and an [instant address](/docs/guides/domains#instant-address) after the first deploy. [Domains](/docs/guides/domains)
 - **Run a command** in an app's container, without SSH. [Run a command](/docs/guides/exec)

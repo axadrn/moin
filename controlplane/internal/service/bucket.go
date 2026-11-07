@@ -43,7 +43,7 @@ func (e *BucketInUseError) Error() string {
 		reasons = append(reasons, "the uploads and backups of "+strings.Join(e.Apps, ", ")+" go there; move them to another bucket first")
 	}
 	if len(e.Older) > 0 {
-		reasons = append(reasons, "it keeps the older backups of "+strings.Join(e.Older, ", ")+", and restores of those read from there")
+		reasons = append(reasons, "it keeps what "+strings.Join(e.Older, ", ")+" left there")
 	}
 	return "The bucket " + e.Bucket + " is in use: " + strings.Join(reasons, ", and ") + "."
 }
@@ -487,36 +487,4 @@ func (s *AppService) appStorage(app *model.App) (*protocol.BackupStorage, error)
 		return nil, err
 	}
 	return s.openBucket(bucket)
-}
-
-// olderStorage are the buckets the app left, with their keys, for the
-// agent to list the older snapshots there.
-func (s *AppService) olderStorage(app *model.App) []protocol.BackupStorage {
-	buckets, err := s.apps.OlderBuckets(app.ID)
-	if err != nil {
-		slog.Error("list older buckets failed", "app_id", app.ID, "error", err)
-		return nil
-	}
-	var storages []protocol.BackupStorage
-	for _, bucket := range buckets {
-		storage, err := s.openBucket(&bucket)
-		if err == nil {
-			storages = append(storages, *storage)
-		}
-	}
-	return storages
-}
-
-// olderBucket is a bucket the app left, by name.
-func (s *AppService) olderBucket(app *model.App, name string) (*model.Bucket, error) {
-	buckets, err := s.apps.OlderBuckets(app.ID)
-	if err != nil {
-		return nil, err
-	}
-	for _, bucket := range buckets {
-		if bucket.Name == name {
-			return &bucket, nil
-		}
-	}
-	return nil, repository.ErrBucketNotFound
 }

@@ -316,9 +316,9 @@ func (m model) backupsTab(u ui, w, h int) string {
 		}
 		word := "on"
 		switch {
-		case d.Error != "" || d.DrillError != "":
+		case d.Problem != "":
 			word = "failed"
-		case d.ReplicatedAt == nil && d.Since == nil && len(d.Snapshots) == 0:
+		case d.Since == nil:
 			word = "waiting"
 		}
 		kind := d.Kind
@@ -327,28 +327,27 @@ func (m model) backupsTab(u ui, w, h int) string {
 		}
 		st = append(st, u.dot(word, word != "on" || m.frame%4 != 3)+" "+u.strong(d.Database)+"  "+u.muted(kind))
 		kv := func(k, v string) { st = append(st, "  "+padR(u.muted(k), 16)+truncate(v, liw-18)) }
-		if d.Since != nil {
-			kv("point in time", u.text("since "+d.Since.Local().Format("Jan 2 15:04")))
-		}
-		if d.ReplicatedAt != nil {
-			kv("last change", u.text(ago(*d.ReplicatedAt, now)))
+		switch {
+		case d.Problem != "":
+			kv("backup", u.bad(d.Problem))
+		case d.Since == nil:
+			kv("backup", u.faint("starting"))
+		default:
+			kv("backup", u.good("every change")+u.muted(" · back to "+d.Since.Local().Format("Jan 2 15:04")))
 		}
 		switch {
 		case d.DrillError != "":
-			kv("restore check", u.bad("failed"))
+			kv("daily check", u.bad("failed"))
 		case d.VerifiedAt != nil:
-			kv("restore check", u.good("passed")+u.muted(" "+ago(*d.VerifiedAt, now)))
+			kv("daily check", u.good("passed")+u.muted(" "+ago(*d.VerifiedAt, now)))
 		default:
-			kv("restore check", u.faint("not yet"))
+			kv("daily check", u.faint("not yet"))
 		}
-		for _, e := range []string{d.DrillError, d.Error} {
-			if e != "" {
-				for j, l := range wrap(e, liw-2) {
-					if j < 2 {
-						st = append(st, "  "+u.bad(l))
-					}
+		if d.Problem != "" {
+			for j, l := range wrap(d.Error, liw-2) {
+				if j < 2 {
+					st = append(st, "  "+u.faint(l))
 				}
-				break
 			}
 		}
 		if d.Note != "" {
@@ -359,46 +358,37 @@ func (m model) backupsTab(u ui, w, h int) string {
 			}
 		}
 	}
-	auto := u.faint("off")
-	if b.SnapshotBeforeChanges {
-		auto = u.good("on")
-	}
-	st = append(st, "", "  "+padR(u.muted("before changes"), 16)+auto+u.faint("  a toggles"))
 	if b.Bucket != "" {
-		st = append(st, "  "+padR(u.muted("bucket"), 16)+u.text(b.Bucket))
+		st = append(st, "", "  "+padR(u.muted("bucket"), 16)+u.text(b.Bucket))
 	}
-	snaps := m.snapshots()
+	st = append(st, "  "+padR(u.muted("a full copy"), 16)+u.faint("c downloads one"))
+	moments := m.moments()
 	sw := w
 	if wide {
 		sw = w - lw - 2
 	}
 	siw := inner(sw)
-	sb := []string{u.row([]cell{u.head("taken", 14, false), u.head("database", 12, false), u.head("why", 10, false), u.head("size", 0, true)}, siw, false)}
-	// narrow, the status takes at most half and the snapshots the rest
+	sb := []string{u.row([]cell{u.head("go back to", max(10, siw-28), false), u.head("at", 14, false), u.head("database", 0, false)}, siw, false)}
+	// narrow, the status takes at most half and the moments the rest
 	stH := min(len(st)+chrome, max(chrome+2, h/2))
 	n := h - chrome - 1
 	if !wide {
 		n = max(1, h-stH-1-chrome-1)
 	}
-	at := m.at("snaps", len(snaps))
-	start := max(0, min(at-n+1, len(snaps)-n))
-	for i := start; i < len(snaps) && i < start+n; i++ {
-		s := snaps[i]
-		size := client.Bytes(float64(s.Size))
-		why := s.Reason
-		if s.Bucket != "" && s.Bucket != b.Bucket {
-			why += " · " + s.Bucket
-		}
-		sb = append(sb, u.row([]cell{{u.text(s.CreatedAt.Local().Format("Jan 2 15:04")), 14, false}, {u.muted(s.db), 12, false}, {u.muted(why), 10, false}, {u.text(size), 0, true}}, siw, i == at))
+	at := m.at("moments", len(moments))
+	start := max(0, min(at-n+1, len(moments)-n))
+	for i := start; i < len(moments) && i < start+n; i++ {
+		mo := moments[i]
+		sb = append(sb, u.row([]cell{{u.text(mo.Label), max(10, siw-28), false}, {u.muted(mo.At.Local().Format("Jan 2 15:04")), 14, false}, {u.muted(mo.db), 0, false}}, siw, i == at))
 	}
-	if len(snaps) == 0 {
-		sb = append(sb, "", u.muted("No snapshots yet. N backs up now."))
+	if len(moments) == 0 {
+		sb = append(sb, "", u.muted("Nothing to go back to yet."))
 	}
-	snapP := u.panel("Snapshots", u.faint(fmt.Sprint(len(snaps))), sb, sw, h, true)
+	momentsP := u.panel("Go back to", u.faint(fmt.Sprint(len(moments))), sb, sw, h, true)
 	if !wide {
-		return vjoin(u.panel("Continuous backup", "", st, w, stH, false), "", u.panel("Snapshots", u.faint(fmt.Sprint(len(snaps))), sb, w, max(chrome+1, h-stH-1), true))
+		return vjoin(u.panel("Backup", "", st, w, stH, false), "", u.panel("Go back to", u.faint(fmt.Sprint(len(moments))), sb, w, max(chrome+1, h-stH-1), true))
 	}
-	return hjoin(2, u.panel("Continuous backup", "", st, lw, h, false), snapP)
+	return hjoin(2, u.panel("Backup", "", st, lw, h, false), momentsP)
 }
 
 func (m model) envTab(u ui, w, h int) string {

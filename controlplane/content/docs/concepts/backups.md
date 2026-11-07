@@ -1,55 +1,39 @@
 ---
 title: "How backups work"
-description: "Every change, full backups and the daily restore check, and what lives where in your bucket"
+description: "Every change for 7 days in your own bucket, a daily check, and what lives where"
 group: "Servers and data"
 order: 4
 ---
 
-moin keeps two kinds of backup of every SQLite and Postgres database, both in your own bucket, and checks every day that they restore. Everything runs in the agent on your server: your data goes from your server to your bucket, never through moin.
+moin writes down every change of your database for 7 days in your bucket. Every day it checks that going back works. Go back to any minute; a restore can be undone for 7 days.
 
-- **Every change**, so you can go back to any second of the last 7 days: to 14:01, one minute before the wrong `DELETE`.
-- **Full backups**, one file each, that you can open anywhere, even without moin.
+That is the whole idea: one backup, the history of your database. Nothing to set up, nothing to schedule.
 
-## The two kinds
+## Your data goes to your bucket only
 
-| | SQLite | Postgres |
-| --- | --- | --- |
-| Every change | [Litestream](https://litestream.io), in the bucket within a second | [WAL-G](https://github.com/wal-g/wal-g), within a minute |
-| Full backups | the file, gzipped | `pg_dump` in its custom format, also every hour |
-| Daily check | restore into a file, `PRAGMA integrity_check` | restore into a throwaway Postgres, check that every table came back |
-| moin finds it | a SQLite file on a volume | a service that runs `postgres`, `postgis/postgis`, `pgvector/pgvector` or `timescale/timescaledb` |
-
-Full backups are taken before every deploy, restore and data edit, and the newest 50 stay. A full SQLite backup is a plain gzipped file: `gunzip` it and open it with `sqlite3`. A Postgres one opens with `pg_restore`. The app shows when the daily check last passed.
-
-## SQLite
-
-The agent runs Litestream for every SQLite file on a volume of the live deploy. Litestream copies each change to the bucket as it happens. Only the agent may run Litestream for a file: a second one for the same file breaks the history.
-
-## Postgres
-
-Next to the Postgres container the agent runs WAL-G in a small companion container that shares its network. It streams every change as Postgres writes it and uploads each finished piece of the log. Once a minute, if there were writes, moin closes the current piece, so a quiet database is in the bucket within a minute too. A full base backup runs every day and before every deploy; WAL-G deletes what the 7 days no longer need.
-
-The daily check restores the newest full backup into a throwaway Postgres of the same image, with no network.
-
-A point in time restore takes a full backup first, rebuilds the data in a new volume from the base backup and the log up to your second, and only when that worked stops the app, swaps the data in and starts it again. If anything fails before the swap, nothing changed. The window starts at the oldest base backup and ends at the newest piece of the log in the bucket.
-
-moin sets `max_slot_wal_keep_size` to 4 GB when it is still the default, so a WAL-G that stays down never fills your disk: past that Postgres drops WAL-G's place, moin takes a new base backup at once, and the app's backups say so for a day.
-
-## A restore
-
-A restore never loses the present. moin first takes a full backup of the current database (`before-restore`), then downloads the backup, checks it, stops the app for the swap and starts it again. To undo a restore, restore `before-restore`. After a restore the point in time history starts again from the restored database.
-
-## Why a bucket
-
-Your laptop and your server never talk to each other directly: the server has no open port, your laptop sits behind a router. They hand things over in your bucket, not on our servers.
+Your database goes from your server straight to your own bucket, the one you added in moin. It never goes to moin's servers, not even in passing, and never to a bucket of ours. When you download a copy, your server puts it in your bucket and moin gives you a link that works for 15 minutes. moin keeps the bucket's secret key encrypted and uses it for one thing: to sign such short-lived links.
 
 ```
-moin deploy   laptop ──▶ your bucket ──▶ your server     (the server deletes it after)
-backups       server ──▶ your bucket                     (every change, plus full backups)
-GitHub        GitHub ──────────────────▶ your server     (no bucket needed)
+every change   your server ──▶ your bucket
+a restore      your bucket ──▶ your server
+a copy         your server ──▶ your bucket ──▶ a 15 minute link ──▶ you
 ```
 
-moin keeps the bucket's secret key encrypted and uses it for one thing: to sign links that work for a few minutes.
+## Going back
+
+- **Any minute of the last 7 days.** Deleted the wrong rows at 14:02? Go back to 14:01.
+- **Moments moin remembers.** Before every deploy, every data edit you make in moin (SQL, a cell, a row) and every catalog update, moin notes the moment, so the list offers "Before v12" or "Before your SQL change".
+- **Undo a restore.** Right before a restore moin takes one full copy of the database as it is, and keeps it 7 days. The list offers it as "Before the restore at 14:02": going back to it undoes the restore. It is the only full copy moin keeps.
+
+Going back is to the minute: the history keeps older changes in pieces of about half a minute.
+
+## The daily check
+
+Every day moin takes the newest state from the history, restores it into a throwaway copy on your server and checks it. The app shows when the check last passed, and an alert goes out when it fails. "Backed up" means "went back and checked".
+
+## A copy for yourself
+
+**Download a copy** gives you the full database as one file, any time: SQLite as a gzipped file (`gunzip`, then `sqlite3`), Postgres as a `pg_dump` (`pg_restore`). You need no moin to open it. The copy waits in your bucket for a day.
 
 ## What lives where
 
@@ -57,39 +41,56 @@ Everything of one workspace goes into one folder named after the workspace's ID,
 
 ```
 <your-bucket>/
-└── <folder>/                     ← only when you set one
-    └── <workspace>/              ← your workspace's ID, it never changes
+└── <folder>/                        ← only when you set one
+    └── <workspace>/                 ← your workspace's ID, it never changes
         └── <app-name>/
-            └── <app-id>/         ← a new app with the same name gets a new one
-                ├── uploads/      ← your code on its way to the server
-                └── <database>/   ← one per database: data-app.db for /data/app.db, postgres-db for service db
-                    ├── litestream/   ← SQLite: every change of the last 7 days
-                    ├── walg/         ← Postgres: every change and the base backups
-                    └── snapshots/    ← full backups, the newest 50
+            └── <app-id>/            ← a new app with the same name gets a new one
+                ├── uploads/         ← your code on its way to the server
+                ├── downloads/       ← copies you asked for
+                └── <database>/      ← one per database: data-app.db for /data/app.db, postgres-db for service db
+                    ├── litestream/      ← SQLite: every change of the last 7 days
+                    ├── walg/            ← Postgres: every change of the last 7 days
+                    └── before-restore/  ← the copy before each restore
 ```
+
+A `snapshots/` folder is from moin before the history: moin no longer reads it. You may delete it.
 
 ## How long things stay
 
 | What | How long | Who deletes it |
 | --- | --- | --- |
-| `uploads/` | until the server has it, 24 hours at most | the agent: right after the download, and once an hour anything older than 24 hours |
 | `litestream/`, `walg/` | every change of the last 7 days | the agent, with Litestream's and WAL-G's own cleanup |
-| `snapshots/` | the newest 50 per database | the agent, after each new full backup |
+| `before-restore/` | 7 days | the agent, once an hour |
+| `downloads/` | a day | the agent, once an hour |
+| `uploads/` | until the server has it, a day at most | the agent: right after the download, and once an hour |
+| `snapshots/` from before | until you delete it | you: moin no longer reads it |
 | an app you removed | until you delete it | you: its `<app-id>/` folder, in your provider's dashboard or with any S3 tool |
-| a bucket or folder you changed | until you delete it | you: moin starts in the new place with a full backup and leaves the old one |
-| a bucket you removed from moin | until you delete it | you: moin deletes nothing |
-| an app you moved to another bucket | until you delete it | you: moin still lists and restores its older backups from there |
+| a bucket or folder you left | until you delete it | you: moin starts the history again in the new place |
 
-A new app with the name of a removed one starts with an empty folder: old backups never mix with new ones. To get the old data back, download a full backup from the old `<app-id>/` folder and open it.
+A new app with the name of a removed one starts with an empty folder: old history never mixes with new.
 
 ## Several buckets
 
-A workspace can keep several buckets: a client's data in the client's bucket, a bucket near the server, separate costs, production apart from tests. One is the **default**: every app without a bucket of its own, and every new app, uses it. The first bucket you add is the default; a bucket from before moin had more than one is the default, named `default`.
+A workspace can keep several buckets: a client's data in the client's bucket, a bucket near the server, separate costs, production apart from tests. One is the **default**: every app without a bucket of its own, and every new app, uses it.
 
-When an app moves to another bucket:
+When an app moves to another bucket its history starts again there, and you can go back to moments from the move on. What is in the old bucket stays; moin deletes nothing.
 
-- **New backups** go to the new bucket. It starts with a full backup of every database, then every change, so a point in time restore reaches back to the move and no further.
-- **Older backups stay** in the old bucket. moin moves and deletes nothing, lists them with their bucket, and restores them from there.
-- **Uploads** of `moin deploy` go to the new bucket at once.
+## Under the hood
 
-Making another bucket the default moves every app that follows the default the same way.
+The agent on your server does it all, with two tools: [Litestream](https://litestream.io) for SQLite and [WAL-G](https://github.com/wal-g/wal-g) for Postgres. moin writes no backup logic of its own. Both work behind the same four verbs, one file each in the agent (`backup_sqlite.go`, `backup_postgres.go`):
+
+```
+                Record                         Check (daily)
+  database ─────────────▶ bucket: every change ─────────────▶ throwaway copy ✓
+     ▲                     for 7 days
+     └─────────────────── GoBack to a minute  (a full copy of now first)
+
+  database ── Download ──▶ bucket downloads/ ──▶ a 15 minute link
+```
+
+- **Record** writes down every change. SQLite: Litestream runs inside the agent and sends each change within a second. Postgres: WAL-G runs in a small companion container next to Postgres, streams its log, and moin closes the current piece of the log once a minute when there were writes; a base backup runs every day and after each restore.
+- **GoBack** restores the history to a moment into a new file (SQLite) or a new volume (Postgres) while the app keeps running, checks it, takes the one full copy of now, and only then stops the app, swaps the data in and starts it again. If anything fails before the swap, nothing changed. Postgres starts a new timeline with each restore; moin keeps track of it, so you can still go back to any moment before the restore. SQLite's history starts again from the restored file; the copy before the restore is the way back.
+- **Check** restores the newest state into a throwaway copy. SQLite: Litestream restores it into a temp file, then `PRAGMA integrity_check`. Postgres: WAL-G fetches the newest base backup and the log after it, then a throwaway Postgres of the same image, with no network, replays it all, and moin checks that every table of the live database came back and reads.
+- **Download** makes a full copy: SQLite with `VACUUM INTO`, gzipped; Postgres with `pg_dump -Fc`. It goes to `downloads/` in your bucket.
+
+Postgres needs a Debian-based image, like `postgres:17`: WAL-G does not run on Alpine. moin sets `max_slot_wal_keep_size` to 4 GB when it is still the default, so a WAL-G that stays down never fills your disk: past that Postgres drops WAL-G's place, moin starts the history again at once, and the app says so for a day.

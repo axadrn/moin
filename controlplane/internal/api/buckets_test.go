@@ -114,8 +114,8 @@ func TestBucketRoutes(t *testing.T) {
 	if status, answer := send("DELETE", "/api/v1/backup-storage", ""); status != http.StatusConflict || code(answer) != "bucket_in_use" {
 		t.Fatalf("remove the default with older backups: %d %v", status, answer)
 	}
-	if status, answer := send("POST", "/api/v1/apps/blog/restore", `{"at":"2026-10-31T14:02:00Z","bucket":"main"}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {
-		t.Fatalf("point in time from an older bucket: %d %v", status, answer)
+	if status, answer := send("POST", "/api/v1/apps/blog/restore", `{"moment":""}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {
+		t.Fatalf("a restore without a moment: %d %v", status, answer)
 	}
 
 	// A rename keeps the stored secret key: no secret_key needed.

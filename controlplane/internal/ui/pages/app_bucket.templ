@@ -50,8 +50,8 @@ templ bucketPanel(bucket service.Bucket) {
 				if len(bucket.Older) > 0 {
 					@kit.Row("") {
 						<div class="min-w-0 flex-1" data-bucket-older>
-							<div class="font-medium">Older backups</div>
-							<div class="text-sm text-muted-foreground">{ strings.Join(bucket.Older, ", ") }: restores of their older snapshots read from here.</div>
+							<div class="font-medium">Left by</div>
+							<div class="text-sm text-muted-foreground">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
 						</div>
 					}
 				}
@@ -65,7 +65,7 @@ templ bucketPanel(bucket service.Bucket) {
 						"hx-select":         "#bucket",
 						"hx-swap":           "outerHTML",
 						"hx-disable":        "this",
-						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default.",
+						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their history starts again there.",
 						"data-make-default": bucket.Name,
 					}) {
 						<span class="font-medium">Make default</span>

@@ -1,6 +1,6 @@
 ---
 title: "Catalog"
-description: "Open source apps on your own server in one click, with every version and a backup before each update"
+description: "Open source apps on your own server in one click, with every version and a way back from each update"
 group: "Apps"
 order: 6
 ---
@@ -37,7 +37,7 @@ moin reads each app's image registry once an hour, so every version shows the ho
 
 ## Update an app
 
-The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys, with a full backup of the database first.
+The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys. moin remembers the moment before, so its [backups](/docs/guides/backups) offer "Before the update to 3.4.1".
 
 ```surfaces
 Web: the app page, **Update** (or another version, **Deploy**)
@@ -47,7 +47,7 @@ API: POST /api/v1/apps/{app}/update
 MCP: update_app
 ```
 
-An older version may not undo the database migrations of a newer one: the backup before the deploy is the way back ([restore](/docs/guides/backups)).
+An older version may not undo the database migrations of a newer one: go back to "Before the update to …" instead ([restore](/docs/guides/backups#go-back)).
 
 ## Add an app
 

@@ -26,8 +26,6 @@ func (m model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case m.ask != nil:
 		return m.askKey(k)
-	case m.restore != nil:
-		return m.restoreKey(k)
 	case m.prompt != nil:
 		return m.promptKey(k)
 	case m.pick != nil:
@@ -66,10 +64,6 @@ func (m model) paste(text string) model {
 		a := *m.ask
 		a.typed += text
 		m.ask = &a
-	case m.restore != nil && m.restore.typing:
-		r := *m.restore
-		r.typed += text
-		m.restore = &r
 	case m.prompt != nil:
 		p := *m.prompt
 		p.value += text
@@ -306,32 +300,34 @@ func (m model) appKey(s string) (tea.Model, tea.Cmd) {
 			m.logs.back = max(0, min(m.logs.back-d, len(m.filteredLogs())))
 		}
 	case tBackups:
-		snaps := m.snapshots()
+		moments := m.moments()
 		if d != 0 {
-			return m.cursor("snaps", len(snaps), d), nil
+			return m.cursor("moments", len(moments), d), nil
 		}
 		switch s {
 		case "enter":
-			if len(snaps) == 0 {
+			if len(moments) == 0 {
 				return m, nil
 			}
-			sn := snaps[m.at("snaps", len(snaps))]
-			bucket := ""
-			if m.app.backups != nil && sn.Bucket != "" && sn.Bucket != m.app.backups.Bucket {
-				bucket = sn.Bucket
-			}
-			detail := fmt.Sprintf("%s goes back to %s. The app stops for the swap and starts again. This cannot be undone.", sn.db, sn.CreatedAt.Local().Format("Jan 2 15:04"))
-			return m.askName("Restore "+sn.db+" of "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, sn.db, sn.ID, bucket, nil)), nil
+			mo := moments[m.at("moments", len(moments))]
+			detail := fmt.Sprintf("%s goes back to %s, %s. moin keeps a copy of it as it is now for 7 days, so you can undo this. The app stops for the swap and starts again.", mo.db, strings.ToLower(mo.Label[:1])+mo.Label[1:], mo.At.Local().Format("Jan 2 15:04"))
+			return m.askName("Restore "+mo.db+" of "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, mo.db, mo.ID, nil)), nil
 		case "t":
-			return m.openRestore(), nil
-		case "a":
-			if m.app.backups != nil {
-				// it flips at once; a refusal loads the truth again
-				b := *m.app.backups
-				b.SnapshotBeforeChanges = !b.SnapshotBeforeChanges
-				m.app.backups = &b
-				return m, m.setSnapshots(a.Name, b.SnapshotBeforeChanges)
+			return m.input("Go back to a time", "in UTC, to the minute, like 14:01 or 2026-11-07 14:01", "", func(m model, v string) (model, tea.Cmd) {
+				at, ok := parseMoment(v, m.now())
+				if !ok {
+					m.say("Cannot read " + v + " as a time: use 14:01 or 2026-11-07 14:01, in UTC")
+					return m, nil
+				}
+				detail := fmt.Sprintf("The database goes back to %s UTC. moin keeps a copy of it as it is now for 7 days, so you can undo this. The app stops for the swap and starts again.", at.Format("Jan 2 15:04"))
+				return m.askName("Restore "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, "", "", &at)), nil
+			}), nil
+		case "c":
+			database := ""
+			if len(moments) > 0 {
+				database = moments[m.at("moments", len(moments))].db
 			}
+			return m, m.downloadCopy(a.Name, database)
 		}
 	case tEnv:
 		keys := m.envKeys()

@@ -154,8 +154,8 @@ func TestSQLiteFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "a", "b", "app.db"), header, 0o644)
 	os.WriteFile(filepath.Join(dir, "notes.db"), []byte("not a database"), 0o644)
 	os.WriteFile(filepath.Join(dir, "stub.db"), []byte("SQLite format 3\x00"), 0o644)
-	os.MkdirAll(filepath.Join(dir, snapshotFolderPrefix+"123"), 0o755)
-	os.WriteFile(filepath.Join(dir, snapshotFolderPrefix+"123", "app.db"), header, 0o644)
+	os.MkdirAll(filepath.Join(dir, copyFolderPrefix+"123"), 0o755)
+	os.WriteFile(filepath.Join(dir, copyFolderPrefix+"123", "app.db"), header, 0o644)
 	files := sqliteFiles(dir)
 	if len(files) != 1 || !strings.HasSuffix(files[0], "app.db") {
 		t.Fatalf("files = %v", files)

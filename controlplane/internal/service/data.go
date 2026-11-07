@@ -80,14 +80,21 @@ func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database,
 			return protocol.DBResult{}, err
 		}
 	}
-	result, err := s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, write, limit)
+	edit := ""
+	if write {
+		edit = "sql"
+	}
+	result, err := s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, edit, limit)
 	if err == nil && write {
 		s.servers.record(actor, "data.sql", "app", idOrName, map[string]string{"database": database, "statements": sqlSummary(sql), "changes": strconv.FormatInt(result.Changes, 10)})
 	}
 	return result, err
 }
 
-func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database, sql string, params []any, write bool, limit int) (protocol.DBResult, error) {
+// query runs SQL; edit says what a write is, such as sql or cell:orders,
+// and is empty for a read. moin remembers the moment before each write.
+func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database, sql string, params []any, edit string, limit int) (protocol.DBResult, error) {
+	write := edit != ""
 	if strings.TrimSpace(sql) == "" {
 		return protocol.DBResult{}, ErrSQL
 	}
@@ -106,12 +113,14 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 		Params:    params,
 		Write:     write,
 		Limit:     limit,
-		Snapshot:  write && s.snapshotBeforeWrite(app),
 	}
 	var result protocol.DBResult
 	err = s.servers.Request(ctx, app.ServerID, protocol.TypeDBQuery, query, &result)
 	if !write {
 		err = readOnlyError(err)
+	}
+	if err == nil && write && result.Before != nil {
+		s.remember(app, result.Database, model.MomentEdit, edit, *result.Before)
 	}
 	return result, err
 }
@@ -141,7 +150,7 @@ func (s *AppService) Rows(ctx context.Context, workspaceID, idOrName, database, 
 	if page.Table.RowID {
 		sql = `SELECT rowid, * FROM ` + quoteName(table) + ` ORDER BY rowid DESC LIMIT ? OFFSET ?`
 	}
-	page.Result, err = s.query(ctx, workspaceID, idOrName, tables.Database, sql, []any{page.Limit, page.Offset}, false, page.Limit)
+	page.Result, err = s.query(ctx, workspaceID, idOrName, tables.Database, sql, []any{page.Limit, page.Offset}, "", page.Limit)
 	return page, err
 }
 
@@ -162,7 +171,7 @@ func (s *AppService) UpdateCell(ctx context.Context, actor Actor, idOrName, data
 	if err != nil {
 		return err
 	}
-	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `UPDATE `+quoteName(table)+` SET `+quoteName(column)+` = ?`+where, append([]any{param}, params...), true, 0)
+	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `UPDATE `+quoteName(table)+` SET `+quoteName(column)+` = ?`+where, append([]any{param}, params...), "cell:"+table, 0)
 	if err == nil {
 		s.servers.record(actor, "data.cell_updated", "app", idOrName, map[string]string{"database": database, "table": table, "row": row.label(), "column": column})
 	}
@@ -179,7 +188,7 @@ func (s *AppService) DeleteRow(ctx context.Context, actor Actor, idOrName, datab
 	if err != nil {
 		return err
 	}
-	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `DELETE FROM `+quoteName(table)+where, params, true, 0)
+	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, `DELETE FROM `+quoteName(table)+where, params, "delete:"+table, 0)
 	if err == nil {
 		s.servers.record(actor, "data.row_deleted", "app", idOrName, map[string]string{"database": database, "table": table, "row": row.label()})
 	}
@@ -291,7 +300,7 @@ func (s *AppService) InsertRow(ctx context.Context, actor Actor, idOrName, datab
 	if err != nil {
 		return err
 	}
-	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, true, 0)
+	_, err = s.query(ctx, actor.WorkspaceID, idOrName, database, sql, params, "add:"+table, 0)
 	if err == nil {
 		s.servers.record(actor, "data.row_inserted", "app", idOrName, map[string]string{"database": database, "table": table})
 	}

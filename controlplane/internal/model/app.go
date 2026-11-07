@@ -32,9 +32,6 @@ type App struct {
 	InstantHost     string `db:"instant_host"`
 	InstantOpen     bool   `db:"instant_open"`
 	InstantPassword string `db:"instant_password"`
-	// SnapshotBeforeChanges takes a snapshot before every change made
-	// through moin, when backups are set up.
-	SnapshotBeforeChanges bool `db:"snapshot_before_changes"`
 	// Repo is owner/name on GitHub when the app follows one, with its
 	// branch; AutoDeploy deploys every push to it.
 	Repo           string `db:"repo"`
@@ -151,9 +148,30 @@ type BackupStatus struct {
 	VerifiedAt   *time.Time `db:"verified_at"`
 	Error        string     `db:"error"`
 	UpdatedAt    time.Time  `db:"updated_at"`
-	// DrillError is why the newest restore check failed.
+	// DrillError is why the newest daily check failed.
 	DrillError string `db:"drill_error"`
 }
+
+// BackupMoment is a moment moin remembers so a restore can go back to
+// it: just before a deploy, a data edit or a catalog update, by the
+// server's clock. Database is empty for every database of the app.
+type BackupMoment struct {
+	ID        int64     `db:"id"`
+	AppID     string    `db:"app_id"`
+	Database  string    `db:"database"`
+	Kind      string    `db:"kind"`
+	Detail    string    `db:"detail"`
+	At        time.Time `db:"at"`
+	CreatedAt time.Time `db:"created_at"`
+}
+
+// Kinds of a BackupMoment; Detail holds the deploy number, the version of
+// an update, or what an edit was: sql, cell, row.
+const (
+	MomentDeploy = "deploy"
+	MomentUpdate = "update"
+	MomentEdit   = "edit"
+)
 
 // BackupError is why the backups themselves fail, without a failed restore
 // check, which older agents report in Error too.

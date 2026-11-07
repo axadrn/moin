@@ -206,7 +206,6 @@ type model struct {
 	helpTop int // the first line the keys layer shows
 	prompt  *prompt
 	ask     *confirm
-	restore *restore
 
 	notice    string
 	noticeErr bool

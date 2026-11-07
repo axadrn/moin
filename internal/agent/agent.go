@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -162,12 +161,11 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.security = newSecurity(dir, agent.apps)
 	agent.apps.proxyMode = agent.security.proxyMode
 	agent.updater = newUpdater(state.URL)
-	go agent.backups.drills(ctx)
-	go agent.backups.pgSnapshots(ctx)
-	go agent.backups.walgLoop(ctx)
+	go agent.backups.recordLoop(ctx)
+	go agent.backups.checks(ctx)
 	go agent.backups.health(ctx)
 	go agent.apps.cleanups(ctx)
-	go agent.backups.sweepUploads(ctx)
+	go agent.backups.sweepLoop(ctx)
 	go agent.metrics(ctx)
 	defer agent.backups.configure(context.Background(), nil, nil)
 	wait := minReconnect
@@ -448,21 +446,13 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			r.backups.reconcile()
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
-	case protocol.TypeBackupSnapshot, protocol.TypeBackupList:
+	case protocol.TypeBackupList:
 		var request protocol.BackupRequest
 		if err := message.Decode(&request); err != nil {
 			fail(err)
 			return
 		}
-		// Older buckets the rules do not allow stay unread.
-		request.Older = slices.DeleteFunc(request.Older, func(storage protocol.BackupStorage) bool {
-			return checkStorage(rules, r.rulesFile, &storage) != nil
-		})
-		list := r.backups.list
-		if message.Type == protocol.TypeBackupSnapshot {
-			list = r.backups.snapshot
-		}
-		result, err := list(ctx, request)
+		result, err := r.backups.list(ctx, request)
 		if err != nil {
 			fail(err)
 			return
@@ -474,15 +464,23 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			fail(err)
 			return
 		}
-		if err := checkStorage(rules, r.rulesFile, request.Storage); err != nil {
-			fail(err)
-			return
-		}
 		if err := r.backups.restore(ctx, request); err != nil {
 			fail(err)
 			return
 		}
 		r.send(protocol.TypeOK, message.RequestID, nil)
+	case protocol.TypeBackupDownload:
+		var request protocol.BackupRequest
+		if err := message.Decode(&request); err != nil {
+			fail(err)
+			return
+		}
+		file, err := r.backups.download(ctx, request)
+		if err != nil {
+			fail(err)
+			return
+		}
+		r.send(protocol.TypeBackupFile, message.RequestID, file)
 	case protocol.TypeExecStart:
 		var start protocol.ExecStart
 		if err := message.Decode(&start); err != nil {

@@ -159,7 +159,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
 		{"env", "rm", "--app", "shop", "KEY"},
-		{"restore", "--app", "shop", "20261031T140200Z-manual"},
+		{"restore", "--app", "shop", "--to", "1h"},
 		{"domains", "rm", "--app", "shop", "blog.de"},
 		{"unlink", "shop"},
 		{"hook", "shop"},
@@ -431,11 +431,10 @@ func TestLoginRefusesPlainHTTP(t *testing.T) {
 	}
 }
 
-// TestBadNamesStayLocal: a made-up snapshot ID or branch name is refused
-// before the CLI calls the control plane.
+// TestBadNamesStayLocal: a made-up branch name is refused before the CLI
+// calls the control plane.
 func TestBadNamesStayLocal(t *testing.T) {
 	for _, args := range [][]string{
-		{"restore", "--app", "shop", "--yes", "../20261031T140200Z"},
 		{"deploy", "--ref", "main..x", "shop"},
 		{"link", "acme/shop", "--branch", "-x", "shop"},
 	} {

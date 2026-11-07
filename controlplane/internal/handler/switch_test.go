@@ -171,27 +171,6 @@ func linkWithoutGitHub(t *testing.T, s *switches, repo, branch string) {
 	}
 }
 
-// The snapshot switch answers itself as stored, on and off.
-func TestSnapshotSwitch(t *testing.T) {
-	s := newSwitches(t)
-	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/backups/settings"
-	pattern := "/app/{workspaceSlug}/apps/{app}/backups/settings"
-	for _, on := range []bool{false, true, false} {
-		form := url.Values{}
-		if on {
-			form.Set("on", "1")
-		}
-		body := s.post(pattern, path, form, s.handler.BackupSettings)
-		if switchOn(t, body, "snapshot-before-changes") != on || s.app().SnapshotBeforeChanges != on {
-			t.Fatalf("on %v: stored %v, answer %s", on, s.app().SnapshotBeforeChanges, body)
-		}
-	}
-	body := s.post(pattern, "/app/"+s.ada.Workspace.Slug+"/apps/gone/backups/settings", url.Values{"on": {"1"}}, s.handler.BackupSettings)
-	if !strings.Contains(body, "Setting not saved") {
-		t.Fatalf("an unknown app: %s", body)
-	}
-}
-
 // The email alerts switch answers itself as stored.
 func TestEmailAlertsSwitch(t *testing.T) {
 	s := newSwitches(t)

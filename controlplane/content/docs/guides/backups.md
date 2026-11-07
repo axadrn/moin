@@ -1,76 +1,75 @@
 ---
 title: "Backups"
-description: "Every change of every SQLite and Postgres database in your bucket, checked every day"
+description: "Go back to any minute of the last 7 days, undo it, and download a copy"
 group: "Servers and data"
 order: 3
 ---
 
-moin backs up every SQLite and Postgres database of your apps to your own bucket, with nothing to set up: every change, so you can go back to any second of the last 7 days, and a full backup before every deploy, restore and edit. Every day it restores a backup and checks it. [How backups work](/docs/concepts/backups) says how.
+moin writes down every change of your database for 7 days in your bucket. Every day it checks that going back works. Go back to any minute; a restore can be undone for 7 days.
+
+It backs up every SQLite and Postgres database of your apps once the workspace has a [bucket](/docs/guides/bucket#add-it), with nothing to set up. Your data goes to your own bucket only, never through moin. [How backups work](/docs/concepts/backups) says how.
+
+## See your backups
+
+One line says how each database stands: "Backed up · checked 2h ago", or in red why it does not work, like "The bucket can't be reached.", with the details under it. Then the moments you can go back to.
 
 ```surfaces
-Web: the app, **Backups**
-CLI: moin backups
+Web: the app, **Data**, a database
+CLI: moin backups shop
 TUI: on the app, `b`
 API: GET /api/v1/apps/{app}/backups
 MCP: get_backups
 ```
 
-It lists the full backups, how far back a point in time restore reaches, and the last restore check. Backups in a bucket the app left show with that bucket's name. Backups start once the workspace has a [bucket](/docs/guides/bucket#add-it).
+The moments, only those inside the last 7 days:
 
-## Back up now
+- **1 minute ago**, **15 minutes ago**, **1 hour ago**, **Yesterday this time**
+- **Before v12**: the moment before a deploy started its new version
+- **Before the update to 3.4.1**: before a [catalog](/docs/guides/catalog) update
+- **Before your SQL change**, **Before your edit in orders**: before a [data](/docs/guides/data) edit in moin
+- **Before the restore at 14:02**: the copy moin took before a restore; going back to it undoes the restore
 
-Takes a full backup right now, before you try something risky.
+## Go back
 
-```surfaces
-Web: the app page, **Data**, a database, **Back up now**
-CLI: moin backup
-TUI: on the app, `N`
-API: POST /api/v1/apps/{app}/backups
-MCP: back_up_app
-```
-
-## Restore a snapshot
-
-Puts the database back to one full backup. Its ID is the time it was taken, then why, like `20261031T143638Z-manual`: copy it from the list, moin refuses anything else.
+Pick a moment, then **Restore**, and type the app's name. moin first keeps a copy of the database as it is, then puts it back to that moment. The app stops for a moment and starts again.
 
 ```surfaces
-Web: the app page, **Data**, a database: pick a backup under **Backups**, **Restore**, then type the app name
-CLI: moin restore <snapshot-id>
-TUI: on the app, `b`, pick the backup, `enter`, then type the app name
+Web: the app, **Data**, a database: pick a moment under **Go back to**, **Restore**, then type the app name
+CLI: moin restore shop --to before-v12
+TUI: on the app, `b`, pick a moment, `enter`, then type the app name
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-A backup in an older bucket, from before the app moved, restores from that bucket: the web and the TUI know it, the CLI takes `--bucket <bucket>`, the API and MCP `bucket`.
+`--to` takes a moment from `moin backups`, by its ID or its label (`1h`, `before-v12`, `"Before your SQL change"`), or a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"` or an RFC 3339 time. In the TUI `t` asks for a time. The API and MCP take `moment` or `at`. An app with more than one database: name it with `--db /data/app.db` or `--db postgres-db`.
 
-## Restore to a point in time
+## Undo a restore
 
-Puts the database back to any second of the last 7 days. Deleted the wrong rows at 14:02? Restore to 14:01. The web restores the backups in its list; for a second of your choice use the CLI, the TUI, the API or MCP.
+Every restore keeps the database as it was right before, for 7 days. Go back to **Before the restore at 14:02** to undo it, the same way:
 
 ```surfaces
-Web: the app, **Backups**, **Restore to a point in time**: pick the day and the time, then **Restore to this time**
-CLI: moin restore --at "2026-10-31 14:01:00"
-TUI: on the app, `b`, then `t`: pick the moment, `enter`, then type the app name
+Web: the app, **Data**, a database: **Before the restore at 14:02**, **Restore**
+CLI: moin restore shop --to undo-20261107T140200Z
+TUI: on the app, `b`, pick **Before the restore at …**, `enter`
 API: POST /api/v1/apps/{app}/restore
 MCP: restore_app
 ```
 
-Times are in UTC. A time without a day, like `14:01`, means today. The API and MCP take it as `at`. After a move to another bucket it reaches back to the move.
+An undo is a restore too: it keeps a copy first, so you can undo the undo.
 
-## A snapshot before every change
+## Download a copy
 
-On by default: a full backup before moin changes anything, so a bad migration or a wrong `UPDATE` is one click from undone.
+The full database as one file, to keep or to open anywhere. Your server puts it in your bucket's `downloads/` folder, and you get a link that works for 15 minutes; the copy waits there for a day. A big database takes a while: the page shows "Making a copy" until it is ready.
 
 ```surfaces
-Web: the app page, **Data**, **Back up before every change**
-CLI: moin backups auto off
-CLI: moin backups auto on
-TUI: on the app, `b`, then `a`
-API: PUT /api/v1/apps/{app}/backups/settings
-MCP: set_backup_settings
+Web: the app, **Data**, a database, **Download a copy**
+CLI: moin backup download shop
+TUI: on the app, `b`, then `c`
+API: POST /api/v1/apps/{app}/backups/downloads
+MCP: download_backup
 ```
 
-It runs before a [deploy](/docs/guides/deploy) (`before-v4`), before a cell edit, a deleted row or SQL with **Allow changes** (`before-sql`), and before a restore (`before-restore`). More in the same second get `before-sql-2`, `before-sql-3`.
+The CLI saves it in the current folder; `--link` prints the link instead. A SQLite copy is gzipped: `gunzip` it and open it with `sqlite3`. A Postgres copy is a `pg_dump`: `pg_restore --list` shows what is in it, `pg_restore` puts it into any Postgres. You need no moin for either.
 
 ## Postgres
 
@@ -99,15 +98,14 @@ In moin this database is `postgres-db` (`postgres-<service>`): in the bucket, in
 ## Requirements
 
 - **SQLite**: the file is on a volume and uses WAL mode (`PRAGMA journal_mode=WAL`), as most apps do. Do not run a second Litestream for the same file.
-- **Postgres**: a service that runs `postgres`, `postgis/postgis`, `pgvector/pgvector` or `timescale/timescaledb`, with its data on a volume and a Debian-based image, like `postgres:17`. Alpine images such as `postgres:17-alpine` get full backups and the daily check but not every change; the app's backups say so.
+- **Postgres**: a service that runs `postgres`, `postgis/postgis`, `pgvector/pgvector` or `timescale/timescaledb`, with its data on a volume and a Debian-based image, like `postgres:17`. An Alpine image such as `postgres:17-alpine` has no backups, and the app says so; **Download a copy** still works.
 - No database shows up? See [Data](/docs/guides/data#requirements).
 
 ## Good to know
 
 - A restore replaces the live data, so moin asks you to type the app's name first, on the web, in the CLI and in the TUI. `--yes` skips it in scripts; an agent passes the name as `confirm`.
-- A restore first takes a full backup of the present (`before-restore`): restore that to undo it.
-- An app with more than one database: the CLI restores the one you name with `--db /data/app.db` or `--db postgres-db`.
-- Full backups: the newest 50 per database stay. Every change: 7 days. Postgres also gets a full backup every hour.
-- A full SQLite backup is a gzipped file: `gunzip` it and open it with `sqlite3`, no moin needed. A Postgres one opens with `pg_restore`.
+- After a restore of a SQLite file its history starts again from the restored file; the copy before the restore is the way back. Postgres keeps its whole history across restores.
+- When an app moves to another bucket, its history starts again there.
 - Removing the bucket from moin stops its backups; what is in it stays. See [Remove a bucket](/docs/guides/bucket#remove-a-bucket).
 - To keep a server's backups in one bucket only, use the `backups-to` [rule](/docs/guides/security#rules).
+- An agent older than this version answers "update the agent": update it under **Servers** or with `moin servers update`.

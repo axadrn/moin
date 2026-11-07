@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,14 +33,15 @@ const (
 )
 
 var (
-	ErrBackupEndpoint = errors.New("the endpoint must be an https:// URL, or empty for AWS S3")
-	ErrBackupBucket   = errors.New("bucket, access key and secret key are required")
-	ErrBackupAccess   = errors.New("moin could not write to the bucket with these keys")
-	ErrBucketPrivate  = errors.New("the endpoint points to a private or local address: moin only reaches buckets on the public internet")
-	ErrNoBackups      = errors.New("backups are not set up: add a bucket first")
-	ErrRestoreTarget  = errors.New("choose a snapshot or a point in time")
-	ErrRestoreOlder   = errors.New("a point in time restore reads from the app's bucket: pick a snapshot to restore from an older bucket")
-	ErrSnapshotID     = errors.New("this is not a snapshot ID: copy one from the backups list")
+	ErrBackupEndpoint   = errors.New("the endpoint must be an https:// URL, or empty for AWS S3")
+	ErrBackupBucket     = errors.New("bucket, access key and secret key are required")
+	ErrBackupAccess     = errors.New("moin could not write to the bucket with these keys")
+	ErrBucketPrivate    = errors.New("the endpoint points to a private or local address: moin only reaches buckets on the public internet")
+	ErrNoBackups        = errors.New("backups are not set up: add a bucket first")
+	ErrRestoreTarget    = errors.New("pick a moment to go back to")
+	ErrMoment           = errors.New("there is no such moment: pick one from the list")
+	ErrRestoreDatabase  = errors.New("the app has several databases: name the one to restore")
+	ErrDownloadNotFound = errors.New("there is no such download: it is older than a day, or of another app")
 )
 
 // AllowOnlyPublicBuckets makes the bucket check refuse private and local
@@ -208,75 +210,261 @@ func (s *AppService) appIDs(serverID, workspaceID string) map[string]string {
 	return ids
 }
 
-// Backups asks the agent for the snapshots and the restore window of an
-// app's databases.
-func (s *AppService) Backups(ctx context.Context, workspaceID, idOrName string) (*model.App, protocol.Backups, error) {
-	return s.backupRequest(ctx, workspaceID, idOrName, protocol.TypeBackupList, "")
+// DatabaseBackups is the backup of one database as people see it: what
+// the agent reports, Problem as one short sentence when it does not work,
+// and the moments a restore can go back to.
+type DatabaseBackups struct {
+	protocol.DatabaseBackup
+	Problem string
+	Moments []Moment
 }
 
-// BackUp takes a snapshot of an app's databases now.
-func (s *AppService) BackUp(ctx context.Context, actor Actor, idOrName string) (*model.App, protocol.Backups, error) {
-	app, backups, err := s.backupRequest(ctx, actor.WorkspaceID, idOrName, protocol.TypeBackupSnapshot, "manual")
-	if err == nil {
-		s.servers.record(actor, "backup.taken", "app", app.Name, nil)
+// Moment is one moment of a database's backup to go back to: a few
+// minutes or hours ago, one moin remembered before a change, or the copy
+// it took before a restore, which undoes that restore. ID is what the CLI,
+// the API and MCP take; Copy names the copy of an undo.
+type Moment struct {
+	ID    string
+	Label string
+	At    time.Time
+	Kind  string
+	Copy  string
+}
+
+// Kinds of a Moment.
+const (
+	MomentAgo  = "ago"
+	MomentUndo = "undo"
+)
+
+// quickMoments are the moments a few minutes and hours back.
+var quickMoments = []struct {
+	id, label string
+	ago       time.Duration
+}{
+	{"1m", "1 minute ago", time.Minute},
+	{"15m", "15 minutes ago", 15 * time.Minute},
+	{"1h", "1 hour ago", time.Hour},
+	{"1d", "Yesterday this time", 24 * time.Hour},
+}
+
+// keepMoments is how long the history and the copies before restores
+// last, and so the moments to go back to.
+const keepMoments = 7 * 24 * time.Hour
+
+// historyReach is how far a database's history reaches: from its oldest
+// moment to now while it works, else to its newest change in the bucket.
+// ok is false without a history.
+func historyReach(backup protocol.DatabaseBackup, now time.Time) (since, until time.Time, ok bool) {
+	if backup.Since == nil {
+		return since, until, false
 	}
-	return app, backups, err
+	since, until = *backup.Since, now
+	if backup.Error != "" {
+		until = since
+		if backup.ReplicatedAt != nil {
+			until = *backup.ReplicatedAt
+		}
+	}
+	return since, until, true
 }
 
-func (s *AppService) backupRequest(ctx context.Context, workspaceID, idOrName string, messageType protocol.MessageType, reason string) (*model.App, protocol.Backups, error) {
+// Moments are the moments a database can go back to: the quick ones, then
+// the remembered ones and the copies before restores, newest first. Only
+// those inside its history show, the copies for 7 days.
+func Moments(backup protocol.DatabaseBackup, remembered []model.BackupMoment, now time.Time) []Moment {
+	moments := []Moment{}
+	since, until, ok := historyReach(backup, now)
+	inside := func(at time.Time) bool { return ok && !at.Before(since) && !at.After(until) }
+	for _, quick := range quickMoments {
+		if at := now.Add(-quick.ago); inside(at) {
+			moments = append(moments, Moment{ID: quick.id, Label: quick.label, At: at, Kind: MomentAgo})
+		}
+	}
+	later := []Moment{}
+	for _, moment := range remembered {
+		if moment.Database != "" && moment.Database != backup.Database || !inside(moment.At) {
+			continue
+		}
+		later = append(later, rememberedMoment(moment))
+	}
+	for _, copy := range backup.Copies {
+		if now.Sub(copy.At) > keepMoments {
+			continue
+		}
+		later = append(later, Moment{ID: "undo-" + copy.ID, Label: "Before the restore at " + copy.At.UTC().Format("15:04"), At: copy.At, Kind: MomentUndo, Copy: copy.ID})
+	}
+	slices.SortStableFunc(later, func(x, y Moment) int { return y.At.Compare(x.At) })
+	return append(moments, later...)
+}
+
+// rememberedMoment is a remembered moment as people see it.
+func rememberedMoment(moment model.BackupMoment) Moment {
+	shown := Moment{ID: "moment-" + strconv.FormatInt(moment.ID, 10), At: moment.At, Kind: moment.Kind}
+	switch moment.Kind {
+	case model.MomentDeploy:
+		shown.ID, shown.Label = "before-v"+moment.Detail, "Before v"+moment.Detail
+	case model.MomentUpdate:
+		number, version, _ := strings.Cut(moment.Detail, " ")
+		shown.ID, shown.Label = "before-v"+number, "Before the update to "+version
+	case model.MomentEdit:
+		what, table, _ := strings.Cut(moment.Detail, ":")
+		shown.ID = "edit-" + strconv.FormatInt(moment.ID, 10)
+		switch what {
+		case "cell":
+			shown.Label = "Before your edit in " + table
+		case "add":
+			shown.Label = "Before the row added to " + table
+		case "delete":
+			shown.Label = "Before the row deleted from " + table
+		default:
+			shown.Label = "Before your SQL change"
+		}
+	}
+	return shown
+}
+
+// findMoment is the moment named by its ID or its label, in any case.
+func findMoment(moments []Moment, name string) (Moment, bool) {
+	name = strings.TrimSpace(name)
+	for _, moment := range moments {
+		if strings.EqualFold(moment.ID, name) || strings.EqualFold(moment.Label, name) {
+			return moment, true
+		}
+	}
+	return Moment{}, false
+}
+
+// BackupProblem says in one short sentence why a backup does not work,
+// from what the agent and its tools said. "" when it works.
+func BackupProblem(raw string) string {
+	text := strings.ToLower(raw)
+	switch {
+	case raw == "":
+		return ""
+	case strings.Contains(text, "once more to start its backups"):
+		return "Deploy the app once more to start its backups."
+	case strings.Contains(text, "debian-based postgres image"):
+		return "Backups need a Debian-based Postgres image, such as postgres:17."
+	case strings.Contains(text, "no space left"):
+		return "The server's disk is full."
+	case strings.Contains(text, "nosuchbucket") || strings.Contains(text, "bucket does not exist") || strings.Contains(text, "specified bucket does not exist"):
+		return "The bucket does not exist."
+	case strings.Contains(text, "accessdenied") || strings.Contains(text, "access denied") || strings.Contains(text, "invalidaccesskeyid") || strings.Contains(text, "signaturedoesnotmatch") || strings.Contains(text, "forbidden") || strings.Contains(text, "statuscode: 403"):
+		return "The bucket refuses the keys."
+	case strings.Contains(text, "no such host") || strings.Contains(text, "connection refused") || strings.Contains(text, "i/o timeout") || strings.Contains(text, "dial tcp") || strings.Contains(text, "deadline exceeded") || strings.Contains(text, "tls:") || strings.Contains(text, "x509") || strings.Contains(text, "connection reset"):
+		return "The bucket can't be reached."
+	case strings.Contains(text, "lost its place") || strings.Contains(text, "fell more than"):
+		return "The backup lost its place and is starting again."
+	case strings.Contains(text, "is not running"):
+		return "The database is not running."
+	case strings.Contains(text, "daily check failed"):
+		return "The daily check could not go back to the newest state."
+	case strings.Contains(text, "too old for this"):
+		return "The agent on the server is too old: update it."
+	}
+	return "The backup does not work."
+}
+
+// Backups asks the agent how the databases of an app are backed up and
+// adds the moments each can go back to.
+func (s *AppService) Backups(ctx context.Context, workspaceID, idOrName string) (*model.App, []DatabaseBackups, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
-		return nil, protocol.Backups{}, err
+		return nil, nil, err
 	}
-	_, err = s.AppBucket(app)
-	if err != nil {
-		return app, protocol.Backups{}, err
+	databases, err := s.backups(ctx, app)
+	return app, databases, err
+}
+
+func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBackups, error) {
+	if _, err := s.AppBucket(app); err != nil {
+		return nil, err
 	}
-	request := protocol.BackupRequest{App: app.Name, Reason: reason, Older: s.olderStorage(app)}
 	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
 	defer cancel()
 	var backups protocol.Backups
-	err = s.servers.Request(ctx, app.ServerID, messageType, request, &backups)
+	err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Name}, &backups)
 	if err != nil {
-		return app, backups, err
+		return nil, err
 	}
 	s.storeBackupStatus(app, backups)
-	return app, backups, nil
+	now := s.now().UTC()
+	remembered, err := s.apps.BackupMoments(app.ID, now.Add(-keepMoments))
+	if err != nil {
+		return nil, err
+	}
+	databases := make([]DatabaseBackups, 0, len(backups.Databases))
+	for _, backup := range backups.Databases {
+		databases = append(databases, DatabaseBackups{DatabaseBackup: backup, Problem: BackupProblem(backup.Error), Moments: Moments(backup, remembered, now)})
+	}
+	return databases, nil
 }
 
-// Restore puts a database of an app back from a snapshot or to a point in
-// time. The agent takes a snapshot of the current state first. bucket names
-// the bucket the snapshot is in, when it is one the app left; empty is the
-// app's bucket. A point in time comes from the app's bucket.
-func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, database, snapshot, bucket string, at *time.Time) error {
-	if snapshot == "" && at == nil {
+// RestoreTarget is where a restore goes: Moment, the ID or label of one
+// of the moments, or At, a time in the history. Database names the
+// database when the app has several.
+type RestoreTarget struct {
+	Database string
+	Moment   string
+	At       *time.Time
+}
+
+// Restore puts a database of an app back to a moment. The agent takes one
+// full copy of it as it is first, which keeps 7 days: going back to it
+// undoes the restore.
+func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName string, target RestoreTarget) error {
+	if strings.TrimSpace(target.Moment) == "" && target.At == nil {
 		return ErrRestoreTarget
-	}
-	// Only IDs the agent makes go on, as part of a bucket key.
-	if snapshot != "" && !protocol.ValidSnapshotID(snapshot) {
-		return ErrSnapshotID
 	}
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return err
 	}
-	current, err := s.AppBucket(app)
+	databases, err := s.backups(ctx, app)
 	if err != nil {
 		return err
 	}
-	request := protocol.BackupRestore{App: app.Name, Database: database, Snapshot: snapshot, At: at}
-	if bucket != "" && bucket != current.Name {
-		if snapshot == "" {
-			return ErrRestoreOlder
+	var backup *DatabaseBackups
+	for index := range databases {
+		if databases[index].Database == target.Database || target.Database == "" && len(databases) == 1 {
+			backup = &databases[index]
 		}
-		older, err := s.olderBucket(app, bucket)
-		if err != nil {
-			return err
+	}
+	if backup == nil {
+		if target.Database == "" {
+			return ErrRestoreDatabase
 		}
-		request.Storage, err = s.openBucket(older)
-		if err != nil {
-			return err
+		return ErrNoDatabase
+	}
+	request := protocol.BackupRestore{App: app.Name, Database: backup.Database}
+	label := ""
+	if target.At != nil {
+		at := target.At.UTC()
+		since, until, ok := historyReach(backup.DatabaseBackup, s.now().UTC().Add(time.Minute))
+		if !ok || at.Before(since) || at.After(until) {
+			return &MomentOutsideError{Since: since, Until: until, Empty: !ok}
 		}
+		request.At, label = &at, at.Format("Jan 2 15:04 UTC")
+	} else {
+		moment, ok := findMoment(backup.Moments, target.Moment)
+		if !ok {
+			return ErrMoment
+		}
+		if moment.Copy != "" {
+			request.Copy = moment.Copy
+		} else {
+			// "1 hour ago" is an hour before the restore: the list was made a
+			// moment earlier.
+			at := moment.At
+			for _, quick := range quickMoments {
+				if moment.Kind == MomentAgo && quick.id == moment.ID {
+					at = s.now().UTC().Add(-quick.ago)
+				}
+			}
+			request.At = &at
+		}
+		label = moment.Label
 	}
 	ctx, cancel := context.WithTimeout(ctx, restoreTimeout)
 	defer cancel()
@@ -284,36 +472,225 @@ func (s *AppService) Restore(ctx context.Context, actor Actor, idOrName, databas
 	if err != nil {
 		return err
 	}
-	slog.Info("database restored", "app_id", app.ID, "database", database, "snapshot", snapshot, "at", at)
-	details := map[string]string{"database": database, "snapshot": snapshot}
-	if request.Storage != nil {
-		details["bucket"] = bucket
-	}
-	if at != nil {
-		details["at"] = at.UTC().Format(time.RFC3339)
+	slog.Info("database restored", "app_id", app.ID, "database", backup.Database, "at", request.At, "copy", request.Copy)
+	details := map[string]string{"database": backup.Database, "to": label}
+	if request.At != nil {
+		details["at"] = request.At.Format(time.RFC3339)
 	}
 	s.servers.record(actor, "backup.restored", "app", app.Name, details)
 	s.notify(actor.WorkspaceID)
 	return nil
 }
 
-// SetSnapshotBeforeChanges turns the snapshot before every change on or
-// off for an app.
-func (s *AppService) SetSnapshotBeforeChanges(actor Actor, idOrName string, on bool) (*model.App, error) {
+// MomentOutsideError refuses a time outside the history of a database.
+type MomentOutsideError struct {
+	Since, Until time.Time
+	Empty        bool
+}
+
+func (e *MomentOutsideError) Error() string {
+	if e.Empty {
+		return "the backup has no history yet: wait a minute after the first change"
+	}
+	return "pick a moment between " + e.Since.UTC().Format("Jan 2 15:04") + " and " + e.Until.UTC().Format("Jan 2 15:04 UTC")
+}
+
+// remember notes a moment to go back to, from the server's clock, and
+// forgets those older than the history.
+func (s *AppService) remember(app *model.App, database, kind, detail string, at time.Time) {
+	err := s.apps.AddBackupMoment(model.BackupMoment{AppID: app.ID, Database: database, Kind: kind, Detail: detail, At: at.UTC()}, s.now().Add(-keepMoments))
+	if err != nil {
+		slog.Error("remember a moment failed", "app_id", app.ID, "kind", kind, "error", err)
+	}
+}
+
+// markUpdate says a deploy updates a catalog app to version, so the moment
+// before it reads "Before the update to 3.4.1".
+func (s *AppService) markUpdate(deployID, version string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.updates == nil {
+		s.updates = map[string]string{}
+	}
+	s.updates[deployID] = version
+}
+
+// rememberDeploy notes the moment before a deploy started its release.
+func (s *AppService) rememberDeploy(deployID string, done protocol.DeployDone) {
+	s.mu.Lock()
+	version, update := s.updates[deployID]
+	delete(s.updates, deployID)
+	s.mu.Unlock()
+	if done.Before == nil {
+		return
+	}
+	deploy, err := s.apps.DeployByID(deployID)
+	if err != nil {
+		return
+	}
+	app, err := s.apps.ByID(deploy.AppID)
+	if err != nil {
+		return
+	}
+	number := strconv.Itoa(deploy.Number)
+	if update {
+		s.remember(app, "", model.MomentUpdate, number+" "+version, *done.Before)
+		return
+	}
+	s.remember(app, "", model.MomentDeploy, number, *done.Before)
+}
+
+// Download is a full copy of a database being made for a download. The
+// agent puts it in the app's own bucket, never through the control plane;
+// Link is a short-lived signed link to it there once State is ready.
+type Download struct {
+	ID          string
+	App         string
+	Database    string
+	State       string
+	Error       string
+	Size        int64
+	Link        string
+	StartedAt   time.Time
+	workspaceID string
+	bucketID    string
+	key         string
+}
+
+// Download states.
+const (
+	DownloadRunning = "running"
+	DownloadReady   = "ready"
+	DownloadFailed  = "failed"
+)
+
+const (
+	downloadTimeout  = 2 * time.Hour
+	downloadKeep     = 24 * time.Hour
+	downloadLinkLife = 15 * time.Minute
+)
+
+// StartDownload has the agent make a full copy of a database in the app's
+// bucket. It runs on its own: Download says when it is ready.
+func (s *AppService) StartDownload(actor Actor, idOrName, database string) (*Download, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
-	if app.SnapshotBeforeChanges == on {
-		return app, nil
-	}
-	err = s.apps.SetSnapshotBeforeChanges(app.ID, on)
+	bucket, err := s.appBucket(app)
 	if err != nil {
 		return nil, err
 	}
-	s.servers.record(actor, "backup.snapshot_before_changes", "app", app.Name, map[string]string{"on": strconv.FormatBool(on)})
-	s.notify(actor.WorkspaceID)
-	return s.apps.ByID(app.ID)
+	if !s.servers.Online(app.ServerID) {
+		return nil, ErrServerOffline
+	}
+	download := &Download{ID: randomToken()[:16], App: app.Name, Database: database, State: DownloadRunning, StartedAt: s.now().UTC(), workspaceID: app.WorkspaceID, bucketID: bucket.ID}
+	s.mu.Lock()
+	if s.downloads == nil {
+		s.downloads = map[string]*Download{}
+	}
+	for id, old := range s.downloads {
+		if s.now().Sub(old.StartedAt) > downloadKeep {
+			delete(s.downloads, id)
+		}
+	}
+	s.downloads[download.ID] = download
+	s.mu.Unlock()
+	s.servers.record(actor, "backup.downloaded", "app", app.Name, map[string]string{"database": database})
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+		defer cancel()
+		var file protocol.BackupFile
+		err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupDownload, protocol.BackupRequest{App: app.Name, Database: database}, &file)
+		s.mu.Lock()
+		if err != nil {
+			download.State, download.Error = DownloadFailed, errorText(err)
+		} else {
+			download.State, download.Database, download.Size, download.key = DownloadReady, file.Database, file.Size, file.Key
+		}
+		s.mu.Unlock()
+		s.notify(app.WorkspaceID)
+	}()
+	return s.copyOf(download), nil
+}
+
+// errorText is an error as people read it.
+func errorText(err error) string {
+	var agentErr *AgentError
+	if errors.As(err, &agentErr) {
+		return agentErr.Message
+	}
+	return err.Error()
+}
+
+// DownloadOf is a download of an app by its ID, with a fresh signed link
+// once it is ready.
+func (s *AppService) DownloadOf(ctx context.Context, workspaceID, idOrName, id string) (*Download, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	download := s.downloads[id]
+	s.mu.Unlock()
+	if download == nil || download.workspaceID != workspaceID || download.App != app.Name || s.now().Sub(download.StartedAt) > downloadKeep {
+		return nil, ErrDownloadNotFound
+	}
+	answer := s.copyOf(download)
+	if answer.State != DownloadReady {
+		return answer, nil
+	}
+	buckets, err := s.apps.Buckets(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	index := slices.IndexFunc(buckets, func(bucket model.Bucket) bool { return bucket.ID == download.bucketID })
+	if index < 0 {
+		return nil, ErrDownloadNotFound
+	}
+	storage, err := s.openBucket(&buckets[index])
+	if err != nil {
+		return nil, err
+	}
+	name := path.Base(answer.key)
+	link, err := s3.NewPresignClient(bucketClient(*storage)).PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(storage.Bucket),
+		Key:                        aws.String(answer.key),
+		ResponseContentDisposition: aws.String(`attachment; filename="` + name + `"`),
+	}, s3.WithPresignExpires(downloadLinkLife))
+	if err != nil {
+		return nil, err
+	}
+	answer.Link = link.URL
+	return answer, nil
+}
+
+// LatestDownload is the newest download of a database of an app, for the
+// page to show while it runs and once it is ready.
+func (s *AppService) LatestDownload(ctx context.Context, workspaceID, idOrName, database string) (*Download, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	var newest *Download
+	for _, download := range s.downloads {
+		if download.workspaceID == workspaceID && download.App == app.Name && (download.Database == database || database == "") && (newest == nil || download.StartedAt.After(newest.StartedAt)) {
+			newest = download
+		}
+	}
+	s.mu.Unlock()
+	if newest == nil {
+		return nil, nil
+	}
+	return s.DownloadOf(ctx, workspaceID, app.ID, newest.ID)
+}
+
+func (s *AppService) copyOf(download *Download) *Download {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	copied := *download
+	return &copied
 }
 
 // BackupStatus is what the agent last reported about the app's databases.
@@ -323,16 +700,6 @@ func (s *AppService) BackupStatus(workspaceID, idOrName string) ([]model.BackupS
 		return nil, err
 	}
 	return s.apps.BackupStatus(app.ID)
-}
-
-// snapshotBeforeWrite says whether a write through moin takes a snapshot
-// first.
-func (s *AppService) snapshotBeforeWrite(app *model.App) bool {
-	if !app.SnapshotBeforeChanges {
-		return false
-	}
-	_, err := s.AppBucket(app)
-	return err == nil
 }
 
 // receiveBackupStatus stores a status the agent sent on its own.

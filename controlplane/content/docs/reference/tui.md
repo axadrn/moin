@@ -90,9 +90,9 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 | Logs | `/` · `c` | filters the lines while you type; clears the filter |
 | Logs | `p` | pauses and resumes; the logs load every three seconds |
 | Logs | `↑` `↓` · `G` | scrolls back; follows the end again |
-| Backups | `enter` | restores the picked full backup once you typed the app's name |
-| Backups | `t` | restores to a point in time: `←` `→` an hour, `H` `L` a day, `↑` `↓` a minute, `tab` the database, `enter`, then the app's name |
-| Backups | `a` | a full backup before every change, on or off |
+| Backups | `enter` | goes back to the picked moment once you typed the app's name; **Before the restore at …** undoes a restore |
+| Backups | `t` | goes back to a time you type, in UTC to the minute, like `14:01`, then the app's name |
+| Backups | `c` | downloads a full copy: it opens the 15 minute link to your bucket in the browser |
 | Env | `a` · `enter` | sets `KEY=value`; edits the picked one |
 | Env | `x` | removes the picked one, after `y` |
 | Env | `v` | shows or hides the values |

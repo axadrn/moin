@@ -85,6 +85,10 @@ type AppService struct {
 	mu          sync.Mutex
 	live        map[string]*liveDeploy
 	subscribers map[string]map[chan struct{}]struct{}
+	// downloads are the copies being made or made for a download, by ID;
+	// updates the catalog version each running update deploy brings.
+	downloads map[string]*Download
+	updates   map[string]string
 }
 
 // liveDeploy is a running deploy: its lines so far and who follows them.
@@ -870,7 +874,6 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	if err != nil {
 		return nil, err
 	}
-	start.Snapshot = s.snapshotBeforeWrite(app)
 	if start.FromNumber == 0 {
 		start.Env = env
 	}
@@ -966,6 +969,7 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			slog.Warn("agent reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
+		s.rememberDeploy(done.DeployID, done)
 		s.finish(done.DeployID, done)
 	}
 }

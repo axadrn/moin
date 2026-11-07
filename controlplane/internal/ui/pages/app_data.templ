@@ -41,8 +41,9 @@ type DataView struct {
 	// Status is what the agent last said about each database's backup, for
 	// the list.
 	Status []model.BackupStatus
-	// Backups is the open database's backups: its bucket, the buckets the
-	// app may pick, the ones it left, and what the agent reports.
+	// Backups is the open database's backup: its bucket, the buckets the
+	// app may pick, the ones it left, what the agent reports and the
+	// moments to go back to.
 	Backups BackupsView
 	Now     time.Time
 }
@@ -84,7 +85,7 @@ func dataTitle(view DataView) string {
 }
 
 // dataListPage is the first page of Data: every database of the app, each a
-// row with how its backup is, then the backup settings of the app.
+// row with how its backup is, then where the backups of the app go.
 templ dataListPage(view DataView) {
 	@appHeader(view.App, "data")
 	@appSection(view.App.Name, "data") {
@@ -111,19 +112,19 @@ templ dataListPage(view DataView) {
 	}
 }
 
-// databaseBackupValue is the value of a database's row: when its last
-// change reached the bucket, or that its backup fails.
+// databaseBackupValue is the value of a database's row: backed up, or
+// that its backup fails and why.
 templ databaseBackupValue(view DataView, database string) {
 	{{ backup, known := backupStatusOf(view.Status, database) }}
 	if view.Backups.Storage == nil {
 		<span class="shrink-0 text-sm text-muted-foreground">No backups</span>
 	} else if known && backup.BackupError() != "" {
-		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ backup.BackupError() }>
+		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.BackupError()) }>
 			@status.Symbol(status.KindFailed)
 			Backup fails
 		</span>
-	} else if known && backup.ReplicatedAt != nil {
-		<span class="shrink-0 text-sm text-muted-foreground tabular-nums" title={ stamp(*backup.ReplicatedAt) }>Backed up { ago(*backup.ReplicatedAt, view.Now) }</span>
+	} else if known && backup.Since != nil {
+		<span class="shrink-0 text-sm text-muted-foreground" title={ "Back to " + stamp(*backup.Since) }>Backed up</span>
 	}
 }
 
@@ -136,8 +137,8 @@ func backupStatusOf(statuses []model.BackupStatus, database string) (model.Backu
 	return model.BackupStatus{}, false
 }
 
-// dataDatabasePage is one database: its tables, its backups with Back up
-// now, and the SQL console.
+// dataDatabasePage is one database: its tables, its backup with the
+// moments to go back to, and the SQL console.
 templ dataDatabasePage(view DataView) {
 	@kit.Header(kit.Back{Label: "Data", Href: dataPath(ctx, view.App.Name)}, databaseName(view.Database))
 	<div class="flex flex-col gap-6">

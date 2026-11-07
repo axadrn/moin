@@ -58,8 +58,7 @@ type App struct {
 	Branch     string `json:"branch"`
 	AutoDeploy bool   `json:"auto_deploy"`
 	// Pinned keeps the app above the others that run fine, in every list.
-	Pinned                bool `json:"pinned"`
-	SnapshotBeforeChanges bool `json:"snapshot_before_changes"`
+	Pinned bool `json:"pinned"`
 	// Bucket is the bucket the app uploads and backs up to; empty uses
 	// the workspace's default bucket.
 	Bucket string `json:"bucket"`
@@ -141,31 +140,30 @@ type envRequest struct {
 
 func NewApp(app model.App) App {
 	return App{
-		ID:                    app.ID,
-		Name:                  app.Name,
-		ServerID:              app.ServerID,
-		ServerName:            app.ServerName,
-		LatestNumber:          app.LatestNumber,
-		LatestStatus:          app.LatestStatus,
-		LiveNumber:            app.LiveNumber,
-		Domains:               app.DomainList(),
-		Canonical:             app.Canonical,
-		Protected:             app.Protect != "",
-		ServiceDomains:        app.ServiceDomainMap(),
-		Instant:               instantURL(app.InstantHost),
-		InstantProvider:       app.Instant,
-		InstantOpen:           app.InstantOpen,
-		Stopped:               app.Stopped,
-		ChangesWaiting:        app.ChangesWaiting,
-		Repo:                  app.Repo,
-		Branch:                app.Branch,
-		AutoDeploy:            app.AutoDeploy,
-		Pinned:                app.Pinned,
-		SnapshotBeforeChanges: app.SnapshotBeforeChanges,
-		Hook:                  app.DeployHookHash != nil,
-		Bucket:                app.BucketName,
-		Catalog:               app.Catalog,
-		CreatedAt:             app.CreatedAt.UTC(),
+		ID:              app.ID,
+		Name:            app.Name,
+		ServerID:        app.ServerID,
+		ServerName:      app.ServerName,
+		LatestNumber:    app.LatestNumber,
+		LatestStatus:    app.LatestStatus,
+		LiveNumber:      app.LiveNumber,
+		Domains:         app.DomainList(),
+		Canonical:       app.Canonical,
+		Protected:       app.Protect != "",
+		ServiceDomains:  app.ServiceDomainMap(),
+		Instant:         instantURL(app.InstantHost),
+		InstantProvider: app.Instant,
+		InstantOpen:     app.InstantOpen,
+		Stopped:         app.Stopped,
+		ChangesWaiting:  app.ChangesWaiting,
+		Repo:            app.Repo,
+		Branch:          app.Branch,
+		AutoDeploy:      app.AutoDeploy,
+		Pinned:          app.Pinned,
+		Hook:            app.DeployHookHash != nil,
+		Bucket:          app.BucketName,
+		Catalog:         app.Catalog,
+		CreatedAt:       app.CreatedAt.UTC(),
 	}
 }
 

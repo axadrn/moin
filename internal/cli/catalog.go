@@ -150,7 +150,7 @@ func updateApp(ctx context.Context, app, version string, stdout io.Writer) error
 		return err
 	}
 	if version != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("An older version may not undo the migrations of a newer one; moin takes a snapshot first."))
+		fmt.Fprintln(stdout, style.Muted.Render("An older version may not undo the migrations of a newer one; moin backups lists the moment before the update to go back to."))
 	}
 	updated, err := api.UpdateApp(ctx, app, version)
 	if err != nil {

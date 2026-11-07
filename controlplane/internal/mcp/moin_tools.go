@@ -166,22 +166,19 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.queryDatabase)))
 	mcpsdk.AddTool(server, add("execute_sql", "Change a database",
-		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. Take a backup first for anything you cannot undo. Needs a token with read and write access.",
+		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin remembers the moment before, so restore_app can go back to it. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.executeSQL)))
 	mcpsdk.AddTool(server, add("get_backups", "List backups",
-		"Lists the snapshots of every database of an app, the window a point in time restore can reach and the newest restore drill. Needs the read scope.",
+		"Lists how every database of an app is backed up and the moments a restore can go back to: quick ones (1 minute, 15 minutes, 1 hour ago, yesterday this time), the moments moin remembered before a deploy, a data edit or a catalog update, and the copies it took before each restore (undo-...), all inside the last 7 days. Each database has problem, one short sentence, when its backup does not work, and verified_at, the newest daily check that passed. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getBackups)))
-	mcpsdk.AddTool(server, add("back_up_app", "Back up now",
-		"Takes a snapshot of every database of an app now. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.backUpApp)))
 	mcpsdk.AddTool(server, add("restore_app", "Restore a database",
-		"Puts a database of an app back from a snapshot or as it was at a point in time. moin takes a snapshot of the current state first; the app stops for the swap and starts again. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
+		"Puts a database of an app back to a moment from get_backups, by its id or label, or to a time in its history (RFC 3339, to the minute). moin takes one full copy of the database first and keeps it 7 days, so the restore can be undone with its undo- moment; the app stops for the swap and starts again. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.restoreApp)))
-	mcpsdk.AddTool(server, add("set_backup_settings", "Snapshot before changes",
-		"Turns the snapshot before every deploy, restore and data change made through moin on or off for an app. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setBackupSettings)))
+	mcpsdk.AddTool(server, add("download_backup", "Download a copy",
+		"Makes a full copy of a database of an app (SQLite gzipped, Postgres as pg_dump in its custom format) in the app's own bucket, never through moin, and returns its state; call it again with id until state is ready, then link is a signed link to the copy in the bucket, valid 15 minutes. A copy lasts a day. Needs a token with read and write access.",
+		change(false, false)), Write(changes(services, tools.downloadBackup)))
 	mcpsdk.AddTool(server, add("list_buckets", "List buckets",
-		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that upload and back up there now) and older_backups (apps that moved to another bucket and keep their older backups there). Needs the read scope.",
+		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that upload and back up there now) and older_backups (apps that moved to another bucket and left what they had there). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listBuckets)))
 	mcpsdk.AddTool(server, add("add_bucket", "Add a bucket",
 		"Checks and stores a new S3-compatible bucket under a name (lowercase letters, digits, dashes). The first bucket is the default; default true makes this one the default, so every app without a bucket of its own uploads and backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
@@ -190,13 +187,13 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, an empty secret_key keeps the stored one, default true makes it the default. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.editBucket)))
 	mcpsdk.AddTool(server, add("set_default_bucket", "Make a bucket the default",
-		"Makes a bucket the workspace's default: apps without a bucket of their own upload and back up there from now on; their older backups stay in the old default, and restores of them read from there. Needs a token with read and write access.",
+		"Makes a bucket the workspace's default: apps without a bucket of their own upload and back up there from now on; their history starts again there; what is in the old default stays. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
 	mcpsdk.AddTool(server, add("remove_bucket", "Remove a bucket",
-		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that keeps older backups of an app, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
+		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that apps left their history in, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeBucket)))
 	mcpsdk.AddTool(server, add("set_app_bucket", "Choose an app's bucket",
-		"Moves an app's uploads and new backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its older backups stay in the old bucket: get_backups still lists them with their bucket, and restore_app reads them from there. Needs a token with read and write access.",
+		"Moves an app's uploads and backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its history starts again in the new bucket; what is in the old one stays. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setAppBucket)))
 	mcpsdk.AddTool(server, add("get_github", "GitHub connection",
 		"Returns where the moin GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
@@ -468,21 +465,26 @@ type ServerOutput struct {
 type RestoreInput struct {
 	App      string  `json:"app" jsonschema:"the app name or ID"`
 	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
-	Snapshot string  `json:"snapshot,omitempty" jsonschema:"a snapshot ID from get_backups"`
-	Bucket   string  `json:"bucket,omitempty" jsonschema:"the bucket of the snapshot from get_backups, when it is an older bucket the app left; empty is the app's bucket"`
-	At       *string `json:"at,omitempty" jsonschema:"a point in time inside the database's window, RFC 3339"`
+	Moment   string  `json:"moment,omitempty" jsonschema:"the id or label of a moment from get_backups, like 1h, before-v12 or undo-20261107T140200Z"`
+	At       *string `json:"at,omitempty" jsonschema:"a time in the database's history instead of a moment, RFC 3339"`
 	Confirm  string  `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
 }
 
-// BackupSettingsInput is the input of set_backup_settings.
-type BackupSettingsInput struct {
-	App                   string `json:"app" jsonschema:"the app name or ID"`
-	SnapshotBeforeChanges bool   `json:"snapshot_before_changes" jsonschema:"take a snapshot before every change made through moin"`
+// DownloadInput is the input of download_backup.
+type DownloadInput struct {
+	App      string `json:"app" jsonschema:"the app name or ID"`
+	Database string `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
+	ID       string `json:"id,omitempty" jsonschema:"the id of a download this tool started, to see how it stands"`
 }
 
-// Backups is the output of get_backups and back_up_app.
+// Backups is the output of get_backups.
 type Backups struct {
 	api.AppBackups
+}
+
+// DownloadOutput is the output of download_backup.
+type DownloadOutput struct {
+	api.Download
 }
 
 // SetEnvInput is the input of set_env.
@@ -1191,14 +1193,6 @@ func (t moinTools) getBackups(ctx context.Context, caller Caller, input AppInput
 	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
 }
 
-func (t moinTools) backUpApp(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
-	app, backups, err := t.services.Apps.BackUp(ctx, caller.actor(), input.app())
-	if err != nil {
-		return Backups{}, err
-	}
-	return Backups{api.NewAppBackups(t.services.Apps, app, backups)}, nil
-}
-
 func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (Done, error) {
 	var at *time.Time
 	if input.At != nil && *input.At != "" {
@@ -1215,19 +1209,39 @@ func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreI
 	if err := confirmed(input.Confirm, app.Name); err != nil {
 		return Done{}, err
 	}
-	err = t.services.Apps.Restore(ctx, caller.actor(), app.ID, input.Database, input.Snapshot, input.Bucket, at)
+	err = t.services.Apps.Restore(ctx, caller.actor(), app.ID, service.RestoreTarget{Database: input.Database, Moment: input.Moment, At: at})
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Restored the database of " + input.App + "; the app runs again."}, nil
+	return Done{Message: "Restored the database of " + input.App + "; the app runs again. The state before is the newest undo- moment in get_backups for 7 days."}, nil
 }
 
-func (t moinTools) setBackupSettings(_ context.Context, caller Caller, input BackupSettingsInput) (api.BackupSettings, error) {
-	app, err := t.services.Apps.SetSnapshotBeforeChanges(caller.actor(), input.App, input.SnapshotBeforeChanges)
-	if err != nil {
-		return api.BackupSettings{}, err
+func (t moinTools) downloadBackup(ctx context.Context, caller Caller, input DownloadInput) (DownloadOutput, error) {
+	if input.ID != "" {
+		download, err := t.services.Apps.DownloadOf(ctx, caller.Token.WorkspaceID, input.App, input.ID)
+		if err != nil {
+			return DownloadOutput{}, err
+		}
+		return DownloadOutput{api.NewDownload(download)}, nil
 	}
-	return api.BackupSettings{SnapshotBeforeChanges: app.SnapshotBeforeChanges}, nil
+	download, err := t.services.Apps.StartDownload(caller.actor(), input.App, input.Database)
+	if err != nil {
+		return DownloadOutput{}, err
+	}
+	// A small database is ready in a moment: wait a little before answering.
+	for deadline := time.Now().Add(20 * time.Second); download.State == service.DownloadRunning && time.Now().Before(deadline); {
+		select {
+		case <-ctx.Done():
+			return DownloadOutput{api.NewDownload(download)}, nil
+		case <-time.After(500 * time.Millisecond):
+		}
+		latest, err := t.services.Apps.DownloadOf(ctx, caller.Token.WorkspaceID, input.App, download.ID)
+		if err != nil {
+			return DownloadOutput{}, err
+		}
+		download = latest
+	}
+	return DownloadOutput{api.NewDownload(download)}, nil
 }
 
 func (t moinTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {

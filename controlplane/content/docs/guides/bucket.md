@@ -5,7 +5,7 @@ group: "Servers and data"
 order: 5
 ---
 
-Your bucket is your own box on the internet, where your backups and uploads go. It is yours, not ours. Any S3-compatible bucket works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. Your code passes through it on its way to the server, and moin keeps none of it. One bucket serves every app. [How backups work](/docs/concepts/backups) shows what lives where.
+Your bucket is your own box on the internet, where your backups and uploads go. It is yours, not ours. Any S3-compatible bucket works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. Your code on its way to the server, your backups and the copies you download go there, and only there: never to moin's servers or to a bucket of ours. moin stores none of it and only signs short-lived links into your bucket. One bucket serves every app. [How backups work](/docs/concepts/backups) shows what lives where.
 
 ## Add it
 
@@ -39,13 +39,13 @@ moin writes and deletes a test file first, so a wrong key fails at once. The sec
 | --- | --- |
 | `moin deploy` from your computer, the TUI or the moin GitHub Action | yes |
 | [Catalog](/docs/guides/catalog) apps | yes |
-| Backups and restores | yes |
+| Backups, restores and **Download a copy** | yes |
 | Deploys from [GitHub](/docs/guides/github) | no: the server downloads the commit itself |
 | Image deploys from [CI](/docs/guides/ci) | no: the server pulls the image |
 
 ## See your buckets
 
-Every bucket, the default first, with the apps that use it and the apps that keep older backups in it. Secret keys never show.
+Every bucket, the default first, with the apps that use it and the apps that left it. Secret keys never show.
 
 ```surfaces
 Web: **Settings**, **Bucket**
@@ -61,20 +61,20 @@ Add another bucket the same way, with another name: a client's data in the clien
 
 ### Choose the bucket of an app
 
-Moves the uploads and the new backups of one app to another bucket. Older backups stay where they are; moin still lists and restores them from there.
+Moves the uploads and the backups of one app to another bucket. Its history starts again there, so you can go back to moments from the move on; what is in the old bucket stays.
 
 ```surfaces
-Web: the app, **Backups**, **Use another bucket**, then **Move**
+Web: the app, **Data**, **Use another bucket**, then **Move**
 CLI: moin buckets use client-a [app]
 CLI: moin buckets use --default [app]
-TUI: on the app, `W`, then **Backups** in the web
+TUI: on the app, `W`, then **Data** in the web
 API: PUT /api/v1/apps/{app}/bucket
 MCP: set_app_bucket
 ```
 
 ### Change a bucket
 
-Renames it, points it at another place, gives it new keys or makes it the default. An empty secret key keeps the stored one. A new place starts with a full backup; the old place keeps what it has.
+Renames it, points it at another place, gives it new keys or makes it the default. An empty secret key keeps the stored one. The history starts again in a new place; the old place keeps what it has.
 
 ```surfaces
 Web: **Settings**, **Bucket**, **Change** on the bucket, then **Save bucket**; **Make default**
@@ -99,7 +99,7 @@ API: DELETE /api/v1/buckets/{name}
 MCP: remove_bucket
 ```
 
-moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that keeps older backups of an app that moved away, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name; `--yes` skips it in scripts.
+moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that apps moved away from, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name; `--yes` skips it in scripts.
 
 ## Good to know
 

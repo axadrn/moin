@@ -237,12 +237,8 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
 
 	if request.Write {
-		if request.Snapshot && a.backups != nil {
-			err = a.backups.snapshotBefore(ctx, request.App, "before-sql", nil)
-			if err != nil {
-				return result, err
-			}
-		}
+		before := time.Now().UTC()
+		result.Before = &before
 		defer matchOwner(database.HostPath)
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
