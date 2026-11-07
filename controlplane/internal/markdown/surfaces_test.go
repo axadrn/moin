@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestSurfacesRenderAsTabs(t *testing.T) {
+func TestSurfacesRenderAsAChoice(t *testing.T) {
 	source := "Intro.\n\n```surfaces\nWeb: **Server** → [Security](/docs/guides/security)\nCLI: moin integrations cloudflare\nnot a surface line\nDesktop: ignored\nMCP: set_integrations\nAPI: PUT /api/v1/integrations\n```\n"
 	html, err := NewParser().Parse([]byte(source))
 	if err != nil {
@@ -14,10 +14,9 @@ func TestSurfacesRenderAsTabs(t *testing.T) {
 	out := string(html)
 
 	for _, want := range []string{
-		`data-slot="tabs"`,
 		`data-surfaces`,
-		`role="tablist"`,
-		`data-slot="tabs-trigger"`,
+		`role="radiogroup"`,
+		`type="radio" id="surface-1-web" name="surface-1" value="web" checked`,
 		`<strong>Server</strong>`,
 		`<a href="/docs/guides/security">Security</a>`,
 		`<pre class="m-0 rounded-none bg-transparent px-6 py-4 pr-14"><code>moin integrations cloudflare</code></pre>`,
@@ -34,8 +33,8 @@ func TestSurfacesRenderAsTabs(t *testing.T) {
 		}
 	}
 
-	// Tabs follow the surface order, not the order of the lines, and the
-	// first is open.
+	// The choice follows the surface order, not the order of the lines,
+	// and the first is picked.
 	order := []string{">Web<", ">CLI<", ">API<", ">MCP<"}
 	last := -1
 	for _, label := range order {
@@ -45,8 +44,8 @@ func TestSurfacesRenderAsTabs(t *testing.T) {
 		}
 		last = i
 	}
-	if !strings.Contains(out, `aria-selected="true"`) || strings.Count(out, `data-hidden`) != 3 {
-		t.Errorf("want the first tab open and three hidden panels:\n%s", out)
+	if strings.Count(out, ` checked`) != 1 || strings.Count(out, `data-surface="`) != 4 {
+		t.Errorf("want the first surface picked and four parts:\n%s", out)
 	}
 }
 
