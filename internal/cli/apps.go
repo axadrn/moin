@@ -460,7 +460,7 @@ func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if number != 0 {
 		target = fmt.Sprintf("v%d", number)
 	}
-	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Roll %s back to %s? It replaces the live release.", name, target))
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Roll %s back to %s? It replaces the live deploy.", name, target))
 	if err != nil {
 		return err
 	}

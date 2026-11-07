@@ -203,7 +203,7 @@ func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	answerDone(w, r, "Redeploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
 }
 
-// Restart starts the live release again with the env and routing as they
+// Restart starts the live deploy again with the env and routing as they
 // are now, without a build. The page follows the new deploy.
 func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	deploy, err := h.apps.Restart(actor(r), r.PathValue("app"))
@@ -212,7 +212,7 @@ func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	answerDone(w, r, "Restart started", fmt.Sprintf("v%d starts the live release again.", deploy.Number))
+	answerDone(w, r, "Restart started", fmt.Sprintf("v%d starts the live deploy again.", deploy.Number))
 }
 
 // Start runs a stopped app again. The page follows the new deploy.

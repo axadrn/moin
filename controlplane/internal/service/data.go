@@ -15,7 +15,7 @@ import (
 const dataTimeout = 40 * time.Second
 
 var (
-	ErrNoDatabase = errors.New("the live release has no database: no SQLite file on a volume, no Postgres service")
+	ErrNoDatabase = errors.New("the live deploy has no database: no SQLite file on a volume, no Postgres service")
 	ErrNoTable    = errors.New("the database has no such table")
 	ErrNoRowID    = errors.New("rows of views and tables without a primary key cannot be edited one by one: use SQL")
 	ErrNoColumn   = errors.New("the table has no such column")
