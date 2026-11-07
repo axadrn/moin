@@ -162,7 +162,7 @@ templ CatalogResults(view CatalogView) {
 				@kit.List() {
 					for _, app := range view.Apps {
 						@kit.Row(view.Base + "/" + app.Entry.Slug) {
-							<span class="flex size-9 shrink-0">
+							<span data-lead class="flex size-9 shrink-0">
 								@kit.AppIcon(app.Entry.Name, catalogLogo(app.Entry), false)
 							</span>
 							@kit.RowText(app.Entry.Name, app.Entry.Pitch)

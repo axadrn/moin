@@ -41,7 +41,7 @@ templ Overview(view OverviewView) {
 						@kit.List() {
 							for _, issue := range view.Status.Issues {
 								@kit.Row(basePath + issue.Path) {
-									<span class={ "flex size-8 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
+									<span data-lead class={ "flex size-9 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
 										@overviewIssueIcon(issue.Kind)
 									</span>
 									@kit.RowText(issue.Target, issue.Detail)

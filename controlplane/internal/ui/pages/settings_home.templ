@@ -130,7 +130,7 @@ templ SettingsHome(view SettingsHomeView) {
 // workspaceRowText is a workspace in the list: its initial, its name, and
 // your role in it under the name.
 templ workspaceRowText(item model.WorkspaceMembership) {
-	<span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">{ model.Initial(item.Name) }</span>
+	<span data-lead class="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">{ model.Initial(item.Name) }</span>
 	@kit.RowText(item.Name, model.WorkspaceRoleLabel(item.Role))
 }
 
