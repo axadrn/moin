@@ -10,7 +10,7 @@ The last lines your app printed, from every container of the app.
 ## Read the logs
 
 ```surfaces
-Web: the app, **Logs**, **Load logs**
+Web: the app's **Logs** tab, the last 200 lines; **Reload** reads them again
 CLI: moin logs <app-name>
 TUI: on the app, `l`, live: `↑` `↓` scroll, `G` follows the end, `/` filters
 API: GET /api/v1/apps/{app}/logs

@@ -28,7 +28,7 @@ Saving never restarts the app: change several, then [restart](/docs/guides/deplo
 ## See the env vars
 
 ```surfaces
-Web: the app, **Environment**; **Show values** for the values
+Web: the app's **Settings** tab, **Environment**
 CLI: moin env
 CLI: moin env --show
 TUI: on the app, `e`; `v` shows the values
@@ -39,7 +39,7 @@ MCP: get_env
 ## Remove an env var
 
 ```surfaces
-Web: the app, **Environment**, the × next to the env var
+Web: the app's **Settings** tab, **Environment**, **Show values**
 CLI: moin env rm KEY
 TUI: on the app, `e`, pick the key, `x`, then `y`
 API: PATCH /api/v1/apps/{app}/env

@@ -10,7 +10,7 @@ Runs one command in a container of your app, with its output as it comes and the
 ## Run a command
 
 ```surfaces
-Web: the app, **Run a command**
+Web: the app's **Logs** tab, **Run a command**
 CLI: moin exec [app] [--service web] -- <command>
 TUI: on the app, `X`, then type the command
 API: POST /api/v1/apps/{app}/exec

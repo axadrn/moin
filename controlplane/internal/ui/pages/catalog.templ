@@ -523,47 +523,62 @@ templ CatalogInstall(view CatalogInstallView) {
 // runs, the newest, and the way to another one.
 templ CatalogUpdate(view CatalogUpdateView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="catalog-update" data-catalog-update>
-		@card.Card(card.Props{Class: utils.CN("min-w-0 gap-0 p-5 sm:p-6", utils.IfElse(view.Newer, "ring-live/40", ""))}) {
-			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div class="flex min-w-0 items-center gap-4">
+	<div id="catalog-update" class="grid" data-catalog-update>
+		@kit.Card("", nil) {
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+				<div class="flex min-w-0 flex-1 items-center gap-4">
 					@catalogTile(view.Entry, "size-11 text-lg")
 					<div class="min-w-0">
-						if view.Newer {
-							<p class="font-medium">{ view.Entry.Name } { view.Latest.Tag } is out</p>
-						} else {
-							<p class="font-medium">{ view.Entry.Name } { view.Version }</p>
-						}
+						<p class="truncate font-medium">{ view.Entry.Name }</p>
 						<p class="text-sm text-muted-foreground">
+							{ catalogUpdateLine(view) }
 							if note := view.Entry.DatabaseNote(); note != "" {
-								You run { view.Version }. <span data-catalog-database-note>{ note }</span>
-							} else {
-								You run { view.Version }. A snapshot comes first.
+								<span data-catalog-database-note>{ note }</span>
 							}
 						</p>
 					</div>
 				</div>
 				<form
-					class="flex flex-col gap-2 sm:flex-row sm:items-center"
+					class="flex gap-2"
 					hx-post={ basePath + "/apps/" + view.App.Name + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
-					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one; moin takes a snapshot first." }
+					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
 				>
 					@csrf.Token()
-					<label for="catalog-update-version" class="sr-only">Version</label>
-					@kit.Select(kit.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Disabled: len(view.Versions) == 0})
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: utils.IfElse(view.Newer, button.VariantDefault, button.VariantSecondary), Attributes: templ.Attributes{"data-catalog-update-submit": true}}) {
+					<div class="min-w-0 flex-1 sm:w-36 sm:flex-none">
+						@kit.Select(kit.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Value: view.Latest.Tag, Disabled: len(view.Versions) == 0})
+					</div>
+					@kit.Button(catalogUpdateKind(view.Newer), "", templ.Attributes{"type": "submit", "data-catalog-update-submit": true}) {
 						if view.Newer {
 							Update
 						} else {
-							Deploy version
+							Deploy
 						}
 					}
 				</form>
 			</div>
 		}
 	</div>
+}
+
+// catalogUpdateLine says which version runs, and the newer one if there is.
+func catalogUpdateLine(view CatalogUpdateView) string {
+	switch {
+	case view.Version == "":
+		return ""
+	case view.Newer:
+		return view.Latest.Tag + " is out. You run " + view.Version + "."
+	}
+	return view.Version + ", the newest."
+}
+
+// catalogUpdateKind makes Update the primary button: it is the thing to do.
+func catalogUpdateKind(newer bool) kit.Kind {
+	if newer {
+		return kit.Primary
+	}
+	return kit.Secondary
 }
 
 func firstVersion(versions []catalog.Version) string {

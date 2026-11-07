@@ -9,8 +9,8 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
-// The app's metrics tab shows the numbers now, a chart per metric with the
-// deploy marked, and refreshes itself for the last hour.
+// The app's metrics page, under the app, shows the numbers now, a chart per
+// metric with the deploy marked, and refreshes itself for the last hour.
 func TestAppMetricsShowsChartsAndDeploys(t *testing.T) {
 	at := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
 	view := AppMetricsView{App: model.App{Name: "shop", ServerName: "web-1"}, Metrics: service.AppMetrics{
@@ -27,7 +27,7 @@ func TestAppMetricsShowsChartsAndDeploys(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-metrics-chart="app-cpu"`, `data-metrics-chart="app-memory"`, `data-metrics-chart="app-network"`, "12%", "300 MB", "of 512 MB", "2 containers", "v12 went live", `hx-trigger="every 15s"`, `data-metrics-range-link="30d"`, `aria-current="page"`} {
+	for _, want := range []string{`data-metrics-chart="app-cpu"`, `data-metrics-chart="app-memory"`, `data-metrics-chart="app-network"`, "12%", "300 MB", "of 512 MB", "Containers", "v12 went live", `hx-trigger="every 15s"`, `name="range" value="30d"`, `href="/app/tiny-rocket-co/apps/shop"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}

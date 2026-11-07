@@ -38,7 +38,7 @@ moin reads each app's image registry once an hour, so every version shows the ho
 The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys, with a full backup of the database first.
 
 ```surfaces
-Web: the app, the catalog panel, **Update**
+Web: the app page, **Update** (or another version, **Deploy**)
 CLI: moin update umami [--version 3.4.1]
 TUI: on the app, `U`, then `y`
 API: POST /api/v1/apps/{app}/update

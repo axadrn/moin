@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -126,6 +127,25 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 	case "app":
 		if h.catalogs != nil {
 			view.Catalog = catalogUpdate(h.catalogs, workspace.ID, app)
+		}
+	case "deploys":
+		repo, err := h.repoView(r, app, false)
+		if err != nil {
+			renderError(w, "load github installations failed", err)
+			return
+		}
+		view.Repo = &repo
+	case "logs":
+		// The page comes with the logs, unless the agent is slow: then the
+		// section asks for them itself.
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		lines, err := h.apps.Logs(ctx, workspace.ID, app.Name, logLines)
+		cancel()
+		if err == nil || !errors.Is(err, context.DeadlineExceeded) {
+			view.Logs = &pages.AppLogsView{Lines: lines}
+			if err != nil {
+				view.Logs.Message = errorMessage(err)
+			}
 		}
 	case "addresses":
 		if routing, err := h.routingView(r, ""); err == nil {
@@ -301,11 +321,15 @@ func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.SettingsRegistriesSection(logins))
 }
 
+// logLines is how many of the last lines of an app's containers the Logs
+// section shows.
+const logLines = 200
+
 // Logs answers the last lines of the app's containers, or why they could
 // not be read: the panel is their output, an error included.
 func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	lines, err := h.apps.Logs(r.Context(), workspace.ID, r.PathValue("app"), 200)
+	lines, err := h.apps.Logs(r.Context(), workspace.ID, r.PathValue("app"), logLines)
 	if err != nil {
 		render(w, r, pages.AppLogs(nil, errorMessage(err)))
 		return
