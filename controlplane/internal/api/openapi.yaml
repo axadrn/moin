@@ -1880,7 +1880,7 @@ paths:
       tags: [Apps]
       operationId: restartApp
       summary: Restart an app
-      description: Starts the live release again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
+      description: Starts the live deploy again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2030,7 +2030,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live release; change them there and deploy.'
+          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live deploy; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.domains`, `fields.canonical` or `fields.service`.'
@@ -2306,7 +2306,7 @@ paths:
       tags: [Data]
       operationId: getAppDatabases
       summary: List databases
-      description: The databases of the live release, SQLite files the agent found on its volumes and services that run Postgres.
+      description: The databases of the live deploy, SQLite files the agent found on its volumes and services that run Postgres.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2359,7 +2359,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2416,7 +2416,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2448,7 +2448,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
@@ -2483,7 +2483,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, `not_editable` for views and tables without a primary key.'
@@ -2518,7 +2518,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, `not_editable` for views and tables without a primary key.'
@@ -2561,7 +2561,7 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found` for an unknown app or table, `no_database` when the live release has no database.'
+          description: '`not_found` for an unknown app or table, `no_database` when the live deploy has no database.'
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, or `read_only_query` when a read without `write` changes data.'
@@ -5272,7 +5272,7 @@ components:
           description: The app was stopped. A deploy, a restart or a start runs it again.
         changes_waiting:
           type: integer
-          description: Changes saved since the live release started (env vars, domains, password, instant address, bucket). Saving never restarts an app; a restart applies them. Only GET /apps/{app} fills it.
+          description: Changes saved since the live deploy started (env vars, domains, password, instant address, bucket). Saving never restarts an app; a restart applies them. Only GET /apps/{app} fills it.
         repo:
           type: string
           description: The GitHub repo the app follows, as owner/name. Empty for none.
@@ -5366,7 +5366,7 @@ components:
           description: Only on `GET /api/v1/apps/{app}/deploys/{number}`.
         on_server:
           type: boolean
-          description: Whether the server still keeps the release, so a rollback can go to it. It keeps the releases of the last 5 builds (source or image) and the restarts and rollbacks after the oldest of them. Only in the deploys of `GET /api/v1/apps/{app}`.
+          description: Whether the server still keeps this deploy, so a rollback can go to it. It keeps the last 5 builds (source or image) and the restarts and rollbacks after the oldest of them. Only in the deploys of `GET /api/v1/apps/{app}`.
     Detected:
       type: object
       description: What the agent found in the repo and on the server.
@@ -5527,7 +5527,7 @@ components:
                 type: boolean
               from_compose:
                 type: boolean
-                description: x-moin.domains in compose.yml of the live release sets the domain. It wins over the domains set in moin, so it changes in compose.yml, then a deploy.
+                description: x-moin.domains in compose.yml of the live deploy sets the domain. It wins over the domains set in moin, so it changes in compose.yml, then a deploy.
               service:
                 type: string
                 description: The service of compose.yml the domain reaches; absent for the main one.
