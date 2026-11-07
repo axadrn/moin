@@ -142,6 +142,7 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	}
 	s.servers.record(actor, "app.created", "app", name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
+	s.reconfigure(server.ID, actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }
 
@@ -185,6 +186,7 @@ func (s *AppService) Delete(ctx context.Context, actor Actor, idOrName, confirm 
 	}
 	s.servers.record(actor, "app.deleted", "app", app.Name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
+	s.reconfigure(app.ServerID, actor.WorkspaceID)
 	return nil
 }
 

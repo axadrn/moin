@@ -552,9 +552,7 @@ func TestLateCopiesAndEditsDuringARestore(t *testing.T) {
 	}
 }
 
-// A bucket that cannot be opened sends no backup config at all, rather
-// than half of one: an empty one would stop the backups, one without a
-// schedule would prune with the default.
+// A bucket that cannot be opened pauses only its app; the others go on.
 func TestNoHalfBackupConfig(t *testing.T) {
 	apps, _, server, _ := newAppService(t)
 	app, err := apps.Create(owner, "shop", server.ID)
@@ -571,8 +569,12 @@ func TestNoHalfBackupConfig(t *testing.T) {
 	if err := apps.apps.SetAppBucket(app.ID, &broken, "", time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.backupConfig(owner.WorkspaceID, server.ID); err == nil {
-		t.Fatal("a broken bucket made a config")
+	config, err := apps.backupConfig(owner.WorkspaceID, server.ID)
+	if err != nil || config.Bucket == nil || !strings.Contains(config.Paused["shop"], "cannot be opened") || config.Schedules["shop"].Every != 60 {
+		t.Fatalf("a broken bucket pauses only its app: %+v %v", config, err)
+	}
+	if BackupProblem(config.Paused["shop"]) != "The app's bucket can't be opened: check its keys under Data." {
+		t.Error("the problem of a paused app")
 	}
 }
 
@@ -588,5 +590,30 @@ func TestStoppedAppRests(t *testing.T) {
 	statuses, _ := apps.apps.BackupStatus(app.ID)
 	if len(statuses) != 1 || statuses[0].Error != "" {
 		t.Fatalf("statuses %+v", statuses)
+	}
+}
+
+// A new app gets its schedule at once, so its copies are kept and
+// pruned as it says; a stopped app is never late.
+func TestNewAppGetsItsSchedule(t *testing.T) {
+	apps, _, server, daemon := newAppService(t)
+	if _, err := apps.Create(owner, "shop", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		var config protocol.BackupConfig
+		if daemon.count(protocol.TypeBackupConfig) > 0 {
+			daemon.last(t, protocol.TypeBackupConfig, &config)
+			if config.Schedules["shop"].Every == 60 {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no backup config for the new app")
+		}
+	}
+	old := time.Now().Add(-5 * time.Hour)
+	if late(&model.App{Stopped: true}, &old, time.Now()) || !late(&model.App{}, &old, time.Now()) {
+		t.Error("late for a stopped app, or not for a running one")
 	}
 }

@@ -141,7 +141,8 @@ func bucketClient(bucket protocol.Bucket) *s3.Client {
 
 // backupConfig is what the daemon of a server gets: the default bucket in
 // plain text, the bucket of each of its apps that uses another one, and
-// the schedule of each; nothing without a bucket. An error means none of
+// the schedule of each; nothing without a bucket. An app whose bucket
+// cannot be opened is paused, the others go on. An error means none of
 // it can be told: half a config would stop or prune backups.
 func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.BackupConfig, error) {
 	bucket, err := s.apps.DefaultBucket(workspaceID)
@@ -169,7 +170,11 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 		}
 		own, err := s.openAppBucket(&app)
 		if err != nil {
-			return protocol.BackupConfig{}, err
+			if config.Paused == nil {
+				config.Paused = map[string]string{}
+			}
+			config.Paused[app.Name] = "the bucket of " + app.Name + " cannot be opened: " + err.Error()
+			continue
 		}
 		if config.AppBuckets == nil {
 			config.AppBuckets = map[string]*protocol.Bucket{}
@@ -177,6 +182,14 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 		config.AppBuckets[app.Name] = own
 	}
 	return config, nil
+}
+
+// reconfigure sends the backup config to a server, when it is online, on
+// its own: an app came or went, so its schedule does too.
+func (s *AppService) reconfigure(serverID, workspaceID string) {
+	if s.servers.Online(serverID) {
+		go s.configureDaemon(serverID, workspaceID)
+	}
 }
 
 // configureDaemons sends the backup config to every online server of the
@@ -307,7 +320,7 @@ func Moments(backup protocol.DatabaseBackup, remembered []model.BackupMoment, no
 	for _, copy := range backup.Copies {
 		moment := Moment{ID: copy.ID, Label: atWhen(copy.At, now), At: copy.At, Kind: MomentCopy, Copy: copy.ID}
 		for _, named := range remembered {
-			if named.At.UTC().Format(protocol.CopyIDLayout) == copy.ID && (named.Database == "" || named.Database == backup.Database) {
+			if named.At.Equal(copy.At) && (named.Database == "" || named.Database == backup.Database) {
 				moment.ID, moment.Label, moment.Kind = rememberedMoment(named)
 			}
 		}
@@ -413,6 +426,8 @@ func BackupProblem(raw string) string {
 		return "The bucket can't be reached."
 	case strings.Contains(text, "is not running"):
 		return "The database is not running."
+	case strings.Contains(text, "cannot be opened"):
+		return "The app's bucket can't be opened: check its keys under Data."
 	case strings.Contains(text, "copies are late"):
 		return "The copies are late."
 	case strings.Contains(text, "daily check failed"):
@@ -473,7 +488,7 @@ func late(app *model.App, copiedAt *time.Time, now time.Time) bool {
 	if every <= 0 {
 		every = time.Duration(protocol.DefaultSchedule.Every) * time.Minute
 	}
-	return copiedAt != nil && now.Sub(*copiedAt) > max(2*every, every+time.Hour)
+	return !app.Stopped && copiedAt != nil && now.Sub(*copiedAt) > max(2*every, every+time.Hour)
 }
 
 // SetBackupSchedule sets how often the daemon copies an app's databases,
@@ -1058,7 +1073,7 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			CheckError: clipText(database.CheckError, 2000),
 			UpdatedAt:  s.now().UTC(),
 		}
-		if app.Stopped && strings.Contains(status.Error, "is not running") {
+		if app.Stopped && (strings.Contains(status.Error, "is not running") || strings.Contains(status.Error, "copies are late")) {
 			// The user stopped the app: its database is meant to rest.
 			status.Error = ""
 		}

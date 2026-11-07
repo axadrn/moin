@@ -79,7 +79,7 @@ A time works too, like 14:01: SQLite with Every change goes to that minute, ever
 
 ## A restore
 
-A restore never changes your data in place. moin builds the database beside the live one, switches in one step, and keeps the old one as the undo.
+A restore never changes your data in place. moin builds the database beside the live one, switches in one atomic step, and keeps the old one as the undo. There is never a moment without a live database: before the switch it is the old one, after it the new one.
 
 ```
 1 build beside, the app runs
@@ -87,10 +87,10 @@ A restore never changes your data in place. moin builds the database beside the 
   app.db.moin-restore  built
 
 2 stop the app, switch
-  app.db ─▶
+  app.db ═ also named
     app.db.moin-before-…
   app.db.moin-restore ─▶
-    app.db
+    app.db (one step)
 
 3 start the app
   app.db  restored
@@ -106,6 +106,7 @@ The same for Postgres, with databases instead of files:
   moin_restore_…   built
 
 2 stop the app, switch
+  in one transaction:
   shop ─▶ moin_before_…
   moin_restore_… ─▶ shop
 
@@ -114,14 +115,14 @@ The same for Postgres, with databases instead of files:
   moin_before_…    the undo
 ```
 
-- **SQLite.** moin unpacks the copy into `app.db.moin-restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, renames it to `app.db.moin-before-<time>` and the restored file to `app.db`, and starts the app. The stop lasts a moment.
-- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `moin_before_<time>_<hash>` and the built one to `shop`, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
+- **SQLite.** moin unpacks the copy into `app.db.moin-restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, gives it a second name, `app.db.moin-before-<time>` (a hard link: the same file, no copy), and renames the restored file over `app.db` in one step. Then it starts the app. The stop lasts a moment.
+- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `moin_before_<time>_<hash>` and the built one to `shop` in one transaction, so both happen or neither, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
 
 Both need room for one more database beside the live one: moin looks first. While a restore runs, edits through moin are refused (they would be lost, or lose it): make them when it is done. During a deploy they wait until the new version is up.
 
 The undo stays as long as you keep copies, then moin removes it. Undo = the same switch the other way.
 
-**If the server dies in the middle.** moin writes a small note before it changes anything, and writes in it how far it came: "switching", "aside" (the first rename is done), "switched". When the daemon starts again it reads the note and follows one rule: before the switch nothing moved; after it the restore is done; in between, the old database goes back, and anything the app made in its place meanwhile (an empty file on its start) is kept aside as an undo of its own. Then it starts the app and tells you how the restore ended. If the rule cannot act yet (a Postgres that does not answer), the note stays and the next start tries again. Your app always runs on a whole database, the one before or the restored one, never half of one.
+**If the server dies in the middle.** moin writes a small note, "restoring", before it changes anything. As the switch is one step, the database is whole either way: the old one or the restored one. When the daemon starts again it reads the note, looks which one is there (SQLite: is the undo another name of the live file, or a file of its own; Postgres: is there an undo), tidies what the restore left, starts the app and tells you how the restore ended. If it cannot look yet (a Postgres that does not answer), the note stays and the next start tries again.
 
 ## The daily check
 
@@ -155,7 +156,7 @@ Everything of one workspace goes into one folder named after the workspace's ID,
 | `<app-id>/` | a new app with the same name gets a new one, so old copies never mix with new |
 | `uploads/` | your code on its way to the server (`moin deploy`) |
 | `<database>/` | one per database, its path with `~` for `/`: `data~app.db` for `/data/app.db`, `postgres-db` for the service `db`, `postgres-db~analytics` for another database in it |
-| `copies/` | the copies, named by their time in UTC: `20261107T140000Z.db.gz` for SQLite, `20261107T140000Z.dump` for Postgres |
+| `copies/` | the copies, named by their time in UTC and six random digits, so two of one second stay apart: `20261107T140000Z-482913.db.gz` for SQLite, `….dump` for Postgres |
 | `litestream/` | SQLite with Every change: every change, in generations. A restore starts a new one; the one before stays until it is older than you keep copies |
 
 ## How long things stay
