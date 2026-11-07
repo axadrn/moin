@@ -26,6 +26,9 @@ var (
 	ErrInvalidRole         = errors.New("invalid workspace role")
 	ErrInvalidInviteEmail  = errors.New("invalid invitation email")
 	ErrActiveSubscription  = errors.New("finish checkout or end paid access before deleting the workspace")
+	// ErrActivityPermission is returned to members who may not view
+	// workspace activity.
+	ErrActivityPermission = errors.New("workspace activity permission required")
 )
 
 type WorkspaceService struct {
@@ -221,10 +224,14 @@ func (s *WorkspaceService) AuditEvents(workspaceID string) ([]model.WorkspaceAud
 	return s.audit.ListByWorkspace(workspaceID, 100)
 }
 
-// AuditEventsPage returns one page of workspace activity, newest first,
-// and the event ID to continue after, empty on the last page.
-func (s *WorkspaceService) AuditEventsPage(workspaceID string, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, string, error) {
-	events, err := s.audit.ListPage(workspaceID, filter, afterID, limit+1)
+// AuditEventsPage returns one page of the activity of the member's
+// workspace, newest first, and the event ID to continue after, empty on the
+// last page. Members who may not view it get ErrActivityPermission.
+func (s *WorkspaceService) AuditEventsPage(member *model.WorkspaceMember, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, string, error) {
+	if member == nil || !member.Can(model.WorkspacePermissionViewAuditLog) {
+		return nil, "", ErrActivityPermission
+	}
+	events, err := s.audit.ListPage(member.WorkspaceID, filter, afterID, limit+1)
 	if err != nil {
 		return nil, "", err
 	}

@@ -207,7 +207,7 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrCheckoutSelection, status: http.StatusConflict, code: "checkout_conflict", message: "A different checkout is already open."},
 	{err: repository.ErrSubscriptionAlreadyPaid, status: http.StatusConflict, code: "already_paid", message: "This subscription is already paid."},
 	{err: ErrBillingPermission, status: http.StatusForbidden, code: "forbidden", message: "Only workspace owners can manage billing."},
-	{err: ErrActivityPermission, status: http.StatusForbidden, code: "forbidden", message: "You do not have permission to view workspace activity."},
+	{err: service.ErrActivityPermission, status: http.StatusForbidden, code: "forbidden", message: "You do not have permission to view workspace activity."},
 	{err: ErrInvalidCursor, status: http.StatusBadRequest, code: "invalid_cursor", message: "The cursor is invalid. Start again without a cursor."},
 	{err: service.ErrFilePermission, status: http.StatusForbidden, code: "forbidden", message: "This file belongs to another account."},
 	{err: repository.ErrServerNotFound, status: http.StatusNotFound, code: "not_found", message: "The server was not found."},
