@@ -80,7 +80,7 @@ templ HomeHero() {
 					<span class="block">Deploy <br class="sm:hidden"/>anything.</span>
 					<span class="block text-muted-foreground/60">Lose nothing.</span>
 				</h1>
-				<p class={ homeLead, "max-w-[34ch] max-sm:hidden" }>Your apps on your servers. Every change backed up. Every restore checked.</p>
+				<p class={ homeLead, "max-w-[34ch] max-sm:hidden" }>Your apps on your servers. Backups on your schedule, checked every day.</p>
 			</div>
 			<div class="flex justify-center gap-2">
 				@homePrimary()
@@ -210,7 +210,7 @@ templ HomeDoes() {
 			}
 			@kit.Section("Keep", nil) {
 				@kit.List() {
-					@homeFeature("Backups", "Every change, in your bucket", "/docs/guides/backups")
+					@homeFeature("Backups", "On your schedule, in your bucket", "/docs/guides/backups")
 					@homeFeature("Data", "Browse, edit, run SQL", "/docs/guides/data")
 					@homeFeature("Uptime and alerts", "Mail, Slack, Discord, Telegram", "/docs/guides/alerts")
 					@homeFeature("AI agents", "Claude, Cursor, any MCP client", "/docs/guides/mcp")
@@ -286,7 +286,7 @@ templ HomeEnd() {
 			</p>
 			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
 				<p>I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing.</p>
-				<p>Your apps are containers too. { brand.Name } ships them to your servers and keeps every change to their data.</p>
+				<p>Your apps are containers too. { brand.Name } ships them to your servers and keeps copies of their data in your bucket.</p>
 			</div>
 			<p class={ homeStatement, "pt-4" }>
 				Deploy anything. <span class="text-muted-foreground/60">Lose nothing.</span>

@@ -64,7 +64,7 @@ templ bucketPanel(bucket service.Bucket) {
 						"hx-select":         "#bucket",
 						"hx-swap":           "outerHTML",
 						"hx-disable":        "this",
-						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their history starts again there.",
+						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
 						"data-make-default": bucket.Name,
 					}) {
 						<span class="font-medium">Make default</span>

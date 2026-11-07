@@ -38,7 +38,7 @@ templ Catalog(view CatalogView) {
 templ CatalogApp(view CatalogEntryView, appURL string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Self-host " + view.Entry.Name + " on your own server",
-		Description: view.Entry.Name + ": " + view.Entry.Pitch + " Install it on your own server in one click, with its database backed up, every change.",
+		Description: view.Entry.Name + ": " + view.Entry.Pitch + " Install it on your own server in one click, with its database backed up to your bucket.",
 		Path:        "/catalog/" + view.Entry.Slug,
 	}) {
 		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))

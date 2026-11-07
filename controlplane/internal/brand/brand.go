@@ -8,7 +8,7 @@ const (
 	Tagline = "Deploy anything. Lose nothing."
 	// Promise is the line under the tagline, the same on the home page,
 	// the sign-in page, the docs, the README and the CLI.
-	Promise = "Your apps on your servers. Every change backed up. Every restore tested."
+	Promise = "Your apps on your servers. Backups on your schedule, checked every day."
 	// Company runs the hosted service and holds the copyright.
 	Company = "Berry Good Ideas LLC"
 	// SupportEmail is where people write about moin, on every install;

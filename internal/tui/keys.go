@@ -341,7 +341,7 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 			return m, nil
 		}
 		mo := moments[m.at("moments", len(moments))]
-		detail := fmt.Sprintf("%s goes back to %s, %s. moin keeps a copy of it as it is now for 7 days, so you can undo this. The app stops for the swap and starts again.", mo.db, strings.ToLower(mo.Label[:1])+mo.Label[1:], mo.At.Local().Format("Jan 2 15:04"))
+		detail := fmt.Sprintf("%s goes back to %s, %s. moin keeps the data of now beside it, so you can undo this. The app stops for the switch and starts again.", mo.db, strings.ToLower(mo.Label[:1])+mo.Label[1:], mo.At.Local().Format("Jan 2 15:04"))
 		return m.askName("Restore "+mo.db+" of "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, mo.db, mo.ID, nil)), nil
 	case "t":
 		return m.input("Go back to a time", "in UTC, to the minute, like 14:01 or 2026-11-07 14:01", "", func(m model, v string) (model, tea.Cmd) {
@@ -350,7 +350,7 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 				m.say("Cannot read " + v + " as a time: use 14:01 or 2026-11-07 14:01, in UTC")
 				return m, nil
 			}
-			detail := fmt.Sprintf("The database goes back to %s UTC. moin keeps a copy of it as it is now for 7 days, so you can undo this. The app stops for the swap and starts again.", at.Format("Jan 2 15:04"))
+			detail := fmt.Sprintf("The database goes back to %s UTC: that minute with Every change, else the newest copy before it. moin keeps the data of now beside it, so you can undo this. The app stops for the switch and starts again.", at.Format("Jan 2 15:04"))
 			return m.askName("Restore "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, "", "", &at)), nil
 		}), nil
 	case "c":

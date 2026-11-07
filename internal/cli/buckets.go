@@ -210,7 +210,7 @@ func bucketsDefault(ctx context.Context, args []string, stdout io.Writer) error 
 	if err != nil {
 		return err
 	}
-	done(stdout, "%s is the default bucket now. Apps without a bucket of their own upload and back up there; their history starts again there.", changed.Name)
+	done(stdout, "%s is the default bucket now. Apps without a bucket of their own upload and back up there; their copies start again there.", changed.Name)
 	return nil
 }
 
@@ -275,7 +275,7 @@ func bucketsUse(ctx context.Context, args []string, stdout io.Writer) error {
 		to = "the default bucket"
 	}
 	done(stdout, "Uploads and backups of %s go to %s now.", app.Name, to)
-	fmt.Fprintf(stdout, "  The history starts again in the new bucket; what is in the old one stays there.\n")
+	fmt.Fprintf(stdout, "  The copies start again in the new bucket; what is in the old one stays there.\n")
 	return nil
 }
 

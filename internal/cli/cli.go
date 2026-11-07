@@ -24,7 +24,7 @@ import (
 )
 
 const usage = `moin: Deploy anything. Lose nothing.
-Your apps on your servers. Every change backed up. Every restore tested.
+Your apps on your servers. Backups on your schedule, checked every day.
 
 Usage
   moin                Open the terminal UI; without a login it signs you in through the browser first

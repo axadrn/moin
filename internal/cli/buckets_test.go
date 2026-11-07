@@ -58,7 +58,7 @@ func TestBuckets(t *testing.T) {
 	}
 
 	code, stdout, _ = runCLI(t, api, "buckets", "use", "client-a", "shop")
-	if code != 0 || !api.seen(`PUT /api/v1/apps/shop/bucket {"bucket":"client-a"}`) || !strings.Contains(stdout, "history starts again") {
+	if code != 0 || !api.seen(`PUT /api/v1/apps/shop/bucket {"bucket":"client-a"}`) || !strings.Contains(stdout, "copies start again") {
 		t.Errorf("use: code %d, stdout %q, requests %v", code, stdout, api.requests)
 	}
 	code, _, _ = runCLI(t, api, "buckets", "use", "--default", "--app", "shop")
