@@ -2,7 +2,7 @@
 title: "API"
 description: "The JSON API under /api/v1: every endpoint, by area"
 group: "Reference"
-order: 4
+order: 5
 ---
 
 The CLI, the terminal UI and your own scripts use this API; its OpenAPI 3.1 document is at [`/api/v1/openapi.yaml`](/api/v1/openapi.yaml).

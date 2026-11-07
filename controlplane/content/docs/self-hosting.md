@@ -2,10 +2,10 @@
 title: "Self-hosting"
 description: "Run all of moin yourself, free forever, the same product we host"
 group: "Start"
-order: 4
+order: 5
 ---
 
-All of moin is open source under AGPL-3.0, the control plane too. Run it on your own server and you get the product we host: every feature, unlimited servers, apps and teammates, no license key, no account with us.
+Self-hosting means you run the control plane yourself, on your own server, instead of using ours. All of moin is open source under AGPL-3.0, so you get the product we host: every feature, unlimited servers, apps and teammates, no license key, no account with us.
 
 ## One server
 

@@ -5,7 +5,7 @@ group: "Every day"
 order: 7
 ---
 
-When something breaks, the owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
+When something breaks, moin tells you: the owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
 
 ```text
 🔴 shop.example.com is down

@@ -2,10 +2,10 @@
 title: "Get started"
 description: "From a fresh server to a live app, in four steps"
 group: "Start"
-order: 1
+order: 2
 ---
 
-moin puts your apps on your own servers and keeps their data safe. It builds your repo, starts it with HTTPS, and backs up every change of its SQLite or Postgres database to your own bucket, with a restore checked every day. You drive it from the web, the `moin` CLI, the terminal UI, the API or an AI agent.
+moin puts your app on your own server and keeps its data safe. You type `moin deploy`, and a minute later your app is on the internet. New to the words? [moin in five words](/docs/moin-in-five-words).
 
 Install the CLI on your Mac or Linux computer:
 
@@ -25,7 +25,7 @@ Your browser opens with a code like `WDJB-MJHT`. Check it is the same as in the 
 
 ## 2. Add a server
 
-Any Linux server you can log in to as root, amd64 or arm64, at any provider.
+A server is your computer on the internet: any Linux server you can log in to as root, amd64 or arm64, at any provider.
 
 ```surfaces
 Web: **Servers**, **Add server**
@@ -41,11 +41,11 @@ Run the command it prints on the server, as root, within the hour:
 curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 ```
 
-It installs Docker if it is missing and starts the agent. `moin servers` shows the server `online`.
+It installs Docker if it is missing and starts the agent, the little helper that only calls out to moin. `moin servers` shows the server `online`.
 
 ## 3. Add your bucket
 
-Your code and your backups go to your own S3-compatible bucket, never to us: Cloudflare R2, AWS S3, Backblaze B2, Hetzner or Exoscale. Make a bucket and a key that may read, write and delete.
+Your bucket is your own box on the internet: your backups and uploads go there, never to us. Any S3-compatible one works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner or Exoscale. Make a bucket and a key that may read, write and delete.
 
 ```surfaces
 Web: **Settings**, **Bucket**, **Add bucket**
@@ -62,7 +62,7 @@ The CLI asks for the secret key. The endpoint starts with `https://`; for AWS S3
 
 ## 4. Deploy
 
-In the folder of your app:
+A deploy puts a new version of your app live. In the folder of your app:
 
 ```bash
 moin deploy
@@ -93,5 +93,6 @@ No Dockerfile needed: moin builds Node, Bun, Python, Ruby, PHP, Go and more, or 
 ## Next
 
 - [Why moin](/docs/why-moin): one binary, an agent that only dials out, restores that are checked.
+- [Palette and keys](/docs/reference/palette): `⌘K` finds everything.
 - [Catalog](/docs/guides/catalog): n8n, Umami, Open WebUI and more in one click.
 - [Backups](/docs/guides/backups) and [Security](/docs/guides/security).

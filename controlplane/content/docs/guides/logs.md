@@ -5,7 +5,7 @@ group: "Every day"
 order: 2
 ---
 
-The last lines your app printed, from every container of the app.
+Logs are what your app writes down while it runs: the last lines, from every container of the app.
 
 ## Read the logs
 

@@ -2,7 +2,7 @@
 title: "FAQ"
 description: "Common questions, short answers"
 group: "Reference"
-order: 5
+order: 6
 ---
 
 ## Does my server need open ports?

@@ -5,7 +5,7 @@ group: "Apps"
 order: 6
 ---
 
-Open source apps in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx. Pick one, a version and a server; a minute later it runs, its secrets generated and its database backed up like any app's.
+The catalog is the place with open source apps you install in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx. Pick one, a version and a server; a minute later it runs, its secrets generated and its database backed up like any app's.
 
 ## Install an app
 

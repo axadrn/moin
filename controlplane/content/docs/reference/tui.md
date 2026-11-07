@@ -2,10 +2,10 @@
 title: "Terminal UI"
 description: "Every view and key of moin without a command"
 group: "Reference"
-order: 3
+order: 4
 ---
 
-Run `moin` in a repo for the daily work: what runs, deploys, logs, rollbacks, backups and restores, env vars, domains, uptime, metrics and commands, all live. Setup you do once opens the web app; [Where things work](/docs/reference/surfaces) says which.
+The terminal UI is moin in your terminal: run `moin` in a repo for the daily work: what runs, deploys, logs, rollbacks, backups and restores, env vars, domains, uptime, metrics and commands, all live. Setup you do once opens the web app; [Where things work](/docs/reference/surfaces) says which.
 
 ## Start
 
@@ -34,7 +34,7 @@ Run `moin` in a repo for the daily work: what runs, deploys, logs, rollbacks, ba
 
 | Key | Does |
 | --- | --- |
-| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `shop logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs |
+| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `shop logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs. [Palette and keys](/docs/reference/palette) |
 | `esc` | back one level; closes what is open first |
 | `?` | every key of this place and the ones that work everywhere; `↑` `↓` scroll them on a small screen |
 | `q` | quits on the dashboard, goes back elsewhere |

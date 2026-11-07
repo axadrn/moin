@@ -5,7 +5,7 @@ group: "Apps"
 order: 2
 ---
 
-Every app answers with HTTPS right after its first deploy, at its instant address. Add your own domains when you are ready; HTTPS is always on.
+A domain is the name people type to reach your app, like `shop.example.com`. Every app gets one right after its first deploy, its instant address; add your own when you are ready. HTTPS is always on.
 
 ## Add a domain
 

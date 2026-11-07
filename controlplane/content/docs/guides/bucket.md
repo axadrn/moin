@@ -5,7 +5,7 @@ group: "Servers and data"
 order: 5
 ---
 
-You bring an S3-compatible bucket: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. Your code on its way to the server and your backups go there; moin stores neither and only signs short-lived links into it. One bucket serves every app. [How backups work](/docs/concepts/backups) shows what lives where.
+Your bucket is your own box on the internet, where your backups and uploads go. It is yours, not ours. Any S3-compatible bucket works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. Your code passes through it on its way to the server, and moin keeps none of it. One bucket serves every app. [How backups work](/docs/concepts/backups) shows what lives where.
 
 ## Add it
 
@@ -109,3 +109,7 @@ moin refuses a bucket that apps still use (the default is used by every app with
 - The `backups-to` [rule](/docs/guides/security#rules) of a server allows one bucket: an app on that server in another bucket is refused there.
 - Backing up an app to its own bucket needs a current agent; older agents back up every app to the default. [Agents update themselves](/docs/guides/servers#updates) unless you turned that off.
 - moin never deletes anything in a bucket you changed or removed, or of an app you removed. [How long things stay](/docs/concepts/backups#how-long-things-stay).
+
+## Under the hood
+
+- The control plane stores neither your code nor your backups; it only signs short-lived links into your bucket.

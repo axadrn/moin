@@ -5,7 +5,7 @@ group: "Team"
 order: 1
 ---
 
-Invite your team, and everyone works on the same servers and apps. Teams are free. Everything lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App, and its plan, so one subscription covers the whole team.
+Your team is the people who work with you: invite them, and everyone works on the same apps and servers. Teams are free. You all share one workspace, the space where everything lives: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key, the GitHub App and the plan, so one subscription covers the whole team.
 
 ```surfaces
 Web: **Settings**, **Team**

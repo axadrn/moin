@@ -5,7 +5,7 @@ group: "Team"
 order: 4
 ---
 
-The control plane is an MCP server at `/mcp`, so Claude, Cursor, VS Code and any MCP client can run moin: *"roll back my app and show me its logs"*. Almost every action is a tool; [Where things work](/docs/reference/surfaces) lists what stays in the web.
+MCP lets an AI agent such as Claude or Cursor use moin for you: *"roll back my app and show me its logs"*. The control plane is an MCP server at `/mcp`, so Claude, Cursor, VS Code and any MCP client can connect. Almost every action is a tool; [Where things work](/docs/reference/surfaces) lists what stays in the web.
 
 [Create an API token](/docs/guides/account#create-an-api-token), **Read and write** to change things or **Read only** to look, and put it where `pat_…` stands.
 

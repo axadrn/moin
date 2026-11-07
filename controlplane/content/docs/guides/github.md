@@ -5,7 +5,7 @@ group: "Apps"
 order: 4
 ---
 
-Connect GitHub once, link a repo to an app, and moin deploys any branch, tag or commit with no checkout on your machine, and every push if you like. The pull request shows a green check, the commit status **moin/deploy**, when the deploy is live.
+Connect GitHub, and moin takes your code straight from it: link a repo to an app once, then deploy any branch, tag or commit with no checkout on your machine, and every push if you like. The pull request shows a green check, the commit status **moin/deploy**, when the deploy is live.
 
 ## Connect GitHub
 

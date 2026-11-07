@@ -5,7 +5,7 @@ group: "Team"
 order: 3
 ---
 
-Your account lives under **Settings**, **Account**, and changes on the web. `moin login` logs your computer in through the browser; CI, scripts and agents use a personal API token.
+Your account is you in moin: your name, your email and how you sign in. It lives under **Settings**, **Account**, and changes on the web. `moin login` logs your computer in through the browser; CI, scripts and AI agents use a personal API token, a key of their own.
 
 ```bash
 moin login

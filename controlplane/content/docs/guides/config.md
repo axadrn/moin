@@ -5,7 +5,7 @@ group: "Apps"
 order: 7
 ---
 
-Everything moin needs to know about an app can live next to its code, in an `x-moin` block in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional.
+Your app's settings can live in your repo, next to the code, so they travel with it: an `x-moin` block in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional.
 
 ```yaml
 x-moin:

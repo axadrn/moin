@@ -43,7 +43,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Update a catalog app | ✓ | ✓ `update` | ✓ `U` | ✓ | ✓ |
 | Activity | ✓ | ✓ `activity` | ✓ | ✓ | ✓ |
 | Activity by app, server or person | ✓ | ✓ `--app`, `--server`, `--user` | Shows all of it: filter in the CLI or the web. | ✓ | ✓ |
-| Jump to anything | ✓ search, `⌘K` | Commands take the app by name. | ✓ palette: `space`, `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
+| Jump to anything | ✓ [palette](/docs/reference/palette), `⌘K` | Commands take the app by name. | ✓ palette: `space`, `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
 
 ## Setup
 

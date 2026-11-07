@@ -2,12 +2,14 @@
 title: "Why moin"
 description: "Small stack, an agent that only dials out, backups whose restores are checked"
 group: "Start"
-order: 2
+order: 3
 ---
 
-Three things make moin different: a small stack you can read, servers that keep no port open for it, and backups that are restored every day to prove they work.
+moin is small, it never lets anyone into your server, and it keeps your data safe. Four things make it different: a small stack you can read, an agent that only calls out, backups you can trust, and a keyboard that reaches everything.
 
 ## A small stack
+
+moin is two programs you can read, not a pile of tools.
 
 | Part | What it is |
 | --- | --- |
@@ -16,15 +18,11 @@ Three things make moin different: a small stack you can read, servers that keep 
 | Web | Server-rendered HTML with templ and htmx. Tailwind is built by its standalone binary: no Node, no npm tree. |
 | Database | SQLite, in a file next to the control plane. |
 
-The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the agent's connection, `x/term`, the AWS S3 SDK for your bucket, Litestream and a pure-Go SQLite for backups.
-
-Built for Linux the way a release builds it (`CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" ./cmd/moin`, Go 1.26.8), the binary is 25.8 MB for arm64 and 28.3 MB for amd64. Measured on November 7, 2026.
-
 All of it is open source under AGPL-3.0, in one repo: [github.com/axadrn/moin](https://github.com/axadrn/moin).
 
 ## The agent only dials out
 
-The agent opens one WebSocket connection from your server to the control plane and keeps it open. Nothing on the server listens for moin, so the server needs no open port for it, and moin holds no SSH key to it.
+The agent on your server calls moin; moin never calls your server. Nothing on the server waits for moin, so it needs no open port for it, and moin holds no SSH key to it.
 
 With the three switches of [Security](/docs/guides/security) on, the server can close almost everything:
 
@@ -53,7 +51,18 @@ In short: with SSH-based tools, whoever runs the tool holds a key that opens a s
 
 ## Backups whose restores are checked
 
-Every change of an app's SQLite or Postgres database goes to your own bucket: SQLite within about a second, Postgres within a minute. A full backup comes before every deploy, restore and data edit. Every day moin restores a backup into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
+moin writes down every change of your database for 7 days, so you can go back to any moment. It goes to your own bucket. A full backup comes before every deploy, restore and data edit. Every day moin restores a backup into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
+
+## Keyboard first
+
+One box finds everything: `⌘K` in the web, `space` in the terminal UI. Type a few letters, even with a typo, and press `enter`. `j` and `k` move through lists, `?` shows every key. [Palette and keys](/docs/reference/palette).
+
+## Under the hood
+
+- The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the agent's connection, `x/term`, the AWS S3 SDK for your bucket, Litestream and a pure-Go SQLite for backups.
+- Built for Linux the way a release builds it (`CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" ./cmd/moin`, Go 1.26.8), the binary is 25.8 MB for arm64 and 28.3 MB for amd64. Measured on November 7, 2026.
+- The agent's call is one WebSocket connection from your server to the control plane, kept open.
+- SQLite changes reach your bucket within about a second, Postgres changes within a minute.
 
 ## Next
 

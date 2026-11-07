@@ -2,18 +2,18 @@
 title: "How moin works"
 description: "The pieces, the words, where your code goes and what a deploy does"
 group: "Start"
-order: 3
+order: 4
 ---
 
-moin has two parts: the control plane you sign in to, and an agent on each of your servers. The agent dials out to the control plane and does the work on the server. Your code and your backups never live with the control plane.
+moin has two halves: the control plane is the place you sign in to, and the agent is the little helper on each of your servers that does the work. Your code and your backups never live with the control plane.
 
 ## The pieces
 
 | Piece | What it is |
 | --- | --- |
-| **control plane** | The moin web app and API. It keeps your servers, apps, deploys and env vars, and tells agents what to do. Open source; we host it, or you [host it yourself](/docs/self-hosting). |
-| **agent** | `moin agent` on each server, the `moin-agent` service. It opens one connection to the control plane and keeps it open. Nothing on your server listens for moin. |
-| **`moin`** | One binary, open source under AGPL-3.0. `moin` opens the terminal UI, `moin <command>` is the CLI, `moin agent` is the agent. |
+| **control plane** | The place you sign in to: the moin web app and API. It remembers your servers, apps and settings, and tells the agents what to do. We host it, or you [host it yourself](/docs/self-hosting). |
+| **agent** | The little helper on each server. It calls the control plane and keeps the line open; nothing on your server waits for calls. |
+| **`moin`** | The one program on your computer: `moin` opens the terminal UI, `moin <command>` is the CLI, `moin agent` is the agent. |
 
 The web, the CLI, the terminal UI, the [API](/docs/reference/api) and AI agents through [MCP](/docs/guides/mcp) do the same work. Your account and the roles of your team change only on the web. [Where things work](/docs/reference/surfaces) lists what each one does.
 
@@ -29,30 +29,51 @@ backups      web-1, web-2 ──▶ your bucket          (every change, plus ful
 
 ## The words
 
+The five that matter most are in [moin in five words](/docs/moin-in-five-words).
+
 | Word | Means |
 | --- | --- |
-| **control plane** | the moin web app and API every server reports to |
-| **workspace** | the space your apps, servers, bucket and team belong to. You get one when you sign up; on hosted moin you pay per workspace |
-| **team** | the people in a workspace. Members deploy and fix things; admins also invite people and change roles; the owner also pays and decides who else is an owner. [Team](/docs/guides/team#roles) |
-| **server** | a Linux machine you rent, for example at Hetzner, with the agent on it |
-| **agent** | the moin process on a server. It calls the control plane for its work; nothing on the server waits for calls |
-| **app** | one website or service, such as your shop. It lives on one server |
-| **service** | one container of an app's `compose.yml`, such as `web` or `db` |
-| **deploy** | one version of an app, numbered v1, v2, v3; also the verb |
-| **restart** | start the live deploy again, applying the changes that wait |
-| **domain** | a name the app answers on, such as `shop.example.com`, with HTTPS. Every app also gets an [instant address](/docs/guides/domains#instant-address) |
-| **env vars** | the settings and secrets of an app, stored encrypted, handed to the server with each deploy |
-| **bucket** | your own S3-compatible bucket, for example at Cloudflare R2. It carries your code on its way to the server and holds your backups. One per workspace, or one per client or region: each app picks one, the default serves the rest |
-| **backup** | a copy of an app's data in the bucket: every change continuously, plus a full backup before every deploy, restore and data change |
-| **restore** | puts the database back to a full backup, or to any second of the last 7 days |
-| **health check** | after a deploy, moin checks that the app starts and stays up, and can call a path of the app such as `/healthz` |
-| **API token** | a key for the CLI, scripts and AI agents. It belongs to one workspace and can read, or read and write |
-| **MCP** | the way AI agents such as Claude or Cursor use tools. moin offers almost every action as an MCP tool |
+| **control plane** | the place you sign in to; every server reports to it |
+| **workspace** | your own space: your apps, servers, bucket and team live in it. You get one when you sign up; on hosted moin you pay per workspace |
+| **team** | the people in a workspace. Members deploy and fix things, admins also invite people, the owner also pays. [Team](/docs/guides/team#roles) |
+| **server** | your computer on the internet: a Linux machine you rent, for example at Hetzner, with the agent on it |
+| **agent** | the little helper on a server. It only calls out to the control plane; it never lets anyone in |
+| **app** | the thing you made, such as your shop. It lives on one server |
+| **service** | one part of an app, such as its website or its database: one container of its `compose.yml` |
+| **deploy** | a new version of your app, put live: v1, v2, v3. Also the verb |
+| **restart** | starts the live deploy again, so the changes that wait take effect |
+| **domain** | the name people type to reach your app, such as `shop.example.com`, always with HTTPS. Every app also gets an [instant address](/docs/guides/domains#instant-address) |
+| **env vars** | the settings and secrets of an app, such as a password it needs, kept encrypted |
+| **bucket** | your own box on the internet, for example at Cloudflare R2: your backups and uploads go there, not to us |
+| **backup** | moin writes down every change of your database for 7 days, so you can go back to any moment |
+| **restore** | going back: the database as it was at the moment you pick |
+| **health check** | after a deploy, moin checks that the app starts and stays up |
+| **catalog** | the place with apps you install in one click, such as n8n or Umami |
+| **API token** | a key for the CLI, scripts and AI agents, for one workspace |
+| **MCP** | the way AI agents such as Claude or Cursor use moin; almost every action is a tool |
 | **activity** | who did what in your workspace, and when |
 
-Docker and Docker Compose run your app in containers on the server. You do not need to know them: for a `Dockerfile`, a Go module or a repo without either, moin writes the compose file for you.
+Your app runs in containers on the server, with Docker. You do not need to know Docker: for a `Dockerfile`, a Go module or a repo without either, moin writes the compose file for you.
 
-## Where builds run
+## Saving and restarting
+
+Saving a setting never restarts your app: the change waits for you. Env vars, domains and the password wait; the app page says how many ("2 changes waiting"). A restart starts the live deploy again with all of them, without a build. A deploy or a start applies them too. A change to a variable used as `${NAME}` in `compose.yml` takes a deploy.
+
+## Your data survives every deploy
+
+What your app saves stays when you deploy a new version, as long as it lives in a mounted folder.
+
+A volume is a folder on the server that a container sees, such as `./data` on the server shown as `/data` in the container.
+
+- A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/moin/apps/<app>/volumes/` and stays there across deploys.
+- Named volumes are kept as they are.
+- Files the repo brings, like a config file, belong to the deploy.
+
+Keep your database in a mounted folder. If your app keeps it somewhere other than `/data`, mount that folder in `compose.yml`, such as `./data:/app/data`; moin keeps it and backs up the SQLite files in it.
+
+## Under the hood
+
+### Where builds run
 
 Builds run on **your** server.
 
@@ -63,7 +84,7 @@ Builds run on **your** server.
 
 The control plane only relays messages. It never stores or runs your code.
 
-## How moin builds a repo
+### How moin builds a repo
 
 | The repo has | moin does |
 | --- | --- |
@@ -74,7 +95,7 @@ The control plane only relays messages. It never stores or runs your code.
 
 Railpack finds the language and its version from `package.json`, `requirements.txt`, `pyproject.toml`, `Gemfile`, `composer.json` and the like, and the start command from the `start` script, a `Procfile` or `main.py`. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets that never land in the image or a log. The agent downloads Railpack once, checked against its published checksum, and builds with Docker's own BuildKit.
 
-## What a deploy does
+### What a deploy does
 
 1. Downloads the code from your bucket, or the commit from GitHub, checks it and keeps it with the deploy.
 2. Reads the compose file with `docker compose config`, together with the [x-moin block](/docs/guides/config).
@@ -88,21 +109,7 @@ If the start or the health check fails, the last good deploy starts again and th
 
 The server keeps the deploys of the last 5 builds (of code or of an image) with their images, and every restart, start, domain change and rollback since the oldest of them. A rollback can go to any of those.
 
-## Saving and restarting
-
-Saving a setting never restarts an app. Changes to env vars, domains and the password wait; the app page says how many ("2 changes waiting"). A restart starts the live deploy again with all of them, without a build. A deploy or a start applies them too. A change to a variable used as `${NAME}` in `compose.yml` takes a deploy.
-
-## Your data survives every deploy
-
-A volume is a folder on the server that a container sees, such as `./data` on the server shown as `/data` in the container.
-
-- A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/moin/apps/<app>/volumes/` and stays there across deploys.
-- Named volumes are kept as they are.
-- Files the repo brings, like a config file, belong to the deploy.
-
-Keep your database in a mounted folder. If your app keeps it somewhere other than `/data`, mount that folder in `compose.yml`, such as `./data:/app/data`; moin keeps it and backs up the SQLite files in it.
-
-## How moin reads your database
+### How moin reads your database
 
 The [data browser](/docs/guides/data) reads the live database on the server; nothing is copied to the control plane.
 
@@ -113,10 +120,10 @@ The [data browser](/docs/guides/data) reads the live database on the server; not
 - WAL mode (`PRAGMA journal_mode=WAL`) lets your app and moin read and write SQLite at the same time.
 - The agent runs as root; after a change it gives the database files back to their owner.
 
-## How a command runs
+### How a command runs
 
 [Run a command](/docs/guides/exec) uses the connection the agent already has: no SSH and no key on your laptop. The agent runs `docker compose exec` in the live deploy, without a shell and without a terminal, and streams what it prints back.
 
-## The catalog
+### The catalog
 
 Each [catalog](/docs/guides/catalog) app is a folder in the moin repo, `controlplane/content/catalog/<app>`: an `app.md` with what it is, and a `compose.yml` that runs the image with `${VERSION}` as its tag and every secret as `${NAME}`. moin reads the image registry of each app once an hour. A self-hosted control plane ships the same catalog and asks the registries itself; nothing goes through us.
