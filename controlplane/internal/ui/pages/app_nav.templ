@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"fmt"
+
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -28,60 +30,158 @@ func appKind(app model.App) status.Kind {
 var appSections = []struct{ ID, Label, Path, Key string }{
 	{"app", "App", "", ""},
 	{"deploys", "Deploys", "/deploys", "d"},
-	{"addresses", "Addresses", "/addresses", "o"},
+	{"addresses", "Domains", "/addresses", "o"},
 	{"logs", "Logs", "/logs", "l"},
 	{"data", "Data", "/data", "b"},
 	{"settings", "Settings", "/settings", "e"},
 }
 
+// appSectionLabel is the name of a section, for the head on a phone.
+func appSectionLabel(id string) string {
+	for _, s := range appSections {
+		if s.ID == id {
+			return s.Label
+		}
+	}
+	return "App"
+}
+
 // appHeader is the head of every section of an app, the same on each, so
-// it stands still while you go through the tabs: its name, the pin, its
-// state as plain words, and its buttons, all of one height: pin, stop or
-// start, deploy.
+// it stands still while you go through the tabs: the way back, the name,
+// its buttons (Restart or Start, Deploy), and under them its state, the one
+// answer of the page: under the name, before the buttons on a phone, under
+// both from sm. On a phone a section other than App is a page of its
+// own: "‹ shop" and the section's name, like a list that drills down.
 templ appHeader(app model.App, section string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	@kit.Header(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, app.Name) {
-		@appSummary(app)
-		<div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-			@PinButton(app)
-			@appPower(app)
-			@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true, "title": "Build the newest source again"}) {
-				Deploy
-			}
+	if section != "app" {
+		<div class="sm:hidden">
+			@kit.Header(kit.Back{Label: app.Name, Href: appPath}, appSectionLabel(section))
 		</div>
 	}
+	<div class={ templ.KV("hidden sm:block", section != "app") }>
+		@kit.Header(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, app.Name) {
+			@appStateLine(app)
+			@appActions(app)
+		}
+	</div>
+}
+
+// appActions are the buttons of an app: Start when it is stopped, else
+// Restart once it runs, and Deploy once it has a deploy. When saved changes
+// wait, Restart is the thing to do, so it is the primary one. Two equal
+// halves on a phone, next to the name from sm.
+templ appActions(app model.App) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	<div id="app-actions" hx-swap-oob="true" class="grid w-full auto-cols-fr grid-flow-col gap-2 empty:hidden sm:ml-auto sm:flex sm:w-auto">
+		if app.Stopped {
+			@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/start", "hx-swap": "none", "hx-disable": "this", "data-start": true}) {
+				Start
+			}
+		} else if app.LiveNumber > 0 {
+			@kit.Button(restartKind(app), "", templ.Attributes{"hx-post": appPath + "/restart", "hx-swap": "none", "hx-disable": "this", "data-restart": true}) {
+				Restart
+			}
+		}
+		if app.LatestNumber > 0 && !app.Stopped {
+			@kit.Button(deployKind(app), "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true}) {
+				Deploy
+			}
+		}
+	</div>
+}
+
+func restartKind(app model.App) kit.Kind {
+	if app.ChangesWaiting > 0 {
+		return kit.Primary
+	}
+	return kit.Secondary
+}
+
+func deployKind(app model.App) kit.Kind {
+	if app.ChangesWaiting > 0 {
+		return kit.Secondary
+	}
+	return kit.Primary
+}
+
+// appStateLine is the answer of an app's page in one line: does it run, and
+// what waits for a restart.
+templ appStateLine(app model.App) {
+	<p id="app-state" hx-swap-oob="true" class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium sm:order-last" data-status>
+		@status.Symbol(appStateKind(app))
+		<span>{ appStateWords(app) }</span>
+		if app.ChangesWaiting > 0 {
+			<span class="text-muted-foreground">·</span>
+			<span class="text-muted-foreground" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
+		}
+	</p>
+}
+
+func appStateKind(app model.App) status.Kind {
+	if app.Stopped {
+		return status.KindIdle
+	}
+	return appKind(app)
+}
+
+func appStateWords(app model.App) string {
+	switch {
+	case app.LatestNumber == 0:
+		return "Not deployed yet"
+	case app.LatestStatus == model.DeployRunning:
+		return fmt.Sprintf("Deploying v%d", app.LatestNumber)
+	case app.Stopped:
+		return fmt.Sprintf("Stopped · v%d", app.LiveNumber)
+	case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
+		return fmt.Sprintf("v%d failed · v%d still live", app.LatestNumber, app.LiveNumber)
+	case app.LatestStatus == model.DeployFailed:
+		return fmt.Sprintf("v%d failed", app.LatestNumber)
+	}
+	return fmt.Sprintf("Live · v%d", app.LiveNumber)
+}
+
+func changesWaiting(n int) string {
+	if n == 1 {
+		return "1 change waiting"
+	}
+	return fmt.Sprintf("%d changes waiting", n)
 }
 
 // appTabs are the sections of an app as a segmented control, each a link
-// to its page.
+// to its page. Only from sm: a phone gets the list on the App section.
 templ appTabs(appName, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
 	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
 	for _, s := range appSections {
 		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
 	}
-	@kit.Segmented("app-tabs", appName, segments)
+	<div class="hidden sm:block">
+		@kit.Segmented("app-tabs", appName, segments)
+	</div>
 }
 
-// appSection is the tabs, then what the open section shows.
+// appSection is the tabs, then what the open section shows. A part that
+// reloads on the app's events keeps the head live on every section.
 templ appSection(appName, section string) {
 	<div id="app-section" class="flex flex-col gap-6">
 		@appTabs(appName, section)
+		if section != "deploys" {
+			// The Deploys section reloads through its list (appDeploys).
+			<div hidden hx-get={ ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/detail?in=" + section } hx-trigger="apps from:body" hx-swap="none"></div>
+		}
 		{ children... }
 	</div>
 }
 
-// PinButton pins an app above the others that run fine, in every list:
-// a real checkbox drawn as a kit button that says Pin, and Pinned once
-// checked. Both words sit in one grid cell, so it keeps its size. htmx
-// saves it without swapping anything (DESIGN.md, Feedback).
-templ PinButton(app model.App) {
-	<form id="pin-form" class="contents" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin" } hx-trigger="change" hx-swap="none">
+// PinSwitch pins an app above the others that run fine, in every list: a
+// switch in the app's settings that saves itself (DESIGN.md, Feedback).
+templ PinSwitch(app model.App) {
+	<form id="pin-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin" } hx-trigger="change" hx-swap="none">
 		@csrf.Token()
-		<label class="relative grid h-11 shrink-0 cursor-pointer place-items-center rounded-full bg-muted px-5 text-sm font-medium whitespace-nowrap text-foreground hover:bg-muted/70 has-focus-visible:ring-3 has-focus-visible:ring-ring/30">
-			<input type="checkbox" name="on" value="1" checked?={ app.Pinned } autocomplete="off" class="peer sr-only" aria-label={ "Pin " + app.Name } data-pin/>
-			<span class="col-start-1 row-start-1 peer-checked:invisible">Pin</span>
-			<span class="invisible col-start-1 row-start-1 peer-checked:visible">Pinned</span>
+		<label class="relative flex min-h-16 cursor-pointer items-center gap-3 px-5 py-3">
+			<span class="flex-1 font-medium">Pin to the top</span>
+			@kit.Switch(templ.Attributes{"name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
 		</label>
 	</form>
 }

@@ -56,9 +56,9 @@ func (h *AppsHandler) NewPage(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.NewApp(servers))
 }
 
-// SetPinned pins or unpins the app (the checkbox on=1). The star already
-// shows the change, so a save answers nothing; a failed one puts the star
-// back as stored.
+// SetPinned pins or unpins the app (the switch on=1). The switch already
+// shows the change, so a save answers nothing; a failed one flips it back
+// as stored.
 func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	_, err := h.apps.SetPinned(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
 	if err == nil {
@@ -73,7 +73,7 @@ func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Retarget", "#pin-form")
 	w.Header().Set("HX-Reswap", "outerHTML")
 	answerError(w, r, "Pin not changed", errorMessage(err))
-	render(w, r, pages.PinButton(*stored))
+	render(w, r, pages.PinSwitch(*stored))
 }
 
 // Create adds an app and answers the reset form. The event stream reloads the table.
@@ -152,7 +152,7 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	selected, _ := strconv.Atoi(r.URL.Query().Get("n"))
 	shown, err := strconv.Atoi(r.URL.Query().Get("shown"))
 	follow := selected == 0 && err == nil
-	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber), selected, follow, shown))
+	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber), selected, follow, shown, r.URL.Query().Get("in")))
 }
 
 // Rollback starts the release of an earlier deploy again. The page follows

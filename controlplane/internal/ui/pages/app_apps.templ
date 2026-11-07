@@ -117,40 +117,6 @@ func serverOptions(servers []model.Server) []kit.Option {
 	return options
 }
 
-// appStatus is the chip of an app: its newest deploy, and the live one when
-// the newest failed.
-templ appStatus(app model.App) {
-	<span data-status class="inline-flex min-w-0 flex-wrap items-center gap-2">
-		switch  {
-			case app.LatestNumber == 0:
-				@status.Status(status.Props{Kind: status.KindIdle}) {
-					new
-				}
-			case app.LatestStatus == model.DeployRunning:
-				@status.Status(status.Props{Kind: status.KindRunning}) {
-					{ fmt.Sprintf("deploying v%d", app.LatestNumber) }
-				}
-			case app.Stopped:
-				@status.Status(status.Props{Kind: status.KindIdle}) {
-					{ fmt.Sprintf("stopped v%d", app.LiveNumber) }
-				}
-			case app.LatestStatus == model.DeployFailed && app.LiveNumber > 0:
-				@status.Status(status.Props{Kind: status.KindFailed}) {
-					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
-				}
-				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("v%d live", app.LiveNumber) }</span>
-			case app.LatestStatus == model.DeployFailed:
-				@status.Status(status.Props{Kind: status.KindFailed}) {
-					{ fmt.Sprintf("v%d failed", app.LatestNumber) }
-				}
-			default:
-				@status.Status(status.Props{Kind: status.KindLive}) {
-					{ fmt.Sprintf("live v%d", app.LiveNumber) }
-				}
-		}
-	</span>
-}
-
 func plural(n int, one, many string) string {
 	if n == 1 {
 		return "1 " + one
@@ -207,44 +173,75 @@ templ AppPage(view AppPageView) {
 	}
 }
 
-// appHomeSection answers "does it run?" with facts: what runs since when,
-// where it is reached, and how it does. The tabs above lead on; nothing here
-// repeats them.
+// appHomeSection answers "does it run?": the head says it; under it where
+// the app is reached and how it does. On a phone it lists the sections
+// first, each with what it holds, like a Settings page that drills down.
 templ appHomeSection(view AppPageView) {
-	{{ app, deploys := view.App, view.Deploys }}
+	{{ app := view.App }}
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	if view.Catalog != nil {
 		@CatalogUpdate(*view.Catalog)
 	}
-	@kit.Section("Runs", nil) {
+	<div class="sm:hidden">
 		@kit.List() {
-			@kit.Row("") {
-				@kit.RowText(appLiveLine(app), appLastDeployLine(deploys))
-			}
-		}
-	}
-	@kit.Section("Addresses", nil) {
-		@kit.List() {
-			for _, address := range appAddresses(app) {
-				@kit.Row("") {
-					<a href={ templ.SafeURL("https://" + address) } target="_blank" rel="noopener" class="min-w-0 flex-1 truncate font-medium hover:underline hover:underline-offset-4">{ address }</a>
+			for _, section := range appSections[1:] {
+				@kit.Row(appPath + section.Path) {
+					@kit.RowText(section.Label, "")
+					<span class="truncate text-sm text-muted-foreground">{ appSectionValue(app, view.Deploys, section.ID) }</span>
 				}
 			}
-			if len(appAddresses(app)) == 0 {
-				@kit.Row("") {
-					@kit.RowText("No address yet", "")
-					@kit.Button(kit.Secondary, appPath+"/addresses", nil) {
-						Add a domain
+		}
+	</div>
+	<div class="hidden sm:block">
+		@kit.Section("Domains", nil) {
+			@kit.List() {
+				for _, address := range appAddresses(app) {
+					@kit.Row("") {
+						<a href={ templ.SafeURL("https://" + address) } target="_blank" rel="noopener" class="min-w-0 flex-1 truncate font-medium hover:underline hover:underline-offset-4">{ address }</a>
+					}
+				}
+				if len(appAddresses(app)) == 0 {
+					@kit.Row("") {
+						@kit.RowText("No domain yet", "")
+						@kit.Button(kit.Secondary, appPath+"/addresses", nil) {
+							Add a domain
+						}
 					}
 				}
 			}
 		}
-	}
+	</div>
 	@kit.List() {
 		@kit.Row(appPath + "/metrics") {
-			@kit.RowText("Metrics", "CPU, memory and network")
+			@kit.RowText("Metrics", "")
 		}
 	}
+}
+
+// appSectionValue is what a section holds, in a word, for the list on a
+// phone.
+func appSectionValue(app model.App, deploys []api.Deploy, id string) string {
+	switch id {
+	case "deploys":
+		if len(deploys) == 0 {
+			return "none yet"
+		}
+		return fmt.Sprintf("%d", len(deploys))
+	case "addresses":
+		addresses := appAddresses(app)
+		if len(addresses) == 0 {
+			return "none yet"
+		}
+		if len(addresses) > 1 {
+			return fmt.Sprintf("%s +%d", addresses[0], len(addresses)-1)
+		}
+		return addresses[0]
+	case "settings":
+		if app.ChangesWaiting > 0 {
+			return changesWaiting(app.ChangesWaiting)
+		}
+	}
+	return ""
 }
 
 // appAddresses are where the app answers: its domains, then its instant
@@ -294,28 +291,38 @@ templ appLogsSection(app model.App, deploys []api.Deploy) {
 	@appExec(app, deploys)
 }
 
-// appSettingsSection answers "how is it set up?": its env and the way out.
+// appSettingsSection answers "how is it set up?": its env, the pin, and at
+// the end what stops or removes it.
 templ appSettingsSection(app model.App, envKeys []string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
 	@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Body: panelBodyRows}) {
 		@AppEnv(app.Name, envKeys, nil)
 	}
-	@kit.Card("Remove "+app.Name, nil) {
-		@kit.Quiet() {
-			Its containers stop and go. Its data stays on the server.
-		}
-		<div>
-			@kit.Button(kit.Danger, "", templ.Attributes{
-				"hx-delete":         appPath,
-				"hx-swap":           "none",
-				"hx-disable":        "this",
-				"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
-				"data-confirm-name": app.Name,
-				"data-remove-app":   true,
+	@kit.List() {
+		@PinSwitch(app)
+	}
+	@kit.List() {
+		if app.LiveNumber > 0 && !app.Stopped {
+			@kit.RowButton(true, templ.Attributes{
+				"hx-post":    appPath + "/stop",
+				"hx-swap":    "none",
+				"hx-disable": "this",
+				"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
+				"data-stop":  true,
 			}) {
-				Remove app
+				<span class="font-medium">Stop { app.Name }</span>
 			}
-		</div>
+		}
+		@kit.RowButton(true, templ.Attributes{
+			"hx-delete":         appPath,
+			"hx-swap":           "none",
+			"hx-disable":        "this",
+			"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
+			"data-confirm-name": app.Name,
+			"data-remove-app":   true,
+		}) {
+			<span class="font-medium">Remove { app.Name }</span>
+		}
 	}
 }
 
@@ -342,51 +349,20 @@ templ loadLogsButton(appPath string) {
 	}
 }
 
-// AppDetail is the status, the facts and the deploys of an app. The page
-// reloads it on every change the app event stream reports, and follows a
-// running deploy.
-templ AppDetail(app model.App, deploys []api.Deploy, selected int, follow bool, shown int) {
-	@appSummary(app)
-	@appPower(app)
-	@appFacts(app, deploys)
-	@appDeploys(app, deploys, selected, follow)
-	// Following the newest deploy, a new one takes the log.
-	if follow && len(deploys) > 0 && deploys[0].Number != shown {
-		@DeployLogPanel(app, &deploys[0], true, true)
-	}
-}
-
-// appPower stops a running app or starts a stopped one.
-templ appPower(app model.App) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<span id="app-power" hx-swap-oob="true" class="contents">
-		if app.Stopped {
-			@kit.Button(kit.Secondary, "", templ.Attributes{
-				"hx-post":    basePath + "/apps/" + app.Name + "/start",
-				"hx-swap":    "none",
-				"hx-disable": "this",
-				"title":      "Run the app again with the env and domains as they are now",
-			}) {
-				Start
-			}
-		} else if app.LiveNumber > 0 {
-			@kit.Button(kit.Secondary, "", templ.Attributes{
-				"hx-post":    basePath + "/apps/" + app.Name + "/stop",
-				"hx-swap":    "none",
-				"hx-disable": "this",
-				"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
-			}) {
-				Stop
-			}
+// AppDetail is the state and the buttons of an app, for the reload on every
+// change the app event stream reports. On the Deploys section (in empty) it
+// brings the facts and the deploys too, and follows a running deploy.
+templ AppDetail(app model.App, deploys []api.Deploy, selected int, follow bool, shown int, in string) {
+	@appStateLine(app)
+	@appActions(app)
+	if in == "" || in == "deploys" {
+		@appFacts(app, deploys)
+		@appDeploys(app, deploys, selected, follow)
+		// Following the newest deploy, a new one takes the log.
+		if follow && len(deploys) > 0 && deploys[0].Number != shown {
+			@DeployLogPanel(app, &deploys[0], true, true)
 		}
-	</span>
-}
-
-// appSummary is the status chip next to the app name.
-templ appSummary(app model.App) {
-	<div id="app-summary" hx-swap-oob="true" class="flex items-center">
-		@appStatus(app)
-	</div>
+	}
 }
 
 // appFacts is what runs, in numbers: the live version, how long the last
