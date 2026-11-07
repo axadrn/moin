@@ -1,7 +1,7 @@
 package tui
 
-// The small layers over a view: a line to type into, a question to answer
-// and the restore dialog.
+// The small layers over a view: a line to type into and a question to
+// answer.
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/moin/protocol"
 )
 
 // prompt asks for one line.
@@ -28,16 +27,6 @@ type confirm struct {
 	danger              bool
 	name, typed         string
 	run                 tea.Cmd
-}
-
-// restore picks a database and a point in time to restore it to.
-type restore struct {
-	app    string
-	dbs    []protocol.DatabaseBackup
-	db     int
-	at     time.Time
-	typing bool
-	typed  string
 }
 
 // edit applies a key to a line of text; ok is false when the key is not
@@ -136,96 +125,6 @@ func (m model) promptKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if p.live != nil {
 		m = p.live(m, value)
 	}
-	return m, nil
-}
-
-// openRestore opens the point in time dialog on the databases that keep
-// a window.
-func (m model) openRestore() model {
-	b := m.app.backups
-	if b == nil {
-		m.say("The backups are still loading")
-		return m
-	}
-	var dbs []protocol.DatabaseBackup
-	for _, d := range b.Databases {
-		if d.Since != nil {
-			dbs = append(dbs, d)
-		}
-	}
-	if len(dbs) == 0 {
-		m.say("No database of " + m.app.name + " keeps a point in time window yet. Restore a snapshot with enter")
-		return m
-	}
-	m.restore = &restore{app: m.app.name, dbs: dbs, at: m.now().Add(-time.Hour).Truncate(time.Minute)}
-	m.restore.clamp(m.now())
-	return m
-}
-
-// window is the first and last moment the database can go back to.
-func (r *restore) window(now time.Time) (time.Time, time.Time) {
-	d := r.dbs[r.db]
-	end := now
-	if d.ReplicatedAt != nil {
-		end = *d.ReplicatedAt
-	}
-	return *d.Since, end
-}
-
-func (r *restore) clamp(now time.Time) {
-	from, to := r.window(now)
-	if r.at.Before(from) {
-		r.at = from
-	}
-	if r.at.After(to) {
-		r.at = to
-	}
-}
-
-func (m model) restoreKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	r := *m.restore
-	s := k.String()
-	if r.typing {
-		switch s {
-		case "esc":
-			r.typing, r.typed = false, ""
-		case "enter":
-			if r.typed == r.app {
-				at := r.at
-				m.restore = nil
-				return m, m.restoreCmd(r.app, r.dbs[r.db].Database, "", "", &at)
-			}
-		default:
-			r.typed, _ = edit(r.typed, k)
-		}
-		m.restore = &r
-		return m, nil
-	}
-	step := map[string]time.Duration{
-		"left": -time.Hour, "h": -time.Hour, "right": time.Hour, "l": time.Hour,
-		"shift+left": -24 * time.Hour, "H": -24 * time.Hour, "shift+right": 24 * time.Hour, "L": 24 * time.Hour,
-		"down": -time.Minute, "j": -time.Minute, "up": time.Minute, "k": time.Minute,
-		"[": -10 * time.Minute, "]": 10 * time.Minute,
-	}
-	switch s {
-	case "esc", "q":
-		m.restore = nil
-		return m, nil
-	case "tab":
-		r.db = (r.db + 1) % len(r.dbs)
-	case "enter":
-		r.typing = true
-	case "end", "G":
-		_, r.at = r.window(m.now())
-	case "home", "g":
-		r.at, _ = r.window(m.now())
-	default:
-		if d, ok := step[s]; ok {
-			r.at = r.at.Add(d)
-		}
-	}
-	r.clamp(m.now())
-	m.restore = &r
 	return m, nil
 }
 

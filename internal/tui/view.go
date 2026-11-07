@@ -55,10 +55,6 @@ func (m model) render() string {
 		pw := min(68, w-8)
 		pop := m.confirmView(f, pw)
 		body = overlay(body, pop, (w-pw)/2, max(1, (bh-len(lines(pop)))/2))
-	case m.restore != nil:
-		pw := min(76, w-8)
-		pop := m.restoreView(f, pw)
-		body = overlay(body, pop, (w-pw)/2, max(1, (bh-len(lines(pop)))/2))
 	case m.prompt != nil:
 		pw := min(76, w-8)
 		pop := m.promptView(f, pw)
@@ -83,7 +79,7 @@ func (m model) render() string {
 
 // layered is whether a layer sits over the view.
 func (m model) layered() bool {
-	return m.ask != nil || m.restore != nil || m.prompt != nil || m.pick != nil || m.help
+	return m.ask != nil || m.prompt != nil || m.pick != nil || m.help
 }
 
 func (m model) crumbs() []string {
@@ -179,8 +175,6 @@ func (m model) viewKeys() []kb {
 		return []kb{{"type", "the name"}, {"enter", "confirm"}, {"esc", "cancel"}}
 	case m.ask != nil:
 		return []kb{{"y", m.ask.verb}, {"esc", "cancel"}}
-	case m.restore != nil:
-		return []kb{{"←→", "hour"}, {"H L", "day"}, {"↑↓", "minute"}, {"enter", "restore"}, {"esc", "cancel"}}
 	case m.prompt != nil:
 		return []kb{{"enter", "save"}, {"esc", "cancel"}}
 	case m.help:
@@ -202,7 +196,7 @@ func (m model) viewKeys() []kb {
 			}
 			ks = append(ks, kb{"/", "filter"}, kb{"p", p}, kb{"G", "follow"})
 		case tBackups:
-			ks = append(ks, kb{"N", "back up now"}, kb{"enter", "restore"}, kb{"t", "point in time"})
+			ks = append(ks, kb{"enter", "go back"}, kb{"t", "a time"}, kb{"c", "download a copy"})
 		case tEnv:
 			v := "show values"
 			if m.shown {
@@ -371,64 +365,4 @@ func (m model) promptView(u ui, w int) string {
 	value := u.strong(p.value) + u.strong("▏")
 	body := []string{u.muted(truncate(p.hint, iw)), "", u.strong("›") + " " + truncate(value, iw-2), "", u.keys(kb{"enter", "save"}, kb{"esc", "cancel"})}
 	return u.floating(u.panel(p.title, "", body, w, len(body)+chrome, true), w)
-}
-
-func (m model) restoreView(u ui, w int) string {
-	r := m.restore
-	iw := inner(w)
-	now := m.now()
-	from, to := r.window(now)
-	bar := iw - 2
-	total := to.Sub(from)
-	pos := bar - 1
-	if total > 0 {
-		pos = int(float64(r.at.Sub(from)) / float64(total) * float64(bar-1))
-	}
-	var b strings.Builder
-	for i := range bar {
-		switch {
-		case i == pos:
-			b.WriteString(u.strong("┃"))
-		case bar >= 12 && i%(bar/6) == 0:
-			b.WriteString(u.faint("┆"))
-		default:
-			b.WriteString(u.fg(u.p.Line, "─"))
-		}
-	}
-	var dbs []string
-	for i, d := range r.dbs {
-		if i == r.db {
-			dbs = append(dbs, u.strong(d.Database))
-		} else {
-			dbs = append(dbs, u.muted(d.Database))
-		}
-	}
-	dbLine := strings.Join(dbs, u.faint("  ·  "))
-	if len(r.dbs) > 1 {
-		dbLine += u.faint("   tab switches")
-	}
-	var body []string
-	for _, l := range wrap("Pick a moment. The app stops for the swap and starts again with the database as it was then.", iw) {
-		body = append(body, u.muted(l))
-	}
-	body = append(body,
-		"",
-		" "+b.String(),
-		" "+spread(u.faint(from.Local().Format("Jan 2 15:04")), u.faint(ago(to, now)), bar),
-		"",
-		spread(u.muted("database"), dbLine, iw),
-		spread(u.muted("restore to"), u.strong(r.at.Local().Format("Mon Jan 2 · 15:04:05")), iw),
-		spread(u.muted(""), u.faint(ago(r.at, now)), iw),
-		"",
-	)
-	if r.typing {
-		typed := u.strong(r.typed) + u.strong("▏")
-		if r.typed == "" {
-			typed = u.strong("▏") + u.faint(r.app)
-		}
-		body = append(body, u.muted("Type ")+u.text(r.app)+u.muted(" to restore. This cannot be undone."), u.strong("›")+" "+typed)
-	} else {
-		body = append(body, u.keys(kb{"←→", "hour"}, kb{"H L", "day"}, kb{"↑↓", "minute"}, kb{"enter", "restore"}, kb{"esc", "cancel"}))
-	}
-	return u.floating(u.panel("Restore "+r.app+" to a point in time", "", body, w, len(body)+chrome, true), w)
 }

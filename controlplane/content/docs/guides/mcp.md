@@ -77,16 +77,15 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
-| `get_backups` | full backups, the point-in-time window, restore drills | read |
-| `back_up_app` | takes a full backup now | write |
-| `restore_app` | restores a full backup or a point in time; `bucket` names an older bucket the backup is in; `confirm` is the app's name | write, destructive |
-| `set_backup_settings` | a full backup before every change | write |
+| `get_backups` | how each database is backed up, the daily check, and the moments to go back to | read |
+| `restore_app` | goes back to a moment (`moment`, its id or label) or a time (`at`), to the minute; keeps a copy first, so it can be undone; `confirm` is the app's name | write, destructive |
+| `download_backup` | a full copy of a database in the app's own bucket; call again with `id` until `state` is `ready`, then `link` works for 15 minutes | write |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each | read |
 | `add_bucket` | adds a bucket; the first is the default | write |
 | `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
 | `set_default_bucket` | makes a bucket the default | write |
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
-| `set_app_bucket` | moves an app's uploads and new backups to a bucket; older backups stay | write |
+| `set_app_bucket` | moves an app's uploads and backups to a bucket; the history starts again there | write |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
 | `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |

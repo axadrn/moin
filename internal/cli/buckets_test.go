@@ -44,7 +44,7 @@ func TestBuckets(t *testing.T) {
 	}
 
 	code, stdout, _ = runCLI(t, api, "buckets")
-	if code != 0 || !strings.Contains(stdout, "main (default)") || !strings.Contains(stdout, "older backups of shop") || !strings.Contains(stdout, "client-a") {
+	if code != 0 || !strings.Contains(stdout, "main (default)") || !strings.Contains(stdout, "left by shop") || !strings.Contains(stdout, "client-a") {
 		t.Errorf("list: code %d, stdout %q", code, stdout)
 	}
 
@@ -58,7 +58,7 @@ func TestBuckets(t *testing.T) {
 	}
 
 	code, stdout, _ = runCLI(t, api, "buckets", "use", "client-a", "shop")
-	if code != 0 || !api.seen(`PUT /api/v1/apps/shop/bucket {"bucket":"client-a"}`) || !strings.Contains(stdout, "Older backups stay") {
+	if code != 0 || !api.seen(`PUT /api/v1/apps/shop/bucket {"bucket":"client-a"}`) || !strings.Contains(stdout, "history starts again") {
 		t.Errorf("use: code %d, stdout %q, requests %v", code, stdout, api.requests)
 	}
 	code, _, _ = runCLI(t, api, "buckets", "use", "--default", "--app", "shop")
@@ -66,9 +66,13 @@ func TestBuckets(t *testing.T) {
 		t.Errorf("use --default: code %d, requests %v", code, api.requests)
 	}
 
-	code, _, stderr = runCLI(t, api, "restore", "--app", "shop", "20261031T140200Z-manual", "--bucket", "main", "--yes")
-	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restore {"bucket":"main","database":"","snapshot":"20261031T140200Z-manual"}`) {
-		t.Errorf("restore from an older bucket: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "Before v12", "--yes")
+	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restore {"database":"","moment":"Before v12"}`) {
+		t.Errorf("restore to a moment: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+	code, _, stderr = runCLI(t, api, "restore", "--app", "shop", "--to", "2026-11-07 14:01", "--db", "/data/app.db", "--yes")
+	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restore {"at":"2026-11-07T14:01:00Z","database":"/data/app.db"}`) {
+		t.Errorf("restore to a time: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 
 	// A bucket in use says so and changes nothing else.

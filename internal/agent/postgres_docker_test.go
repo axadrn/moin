@@ -198,20 +198,4 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 	if _, err := query(`SELECT * FROM names`, nil, false); err != nil {
 		t.Errorf("the view did not come back: %v", err)
 	}
-
-	// The drill restores the dump into a throwaway container and counts.
-	if err := a.pgDrill(ctx, image, file.Name()); err != nil {
-		t.Fatalf("drill: %v", err)
-	}
-	broken := file.Name() + ".broken"
-	if err := os.WriteFile(broken, []byte("not a dump"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.pgDrill(ctx, image, broken); err == nil {
-		t.Error("a broken dump passed the drill")
-	}
-	left, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=moin.drill=true").Output()
-	if strings.TrimSpace(string(left)) != "" {
-		t.Errorf("drill containers left behind: %s", left)
-	}
 }

@@ -79,7 +79,7 @@ func buckets(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			}
 			apps := strings.Join(item.Apps, ", ")
 			if len(item.OlderBackups) > 0 {
-				apps = strings.TrimPrefix(apps+"; older backups of "+strings.Join(item.OlderBackups, ", "), "; ")
+				apps = strings.TrimPrefix(apps+"; left by "+strings.Join(item.OlderBackups, ", "), "; ")
 			}
 			rows = append(rows, []string{name, item.Bucket, item.Folder, orAWS(item.Endpoint), item.AccessKey, dash(apps)})
 		}
@@ -159,7 +159,7 @@ func buckets(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			return err
 		}
 		if command == "default" {
-			done(stdout, "%s is the default bucket now. Apps without a bucket of their own upload and back up there; their older backups stay in the old default.", changed.Name)
+			done(stdout, "%s is the default bucket now. Apps without a bucket of their own upload and back up there; their history starts again there.", changed.Name)
 			return nil
 		}
 		done(stdout, "Saved %s.", changed.Name)
@@ -201,8 +201,8 @@ func buckets(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if to == "" {
 			to = "the default bucket"
 		}
-		done(stdout, "Uploads and new backups of %s go to %s now.", app.Name, to)
-		fmt.Fprintf(stdout, "  Older backups stay in the bucket they are in; %s backups lists them and %s restore reads them from there.\n", build.Name, build.Name)
+		done(stdout, "Uploads and backups of %s go to %s now.", app.Name, to)
+		fmt.Fprintf(stdout, "  The history starts again in the new bucket; what is in the old one stays there.\n")
 		return nil
 	}
 	return nil

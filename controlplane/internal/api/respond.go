@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 // ErrorBody is the envelope of every non-2xx JSON response.
@@ -84,6 +85,10 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	var sendErr *service.AlertSendError
 	if errors.As(err, &sendErr) {
 		return http.StatusFailedDependency, ErrorDetail{Code: "alert_send_failed", Message: "The destination did not take the alert: " + sendErr.Message}, true
+	}
+	var outside *service.MomentOutsideError
+	if errors.As(err, &outside) {
+		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"at": strings.ToUpper(outside.Error()[:1]) + outside.Error()[1:] + "."}}, true
 	}
 	var inUse *service.BucketInUseError
 	if errors.As(err, &inUse) {
@@ -286,10 +291,12 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBucketName, field: "name", message: "Name the bucket with 1 to 63 lowercase letters, digits or dashes, like client-a."},
 	{err: repository.ErrDuplicateBucket, field: "name", message: "A bucket with this name already exists."},
 	{err: repository.ErrBucketNotFound, status: http.StatusNotFound, code: "not_found", message: "The bucket was not found. List them with moin buckets."},
-	{err: service.ErrRestoreOlder, field: "bucket", message: "A point in time restore reads from the app's bucket. Pick a snapshot to restore from an older bucket."},
 	{err: service.ErrBackupAccess, field: "secret_key", message: "moin could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
-	{err: service.ErrRestoreTarget, field: "snapshot", message: "Choose a snapshot or a point in time."},
-	{err: service.ErrSnapshotID, field: "snapshot", message: "This is not a snapshot ID. Copy one from the backups list, like 20261031T140200Z-daily."},
+	{err: service.ErrRestoreTarget, field: "moment", message: "Pick a moment to go back to, from moin backups."},
+	{err: service.ErrMoment, field: "moment", message: "There is no such moment. Pick one from moin backups, like 1h or before-v12."},
+	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one to restore."},
+	{err: service.ErrDownloadNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such download. A copy lasts a day; make a new one."},
+	{err: service.ErrAgentOutdated, status: http.StatusConflict, code: "agent_outdated", message: "The agent on this server is too old for this. Update it with moin servers update."},
 	{err: service.ErrGitHubOff, status: http.StatusConflict, code: "github_off", message: "The GitHub App is not set up on this control plane."},
 	{err: service.ErrGitHubState, status: http.StatusBadRequest, code: "github_state", message: "The GitHub install link expired or belongs to another account. Connect again."},
 	{err: service.ErrGitHubNotYours, status: http.StatusForbidden, code: "github_not_yours", message: "Your GitHub account cannot manage this installation. Install the app from an account you own, then connect again."},

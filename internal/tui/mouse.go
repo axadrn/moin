@@ -12,7 +12,7 @@ import (
 const tabBarY = 4
 
 func (m model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.auth != nil || m.ask != nil || m.restore != nil || m.prompt != nil {
+	if m.auth != nil || m.ask != nil || m.prompt != nil {
 		return m, nil
 	}
 	switch msg := msg.(type) {

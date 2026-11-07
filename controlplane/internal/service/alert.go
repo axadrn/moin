@@ -152,17 +152,17 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		message.URL = base + "/apps/" + target + "/backups"
 		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)
 	case "drill.failed":
-		message.Symbol, message.Heading = "🔴", "Restore check of "+target+" failed"
+		message.Symbol, message.Heading = "🔴", "Daily check of "+target+" failed"
 		message.Lines = []string{
 			"Database: " + details["database"] + ", app " + target + ".",
 			"Error: " + orDash(clipText(details["error"], 300)),
-			"The newest backup did not restore cleanly. Take a snapshot now and look: moin backups " + target,
+			"The daily check could not go back to the newest state. Download a copy now and look: moin backups " + target,
 		}
 		message.URL = base + "/apps/" + target + "/backups"
 		message.Payload.App, message.Payload.Server, message.Payload.Reason = target, s.serverOf(workspace.ID, target), clipText(details["error"], 300)
 	case "drill.recovered":
-		message.Symbol, message.Heading = "🟢", "Restore check of "+target+" passes again"
-		message.Lines = []string{"Database: " + details["database"] + ", app " + target + ". The newest backup restores cleanly."}
+		message.Symbol, message.Heading = "🟢", "Daily check of "+target+" passes again"
+		message.Lines = []string{"Database: " + details["database"] + ", app " + target + ". Going back works again."}
 		message.URL = base + "/apps/" + target + "/backups"
 		message.Payload.App, message.Payload.Server = target, s.serverOf(workspace.ID, target)
 	case "disk.full":

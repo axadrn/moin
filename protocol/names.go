@@ -14,24 +14,18 @@ var appName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 // ValidAppName reports whether name is a valid app name.
 func ValidAppName(name string) bool { return appName.MatchString(name) }
 
-// SnapshotIDLayout is the time at the start of every snapshot ID.
-const SnapshotIDLayout = "20060102T150405Z"
+// CopyIDLayout is the ID of a copy before a restore: the time it was
+// taken.
+const CopyIDLayout = "20060102T150405Z"
 
-// snapshotSuffix is the reason after the time, like -before-sql or
-// -before-sql-2: lowercase letters, digits and dashes.
-var snapshotSuffix = regexp.MustCompile(`^(-[a-z0-9-]{0,64})?$`)
-
-// ValidSnapshotID reports whether id looks like an ID the agent makes:
-// 20060102T150405Z, then an optional reason. Anything else never reaches
-// the bucket as part of a key.
-func ValidSnapshotID(id string) bool {
-	if len(id) < len(SnapshotIDLayout) {
+// ValidCopyID reports whether id is the ID of a copy before a restore.
+// Anything else never reaches the bucket as part of a key.
+func ValidCopyID(id string) bool {
+	if len(id) != len(CopyIDLayout) {
 		return false
 	}
-	if _, err := time.Parse(SnapshotIDLayout, id[:len(SnapshotIDLayout)]); err != nil {
-		return false
-	}
-	return snapshotSuffix.MatchString(id[len(SnapshotIDLayout):])
+	_, err := time.Parse(CopyIDLayout, id)
+	return err == nil
 }
 
 // MaxRefLength is the longest branch, tag or commit name moin accepts.

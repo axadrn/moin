@@ -22,7 +22,7 @@ MCP: list_activity
 | 2026-11-02 14:10:12 | ben@example.com | Web | set STRIPE_KEY in the env of shop |
 | 2026-11-02 14:12:30 | ben@example.com | Web | edited status of row 1182 in orders of shop |
 | 2026-11-02 14:25:44 | ada@example.com | MCP, token claude | ran UPDATE on orders in shop, 3 rows changed |
-| 2026-11-03 03:00:18 | moin | moin | restored app.db of shop in a restore drill and checked it |
+| 2026-11-03 03:00:18 | moin | moin | checked that app.db of shop can go back |
 
 ## Find one change
 

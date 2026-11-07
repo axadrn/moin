@@ -35,11 +35,10 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Uptime and outages | ✓ | ✓ `uptime` | ✓ | ✓ | ✓ |
 | Uptime check path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
 | App metrics, 1h to 30d | ✓ | ✓ `metrics` | ✓ | ✓ | ✓ |
-| Backups and restore checks | ✓ | ✓ `backups` | ✓ | ✓ | ✓ |
-| Back up now | ✓ | ✓ `backup` | ✓ `N` | ✓ | ✓ |
-| Restore a full backup | ✓ | ✓ `restore` | ✓ | ✓ | ✓ |
-| Restore to a point in time | ✓ | ✓ `restore --at` | ✓ `t` | ✓ | ✓ |
-| A full backup before every change | ✓ | ✓ `backups auto` | ✓ `a` | ✓ | ✓ |
+| Backups, the daily check and the moments to go back to | ✓ | ✓ `backups` | ✓ | ✓ | ✓ |
+| Go back to a moment, to the minute | ✓ | ✓ `restore --to` | ✓ `enter`, `t` | ✓ | ✓ |
+| Undo a restore | ✓ | ✓ `restore --to undo-…` | ✓ | ✓ | ✓ |
+| Download a copy | ✓ | ✓ `backup download` | ✓ `c` | ✓ | ✓ |
 | Update a catalog app | ✓ | ✓ `update` | ✓ `U` | ✓ | ✓ |
 | Activity | ✓ | ✓ `activity` | ✓ | ✓ | ✓ |
 | Activity by app, server or person | ✓ | ✓ `--app`, `--server`, `--user` | Shows all of it: filter in the CLI or the web. | ✓ | ✓ |
@@ -67,7 +66,6 @@ The terminal UI opens these in your browser: `w` on the dashboard, or `web app` 
 | Instant address: provider, open | ✓ | ✓ `instant` | Shows it; change it in the web. | ✓ | ✓ |
 | Buckets | ✓ | ✓ `buckets` | Opens the web. | ✓ | ✓ |
 | Move an app to another bucket | ✓ | ✓ `buckets use` | Opens the web. | ✓ | ✓ |
-| Restore from an older bucket | ✓ | ✓ `restore --bucket` | ✓ the backup knows its bucket | ✓ | ✓ |
 | Data: tables, rows, schema | ✓ | ✓ `db` | A grid of rows wants a page: opens the web. | ✓ | ✓ `list_tables`, rows through SQL |
 | SQL, read and write | ✓ | ✓ `sql` | Opens the web. | ✓ | ✓ |
 | Alert destinations | ✓ | ✓ `alerts add` | Opens the web. | ✓ | ✓ |

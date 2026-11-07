@@ -166,12 +166,13 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET` · `POST /api/v1/apps/{app}/backups` | read · write | the app's backups; takes a full backup now |
-| `PUT /api/v1/apps/{app}/backups/settings` | write | a full backup before every change, on or off |
-| `POST /api/v1/apps/{app}/restore` | write | restores a full backup or a point in time; `bucket` names an older bucket the backup is in |
+| `GET /api/v1/apps/{app}/backups` | read | how each database is backed up, `problem` in one sentence when it does not work, and the `moments` to go back to |
+| `POST /api/v1/apps/{app}/restore` | write | goes back to a moment, `{"moment": "before-v12"}` (its id or label), or a time, `{"at": "2026-11-07T14:01:00Z"}`; `database` when the app has several |
+| `POST /api/v1/apps/{app}/backups/downloads` | write | starts a full copy of a database in the app's own bucket, `202` with its `id` |
+| `GET /api/v1/apps/{app}/backups/downloads/{download}` | write | how the copy stands; `link`, valid 15 minutes, once `state` is `ready` |
 | `GET /api/v1/buckets` · `POST /api/v1/buckets` | read · write | the workspace's buckets, the default first, with the apps that use each; adds one |
-| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it, `409` `bucket_in_use` while apps use it or it keeps older backups |
-| `PUT /api/v1/apps/{app}/bucket` | write | the app's bucket, `{"bucket": "client-a"}`, or `""` for the default; older backups stay in the old bucket |
+| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it, `409` `bucket_in_use` while apps use it or left it |
+| `PUT /api/v1/apps/{app}/bucket` | write | the app's bucket, `{"bucket": "client-a"}`, or `""` for the default; the history starts again there |
 | `GET` · `PUT` · `DELETE /api/v1/backup-storage` | read · write | the default bucket, for older clients |
 
 ## Alerts

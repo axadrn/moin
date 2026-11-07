@@ -125,10 +125,9 @@ Data
   sql --write        Run SQL that changes data, in one transaction; DROP or DELETE asks [--yes]
 
 Backups
-  backups            Snapshots, point in time window and restore drills of an app: backups [app]
-  backup             Take a snapshot now: backup [app]
-  restore            Restore a snapshot: restore <snapshot> [--bucket <older bucket>], or a time: restore --at "2026-10-31 14:02" [--yes]
-  backups auto       Snapshot before every change: backups auto on|off
+  backups            How each database is backed up, the moments to go back to: backups [app]
+  restore            Go back to a moment, to the minute; can be undone for 7 days: restore [app] --to 1h|before-v12|14:01 [--yes]
+  backup download    Save a full copy of a database from your bucket: backup download [app] [--db <path>] [--link]
 
 Buckets
   buckets            Your buckets, the default first, and the apps that use each
@@ -136,7 +135,7 @@ Buckets
   buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
   buckets default    Make one the default for apps without their own: buckets default <name>
   buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--yes]
-  buckets use        Move an app's uploads and new backups: buckets use <bucket> [app], or --default
+  buckets use        Move an app's uploads and backups: buckets use <bucket> [app], or --default
 
 Env
   env                List env vars: env [--show] [app]
@@ -153,7 +152,7 @@ Agent
 
   version            Show the version of moin and the control plane, and a newer release
   update             Update a self-hosted control plane to the newest release [--yes]
-  update <app>       Update an app from the catalog, after a snapshot: update umami [--version 3.4.1]
+  update <app>       Update an app from the catalog; restore can go back to before it: update umami [--version 3.4.1]
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then

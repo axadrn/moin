@@ -121,9 +121,6 @@ func TestBuckets(t *testing.T) {
 	if err != nil || len(older) != 1 || older[0].Name != "default" {
 		t.Fatalf("blog's older buckets = %+v, %v", older, err)
 	}
-	if storages := apps.olderStorage(moved); len(storages) != 1 || storages[0].Bucket != "owner" || storages[0].SecretKey != "secret" {
-		t.Fatalf("older storage for the agent = %+v", storages)
-	}
 
 	// In use: client-a by blog, the default by shop and blog's older backups.
 	var inUse *BucketInUseError
@@ -174,14 +171,6 @@ func TestBuckets(t *testing.T) {
 	stored, _ := apps.apps.Bucket(owner.WorkspaceID, "old")
 	if secret, err := apps.box.Open(stored.SecretKey, owner.WorkspaceID+"/backups"); err != nil || secret != "secret" {
 		t.Fatalf("secret after the rename = %q, %v", secret, err)
-	}
-
-	// A point in time comes only from the app's bucket.
-	if err := apps.Restore(ctx, owner, "shop", "", "", "old", &time.Time{}); !errors.Is(err, ErrRestoreOlder) {
-		t.Fatalf("point in time from an older bucket: err = %v", err)
-	}
-	if err := apps.Restore(ctx, owner, "shop", "", "20261031T140200Z-manual", "nowhere", nil); !errors.Is(err, repository.ErrBucketNotFound) {
-		t.Fatalf("restore from a bucket the app never used: err = %v", err)
 	}
 }
 

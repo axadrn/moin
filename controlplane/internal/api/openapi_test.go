@@ -203,6 +203,8 @@ func TestOpenAPIDocumentsTokenAccess(t *testing.T) {
 var secretReads = map[string]bool{
 	"GET /api/v1/apps/{app}/env":            true,
 	"GET /api/v1/apps/{app}/databases/rows": true,
+	// A link to a full copy of the database.
+	"GET /api/v1/apps/{app}/backups/downloads/{download}": true,
 }
 
 func TestTokenScopesFollowTheMethod(t *testing.T) {

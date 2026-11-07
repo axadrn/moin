@@ -43,9 +43,9 @@ func AlertEventLabel(event string) string {
 	case "backup.recovered":
 		return "Backups work again"
 	case "drill.failed":
-		return "Restore check failed"
+		return "Daily check failed"
 	case "drill.recovered":
-		return "Restore check passes again"
+		return "Daily check passes again"
 	case "disk.full":
 		return "Disk almost full"
 	case "disk.ok":

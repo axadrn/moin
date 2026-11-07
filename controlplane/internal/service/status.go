@@ -118,7 +118,7 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 					status.Issues = append(status.Issues, StatusIssue{Kind: IssueBackupFailed, Target: app.Name, Detail: "backups of " + backup.Database + " stopped: " + clipText(message, 120), Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
 				}
 				if backup.DrillError != "" {
-					status.Issues = append(status.Issues, StatusIssue{Kind: IssueDrillFailed, Target: app.Name, Detail: "restore check of " + backup.Database + " failed", Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
+					status.Issues = append(status.Issues, StatusIssue{Kind: IssueDrillFailed, Target: app.Name, Detail: "the daily check of " + backup.Database + " failed", Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
 				}
 			}
 		}

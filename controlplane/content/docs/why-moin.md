@@ -51,7 +51,7 @@ In short: with SSH-based tools, whoever runs the tool holds a key that opens a s
 
 ## Backups whose restores are checked
 
-moin writes down every change of your database for 7 days, so you can go back to any moment. It goes to your own bucket. A full backup comes before every deploy, restore and data edit. Every day moin restores a backup into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
+moin writes down every change of your database for 7 days, in your own bucket, so you can go back to any minute; a restore can be undone for 7 days. Every day moin restores the newest state into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
 
 ## Every way in
 

@@ -20,10 +20,10 @@ func TestWalgNote(t *testing.T) {
 	if got := walgNoteFor("", "", time.Time{}, time.Time{}, now); got != "" {
 		t.Errorf("nothing broke: %q", got)
 	}
-	if got := walgNoteFor("", walgWhyCap, broke, time.Time{}, now); !strings.Contains(got, "broke at Nov 4, 11:00 UTC") || !strings.Contains(got, "4GB") || !strings.Contains(got, "started a new base backup") {
+	if got := walgNoteFor("", walgWhyCap, broke, time.Time{}, now); !strings.Contains(got, "broke at Nov 4, 11:00 UTC") || !strings.Contains(got, "4GB") || !strings.Contains(got, "moin is starting it again") {
 		t.Errorf("broke: %q", got)
 	}
-	if got := walgNoteFor("", walgWhyCap, broke, broke.Add(5*time.Minute), now); !strings.Contains(got, "took a new base backup at 11:05 UTC") {
+	if got := walgNoteFor("", walgWhyCap, broke, broke.Add(5*time.Minute), now); !strings.Contains(got, "started it again at 11:05 UTC") {
 		t.Errorf("rebased: %q", got)
 	}
 	if got := walgNoteFor("", walgWhyCap, broke, broke, now.Add(25*time.Hour)); got != "" {
@@ -81,8 +81,8 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	if databaseKey(found[1].Path) != "postgres-db" {
 		t.Errorf("bucket folder %q", databaseKey(found[1].Path))
 	}
-	if snapshotExt(found[0]) != ".dump" || snapshotExt(protocol.Database{Path: "/data/app.db"}) != ".db.gz" {
-		t.Error("snapshot file endings")
+	if copyExt(found[0]) != ".dump" || copyExt(protocol.Database{Path: "/data/app.db"}) != ".db.gz" {
+		t.Error("copy file endings")
 	}
 	if _, err := a.databases(context.Background(), composeFile, &protocol.Config{Database: "postgres-nope"}); err == nil {
 		t.Error("x-moin naming a missing database passed")
@@ -188,19 +188,9 @@ func TestPgRows(t *testing.T) {
 	}
 }
 
-func TestPgChangesAndDumpTables(t *testing.T) {
+func TestPgChanges(t *testing.T) {
 	if got := pgChanges("SET\nBEGIN\nUPDATE 3\nINSERT 0 2\nDELETE 1\nCOMMIT\n"); got != 6 {
 		t.Errorf("changes %d", got)
-	}
-	list := `;
-; Archive created at 2026-11-04 10:00:00 UTC
-215; 1259 16386 TABLE public users app
-216; 1259 16390 TABLE public orders app
-3350; 0 16386 TABLE DATA public users app
-217; 1259 16395 SEQUENCE public users_id_seq app
-`
-	if got := pgDumpTables(list); got != 2 {
-		t.Errorf("tables %d", got)
 	}
 }
 

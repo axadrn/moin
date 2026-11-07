@@ -60,7 +60,12 @@ type AppRepository interface {
 	RemoveDeployHook(appID string) error
 
 	BucketRepository
-	SetSnapshotBeforeChanges(appID string, on bool) error
+	// AddBackupMoment remembers a moment to go back to and forgets those
+	// older than before.
+	AddBackupMoment(moment model.BackupMoment, before time.Time) error
+	// BackupMoments are the remembered moments of an app since a time,
+	// newest first.
+	BackupMoments(appID string, since time.Time) ([]model.BackupMoment, error)
 	BackupStatus(appID string) ([]model.BackupStatus, error)
 	SetBackupStatus(status model.BackupStatus) error
 
@@ -338,9 +343,20 @@ func (r *appRepository) SetStopped(appID string, stopped bool) error {
 	return err
 }
 
-func (r *appRepository) SetSnapshotBeforeChanges(appID string, on bool) error {
-	_, err := r.db.Exec(`UPDATE apps SET snapshot_before_changes = $1 WHERE id = $2`, on, appID)
+func (r *appRepository) AddBackupMoment(moment model.BackupMoment, before time.Time) error {
+	_, err := r.db.Exec(`INSERT INTO backup_moments (app_id, database, kind, detail, at) VALUES ($1, $2, $3, $4, $5)`,
+		moment.AppID, moment.Database, moment.Kind, moment.Detail, moment.At.UTC())
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`DELETE FROM backup_moments WHERE app_id = $1 AND at < $2`, moment.AppID, before.UTC())
 	return err
+}
+
+func (r *appRepository) BackupMoments(appID string, since time.Time) ([]model.BackupMoment, error) {
+	moments := []model.BackupMoment{}
+	err := r.db.Select(&moments, `SELECT * FROM backup_moments WHERE app_id = $1 AND at >= $2 ORDER BY at DESC, id DESC`, appID, since.UTC())
+	return moments, err
 }
 
 func (r *appRepository) BackupStatus(appID string) ([]model.BackupStatus, error) {

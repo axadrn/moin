@@ -5,6 +5,7 @@ package tui
 
 import (
 	"errors"
+	"github.com/axadrn/moin/internal/client"
 	"slices"
 	"sort"
 	"strings"
@@ -65,7 +66,7 @@ func (m model) appActions(name string) []action {
 	}
 	if a.Catalog != "" {
 		out = append(out, action{"U", "update release", func(m model) (tea.Model, tea.Cmd) {
-			return m.ask1("Update "+name+"?", "It installs the newest release of "+a.Catalog+". A snapshot comes first when that is on.", "update", false, m.updateCatalogApp(name)), nil
+			return m.ask1("Update "+name+"?", "It installs the newest release of "+a.Catalog+". A restore can go back to before it.", "update", false, m.updateCatalogApp(name)), nil
 		}})
 	}
 	pinWord := "pin"
@@ -74,7 +75,6 @@ func (m model) appActions(name string) []action {
 	}
 	out = append(out, action{"*", pinWord, func(m model) (tea.Model, tea.Cmd) { return m, m.pin(name, !a.Pinned) }})
 	out = append(out,
-		action{"N", "back up now", func(m model) (tea.Model, tea.Cmd) { return m, m.backUp(name) }},
 		action{"X", "run a command", func(m model) (tea.Model, tea.Cmd) { return m.openExec(name) }},
 		action{"W", "open in web", func(m model) (tea.Model, tea.Cmd) { return m.browse("/apps/" + name) }},
 	)
@@ -144,27 +144,41 @@ func (m model) browseURL(url string) (tea.Model, tea.Cmd) {
 // and tests replace it. Without one the TUI shows the address.
 var openBrowser = func(url string) error { return errors.New("no browser") }
 
-// snap is a snapshot with the database it belongs to.
-type snap struct {
-	db                 string
-	ID, Reason, Bucket string
-	Size               int64
-	CreatedAt          time.Time
+// moment is a moment to go back to with the database it belongs to.
+type moment struct {
+	db string
+	client.Moment
 }
 
-// snapshots are the snapshots of every database, the newest first.
-func (m model) snapshots() []snap {
+// moments are the moments of every database, in the order the control
+// plane lists them: the quick ones first, then the newest.
+func (m model) moments() []moment {
 	if m.app.backups == nil {
 		return nil
 	}
-	var out []snap
+	var out []moment
 	for _, d := range m.app.backups.Databases {
-		for _, s := range d.Snapshots {
-			out = append(out, snap{db: d.Database, ID: s.ID, Reason: s.Reason, Bucket: s.Bucket, Size: s.Size, CreatedAt: s.CreatedAt})
+		for _, mo := range d.Moments {
+			out = append(out, moment{db: d.Database, Moment: mo})
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	return out
+}
+
+// parseMoment reads a time in UTC to the minute: 14:01 is today.
+func parseMoment(text string, now time.Time) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04", "2006-01-02T15:04", "15:04"} {
+		at, err := time.Parse(layout, strings.TrimSpace(text))
+		if err != nil {
+			continue
+		}
+		if at.Year() == 0 {
+			now = now.UTC()
+			at = time.Date(now.Year(), now.Month(), now.Day(), at.Hour(), at.Minute(), 0, 0, time.UTC)
+		}
+		return at.UTC().Truncate(time.Minute), true
+	}
+	return time.Time{}, false
 }
 
 func (m model) envKeys() []string {

@@ -71,8 +71,10 @@ type ServerService struct {
 
 type agentSession struct {
 	workspaceID string
-	kick        func()
-	send        func(protocol.Message) error
+	// protocol is the protocol version the agent speaks.
+	protocol int
+	kick     func()
+	send     func(protocol.Message) error
 	// waiting maps request IDs to the requests waiting for their answer.
 	waiting map[string]chan protocol.Message
 	// streams maps request IDs to the requests whose answer comes in
@@ -309,7 +311,7 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	if err != nil {
 		slog.Error("store agent hello failed", "error", err, "server_id", server.ID)
 	}
-	session := &agentSession{workspaceID: server.WorkspaceID, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
+	session := &agentSession{workspaceID: server.WorkspaceID, protocol: hello.ProtocolVersion, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
 	s.mu.Lock()
 	previous := s.sessions[server.ID]
 	s.sessions[server.ID] = session
@@ -344,6 +346,10 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 		s.notify(server.WorkspaceID)
 	}
 }
+
+// ErrAgentOutdated answers a request the agent of a server is too old
+// for, instead of sending it.
+var ErrAgentOutdated = errors.New("the agent on this server is too old for this: update it under Servers, or with moin servers update")
 
 // ErrSubscriptionRequired means the account needs the moin plan to add a
 // server.
@@ -468,12 +474,16 @@ func (s *ServerService) Request(ctx context.Context, serverID string, messageTyp
 	answer := make(chan protocol.Message, 1)
 	s.mu.Lock()
 	session := s.sessions[serverID]
-	if session != nil {
+	old := session != nil && session.protocol < protocol.Needs(messageType)
+	if session != nil && !old {
 		session.waiting[message.RequestID] = answer
 	}
 	s.mu.Unlock()
 	if session == nil {
 		return ErrServerOffline
+	}
+	if old {
+		return ErrAgentOutdated
 	}
 	defer func() {
 		s.mu.Lock()

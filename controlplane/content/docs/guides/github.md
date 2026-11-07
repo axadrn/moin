@@ -95,7 +95,7 @@ MCP: unlink_repo
 - A ref is a branch like `main`, a tag like `v1.4.0` or a commit like `3f2a9c1`. A branch or ref name follows git's rules and has at most 255 characters; moin refuses others, such as one that starts with `-` or has `..`, and a branch the repo does not have.
 - Already installed the app? Press **Connect GitHub** anyway: moin asks GitHub which accounts have it and connects them; if none has it, GitHub asks you to install it. An account connected to another workspace stays there until you disconnect it there.
 - Linking the repo and branch an app follows already changes only Deploy every push, without asking GitHub.
-- A deploy from GitHub takes a full backup of the database first, like every deploy.
+- moin remembers the moment before a deploy from GitHub, like before every deploy, so a restore can go back to it.
 - In the TUI, the app's header shows the repo and branch it follows, and `B` deploys from it.
 - Without the GitHub App: [`moin deploy`](/docs/guides/deploy) uploads your folder through [your bucket](/docs/guides/bucket), and [CI](/docs/guides/ci) can build an image and call a deploy hook.
 - A self-hosted control plane needs [your own GitHub App](/docs/self-hosting#your-own-github-app).

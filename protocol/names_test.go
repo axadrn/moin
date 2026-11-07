@@ -5,23 +5,27 @@ import (
 	"testing"
 )
 
-func TestValidSnapshotID(t *testing.T) {
+func TestValidCopyID(t *testing.T) {
 	for id, ok := range map[string]bool{
-		"20261031T140200Z":               true,
-		"20261031T140200Z-":              true,
-		"20261031T140200Z-before-sql":    true,
-		"20261031T140200Z-before-sql-2":  true,
-		"20261331T140200Z-daily":         false,
-		"20261031T140200Z-../../secrets": false,
-		"20261031T140200Z/other":         false,
-		"20261031T140200Z-Daily":         false,
-		"20261031T140200Z-" + long(65):   false,
-		"2026-10-31":                     false,
-		"":                               false,
+		"20261031T140200Z":        true,
+		"20261031T140200Z-":       false,
+		"20261031T140200Z-manual": false,
+		"20261331T140200Z":        false,
+		"20261031T140200Z/../x":   false,
+		"../20261031T140200Z":     false,
+		"20261031T140200Z" + "\n": false,
+		"2026-10-31":              false,
+		"":                        false,
 	} {
-		if got := ValidSnapshotID(id); got != ok {
-			t.Errorf("ValidSnapshotID(%q) = %t, want %t", id, got, ok)
+		if got := ValidCopyID(id); got != ok {
+			t.Errorf("ValidCopyID(%q) = %t, want %t", id, got, ok)
 		}
+	}
+}
+
+func TestNeeds(t *testing.T) {
+	if Needs(TypeBackupRestore) != 2 || Needs(TypeBackupDownload) != 2 || Needs(TypeDeployStart) != 1 {
+		t.Error("Needs is wrong")
 	}
 }
 

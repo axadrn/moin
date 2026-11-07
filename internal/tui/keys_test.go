@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/moin/internal/client"
@@ -262,9 +263,9 @@ func TestConfirmRunsOnlyOnYes(t *testing.T) {
 }
 
 func TestRestoreAsksForTheName(t *testing.T) {
-	m := press(fixture(120, 40).withApp("shop", tBackups), "enter")
-	if m.ask == nil || m.ask.name != "shop" {
-		t.Fatal("enter on a snapshot asks for the app's name")
+	m := press(fixture(120, 40).withApp("shop", tBackups), "down", "enter")
+	if m.ask == nil || m.ask.name != "shop" || !strings.Contains(m.ask.detail, "before v43") || !strings.Contains(m.ask.detail, "undo") {
+		t.Fatalf("enter on a moment asks for the app's name: %+v", m.ask)
 	}
 	m2, cmd := update(m, keyMsg("enter"))
 	if cmd != nil || m2.ask == nil {
@@ -277,31 +278,25 @@ func TestRestoreAsksForTheName(t *testing.T) {
 	}
 }
 
-func TestPointInTimeStaysInTheWindow(t *testing.T) {
+// TestGoBackToATime: t asks for a time, to the minute, then for the name.
+func TestGoBackToATime(t *testing.T) {
 	m := press(fixture(120, 40).withApp("shop", tBackups), "t")
-	if m.restore == nil || len(m.restore.dbs) != 1 || m.restore.dbs[0].Database != "shop.db" {
-		t.Fatalf("t opens the window of the databases that keep one: %+v", m.restore)
+	if m.prompt == nil {
+		t.Fatal("t asks for a time")
 	}
-	start := m.restore.at
-	m = press(m, "left", "left")
-	if got := start.Sub(m.restore.at).Hours(); got != 2 {
-		t.Errorf("left goes back an hour each, moved %v hours", got)
+	m = press(m, "1", "4", ":", "0", "1", "enter")
+	if m.ask == nil || m.ask.name != "shop" || !strings.Contains(m.ask.detail, "14:01 UTC") {
+		t.Fatalf("a time asks for the name: %+v", m.ask)
 	}
-	for range 40 {
-		m = press(m, "H")
+	m = press(fixture(120, 40).withApp("shop", tBackups), "t", "x", "enter")
+	if m.ask != nil || !strings.Contains(m.notice, "Cannot read") {
+		t.Errorf("a bad time says so: %q", m.notice)
 	}
-	from, _ := m.restore.window(now)
-	if !m.restore.at.Equal(from) {
-		t.Errorf("it stops at the start of the window, at %v", m.restore.at)
+	if _, cmd := update(fixture(120, 40).withApp("shop", tBackups), keyMsg("c")); cmd == nil {
+		t.Error("c downloads a copy")
 	}
-	m = press(m, "G")
-	if !m.restore.at.Equal(*m.app.backups.Databases[0].ReplicatedAt) {
-		t.Error("G goes to the newest change")
-	}
-	m = press(m, "enter", "s", "h", "o", "p")
-	_, cmd := update(m, keyMsg("enter"))
-	if cmd == nil {
-		t.Error("the name and enter restore")
+	if at, ok := parseMoment("2026-11-07 14:01", now); !ok || !at.Equal(time.Date(2026, 11, 7, 14, 1, 0, 0, time.UTC)) {
+		t.Errorf("parseMoment = %v %v", at, ok)
 	}
 }
 
@@ -375,10 +370,6 @@ func TestChangesShowAtOnce(t *testing.T) {
 		t.Fatal("the removed var goes at once")
 	}
 
-	m = press(fixture(120, 40).withApp("shop", tBackups), "a")
-	if m.app.backups.SnapshotBeforeChanges {
-		t.Fatal("a flips the snapshot before changes at once")
-	}
 	m = press(fixture(120, 40).withApp("shop", tUptime), "p")
 	if !m.app.uptime.Domains[0].Paused {
 		t.Fatal("p pauses the check at once")

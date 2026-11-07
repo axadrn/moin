@@ -194,7 +194,7 @@ func (m model) tiles(u ui, c client.StatusCounts, w int) string {
 	} else if c.Servers == 0 {
 		srvSub = "add one in the web app"
 	}
-	bakSub := "restore checks today"
+	bakSub := "daily checks passed"
 	if c.Databases == 0 {
 		bakSub = "no databases yet"
 	} else if c.BackupsChecked < c.Databases {

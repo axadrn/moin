@@ -226,14 +226,21 @@ func (e WorkspaceAuditEvent) Summary() string {
 		}
 		return "moved the uploads and backups of " + target + " to " + to
 	case "backup.taken":
-		return "took a snapshot of " + target
+		// Before backups were one history: a full copy by hand.
+		return "backed up " + target
 	case "backup.restored":
-		if d["snapshot"] != "" {
-			return "restored " + target + " from the snapshot " + d["snapshot"]
+		switch {
+		case d["to"] != "":
+			return "restored " + target + " to " + strings.ToLower(d["to"][:1]) + d["to"][1:]
+		case d["snapshot"] != "":
+			return "restored " + target + " from the backup " + d["snapshot"]
 		}
 		return "restored " + target + " to " + d["at"]
+	case "backup.downloaded":
+		return "downloaded a copy of " + target
 	case "backup.snapshot_before_changes":
-		return on("turned the snapshot before changes %s for " + target)
+		// Gone with backups as one history.
+		return on("turned the backup before changes %s for " + target)
 	case "data.sql":
 		what := "SQL"
 		if d["statements"] != "" {
@@ -343,11 +350,11 @@ func (e WorkspaceAuditEvent) Summary() string {
 		}
 		return ran + ", exit " + d["exit_code"]
 	case "backup.drill_passed":
-		return "restored " + d["database"] + " of " + target + " in a restore drill and checked it"
+		return "checked that " + d["database"] + " of " + target + " can go back"
 	case "drill.failed":
-		return "could not restore " + d["database"] + " of " + target + " in the restore check: " + d["error"]
+		return "could not go back with " + d["database"] + " of " + target + " in the daily check: " + d["error"]
 	case "drill.recovered":
-		return "restores " + d["database"] + " of " + target + " in the restore check again"
+		return "goes back with " + d["database"] + " of " + target + " in the daily check again"
 	case "disk.full":
 		return "found the disk of " + target + " " + d["used_percent"] + "% full"
 	case "disk.ok":

@@ -333,45 +333,40 @@ func (m model) deployDir() tea.Cmd {
 	})
 }
 
-func (m model) backUp(app string) tea.Cmd {
+func (m model) restoreCmd(app, database, moment string, at *time.Time) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		b, err := api.BackUp(ctx, app)
+		if err := api.Restore(ctx, app, database, moment, at); err != nil {
+			return errMsg{err}
+		}
+		return reloadMsg{notice: "Restored " + app + ". It runs again; the newest undo moment undoes it"}
+	}
+}
+
+// downloadCopy has the agent make a full copy of a database in the app's
+// bucket, waits for it and opens its link, or shows it.
+func (m model) downloadCopy(app, database string) tea.Cmd {
+	api, ctx := m.api, m.ctx
+	return func() tea.Msg {
+		download, err := api.StartDownload(ctx, app, database)
+		for err == nil && download.State == "running" {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(time.Second):
+			}
+			download, err = api.Download(ctx, app, download.ID)
+		}
 		if err != nil {
 			return errMsg{err}
 		}
-		return tea.BatchMsg{
-			func() tea.Msg { return backupsMsg{app, b} },
-			func() tea.Msg { return noticeMsg("Backed up " + app + " just now") },
+		if download.State != "ready" {
+			return errMsg{fmt.Errorf("the copy failed: %s", download.Error)}
 		}
-	}
-}
-
-func (m model) restoreCmd(app, database, snapshot, bucket string, at *time.Time) tea.Cmd {
-	api, ctx := m.api, m.ctx
-	return func() tea.Msg {
-		if err := api.Restore(ctx, app, database, snapshot, bucket, at); err != nil {
-			return errMsg{err}
+		if openBrowser(download.Link) == nil {
+			return noticeMsg("The copy of " + download.Database + " downloads in your browser")
 		}
-		what := "the snapshot"
-		if at != nil {
-			what = at.Local().Format("Jan 2 15:04:05")
-		}
-		return reloadMsg{notice: fmt.Sprintf("Restoring %s of %s to %s. The app restarts with it", database, app, what)}
-	}
-}
-
-func (m model) setSnapshots(app string, on bool) tea.Cmd {
-	api, ctx := m.api, m.ctx
-	return func() tea.Msg {
-		if err := api.SetSnapshotBeforeChanges(ctx, app, on); err != nil {
-			return undoMsg{err}
-		}
-		word := "off"
-		if on {
-			word = "on"
-		}
-		return reloadMsg{notice: "A snapshot before every change is " + word}
+		return noticeMsg("The copy of " + download.Database + " is ready for 15 minutes: " + download.Link)
 	}
 }
 

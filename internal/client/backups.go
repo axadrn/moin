@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -9,13 +11,43 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// AppBackups are the backups of an app's databases. Bucket is where new
-// backups go; OlderBuckets keep the older ones, which are listed too.
+// AppBackups are the backups of an app's databases. Bucket is where the
+// history goes, the user's own; OlderBuckets are the buckets the app left.
 type AppBackups struct {
-	SnapshotBeforeChanges bool                      `json:"snapshot_before_changes"`
-	Bucket                string                    `json:"bucket"`
-	OlderBuckets          []string                  `json:"older_buckets"`
-	Databases             []protocol.DatabaseBackup `json:"databases"`
+	Bucket       string            `json:"bucket"`
+	OlderBuckets []string          `json:"older_buckets"`
+	Databases    []DatabaseBackups `json:"databases"`
+}
+
+// DatabaseBackups is the backup of one database: how it stands, Problem
+// in one sentence when it does not work, and the moments a restore can go
+// back to.
+type DatabaseBackups struct {
+	protocol.DatabaseBackup
+	Problem string   `json:"problem,omitempty"`
+	Moments []Moment `json:"moments"`
+}
+
+// Moment is one moment to go back to; Restore takes its ID or label.
+type Moment struct {
+	ID    string    `json:"id"`
+	Label string    `json:"label"`
+	At    time.Time `json:"at"`
+	Kind  string    `json:"kind"`
+}
+
+// Download is a full copy of a database being made in the app's bucket.
+// Link is a signed link to it there, valid 15 minutes, once State is
+// ready.
+type Download struct {
+	ID        string    `json:"id"`
+	App       string    `json:"app"`
+	Database  string    `json:"database"`
+	State     string    `json:"state"`
+	Size      int64     `json:"size"`
+	Link      string    `json:"link"`
+	Error     string    `json:"error"`
+	StartedAt time.Time `json:"started_at"`
 }
 
 // Bucket is one bucket of the workspace, without its secret key. Apps use
@@ -107,27 +139,19 @@ type BackupStorage struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Backups lists the snapshots and restore windows of an app.
+// Backups lists the backups of an app with the moments to go back to.
 func (c *Client) Backups(ctx context.Context, app string) (AppBackups, error) {
 	var backups AppBackups
 	err := c.do(ctx, http.MethodGet, appPath(app, "backups"), nil, &backups)
 	return backups, err
 }
 
-// BackUp takes a snapshot of an app's databases now.
-func (c *Client) BackUp(ctx context.Context, app string) (AppBackups, error) {
-	var backups AppBackups
-	err := c.do(ctx, http.MethodPost, appPath(app, "backups"), map[string]any{}, &backups)
-	return backups, err
-}
-
-// Restore puts a database back from a snapshot or to a point in time.
-// bucket is the bucket of the snapshot when it is an older one the app
-// left; empty is the app's bucket.
-func (c *Client) Restore(ctx context.Context, app, database, snapshot, bucket string, at *time.Time) error {
-	body := map[string]any{"database": database, "snapshot": snapshot}
-	if bucket != "" {
-		body["bucket"] = bucket
+// Restore puts a database back to a moment from Backups, by its ID or
+// label, or to a time in its history.
+func (c *Client) Restore(ctx context.Context, app, database, moment string, at *time.Time) error {
+	body := map[string]any{"database": database}
+	if moment != "" {
+		body["moment"] = moment
 	}
 	if at != nil {
 		body["at"] = at.UTC()
@@ -135,9 +159,19 @@ func (c *Client) Restore(ctx context.Context, app, database, snapshot, bucket st
 	return c.do(ctx, http.MethodPost, appPath(app, "restore"), body, nil)
 }
 
-// SetSnapshotBeforeChanges turns the snapshot before every change on or off.
-func (c *Client) SetSnapshotBeforeChanges(ctx context.Context, app string, on bool) error {
-	return c.do(ctx, http.MethodPut, appPath(app, "backups/settings"), map[string]any{"snapshot_before_changes": on}, nil)
+// StartDownload has the agent make a full copy of a database in the app's
+// bucket.
+func (c *Client) StartDownload(ctx context.Context, app, database string) (Download, error) {
+	var download Download
+	err := c.do(ctx, http.MethodPost, appPath(app, "backups/downloads"), map[string]string{"database": database}, &download)
+	return download, err
+}
+
+// Download says how a copy stands, with a fresh link once it is ready.
+func (c *Client) Download(ctx context.Context, app, id string) (Download, error) {
+	var download Download
+	err := c.do(ctx, http.MethodGet, appPath(app, "backups/downloads/"+url.PathEscape(id)), nil, &download)
+	return download, err
 }
 
 // BackupStorage returns the account's bucket.
@@ -166,4 +200,23 @@ func (c *Client) SetBackupStorage(ctx context.Context, storage BackupStorage) (B
 // RemoveBackupStorage stops backups; the bucket keeps what is in it.
 func (c *Client) RemoveBackupStorage(ctx context.Context) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/backup-storage", nil, nil)
+}
+
+// FetchCopy writes the copy a download link points to, in the user's own
+// bucket, to out. It goes straight to the bucket, not to the control plane.
+func (c *Client) FetchCopy(ctx context.Context, link string, out io.Writer) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("download the copy: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("download the copy: the bucket answered %s", response.Status)
+	}
+	_, err = io.Copy(out, response.Body)
+	return err
 }

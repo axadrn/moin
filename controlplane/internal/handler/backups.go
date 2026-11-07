@@ -18,69 +18,31 @@ func (h *AppsHandler) Backups(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+r.PathValue("app")+"/data", http.StatusMovedPermanently)
 }
 
-// BackupNow takes a backup of every database now and answers the backups
-// of the database the button was on.
-func (h *AppsHandler) BackupNow(w http.ResponseWriter, r *http.Request) {
-	_, _, err := h.apps.BackUp(r.Context(), actor(r), r.PathValue("app"))
-	if err != nil {
-		failed(w, r, "Not backed up", err, nil)
-		return
-	}
-	h.renderDatabaseBackups(w, r)
-	answerDone(w, r, "Backed up", "")
-}
-
-// BackupRestore restores a database from a backup or to a point in time.
-// A backup in a bucket the app left names it in bucket, or in
-// bucket:<backup> when the form lists several to pick from.
+// BackupRestore puts a database back to the moment picked.
 func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
-	database := r.FormValue("database")
-	snapshot := r.FormValue("snapshot")
-	bucket := r.FormValue("bucket")
-	if bucket == "" && snapshot != "" {
-		bucket = r.FormValue("bucket:" + snapshot)
-	}
-	// A point in time comes as a date and a time.
-	var at *time.Time
-	if date := r.FormValue("date"); date != "" {
-		raw := date + "T" + r.FormValue("time")
-		parsed, err := time.Parse("2006-01-02T15:04:05", raw)
-		if err != nil {
-			parsed, err = time.Parse("2006-01-02T15:04", raw)
-		}
-		if err != nil {
-			answerFailed(w, r, "Not restored", "Choose a date and a time.")
-			return
-		}
-		at = &parsed
-	}
-	if snapshot == "" && at == nil {
-		answerFailed(w, r, "Not restored", "Pick a backup.")
+	moment := r.FormValue("moment")
+	if moment == "" {
+		answerFailed(w, r, "Not restored", "Pick a moment.")
 		return
 	}
-	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), database, snapshot, bucket, at)
+	err := h.apps.Restore(r.Context(), actor(r), r.PathValue("app"), service.RestoreTarget{Database: r.FormValue("database"), Moment: moment})
 	if err != nil {
 		failed(w, r, "Not restored", err, nil)
 		return
 	}
 	h.renderDatabaseBackups(w, r)
-	answerDone(w, r, "Restored", "The state before is the newest backup.")
+	answerDone(w, r, "Restored", "")
 }
 
-// BackupSettings turns the snapshot before every change on or off and
-// answers the switch as stored, so a failed save flips it back.
-func (h *AppsHandler) BackupSettings(w http.ResponseWriter, r *http.Request) {
-	app, err := h.apps.SetSnapshotBeforeChanges(actor(r), r.PathValue("app"), r.FormValue("on") == "1")
+// BackupDownload starts a full copy of the database for a download. The
+// row says it runs, and turns into the link once the copy is ready.
+func (h *AppsHandler) BackupDownload(w http.ResponseWriter, r *http.Request) {
+	_, err := h.apps.StartDownload(actor(r), r.PathValue("app"), r.FormValue("database"))
 	if err != nil {
-		stored, getErr := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-		if getErr != nil {
-			failed(w, r, "Setting not saved", err, nil)
-			return
-		}
-		app = stored
-		answerError(w, r, "Setting not saved", errorMessage(err))
+		failed(w, r, "No copy", err, nil)
+		return
 	}
-	render(w, r, pages.BackupSettingsForm(*app))
+	h.renderDatabaseBackups(w, r)
 }
 
 // SetAppBucket moves the app's uploads and new backups to another bucket.
@@ -99,7 +61,7 @@ func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	if app.BucketName != "" {
 		bucket = app.BucketName
 	}
-	answerDone(w, r, "Uploads and new backups go to "+bucket, "Older backups stay where they are; restores of them read from there.")
+	answerDone(w, r, "Uploads and backups go to "+bucket, "The history starts again there.")
 }
 
 // Bucket is the buckets page.
@@ -159,7 +121,7 @@ func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their older backups stay in the old default.")
+	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their history starts again there.")
 }
 
 // RemoveBucket forgets a bucket nothing uses.
@@ -197,10 +159,10 @@ func (h *AppsHandler) renderBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 // backupsView is how an app is backed up: its bucket and the buckets to
-// pick from, and with agent what the agent reports. Error in the view says
-// why the server could not report its backups: a state of the page, not of
-// a click.
-func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool) (pages.BackupsView, error) {
+// pick from, and with agent what the agent reports and the newest copy to
+// download of database. Error in the view says why the server could not
+// report its backups: a state of the page, not of a click.
+func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool, database string) (pages.BackupsView, error) {
 	workspace := ctxkeys.Workspace(r.Context())
 	view := pages.BackupsView{App: *app, Now: time.Now()}
 	var err error
@@ -220,16 +182,20 @@ func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool) (
 		return view, err
 	}
 	if agent {
-		_, view.Backups, err = h.apps.Backups(r.Context(), workspace.ID, app.ID)
+		_, view.Databases, err = h.apps.Backups(r.Context(), workspace.ID, app.ID)
 		if err != nil {
 			view.Error = errorMessage(err)
+		}
+		view.Download, err = h.apps.LatestDownload(r.Context(), workspace.ID, app.ID, database)
+		if err != nil {
+			return view, err
 		}
 	}
 	return view, nil
 }
 
-// renderDatabaseBackups answers the backups of the database the form names,
-// after Back up now or a restore.
+// renderDatabaseBackups answers the backup of the database the form names,
+// after a restore or a download.
 func (h *AppsHandler) renderDatabaseBackups(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if errors.Is(err, repository.ErrAppNotFound) {
@@ -240,7 +206,7 @@ func (h *AppsHandler) renderDatabaseBackups(w http.ResponseWriter, r *http.Reque
 		renderError(w, "load app failed", err)
 		return
 	}
-	view, err := h.backupsView(r, app, true)
+	view, err := h.backupsView(r, app, true, r.FormValue("database"))
 	if err != nil {
 		renderError(w, "load backups failed", err)
 		return

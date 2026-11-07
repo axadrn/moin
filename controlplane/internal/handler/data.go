@@ -43,7 +43,7 @@ func (h *AppsHandler) Data(w http.ResponseWriter, r *http.Request) {
 			database = databases[0].Path
 		}
 	}
-	view.Backups, err = h.backupsView(r, app, database != "" && table == "")
+	view.Backups, err = h.backupsView(r, app, database != "" && table == "", database)
 	if err != nil {
 		renderError(w, "load backups failed", err)
 		return

@@ -18,13 +18,16 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestWALGPointInTime runs a real postgres:17 as the service db of the app
-// walgtest, with a local S3 (SeaweedFS) next to it. It writes rows at T1, more at
-// T2, restores to a time between them and checks that exactly the T1 rows
-// are back. Run with: go test -tags docker -run WALG ./internal/agent/
+// TestPostgresGoBack is the promise for Postgres: a real postgres:17 as
+// the service db of the app walgtest, with a local S3 (SeaweedFS) next to
+// it. It writes rows, notes the minute, changes and deletes some, goes
+// back to the noted minute and finds exactly its rows, undoes the restore,
+// goes back across the timelines the restores made, checks the history,
+// downloads a copy and breaks the history to see the check fail. Run with:
+// go test -tags docker -run PostgresGoBack ./internal/agent/
 // MOIN_WALG_BINARY skips the download of WAL-G.
-func TestWALGPointInTime(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+func TestPostgresGoBack(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
 	defer cancel()
 	walgBinaryPath = os.Getenv("MOIN_WALG_BINARY")
 	defer func() { walgBinaryPath = "" }()
@@ -55,11 +58,15 @@ func TestWALGPointInTime(t *testing.T) {
 	os.WriteFile(filepath.Join(a.appDir(app), "current"), []byte("1"), 0o600)
 	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("4f6c1d2e-0000-4000-8000-000000000001"), 0o600)
 	down := func() {
-		exec.Command("docker", "compose", "-p", project(app), "-f", composeFile, "down", "-v").Run()
+		// The companion mounts the data volume: it goes first.
 		exec.Command("docker", "rm", "-f", companionName(app, "db"), "moin-walgtest-s3").Run()
+		exec.Command("docker", "compose", "-p", project(app), "-f", composeFile, "down", "-v").Run()
+		exec.Command("docker", "volume", "rm", "-f", "moin-walgtest-pgdata").Run()
 	}
 	down()
 	defer down()
+	// What an earlier run left halfway goes, as when the agent starts.
+	b.removeThrowaways(ctx)
 	// A local S3 for this test only, outside the app: a restore stops and
 	// starts the app's services, never the bucket.
 	if out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", "moin-walgtest-s3", "-p", "19000:8333", "chrislusf/seaweedfs:latest", "server", "-s3", "-s3.port=8333", "-dir=/data").CombinedOutput(); err != nil {
@@ -85,149 +92,179 @@ func TestWALGPointInTime(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	b.storage = storage
+	e := b.engine(app, database)
 
-	target, err := a.postgres(ctx, app, database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for deadline := time.Now().Add(time.Minute); ; {
-		if exec.Command("docker", "exec", target.container, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "app").Run() == nil {
-			break
+	var target pgTarget
+	ready := func() {
+		t.Helper()
+		var err error
+		for deadline := time.Now().Add(time.Minute); ; {
+			target, err = a.postgres(ctx, app, database)
+			if err == nil && exec.Command("docker", "exec", target.container, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "app").Run() == nil {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("postgres did not start: %v", err)
+			}
+			time.Sleep(time.Second)
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("postgres did not start")
-		}
-		time.Sleep(time.Second)
 	}
-
-	// The companion starts and takes the first base backup.
-	b.walgOnce(ctx)
-	running, _ := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
-	if strings.TrimSpace(running) != "true" {
-		logs, _ := exec.Command("docker", "logs", companionName(app, "db")).CombinedOutput()
-		t.Fatalf("companion not running: %s", logs)
-	}
-	bases, err := b.walgBaseBackups(ctx, app, database)
-	if err != nil || len(bases) != 1 {
-		t.Fatalf("base backups %v %v", bases, err)
-	}
-
+	ready()
 	sql := func(script string) string {
+		t.Helper()
 		out, err := target.psql(ctx, script, nil, false)
 		if err != nil {
 			t.Fatalf("%s: %v", script, err)
 		}
 		return strings.TrimSpace(out)
 	}
-	// waitWAL closes the segment and waits until the bucket has more WAL.
-	waitWAL := func() {
+	orders := func() string {
+		t.Helper()
+		return sql(`SELECT coalesce(string_agg(id || ':' || at, ',' ORDER BY id), '') FROM orders;`)
+	}
+	// flush closes the segment and waits until the bucket has more WAL.
+	flush := func() {
+		t.Helper()
 		before, _ := b.walgObjects(ctx, app, database, "wal_005")
-		if err := b.walgSwitch(ctx, app, database); err != nil {
-			t.Fatal(err)
-		}
-		for deadline := time.Now().Add(2 * time.Minute); ; {
-			now, _ := b.walgObjects(ctx, app, database, "wal_005")
-			if now > before {
-				return
-			}
-			if time.Now().After(deadline) {
-				logs, _ := exec.Command("docker", "logs", "--tail", "20", companionName(app, "db")).CombinedOutput()
-				t.Fatalf("no new WAL in the bucket after a switch: %s", logs)
-			}
-			time.Sleep(time.Second)
+		b.walgFlush(ctx, app, database)
+		if now, _ := b.walgObjects(ctx, app, database, "wal_005"); now <= before {
+			logs, _ := exec.Command("docker", "logs", "--tail", "20", companionName(app, "db")).CombinedOutput()
+			t.Fatalf("no new WAL in the bucket after a flush: %s", logs)
 		}
 	}
-	sql(`CREATE TABLE orders (id int PRIMARY KEY, at text); INSERT INTO orders VALUES (1, 'T1'), (2, 'T1');`)
-	waitWAL()
-	time.Sleep(2 * time.Second)
-	between := time.Now().UTC()
-	time.Sleep(2 * time.Second)
-	sql(`INSERT INTO orders VALUES (3, 'T2'), (4, 'T2'); UPDATE orders SET at = 'T2' WHERE id = 1;`)
-	waitWAL()
+	goBack := func(request protocol.BackupRestore, want string) {
+		t.Helper()
+		request.App, request.Database = app, database.Path
+		if err := b.restore(ctx, request); err != nil {
+			t.Fatalf("restore %+v: %v", request, err)
+		}
+		ready()
+		if got := orders(); got != want {
+			t.Fatalf("after the restore %+v: %s, want %s", request, got, want)
+		}
+	}
+	pause := func() time.Time {
+		time.Sleep(2 * time.Second)
+		at := time.Now().UTC()
+		time.Sleep(2 * time.Second)
+		return at
+	}
 
+	// Record starts the companion and takes the first base backup.
+	b.recordAll(ctx)
+	running, _ := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
+	if strings.TrimSpace(running) != "true" {
+		logs, _ := exec.Command("docker", "logs", companionName(app, "db")).CombinedOutput()
+		t.Fatalf("companion not running: %s", logs)
+	}
+	if bases, err := b.walgBaseBackups(ctx, app, database); err != nil || len(bases) != 1 {
+		t.Fatalf("base backups %v %v", bases, err)
+	}
+
+	sql(`CREATE TABLE orders (id int PRIMARY KEY, at text); INSERT INTO orders VALUES (1, 'T1'), (2, 'T1');`)
+	flush()
+	noted := pause()
+	sql(`INSERT INTO orders VALUES (3, 'T2'), (4, 'T2'); UPDATE orders SET at = 'T2' WHERE id = 1;`)
+	flush()
+	beforeFirst := pause()
 	status := b.status(ctx, app, database, true)
-	if status.Since == nil || status.ReplicatedAt == nil || status.ReplicatedAt.Before(between) || status.Note != "" {
+	if status.Since == nil || status.ReplicatedAt == nil || status.ReplicatedAt.Before(noted) || status.Note != "" || len(status.Copies) != 0 {
 		t.Fatalf("status %+v", status)
 	}
 
-	err = b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &between})
-	if err != nil {
-		t.Fatalf("restore: %v", err)
+	// Back to the noted minute: exactly its rows.
+	goBack(protocol.BackupRestore{At: &noted}, "1:T1,2:T1")
+	copies, err := b.copies(ctx, app, database)
+	if err != nil || len(copies) != 1 {
+		t.Fatalf("copies after the restore %+v %v", copies, err)
 	}
-	target, err = a.postgres(ctx, app, database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for deadline := time.Now().Add(time.Minute); ; {
-		if exec.Command("docker", "exec", target.container, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "app").Run() == nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("postgres did not come back")
-		}
-		time.Sleep(time.Second)
-	}
-	got := sql(`SELECT string_agg(id || ':' || at, ',' ORDER BY id) FROM orders;`)
-	if got != "1:T1,2:T1" {
-		t.Fatalf("after the restore to %s: %s, want 1:T1,2:T1", between, got)
-	}
-	// The snapshot before the restore holds the T2 state.
-	snapshots, _ := b.snapshots(ctx, app, database.Path)
-	if len(snapshots) == 0 || snapshots[0].Reason != "before-restore" {
-		t.Errorf("snapshots %+v", snapshots)
-	}
-	// Continuous backup goes on after the restore, on the new timeline:
-	// the old slot from the restored data is gone, WAL-G streams again.
-	for deadline := time.Now().Add(time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'moin_walg' AND active;`) != "1"; {
+	// The history goes on after the restore, on the new timeline.
+	for deadline := time.Now().Add(2 * time.Minute); sql(`SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'moin_walg' AND active;`) != "1"; {
 		if time.Now().After(deadline) {
 			logs, _ := exec.Command("docker", "logs", "--tail", "10", companionName(app, "db")).CombinedOutput()
 			t.Fatalf("WAL-G does not stream after the restore: %s", logs)
 		}
 		time.Sleep(time.Second)
 	}
-	sql(`INSERT INTO orders VALUES (5, 'T3'), (6, 'T3');`)
-	waitWAL()
-	time.Sleep(2 * time.Second)
-	afterT3 := time.Now().UTC()
-	time.Sleep(2 * time.Second)
-	sql(`DELETE FROM orders;`)
-	waitWAL()
-	running, _ = a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
-	if strings.TrimSpace(running) != "true" {
-		t.Fatal("WAL-G stopped after the restore")
-	}
-	restoreTo := func(at time.Time, want string) {
-		t.Helper()
-		if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &at}); err != nil {
-			t.Fatalf("restore to %s: %v", at, err)
-		}
-		target, err = a.postgres(ctx, app, database)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for deadline := time.Now().Add(time.Minute); exec.Command("docker", "exec", target.container, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "app").Run() != nil; {
-			if time.Now().After(deadline) {
-				t.Fatal("postgres did not come back")
-			}
-			time.Sleep(time.Second)
-		}
-		if got := sql(`SELECT coalesce(string_agg(id || ':' || at, ',' ORDER BY id), '') FROM orders;`); got != want {
-			t.Fatalf("after the restore to %s: %s, want %s", at, got, want)
-		}
-	}
-	// A second restore, to after T3 on the new timeline.
-	restoreTo(afterT3, "1:T1,2:T1,5:T3,6:T3")
-	// And back before the first restore: the older history still serves.
-	restoreTo(between, "1:T1,2:T1")
+	// Undo: the copy before the restore puts the state before it back.
+	goBack(protocol.BackupRestore{Copy: copies[0].ID}, "1:T2,2:T1,3:T2,4:T2")
 
-	// A time outside the window is refused, and nothing changes.
+	sql(`INSERT INTO orders VALUES (5, 'T3'), (6, 'T3');`)
+	flush()
+	afterT3 := pause()
+	sql(`DELETE FROM orders;`)
+	flush()
+	// A moment after the first restore, on its timeline.
+	goBack(protocol.BackupRestore{At: &afterT3}, "1:T2,2:T1,3:T2,4:T2,5:T3,6:T3")
+	// A moment before the first restore but after the moment it went back
+	// to: the timeline live then, not the newest.
+	goBack(protocol.BackupRestore{At: &beforeFirst}, "1:T2,2:T1,3:T2,4:T2")
+	// And back to the first noted minute once more.
+	goBack(protocol.BackupRestore{At: &noted}, "1:T1,2:T1")
+
+	// A moment to come is refused, and nothing changes.
 	future := time.Now().Add(time.Hour)
-	if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &future}); err == nil || !strings.Contains(err.Error(), "outside the point in time window") {
-		t.Errorf("restore to the future: %v", err)
+	if err := b.restore(ctx, protocol.BackupRestore{App: app, Database: database.Path, At: &future}); err == nil {
+		t.Error("a restore to a moment to come worked")
+	}
+	if got := orders(); got != "1:T1,2:T1" {
+		t.Fatalf("after a refused restore: %s", got)
+	}
+
+	// The daily check passes on a good history.
+	for deadline := time.Now().Add(3 * time.Minute); ; {
+		bases, _ := b.walgBaseBackups(ctx, app, database)
+		if len(bases) >= 4 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no base backups after the restores: %v", bases)
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if err := e.Check(ctx); err != nil {
+		logs, _ := exec.Command("docker", "logs", "--tail", "80", companionName(app, "db")).CombinedOutput()
+		names := []string{}
+		b.walgList(ctx, app, database, func(name string, modified time.Time) { names = append(names, name+"@"+modified.Format("15:04:05")) })
+		bases, _ := b.walgBaseBackups(ctx, app, database)
+		_, prefix, _ := b.walgPrefix(app, database)
+		sentinels := ""
+		for _, base := range bases {
+			object, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(prefix + "/basebackups_005/" + base.name + "_backup_stop_sentinel.json")})
+			if err == nil {
+				body := new(strings.Builder)
+				buf := make([]byte, 4096)
+				n, _ := object.Body.Read(buf)
+				body.Write(buf[:n])
+				object.Body.Close()
+				sentinels += base.name + ": " + body.String() + "\n"
+			}
+		}
+		t.Fatalf("the check of a good history: %v\ncompanion: %s\nwal: %v\nsentinels: %s\ndb: %s / %s", err, logs, names, sentinels,
+			sql(`SELECT pg_current_wal_lsn() || ' ' || (SELECT timeline_id FROM pg_control_checkpoint());`),
+			sql(`SELECT coalesce(string_agg(slot_name || ' ' || active || ' ' || coalesce(restart_lsn::text, '-'), ';'), '') FROM pg_replication_slots;`))
+	}
+
+	// Download a copy: a pg_dump pg_restore reads.
+	copied, err := b.download(ctx, protocol.BackupRequest{App: app})
+	if err != nil {
+		t.Fatal(err)
+	}
+	object, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(storage.Bucket), Key: aws.String(copied.Key)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dump := filepath.Join(t.TempDir(), "copy.dump")
+	out, _ := os.Create(dump)
+	out.ReadFrom(object.Body)
+	out.Close()
+	object.Body.Close()
+	list, err := exec.CommandContext(ctx, "docker", "run", "--rm", "-v", dump+":/copy.dump:ro", "postgres:17", "pg_restore", "--list", "/copy.dump").CombinedOutput()
+	if err != nil || !strings.Contains(string(list), "TABLE public orders") {
+		t.Fatalf("pg_restore --list: %v %s", err, list)
 	}
 
 	// The slot is capped, so a WAL-G that stays down cannot fill the disk.
-	b.walgOnce(ctx)
 	if got := sql(`SHOW max_slot_wal_keep_size;`); got != "4GB" {
 		t.Errorf("max_slot_wal_keep_size = %s, want 4GB", got)
 	}
@@ -251,41 +288,70 @@ func TestWALGPointInTime(t *testing.T) {
 		lost = sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'moin_walg'), '');`) == "lost"
 	}
 	if !lost {
-		t.Fatalf("the slot never got lost: %s; cap %s; lsn %s", sql(`SELECT string_agg(slot_name || ' ' || coalesce(wal_status, '-') || ' ' || active || ' ' || coalesce(restart_lsn::text, '-'), '; ') FROM pg_replication_slots;`), sql(`SHOW max_slot_wal_keep_size;`), sql(`SELECT pg_current_wal_lsn();`))
+		t.Fatalf("the slot never got lost")
 	}
+	// Back to the real cap, or the new slot is lost again at once.
+	sql(`ALTER SYSTEM SET max_slot_wal_keep_size = '4GB';`)
+	sql(`SELECT pg_reload_conf();`)
 	basesBefore, _ := b.walgBaseBackups(ctx, app, database)
-	b.walgOnce(ctx)
+	b.recordAll(ctx)
 	if got := sql(`SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'moin_walg'), 'none');`); got == "lost" {
 		t.Errorf("the slot is still lost")
-	}
-	running, _ = a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", companionName(app, "db"))
-	if strings.TrimSpace(running) != "true" {
-		t.Errorf("no companion after the lost slot")
 	}
 	basesAfter, _ := b.walgBaseBackups(ctx, app, database)
 	if len(basesAfter) <= len(basesBefore) {
 		t.Errorf("no new base backup: %d before, %d after", len(basesBefore), len(basesAfter))
 	}
 	status = b.status(ctx, app, database, false)
-	if !strings.Contains(status.Note, "Continuous backup broke") || !strings.Contains(status.Note, "took a new base backup") {
+	if !strings.Contains(status.Note, "The backup broke") || !strings.Contains(status.Note, "started it again") {
 		t.Errorf("note %q", status.Note)
 	}
 	if status.Since == nil || status.Since.Before(basesAfter[len(basesAfter)-1].at.Add(-time.Second)) {
-		t.Errorf("the window starts before the new base backup: %v", status.Since)
+		t.Errorf("the history starts before the new base backup: %v", status.Since)
 	}
 
-	// Without a bucket the companion goes and its slot with it.
-	b.walgOnce(ctx)
+	// A broken history fails the check loudly: the newest base backup's
+	// files turn to garbage.
+	newest := basesAfter[len(basesAfter)-1].name
+	_, prefix, _ := b.walgPrefix(app, database)
+	pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(storage.Bucket), Prefix: aws.String(prefix + "/basebackups_005/" + newest + "/")})
+	broken := 0
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, object := range page.Contents {
+			client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(storage.Bucket), Key: object.Key, Body: strings.NewReader("garbage")})
+			broken++
+		}
+	}
+	if broken == 0 {
+		t.Fatal("no base backup files to break")
+	}
+	if err := e.Check(ctx); err == nil {
+		t.Fatal("the check of a broken history passed")
+	} else {
+		t.Logf("the check of a broken history: %v", err)
+	}
+
+	// Without a bucket the companion goes and its slot with it, and no
+	// restore or check volume is left.
 	b.storage = nil
-	b.walgOnce(ctx)
+	b.recordAll(ctx)
 	if out, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=moin.walg").Output(); strings.TrimSpace(string(out)) != "" {
 		t.Errorf("companion left: %s", out)
 	}
 	if slots := sql(`SELECT count(*) FROM pg_replication_slots;`); slots != "0" {
 		t.Errorf("slots left: %s", slots)
 	}
-	out, _ := exec.Command("docker", "volume", "ls", "-q", "--filter", "name=moin-restore-").Output()
-	if strings.TrimSpace(string(out)) != "" {
-		t.Errorf("restore volumes left: %s", out)
+	if out, _ := exec.Command("docker", "ps", "-aq", "--filter", "label=moin.drill").Output(); strings.TrimSpace(string(out)) != "" {
+		t.Errorf("throwaway containers left: %s", out)
+	}
+	for _, prefix := range []string{"moin-restore-", "moin-check-"} {
+		out, _ := exec.Command("docker", "volume", "ls", "-q", "--filter", "name="+prefix).Output()
+		if strings.TrimSpace(string(out)) != "" {
+			t.Errorf("volumes left: %s", out)
+		}
 	}
 }

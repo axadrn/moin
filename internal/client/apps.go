@@ -39,11 +39,10 @@ type App struct {
 	// started; a restart applies them. Only App fills it.
 	ChangesWaiting int `json:"changes_waiting"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
-	Repo                  string `json:"repo"`
-	Branch                string `json:"branch"`
-	AutoDeploy            bool   `json:"auto_deploy"`
-	Pinned                bool   `json:"pinned"`
-	SnapshotBeforeChanges bool   `json:"snapshot_before_changes"`
+	Repo       string `json:"repo"`
+	Branch     string `json:"branch"`
+	AutoDeploy bool   `json:"auto_deploy"`
+	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
 	// Bucket is the bucket the app uploads and backs up to; empty follows

@@ -16,8 +16,20 @@ import (
 )
 
 // Version is the protocol version the agent reports in Hello. Bump it when a
-// message changes in a way an older peer cannot read.
-const Version = 1
+// message changes in a way an older peer cannot read. Version 2 brought
+// backups as one history to go back in, without snapshots.
+const Version = 2
+
+// Needs is the protocol version an agent must speak for a request: the
+// control plane answers "update the agent" to an older one instead of
+// sending it.
+func Needs(messageType MessageType) int {
+	switch messageType {
+	case TypeBackupList, TypeBackupRestore, TypeBackupDownload:
+		return 2
+	}
+	return 1
+}
 
 const (
 	// RegisterPath trades a one-time install token, sent as
@@ -69,18 +81,21 @@ const (
 	// control plane sends it after hello and whenever it changes. The agent
 	// answers with TypeOK.
 	TypeBackupConfig MessageType = "backup.config"
-	// TypeBackupSnapshot takes a snapshot of an app's databases now
-	// (BackupRequest). The agent answers with TypeBackupsResult.
-	TypeBackupSnapshot MessageType = "backup.snapshot"
-	// TypeBackupList lists the backups of an app (BackupRequest). The agent
-	// answers with TypeBackupsResult.
+	// TypeBackupList says how the backups of an app stand (BackupRequest).
+	// The agent answers with TypeBackupsResult.
 	TypeBackupList    MessageType = "backup.list"
 	TypeBackupsResult MessageType = "backups.result"
-	// TypeBackupRestore puts a snapshot or a point in time back
-	// (BackupRestore). The agent answers with TypeOK or TypeError.
+	// TypeBackupRestore puts a database back to a moment, or to the copy
+	// before an earlier restore (BackupRestore). The agent answers with
+	// TypeOK or TypeError.
 	TypeBackupRestore MessageType = "backup.restore"
+	// TypeBackupDownload makes a full copy of one database in the bucket's
+	// downloads/ folder (BackupRequest). The agent answers with
+	// TypeBackupFile or TypeError.
+	TypeBackupDownload MessageType = "backup.download"
+	TypeBackupFile     MessageType = "backup.file"
 	// TypeBackupStatus is how the backups of an app stand (Backups), sent by
-	// the agent after a snapshot, a restore drill or a failure.
+	// the agent after a daily check, or when a backup breaks or works again.
 	TypeBackupStatus MessageType = "backup.status"
 
 	// TypeServerConfig sets how the server is reached and locked down
@@ -259,9 +274,6 @@ type DeployStart struct {
 	Registry     *Registry         `json:"registry,omitempty"`
 	Env          map[string]string `json:"env,omitempty"`
 	Routing      *Routing          `json:"routing,omitempty"`
-	// Snapshot takes a snapshot of the app's databases before the new
-	// release starts, when backups are set up.
-	Snapshot bool `json:"snapshot,omitempty"`
 }
 
 // Routing is how visitors reach the main service, as set in web, CLI, TUI
@@ -316,6 +328,10 @@ type DeployDone struct {
 	OK       bool     `json:"ok"`
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
+	// Before is the moment, by the server's clock, just before the new
+	// release started over an older one: the control plane remembers it,
+	// so a restore can go back to it.
+	Before *time.Time `json:"before,omitempty"`
 }
 
 // Detected is what the agent learned about an app from its repo and its
@@ -541,8 +557,6 @@ type DBQuery struct {
 	Params []any  `json:"params,omitempty"`
 	Write  bool   `json:"write,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
-	// Snapshot takes a snapshot before a write, when backups are set up.
-	Snapshot bool `json:"snapshot,omitempty"`
 }
 
 // DBResult is the answer to a DBQuery. Values are null, numbers or text;
@@ -554,18 +568,23 @@ type DBResult struct {
 	Rows      [][]any  `json:"rows"`
 	Truncated bool     `json:"truncated,omitempty"`
 	Changes   int64    `json:"changes,omitempty"`
+	// Before is the moment, by the server's clock, just before a write:
+	// the control plane remembers it, so a restore can go back to it.
+	Before *time.Time `json:"before,omitempty"`
 }
 
 // BackupStorage is an S3-compatible bucket. Everything of a workspace
 // goes under <Path>/<Workspace>/, each app under <app>/<app ID>/:
 //
-//	<Path>/<Workspace>/<app>/<app ID>/uploads/
-//	<Path>/<Workspace>/<app>/<app ID>/<database>/litestream/
-//	<Path>/<Workspace>/<app>/<app ID>/<database>/snapshots/
+//	<app>/<app ID>/uploads/                      sources of moin deploy, a day
+//	<app>/<app ID>/downloads/                    copies to download, a day
+//	<app>/<app ID>/<database>/litestream/        every change of a SQLite file, 7 days
+//	<app>/<app ID>/<database>/walg/              every change of a Postgres, 7 days
+//	<app>/<app ID>/<database>/before-restore/    the copy before each restore, 7 days
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
 // sharing one bucket never touch each other's files. Name is the bucket's
-// name in moin, which snapshots carry; older control planes send none.
+// name in moin.
 type BackupStorage struct {
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
@@ -578,25 +597,21 @@ type BackupStorage struct {
 }
 
 // BackupConfig is where backups go. Storage is the workspace's default
-// bucket; without it the agent stops replicating. AppStorage is the bucket
-// of each app, by name, that uses another one than the default; older
-// agents ignore it and back up every app to Storage. Apps are the IDs of
-// the server's apps by name: an app deployed before deploys brought its ID
-// gets it here, so its backups start without another deploy.
+// bucket; without it the agent stops recording. AppStorage is the bucket
+// of each app, by name, that uses another one than the default. Apps are
+// the IDs of the server's apps by name: an app deployed before deploys
+// brought its ID gets it here, so its backups start without another
+// deploy.
 type BackupConfig struct {
 	Storage    *BackupStorage            `json:"storage,omitempty"`
 	AppStorage map[string]*BackupStorage `json:"app_storage,omitempty"`
 	Apps       map[string]string         `json:"apps,omitempty"`
 }
 
-// BackupRequest names an app; Database narrows it to one database. Reason
-// names a snapshot, such as "manual". Older are the buckets the app left:
-// a list also shows the snapshots it keeps there.
+// BackupRequest names an app; Database narrows it to one database.
 type BackupRequest struct {
-	App      string          `json:"app"`
-	Database string          `json:"database,omitempty"`
-	Reason   string          `json:"reason,omitempty"`
-	Older    []BackupStorage `json:"older,omitempty"`
+	App      string `json:"app"`
+	Database string `json:"database,omitempty"`
 }
 
 // Backups are the backups of an app's databases.
@@ -605,47 +620,55 @@ type Backups struct {
 	Databases []DatabaseBackup `json:"databases"`
 }
 
-// DatabaseBackup is how one database is backed up: its snapshots, newest
-// first, and the window a point in time restore can reach. VerifiedAt is
-// the newest restore drill that passed the integrity check.
+// DatabaseBackup is how one database is backed up. Since is the oldest
+// moment a restore can go back to, ReplicatedAt the newest change in the
+// bucket. VerifiedAt is the newest daily check that passed: it restored
+// the latest state into a throwaway copy and checked it. Copies are the
+// copies moin took before each restore of the last 7 days, newest first:
+// going back to one undoes that restore.
 type DatabaseBackup struct {
 	Database     string     `json:"database"`
 	Kind         string     `json:"kind,omitempty"`
-	Snapshots    []Snapshot `json:"snapshots"`
 	Since        *time.Time `json:"since,omitempty"`
 	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
 	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
+	Copies       []Copy     `json:"copies,omitempty"`
 	Error        string     `json:"error,omitempty"`
-	// DrillError is why the newest restore check failed. Error holds it
-	// too when nothing else is wrong, for control planes that know no
-	// DrillError.
+	// DrillError is why the newest daily check failed. Error holds it too
+	// when nothing else is wrong.
 	DrillError string `json:"drill_error,omitempty"`
-	// Note says what a database lacks, such as a point in time window for
-	// a Postgres image WAL-G does not run in.
+	// Note says what a database lacks, such as backups for a Postgres
+	// image WAL-G does not run in.
 	Note string `json:"note,omitempty"`
 }
 
-// Snapshot is a full copy of a database in the bucket: a gzipped SQLite
-// file, or for Postgres a pg_dump in its custom format. Bucket is
-// the name of the bucket it is in, empty from older agents.
-type Snapshot struct {
-	ID        string    `json:"id"`
-	Reason    string    `json:"reason"`
-	Size      int64     `json:"size"`
-	CreatedAt time.Time `json:"created_at"`
-	Bucket    string    `json:"bucket,omitempty"`
+// Copy is the full copy of a database moin took before a restore. Its ID
+// is the time it was taken, in CopyIDLayout.
+type Copy struct {
+	ID   string    `json:"id"`
+	At   time.Time `json:"at"`
+	Size int64     `json:"size"`
 }
 
-// BackupRestore puts one database back: from a snapshot, or to a point in
-// time. The app stops for the swap and starts again. Storage is the bucket
-// the snapshot is in when it is not the app's bucket: a bucket the app
-// left, which keeps its older backups.
+// BackupRestore puts one database back: to the moment At, or to the copy
+// Copy took before an earlier restore, which undoes that restore. Either
+// way the agent first takes one full copy of the database as it is, so
+// this restore can be undone too. The app stops for the swap and starts
+// again.
 type BackupRestore struct {
-	App      string         `json:"app"`
-	Database string         `json:"database,omitempty"`
-	Snapshot string         `json:"snapshot,omitempty"`
-	At       *time.Time     `json:"at,omitempty"`
-	Storage  *BackupStorage `json:"storage,omitempty"`
+	App      string     `json:"app"`
+	Database string     `json:"database,omitempty"`
+	At       *time.Time `json:"at,omitempty"`
+	Copy     string     `json:"copy,omitempty"`
+}
+
+// BackupFile is a full copy of a database the agent put in the bucket for
+// a download: a gzipped SQLite file, or a pg_dump in its custom format.
+// Key is where it is in the app's bucket; it goes after a day.
+type BackupFile struct {
+	Database string `json:"database"`
+	Key      string `json:"key"`
+	Size     int64  `json:"size"`
 }
 
 // ServerConfig is how a server is reached and locked down.

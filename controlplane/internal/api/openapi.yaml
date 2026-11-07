@@ -67,7 +67,7 @@ tags:
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
-    description: Continuous backups and snapshots of every SQLite and Postgres database into your own S3-compatible bucket, with restore to a snapshot or a point in time and daily restore drills.
+    description: The backup of every SQLite and Postgres database, in your own S3-compatible bucket only, never through the control plane. moin writes down every change and keeps it 7 days; a restore goes back to any minute and can be undone for 7 days; every day moin checks that going back works; a full copy downloads with a short-lived link into your bucket.
   - name: Uptime
     description: The control plane checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: Alerts
@@ -1665,7 +1665,7 @@ paths:
       tags: [Catalog]
       operationId: updateApp
       summary: Update a catalog app
-      description: Sets VERSION to the version, the newest release when empty, and deploys the app's compose.yml from the catalog. The deploy takes a snapshot of its SQLite and Postgres databases first. An older version goes too, but its migrations may not go back.
+      description: Sets VERSION to the version, the newest release when empty, and deploys the app's compose.yml from the catalog. moin remembers the moment before, so a restore can go back to it. An older version goes too, but its migrations may not go back.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2580,7 +2580,7 @@ paths:
       tags: [Backups]
       operationId: getAppBackups
       summary: List backups
-      description: The snapshots of every database of the app, newest first, the window a point in time restore can reach, and the newest restore drill. Read from the server and the bucket.
+      description: How every database of the app is backed up, and the moments a restore can go back to. Quick moments come first (1 minute, 15 minutes, 1 hour ago, yesterday this time), then the moments moin remembered before a deploy, a data edit or a catalog update, and the copies it took before each restore, newest first. Only moments inside the last 7 days of history show. Read from the server and the bucket.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2601,27 +2601,37 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`no_backups` without a bucket, `server_offline`.'
+          description: '`no_backups` without a bucket, `server_offline`, `agent_outdated` when the agent is too old.'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/backups/downloads:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
     post:
       tags: [Backups]
-      operationId: backUpApp
-      summary: Back up now
-      description: Takes a snapshot of every database of the app now.
+      operationId: downloadBackup
+      summary: Download a copy
+      description: The agent makes a full copy of a database (SQLite gzipped, Postgres as pg_dump in its custom format) and puts it in the app's own bucket under downloads/, where it stays a day. Nothing goes through the control plane. It runs on its own; follow it with getBackupDownload, which gives a short-lived signed link to the bucket once it is ready.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
-        '201':
-          description: The backups with the new snapshot.
+        '202':
+          description: The copy runs.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AppBackups'
+                $ref: '#/components/schemas/BackupDownload'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2632,43 +2642,41 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_backups` without a bucket, `server_offline`.'
-        '424':
-          $ref: '#/components/responses/AgentError'
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/apps/{app}/backups/settings:
+  /api/v1/apps/{app}/backups/downloads/{download}:
     parameters:
       - $ref: '#/components/parameters/AppName'
-    put:
-      tags: [Backups]
-      operationId: setBackupSettings
-      summary: Snapshot before changes
-      description: Turns the snapshot before every deploy, restore and data change made through moin on or off. On by default.
-      requestBody:
+      - name: download
+        in: path
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BackupSettings'
+        schema:
+          type: string
+        description: The id downloadBackup answered.
+    get:
+      tags: [Backups]
+      operationId: getBackupDownload
+      summary: Get a download
+      description: How a copy stands. Once `state` is `ready`, `link` is a signed link to the copy in the app's own bucket, valid 15 minutes; ask again for a fresh one. A copy lasts a day.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
         '200':
-          description: The setting.
+          description: The download.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BackupSettings'
+                $ref: '#/components/schemas/BackupDownload'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found`. No app with this ID or name belongs to the account.'
+          description: '`not_found` for an unknown app or a download older than a day.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -2785,7 +2793,7 @@ paths:
       tags: [Backups]
       operationId: restoreApp
       summary: Restore a database
-      description: Puts a database back from a snapshot, or as it was at a point in time. The agent takes a snapshot of the current state first, checks the restored file, stops the app for the swap and starts it again. Point in time history starts again from the restored state.
+      description: Puts a database back to a moment from getAppBackups, by its id or label, or to a time in its history, to the minute. The agent first takes one full copy of the database as it is, which stays 7 days in the app's bucket, so the restore can be undone; then it checks what came back, stops the app for the swap and starts it again. A restore to an `undo-` moment puts that copy back.
       requestBody:
         required: true
         content:
@@ -2811,7 +2819,7 @@ paths:
           description: '`no_backups` without a bucket, `server_offline`.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.snapshot`.'
+          description: '`validation_failed` with `fields.moment`, `fields.at` outside the history, or `fields.database` when the app has several.'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
@@ -3045,7 +3053,7 @@ paths:
       tags: [Backups]
       operationId: setAppBucket
       summary: Choose the app's bucket
-      description: Moves the app's uploads and new backups to a bucket of the workspace; an empty `bucket` follows the default. Its older backups stay in the old bucket, getAppBackups still lists them, and restoreApp reads them from there.
+      description: Moves the app's uploads and new backups to a bucket of the workspace; an empty `bucket` follows the default. Its history starts again in the new bucket; what is in the old bucket stays there.
       requestBody:
         required: true
         content:
@@ -5276,9 +5284,6 @@ components:
         pinned:
           type: boolean
           description: Lists show the app above the others that run fine. Set it with `PUT /api/v1/apps/{app}/pin`.
-        snapshot_before_changes:
-          type: boolean
-          description: A snapshot before every change made through moin.
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
@@ -5763,7 +5768,7 @@ components:
               type: integer
             backups_checked:
               type: integer
-              description: Databases whose restore check passed in the last 24 hours.
+              description: Databases whose daily check passed in the last 24 hours.
     CatalogList:
       type: object
       required: [items]
@@ -6088,28 +6093,50 @@ components:
         bucket:
           type: string
           description: A bucket's name; empty follows the workspace's default bucket.
-    BackupSettings:
-      type: object
-      required: [snapshot_before_changes]
-      properties:
-        snapshot_before_changes:
-          type: boolean
     RestoreRequest:
       type: object
       properties:
         database:
           type: string
           description: The database's path in the container; needed when the app has several.
-        snapshot:
+        moment:
           type: string
-          description: A snapshot ID from getAppBackups.
-        bucket:
-          type: string
-          description: The bucket of the snapshot from getAppBackups when it is an older bucket the app left. Empty is the app's bucket. A point in time always comes from the app's bucket.
+          description: The id or the label of a moment from getAppBackups, like `1h`, `before-v12`, `Before your SQL change` or `undo-20261107T140200Z`.
         at:
           type: string
           format: date-time
-          description: A point in time inside the database's window.
+          description: A time in the database's history instead of a moment.
+    DownloadRequest:
+      type: object
+      properties:
+        database:
+          type: string
+          description: The database's path in the container; needed when the app has several.
+    BackupDownload:
+      type: object
+      required: [id, app, database, state, size, started_at]
+      properties:
+        id:
+          type: string
+        app:
+          type: string
+        database:
+          type: string
+        state:
+          type: string
+          enum: [running, ready, failed]
+        size:
+          type: integer
+          description: Bytes, once ready.
+        link:
+          type: string
+          description: A signed link to the copy in the app's own bucket, valid 15 minutes, once ready.
+        error:
+          type: string
+          description: Why the copy failed.
+        started_at:
+          type: string
+          format: date-time
     ServerMetrics:
       type: object
       required: [server, online, range, step_seconds, now, points, apps]
@@ -6352,49 +6379,32 @@ components:
           type: boolean
     AppBackups:
       type: object
-      required: [snapshot_before_changes, bucket, older_buckets, databases]
+      required: [bucket, older_buckets, databases]
       properties:
-        snapshot_before_changes:
-          type: boolean
         bucket:
           type: string
-          description: The bucket new backups of the app go to.
+          description: The bucket the history of the app goes to, your own.
         older_buckets:
           type: array
-          description: Buckets the app left. They keep its older backups; the snapshots there are listed too.
+          description: Buckets the app left.
           items:
             type: string
         databases:
           type: array
           items:
             type: object
-            required: [database, snapshots]
+            required: [database, moments]
             properties:
               database:
                 type: string
-              snapshots:
-                type: array
-                items:
-                  type: object
-                  required: [id, reason, size, created_at]
-                  properties:
-                    id:
-                      type: string
-                    reason:
-                      type: string
-                      description: manual, hourly (Postgres), before-v4, before-sql, before-restore.
-                    size:
-                      type: integer
-                    created_at:
-                      type: string
-                      format: date-time
-                    bucket:
-                      type: string
-                      description: The bucket the snapshot is in. Empty from older agents.
+              kind:
+                type: string
+                enum: [postgres]
+                description: '`postgres` for a Postgres service; absent for SQLite.'
               since:
                 type: string
                 format: date-time
-                description: The oldest point a point in time restore can reach.
+                description: The oldest moment a restore can go back to.
               replicated_at:
                 type: string
                 format: date-time
@@ -6402,16 +6412,52 @@ components:
               verified_at:
                 type: string
                 format: date-time
-                description: The newest restore drill that passed the integrity check.
+                description: The newest daily check that passed. It restored the newest state into a throwaway copy and checked it.
+              copies:
+                type: array
+                description: The copies moin took before each restore of the last 7 days, newest first.
+                items:
+                  type: object
+                  required: [id, at, size]
+                  properties:
+                    id:
+                      type: string
+                    at:
+                      type: string
+                      format: date-time
+                    size:
+                      type: integer
               error:
                 type: string
-              kind:
+                description: What the agent and its tools said, for details.
+              drill_error:
                 type: string
-                enum: [postgres]
-                description: '`postgres` for a Postgres service; absent for SQLite.'
+                description: Why the newest daily check failed.
+              problem:
+                type: string
+                description: In one short sentence why the backup does not work, like "The bucket can't be reached."; absent when it works.
               note:
                 type: string
-                description: What the database lacks, such as a point in time window for a Postgres image WAL-G does not run in.
+                description: What the database lacks, such as backups for a Postgres image WAL-G does not run in.
+              moments:
+                type: array
+                description: The moments a restore can go back to.
+                items:
+                  type: object
+                  required: [id, label, at, kind]
+                  properties:
+                    id:
+                      type: string
+                      description: What restoreApp takes, like 1h, before-v12, edit-37 or undo-20261107T140200Z.
+                    label:
+                      type: string
+                      description: Like "1 hour ago", "Before v12", "Before your SQL change", "Before the restore at 14:02".
+                    at:
+                      type: string
+                      format: date-time
+                    kind:
+                      type: string
+                      enum: [ago, deploy, update, edit, undo]
     Integrations:
       type: object
       required: [cloudflare, cloudflare_account, tailscale]
