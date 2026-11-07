@@ -37,7 +37,6 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 // Static asset paths are never logged (they would bury real requests).
 var skipLoggingPaths = []string{
 	"/assets/",
-	"/components/", // bundled vendored shadcn-templ component scripts
 	"/uploads/",
 	"/favicon.ico",
 }

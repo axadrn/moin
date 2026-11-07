@@ -21,7 +21,7 @@ templ HighlightScripts() {
 			pre.parentNode.insertBefore(block, pre);
 			block.appendChild(pre);
 
-			// Create copy button with Tailwind classes matching shadcn-templ.
+			// Create the copy button with the classes of kit.Command.
 			const button = document.createElement('button');
 			button.setAttribute('data-slot', 'code-copy-button');
 			button.setAttribute('type', 'button');

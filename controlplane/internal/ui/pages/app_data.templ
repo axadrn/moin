@@ -14,7 +14,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -119,7 +118,7 @@ templ databaseBackupValue(view DataView, database string) {
 		<span class="shrink-0 text-sm text-muted-foreground">No backups</span>
 	} else if known && backup.BackupError() != "" {
 		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.BackupError()) }>
-			@status.Symbol(status.KindFailed)
+			@kit.Dot(kit.StateFailed)
 			Backup fails
 		</span>
 	} else if known && backup.Since != nil {
@@ -192,7 +191,7 @@ templ dataTablePage(view DataView) {
 // dataError is why the server could not answer: a state of the page.
 templ dataError(message string) {
 	<p role="alert" class="flex items-center gap-2 px-1 text-sm text-failed" data-data-error>
-		@status.Symbol(status.KindFailed)
+		@kit.Dot(kit.StateFailed)
 		<span class="min-w-0 break-words">{ message }</span>
 	</p>
 }
