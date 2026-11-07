@@ -64,9 +64,9 @@ func TestRestoreNeedsAMoment(t *testing.T) {
 	if code == 0 || !strings.Contains(stderr, "--to 1h") || len(api.requests) > 0 {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
-	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "1h", "--yes")
+	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "1h")
 	if code == 0 || !strings.Contains(stderr, "--confirm shop") || len(api.requests) > 0 {
-		t.Fatalf("--yes alone: code %d, stderr %q, requests %v", code, stderr, api.requests)
+		t.Fatalf("without --confirm: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 	if moment, at := restoreTarget("14:01", time.Date(2026, 11, 7, 20, 0, 0, 0, time.UTC)); moment != "" || at == nil || !at.Equal(time.Date(2026, 11, 7, 14, 1, 0, 0, time.UTC)) {
 		t.Errorf("14:01 = %q %v", moment, at)

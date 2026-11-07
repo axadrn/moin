@@ -296,7 +296,6 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRestoreTarget, field: "moment", message: "Pick a moment to go back to, from moin backups."},
 	{err: service.ErrMoment, field: "moment", message: "There is no such moment. Pick one from moin backups, like 1h or before-v12."},
 	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one."},
-	{err: service.ErrConfirm, status: http.StatusUnprocessableEntity, code: "confirm_mismatch", message: "Type the app's name to confirm."},
 	{err: service.ErrMomentOutside, field: "at", message: "There is no copy that old. Pick a moment from moin backups."},
 	{err: service.ErrNoCopy, status: http.StatusConflict, code: "no_copy", message: "There is no copy yet. The first one is taken within a minute of a deploy with a bucket."},
 	{err: service.ErrBackupEvery, field: "every_minutes", message: "Copy every 15 minutes (15), hourly (60) or daily (1440)."},

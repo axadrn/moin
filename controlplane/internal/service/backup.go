@@ -50,7 +50,6 @@ var (
 	ErrNoCopy          = errors.New("there is no copy yet: the first one is taken within a minute of a deploy with a bucket")
 	ErrBackupEvery     = errors.New("how often: every 15 minutes, hourly or daily")
 	ErrBackupKeep      = errors.New("keep: 1, 3, 7 or 30 days")
-	ErrConfirm         = errors.New("type the app's name to confirm")
 )
 
 // AllowOnlyPublicBuckets makes the bucket check refuse private and local
@@ -563,8 +562,8 @@ func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName str
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(target.Confirm) != app.Name {
-		return nil, ErrConfirm
+	if err := confirmed(target.Confirm, app.Name); err != nil {
+		return nil, err
 	}
 	restore, err := s.reserveRestore(app, target.Database)
 	if err != nil {

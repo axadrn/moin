@@ -137,7 +137,7 @@ func TestRestoreToMoments(t *testing.T) {
 
 	// The name typed out is checked here, for every surface.
 	for _, typed := range []string{"", "blog", "shop2"} {
-		if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h", Confirm: typed}); !errors.Is(err, ErrConfirm) {
+		if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h", Confirm: typed}); !errors.Is(err, ErrConfirmMismatch) {
 			t.Fatalf("confirm %q: %v", typed, err)
 		}
 	}

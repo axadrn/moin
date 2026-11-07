@@ -171,9 +171,8 @@ func copyName(app, link string) string {
 
 // restore puts a database back to a moment.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", `restore [app] --to <moment> [--db <path>] [--confirm <app>]`).withApp().withYes()
+	flags := newFlags("restore", `restore [app] --to <moment> [--db <path>] [--confirm <app>]`).withApp().withConfirm()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	typed := flags.String("confirm", "", "the app's name, typed out, for scripts; without it the CLI asks for it")
 	to := flags.String("to", "", `a moment from `+build.Name+` backups, like before-v12 or 1h, or a time in UTC, like 14:01 or "2026-11-07 14:01"`)
 	if err := flags.parse(args); err != nil {
 		return err
@@ -193,23 +192,17 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if at != nil {
 		what = at.Format("2006-01-02 15:04") + " UTC"
 	}
-	// The control plane checks the name too: --yes is not enough.
-	if *typed == "" {
-		if !isTerminal(stdin) {
-			return fmt.Errorf("a restore replaces the data of %s: confirm it with --confirm %s", name, name)
-		}
-		err = confirmName(stdin, stdout, false, fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s keeps the data of now beside it, so you can undo this.", name, what, build.Name), name)
-		if err != nil {
-			return err
-		}
-		*typed = name
+	// The control plane checks the name typed out too.
+	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s keeps the data of now beside it, so you can undo this.", name, what, build.Name), name)
+	if err != nil {
+		return err
 	}
 	api, err := apiClient()
 	if err != nil {
 		return err
 	}
 	step(stdout, "restoring %s: building it beside the live database, then one switch", name)
-	err = api.Restore(ctx, name, *database, moment, at, *typed)
+	err = api.Restore(ctx, name, *database, moment, at, typed)
 	if err != nil {
 		return err
 	}

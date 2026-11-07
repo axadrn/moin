@@ -22,7 +22,7 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The confirm dialog sends the name the user typed.
-	_, err := h.apps.StartRestore(r.Context(), actor(r), r.PathValue("app"), service.RestoreTarget{Database: r.FormValue("database"), Moment: moment, Confirm: r.Header.Get("X-Moin-Confirm")})
+	_, err := h.apps.StartRestore(r.Context(), actor(r), r.PathValue("app"), service.RestoreTarget{Database: r.FormValue("database"), Moment: moment, Confirm: confirmation(r)})
 	if err != nil {
 		failed(w, r, "Not restored", err, nil)
 		return

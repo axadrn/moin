@@ -13,7 +13,7 @@ func TestRestoreNeedsTheTypedName(t *testing.T) {
 	s := newSwitches(t)
 	form := url.Values{"moment": {"1h"}, "database": {"/data/app.db"}}
 	body := s.post("/app/{workspaceSlug}/apps/{app}/backups/restore", "/app/ada/apps/blog/backups/restore", form, s.handler.BackupRestore)
-	if !strings.Contains(body, "Type the app") {
+	if !strings.Contains(body, "Type the name") {
 		t.Fatalf("a restore without the name: %s", body)
 	}
 	if activity(t, s, "backup.restored") != 0 {
