@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/internal/client"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -269,10 +270,7 @@ type Activity struct {
 func (a Activity) Summary() string {
 	lines := []string{}
 	for _, event := range a.Items {
-		via := event.Via
-		if event.Token != "" {
-			via += ", token " + event.Token
-		}
+		via := client.ViaLabel(event.Via, event.Token)
 		lines = append(lines, fmt.Sprintf("%s %s %s (%s).", event.CreatedAt.Format(time.RFC3339), event.Actor, event.Summary, via))
 	}
 	more := "This is the last page."

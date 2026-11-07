@@ -4,8 +4,10 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/internal/build"
 )
 
 func TestEnvSetSummary(t *testing.T) {
@@ -43,6 +45,22 @@ func TestSummariesReadWell(t *testing.T) {
 		if got != want {
 			t.Errorf("%q, want %q", got, want)
 		}
+	}
+}
+
+// TestActivitySaysHowLikeTheWeb: list_activity names how a change came in
+// as the web and the CLI do.
+func TestActivitySaysHowLikeTheWeb(t *testing.T) {
+	at := time.Date(2026, 11, 3, 14, 2, 0, 0, time.UTC)
+	activity := Activity{api.ActivityPage{Items: []api.WorkspaceEvent{
+		{Actor: "ada@example.com", Summary: "deployed shop v3", Via: "cli", Token: "ci", CreatedAt: at},
+		{Actor: "moin", Summary: "found shop.de of shop down: HTTP 502", Via: "system", CreatedAt: at},
+	}}}
+	want := "2 events, newest first. This is the last page.\n" +
+		"2026-11-03T14:02:00Z ada@example.com deployed shop v3 (CLI, token ci).\n" +
+		"2026-11-03T14:02:00Z moin found shop.de of shop down: HTTP 502 (" + build.Name + ")."
+	if got := activity.Summary(); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
 
