@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/config"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/service"
@@ -20,7 +21,7 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 		t.Fatalf("status = %d, body is no page", response.Code)
 	}
-	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-q"`, `data-docs-search-open`, `id="docs-search"`} {
+	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="site-search"`, `data-site-search-open`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("docs home misses %q", want)
 		}
@@ -34,24 +35,34 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	}
 }
 
-func TestDocsSearchFindsPagesAndSectionsWithATypo(t *testing.T) {
-	handler := newDocsTestHandler(t)
-	// Opened as a page, the search renders the home with what it finds.
-	body := serveDocs(t, handler, "/docs?q=domians").Body.String()
-	if !strings.Contains(body, `href="/docs/guides/domains"`) || strings.Contains(body, ">Start</h2>") {
-		t.Errorf("search page does not list only what it finds:\n%s", body)
+func TestSiteSearchFindsDocsAndCatalogWithATypo(t *testing.T) {
+	docs := newDocsTestHandler(t).docsService
+	store := catalog.NewStore([]catalog.Entry{{Slug: "ntfy", Name: "ntfy", Category: "Communication", Pitch: "Push notifications."}}, catalog.Registry{})
+	search := NewSiteSearchHandler(docs, service.NewCatalogService(store, nil))
+	serve := func(path string, htmx bool) string {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		if htmx {
+			request.Header.Set("HX-Request", "true")
+		}
+		recorder := httptest.NewRecorder()
+		search.Search(recorder, request)
+		return recorder.Body.String()
 	}
-	if !strings.Contains(body, `value="domians"`) {
-		t.Error("search page loses what was typed")
+	// Without JavaScript the search is a page with what it finds.
+	page := serve("/search?q=domians", false)
+	if !strings.Contains(strings.ToLower(page), "<!doctype html>") || !strings.Contains(page, `href="/docs/guides/domains"`) || !strings.Contains(page, `value="domians"`) {
+		t.Errorf("search page = %q", page)
 	}
-	// The palette asks /docs/search and gets only its answers.
-	request := httptest.NewRequest(http.MethodGet, "/docs/search?q=first", nil)
-	request.Header.Set("HX-Request", "true")
-	recorder := httptest.NewRecorder()
-	handler.SearchDocs(recorder, request)
-	fragment := recorder.Body.String()
-	if strings.Contains(strings.ToLower(fragment), "<!doctype html>") || !strings.Contains(fragment, `href="/docs/getting-started#first-step"`) {
-		t.Errorf("search answer = %q", fragment)
+	// The palette gets only its answers: a section, and an app by its name.
+	if fragment := serve("/search?q=first", true); strings.Contains(strings.ToLower(fragment), "<!doctype html>") || !strings.Contains(fragment, `href="/docs/getting-started#first-step"`) {
+		t.Errorf("palette answer = %q", fragment)
+	}
+	if fragment := serve("/search?q=nfty", true); !strings.Contains(fragment, `href="/catalog/ntfy"`) {
+		t.Errorf("nfty does not find ntfy: %q", fragment)
+	}
+	// Nothing typed: the first steps and the catalog.
+	if fragment := serve("/search?q=", true); !strings.Contains(fragment, `href="/docs/getting-started"`) || !strings.Contains(fragment, `href="/catalog"`) {
+		t.Errorf("empty search = %q", fragment)
 	}
 }
 

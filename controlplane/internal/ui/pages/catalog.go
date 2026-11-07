@@ -29,8 +29,7 @@ func (v CatalogEntryView) Latest() (catalog.Version, bool) {
 	return v.Versions[0], true
 }
 
-// CatalogView is the catalog page: the apps of the category the search
-// finds.
+// CatalogView is the catalog page: the apps of the category.
 type CatalogView struct {
 	Apps       []CatalogEntryView
 	Categories []string
@@ -39,15 +38,14 @@ type CatalogView struct {
 	// Base is where the pages of the apps live: /apps on the site,
 	// <workspace>/catalog in the app.
 	Base string
-	// Query is the search (FilterCatalog); Sort is SortUpdated or
-	// SortName. Both, and the category, live in the URL.
-	Query string
-	Sort  string
+	// Sort is SortUpdated or SortName. It and the category live in the
+	// URL.
+	Sort string
 }
 
 // URL is the catalog as it is now, for the address bar.
 func (v CatalogView) URL() string {
-	return catalogURL(v.Base, v.Category, v.Query, v.Sort)
+	return catalogURL(v.Base, v.Category, v.Sort)
 }
 
 // categoryOptions are the categories for the select, All first.
@@ -65,8 +63,8 @@ const (
 	SortName    = "name"
 )
 
-// FilterCatalog keeps the apps of category that the search finds, with
-// find.Name like the palette, so a typo like "nfty" still finds ntfy: on
+// FilterCatalog keeps the apps of category that query finds (the search of
+// the site, FindSite), with find.Name like the palette, so a typo like "nfty" still finds ntfy: on
 // their name first, then on their name, category and pitch together. A
 // search puts the best answers first; else sort orders them: the newest
 // release first, apps without a date last, or by name.
@@ -138,13 +136,10 @@ func releaseTime(app CatalogEntryView) time.Time {
 
 // catalogURL is the catalog with a category, a search and an order; the
 // defaults stay out of the URL.
-func catalogURL(base, category, query, sort string) string {
+func catalogURL(base, category, sort string) string {
 	values := url.Values{}
 	if category != "" {
 		values.Set("category", categorySlug(category))
-	}
-	if strings.TrimSpace(query) != "" {
-		values.Set("q", strings.TrimSpace(query))
 	}
 	if sort == SortName {
 		values.Set("sort", SortName)

@@ -31,7 +31,7 @@ API: GET /api/v1/catalog, GET /api/v1/catalog/{slug}
 MCP: list_catalog, get_catalog_app
 ```
 
-The search finds an app by its name, its category or what it does, and a typo still finds it: `nfty` finds ntfy. Next to it, pick a category, and the order: newest release first, or by name. The search and the category stay in the address, so a link shows the same list.
+Pick a category, and the order: newest release first, or by name. Both stay in the address, so a link shows the same list. To find one app, use the search at the top right (`⌘K` or `/`): it finds an app by its name, its category or what it does, and a typo still finds it: `nfty` finds ntfy.
 
 moin reads each app's image registry once an hour, so every version shows the hour it ships, newest first. Any of them can be installed, an older one too.
 

@@ -19,7 +19,10 @@ The palette is a box in the middle of the screen: type what you want, press `ent
 - **Every page**: Overview, Apps, Servers, Settings, Team, Alerts, Bucket, Activity, and each section of every app.
 - **Every app and every server**.
 - **Actions**: deploy, restart, start, roll back, open the app's domain. In the web the harmless ones run at once; rolling back asks first. In the terminal UI deploy, restart, stop and roll back ask first: `y` does it.
+- **The catalog**: an app you can install, such as ntfy or Umami (web only).
 - **The docs**, last, at most three pages (web only).
+
+On the website, signed out, the magnifier at the top right is the same box: it finds the docs and the catalog. There is no other search field anywhere.
 
 With nothing typed, it shows what goes with the page you are on first, such as the sections and actions of the app you are looking at, then **Recent**: what you picked most and latest. The web remembers that in your browser, the terminal UI its last eight picks.
 

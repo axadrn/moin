@@ -2,7 +2,6 @@ package blocks
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -51,7 +50,7 @@ templ Navbar() {
 			<div class="flex min-w-0 items-center gap-4">
 				<a href="/" class="flex items-center gap-2 text-xl leading-none outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home, beta" }>
 					@Wordmark()
-					@BetaBadge("max-[359px]:hidden")
+					@BetaBadge("max-sm:hidden")
 				</a>
 				<div class="hidden items-center lg:flex">
 					@navLink("/catalog", "Catalog")
@@ -61,21 +60,15 @@ templ Navbar() {
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-1">
-				// The docs search sits where the app keeps its search: top
-				// right, on every docs page. Without JavaScript it is the
-				// docs home with its field.
-				{{ inDocs := strings.HasPrefix(ctxkeys.URLPath(ctx), "/docs") }}
-				if inDocs {
-					<a href="/docs" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
-						@icon.Search(icon.Props{Class: "size-5"})
-					</a>
-				}
-				// On a phone in the docs the search takes the place of Docs.
-				if !inDocs {
-					<span class="lg:hidden">
-						@NavbarDocsMobile()
-					</span>
-				}
+				// The one search of the site, where the app keeps its search:
+				// top right, on every public page. Without JavaScript it is
+				// the page /search.
+				<a href="/search" data-site-search-open aria-label="Search" aria-keyshortcuts="Meta+K /" class="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
+					@icon.Search(icon.Props{Class: "size-5"})
+				</a>
+				<span class="lg:hidden">
+					@NavbarDocsMobile()
+				</span>
 				// The star count shows from starsShowAt on: a small one says
 				// "nobody uses this", like the live numbers of the home page.
 				{{ stars := githubstars.Count() }}
@@ -88,9 +81,6 @@ templ Navbar() {
 						<span class="text-sm font-medium tabular-nums">{ githubstars.Short(stars) }</span>
 					}
 				</a>
-				<span class="hidden lg:contents">
-					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-11 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"})
-				</span>
 				// One way in: /auth signs in and signs up alike. On a phone it
 				// is gray, so the page keeps its one primary button.
 				{{ href, label := "/auth", "Deploy now" }}
