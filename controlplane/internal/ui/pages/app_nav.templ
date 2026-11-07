@@ -67,11 +67,17 @@ templ appHeader(app model.App, section string) {
 
 // appActions are the buttons of an app: Start when it is stopped, else
 // Restart once it runs, and Deploy once it has a deploy. When saved changes
-// wait, Restart is the thing to do, so it is the primary one. Two equal
-// halves on a phone, next to the name from sm.
+// wait, Restart is the thing to do, so it is the primary one, and how many
+// wait stands quietly next to it, the reason for the button (on a phone
+// the Settings row says it). Two equal halves on a phone, next to the
+// name from sm.
 templ appActions(app model.App) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	<div id="app-actions" hx-swap-oob="true" class="grid w-full auto-cols-fr grid-flow-col gap-2 empty:hidden sm:ml-auto sm:flex sm:w-auto">
+	<div id="app-actions" hx-swap-oob="true" class="flex w-full flex-col gap-2 empty:hidden sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+		if app.ChangesWaiting > 0 && !app.Stopped && app.LiveNumber > 0 {
+			<span class="hidden text-sm text-muted-foreground sm:inline" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
+		}
+		<div class="grid w-full auto-cols-fr grid-flow-col gap-2 empty:hidden sm:flex sm:w-auto">
 		if app.Stopped {
 			@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/start", "hx-swap": "none", "hx-disable": "this", "data-start": true}) {
 				Start
@@ -86,6 +92,7 @@ templ appActions(app model.App) {
 				Deploy
 			}
 		}
+		</div>
 	</div>
 }
 
@@ -103,16 +110,11 @@ func deployKind(app model.App) kit.Kind {
 	return kit.Primary
 }
 
-// appStateLine is the answer of an app's page in one line: does it run, and
-// what waits for a restart.
+// appStateLine is the answer of an app's page in one line: does it run.
 templ appStateLine(app model.App) {
 	<p id="app-state" hx-swap-oob="true" class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium sm:order-last" data-status>
 		@kit.Dot(appStateKind(app))
 		<span>{ appStateWords(app) }</span>
-		if app.ChangesWaiting > 0 {
-			<span class="text-muted-foreground">·</span>
-			<span class="text-muted-foreground" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
-		}
 	</p>
 }
 
