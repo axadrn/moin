@@ -152,6 +152,9 @@ Rules every page follows:
   something lights up under the mouse and ends in a chevron or names its
   action; a row that only tells (a version, a fact) stays still. The kit
   does it: `kit.Row` with an href, `kit.RowButton`.
+- **Icons only in the catalog.** A catalog app shows its logo
+  (`kit.AppIcon`) where you browse and pick; your own apps go by their
+  names everywhere else.
 - **One look for picking.** The palette and every `kit.Select` list share
   `kit.OptionClass`: the option the mouse or the arrows are on is lit, only
   that one.
@@ -265,8 +268,9 @@ to run in bold.
 One thing, one word, on every surface and in every layer: the web, the
 CLI, the TUI, the API, MCP, the docs, and the code under them (handlers,
 services, tables, columns). Where the code says something else, it is
-renamed, with a migration when a table or column changes; an old CLI
-command or API field stays as an alias so nothing breaks.
+renamed, with a migration when a table or column changes. moin is in
+beta: a rename is a clean break, no alias and no redirect; the release
+notes say it under Changed.
 
 | Word | Means | Not |
 | --- | --- | --- |
@@ -281,6 +285,7 @@ command or API field stays as an alias so nothing breaks.
 | bucket | the S3-compatible bucket you bring, for backups and uploads | storage, S3 (alone), object storage (in copy) |
 | workspace | the space apps, servers and the team belong to | organization, account, team (for the space) |
 | team | the people in a workspace | members (in copy), users |
+| catalog | the place with the apps you install in one click; its items are apps ("catalog app" where it is unclear) | apps (for the place), templates, marketplace |
 | changelog | what changed in each version of moin | what's new, release notes (in the app) |
 | activity | who did what, when | audit log, history |
 

@@ -25,8 +25,6 @@ type SearchItem struct {
 	Key  string
 	Icon func(...icon.Props) templ.Component
 	Href string
-	// App, for an app itself, shows its icon instead of Icon.
-	App *model.App
 	// External opens Href in a new tab, like the app's own site.
 	External bool
 	// Post makes the item an action. Confirm, with Accept, asks first; it
@@ -82,7 +80,7 @@ const (
 func SearchItems(in SearchInput) []SearchItem {
 	items := []SearchItem{}
 	for _, app := range in.Apps {
-		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: icon.Box, App: &app, Href: in.Base + "/apps/" + app.Name})
+		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: icon.Box, Href: in.Base + "/apps/" + app.Name})
 	}
 	for _, server := range in.Servers {
 		path := in.Base + "/servers/" + server.ID
@@ -325,13 +323,9 @@ const searchOptionClass = kit.OptionClass + " aria-selected:bg-foreground/8"
 // searchOption is one answer: its icon, its title with where it is under
 // it, and its key.
 templ searchOption(item SearchItem) {
-	if item.App != nil {
-		@kit.AppIcon(item.App.Name, appLogo(*item.App), false)
-	} else {
-		<span class="flex size-9 shrink-0 items-center justify-center rounded-[28%] bg-foreground/8 [&_svg]:size-4">
-			@item.Icon()
-		</span>
-	}
+	<span class="flex size-9 shrink-0 items-center justify-center rounded-[28%] bg-foreground/8 [&_svg]:size-4">
+		@item.Icon()
+	</span>
 	<span class="flex min-w-0 flex-1 flex-col">
 		<span class="truncate font-medium">{ item.Title }</span>
 		if item.Where != "" {
