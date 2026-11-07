@@ -239,6 +239,8 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrAlertDestinationNotFound, status: http.StatusNotFound, code: "not_found", message: "The alert destination was not found."},
 	{err: service.ErrDomain, field: "domains", message: "Use host names like blog.de."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
+	{err: service.ErrServiceCanonical, field: "canonical", message: "canonical is for the main service only."},
+	{err: service.ErrInstantShow, status: http.StatusForbidden, code: "insufficient_scope", message: "Showing the password needs a token with read and write access."},
 	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},
 	{err: service.ErrUptimePath, field: "path", message: "Use a path that starts with /, like /health, without spaces."},
 	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},

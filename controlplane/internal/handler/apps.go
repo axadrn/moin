@@ -462,13 +462,8 @@ func (h *AppsHandler) Routing(w http.ResponseWriter, r *http.Request) {
 // applies it.
 func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 	domain := strings.TrimSpace(r.FormValue("domain"))
-	if service := strings.TrimSpace(r.FormValue("service")); service != "" {
-		h.changeServiceDomains(w, r, service, domain, domain+" added", "Domain not added", func(domains []string) []string {
-			return append(domains, domain)
-		})
-		return
-	}
-	h.changeDomains(w, r, domain, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
+	service := strings.TrimSpace(r.FormValue("service"))
+	h.changeDomains(w, r, service, domain, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
 		return append(domains, domain), canonical
 	})
 }
@@ -476,13 +471,7 @@ func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 // RemoveDomain removes one domain and applies it.
 func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
-	if service := r.FormValue("service"); service != "" {
-		h.changeServiceDomains(w, r, service, "", domain+" removed", domain+" not removed", func(domains []string) []string {
-			return slices.DeleteFunc(domains, func(d string) bool { return d == domain })
-		})
-		return
-	}
-	h.changeDomains(w, r, "", domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
+	h.changeDomains(w, r, r.FormValue("service"), "", domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
 		if canonical == domain {
 			canonical = ""
 		}
@@ -497,38 +486,22 @@ func (h *AppsHandler) MakeCanonical(w http.ResponseWriter, r *http.Request) {
 	if domain == "" {
 		done = "No canonical domain"
 	}
-	h.changeDomains(w, r, "", done, "Canonical domain not changed", func(domains []string, _ string) ([]string, string) {
+	h.changeDomains(w, r, "", "", done, "Canonical domain not changed", func(domains []string, _ string) ([]string, string) {
 		return domains, domain
 	})
 }
 
-// changeDomains saves the domains of the main service; check is a domain
-// to look up for the answer, the one added.
-func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, check, done, notDone string, change func([]string, string) ([]string, string)) {
+// changeDomains saves the domains of a service, the main one for "";
+// check is a domain to look up for the answer, the one added.
+func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, service, check, done, notDone string, change func([]string, string) ([]string, string)) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		renderError(w, "load app failed", err)
 		return
 	}
-	domains, canonical := change(app.DomainList(), app.Canonical)
-	changed, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
-	if err != nil {
-		failed(w, r, notDone, err, map[string]string{"domains": "domain-name"})
-		return
-	}
-	h.routingChanged(w, r, done, changed, check)
-}
-
-func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Request, service, check, done, notDone string, change func([]string) []string) {
-	workspace := ctxkeys.Workspace(r.Context())
-	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
-	if err != nil {
-		renderError(w, "load app failed", err)
-		return
-	}
-	domains := change(slices.Clone(app.ServiceDomainMap()[service]))
-	changed, err := h.apps.SetServiceDomains(actor(r), app.ID, service, domains)
+	domains, canonical := change(app.DomainsOf(service))
+	changed, err := h.apps.SetDomains(actor(r), app.ID, service, domains, canonical)
 	if err != nil {
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name", "service": "domain-service"})
 		return
@@ -673,7 +646,7 @@ func (h *AppsHandler) routingView(r *http.Request, check string) (pages.RoutingV
 	if err != nil {
 		return pages.RoutingView{}, err
 	}
-	instant, err := h.apps.Instant(workspace.ID, app.ID, r.URL.Query().Get("show") == "true")
+	instant, err := h.apps.Instant(workspace.ID, app.ID, r.URL.Query().Get("show") == "true", ctxkeys.APIToken(r.Context()))
 	if err != nil {
 		return pages.RoutingView{}, err
 	}

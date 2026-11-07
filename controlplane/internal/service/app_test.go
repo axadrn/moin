@@ -447,17 +447,17 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed, err := apps.SetDomains(owner, "blog", []string{"Blog.de", "www.blog.de", "blog.de"}, "blog.de")
+	changed, err := apps.SetDomains(owner, "blog", "", []string{"Blog.de", "www.blog.de", "blog.de"}, "blog.de")
 	if err != nil || !changed {
 		t.Fatalf("set domains before a deploy = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed {
 		t.Fatalf("no password, taken away = %v, %v", changed, err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
 		t.Fatalf("bad domain: err = %v", err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, "other.de"); !errors.Is(err, ErrCanonical) {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, "other.de"); !errors.Is(err, ErrCanonical) {
 		t.Fatalf("bad canonical: err = %v", err)
 	}
 	first, err := deployUpload(apps)
@@ -494,7 +494,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
 		t.Fatalf("set protection = %v, %v", changed, err)
 	}
-	if changed, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil || !changed {
+	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil || !changed {
 		t.Fatalf("set domains = %v, %v", changed, err)
 	}
 	if agent.count(protocol.TypeDeployStart) != sent {
@@ -507,7 +507,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed {
 		t.Fatalf("the same password = %v, %v", changed, err)
 	}
-	if changed, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil || changed {
+	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil || changed {
 		t.Fatalf("the same domains = %v, %v", changed, err)
 	}
 
@@ -564,7 +564,7 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.de" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
 		t.Fatalf("checks = %+v, %v", checks, err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); !errors.Is(err, ErrComposeDomains) {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); !errors.Is(err, ErrComposeDomains) {
 		t.Fatalf("set domains under x-moin: err = %v", err)
 	}
 }
@@ -655,7 +655,7 @@ func TestStopStartAndRestart(t *testing.T) {
 	}
 
 	// A stopped app keeps a domain change for its start.
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
 		t.Fatalf("set domains of a stopped app: %v", err)
 	}
 

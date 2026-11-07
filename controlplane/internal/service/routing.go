@@ -16,10 +16,12 @@ import (
 )
 
 var (
-	ErrService         = errors.New("a service name is lowercase letters, digits, dashes, dots or underscores")
-	ErrMainService     = errors.New("this is the app's main service: set its domains without --service")
-	ErrDomainTaken     = errors.New("a domain reaches one service of an app")
-	ErrInstantProvider = errors.New("the instant address provider is sslip.io, nip.io or off")
+	ErrService          = errors.New("a service name is lowercase letters, digits, dashes, dots or underscores")
+	ErrMainService      = errors.New("this is the app's main service: set its domains without --service")
+	ErrServiceCanonical = errors.New("canonical is for the main service only")
+	ErrDomainTaken      = errors.New("a domain reaches one service of an app")
+	ErrInstantProvider  = errors.New("the instant address provider is sslip.io, nip.io or off")
+	ErrInstantShow      = errors.New("showing the password needs a token with read and write access")
 )
 
 // servicePattern is a compose service name.
@@ -29,10 +31,9 @@ var servicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
 // password of the app.
 const instantUser = build.Name
 
-// SetServiceDomains replaces the domains of one of the app's services other
-// than the main one, like SetDomains. An empty list removes the service's
-// domains.
-func (s *AppService) SetServiceDomains(actor Actor, idOrName, service string, domains []string) (changed bool, err error) {
+// setServiceDomains replaces the domains of one of the app's services other
+// than the main one. An empty list removes the service's domains.
+func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, domains []string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
@@ -129,8 +130,12 @@ type Instant struct {
 }
 
 // Instant reports the app's instant address. With show, it carries the
-// password moin made for it.
-func (s *AppService) Instant(workspaceID, idOrName string, show bool) (Instant, error) {
+// password moin made for it, which a session sees and an API token only
+// when it may write: ErrInstantShow.
+func (s *AppService) Instant(workspaceID, idOrName string, show bool, token *model.APIToken) (Instant, error) {
+	if show && token != nil && !token.HasScope(model.APITokenScopeWrite) {
+		return Instant{}, ErrInstantShow
+	}
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
 		return Instant{}, err
