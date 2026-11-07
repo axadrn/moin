@@ -25,7 +25,7 @@ On the server, the agent hands the Cloudflare token to cloudflared through its e
 Adds the Cloudflare token or the Tailscale key. A new key replaces the old one; an empty field keeps it.
 
 ```surfaces
-Web: **Servers**, **Security** on the server, **Integrations**
+Web: **Servers**, **Security** on the server, **Keys for every server**
 CLI: moin integrations cloudflare
 CLI: moin integrations tailscale
 TUI: on the server, `W` opens its security page in the web
@@ -40,7 +40,7 @@ The CLI reads the key from stdin, so it never ends up in your shell history.
 Shows whether a Cloudflare token and a Tailscale key are there, never the keys themselves.
 
 ```surfaces
-Web: **Servers**, **Security** on the server, **Integrations**
+Web: **Servers**, **Security** on the server, **Keys for every server**
 CLI: moin integrations
 TUI: on the server, `W` opens its security page in the web
 API: GET /api/v1/integrations
@@ -52,7 +52,7 @@ MCP: get_integrations
 Deletes a key from moin. Turn the tunnels off first: without the token moin cannot delete a tunnel in Cloudflare.
 
 ```surfaces
-Web: **Servers**, **Security** on the server, **Integrations**, then **Remove Cloudflare token** or **Remove Tailscale key**
+Web: **Servers**, **Security** on the server, **Remove Cloudflare API token** or **Remove Tailscale auth key** at the end
 CLI: moin integrations rm cloudflare
 CLI: moin integrations rm tailscale
 TUI: on the server, `W` opens its security page in the web

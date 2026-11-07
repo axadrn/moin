@@ -10,7 +10,7 @@ func TestTailnetText(t *testing.T) {
 		key, ssh     bool
 		text, prefix string
 	}{
-		{"100.64.0.9", true, true, "100.64.0.9", "The server's address"},
+		{"100.64.0.9", true, true, "100.64.0.9", "The server's IP"},
 		{"", true, true, "not up", "The server could not join"},
 		{"", true, false, "not used", "Turn on SSH only on Tailscale"},
 		{"", false, false, "not joined", "Add a Tailscale auth key"},
