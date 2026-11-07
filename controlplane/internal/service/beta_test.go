@@ -30,7 +30,7 @@ func signUpOpen(t *testing.T, beta *BetaService, environment authFlowEnvironment
 
 func TestOpenSignupLetsAnyoneIn(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
-	beta := NewBetaService(true, nil, repository.NewWorkspaceInvitationRepository(environment.database), environment.subscriptionRepository)
+	beta := NewBetaService(true, nil, repository.NewWorkspaceInvitations(environment.database), environment.subscriptionRepository)
 	environment.auth.SetBeta(beta)
 	if err := environment.auth.SendMagicLink("anyone@example.com"); err != nil {
 		t.Fatalf("open sign-up: err = %v", err)
@@ -39,7 +39,7 @@ func TestOpenSignupLetsAnyoneIn(t *testing.T) {
 
 func TestClosedSignupIsPrivate(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
-	beta := NewBetaService(false, []string{"admin@example.com"}, repository.NewWorkspaceInvitationRepository(environment.database), environment.subscriptionRepository)
+	beta := NewBetaService(false, []string{"admin@example.com"}, repository.NewWorkspaceInvitations(environment.database), environment.subscriptionRepository)
 	environment.auth.SetBeta(beta)
 
 	if err := environment.auth.SendMagicLink("stranger@example.com"); !errors.Is(err, ErrPrivate) {

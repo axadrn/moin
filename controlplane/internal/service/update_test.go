@@ -124,7 +124,7 @@ func TestUpdateStartAndSettle(t *testing.T) {
 	}))
 	defer github.Close()
 	database := testutil.NewDatabase(t)
-	audit := repository.NewWorkspaceAuditRepository(database)
+	audit := repository.NewWorkspaceAudit(database)
 	admin := testutil.SeedUser(t, database, testutil.UserOptions{ID: "ada", Email: "Ada@example.com", Verified: true})
 	member := testutil.SeedUser(t, database, testutil.UserOptions{ID: "bob", Email: "bob@example.com", Verified: true})
 	dir := t.TempDir()

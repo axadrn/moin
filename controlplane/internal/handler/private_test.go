@@ -76,7 +76,7 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 				users, repository.NewTokens(database), repository.NewSessionRepository(database), workspaces, email,
 				false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 			)
-			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitationRepository(database), repository.NewSubscriptions(database)))
+			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitations(database), repository.NewSubscriptions(database)))
 			form := url.Values{"email": {test.email}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/magic-link", strings.NewReader(form.Encode()))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")

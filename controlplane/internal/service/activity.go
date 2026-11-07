@@ -90,7 +90,7 @@ func System(workspaceID string) Actor {
 // values, secrets, tokens, passwords, SQL text, row contents or cell values,
 // file contents and log lines of an app. moin keeps none of the user's data,
 // so details only ever hold names, numbers and settings.
-func recordActivity(audit repository.WorkspaceAuditRepository, at time.Time, actor Actor, action, targetType, target string, details map[string]string) {
+func recordActivity(audit *repository.WorkspaceAudit, at time.Time, actor Actor, action, targetType, target string, details map[string]string) {
 	if audit == nil || actor.WorkspaceID == "" {
 		return
 	}

@@ -40,7 +40,7 @@ type AdminService struct {
 	// subscriptions and activity, when set, show and change who is free
 	// forever.
 	subscriptions *repository.Subscriptions
-	activity      repository.WorkspaceAuditRepository
+	activity      *repository.WorkspaceAudit
 	// oldAddress counts what still arrives on old addresses.
 	oldAddress *OldAddressService
 }
@@ -55,7 +55,7 @@ func NewAdminService(repo *repository.Admin, users *repository.Users, auth *Auth
 
 // UsePlans shows the plan of every user and lets admins make them free
 // forever. Without billing there are no plans to show.
-func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activity repository.WorkspaceAuditRepository) {
+func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activity *repository.WorkspaceAudit) {
 	s.subscriptions = subscriptions
 	s.activity = activity
 }

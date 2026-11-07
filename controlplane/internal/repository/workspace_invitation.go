@@ -21,29 +21,16 @@ var (
 	ErrSeatLimit                   = errors.New("workspace seat limit reached")
 )
 
-type WorkspaceInvitationRepository interface {
-	Create(invitation *model.WorkspaceInvitation, event *model.WorkspaceAuditEvent) error
-	ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceInvitation, error)
-	ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error)
-	// HasPending reports whether a workspace invited the address and the
-	// invitation is still open.
-	HasPending(email string, now time.Time) (bool, error)
-	ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error)
-	Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error
-	// Accept makes the user a member. event is the activity of it; Accept fills
-	// in its workspace and invitation.
-	Accept(tokenHash, userID, email, memberID string, event *model.WorkspaceAuditEvent, now time.Time) (*model.WorkspaceMember, error)
-}
-
-type workspaceInvitationRepository struct {
+// WorkspaceInvitations stores the invitations to join a workspace.
+type WorkspaceInvitations struct {
 	db *sqlx.DB
 }
 
-func NewWorkspaceInvitationRepository(db *sqlx.DB) WorkspaceInvitationRepository {
-	return &workspaceInvitationRepository{db: db}
+func NewWorkspaceInvitations(db *sqlx.DB) *WorkspaceInvitations {
+	return &WorkspaceInvitations{db: db}
 }
 
-func (r *workspaceInvitationRepository) Create(invitation *model.WorkspaceInvitation, event *model.WorkspaceAuditEvent) error {
+func (r *WorkspaceInvitations) Create(invitation *model.WorkspaceInvitation, event *model.WorkspaceAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -81,7 +68,7 @@ func (r *workspaceInvitationRepository) Create(invitation *model.WorkspaceInvita
 	return tx.Commit()
 }
 
-func (r *workspaceInvitationRepository) ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceInvitation, error) {
+func (r *WorkspaceInvitations) ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceInvitation, error) {
 	invitation := &model.WorkspaceInvitation{}
 	err := r.db.Get(invitation, `SELECT * FROM workspace_invitations WHERE id = $1 AND workspace_id = $2`, id, workspaceID)
 	if err == sql.ErrNoRows {
@@ -90,7 +77,7 @@ func (r *workspaceInvitationRepository) ByIDForWorkspace(id, workspaceID string)
 	return invitation, err
 }
 
-func (r *workspaceInvitationRepository) ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error) {
+func (r *WorkspaceInvitations) ByTokenHash(tokenHash string) (*model.WorkspaceInvitation, error) {
 	invitation := &model.WorkspaceInvitation{}
 	err := r.db.Get(invitation, `
 		SELECT i.*, o.name AS workspace_name, o.slug AS workspace_slug, COALESCE(u.name, '') AS inviter_name
@@ -105,7 +92,7 @@ func (r *workspaceInvitationRepository) ByTokenHash(tokenHash string) (*model.Wo
 	return invitation, err
 }
 
-func (r *workspaceInvitationRepository) ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error) {
+func (r *WorkspaceInvitations) ListPendingByWorkspace(workspaceID string, now time.Time) ([]model.WorkspaceInvitation, error) {
 	cutoff := now.Add(-model.WorkspaceInvitationRetention)
 	if _, err := r.db.Exec(`
 		DELETE FROM workspace_invitations
@@ -124,7 +111,7 @@ func (r *workspaceInvitationRepository) ListPendingByWorkspace(workspaceID strin
 	return invitations, err
 }
 
-func (r *workspaceInvitationRepository) Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error {
+func (r *WorkspaceInvitations) Revoke(workspaceID, invitationID string, revokedAt time.Time, event *model.WorkspaceAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -155,7 +142,9 @@ func (r *workspaceInvitationRepository) Revoke(workspaceID, invitationID string,
 	return tx.Commit()
 }
 
-func (r *workspaceInvitationRepository) Accept(
+// Accept makes the user a member. event is the activity of it; Accept fills
+// in its workspace and invitation.
+func (r *WorkspaceInvitations) Accept(
 	tokenHash, userID, email, memberID string,
 	event *model.WorkspaceAuditEvent,
 	now time.Time,
@@ -264,7 +253,9 @@ func (r *workspaceInvitationRepository) Accept(
 	return member, nil
 }
 
-func (r *workspaceInvitationRepository) HasPending(email string, now time.Time) (bool, error) {
+// HasPending reports whether a workspace invited the address and the
+// invitation is still open.
+func (r *WorkspaceInvitations) HasPending(email string, now time.Time) (bool, error) {
 	var count int
 	err := r.db.Get(&count, `
 		SELECT COUNT(*) FROM workspace_invitations

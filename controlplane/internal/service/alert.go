@@ -19,17 +19,17 @@ import (
 // the event: Slack, Discord, Telegram or a webhook (alert_destination.go).
 type AlertService struct {
 	email        *EmailService
-	workspaces   repository.WorkspaceRepository
-	members      repository.WorkspaceMemberRepository
+	workspaces   *repository.Workspaces
+	members      *repository.WorkspaceMembers
 	apps         repository.AppRepository
 	destinations *repository.AlertDestinations
-	audit        repository.WorkspaceAuditRepository
+	audit        *repository.WorkspaceAudit
 	box          *secret.Box
 	sender       *alertSender
 	now          func() time.Time
 }
 
-func NewAlertService(email *EmailService, workspaces repository.WorkspaceRepository, members repository.WorkspaceMemberRepository, apps repository.AppRepository, destinations *repository.AlertDestinations, audit repository.WorkspaceAuditRepository, box *secret.Box) *AlertService {
+func NewAlertService(email *EmailService, workspaces *repository.Workspaces, members *repository.WorkspaceMembers, apps repository.AppRepository, destinations *repository.AlertDestinations, audit *repository.WorkspaceAudit, box *secret.Box) *AlertService {
 	return &AlertService{
 		email: email, workspaces: workspaces, members: members, apps: apps,
 		destinations: destinations, audit: audit, box: box,

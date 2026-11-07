@@ -239,10 +239,10 @@ func invitationHandlerTestSetup(t *testing.T) (*sqlx.DB, *service.WorkspaceServi
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	workspaces := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		users,
 		service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database)),
 		email,

@@ -17,12 +17,12 @@ type SubscriptionService struct {
 	repo       *repository.Subscriptions
 	adminAudit *repository.Admin
 	// activity, when set, gets plan and status changes of a workspace.
-	activity repository.WorkspaceAuditRepository
+	activity *repository.WorkspaceAudit
 }
 
 // UseActivity writes plan and status changes to the activity of the
 // workspace.
-func (s *SubscriptionService) UseActivity(activity repository.WorkspaceAuditRepository) {
+func (s *SubscriptionService) UseActivity(activity *repository.WorkspaceAudit) {
 	s.activity = activity
 }
 

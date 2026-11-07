@@ -37,8 +37,8 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 	}
 	mails := testutil.NewMemoryMailer()
 	apps := repository.NewAppRepository(database, database)
-	alerts := NewAlertService(NewEmailService(mails, "https://moin.example.com", "moin"), repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), apps, repository.NewAlertDestinations(database), repository.NewWorkspaceAuditRepository(database), testBox(t))
-	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
+	alerts := NewAlertService(NewEmailService(mails, "https://moin.example.com", "moin"), repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), apps, repository.NewAlertDestinations(database), repository.NewWorkspaceAudit(database), testBox(t))
+	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)

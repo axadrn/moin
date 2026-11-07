@@ -14,7 +14,7 @@ func TestEmailAlertsAreOnByDefault(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "ada", Verified: true})
 	users := repository.NewUsers(database)
-	members := repository.NewWorkspaceMemberRepository(database)
+	members := repository.NewWorkspaceMembers(database)
 	for i, on := range []bool{true, false, true} {
 		if i > 0 {
 			if err := users.SetEmailAlerts("ada", on); err != nil {

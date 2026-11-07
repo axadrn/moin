@@ -89,7 +89,7 @@ func TestDiskState(t *testing.T) {
 func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
-	audit := repository.NewWorkspaceAuditRepository(database)
+	audit := repository.NewWorkspaceAudit(database)
 	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
@@ -197,7 +197,7 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
-	audit := repository.NewWorkspaceAuditRepository(database)
+	audit := repository.NewWorkspaceAudit(database)
 	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	apps := NewAppService(repository.NewAppRepository(database, database), servers, testBox(t))
 	server, _, err := servers.Create(owner, "web-1")

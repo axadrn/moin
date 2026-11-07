@@ -17,24 +17,16 @@ var (
 	ErrWorkspaceSlugTaken = errors.New("workspace slug taken")
 )
 
-type WorkspaceRepository interface {
-	CreateWithOwner(workspace *model.Workspace, member *model.WorkspaceMember, subscription *model.Subscription, event *model.WorkspaceAuditEvent) error
-	ByID(id string) (*model.Workspace, error)
-	BySlugForUser(slug, userID string) (*model.Workspace, error)
-	ListForUser(userID string) ([]model.WorkspaceMembership, error)
-	UpdateName(id, name string, updatedAt time.Time, event *model.WorkspaceAuditEvent) error
-	DeleteIfBillingInactive(id string, now time.Time, adminEvent *model.AdminAuditEvent) error
-}
-
-type workspaceRepository struct {
+// Workspaces stores the workspaces that own everything else.
+type Workspaces struct {
 	db *sqlx.DB
 }
 
-func NewWorkspaceRepository(db *sqlx.DB) WorkspaceRepository {
-	return &workspaceRepository{db: db}
+func NewWorkspaces(db *sqlx.DB) *Workspaces {
+	return &Workspaces{db: db}
 }
 
-func (r *workspaceRepository) CreateWithOwner(
+func (r *Workspaces) CreateWithOwner(
 	workspace *model.Workspace,
 	member *model.WorkspaceMember,
 	subscription *model.Subscription,
@@ -74,7 +66,7 @@ func (r *workspaceRepository) CreateWithOwner(
 	return tx.Commit()
 }
 
-func (r *workspaceRepository) ByID(id string) (*model.Workspace, error) {
+func (r *Workspaces) ByID(id string) (*model.Workspace, error) {
 	workspace := &model.Workspace{}
 	if err := r.db.Get(workspace, `SELECT * FROM workspaces WHERE id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
@@ -85,7 +77,7 @@ func (r *workspaceRepository) ByID(id string) (*model.Workspace, error) {
 	return workspace, nil
 }
 
-func (r *workspaceRepository) BySlugForUser(slug, userID string) (*model.Workspace, error) {
+func (r *Workspaces) BySlugForUser(slug, userID string) (*model.Workspace, error) {
 	workspace := &model.Workspace{}
 	err := r.db.Get(workspace, `
 		SELECT o.*
@@ -99,7 +91,7 @@ func (r *workspaceRepository) BySlugForUser(slug, userID string) (*model.Workspa
 	return workspace, err
 }
 
-func (r *workspaceRepository) ListForUser(userID string) ([]model.WorkspaceMembership, error) {
+func (r *Workspaces) ListForUser(userID string) ([]model.WorkspaceMembership, error) {
 	var workspaces []model.WorkspaceMembership
 	err := r.db.Select(&workspaces, `
 		SELECT o.*, m.role
@@ -111,7 +103,7 @@ func (r *workspaceRepository) ListForUser(userID string) ([]model.WorkspaceMembe
 	return workspaces, err
 }
 
-func (r *workspaceRepository) UpdateName(id, name string, updatedAt time.Time, event *model.WorkspaceAuditEvent) error {
+func (r *Workspaces) UpdateName(id, name string, updatedAt time.Time, event *model.WorkspaceAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -134,7 +126,7 @@ func (r *workspaceRepository) UpdateName(id, name string, updatedAt time.Time, e
 	return tx.Commit()
 }
 
-func (r *workspaceRepository) DeleteIfBillingInactive(id string, now time.Time, adminEvent *model.AdminAuditEvent) error {
+func (r *Workspaces) DeleteIfBillingInactive(id string, now time.Time, adminEvent *model.AdminAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err

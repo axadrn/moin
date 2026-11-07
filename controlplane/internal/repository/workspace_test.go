@@ -18,7 +18,7 @@ func TestWorkspaceQueriesEnforceMembershipScope(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	alice := testutil.SeedUser(t, database, testutil.UserOptions{ID: "alice", Name: "Alice"})
 	bob := testutil.SeedUser(t, database, testutil.UserOptions{ID: "bob", Name: "Bob"})
-	workspaceRepository := repository.NewWorkspaceRepository(database)
+	workspaceRepository := repository.NewWorkspaces(database)
 
 	if _, err := workspaceRepository.BySlugForUser(alice.Workspace.Slug, bob.User.ID); !errors.Is(err, repository.ErrWorkspaceNotFound) {
 		t.Fatalf("cross-workspace lookup error = %v, want ErrWorkspaceNotFound", err)
@@ -46,7 +46,7 @@ func TestWorkspaceQueriesEnforceMembershipScope(t *testing.T) {
 func TestWorkspaceMemberRepositoryProtectsLastOwner(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Owner"})
-	workspaceMemberRepository := repository.NewWorkspaceMemberRepository(database)
+	workspaceMemberRepository := repository.NewWorkspaceMembers(database)
 
 	if err := workspaceMemberRepository.UpdateRole(owner.Workspace.ID, owner.User.ID, owner.WorkspaceMember.ID, model.WorkspaceRoleMember, testAudit(owner.Workspace.ID, owner.User.ID, "change-last-owner-role")); !errors.Is(err, repository.ErrLastOwner) {
 		t.Fatalf("change last owner role error = %v, want ErrLastOwner", err)
@@ -77,7 +77,7 @@ func TestAdminCannotRaceOwnerPromotion(t *testing.T) {
 		targetMembershipID := fmt.Sprintf("race-target-member-%d", iteration)
 		insertMembership(t, database, adminMembershipID, owner.Workspace.ID, admin.ID, model.WorkspaceRoleAdmin)
 		insertMembership(t, database, targetMembershipID, owner.Workspace.ID, target.ID, model.WorkspaceRoleMember)
-		members := repository.NewWorkspaceMemberRepository(database)
+		members := repository.NewWorkspaceMembers(database)
 
 		start := make(chan struct{})
 		results := make(chan error, 2)
@@ -113,7 +113,7 @@ func TestAdminCannotRaceOwnerPromotionAndRemoval(t *testing.T) {
 		targetMembershipID := fmt.Sprintf("remove-target-member-%d", iteration)
 		insertMembership(t, database, fmt.Sprintf("remove-admin-member-%d", iteration), owner.Workspace.ID, admin.ID, model.WorkspaceRoleAdmin)
 		insertMembership(t, database, targetMembershipID, owner.Workspace.ID, target.ID, model.WorkspaceRoleMember)
-		members := repository.NewWorkspaceMemberRepository(database)
+		members := repository.NewWorkspaceMembers(database)
 
 		type result struct {
 			action string
@@ -159,7 +159,7 @@ func TestInvitationAcceptanceValidatesEmailAndExpiry(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "validation-owner", Name: "Owner"})
 	invitee := createBareUser(t, database, "validation-invitee", "invitee@example.com")
-	workspaceInvitationRepository := repository.NewWorkspaceInvitationRepository(database)
+	workspaceInvitationRepository := repository.NewWorkspaceInvitations(database)
 	now := time.Now()
 
 	createInvitation(t, workspaceInvitationRepository, owner, "email-invitation", invitee.Email, "email-secret", now)
@@ -189,7 +189,7 @@ func TestInvitationCannotBeAcceptedAndRevokedConcurrently(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "revoke-owner", Name: "Owner"})
 	invitee := createBareUser(t, database, "revoke-invitee", "revoke@example.com")
-	workspaceInvitationRepository := repository.NewWorkspaceInvitationRepository(database)
+	workspaceInvitationRepository := repository.NewWorkspaceInvitations(database)
 	createInvitation(t, workspaceInvitationRepository, owner, "revoke-race-invitation", invitee.Email, "revoke-race-secret", time.Now())
 	if _, err := database.Exec(`UPDATE subscriptions SET plan_id = $1 WHERE workspace_id = $2`, model.SubscriptionPlanPro, owner.Workspace.ID); err != nil {
 		t.Fatalf("set seat plan: %v", err)
@@ -252,7 +252,7 @@ func insertMembership(t *testing.T, database *sqlx.DB, id, workspaceID, userID, 
 	}
 }
 
-func createInvitation(t *testing.T, workspaceInvitationRepository repository.WorkspaceInvitationRepository, owner testutil.UserFixture, id, email, token string, now time.Time) {
+func createInvitation(t *testing.T, workspaceInvitationRepository *repository.WorkspaceInvitations, owner testutil.UserFixture, id, email, token string, now time.Time) {
 	t.Helper()
 	invitation := &model.WorkspaceInvitation{
 		ID:          id,

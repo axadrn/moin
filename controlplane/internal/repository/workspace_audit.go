@@ -13,27 +13,13 @@ import (
 // ErrAuditCursorNotFound means a page cursor names no event of the workspace.
 var ErrAuditCursorNotFound = errors.New("audit cursor not found")
 
-type WorkspaceAuditRepository interface {
-	Create(event *model.WorkspaceAuditEvent) error
-	ListByWorkspace(workspaceID string, limit int) ([]model.WorkspaceAuditEvent, error)
-	ListPage(workspaceID string, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, error)
-	// Choices returns the apps, servers and member emails that occur in the
-	// activity of a workspace, sorted, for its filters.
-	Choices(workspaceID string) (model.ActivityChoices, error)
-	// AppServer returns the name of an app, given by ID or name, and of its
-	// server. Both are empty for an app that is gone.
-	AppServer(workspaceID, idOrName string) (app, server string, err error)
-	// CountAppChanges counts the events of an app with one of actions since
-	// a time.
-	CountAppChanges(workspaceID, app string, actions []string, since time.Time) (int, error)
-}
-
-type workspaceAuditRepository struct {
+// WorkspaceAudit stores the activity of each workspace: who did what.
+type WorkspaceAudit struct {
 	db *sqlx.DB
 }
 
-func NewWorkspaceAuditRepository(db *sqlx.DB) WorkspaceAuditRepository {
-	return &workspaceAuditRepository{db: db}
+func NewWorkspaceAudit(db *sqlx.DB) *WorkspaceAudit {
+	return &WorkspaceAudit{db: db}
 }
 
 // auditColumns are the columns of an event; actor_email is the member's
@@ -57,11 +43,13 @@ func insertAuditEvent(db execer, event *model.WorkspaceAuditEvent) error {
 	return err
 }
 
-func (r *workspaceAuditRepository) Create(event *model.WorkspaceAuditEvent) error {
+func (r *WorkspaceAudit) Create(event *model.WorkspaceAuditEvent) error {
 	return insertAuditEvent(r.db, event)
 }
 
-func (r *workspaceAuditRepository) AppServer(workspaceID, idOrName string) (string, string, error) {
+// AppServer returns the name of an app, given by ID or name, and of its
+// server. Both are empty for an app that is gone.
+func (r *WorkspaceAudit) AppServer(workspaceID, idOrName string) (string, string, error) {
 	var found struct {
 		App    string `db:"app"`
 		Server string `db:"server"`
@@ -78,7 +66,7 @@ func (r *workspaceAuditRepository) AppServer(workspaceID, idOrName string) (stri
 	return found.App, found.Server, err
 }
 
-func (r *workspaceAuditRepository) ListByWorkspace(workspaceID string, limit int) ([]model.WorkspaceAuditEvent, error) {
+func (r *WorkspaceAudit) ListByWorkspace(workspaceID string, limit int) ([]model.WorkspaceAuditEvent, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
@@ -89,7 +77,7 @@ func (r *workspaceAuditRepository) ListByWorkspace(workspaceID string, limit int
 // newest first, ordered by (created_at, id). With afterID it continues after
 // that event. The cursor event is compared inside the database, so the page
 // boundary uses exactly the stored values and the same order as ORDER BY.
-func (r *workspaceAuditRepository) ListPage(workspaceID string, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, error) {
+func (r *WorkspaceAudit) ListPage(workspaceID string, filter model.ActivityFilter, afterID string, limit int) ([]model.WorkspaceAuditEvent, error) {
 	where := []string{"e.workspace_id = ?"}
 	args := []any{workspaceID}
 	if filter.App != "" {
@@ -133,7 +121,9 @@ func (r *workspaceAuditRepository) ListPage(workspaceID string, filter model.Act
 	return events, err
 }
 
-func (r *workspaceAuditRepository) Choices(workspaceID string) (model.ActivityChoices, error) {
+// Choices returns the apps, servers and member emails that occur in the
+// activity of a workspace, sorted, for its filters.
+func (r *WorkspaceAudit) Choices(workspaceID string) (model.ActivityChoices, error) {
 	var choices model.ActivityChoices
 	err := r.db.Select(&choices.Apps, `SELECT DISTINCT app FROM workspace_audit_events WHERE workspace_id = $1 AND app != '' ORDER BY app`, workspaceID)
 	if err != nil {
@@ -152,7 +142,9 @@ func (r *workspaceAuditRepository) Choices(workspaceID string) (model.ActivityCh
 	return choices, err
 }
 
-func (r *workspaceAuditRepository) CountAppChanges(workspaceID, app string, actions []string, since time.Time) (int, error) {
+// CountAppChanges counts the events of an app with one of actions since
+// a time.
+func (r *WorkspaceAudit) CountAppChanges(workspaceID, app string, actions []string, since time.Time) (int, error) {
 	query, args, err := sqlx.In(`SELECT COUNT(*) FROM workspace_audit_events WHERE workspace_id = ? AND app = ? AND action IN (?) AND created_at > ?`, workspaceID, app, actions, since.UTC())
 	if err != nil {
 		return 0, err

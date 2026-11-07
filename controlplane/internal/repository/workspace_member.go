@@ -17,19 +17,7 @@ var (
 	ErrLastOwner                 = errors.New("workspace must keep at least one owner")
 )
 
-type WorkspaceMemberRepository interface {
-	ByWorkspaceAndUser(workspaceID, userID string) (*model.WorkspaceMember, error)
-	ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceMember, error)
-	ListByWorkspace(workspaceID string) ([]model.WorkspaceMember, error)
-	AlertEmails(workspaceID string) ([]string, error)
-	CountByWorkspace(workspaceID string) (int, error)
-	CountOwners(workspaceID string) (int, error)
-	UpdateRole(workspaceID, actorUserID, memberID, role string, event *model.WorkspaceAuditEvent) error
-	Delete(workspaceID, actorUserID, memberID string, event *model.WorkspaceAuditEvent) error
-	DeleteUserIfOwnershipSafe(userID string) error
-}
-
-func (r *workspaceMemberRepository) ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceMember, error) {
+func (r *WorkspaceMembers) ByIDForWorkspace(id, workspaceID string) (*model.WorkspaceMember, error) {
 	member := &model.WorkspaceMember{}
 	err := r.db.Get(member, `SELECT * FROM workspace_members WHERE id = $1 AND workspace_id = $2`, id, workspaceID)
 	if err == sql.ErrNoRows {
@@ -38,15 +26,16 @@ func (r *workspaceMemberRepository) ByIDForWorkspace(id, workspaceID string) (*m
 	return member, err
 }
 
-type workspaceMemberRepository struct {
+// WorkspaceMembers stores who belongs to a workspace and with which role.
+type WorkspaceMembers struct {
 	db *sqlx.DB
 }
 
-func NewWorkspaceMemberRepository(db *sqlx.DB) WorkspaceMemberRepository {
-	return &workspaceMemberRepository{db: db}
+func NewWorkspaceMembers(db *sqlx.DB) *WorkspaceMembers {
+	return &WorkspaceMembers{db: db}
 }
 
-func (r *workspaceMemberRepository) ByWorkspaceAndUser(workspaceID, userID string) (*model.WorkspaceMember, error) {
+func (r *WorkspaceMembers) ByWorkspaceAndUser(workspaceID, userID string) (*model.WorkspaceMember, error) {
 	member := &model.WorkspaceMember{}
 	err := r.db.Get(member, `SELECT * FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`, workspaceID, userID)
 	if err == sql.ErrNoRows {
@@ -57,7 +46,7 @@ func (r *workspaceMemberRepository) ByWorkspaceAndUser(workspaceID, userID strin
 
 // AlertEmails returns the addresses that get the email alerts of a
 // workspace: its owners and admins with the switch on and a verified address.
-func (r *workspaceMemberRepository) AlertEmails(workspaceID string) ([]string, error) {
+func (r *WorkspaceMembers) AlertEmails(workspaceID string) ([]string, error) {
 	emails := []string{}
 	err := r.db.Select(&emails, `
 		SELECT u.email FROM workspace_members m JOIN users u ON u.id = m.user_id
@@ -66,7 +55,7 @@ func (r *workspaceMemberRepository) AlertEmails(workspaceID string) ([]string, e
 	return emails, err
 }
 
-func (r *workspaceMemberRepository) ListByWorkspace(workspaceID string) ([]model.WorkspaceMember, error) {
+func (r *WorkspaceMembers) ListByWorkspace(workspaceID string) ([]model.WorkspaceMember, error) {
 	var members []model.WorkspaceMember
 	err := r.db.Select(&members, `
 		SELECT m.*, u.email, u.name
@@ -78,19 +67,19 @@ func (r *workspaceMemberRepository) ListByWorkspace(workspaceID string) ([]model
 	return members, err
 }
 
-func (r *workspaceMemberRepository) CountByWorkspace(workspaceID string) (int, error) {
+func (r *WorkspaceMembers) CountByWorkspace(workspaceID string) (int, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(*) FROM workspace_members WHERE workspace_id = $1`, workspaceID)
 	return count, err
 }
 
-func (r *workspaceMemberRepository) CountOwners(workspaceID string) (int, error) {
+func (r *WorkspaceMembers) CountOwners(workspaceID string) (int, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(*) FROM workspace_members WHERE workspace_id = $1 AND role = 'owner'`, workspaceID)
 	return count, err
 }
 
-func (r *workspaceMemberRepository) UpdateRole(workspaceID, actorUserID, memberID, role string, event *model.WorkspaceAuditEvent) error {
+func (r *WorkspaceMembers) UpdateRole(workspaceID, actorUserID, memberID, role string, event *model.WorkspaceAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -148,7 +137,7 @@ func (r *workspaceMemberRepository) UpdateRole(workspaceID, actorUserID, memberI
 	return tx.Commit()
 }
 
-func (r *workspaceMemberRepository) Delete(workspaceID, actorUserID, memberID string, event *model.WorkspaceAuditEvent) error {
+func (r *WorkspaceMembers) Delete(workspaceID, actorUserID, memberID string, event *model.WorkspaceAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -220,7 +209,7 @@ func auditMetadata(values map[string]string) string {
 	return string(encoded)
 }
 
-func (r *workspaceMemberRepository) DeleteUserIfOwnershipSafe(userID string) error {
+func (r *WorkspaceMembers) DeleteUserIfOwnershipSafe(userID string) error {
 	var workspaceIDs []string
 	if err := r.db.Select(&workspaceIDs, `
 		SELECT workspace_id

@@ -22,10 +22,10 @@ func newBillingHandler(t *testing.T, provider *paymentProviderStub) *BillingHand
 	database := testutil.NewDatabase(t)
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		repository.NewUsers(database),
 		subscriptions,
 		service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App"),
