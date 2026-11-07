@@ -149,13 +149,13 @@ func paletteActions(in SearchInput, app model.App) []SearchItem {
 		return append(items, SearchItem{Group: groupActions, Title: "Start " + app.Name, Where: app.Name, Icon: icon.Play, Post: path + "/start"})
 	}
 	if app.LatestNumber > 0 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Deploy " + app.Name, Where: app.Name, Key: "R", Icon: icon.Rocket, Post: path + "/redeploy"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Deploy " + app.Name, Where: app.Name, Icon: icon.Rocket, Post: path + "/redeploy"})
 	}
 	if app.LiveNumber > 0 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Restart " + app.Name, Where: app.Name, Key: "T", Icon: icon.RotateCw, Post: path + "/restart"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Restart " + app.Name, Where: app.Name, Icon: icon.RotateCw, Post: path + "/restart"})
 	}
 	if app.LiveNumber > 1 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Roll back " + app.Name, Where: app.Name + " › to v" + strconv.Itoa(app.LiveNumber-1), Key: "P", Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Roll back " + app.Name + " to v" + strconv.Itoa(app.LiveNumber-1) + "? It runs that deploy again.", Accept: "Roll back"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Roll back " + app.Name, Where: app.Name + " › to v" + strconv.Itoa(app.LiveNumber-1), Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Roll back " + app.Name + " to v" + strconv.Itoa(app.LiveNumber-1) + "? It runs that deploy again.", Accept: "Roll back"})
 	}
 	return items
 }

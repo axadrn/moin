@@ -107,7 +107,7 @@ templ appShellScript() {
 				clearTimeout(button.copyTimer);
 				button.copyTimer = setTimeout(() => delete button.dataset.copied, 1400);
 			});
-			const places = { h: "/overview", o: "/overview", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
+			const places = { h: "/overview", o: "/overview", a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
 			let leader = 0;
 			document.addEventListener("keydown", (event) => {
 				if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
