@@ -117,7 +117,7 @@ The same for Postgres, with databases instead of files:
 - **SQLite.** moin unpacks the copy into `app.db.moin-restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, renames it to `app.db.moin-before-<time>` and the restored file to `app.db`, and starts the app. The stop lasts a moment.
 - **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `moin_before_<time>_<hash>` and the built one to `shop`, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
 
-Both need room for one more database beside the live one: moin looks first. While a restore runs, edits through moin wait: they would be lost, or lose it.
+Both need room for one more database beside the live one: moin looks first. While a restore runs, edits through moin are refused (they would be lost, or lose it): make them when it is done. During a deploy they wait until the new version is up.
 
 The undo stays as long as you keep copies, then moin removes it. Undo = the same switch the other way.
 
@@ -189,4 +189,4 @@ The daemon does it all, with one small set of verbs and one file per kind of dat
 | **Check** | `PRAGMA integrity_check` | read every table of `moin_check_…` |
 | **Record** | Litestream, with Every change | |
 
-Once a minute the daemon looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**. When the newest copy is older than twice **how often**, the copies are late: the app says so and an [alert](/docs/guides/alerts) goes out.
+Once a minute the daemon looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**. When the newest copy is older than twice **how often**, and more than an hour past it (a big copy takes a while), the copies are late: the app says so and an [alert](/docs/guides/alerts) goes out. An app you stopped gets no alert that its database does not run.

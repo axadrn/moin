@@ -140,22 +140,25 @@ func bucketClient(bucket protocol.Bucket) *s3.Client {
 }
 
 // backupConfig is what the daemon of a server gets: the default bucket in
-// plain text, and the bucket of each of its apps that uses another one,
-// or nothing.
-func (s *AppService) backupConfig(workspaceID, serverID string) protocol.BackupConfig {
+// plain text, the bucket of each of its apps that uses another one, and
+// the schedule of each; nothing without a bucket. An error means none of
+// it can be told: half a config would stop or prune backups.
+func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.BackupConfig, error) {
 	bucket, err := s.apps.DefaultBucket(workspaceID)
+	if errors.Is(err, repository.ErrNoBucket) {
+		return protocol.BackupConfig{}, nil
+	}
 	if err != nil {
-		return protocol.BackupConfig{}
+		return protocol.BackupConfig{}, err
 	}
 	open, err := s.openBucket(bucket)
 	if err != nil {
-		return protocol.BackupConfig{}
+		return protocol.BackupConfig{}, err
 	}
 	config := protocol.BackupConfig{Bucket: open, Schedules: map[string]protocol.Schedule{}}
 	apps, err := s.apps.ListByWorkspaceID(workspaceID)
 	if err != nil {
-		slog.Error("list apps for backups failed", "workspace_id", workspaceID, "error", err)
-		return config
+		return protocol.BackupConfig{}, err
 	}
 	for _, app := range apps {
 		if app.ServerID == serverID {
@@ -166,14 +169,14 @@ func (s *AppService) backupConfig(workspaceID, serverID string) protocol.BackupC
 		}
 		own, err := s.openAppBucket(&app)
 		if err != nil {
-			continue
+			return protocol.BackupConfig{}, err
 		}
 		if config.AppBuckets == nil {
 			config.AppBuckets = map[string]*protocol.Bucket{}
 		}
 		config.AppBuckets[app.Name] = own
 	}
-	return config
+	return config, nil
 }
 
 // configureDaemons sends the backup config to every online server of the
@@ -197,9 +200,13 @@ func (s *AppService) configureDaemons(workspaceID string) {
 func (s *AppService) configureDaemon(serverID, workspaceID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	config := s.backupConfig(workspaceID, serverID)
+	config, err := s.backupConfig(workspaceID, serverID)
+	if err != nil {
+		slog.Error("the backup config is not sent", "server_id", serverID, "error", err)
+		return
+	}
 	config.Apps = s.appIDs(serverID, workspaceID)
-	err := s.servers.Request(ctx, serverID, protocol.TypeBackupConfig, config, nil)
+	err = s.servers.Request(ctx, serverID, protocol.TypeBackupConfig, config, nil)
 	if err != nil {
 		slog.Warn("send backup config failed", "server_id", serverID, "error", err)
 	}
@@ -459,13 +466,14 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 }
 
 // late says the newest copy is older than twice how often the app is
-// copied: the copies stopped coming.
+// copied, and than one more copy may take (an hour): the copies stopped
+// coming.
 func late(app *model.App, copiedAt *time.Time, now time.Time) bool {
 	every := time.Duration(scheduleOf(app).Every) * time.Minute
 	if every <= 0 {
 		every = time.Duration(protocol.DefaultSchedule.Every) * time.Minute
 	}
-	return copiedAt != nil && now.Sub(*copiedAt) > 2*every
+	return copiedAt != nil && now.Sub(*copiedAt) > max(2*every, every+time.Hour)
 }
 
 // SetBackupSchedule sets how often the daemon copies an app's databases,
@@ -1049,6 +1057,10 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			Error:      clipText(database.Error, 2000),
 			CheckError: clipText(database.CheckError, 2000),
 			UpdatedAt:  s.now().UTC(),
+		}
+		if app.Stopped && strings.Contains(status.Error, "is not running") {
+			// The user stopped the app: its database is meant to rest.
+			status.Error = ""
 		}
 		if database.CheckedAt == nil {
 			// No check since the daemon started: the last one still stands.

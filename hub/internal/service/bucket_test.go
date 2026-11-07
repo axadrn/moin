@@ -73,7 +73,7 @@ func TestBuckets(t *testing.T) {
 	if err != nil || current.Name != "default" || !current.Default {
 		t.Fatalf("blog's bucket = %+v, %v", current, err)
 	}
-	config := apps.backupConfig(owner.WorkspaceID, server.ID)
+	config, _ := apps.backupConfig(owner.WorkspaceID, server.ID)
 	if config.Bucket == nil || config.Bucket.Bucket != "owner" || config.Bucket.SecretKey != "secret" || len(config.AppBuckets) != 0 {
 		t.Fatalf("config with one bucket = %+v", config)
 	}
@@ -100,7 +100,7 @@ func TestBuckets(t *testing.T) {
 	if err != nil || moved.BucketName != "client-a" {
 		t.Fatalf("move blog = %+v, %v", moved, err)
 	}
-	config = apps.backupConfig(owner.WorkspaceID, server.ID)
+	config, _ = apps.backupConfig(owner.WorkspaceID, server.ID)
 	if config.Bucket == nil || config.Bucket.Bucket != "owner" {
 		t.Fatalf("the default for old daemons = %+v", config.Bucket)
 	}

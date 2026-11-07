@@ -55,8 +55,8 @@ func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
 	if want := "/owner/" + owner.WorkspaceID + "/blog/" + app.ID + "/uploads/" + upload.ID + ".tar.gz"; link.Path != want {
 		t.Errorf("upload path = %s, want %s", link.Path, want)
 	}
-	if bucket := apps.backupConfig(owner.WorkspaceID, server.ID).Bucket; bucket == nil || bucket.Workspace != owner.WorkspaceID {
-		t.Errorf("the daemon's bucket = %+v, want the workspace folder", bucket)
+	if config, _ := apps.backupConfig(owner.WorkspaceID, server.ID); config.Bucket == nil || config.Bucket.Workspace != owner.WorkspaceID {
+		t.Errorf("the daemon's bucket = %+v, want the workspace folder", config.Bucket)
 	}
 	shown, err := apps.DefaultBucket(owner.WorkspaceID)
 	if err != nil || shown.Folder != owner.WorkspaceID+"/" || shown.AppFolder(app) != owner.WorkspaceID+"/blog/"+app.ID+"/" {

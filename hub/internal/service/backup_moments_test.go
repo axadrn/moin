@@ -521,7 +521,7 @@ func TestBackupSchedule(t *testing.T) {
 	if app.BackupEvery != 15 || app.BackupKeep != 30 || app.BackupEveryChange {
 		t.Fatalf("stored: %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
 	}
-	config := apps.backupConfig(owner.WorkspaceID, app.ServerID)
+	config, _ := apps.backupConfig(owner.WorkspaceID, app.ServerID)
 	if got := config.Schedules["shop"]; got != (protocol.Schedule{Every: 15, Keep: 30}) {
 		t.Fatalf("to the daemon: %+v", got)
 	}
@@ -549,5 +549,44 @@ func TestLateCopiesAndEditsDuringARestore(t *testing.T) {
 	}
 	if _, err := apps.Query(context.Background(), owner, "shop", "", "DELETE FROM notes", nil, true, 0); !errors.Is(err, ErrRestoreRunning) {
 		t.Fatalf("an edit during a restore: %v", err)
+	}
+}
+
+// A bucket that cannot be opened sends no backup config at all, rather
+// than half of one: an empty one would stop the backups, one without a
+// schedule would prune with the default.
+func TestNoHalfBackupConfig(t *testing.T) {
+	apps, _, server, _ := newAppService(t)
+	app, err := apps.Create(owner, "shop", server.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config, err := apps.backupConfig(owner.WorkspaceID, server.ID); err != nil || config.Bucket == nil || config.Schedules["shop"].Every != 60 {
+		t.Fatalf("config: %+v %v", config, err)
+	}
+	broken := "bucket-broken"
+	if err := apps.apps.CreateBucket(model.Bucket{ID: broken, WorkspaceID: owner.WorkspaceID, Name: "broken", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "broken", AccessKey: "key", SecretKey: "not sealed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := apps.apps.SetAppBucket(app.ID, &broken, "", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.backupConfig(owner.WorkspaceID, server.ID); err == nil {
+		t.Fatal("a broken bucket made a config")
+	}
+}
+
+// A database the user stopped is meant to rest: no "not running" for it.
+func TestStoppedAppRests(t *testing.T) {
+	apps, _, server, _ := newAppService(t)
+	app, err := apps.Create(owner, "shop", server.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Stopped = true
+	apps.storeBackupStatus(app, protocol.Backups{App: "shop", Databases: []protocol.DatabaseBackup{{Database: "postgres-db", Error: "the Postgres service db of shop is not running"}}})
+	statuses, _ := apps.apps.BackupStatus(app.ID)
+	if len(statuses) != 1 || statuses[0].Error != "" {
+		t.Fatalf("statuses %+v", statuses)
 	}
 }
