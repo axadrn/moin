@@ -205,7 +205,7 @@ templ AppPage(view AppPageView) {
 		}
 		// The app's changes come as the event "apps"; parts that show them
 		// reload on it (hx-trigger "apps from:body").
-		<div hx-sse:connect={ "/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug } hidden></div>
+		@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
 	}
 }
 

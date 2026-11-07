@@ -13,6 +13,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -174,9 +175,9 @@ templ keyField(id, name, label, placeholder string, stored bool, storedText, hel
 // changes, like the servers page, but not while a flipped switch waits for
 // Apply or the server is being removed.
 templ securityScript() {
-	<script nonce={ templ.GetNonce(ctx) } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
+	@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			const events = new EventSource(`/api/v1/servers/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
 			const waiting = () => {
 				if (document.querySelector("[data-remove-server]:disabled")) return true;
 				const form = document.querySelector("[data-security-form]");
@@ -186,12 +187,9 @@ templ securityScript() {
 					return was && box.checked !== (was.value === "1");
 				});
 			};
-			events.addEventListener("servers", () => {
+			document.addEventListener("servers", () => {
 				if (!waiting()) document.body.dispatchEvent(new Event("security-changed"));
 			});
-			// Leaving the page closes the stream, so pages kept for the back
-			// button hold no connection.
-			addEventListener("pagehide", () => events.close());
 		})();
 	</script>
 }

@@ -144,7 +144,7 @@ templ ServerList(servers []model.Server) {
 		id="server-list"
 		hx-swap-oob="true"
 		hx-get={ basePath + "/servers/list" }
-		hx-trigger="servers-changed from:body"
+		hx-trigger="servers from:body"
 		hx-swap="none"
 	>
 		@kit.List() {
@@ -226,16 +226,11 @@ templ serverStatus(server model.Server) {
 	}
 }
 
-// serversScript reloads the list whenever the event stream reports a change.
-// EventSource reconnects on its own.
+// serversScript keeps the page live: the list reloads on every change.
 templ serversScript() {
-	<script nonce={ templ.GetNonce(ctx) } data-workspace={ ctxkeys.Workspace(ctx).Slug }>
+	@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
-			const events = new EventSource(`/api/v1/servers/events?workspace=${encodeURIComponent(document.currentScript.dataset.workspace)}`);
-			events.addEventListener("servers", () => document.body.dispatchEvent(new Event("servers-changed")));
-			// Leaving the page closes the stream, so pages kept for the back
-			// button hold no connection.
-			addEventListener("pagehide", () => events.close());
 			// The install command works once: when its agent is online it
 			// goes, the server says moin, and after a while that goes too.
 			const hideUsedCommand = () => {
