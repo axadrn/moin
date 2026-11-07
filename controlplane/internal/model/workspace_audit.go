@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/client"
 )
 
 // WorkspaceAuditEvent is one change in the activity of a workspace.
@@ -115,32 +116,7 @@ func (e WorkspaceAuditEvent) Actor() string {
 // ViaLabel names how a change came in, with the token it came with:
 // "CLI, token ci".
 func (e WorkspaceAuditEvent) ViaLabel() string {
-	label := ""
-	switch e.Via {
-	case "web":
-		label = "Web"
-	case "cli":
-		label = "CLI"
-	case "tui":
-		label = "TUI"
-	case "api":
-		label = "API"
-	case "mcp":
-		label = "MCP"
-	case "hook":
-		label = "Deploy hook"
-	case "github":
-		label = "GitHub"
-	case "system":
-		label = build.Name
-	}
-	if e.TokenName != "" {
-		if label == "" {
-			return "token " + e.TokenName
-		}
-		return label + ", token " + e.TokenName
-	}
-	return label
+	return client.ViaLabel(e.Via, e.TokenName)
 }
 
 // Summary says what happened, to follow the actor: "deployed blog v12".

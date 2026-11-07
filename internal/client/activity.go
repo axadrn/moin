@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Event is one thing that happened in the workspace. Actor and Summary read
@@ -26,6 +28,37 @@ type Event struct {
 	UserAgent string    `json:"user_agent"`
 	Metadata  string    `json:"metadata"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// ViaLabel names how a change came in, with the API token it came with:
+// "CLI, token ci". The web shows the same label as the CLI.
+func ViaLabel(via, token string) string {
+	label := ""
+	switch via {
+	case "web":
+		label = "Web"
+	case "cli":
+		label = "CLI"
+	case "tui":
+		label = "TUI"
+	case "api":
+		label = "API"
+	case "mcp":
+		label = "MCP"
+	case "hook":
+		label = "Deploy hook"
+	case "github":
+		label = "GitHub"
+	case "system":
+		label = build.Name
+	}
+	if token != "" {
+		if label == "" {
+			return "token " + token
+		}
+		return label + ", token " + token
+	}
+	return label
 }
 
 // ActivityQuery picks a page of the activity: up to Limit events, after the
