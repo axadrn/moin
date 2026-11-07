@@ -1,43 +1,11 @@
 ---
 title: "Self-hosting"
-description: "Free forever: run all of moin yourself, the same product we host"
-order: 3
+description: "Run all of moin yourself, free forever, the same product we host"
+group: "Start"
+order: 4
 ---
 
-**Free forever.** All of moin is open source under AGPL-3.0, the control plane too. Run it on your own server and you get exactly the product we host: every feature, unlimited servers, apps and members, no license key and no account with us.
-
-| | Self-hosted | Hosted |
-| --- | --- | --- |
-| Price | free forever | $249 a year (save $99) or $29 a month, per workspace |
-| Features | all | all |
-| Servers, apps, members | unlimited | unlimited |
-| Setup | one command on one server, about an hour on two | two minutes |
-| Control plane | on your own server | ours, nothing to run |
-| Updates | one click, when moin says a release is out | the day they ship, by us |
-| GitHub App, email | you set them up | ready to use |
-| Backups of the control plane | yours to run | every day, by us |
-| Support | GitHub issues | email, from the team |
-| Where your apps and data are | your servers | your servers |
-
-You need nothing from us, not even a license key. Prefer not to run it? Our hosted control plane is the same code.
-
-**It is private.** A self-hosted control plane has no landing page and no sign-up for strangers: only admins (`ADMIN_EMAILS`) and teammates they invite sign in.
-
-## What is different
-
-Billing, and who gets in. With `BILLING=false` there are no prices, no checkout and no billing page, and every workspace gets unlimited servers, apps and members. Everything else is the code we run: the web UI, the API, MCP, deploys, backups, data, GitHub, teams and the activity.
-
-And it is private:
-
-- No landing page. Your `APP_URL` opens the sign-in page, or your workspace when you are signed in.
-- Sign-up is closed. New accounts are only for the addresses in `ADMIN_EMAILS` and for teammates invited to a workspace. Anyone else sees "This moin is private. Ask its admin for an invitation."
-- The docs stay at `/docs`. The terms and privacy pages of our hosted service are not there, and search engines are asked to stay away (`ROBOTS_NOINDEX` is on).
-
-## Three ways to run moin
-
-- **Hosted.** We run the control plane. Your servers keep your apps and data, with no open port for us.
-- **One server.** The control plane and your apps on one machine, in one command. The way to start.
-- **Two servers.** The control plane on its own small server. Recommended once it matters: an app that is broken into cannot reach the control plane, and you can still restore, roll back and see what happened.
+All of moin is open source under AGPL-3.0, the control plane too. Run it on your own server and you get the product we host: every feature, unlimited servers, apps and teammates, no license key, no account with us.
 
 ## One server
 
@@ -47,133 +15,145 @@ Point a domain at the server with an A record, then run this as root on a fresh 
 curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
-It takes a few minutes and does it all:
+In a few minutes it installs Docker and security updates, writes the settings to `/etc/moin-controlplane/env` with a new `SECRETS_KEY`, starts the control plane with your account, a workspace and this server in it, installs the agent and serves the control plane on your domain with a Let's Encrypt certificate. At the end it prints a sign-in link.
 
-1. Installs Docker and security updates.
-2. Writes the settings to `/etc/moin-controlplane/env`, with a new `SECRETS_KEY`. Keep a copy of that key: it seals the secrets of your apps.
-3. Starts the control plane, and makes your account, a workspace and this server in it.
-4. Installs the agent, which reaches the control plane on this machine and starts the proxy for ports 80 and 443.
-5. Serves the control plane on your domain, with a certificate from Let's Encrypt, like any app.
-
-At the end it prints a sign-in link. Email and a bucket can come later: until email is set up, sign-in links go to the control plane's log, and this prints a new one:
+Then point the CLI at it:
 
 ```bash
-docker compose -f /opt/moin/compose.yml exec controlplane ./main sign-in-link
+moin login --url https://moin.example.com
 ```
 
-Fill in `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the control plane's own backup, then run `sh /opt/moin/update.sh`. Run the install command again any time: it keeps your settings and data.
+The rest of these docs apply as they are.
 
-### Move from one server to two
+## Good to know
 
-1. Turn on the control plane's backup: fill in `S3_*`, set `BACKUP_DATABASE=true`, run `sh /opt/moin/update.sh`. Use a bucket no other control plane backs up to: its backup lives in the folder `controlplane/litestream`.
-2. Wait a few seconds, so the last change is in the bucket. Then, on the old server, stop the control plane and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running, and the proxy still serves them.
-3. On the new server, follow [Run it](#run-it) below with the same settings, without `SAME_SERVER`. The same `SECRETS_KEY` matters most: it opens your apps' secrets. The control plane restores its database from the bucket on its first start: your account, workspaces, apps and API tokens are there. Point the domain at the new server.
-4. The agent on the old server still looks for the control plane on its own machine. Get a new install command with `moin servers install-command <server>` and run it on the old server: the agent now dials your domain, as the same server. Your apps keep running.
-5. Once all works, remove the old settings from the old server: `rm -r /opt/moin /etc/moin-controlplane /var/lib/moin-controlplane`.
+- Keep a copy of `SECRETS_KEY`: it seals the secrets of your apps. Without it they are lost.
+- Email and a bucket can come later. Until email is set up, sign-in links go to the control plane's log; `docker compose -f /opt/moin/compose.yml exec controlplane ./main sign-in-link` prints a new one.
+- Add `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the control plane's own backup, then run `sh /opt/moin/update.sh`.
+- Run the install command again any time: it keeps your settings and data.
 
-## Where to run it
+| | Self-hosted | Hosted |
+| --- | --- | --- |
+| Price | free forever | $29 a month or $249 a year, per workspace |
+| Features; servers, apps, teammates | all; unlimited | all; unlimited |
+| Setup | one command on one server | ready to use |
+| Updates | one click, when a new version is out | by us, the day they ship |
+| GitHub App, email | you set them up | ready to use |
+| Backup of the control plane | yours to run | every day, by us |
+| Support | GitHub issues | email |
+| Your apps and data | your servers | your servers |
 
-On its own small server, not on a server with your apps, once it matters. The agent on an app server takes ports 80 and 443 for your apps, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers, since their agents dial out to it.
+## What is different
 
-## What you need
+- **Billing is off** (`BILLING=false`): no prices, no checkout, no billing page, and every workspace is unlimited.
+- **It is private.** No landing page: `APP_URL` opens the sign-in page, or your workspace when you are signed in. Sign-up is closed (see [Who signs in](#who-signs-in)); anyone else sees "This moin is private. Ask its admin for an invitation."
+- **The docs stay at `/docs`.** The terms and privacy pages of the hosted service are not there, and `ROBOTS_NOINDEX` asks search engines to stay away.
+- Everything else is the code we run: web, API, MCP, deploys, backups, data, GitHub, teams and the activity.
 
-- A small Linux server (Ubuntu or Debian) for the control plane, and a domain for it.
-- An S3-compatible bucket for the files of the control plane.
-- Cloudflare Email Sending, for sign-in links and invitations.
-- Optional: a Cloudflare Tunnel, so no web port has to be open.
-- Optional: your own GitHub App for GitHub deploys, see [GitHub](/docs/guides/github).
+## Two servers
 
-## Run it
+Once it matters, run the control plane on its own small server, not next to your apps. The agent on an app server takes ports 80 and 443, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers: their agents dial out to it.
 
-Three files do the work. They are in the repo, in `controlplane/deploy/`:
+You need a small Ubuntu or Debian server and a domain for it, an S3-compatible bucket, Cloudflare Email Sending for sign-in links and invitations, and, if you like, a Cloudflare Tunnel and [your own GitHub App](#your-own-github-app).
+
+### Run it
+
+The files are in the repo, in `controlplane/deploy/`:
 
 | File | What it does |
 | --- | --- |
-| `setup.sh` | Prepares the server once: Docker, security updates, and with `--tailscale` SSH on your tailnet |
-| `compose.yml` | Runs the control plane, and with a tunnel token also `cloudflared` |
-| `update.sh` | Starts the control plane, and later updates it to the newest version |
-| `updater.sh` | Runs next to it and does **Update now**, see [Updates](#updates) |
+| `setup.sh` | prepares the server once: Docker, security updates, and with `--tailscale` SSH on your tailnet |
+| `compose.yml` | runs the control plane, with a tunnel token also `cloudflared` |
+| `update.sh` | starts the control plane, and later updates it to the newest version |
+| `updater.sh` | runs next to it and does **Update now** |
 
-**1. Prepare the server**, as root:
+1. Prepare the server, as root:
 
-```bash
-git clone https://github.com/axadrn/moin
-cd moin/controlplane/deploy
-sh setup.sh
-```
+   ```bash
+   git clone https://github.com/axadrn/moin
+   cd moin/controlplane/deploy
+   sh setup.sh
+   ```
 
-**2. Write the settings** into `/etc/moin-controlplane/env`:
+2. Write the settings into `/etc/moin-controlplane/env` and `chmod 600` it:
 
-```bash
-APP_ENV=production
-APP_URL=https://moin.example.com
-BILLING=false
-# You: the first admin. Sign up with this address.
-ADMIN_EMAILS=you@example.com
-DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-# openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
-SECRETS_KEY=
-EMAIL_FROM=hello@example.com
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_API_TOKEN=
-S3_ENDPOINT=
-S3_REGION=auto
-S3_BUCKET=
-S3_ACCESS_KEY=
-S3_SECRET_KEY=
-```
+   ```bash
+   APP_ENV=production
+   APP_URL=https://moin.example.com
+   BILLING=false
+   # You: the first admin. Sign up with this address.
+   ADMIN_EMAILS=you@example.com
+   DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
+   # openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
+   SECRETS_KEY=
+   EMAIL_FROM=hello@example.com
+   CLOUDFLARE_ACCOUNT_ID=
+   CLOUDFLARE_API_TOKEN=
+   S3_ENDPOINT=
+   S3_REGION=auto
+   S3_BUCKET=
+   S3_ACCESS_KEY=
+   S3_SECRET_KEY=
+   ```
 
-`controlplane/.env.example` lists every setting. Keep the file readable by root only: `chmod 600 /etc/moin-controlplane/env`.
+3. Start it with `sh update.sh`. It listens on `127.0.0.1:8090`. Put it on your domain with a **Cloudflare Tunnel** (no open port: a tunnel in Zero Trust, Networks, Tunnels, with a public hostname for your domain and the service `http://controlplane:8090`, then `TUNNEL_TOKEN=` and `TRUSTED_PROXY_CIDRS=172.16.0.0/12` in the settings and `update.sh` again) or **a proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
 
-**3. Start it:**
+### Settings
 
-```bash
-sh update.sh
-```
+`controlplane/.env.example` lists every setting. The ones these docs use:
 
-The control plane listens on `127.0.0.1:8090`. Put it on your domain in one of two ways:
-
-- **Cloudflare Tunnel, no open port.** Create a tunnel in Cloudflare (Zero Trust, Networks, Tunnels) with a public hostname for your domain and the service `http://controlplane:8090`. Add its token and the Docker networks as trusted proxies to the settings, then run `update.sh` again:
-
-  ```bash
-  TUNNEL_TOKEN=
-  TRUSTED_PROXY_CIDRS=172.16.0.0/12
-  ```
-
-- **A proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
-
-### Keep it private: run it on your tailnet
-
-The safest control plane is one the internet cannot reach. Run it only on your Tailscale network, your private network of your own devices:
-
-1. Prepare the server with `sh setup.sh --tailscale`. It joins your tailnet.
-2. Serve the control plane on the tailnet, with HTTPS: `tailscale serve --bg 8090`. It is now at `https://<server>.<tailnet>.ts.net`. Use that as `APP_URL`, with no tunnel and no open port.
-3. Put each server on the tailnet too, with `tailscale up`, before you install the agent. The agent then reaches the control plane.
-4. Put your computer on the tailnet, for the web UI, the CLI and the TUI.
-
-Your apps stay public: they get their visitors through a Cloudflare Tunnel or ports 80 and 443 on each server, never through the control plane.
-
-GitHub and CI outside your tailnet cannot reach the control plane, so **Deploy every push** and deploy hooks do not work there. Deploy from the web, the CLI or a CI runner on your tailnet.
+| Setting | What it does |
+| --- | --- |
+| `APP_URL` | the address of the control plane |
+| `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up without an invitation |
+| `SECRETS_KEY` | seals the secrets of your apps; keep a copy |
+| `BILLING` | `false` turns off prices, checkout and the billing page |
+| `SIGNUPS_OPEN` | `true` lets anyone sign up; off by default without billing, keep it off on a control plane the internet can reach |
+| `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | email through Cloudflare Email Sending |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | the bucket of the control plane |
+| `BACKUP_DATABASE` | backup of the control plane's database; on by default in production once `S3_BUCKET` is set, `false` turns it off |
+| `UPTIME_CHECKS` | the [uptime checks](/docs/guides/uptime); on in production, off in development |
+| `TUNNEL_TOKEN`, `TRUSTED_PROXY_CIDRS` | a Cloudflare Tunnel in front of the control plane |
+| `SAME_SERVER` | `true` when the control plane runs on the same server as its apps, as the one-server install sets it |
+| `OLD_URLS` | old addresses the control plane still answers on, see [A new address](#a-new-address) |
+| `TELEMETRY` | `false` stops the count it sends us, see [What it sends us](#what-it-sends-us) |
+| `UPDATE_CHECK` | `false` stops the daily check for a new version |
+| `ROBOTS_NOINDEX` | asks search engines to stay away; on by default without billing |
+| `UMAMI_WEBSITE_ID`, `UMAMI_HOST` | count visitors with your own Umami; off by default |
+| `GITHUB_APP_*` | [your own GitHub App](#your-own-github-app) |
 
 ### Keep the settings in 1Password
 
-Instead of writing passwords into `/etc/moin-controlplane/env`, keep them in 1Password:
+Create a 1Password service account that may read one vault, put its token in `/etc/moin-controlplane/op-token` (root only), and write the settings as `/etc/moin-controlplane/env.tpl` with references like `SECRETS_KEY={{ op://vault/item/field }}`. `update.sh` fills them in on every start; a changed password counts after the next `update.sh`.
 
-1. Create a 1Password service account that may read one vault, and put its token on the server: `/etc/moin-controlplane/op-token`, readable by root only.
-2. Write the settings as `/etc/moin-controlplane/env.tpl`, with references like `SECRETS_KEY={{ op://vault/item/field }}` in place of passwords.
+### Keep it on your tailnet
 
-`update.sh` fills them in from 1Password on every start. A changed password counts after the next `update.sh`.
+The safest control plane is one the internet cannot reach:
 
-### Your own GitHub App
+1. Prepare the server with `sh setup.sh --tailscale`.
+2. `tailscale serve --bg 8090` serves it at `https://<server>.<tailnet>.ts.net`. Use that as `APP_URL`, with no tunnel and no open port.
+3. Put each server on the tailnet with `tailscale up` before you install the agent, and your computer too, for the web, the CLI and the TUI.
 
-For deploys from GitHub, the control plane needs a GitHub App of its own. Create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**:
+Your apps stay public through their own tunnel or ports 80 and 443. GitHub and CI outside your tailnet cannot reach the control plane, so **Deploy every push** and deploy hooks do not work: deploy from the web, the CLI or a CI runner on your tailnet.
+
+### Move from one server to two
+
+1. Turn on the control plane's backup: `S3_*`, `BACKUP_DATABASE=true`, `sh /opt/moin/update.sh`. Use a bucket no other control plane backs up to (folder `controlplane/litestream`).
+2. Wait a few seconds, then on the old server stop the control plane and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running.
+3. On the new server, [run it](#run-it) with the same settings, without `SAME_SERVER`, and above all the same `SECRETS_KEY`. It restores its database from the bucket on its first start. Point the domain at it.
+4. On the old server, run a new install command from `moin servers install-command <server>`: its agent now dials your domain, as the same server.
+5. Once all works, on the old server: `rm -r /opt/moin /etc/moin-controlplane /var/lib/moin-controlplane`.
+
+## Your own GitHub App
+
+For deploys from GitHub the control plane needs its own GitHub App. Create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**:
 
 1. **Permissions:** Contents read, Commit statuses read and write. **Events:** Push and Installation.
 2. **Callback URL:** `{APP_URL}/app/github/setup`. Tick **Request user authorization (OAuth) during installation** and **Redirect on update**.
 3. **Webhook URL:** `{APP_URL}/webhooks/github`, with a secret of your own.
 4. Generate a private key and a client secret.
 
-Put the key next to the settings as `/etc/moin-controlplane/github-app.pem`, add the rest to the settings and run `update.sh` again:
+Put the key at `/etc/moin-controlplane/github-app.pem`, add the rest and run `update.sh` again:
 
 ```bash
 GITHUB_APP_ID=
@@ -184,90 +164,49 @@ GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
 ```
 
-With the client ID and secret, moin asks GitHub who installed the app, and connects an installation only for someone whose GitHub account may manage it. They also let **Connect GitHub** work when the app is already installed: moin signs the user in to GitHub and connects the installations they have. Without them, moin trusts the installation in the link GitHub sends back and says so in its log when it starts.
+With the client ID and secret, moin connects an installation only for someone whose GitHub account may manage it, and **Connect GitHub** works when the app is already installed. Without them, moin trusts the installation in the link GitHub sends back, and says so in its log when it starts.
 
-### Who signs in
+## Who signs in
 
-- **You, first.** Put your address in `ADMIN_EMAILS` and sign up with it, with a sign-in link. Add a password later under **Settings** if you like. `ADMIN_EMAILS` takes several addresses, separated by commas.
-- **Your team.** Invite teammates to your workspace. They sign up with the invited address.
-- **Nobody else.** Other addresses get no account.
+- **You, first.** Sign up with your address from `ADMIN_EMAILS`, with a sign-in link. Add a password later under **Settings**, **Account**.
+- **Your team.** Invite teammates; they sign up with the invited address.
+- **Nobody else.** If `ADMIN_EMAILS` is empty nobody can create the first account, and the log says so when the control plane starts.
 
-If `ADMIN_EMAILS` is empty, nobody can create the first account, and the control plane says so in its log when it starts. Set it and run `update.sh` again.
+`/admin` is only for the addresses in `ADMIN_EMAILS`: users, sessions, operator activity and **Update now**.
 
-If you do want anyone to sign up, set `SIGNUPS_OPEN=true`. Keep it off on a control plane the internet can reach.
+## Updates
 
-### Analytics
+Once a day the control plane asks GitHub for the newest version. When one is out, the admins see a note at the top of the web: the version, what is new, a link to the [changelog](/changelog). Then click **Update now**, run `moin update`, or `sh update.sh` on the server.
 
-Off by default. To count visitors with your own Umami, set `UMAMI_WEBSITE_ID` and, for a self-hosted Umami, `UMAMI_HOST` (like `umami.example.com`). The page then loads its script, and the content security policy allows it.
+- moin is away for about a minute; your apps keep running.
+- Before the database changes it keeps a copy next to it, like `/var/lib/moin-controlplane/backup-before-v0.3.0.db`; the last three stay.
+- If the new version is not up within two minutes, the old one starts again and the note says why.
+- `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
+- **Update now** needs the updater next to the control plane, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A control plane set up before it gets it once with `git pull`, then `sh update.sh`.
+- `UPDATE_CHECK=false` stops the check; then update with `sh update.sh`.
+- The agents update themselves to the version of the control plane, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
 
-## Use it
+## Database backup
 
-Sign up at your `APP_URL` with your address from `ADMIN_EMAILS`, then point the CLI at it:
+Like your apps' databases, the control plane's SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `controlplane/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
 
-```bash
-moin login --url https://moin.example.com
-```
+| File | What is in it | Backup |
+| --- | --- | --- |
+| `app.db` (the name in `DB_CONNECTION`) | users, apps, deploys, settings, the state of each uptime check and every outage | every change, within a second |
+| `history.db` | [metrics](/docs/guides/metrics) and [uptime](/docs/guides/uptime) per hour | none: it grows back, losing it costs old charts |
 
-It opens your browser to approve the login. The install line for a server, the CLI, the terminal UI and MCP all talk to your control plane from then on. The rest of these docs apply as they are.
+A control plane that starts without a database restores the newest one from the bucket by itself; an empty bucket means a fresh start. So to move or rebuild: prepare a new server with `setup.sh`, put your settings in `/etc/moin-controlplane/` again and run `update.sh`. With a tunnel nothing else changes.
+
+## A new address
+
+Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old address goes on to the same page on the new one, agents and the CLI move by themselves, and webhooks and API calls there keep working. **Admin**, **Old domain** (or `GET /api/v1/admin/old-address`) shows what still arrives, by day and kind; after 14 quiet days it can go.
 
 ## What it sends us
 
-Every five minutes a self-hosted control plane tells us that it runs, with a few counts and nothing else:
+Every five minutes a self-hosted control plane tells us it runs, with a few counts:
 
 ```json
 {"instance": "8f14e45f-ceea-467a-9575-6c6f2b2b8f1e", "version": "v0.1.0", "counts": {"servers": 3, "apps": 7, "deploys": 412}}
 ```
 
-The instance ID is random and made once, on the first start. There is no name, domain, email, address or data of your apps in it, and we do not keep the address it comes from. The numbers add up to what the landing page shows as running on moin right now; a control plane that stops sending drops off within fifteen minutes. The code is in `controlplane/internal/service/telemetry.go`, and the control plane says so in its log when it starts.
-
-Turn it off with one setting:
-
-```bash
-TELEMETRY=false
-```
-
-Once a day it also asks GitHub for the newest release, see [Updates](#updates). That request carries nothing about you.
-
-## Database backup
-
-The control plane keeps its own SQLite database safe the way it keeps your apps' databases: every change goes to its bucket within seconds (`S3_BUCKET`, folder `controlplane/litestream`), with Litestream. In production this is on by default; `BACKUP_DATABASE=false` turns it off.
-
-The data folder holds two files:
-
-| File | What is in it | Backup |
-| --- | --- | --- |
-| `app.db` (the name in `DB_CONNECTION`) | everything that must not get lost: users, apps, deploys, settings, the state of each uptime check and every outage | every change, in your bucket within a second |
-| `history.db` | everything that is a chart over time: [metrics](/docs/guides/metrics) and [uptime](/docs/guides/uptime) per hour | none |
-
-The rule: what an alert or a decision depends on goes in the database; what is a chart goes in `history.db`. History grows back by itself, so losing `history.db` costs old charts, nothing else. The database stays small, its backup cheap and a restore fast.
-
-## Uptime checks
-
-The control plane checks every domain of every app once a minute, like the hosted one ([Uptime](/docs/guides/uptime)). In production this is on by default; `UPTIME_CHECKS=false` turns it off. In development it is off, so no real domain gets called, and `UPTIME_CHECKS=true` turns it on.
-
-When the control plane starts and finds no database, it restores the newest one from the bucket by itself. An empty bucket means a fresh start.
-
-## Updates
-
-**The control plane.** Once a day it asks GitHub for the newest release. When one is out, the admins in `ADMIN_EMAILS` see a note at the top of the web UI: the version, what is new in one line, and a link to the release notes. Then:
-
-- Click **Update now**. Or run `moin update` in the CLI.
-- Or run `sh update.sh` on the server, as before.
-
-moin is away for about a minute. Your apps keep running. Before the database changes, moin keeps a copy of it next to it, like `/var/lib/moin-controlplane/backup-before-v0.3.0.db`; the last three stay. If the new version does not come up within two minutes, the old one starts again, and the note says why.
-
-`moin version` shows the version of the control plane and says when a newer one is out. You only get releases, with their notes in the [changelog](/changelog), never work in between.
-
-**Update now** needs the updater, a small helper next to the control plane. It is the only part with access to Docker. moin itself never touches Docker: someone who breaks into it can at most ask for an official moin release, never run their own code on your server. A control plane set up before it gets it once: `git pull` in the repo, then `sh update.sh`.
-
-To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh` when you like.
-
-**The agents** update themselves to the version of the control plane, one server at a time, never during a deploy. Your apps keep running. See [Servers](/docs/guides/servers#updates).
-
-**The admin page.** `/admin` is for the addresses in `ADMIN_EMAILS` only: users, sessions, operator activity and **Update now**. Nobody else sees it. Your control plane counts only its own people; it never sees anyone else's.
-
-**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old domain**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
-
-## Move or rebuild
-
-When the server dies or you move: prepare a new server with `setup.sh`, put your settings in `/etc/moin-controlplane/` again and run `update.sh`. The database comes back from the bucket by itself. With a tunnel, nothing else changes: the tunnel connects from the new server and your domain follows.
+The instance ID is random, made on the first start. No name, domain, email, address or app data, and we do not keep the address it comes from. One that stops sending drops off within fifteen minutes. The code is in `controlplane/internal/service/telemetry.go`, and the log says so at start. `TELEMETRY=false` turns it off. The daily check for a new version carries nothing about you.

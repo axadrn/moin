@@ -1,27 +1,21 @@
 ---
-title: "Team and activity"
-description: "Work on the same servers with your team and see who changed what"
-order: 14
+title: "Team"
+description: "Invite your team to the same servers and apps, with roles"
+group: "Team"
+order: 1
 ---
 
-**The short version:** invite your team, everyone deploys to the same servers, and the activity shows who did what. Teams are free.
-
-## Your workspace
-
-Everything you add to moin lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App. Everyone in the workspace sees and works on all of it. The plan belongs to the workspace too, so one subscription covers the whole team.
-
-You name your first workspace when you sign up. Rename it later under [Rename the workspace](#rename-the-workspace).
-
-## Create a workspace
-
-Makes one more workspace, for example one per client. On hosted moin each workspace has its own plan.
+Invite your team, and everyone works on the same servers and apps. Teams are free. Everything lives in a workspace: servers, apps, the bucket, registry logins, the Cloudflare token, the Tailscale key and the GitHub App, and its plan, so one subscription covers the whole team.
 
 ```surfaces
-Web: the workspace switcher at the top of the sidebar, **New workspace**
-API: POST /api/v1/workspaces
+Web: **Settings**, **Team**
+CLI: moin team
+TUI: opens the web: `w`, then `t`
+API: GET /api/v1/workspaces/{slug}
+MCP: get_workspace
 ```
 
-The new workspace starts empty. Your API tokens stay with their own workspace: [make a token](/docs/guides/account#create-an-api-token) in the new one for the CLI.
+It lists the team and the invitations that wait for an answer.
 
 ## Roles
 
@@ -33,54 +27,36 @@ The new workspace starts empty. Your API tokens stay with their own workspace: [
 | Make someone a member or an admin, remove members and admins | | ✓ | ✓ |
 | Make someone an owner, remove an owner, billing, delete the workspace | | | ✓ |
 
-Everyone can leave a workspace. A workspace always keeps one owner: the last owner hands the role to someone else first, or deletes the workspace.
-
-## See the team
-
-Lists the members of the workspace and the invitations that wait for an answer.
-
-```surfaces
-Web: **Team**
-CLI: moin team
-TUI: opens the web: `w`, then `t`
-API: GET /api/v1/workspaces/{slug}
-MCP: get_workspace
-```
+Everyone can leave a workspace. A workspace always keeps one owner: the last owner hands the role on first, or deletes the workspace.
 
 ## Invite someone
 
-Sends an email that lets someone join the workspace. The invitation works for seven days.
+An email to join the workspace, good for seven days. They sign up with that address and land in your workspace.
 
 ```surfaces
-Web: **Team**, **Invite a teammate**, **Send invite**
-CLI: moin team invite <email>
+Web: **Settings**, **Team**, **Invite a teammate**, **Send invite**
+CLI: moin team invite <email>; --admin invites an admin
 TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
 ```
 
-`--admin` in the CLI invites them as an admin. They sign up with the address you invited, then land in your workspace. What each role may do is in [Roles](#roles).
-
 ## Send an invitation again
 
-Sends the email again, for example when it landed in spam.
+When it landed in spam. Only the new link works.
 
 ```surfaces
-Web: **Team**, **Invitations**, **Resend**
+Web: **Settings**, **Team**, **Invitations**, **Resend**
 CLI: moin team resend <email>
 TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
 MCP: resend_invitation
 ```
 
-Only the new link works.
-
 ## Revoke an invitation
 
-Takes an invitation back before someone accepts it.
-
 ```surfaces
-Web: **Team**, **Invitations**, **Revoke**
+Web: **Settings**, **Team**, **Invitations**, **Revoke**
 CLI: moin team revoke <email>
 TUI: opens the web: `w`, then `t`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
@@ -89,10 +65,8 @@ MCP: revoke_invitation
 
 ## Rename the workspace
 
-Changes the name everyone in the workspace sees.
-
 ```surfaces
-Web: **Team**, **Workspace name**, **Save**
+Web: **Settings**, **Team**, **Workspace name**, **Save**
 CLI: moin team rename "<workspace-name>"
 TUI: opens the web: `w`, then `t`
 API: PATCH /api/v1/workspaces/{slug}/name
@@ -101,49 +75,46 @@ MCP: rename_workspace
 
 ## Change a role
 
-Makes a member an admin, or the other way round. Only an owner makes someone an owner or changes an owner's role.
+Only an owner makes someone an owner or changes an owner's role.
 
 ```surfaces
-Web: **Team**, the role next to the person; it saves at once
+Web: **Settings**, **Team**, the role next to the person; it saves at once
 API: PATCH /api/v1/workspaces/{slug}/members/{id}/role
 ```
 
-## Remove a member
+## Remove someone
 
-Takes someone out of the workspace. Their API tokens for it stop working right away.
+Their API tokens for the workspace stop working at once.
 
 ```surfaces
-Web: **Team**, **Remove** next to the person
+Web: **Settings**, **Team**, **Remove** next to the person
 API: DELETE /api/v1/workspaces/{slug}/members/{id}
+```
+
+## Create a workspace
+
+One more workspace, for example one per client. On hosted moin each has its own plan. It starts empty, and your API tokens stay with their own workspace: [make a token](/docs/guides/account#create-an-api-token) in the new one.
+
+```surfaces
+Web: **Settings**, **Workspaces**, **New workspace**
+API: POST /api/v1/workspaces
 ```
 
 ## Leave or delete a workspace
 
-**Leave** takes you out of the workspace. Its servers and apps stay for the others.
+**Leave workspace** takes you out; servers and apps stay for the others. The last owner cannot leave: [change a role](#change-a-role) first.
 
-**Delete workspace** removes the workspace with its members, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner deletes a workspace, and you type its name first. It cannot be undone. A paid plan must be cancelled and run out first.
+**Delete workspace** removes it with its team, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner can, after typing its name; it cannot be undone. A paid plan must be cancelled and run out first.
 
 ```surfaces
-Web: **Team**, **Leave workspace**
-Web: **Team**, **Delete workspace**, then type its name
+Web: **Settings**, **Team**, **Leave workspace**
+Web: **Settings**, **Team**, **Delete workspace**, then type its name
 API: POST /api/v1/workspaces/{slug}/leave
 API: DELETE /api/v1/workspaces/{slug}
 ```
 
-The last owner cannot leave: [change a role](#change-a-role) to make someone else an owner first.
+## Good to know
 
-## Why only the web
-
-Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. An API token, and so the CLI, the TUI and agents, cannot do them. A leaked token can never lock your team out or delete its work.
-
-## Tokens and workspaces
-
-A personal API token belongs to one workspace: you pick it when you create the token under **Settings**. The CLI, the terminal UI, the GitHub Action and agents work in that workspace. For another workspace, log in with one of its tokens:
-
-```bash
-moin login --token pat_…
-```
-
-## Activity
-
-Every change goes into the activity of the workspace: who did it, to the second, how it came in and what changed. Filter it by app, server or member and page back as far as you like. The [activity log](/docs/guides/activity) shows what it records and what it never records.
+- Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. An API token, and so the CLI, the TUI and agents, cannot, so a leaked token never locks your team out.
+- A personal API token belongs to one workspace. For another workspace, log in with one of its tokens: `moin login --token pat_…`.
+- Every change goes into the [activity](/docs/guides/activity).

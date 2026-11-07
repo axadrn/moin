@@ -1,84 +1,39 @@
 ---
 title: "Build in CI"
-description: "Build images in GitHub Actions and deploy them with a hook"
-order: 13
+description: "Build images in GitHub Actions or any CI and deploy them with a hook"
+group: "Apps"
+order: 5
 ---
 
-By default your server builds the app, as in [Deploy](/docs/guides/deploy). You can also build the image in CI, push it to a registry and let moin deploy it. The server then only pulls and starts it.
-
-| | Server builds | CI builds |
-| --- | --- | --- |
-| Who builds | your server, from the code `moin deploy` uploads | GitHub Actions or any CI |
-| Start it | `moin deploy` | the deploy hook, or `moin deploy --image` (after one `moin deploy` of the repo, whose compose file it reuses) |
-| Good for | small apps, no registry needed | heavy builds, build caches, many servers |
-
-An image deploy keeps the compose file of the running release and only swaps the image of the main service. So deploy the repo once with `moin deploy`; after that CI can ship images. Health check, automatic rollback, `moin rollback` and env vars work the same.
+Build the image in CI, push it to a registry, and moin deploys it: the server only pulls and starts it. Good for heavy builds, build caches and many servers. Deploy the repo once with `moin deploy` first: an image deploy keeps that compose file and swaps only the image of the main service.
 
 ## 1. Save a registry login
 
-Lets your servers pull private images. A registry is where CI stores the images it builds, such as GitHub Container Registry. Public images need no login.
+Only for private images. For GitHub Container Registry, use a token with `read:packages`.
 
 ```surfaces
-Web: **Settings**, **Tokens** tab, **Registries**, **Save login**
+Web: **Settings**, **Account**, **Tokens** tab, **Registries**, **Save login**
 CLI: moin registry set ghcr.io <username>
 TUI: opens the web: `w`, then `s`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
 
-For GitHub Container Registry, create a token with `read:packages`. The CLI asks for it on stdin. The token is stored encrypted. The agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
-
-### See the registry logins
-
-Lists the saved logins, without their passwords.
-
-```surfaces
-Web: **Settings**, **Tokens** tab, **Registries**
-CLI: moin registry
-TUI: opens the web: `w`, then `s`
-API: GET /api/v1/registries
-MCP: list_registries
-```
-
-### Remove a registry login
-
-Deletes a saved login. Servers can then no longer pull private images from that registry.
-
-```surfaces
-Web: **Settings**, **Tokens** tab, **Registries**, **Remove** on the login
-CLI: moin registry rm ghcr.io
-TUI: opens the web: `w`, then `s`
-API: DELETE /api/v1/registries/{host}
-MCP: remove_registry
-```
+The CLI reads the token from stdin. It is stored encrypted, and the agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
 
 ## 2. Create a deploy hook
 
-Gives you a secret URL that deploys an image when CI calls it.
+A secret URL that deploys an image when CI calls it. moin shows it once: store it as the CI secret `MOIN_DEPLOY_HOOK`.
 
 ```surfaces
-Web: the app page, **Deploy from CI**, **Show**, **Deploy hook**, **New deploy hook**
+Web: the app, **Deploy from CI**, **Show**, **Deploy hook**, **New deploy hook**
 CLI: moin hook <app-name>
 TUI: on the app, `W` opens **Deploy from CI** in the web
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-moin shows the URL once. Store it as the CI secret `MOIN_DEPLOY_HOOK`. A new hook makes the old one stop working, so moin asks first when the app has a hook already; the first one needs no question. In a script, add `--yes`.
-
-### Turn the deploy hook off
-
-Makes the hook URL stop working, so CI can no longer deploy. Do it when you stop using CI or think the URL leaked. A new hook can be made again any time.
-
-```surfaces
-Web: the app page, **Deploy from CI**, **Deploy hook**, **Turn off**
-CLI: moin hook off <app-name>
-TUI: on the app, `W` opens **Deploy from CI** in the web
-API: DELETE /api/v1/apps/{app}/hook
-MCP: remove_deploy_hook
-```
-
-It works also when the plan allows no changes. `get_app` and `GET /api/v1/apps/{app}` say in `hook` whether the app has one.
+A new hook stops the old one, so moin asks first when there is one; `--yes` skips it.
 
 ## 3. The workflow
 
@@ -113,11 +68,11 @@ jobs:
           MOIN_DEPLOY_HOOK: ${{ secrets.MOIN_DEPLOY_HOOK }}
 ```
 
-Build for the arch of your server (`moin servers` shows it). The hook answers `202` with the deploy; follow it in the web UI, the TUI or with `moin logs`.
+Build for the arch of your server (`moin servers` shows it). The hook answers `202` with the deploy; follow it on the web, in the TUI or with `moin logs`.
 
-## Or deploy with the moin action
+## Or use the moin action
 
-The moin GitHub Action installs `moin` from your control plane and runs `moin deploy` with a personal API token. Without `image` it puts the repo into [your bucket](/docs/guides/bucket) and your server builds it; with `image` it deploys the image the job pushed.
+Installs `moin` from your control plane and runs `moin deploy` with a personal API token. With `image` it deploys that image; without, it puts the repo into [your bucket](/docs/guides/bucket) and your server builds it. The step waits until the deploy is live and fails the job when it fails.
 
 ```yaml
       - uses: axadrn/moin@main
@@ -127,18 +82,49 @@ The moin GitHub Action installs `moin` from your control plane and runs `moin de
           image: ghcr.io/${{ github.repository }}:${{ github.sha }}
 ```
 
-The step waits until the deploy is live and fails the job when the deploy fails. For deploys without CI, [GitHub](/docs/guides/github) deploys every push by itself.
-
 ## Deploy an image by hand
 
-Deploys an image that is already in a registry, without CI.
-
 ```surfaces
-Web: the app page, **Deploy from CI**, **Show**, **Deploy an image**, **Deploy image**
+Web: the app, **Deploy from CI**, **Show**, **Deploy an image**, **Deploy image**
 CLI: moin deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
 TUI: on the app, `I`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_image
 ```
 
-In the API, send `{"image": "ghcr.io/<owner>/<image>:<tag>"}`. A redeploy of an image deploy pulls the same image again.
+The API takes `{"image": "ghcr.io/<owner>/<image>:<tag>"}`. A redeploy of an image deploy pulls the same image again.
+
+## Turn the deploy hook off
+
+The hook URL stops working, so CI can no longer deploy. Do it when you stop using CI or the URL leaked; a new hook can be made any time.
+
+```surfaces
+Web: the app, **Deploy from CI**, **Deploy hook**, **Turn off**
+CLI: moin hook off <app-name>
+TUI: on the app, `W` opens **Deploy from CI** in the web
+API: DELETE /api/v1/apps/{app}/hook
+MCP: remove_deploy_hook
+```
+
+It works also when the plan allows no changes. `get_app` and `GET /api/v1/apps/{app}` say in `hook` whether the app has one.
+
+## Registry logins
+
+```surfaces
+Web: **Settings**, **Account**, **Tokens** tab, **Registries**; **Remove** on a login
+CLI: moin registry
+CLI: moin registry rm ghcr.io
+TUI: opens the web: `w`, then `s`
+API: GET /api/v1/registries
+API: DELETE /api/v1/registries/{host}
+MCP: list_registries
+MCP: remove_registry
+```
+
+The list never shows passwords. Without a login, servers can no longer pull private images from that registry.
+
+## Good to know
+
+- `moin deploy --image` also works after one `moin deploy` of the repo, whose compose file it reuses.
+- Health check, the fallback to the last good deploy, `moin rollback` and env vars work the same as for a server build.
+- Public images need no registry login.

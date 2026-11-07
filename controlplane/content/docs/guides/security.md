@@ -1,138 +1,86 @@
 ---
 title: "Security"
-description: "No open port, SSH only on your tailnet, everything else dropped"
-order: 8
+description: "No open port, SSH only on your tailnet, everything else dropped, and rules only root can change"
+group: "Servers and data"
+order: 2
 ---
 
-A [server](/docs/guides/servers) moin runs can have no open port at all. moin sets up three switches per server, and each one closes a door:
+A server moin runs can have no open port at all. Three switches per server each close a door, and a file on the server decides what moin may do there. The agent only dials out, so moin itself needs no open port.
 
-- **Cloudflare Tunnel.** Visitors reach your apps through Cloudflare instead of ports 80 and 443. A tunnel is a connection your server opens to Cloudflare, so nothing has to come in.
-- **SSH only on Tailscale.** SSH, the way you log in to the server, answers only on your tailnet. [Tailscale](https://tailscale.com) is a free service that links your own devices in a private network, your tailnet.
-- **Firewall.** The server drops every connection the other switches do not need.
+| Switch | What it closes | Needs |
+| --- | --- | --- |
+| **Cloudflare Tunnel** | ports 80 and 443: visitors come through Cloudflare | your domains in a Cloudflare account |
+| **SSH only on Tailscale** | SSH from everywhere but your tailnet | a [Tailscale](https://tailscale.com) account |
+| **Firewall** | everything the other switches do not need | nothing: turn it on for every server |
 
-The agent only dials out to moin, so moin itself needs no open port either.
+```surfaces
+Web: **Servers**, **Security** on the server, flip the switches, then **Apply**
+CLI: moin servers secure web-1 --tunnel on --ssh tailscale --firewall on
+TUI: on the server, `W` opens its security page in the web
+API: PUT /api/v1/servers/{id}/security
+MCP: set_server_security
+```
 
-You can turn on each switch alone. If you only do one thing, turn on the firewall. The tunnel needs your domains in a Cloudflare account; SSH on Tailscale needs a Tailscale account.
+Each switch works alone; `--tunnel off`, `--ssh open` and `--firewall off` turn them back. If you do one thing, turn on the firewall. The CLI asks first; `--yes` skips it in scripts. On the web, **Apply** changes only the switches you flipped, so a change made meanwhile elsewhere stays.
 
 ## Keys
 
-The switches need two keys: a Cloudflare API token for the tunnel and a Tailscale auth key for SSH. They belong to the workspace, work for all its servers and are stored encrypted. On the web they are under **Integrations** on the security page of any server.
-
-On the server, the agent hands the Cloudflare token to cloudflared through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows up in `ps`.
-
-### Store a key
-
-Adds the Cloudflare token or the Tailscale key. A new key replaces the old one; an empty field keeps it.
-
-```surfaces
-Web: **Servers**, **Security** on the server, **Keys for every server**
-CLI: moin integrations cloudflare
-CLI: moin integrations tailscale
-TUI: on the server, `W` opens its security page in the web
-API: PUT /api/v1/integrations
-MCP: set_integrations
-```
-
-The CLI reads the key from stdin, so it never ends up in your shell history.
-
-### See which keys are stored
-
-Shows whether a Cloudflare token and a Tailscale key are there, never the keys themselves.
+The tunnel needs a Cloudflare API token, SSH on Tailscale a Tailscale auth key. They belong to the workspace, work for all its servers and are stored encrypted. A new key replaces the old one; an empty field keeps it.
 
 ```surfaces
 Web: **Servers**, **Security** on the server, **Keys for every server**
 CLI: moin integrations
-TUI: on the server, `W` opens its security page in the web
-API: GET /api/v1/integrations
-MCP: get_integrations
-```
-
-### Remove a key
-
-Deletes a key from moin. Turn the tunnels off first: without the token moin cannot delete a tunnel in Cloudflare.
-
-```surfaces
-Web: **Servers**, **Security** on the server, **Remove Cloudflare API token** or **Remove Tailscale auth key** at the end
+CLI: moin integrations cloudflare
+CLI: moin integrations tailscale
 CLI: moin integrations rm cloudflare
 CLI: moin integrations rm tailscale
 TUI: on the server, `W` opens its security page in the web
+API: GET /api/v1/integrations
 API: PUT /api/v1/integrations
+MCP: get_integrations
 MCP: set_integrations
 ```
 
-The API and MCP remove a key when you send it empty.
+`moin integrations` shows which keys are stored, never the keys. The CLI reads a key from stdin, so it never lands in your shell history. The API and MCP remove a key when you send it empty; the web has **Remove Cloudflare API token** and **Remove Tailscale auth key** at the end of the security page.
 
-Removing a key changes no server right away. Without the Tailscale key, the next security change of a server opens SSH again on every network. Turning the tunnel or SSH on Tailscale back on needs a key again.
-
-### Create the keys
-
-- **Cloudflare token:** in Cloudflare under **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Give it Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit**, for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS** for your domains, without it you turn that on in Cloudflare yourself. A zone is a domain you added to Cloudflare, such as `example.com`. moin checks the token before it stores it.
-- **Tailscale key:** in the Tailscale admin console under **Settings**, **Keys**. Make it reusable.
+- **Cloudflare token**: in Cloudflare, **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit** for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS**, without it you do that in Cloudflare. moin checks the token before it stores it.
+- **Tailscale key**: in the Tailscale admin console, **Settings**, **Keys**. Make it reusable.
+- On the server the agent hands the Cloudflare token to cloudflared through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows in `ps`.
+- Turn the tunnels off before you remove the Cloudflare token: without it moin cannot delete a tunnel. Removing a key changes no server at once; without the Tailscale key, the next security change of a server opens SSH again on every network.
 
 ## Cloudflare Tunnel
 
-Sends all web traffic of a server through Cloudflare and closes ports 80 and 443. Use it when you want no web port open on the server.
+`cloudflared` runs next to Traefik, the server's proxy, and keeps a connection open to Cloudflare. With your token moin creates a tunnel for the server, routes every domain of its apps through it (anything else gets a 404), points each domain's DNS at the tunnel in the zone that holds it, and turns on **Always Use HTTPS**: Cloudflare serves HTTPS, so the server needs no certificate. A domain you add later gets the same.
 
-```surfaces
-Web: **Servers**, **Security** on the server, turn on **Cloudflare Tunnel**, then **Apply**
-CLI: moin servers secure <server-name> --tunnel on
-TUI: on the server, `W` opens its security page in the web
-API: PUT /api/v1/servers/{id}/security
-MCP: set_server_security
+```bash
+moin servers secure web-1 --tunnel on
 ```
 
-With the tunnel on, `cloudflared` runs next to Traefik, the proxy of the server, and keeps a connection open to Cloudflare. Visitors reach Cloudflare, Cloudflare sends their requests through the tunnel and Traefik hands them to your app.
-
-moin does the setup with your Cloudflare token:
-
-1. It creates a tunnel for the server and starts `cloudflared`.
-2. It routes every domain of the server's apps through the tunnel. Anything else gets a 404.
-3. It points the DNS of each domain at the tunnel, in the Cloudflare zone that holds the domain.
-4. It turns on **Always Use HTTPS** for those zones. Cloudflare serves HTTPS, so the server needs no certificate.
-
-A domain you add later gets the same setup. If the token cannot reach the zone of a domain, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says so too: turn on **Always Use HTTPS** in Cloudflare yourself.
-
-Turning the tunnel off deletes it and the DNS records moin pointed at it. Traefik opens ports 80 and 443 again and gets certificates from Let's Encrypt. Point your domains back at the server with an A record, as in [Add a domain](/docs/guides/domains#add-a-domain).
+- If the token cannot reach a domain's zone, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says to turn on **Always Use HTTPS** yourself.
+- Off deletes the tunnel and the DNS records moin made. Traefik opens 80 and 443 again and gets certificates from Let's Encrypt: point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
+- A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
 
 ## SSH only on Tailscale
 
-Lets SSH answer only on your tailnet, so nobody else on the internet can even try to log in. Use it when you reach your servers from your own devices only.
+SSH answers only on your tailnet, so nobody else on the internet can even try to log in.
 
-```surfaces
-Web: **Servers**, **Security** on the server, turn on **SSH only on Tailscale**, then **Apply**
-CLI: moin servers secure <server-name> --ssh tailscale
-TUI: on the server, `W` opens its security page in the web
-API: PUT /api/v1/servers/{id}/security
-MCP: set_server_security
+```bash
+moin servers secure web-1 --ssh tailscale
 ```
 
-The agent installs Tailscale when it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address. Until then it stays open and moin says why. It closes with the firewall off too: the agent then drops only SSH from other networks.
-
-Before you close SSH, keep a second way into the server, such as the web console of your provider.
+The agent installs Tailscale if it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address; until then it stays open and moin says why. With the firewall off it closes too: the agent then drops only SSH from other networks. Before you close SSH, keep a second way in, such as your provider's web console.
 
 ## Firewall
 
-Drops every connection the server does not need. Turn it on for every server: without it, any program that listens on a port is open to the internet.
-
-```surfaces
-Web: **Servers**, **Security** on the server, turn on **Firewall**, then **Apply**
-CLI: moin servers secure <server-name> --firewall on
-TUI: on the server, `W` opens its security page in the web
-API: PUT /api/v1/servers/{id}/security
-MCP: set_server_security
+```bash
+moin servers secure web-1 --firewall on
 ```
 
-The firewall lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and port 41641 for Tailscale. It drops everything else.
-
-The agent keeps its rules in one nftables table, `moin`, and changes them in one step, so there is never a moment without rules. nftables is the firewall built into Linux. Docker publishes container ports on its own, past this table. With the tunnel on, no container port is published.
-
-## Apply on the web
-
-On the web, flip the switches and press **Apply**. The switches are in the **Access** box. Apply changes only the switches you flipped: a change someone made meanwhile in the CLI, the TUI or through an agent stays. The page updates by itself when the server changes, except while a flipped switch waits for Apply.
+It lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and 41641/udp for Tailscale. It drops everything else. The rules live in one nftables table, `moin`, changed in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table; with the tunnel on, no container port is published.
 
 ## See what is open
 
-Shows what the agent set up on a server: how traffic comes in, which ports are open to everyone, and the tailnet address.
+How traffic comes in, which ports are open to everyone, and the tailnet address.
 
 ```surfaces
 Web: **Servers**, **Security** on the server, **What the agent set up**
@@ -142,17 +90,15 @@ API: GET /api/v1/servers
 MCP: list_servers
 ```
 
-In the CLI it is the ACCESS column, and `moin servers secure` prints it after each change. In the API it is the `security` field. Without the firewall, **Open to everyone** lists only the ports moin uses, but every other listening port is open too.
+The CLI shows it in the ACCESS column and after every `moin servers secure`; the API in the `security` field. Without the firewall, **Open to everyone** lists only the ports moin uses, but every other listening port is open too.
 
 ## No open port
 
-With all three switches on, nothing is open to the internet. The agent dials out to moin, `cloudflared` dials out to Cloudflare and Tailscale dials out to its own servers. **What the agent set up** then shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
+With all three switches on, nothing is open to the internet: the agent dials out to moin, `cloudflared` to Cloudflare, Tailscale to its own servers. **What the agent set up** shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
 
 ## Rules
 
-Rules are a file on your server that says what moin may do there. The agent checks every request against it and refuses what it does not allow. Nobody can change the file through moin: not us, not your team, not someone who breaks into moin. Changing it takes root on the server.
-
-Write one rule per line into `/etc/moin/rules`:
+`/etc/moin/rules` on the server says what moin may do there. The agent checks every request against it and refuses what it does not allow. Nobody can change it through moin: not us, not your team, not someone who breaks into moin. It takes root on the server.
 
 ```
 # /etc/moin/rules
@@ -169,44 +115,26 @@ network: locked
 | `data: off` | reading tables, running SQL and editing rows through moin |
 | `logs: off` | reading container logs through moin; logs often hold what your users sent |
 | `exec: off` | [running commands](/docs/guides/exec) in containers through moin |
-| `deploy-from: <sources>` | deploys from anywhere else, see below |
+| `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
-| `network: locked` | changes to the tunnel, SSH on Tailscale and the firewall. Set them up first, then lock them |
+| `network: locked` | changes to the tunnel, SSH on Tailscale and the firewall: set them up first, then lock them |
 
-A source in `deploy-from` is one of these:
-
-- a GitHub repo, as `github.com/<owner>/<repo>`,
-- an image without its tag, such as `ghcr.io/<owner>/<image>`,
-- `upload`, for `moin deploy` from your computer. With `backups-to` set, an upload must come from that bucket too.
-
-`*` stands for one part, so `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
-
-For `backups-to`, the endpoint host is the endpoint of [your bucket](/docs/guides/bucket#add-it) without `https://`, such as `<account-id>.r2.cloudflarestorage.com`. For AWS S3 it is `s3.<region>.amazonaws.com`.
-
-Without the file, moin may do everything. A rule you leave out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it, so a typo never lets through what it was meant to stop.
-
-Rules apply to every request right away. The agent reports them when it connects, so restart it after a change to show the new rules everywhere:
-
-```bash
-systemctl restart moin-agent
-```
+- A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
+- The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
+- No file: moin may do everything. A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
+- Rules apply to every request at once. The agent reports them when it connects, so `systemctl restart moin-agent` after a change shows them everywhere.
+- A server with rules never updates its agent from moin ([Updates](/docs/guides/servers#updates)).
+- A refused request says why, on every surface: `refused by the rules of this server (/etc/moin/rules): data: off`.
+- With all of them, a break-in at moin reads nothing and runs nothing of its own on your server: `data` and `logs` keep your users' data from passing through moin, `deploy-from` and `exec` stop code that could copy it.
 
 ### See the rules of a server
 
-Shows the rules a server has, as its agent reported them.
-
 ```surfaces
 Web: **Servers**, **Security** on the server, **Rules**
-CLI: moin servers rules <server-name>
+CLI: moin servers rules web-1
 TUI: on the server, **Access**, under the rules
 API: GET /api/v1/servers
 MCP: list_servers
 ```
 
-`moin servers` shows them in its RULES column too. In the API they are the `rules` field.
-
-A refused request says why, on every surface: `refused by the rules of this server (/etc/moin/rules): data: off`.
-
-### Why it matters
-
-`data: off` and `logs: off` keep your users' data from passing through moin. `deploy-from` and `exec: off` are the other half: without them, whoever controls moin could deploy code, or run a command, that copies your database. With all of them, a break-in at moin reads nothing and runs nothing of its own on your server.
+`moin servers` shows them in its RULES column; the API in the `rules` field.

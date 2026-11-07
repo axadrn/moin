@@ -1,39 +1,40 @@
 ---
 title: "AI agents (MCP)"
-description: "Let Claude and other agents run moin for you"
-order: 12
+description: "Let Claude, Cursor and other agents run moin for you"
+group: "Team"
+order: 4
 ---
 
-MCP (Model Context Protocol) is how AI agents such as Claude, Cursor or VS Code use tools. The control plane serves an MCP server at `/mcp`. Almost every action of the web UI, the CLI and the terminal UI is a tool, so you can say *"roll back my app and show me its logs"*. [Where things work](/docs/reference/surfaces) lists what stays in the web.
+The control plane is an MCP server at `/mcp`, so Claude, Cursor, VS Code and any MCP client can run moin: *"roll back my app and show me its logs"*. Almost every action is a tool; [Where things work](/docs/reference/surfaces) lists what stays in the web.
 
-Agents authenticate with a personal API token. There is no login tool and no browser login for MCP, unlike `moin login` for the CLI: a token from Settings is all an agent needs. A read-only token can call the read tools; changes need read and write access. Tools that remove, replace or stop something, like removing a server or an app, are marked destructive, so clients ask before they call them. Four of them cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, typed out, and refuse without it.
+[Create an API token](/docs/guides/account#create-an-api-token), **Read and write** to change things or **Read only** to look, and put it where `pat_…` stands.
 
 ## Connect an agent
 
-First [create an API token](/docs/guides/account#create-an-api-token). Pick **Read and write** if the agent should change things, **Read only** if it should only look. Put the token where `pat_…` stands below.
-
-### Claude Code
+Claude Code:
 
 ```bash
 claude mcp add --transport http moin https://moin.example.com/mcp \
   --header "Authorization: Bearer pat_…"
 ```
 
-### Cursor
-
-In `.cursor/mcp.json`:
+Cursor, in `.cursor/mcp.json`:
 
 ```json
 {"mcpServers": {"moin": {"url": "https://moin.example.com/mcp", "headers": {"Authorization": "Bearer pat_…"}}}}
 ```
 
-### Other clients
+Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mcp` and the header `Authorization: Bearer pat_…`.
 
-Any client that speaks MCP over HTTP works: give it the URL `https://moin.example.com/mcp` and the header `Authorization: Bearer pat_…`.
+## Good to know
+
+- No login tool and no browser login: the token is all an agent needs.
+- A read-only token calls the read tools; changes need read and write.
+- Tools that remove, replace or stop something are marked destructive, so clients ask first.
+- Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it.
+- Tools take the app as `app` and the server as `server`; the older `name` still works for both, for now.
 
 ## Tools
-
-Tools take the app as `app` and the server as `server`. The older `name` still works for both, for now.
 
 | Tool | Does | Scope |
 | --- | --- | --- |
@@ -51,13 +52,13 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `rename_server` | renames a server | write |
 | `update_agent` | puts the control plane's agent version on a server | write |
 | `set_agent_updates` | turns automatic agent updates on or off | write |
-| `get_version` | the control plane's version, the newest release and whether agents update by themselves | read |
-| `update_control_plane` | updates a self-hosted control plane to the newest release, for its admins | write |
-| `list_apps` | apps with live and newest deploy | read |
+| `get_version` | the control plane's version, the newest version of moin and whether agents update by themselves | read |
+| `update_control_plane` | updates a self-hosted control plane to the newest version, for its admins | write |
+| `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |
 | `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
-| `pin_app` | pins an app or unpins it with `pinned` false | write |
+| `pin_app` | pins an app, or unpins it with `pinned` false | write |
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |
 | `deploy_image` | deploys an image built in CI | write |
@@ -66,20 +67,20 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `list_registries` | registry logins, without passwords | read |
 | `set_registry` | stores a registry login | write |
 | `remove_registry` | removes a registry login | write, destructive |
-| `rollback_app` | starts an earlier release again | write, destructive |
-| `list_catalog` | the catalog with each app's newest release | read |
-| `get_catalog_app` | a catalog app with every release | read |
+| `rollback_app` | starts an earlier deploy again | write, destructive |
+| `list_catalog` | the catalog with each app's newest version | read |
+| `get_catalog_app` | a catalog app with every version | read |
 | `install_catalog_app` | installs a catalog app on a server | write |
-| `update_app` | sets a catalog app to a release and deploys it | write |
+| `update_app` | sets a catalog app to a version and deploys it | write |
 | `get_logs` | the last container lines | read |
 | `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | write |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
-| `get_backups` | snapshots, point in time window, restore drills | read |
-| `back_up_app` | takes a snapshot now | write |
-| `restore_app` | restores a snapshot or a point in time; `bucket` names an older bucket the snapshot is in; `confirm` is the app's name | write, destructive |
-| `set_backup_settings` | snapshot before every change | write |
+| `get_backups` | full backups, the point-in-time window, restore drills | read |
+| `back_up_app` | takes a full backup now | write |
+| `restore_app` | restores a full backup or a point in time; `bucket` names an older bucket the backup is in; `confirm` is the app's name | write, destructive |
+| `set_backup_settings` | a full backup before every change | write |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each | read |
 | `add_bucket` | adds a bucket; the first is the default | write |
 | `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
@@ -95,7 +96,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `set_instant` | the provider of the instant address or off, and whether a password guards it | write |
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |
-| `restart_app` | starts the live release again with the current settings | write |
+| `restart_app` | starts the live deploy again with the current settings | write |
 | `stop_app` | takes the app offline; its data stays | write, destructive |
 | `start_app` | runs a stopped app again | write |
 | `get_env` | env vars in plain text | write |
@@ -111,7 +112,7 @@ Tools take the app as `app` and the server as `server`. The older `name` still w
 | `set_integrations` | stores them | write |
 | `set_server_security` | Cloudflare Tunnel, SSH on Tailscale, firewall | write, destructive |
 | `get_billing` | the subscription; on a self-hosted control plane it says billing is off | read |
-| `list_workspaces` · `get_workspace` | the token's workspace with its members | read |
+| `list_workspaces` · `get_workspace` | the token's workspace with its team | read |
 | `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |
 | `invite_member` | invites someone by email | write |
 | `resend_invitation` | sends an invitation again | write |

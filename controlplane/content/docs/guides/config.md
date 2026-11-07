@@ -1,12 +1,11 @@
 ---
 title: "Config in the repo"
 description: "The x-moin block in compose.yml"
-order: 5
+group: "Apps"
+order: 7
 ---
 
-Everything moin needs to know about an app can live next to its code, in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional; without them moin detects what it can, as [Deploy](/docs/guides/deploy#deploy-from-a-repo) shows.
-
-Your repo has only a `Dockerfile` or a `go.mod`, or none of them and moin [builds it with Railpack](/docs/guides/deploy#no-dockerfile)? Then you need no file at all. To set one of these fields anyway, add a `compose.yml` like the one below: it then replaces the one moin would write, so it needs the `services` part too, with a `Dockerfile` to build. For a Railpack app, change the start command with the env var `RAILPACK_START_CMD` instead.
+Everything moin needs to know about an app can live next to its code, in an `x-moin` block in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional.
 
 ```yaml
 x-moin:
@@ -29,10 +28,11 @@ services:
       - ./data:/data
 ```
 
-Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
+## Good to know
 
-The agent reports what it detected after every deploy: kind, service, port, databases and this block. The web UI shows it on the app page, `moin deploy` at the end and MCP in `get_app`.
-
-Fields in `x-moin` win over the settings you make in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address). `database` picks the file the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
-
-Secrets never belong in the repo. Use [env vars](/docs/guides/env).
+- Fields in `x-moin` win over the settings in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address).
+- `database` picks the database the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
+- Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
+- Only a `Dockerfile` or `go.mod`, or neither? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`: it replaces the one moin would write. For a Railpack app, set the start command with the env var `RAILPACK_START_CMD` instead.
+- After every deploy the agent reports what it detected: kind, service, port, databases and this block. The app page, the end of `moin deploy` and `get_app` show it.
+- Secrets never belong in the repo: use [env vars](/docs/guides/env).
