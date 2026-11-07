@@ -1,8 +1,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/model"
 )
@@ -81,33 +79,4 @@ type URLResponse struct {
 type checkoutRequest struct {
 	PlanID   string `json:"plan_id"`
 	Interval string `json:"interval"`
-}
-
-// checkoutSelection validates a checkout request like the web handler: the
-// plan must exist and be purchasable, an empty interval means monthly. It
-// writes the 422 answer and returns false when the selection is invalid.
-func checkoutSelection(w http.ResponseWriter, request *checkoutRequest) bool {
-	plan, exists := access.PlanByID(request.PlanID)
-	if !exists || !plan.Purchasable {
-		Error(w, http.StatusUnprocessableEntity, "invalid_plan", "Choose an available paid plan.")
-		return false
-	}
-	if request.Interval == "" {
-		request.Interval = model.SubscriptionIntervalMonthly
-	}
-	if request.Interval != model.SubscriptionIntervalMonthly && request.Interval != model.SubscriptionIntervalYearly {
-		Error(w, http.StatusUnprocessableEntity, "invalid_interval", "Choose monthly or yearly billing.")
-		return false
-	}
-	return true
-}
-
-// hasBillingAccount reports whether the provider knows a customer for the
-// subscription, which the portal and billing management need.
-func hasBillingAccount(subscription *model.Subscription) bool {
-	return subscription != nil && subscription.ProviderCustomerID != nil && *subscription.ProviderCustomerID != ""
-}
-
-func noBillingAccount(w http.ResponseWriter) {
-	Error(w, http.StatusConflict, "no_billing_account", "Start a paid plan before managing billing.")
 }

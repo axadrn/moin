@@ -6,9 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/service/payment"
@@ -28,7 +26,7 @@ func NewBillingHandler(paymentService payment.Provider, workspaceService *servic
 }
 
 func (h *BillingHandler) BillingPage(w http.ResponseWriter, r *http.Request) {
-	if !ctxkeys.WorkspaceMember(r.Context()).Can(model.WorkspacePermissionManageBilling) {
+	if service.ManageBilling(ctxkeys.WorkspaceMember(r.Context())) != nil {
 		w.WriteHeader(http.StatusForbidden)
 		render(w, r, pages.ErrorPage(http.StatusForbidden, "Access denied", "Only workspace owners can manage billing."))
 		return
@@ -37,73 +35,33 @@ func (h *BillingHandler) BillingPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
-	workspace := ctxkeys.Workspace(r.Context())
-	member := ctxkeys.WorkspaceMember(r.Context())
-	if !member.Can(model.WorkspacePermissionManageBilling) {
-		if isAction(r) {
-			answerFailed(w, r, "Action not allowed", "Only workspace owners can start checkout.")
-		} else {
-			w.WriteHeader(http.StatusForbidden)
-			render(w, r, pages.ErrorPage(http.StatusForbidden, "Action not allowed", "Only workspace owners can start checkout."))
-		}
+	ctx := r.Context()
+	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), r.FormValue("plan_id"), r.FormValue("interval"), service.RequestSource(ctx), h.paymentService.CreateCheckoutURL)
+	switch {
+	case err == nil:
+		redirect(w, r, checkoutURL, http.StatusSeeOther)
+	case errors.Is(err, service.ErrBillingPermission):
+		checkoutFailed(w, r, http.StatusForbidden, "Action not allowed", "Action not allowed", "Only workspace owners can start checkout.")
+	case errors.Is(err, service.ErrPlan):
+		checkoutFailed(w, r, http.StatusBadRequest, "Invalid plan", "Invalid plan", "Choose an available paid plan.")
+	case errors.Is(err, service.ErrInterval):
+		checkoutFailed(w, r, http.StatusBadRequest, "Invalid billing interval", "Invalid billing interval", "Choose monthly or yearly billing.")
+	case errors.Is(err, repository.ErrCheckoutPending), errors.Is(err, repository.ErrCheckoutSelection), errors.Is(err, repository.ErrSubscriptionAlreadyPaid):
+		checkoutFailed(w, r, http.StatusConflict, "Checkout already active", "Checkout already active", "Finish the existing checkout or manage the current subscription first.")
+	default:
+		checkoutFailed(w, r, http.StatusInternalServerError, "Checkout not started", "Checkout unavailable", "Checkout could not be started. Please try again.")
+	}
+}
+
+// checkoutFailed answers a failed checkout: a toast for an action, else
+// an error page with the status.
+func checkoutFailed(w http.ResponseWriter, r *http.Request, status int, actionTitle, pageTitle, message string) {
+	if isAction(r) {
+		answerFailed(w, r, actionTitle, message)
 		return
 	}
-
-	planID := r.FormValue("plan_id")
-	plan, exists := access.PlanByID(planID)
-	if !exists || !plan.Purchasable {
-		if isAction(r) {
-			answerFailed(w, r, "Invalid plan", "Choose an available paid plan.")
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-			render(w, r, pages.ErrorPage(http.StatusBadRequest, "Invalid plan", "Choose an available paid plan."))
-		}
-		return
-	}
-
-	interval := r.FormValue("interval")
-	if interval == "" {
-		interval = "monthly"
-	}
-	if interval != model.SubscriptionIntervalMonthly && interval != model.SubscriptionIntervalYearly {
-		if isAction(r) {
-			answerFailed(w, r, "Invalid billing interval", "Choose monthly or yearly billing.")
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-			render(w, r, pages.ErrorPage(http.StatusBadRequest, "Invalid billing interval", "Choose monthly or yearly billing."))
-		}
-		return
-	}
-
-	checkoutURL, err := h.paymentService.CreateCheckoutURL(workspace.ID, workspace.Slug, planID, interval, user.Email, workspace.Name)
-	if err != nil {
-		if errors.Is(err, repository.ErrCheckoutPending) || errors.Is(err, repository.ErrCheckoutSelection) || errors.Is(err, repository.ErrSubscriptionAlreadyPaid) {
-			if isAction(r) {
-				answerFailed(w, r, "Checkout already active", "Finish the existing checkout or manage the current subscription first.")
-			} else {
-				w.WriteHeader(http.StatusConflict)
-				render(w, r, pages.ErrorPage(http.StatusConflict, "Checkout already active", "Finish the existing checkout or manage the current subscription first."))
-			}
-			return
-		}
-		slog.Error("failed to create checkout", "error", err, "workspace_id", workspace.ID, "plan_id", planID, "provider", h.paymentService.Name())
-		if isAction(r) {
-			answerFailed(w, r, "Checkout not started", "Checkout could not be started. Please try again.")
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Checkout unavailable", "Checkout could not be started. Please try again."))
-		}
-		return
-	}
-
-	if h.workspaceService != nil {
-		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.checkout_started", service.RequestSource(r.Context())); err != nil {
-			slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspace.ID)
-		}
-	}
-	slog.Info("redirecting to checkout", "workspace_id", workspace.ID, "provider", h.paymentService.Name())
-	redirect(w, r, checkoutURL, http.StatusSeeOther)
+	w.WriteHeader(status)
+	render(w, r, pages.ErrorPage(status, pageTitle, message))
 }
 
 func (h *BillingHandler) Webhook(w http.ResponseWriter, r *http.Request) {
@@ -138,26 +96,16 @@ func (h *BillingHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BillingHandler) BillingManagement(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
-	workspace := ctxkeys.Workspace(r.Context())
-	if !ctxkeys.WorkspaceMember(r.Context()).Can(model.WorkspacePermissionManageBilling) {
+	ctx := r.Context()
+	managementURL, err := h.workspaceService.BillingManagement(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.Subscription(ctx), service.RequestSource(ctx), h.paymentService.BillingManagementURL)
+	switch {
+	case err == nil:
+		redirect(w, r, managementURL, http.StatusSeeOther)
+	case errors.Is(err, service.ErrBillingPermission):
 		w.WriteHeader(http.StatusForbidden)
 		render(w, r, pages.ErrorPage(http.StatusForbidden, "Action not allowed", "Only workspace owners can manage billing."))
-		return
-	}
-
-	managementURL, err := h.paymentService.BillingManagementURL(workspace.ID, workspace.Slug)
-	if err != nil {
-		slog.Error("failed to get billing management URL", "error", err, "workspace_id", workspace.ID, "provider", h.paymentService.Name())
+	default:
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Billing unavailable", "Billing management could not be opened. Please try again."))
-		return
 	}
-	if h.workspaceService != nil {
-		if err := h.workspaceService.RecordBillingAction(workspace.ID, user.ID, "billing.management_opened", service.RequestSource(r.Context())); err != nil {
-			slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspace.ID)
-		}
-	}
-
-	redirect(w, r, managementURL, http.StatusSeeOther)
 }
