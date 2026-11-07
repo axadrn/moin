@@ -3,8 +3,8 @@
 // `space`, `ctrl+k` or `/` opens the palette, `esc` goes back.
 //
 // tui.go holds the state and the message loop, keys.go the keys, load.go
-// the calls to the control plane, palette.go the palette, and
-// the view files draw it.
+// the calls to the control plane, received.go what they answered,
+// palette.go the palette, and the view files draw it.
 package tui
 
 import (
@@ -372,7 +372,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.auth != nil {
 		return m.authUpdate(msg)
 	}
-	return m.data(msg)
+	return m.received(msg)
 }
 
 // tick moves the pulse and reloads what the open view shows live.
@@ -440,169 +440,6 @@ func reason(err error) string {
 		return "The control plane does not answer. This loads again when it is back."
 	}
 	return err.Error()
-}
-
-// data takes what the control plane answered.
-func (m model) data(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case serversMsg:
-		m.servers, m.offline = msg, nil
-	case appsMsg:
-		first, back := !m.loaded, m.offline != nil
-		m.apps, m.loaded, m.offline, m.cached = msg, true, nil, false
-		cmds := []tea.Cmd{}
-		if first {
-			cmds = append(cmds, m.loadUsage()...)
-		}
-		// after a start or a break, what loaded once may have failed
-		if !m.wsLive || back {
-			cmds = append(cmds, m.loadWorkspace(), m.loadStatus(), m.loadEvents(""))
-		}
-		if back && len(m.app.errs) > 0 {
-			cmds = append(cmds, m.openTab())
-		}
-		return m, tea.Batch(cmds...)
-	case offlineMsg:
-		m.offline = msg.err
-	case statusMsg:
-		s := client.Status(msg)
-		m.status, m.live = &s, true
-	case workspaceMsg:
-		m.ws, m.wsLive = workspace(msg), true
-	case eventsMsg:
-		if msg.older {
-			m.events = append(m.events, msg.page.Items...)
-		} else {
-			m.events = msg.page.Items
-		}
-		m.eventsEnd = msg.page.Next
-	case usageMsg:
-		var cpu []float64
-		for _, p := range msg.m.Points {
-			cpu = append(cpu, p.CPU)
-		}
-		m.cpu[msg.server] = cpu
-		m.usage[msg.server] = msg.m.Now
-	case serverMetricsMsg:
-		s := client.ServerMetrics(msg)
-		if s.Server == m.cur.server {
-			m.srv = &s
-		}
-	case detailMsg:
-		if msg.App.Name == m.app.name {
-			d := client.AppDetail(msg)
-			m.app.detail = &d
-		}
-	case logsMsg:
-		if msg.app == m.app.name {
-			m.app.logs, m.app.logsAt = msg.lines, m.now()
-			delete(m.app.errs, tLogs)
-		}
-	case backupsMsg:
-		if msg.app == m.app.name {
-			m.app.backups = &msg.b
-			delete(m.app.errs, tBackups)
-		}
-	case envMsg:
-		if msg.app == m.app.name {
-			m.app.env = msg.env
-			delete(m.app.errs, tEnv)
-		}
-	case domainsMsg:
-		if msg.app == m.app.name {
-			m.app.domains, m.app.instant = msg.checks, msg.instant
-			delete(m.app.errs, tDomains)
-		}
-	case uptimeMsg:
-		if msg.App == m.app.name {
-			u := client.Uptime(msg)
-			m.app.uptime = &u
-			delete(m.app.errs, tUptime)
-		}
-	case appMetricsMsg:
-		if msg.App == m.app.name {
-			a := client.AppMetrics(msg)
-			m.app.metrics = &a
-			delete(m.app.errs, tMetrics)
-		}
-	case tabErrMsg:
-		if msg.app == m.app.name {
-			if m.app.errs == nil {
-				m.app.errs = map[tab]string{}
-			}
-			m.app.errs[msg.tab] = reason(msg.err)
-		}
-	case startedMsg:
-		return m.follow(msg)
-	case deployMsg:
-		d := client.Deploy(msg)
-		if m.cur.v == vDeploy && m.out.number == d.Number && !m.out.running {
-			m.out.deploy = &d
-			m.out.lines = d.Log
-			m.out.status = d.Status
-			m.out.err = d.Error
-		}
-	case lineMsg:
-		if msg.id == m.out.id {
-			m.out.lines = append(m.out.lines, msg.line)
-		}
-	case doneMsg:
-		if msg.id == m.out.id {
-			m.out.running = false
-			m.out.status = msg.status
-			if msg.deploy != nil {
-				m.out.deploy = msg.deploy
-			}
-			if msg.err != nil {
-				m.out.err = msg.err.Error()
-			}
-		}
-		if msg.err != nil {
-			m.fail(msg.err)
-		} else if msg.notice != "" {
-			m.say(msg.notice)
-		}
-		if m.out.app != "" {
-			return m, m.loadDetail(m.out.app)
-		}
-	case pinnedMsg:
-		for i := range m.apps {
-			if m.apps[i].Name == msg.app {
-				m.apps[i].Pinned = msg.on
-			}
-		}
-		if msg.on {
-			m.say(msg.app + " is pinned. * unpins it")
-		} else {
-			m.say(msg.app + " is unpinned")
-		}
-	case stoppedMsg:
-		for i := range m.apps {
-			if m.apps[i].Name == string(msg) {
-				m.apps[i].Stopped = true
-			}
-		}
-		m.say(string(msg) + " is stopped. S starts it again")
-	case reloadMsg:
-		if msg.notice != "" {
-			m.say(msg.notice)
-		}
-		return m, m.openTab()
-	case noticeMsg:
-		m.say(string(msg))
-	case errMsg:
-		m.fail(msg.err)
-	case undoMsg:
-		m.fail(msg.err)
-		return m, m.openTab()
-	case optimisticMsg:
-		return msg.do(m), msg.cmd
-	case editMsg:
-		return m, m.openEditor(msg)
-	case editedMsg:
-		return m.edited(msg)
-	}
-	return m, nil
 }
 
 // open goes one level deeper.
