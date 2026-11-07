@@ -24,19 +24,31 @@ All of it is open source under AGPL-3.0, in one repo: [github.com/axadrn/moin](h
 
 The agent on your server calls moin; moin never calls your server. Nothing on the server waits for moin, so it needs no open port for it, and moin holds no SSH key to it.
 
-```text
-SSH tools          moin
+SSH tools, like Coolify, Dokploy or Kamal: the tool holds a key to a root shell on your server, so port 22 stays open for it.
 
-the tool           control plane
- │ holds a key      ▲
- │ to a root shell  │ the agent
- ▼                  │ calls out
-┌──────────┐       ┌┴─────────┐
-│ server   │       │ server   │
-│ port 22  │       │ agent    │
-│ is open  │       │ no port  │
-│          │       │ for moin │
-└──────────┘       └──────────┘
+```text
+the tool
+ │ holds a key
+ │ to a root shell
+ ▼
+┌───────────────┐
+│ your server   │
+│ port 22 open  │
+└───────────────┘
+```
+
+moin: the agent on your server calls out. Nothing waits for moin, and moin holds no key.
+
+```text
+moin
+ ▲
+ │ the agent
+ │ calls out
+┌┴──────────────┐
+│ your server   │
+│ agent         │
+│ no open port  │
+└───────────────┘
 ```
 
 moin's requests come back down the line the agent opened, and the agent checks each one against your rules.
