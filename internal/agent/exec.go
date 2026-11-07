@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -29,6 +30,29 @@ func execTimeout(seconds int) time.Duration {
 		seconds = protocol.ExecMaxTimeout
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// execStart runs a command (ExecStart) unless the rules say exec: off, and
+// streams its output back.
+func (r *runner) execStart(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var start protocol.ExecStart
+	if err := message.Decode(&start); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if rules != nil && rules.ExecOff {
+		r.fail(message, refused(r.rulesFile, "exec: off"))
+		return
+	}
+	slog.Info("exec", "app", start.App, "service", start.Service)
+	done, err := r.apps.runExec(ctx, start, func(data string) {
+		r.send(protocol.TypeExecOutput, message.RequestID, protocol.ExecOutput{Data: data})
+	})
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeExecDone, message.RequestID, done)
 }
 
 // runExec runs one command in a container of an app and hands what it

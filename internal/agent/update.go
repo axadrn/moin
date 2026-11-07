@@ -55,6 +55,34 @@ func newUpdater(url string) *updater {
 	return u
 }
 
+// agentUpdate installs the binary of the control plane (AgentUpdate) and
+// restarts, unless the server has rules or a deploy runs.
+func (r *runner) agentUpdate(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var update protocol.AgentUpdate
+	if err := message.Decode(&update); err != nil {
+		r.fail(message, err)
+		return
+	}
+	// A new binary could allow what the rules stop, so with rules only
+	// the owner updates it, on the server.
+	if rules != nil {
+		r.fail(message, fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH)))
+		return
+	}
+	if r.deploying.Load() > 0 {
+		r.fail(message, errors.New("a deploy is running: update the agent when it is done"))
+		return
+	}
+	slog.Info("update", "from", build.Version, "to", update.Version)
+	if err := r.updater.install(ctx, update); err != nil {
+		slog.Error("update failed", "error", err)
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeOK, message.RequestID, nil)
+	r.updater.restart()
+}
+
 // install downloads the binary, checks its SHA-256 and that it runs as the
 // version the control plane named, and moves it over the running one in
 // one rename. Nothing changes when a step fails.

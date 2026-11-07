@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -124,6 +125,25 @@ func (a *apps) current(app string) int {
 	return number
 }
 
+// deployStart runs a deploy the rules allow (DeployStart). The answer is
+// deploy.done, never TypeError.
+func (r *runner) deployStart(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var start protocol.DeployStart
+	if err := message.Decode(&start); err != nil {
+		slog.Error("bad deploy.start", "error", err)
+		return
+	}
+	if err := checkDeploy(rules, r.rulesFile, start); err != nil {
+		slog.Warn("deploy refused", "app", start.App, "number", start.Number, "error", err)
+		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
+		return
+	}
+	slog.Info("deploy", "app", start.App, "number", start.Number)
+	r.deploying.Add(1)
+	defer r.deploying.Add(-1)
+	r.apps.deploy(ctx, start)
+}
+
 // deploy runs one deploy and always ends with deploy.done.
 func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 	logf := func(format string, args ...any) {
@@ -149,27 +169,55 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 	a.send(protocol.TypeDeployDone, "", done)
 }
 
+// runDeploy runs the steps of one deploy in order: make the release, take
+// the compose file of an older release or fetch and build a new one, start
+// it, then follow its databases and clean up.
 func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
-	var detected protocol.Detected
 	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
-		return detected, errors.New("invalid app name, app ID or deploy number")
+		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
 	}
 	defer a.lock(start.App)()
+	release, err := a.newRelease(start)
+	if err != nil {
+		return protocol.Detected{}, err
+	}
+	composeFile := filepath.Join(release, "compose.json")
+	var detected protocol.Detected
+	if start.FromNumber > 0 {
+		detected, err = a.rollBack(start.App, start.FromNumber, release, logf)
+	} else {
+		// prepareRelease may give start the image of the running release.
+		detected, err = a.prepareRelease(ctx, &start, release, logf)
+	}
+	if err != nil {
+		return detected, err
+	}
+	saveJSON(filepath.Join(release, "detected.json"), detected)
+	a.ownVolumes(ctx, start.App, composeFile, logf)
+	err = a.startRelease(ctx, start, composeFile, detected, logf)
+	if err != nil {
+		return detected, err
+	}
+	return a.afterStart(ctx, start.App, release, composeFile, detected, logf), nil
+}
+
+// newRelease keeps the app's ID and makes an empty folder for the release,
+// with its kind for prune. It returns the folder.
+func (a *apps) newRelease(start protocol.DeployStart) (string, error) {
 	if start.AppID != "" {
 		err := os.MkdirAll(a.appDir(start.App), 0o700)
 		if err == nil {
 			err = os.WriteFile(filepath.Join(a.appDir(start.App), "app-id"), []byte(start.AppID), 0o600)
 		}
 		if err != nil {
-			return detected, err
+			return "", err
 		}
 	}
-
 	release := a.releaseDir(start.App, start.Number)
 	_ = os.RemoveAll(release)
 	err := os.MkdirAll(release, 0o700)
 	if err != nil {
-		return detected, err
+		return "", err
 	}
 	kind := releaseApply
 	if start.SourceURL != "" || start.SourceNumber > 0 || start.Image != "" {
@@ -177,112 +225,150 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	}
 	err = os.WriteFile(filepath.Join(release, "kind"), []byte(kind), 0o600)
 	if err != nil {
+		return "", err
+	}
+	return release, nil
+}
+
+// rollBack copies the compose file of release from into the new release:
+// the same images and the same env.
+func (a *apps) rollBack(app string, from int, release string, logf func(string, ...any)) (protocol.Detected, error) {
+	var detected protocol.Detected
+	logf("rolling back to v%d", from)
+	old := a.releaseDir(app, from)
+	body, err := os.ReadFile(filepath.Join(old, "compose.json"))
+	if err != nil {
+		return detected, fmt.Errorf("v%d is no longer on the server", from)
+	}
+	detectedBody, _ := os.ReadFile(filepath.Join(old, "detected.json"))
+	_ = json.Unmarshal(detectedBody, &detected)
+	err = os.WriteFile(filepath.Join(release, "compose.json"), body, 0o600)
+	if err != nil {
 		return detected, err
 	}
-	composeFile := filepath.Join(release, "compose.json")
+	base, err := os.ReadFile(filepath.Join(old, "base.json"))
+	if err == nil {
+		_ = os.WriteFile(filepath.Join(release, "base.json"), base, 0o600)
+	}
+	return detected, nil
+}
 
-	if start.FromNumber > 0 {
-		logf("rolling back to v%d", start.FromNumber)
-		body, err := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "compose.json"))
-		if err != nil {
-			return detected, fmt.Errorf("v%d is no longer on the server", start.FromNumber)
-		}
-		detectedBody, _ := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "detected.json"))
-		_ = json.Unmarshal(detectedBody, &detected)
-		err = os.WriteFile(composeFile, body, 0o600)
-		if err != nil {
-			return detected, err
-		}
-		base, err := os.ReadFile(filepath.Join(a.releaseDir(start.App, start.FromNumber), "base.json"))
-		if err == nil {
-			_ = os.WriteFile(filepath.Join(release, "base.json"), base, 0o600)
-		}
-	} else {
-		var config map[string]any
-		var running map[string]string
-		pull := start.Image != ""
-		if start.SourceURL != "" || start.SourceNumber > 0 {
-			src := filepath.Join(release, "src")
-			if start.SourceURL != "" {
-				logf("downloading the source")
-				err = download(ctx, start, src)
-			} else {
-				logf("building the source of v%d again", start.SourceNumber)
-				err = a.copySource(ctx, start.App, start.SourceNumber, src)
-			}
-			if err != nil {
-				return detected, err
-			}
-			config, detected, err = a.resolve(ctx, start.App, src, start.Env)
+// prepareRelease fetches the source, routes the app, writes compose.json and
+// builds or pulls its images. A deploy without source takes the image of
+// the running release into start.
+func (a *apps) prepareRelease(ctx context.Context, start *protocol.DeployStart, release string, logf func(string, ...any)) (protocol.Detected, error) {
+	pull := start.Image != ""
+	config, detected, running, err := a.fetch(ctx, start, release, logf)
+	if err != nil {
+		return detected, err
+	}
+	saveJSON(filepath.Join(release, "base.json"), config)
+	detected.Image = start.Image
+	composeFile := filepath.Join(release, "compose.json")
+	detected, err = a.writeCompose(ctx, *start, config, detected, running, composeFile, logf)
+	if err != nil {
+		return detected, err
+	}
+	return detected, a.build(ctx, *start, config, detected, composeFile, pull, logf)
+}
+
+// fetch downloads the source, or copies the one of an older release, and
+// reads its compose file. A deploy without source keeps the compose file of
+// the running release and its images; an image replaces the main one, and
+// without one start takes the running image. running names the images of
+// the running release by service.
+func (a *apps) fetch(ctx context.Context, start *protocol.DeployStart, release string, logf func(string, ...any)) (config map[string]any, detected protocol.Detected, running map[string]string, err error) {
+	if start.SourceURL != "" || start.SourceNumber > 0 {
+		src := filepath.Join(release, "src")
+		if start.SourceURL != "" {
+			logf("downloading the source")
+			err = download(ctx, *start, src)
 		} else {
-			// A deploy without source keeps the compose file of the running
-			// release and its images; an image replaces the main one.
-			current := a.current(start.App)
-			if current == 0 {
-				return detected, errors.New("no release to take the compose file from: deploy the repo once with moin deploy")
-			}
-			config, detected, running, err = loadBase(a.releaseDir(start.App, current))
-			if err == nil && start.Image == "" {
-				start.Image = detected.Image
-			}
-			if err == nil {
-				err = a.rebuildMissing(ctx, config, running, detected.Service, start.Image != "", logf)
-			}
+			logf("building the source of v%d again", start.SourceNumber)
+			err = a.copySource(ctx, start.App, start.SourceNumber, src)
 		}
 		if err != nil {
-			return detected, err
+			return nil, detected, nil, err
 		}
-		saveJSON(filepath.Join(release, "base.json"), config)
-		detected.Image = start.Image
-		detected, err = route(start.App, detected, start.Routing)
+		config, detected, err = a.resolve(ctx, start.App, src, start.Env)
+		return config, detected, nil, err
+	}
+	current := a.current(start.App)
+	if current == 0 {
+		return nil, detected, nil, errors.New("no release to take the compose file from: deploy the repo once with moin deploy")
+	}
+	config, detected, running, err = loadBase(a.releaseDir(start.App, current))
+	if err != nil {
+		return config, detected, running, err
+	}
+	if start.Image == "" {
+		start.Image = detected.Image
+	}
+	err = a.rebuildMissing(ctx, config, running, detected.Service, start.Image != "", logf)
+	return config, detected, running, err
+}
+
+// writeCompose routes the app, writes compose.json, checks its databases and
+// makes sure the proxy runs when the app has an address.
+func (a *apps) writeCompose(ctx context.Context, start protocol.DeployStart, config map[string]any, detected protocol.Detected, running map[string]string, composeFile string, logf func(string, ...any)) (protocol.Detected, error) {
+	detected, err := route(start.App, detected, start.Routing)
+	if err != nil {
+		return detected, err
+	}
+	err = finish(config, start, detected, running, composeFile)
+	if err != nil {
+		return detected, err
+	}
+	_, err = a.databases(ctx, composeFile, detected.Config)
+	if err != nil {
+		return detected, err
+	}
+	if len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != "" {
+		err = a.ensureProxy(ctx, logf)
 		if err != nil {
-			return detected, err
-		}
-		err = finish(config, start, detected, running, composeFile)
-		if err != nil {
-			return detected, err
-		}
-		_, err = a.databases(ctx, composeFile, detected.Config)
-		if err != nil {
-			return detected, err
-		}
-		if len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != "" {
-			err = a.ensureProxy(ctx, logf)
-			if err != nil {
-				return detected, fmt.Errorf("proxy: %w", err)
-			}
-		}
-		if pull {
-			logf("pulling %s", start.Image)
-			err = a.pull(ctx, start, composeFile, detected.Service, logf)
-			if err != nil {
-				return detected, fmt.Errorf("pull: %w", err)
-			}
-		} else if start.SourceURL != "" || start.SourceNumber > 0 {
-			logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
-			if detected.Builder != "" {
-				logf("→ Railpack: %s", detected.Builder)
-			}
-		} else {
-			logf("applying env and routing to the running images")
-		}
-		if builds(config) {
-			logf("building")
-			// A Railpack build reads the app's env as BuildKit secrets, from
-			// the environment of compose, never from its arguments.
-			var environment []string
-			if detected.Kind == "railpack" {
-				environment = buildEnv(start.Env)
-			}
-			err = a.run(ctx, logf, environment, "compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "build")
-			if err != nil {
-				return detected, fmt.Errorf("build: %w", err)
-			}
+			return detected, fmt.Errorf("proxy: %w", err)
 		}
 	}
-	saveJSON(filepath.Join(release, "detected.json"), detected)
-	a.ownVolumes(ctx, start.App, composeFile, logf)
+	return detected, nil
+}
 
+// build pulls the image built elsewhere, then builds the services that
+// build here.
+func (a *apps) build(ctx context.Context, start protocol.DeployStart, config map[string]any, detected protocol.Detected, composeFile string, pull bool, logf func(string, ...any)) error {
+	if pull {
+		logf("pulling %s", start.Image)
+		err := a.pull(ctx, start, composeFile, detected.Service, logf)
+		if err != nil {
+			return fmt.Errorf("pull: %w", err)
+		}
+	} else if start.SourceURL != "" || start.SourceNumber > 0 {
+		logf("detected %s, service %s on port %d", detected.Kind, detected.Service, detected.Port)
+		if detected.Builder != "" {
+			logf("→ Railpack: %s", detected.Builder)
+		}
+	} else {
+		logf("applying env and routing to the running images")
+	}
+	if !builds(config) {
+		return nil
+	}
+	logf("building")
+	// A Railpack build reads the app's env as BuildKit secrets, from the
+	// environment of compose, never from its arguments.
+	var environment []string
+	if detected.Kind == "railpack" {
+		environment = buildEnv(start.Env)
+	}
+	err := a.run(ctx, logf, environment, "compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "build")
+	if err != nil {
+		return fmt.Errorf("build: %w", err)
+	}
+	return nil
+}
+
+// startRelease starts the release and makes it the current one. When it
+// does not come up, the release before it starts again.
+func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, composeFile string, detected protocol.Detected, logf func(string, ...any)) error {
 	previous := a.current(start.App)
 	if previous > 0 && len(a.runningDatabases(start.App)) > 0 {
 		// The control plane remembers this moment: a restore can go back
@@ -295,21 +381,23 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	// A restart brings nothing new, so compose would leave the containers
 	// as they are: recreate them.
 	restart := start.SourceURL == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
-	err = a.start(ctx, start.App, composeFile, detected, restart, logf)
+	err := a.start(ctx, start.App, composeFile, detected, restart, logf)
 	if err != nil {
 		if previous > 0 && previous != start.Number {
 			logf("starting v%d again", previous)
 			rollbackErr := a.compose(ctx, start.App, filepath.Join(a.releaseDir(start.App, previous), "compose.json"), logf, "up", "-d", "--remove-orphans")
 			if rollbackErr == nil {
-				return detected, fmt.Errorf("%w; v%d is running again", err, previous)
+				return fmt.Errorf("%w; v%d is running again", err, previous)
 			}
 		}
-		return detected, err
+		return err
 	}
-	err = os.WriteFile(filepath.Join(a.appDir(start.App), "current"), []byte(strconv.Itoa(start.Number)), 0o600)
-	if err != nil {
-		return detected, err
-	}
+	return os.WriteFile(filepath.Join(a.appDir(start.App), "current"), []byte(strconv.Itoa(start.Number)), 0o600)
+}
+
+// afterStart notes the databases the running release has, has backups
+// follow them, and drops old releases and images.
+func (a *apps) afterStart(ctx context.Context, app, release, composeFile string, detected protocol.Detected, logf func(string, ...any)) protocol.Detected {
 	databases, err := a.databases(ctx, composeFile, detected.Config)
 	if err == nil {
 		detected.Databases = databases
@@ -331,9 +419,9 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 			a.backups.recordAll(ctx)
 		}()
 	}
-	a.prune(ctx, start.App)
+	a.prune(ctx, app)
 	a.cleanup(ctx)
-	return detected, nil
+	return detected
 }
 
 // start brings the release up and checks that it stays up.
@@ -1184,6 +1272,26 @@ func (a *apps) markFailed(app string, number int) {
 	_ = os.WriteFile(filepath.Join(release, "kind"), []byte(releaseFailed), 0o600)
 }
 
+// sendLogs answers a logs request (LogsRequest) unless the rules say
+// logs: off.
+func (r *runner) sendLogs(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var request protocol.LogsRequest
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if rules != nil && rules.LogsOff {
+		r.fail(message, refused(r.rulesFile, "logs: off"))
+		return
+	}
+	result, err := r.apps.logs(ctx, request)
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeLogsResult, message.RequestID, result)
+}
+
 // logs returns the last lines of every container of the app.
 func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol.LogsResult, error) {
 	if !protocol.ValidAppName(request.App) {
@@ -1199,6 +1307,20 @@ func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol
 		lines = []string{}
 	}
 	return protocol.LogsResult{Lines: lines}, nil
+}
+
+// removeApp answers app.remove (AppRemove).
+func (r *runner) removeApp(ctx context.Context, message protocol.Message) {
+	var request protocol.AppRemove
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if err := r.apps.remove(ctx, request.App); err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeOK, message.RequestID, nil)
 }
 
 // remove stops the app and deletes its containers, images and releases. The
@@ -1224,6 +1346,20 @@ func (a *apps) remove(ctx context.Context, app string) error {
 		a.backups.reconcile()
 	}
 	return nil
+}
+
+// stopApp answers app.stop (AppStop).
+func (r *runner) stopApp(ctx context.Context, message protocol.Message) {
+	var request protocol.AppStop
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if err := r.apps.stop(ctx, request.App); err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeOK, message.RequestID, nil)
 }
 
 // stop stops the containers of the app's current release. Their restart

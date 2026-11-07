@@ -107,6 +107,25 @@ func matchOwnerOf(path string, info os.FileInfo) {
 
 func quoteName(name string) string { return `"` + strings.ReplaceAll(name, `"`, `""`) + `"` }
 
+// dbTables answers db.tables (DBRequest) unless the rules say data: off.
+func (r *runner) dbTables(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var request protocol.DBRequest
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if rules != nil && rules.DataOff {
+		r.fail(message, refused(r.rulesFile, "data: off"))
+		return
+	}
+	result, err := r.apps.tables(ctx, request)
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeDBTablesResult, message.RequestID, result)
+}
+
 // tables lists the tables and views of a database with their columns and
 // row counts.
 func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol.DBTables, error) {
@@ -213,6 +232,25 @@ func migration(ctx context.Context, db *sql.Conn, tables []protocol.DBTable) *pr
 		}
 	}
 	return nil
+}
+
+// dbQuery answers db.query (DBQuery) unless the rules say data: off.
+func (r *runner) dbQuery(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var request protocol.DBQuery
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if rules != nil && rules.DataOff {
+		r.fail(message, refused(r.rulesFile, "data: off"))
+		return
+	}
+	result, err := r.apps.query(ctx, request)
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeDBQueryResult, message.RequestID, result)
 }
 
 // query runs one read or one write against a database.

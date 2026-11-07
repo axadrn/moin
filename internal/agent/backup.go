@@ -154,6 +154,35 @@ func key(app string, database protocol.Database) string {
 	return database.HostPath
 }
 
+// backupConfig answers backup.config (BackupConfig): every bucket must be
+// one the rules allow.
+func (r *runner) backupConfig(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var config protocol.BackupConfig
+	if err := message.Decode(&config); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if err := checkStorage(rules, r.rulesFile, config.Storage); err != nil {
+		r.fail(message, err)
+		return
+	}
+	for _, storage := range config.AppStorage {
+		if err := checkStorage(rules, r.rulesFile, storage); err != nil {
+			r.fail(message, err)
+			return
+		}
+	}
+	kept := r.apps.keepIDs(config.Apps)
+	if err := r.backups.configure(ctx, config.Storage, config.AppStorage); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if kept {
+		r.backups.reconcile()
+	}
+	r.send(protocol.TypeOK, message.RequestID, nil)
+}
+
 // configure sets the default bucket and the buckets of single apps, and
 // records every database into its app's bucket. A nil storage stops it.
 func (b *backups) configure(ctx context.Context, storage *protocol.BackupStorage, appStorage map[string]*protocol.BackupStorage) error {
@@ -404,6 +433,21 @@ func (b *backups) one(app, database string) (protocol.Database, error) {
 	return databases[0], nil
 }
 
+// backupList answers backup.list (BackupRequest).
+func (r *runner) backupList(ctx context.Context, message protocol.Message) {
+	var request protocol.BackupRequest
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	result, err := r.backups.list(ctx, request)
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeBackupsResult, message.RequestID, result)
+}
+
 // list reports the backups of an app: the history of each database, its
 // copies before restores and its newest daily check.
 func (b *backups) list(ctx context.Context, request protocol.BackupRequest) (protocol.Backups, error) {
@@ -453,6 +497,20 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		}
 	}
 	return backup
+}
+
+// backupRestore answers backup.restore (BackupRestore).
+func (r *runner) backupRestore(ctx context.Context, message protocol.Message) {
+	var request protocol.BackupRestore
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if err := r.backups.restore(ctx, request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeOK, message.RequestID, nil)
 }
 
 // restore puts one database back to a moment, or to the copy before an
@@ -519,6 +577,21 @@ func (b *backups) keepCopy(ctx context.Context, app string, database protocol.Da
 	}
 	slog.Info("backup: copy before the restore", "app", app, "database", database.Path, "id", id)
 	return nil
+}
+
+// backupDownload answers backup.download (BackupRequest).
+func (r *runner) backupDownload(ctx context.Context, message protocol.Message) {
+	var request protocol.BackupRequest
+	if err := message.Decode(&request); err != nil {
+		r.fail(message, err)
+		return
+	}
+	file, err := r.backups.download(ctx, request)
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(protocol.TypeBackupFile, message.RequestID, file)
 }
 
 // download puts a full copy of one database in the app's downloads/
