@@ -39,21 +39,24 @@ func TestRoutingMarksComposeDomains(t *testing.T) {
 func TestRoutingInstantAndServices(t *testing.T) {
 	view := RoutingView{
 		App:     model.App{Name: "shop"},
-		Checks:  []service.DomainCheck{{Domain: "shop.de", Points: true}, {Domain: "api.shop.de", Service: "api", Points: true}},
-		Instant: service.Instant{Provider: "sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "moin"},
+		Checks:  []service.DomainCheck{{Domain: "shop.de"}, {Domain: "www.shop.de", Canonical: true}, {Domain: "api.shop.de", Service: "api"}},
+		Instant: service.Instant{Provider: "sslip.io", Host: "shop.203-0-113-7.sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "moin"},
 	}
 	var html strings.Builder
 	if err := AppRouting(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-show", `data-domain-service="api"`, "Remove api.shop.de"} {
+	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-show", `data-domain-service="api"`, "Remove api.shop.de", "canonical"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("no %s", want)
 		}
 	}
-	if strings.Count(page, "Make canonical") != 1 {
-		t.Errorf("a service domain offers canonical")
+	if !strings.Contains(page, "data-canonical") || strings.Contains(page, `value="api.shop.de"`) {
+		t.Errorf("no canonical choice of the main domains")
+	}
+	if strings.Contains(page, "data-domain-checked") {
+		t.Errorf("a domain shows a DNS answer it was never asked for")
 	}
 
 	view.Instant = service.Instant{Provider: "sslip.io", Reason: "The server runs behind a Cloudflare Tunnel."}
@@ -63,5 +66,26 @@ func TestRoutingInstantAndServices(t *testing.T) {
 	}
 	if !strings.Contains(html.String(), "data-instant-reason") || strings.Contains(html.String(), "data-instant-url") {
 		t.Errorf("no reason for the missing address")
+	}
+}
+
+// A domain added or checked says whether it points at the server, or the
+// record to set.
+func TestRoutingShowsTheCheck(t *testing.T) {
+	view := RoutingView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{
+		{Domain: "shop.de", Checked: true, Points: true},
+		{Domain: "www.shop.de", Checked: true, Advice: "A record to 203.0.113.7"},
+		{Domain: "old.shop.de"},
+	}}
+	var html strings.Builder
+	if err := AppRouting(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		t.Fatal(err)
+	}
+	page := html.String()
+	if strings.Count(page, "data-domain-checked") != 2 || !strings.Contains(page, "Points here") || !strings.Contains(page, "Set its A record to 203.0.113.7") {
+		t.Errorf("no answer of the check: %s", page)
+	}
+	if !strings.Contains(page, `data-check="old.shop.de"`) {
+		t.Errorf("no Check button")
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/protocol"
 )
 
 // AppsHandler is the apps pages of the web UI. Deploys come from `moin
@@ -127,6 +128,9 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 			view.Catalog = catalogUpdate(h.catalogs, workspace.ID, app)
 		}
 	case "addresses":
+		if routing, err := h.routingView(r, ""); err == nil {
+			view.Routing = &routing
+		}
 		if _, uptime, err := h.apps.Uptime(workspace.ID, app.Name); err == nil {
 			view.Uptime = &pages.UptimeView{App: *app, Uptime: uptime, Now: time.Now()}
 		}
@@ -423,9 +427,11 @@ func sortedKeys(values map[string]string) []string {
 	return keys
 }
 
-// Routing answers the domains and access panel with fresh DNS checks.
+// Routing answers the domains of an app, its instant address and its
+// password. It looks up no DNS, but the domain in ?check= (its Check
+// button).
 func (h *AppsHandler) Routing(w http.ResponseWriter, r *http.Request) {
-	h.renderRouting(w, r)
+	h.renderRouting(w, r, r.URL.Query().Get("check"))
 }
 
 // AddDomain adds one domain, to the main service or the one named, and
@@ -433,12 +439,12 @@ func (h *AppsHandler) Routing(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 	domain := strings.TrimSpace(r.FormValue("domain"))
 	if service := strings.TrimSpace(r.FormValue("service")); service != "" {
-		h.changeServiceDomains(w, r, service, domain+" added", "Domain not added", func(domains []string) []string {
+		h.changeServiceDomains(w, r, service, domain, domain+" added", "Domain not added", func(domains []string) []string {
 			return append(domains, domain)
 		})
 		return
 	}
-	h.changeDomains(w, r, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
+	h.changeDomains(w, r, domain, domain+" added", "Domain not added", func(domains []string, canonical string) ([]string, string) {
 		return append(domains, domain), canonical
 	})
 }
@@ -447,12 +453,12 @@ func (h *AppsHandler) AddDomain(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
 	if service := r.FormValue("service"); service != "" {
-		h.changeServiceDomains(w, r, service, domain+" removed", domain+" not removed", func(domains []string) []string {
+		h.changeServiceDomains(w, r, service, "", domain+" removed", domain+" not removed", func(domains []string) []string {
 			return slices.DeleteFunc(domains, func(d string) bool { return d == domain })
 		})
 		return
 	}
-	h.changeDomains(w, r, domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
+	h.changeDomains(w, r, "", domain+" removed", domain+" not removed", func(domains []string, canonical string) ([]string, string) {
 		if canonical == domain {
 			canonical = ""
 		}
@@ -463,12 +469,18 @@ func (h *AppsHandler) RemoveDomain(w http.ResponseWriter, r *http.Request) {
 // MakeCanonical lets the other domains redirect to one.
 func (h *AppsHandler) MakeCanonical(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
-	h.changeDomains(w, r, domain+" is canonical", "Canonical domain not changed", func(domains []string, _ string) ([]string, string) {
+	done := domain + " is canonical"
+	if domain == "" {
+		done = "No canonical domain"
+	}
+	h.changeDomains(w, r, "", done, "Canonical domain not changed", func(domains []string, _ string) ([]string, string) {
 		return domains, domain
 	})
 }
 
-func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, done, notDone string, change func([]string, string) ([]string, string)) {
+// changeDomains saves the domains of the main service; check is a domain
+// to look up for the answer, the one added.
+func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, check, done, notDone string, change func([]string, string) ([]string, string)) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
@@ -481,10 +493,10 @@ func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, done
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name"})
 		return
 	}
-	h.routingChanged(w, r, done, changed)
+	h.routingChanged(w, r, done, changed, check)
 }
 
-func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Request, service, done, notDone string, change func([]string) []string) {
+func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Request, service, check, done, notDone string, change func([]string) []string) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
@@ -497,22 +509,32 @@ func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Reques
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name", "service": "domain-service"})
 		return
 	}
-	h.routingChanged(w, r, done, changed)
+	h.routingChanged(w, r, done, changed, check)
 }
 
-// SetInstant picks the provider of the instant address, or off.
+// SetInstant picks the provider of the instant address, or off. Its
+// switch (switch=1) turns it on with the first provider, or off; a failed
+// switch flips back.
 func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	provider := r.FormValue("provider")
+	if r.FormValue("switch") == "1" {
+		provider = "off"
+		if r.FormValue("on") == "1" {
+			provider = protocol.InstantProviders[0]
+		}
+	}
 	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
 	if err != nil {
-		failed(w, r, "Instant address not changed", err, nil)
+		if _, ok := h.renderRouting(w, r, ""); ok {
+			answerError(w, r, "Instant address not changed", errorMessage(err))
+		}
 		return
 	}
 	done := "Instant address via " + provider
 	if provider == "off" {
 		done = "Instant address off"
 	}
-	h.routingChanged(w, r, done, changed)
+	h.routingChanged(w, r, done, changed, "")
 }
 
 // SetInstantPassword is the switch that puts the password in front of the
@@ -527,10 +549,11 @@ func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request)
 	}
 	switch {
 	case err != nil:
-		h.renderRouting(w, r)
-		answerError(w, r, "Password not changed", errorMessage(err))
+		if _, ok := h.renderRouting(w, r, ""); ok {
+			answerError(w, r, "Password not changed", errorMessage(err))
+		}
 	default:
-		h.routingChanged(w, r, done, changed)
+		h.routingChanged(w, r, done, changed, "")
 	}
 }
 
@@ -552,7 +575,7 @@ func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Password not set", err, nil)
 		return
 	}
-	h.routingChanged(w, r, "Password set", changed)
+	h.routingChanged(w, r, "Password set", changed, "")
 }
 
 // Unprotect makes the app public again.
@@ -562,43 +585,79 @@ func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Password not removed", err, nil)
 		return
 	}
-	h.routingChanged(w, r, "Password removed", changed)
+	h.routingChanged(w, r, "Password removed", changed, "")
 }
 
 // routingChanged answers a saved change of the domains or the password: the
 // panel as it is now and a check on the button. The app takes it on its
-// next restart; its head says so (changes waiting).
-func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, changed bool) {
-	h.renderRouting(w, r)
+// next restart; its head says so (changes waiting). check is the domain
+// added: the answer says whether it points at the server, or the record
+// to set.
+func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, changed bool, check string) {
+	view, ok := h.renderRouting(w, r, check)
+	if !ok {
+		return
+	}
 	if !changed {
 		answerDone(w, r, "Nothing changed", "")
 		return
 	}
-	answerDone(w, r, done, "")
+	answerDone(w, r, done, pointsNote(view.Checks, check))
 }
 
-func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request) {
+// pointsNote says whether the domain checked points at the server, or the
+// record it needs.
+func pointsNote(checks []service.DomainCheck, domain string) string {
+	for _, check := range checks {
+		if check.Domain != domain || !check.Checked {
+			continue
+		}
+		if check.Points {
+			return "It points at the server."
+		}
+		return "Set its " + check.Advice + "."
+	}
+	return ""
+}
+
+// renderRouting renders the domains, the instant address and the password,
+// looking up only the domain check.
+func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request, check string) (pages.RoutingView, bool) {
+	view, err := h.routingView(r, check)
+	if err != nil {
+		renderError(w, "load domains failed", err)
+		return view, false
+	}
+	render(w, r, pages.AppRouting(view))
+	return view, true
+}
+
+// routingView is what the Domains section shows. It looks up no DNS but
+// the domain check, so opening the page waits on no lookup.
+func (h *AppsHandler) routingView(r *http.Request, check string) (pages.RoutingView, error) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil {
-		renderError(w, "load app failed", err)
-		return
+		return pages.RoutingView{}, err
 	}
-	checks, err := h.apps.CheckDomains(r.Context(), workspace.ID, app.ID)
+	var checks []service.DomainCheck
+	if check != "" {
+		checks, err = h.apps.CheckDomain(r.Context(), workspace.ID, app.ID, check)
+	} else {
+		checks, err = h.apps.Domains(workspace.ID, app.ID)
+	}
 	if err != nil {
-		renderError(w, "check domains failed", err)
-		return
+		return pages.RoutingView{}, err
 	}
 	instant, err := h.apps.Instant(workspace.ID, app.ID, r.URL.Query().Get("show") == "true")
 	if err != nil {
-		renderError(w, "load instant address failed", err)
-		return
+		return pages.RoutingView{}, err
 	}
 	view := pages.RoutingView{App: *app, Checks: checks, Instant: instant}
 	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
 		view.Server = *server
 	}
-	render(w, r, pages.AppRouting(view))
+	return view, nil
 }
 
 // actor is the member who sends the request, in the workspace of its path.

@@ -8,7 +8,7 @@ order: 6
 From the first deploy on, the control plane visits every domain of every app once a minute, like a visitor: the status, the response time and the HTTPS certificate. Nothing to set up.
 
 ```surfaces
-Web: the app, **Uptime**
+Web: the app, **Domains**, a domain under **Uptime**
 CLI: moin uptime <app-name>
 TUI: on the app, `u`; `r` checks again
 API: GET /api/v1/apps/{app}/uptime
@@ -33,7 +33,7 @@ A domain that goes down or comes back goes into the [activity](/docs/guides/acti
 The check goes to the health path from `x-moin.health` in `compose.yml` ([Config in the repo](/docs/guides/config)), else `/`. Set another per domain; `default` goes back.
 
 ```surfaces
-Web: the app, **Uptime**, the domain's **Path**, then **Save path**
+Web: the app, **Domains**, a domain under **Uptime**, its **Path**, then **Save**
 CLI: moin uptime path blog.de /health
 TUI: on the app, `u`, pick the domain, `c`, type `/health`, then `enter`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"path": "/health"}
@@ -45,7 +45,7 @@ MCP: set_uptime_check
 For maintenance, or a domain whose DNS is not set yet. A paused check counts neither as up nor as down, and starts over when it resumes.
 
 ```surfaces
-Web: the app, **Uptime**, the domain's **Uptime check** switch
+Web: the app, **Domains**, a domain under **Uptime**, its **Check every minute** switch
 CLI: moin uptime pause blog.de, then moin uptime resume blog.de
 TUI: on the app, `u`, pick the domain, then `p`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"paused": true}

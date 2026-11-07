@@ -138,6 +138,8 @@ type AppPageView struct {
 	// them, so the page comes whole.
 	Catalog *CatalogUpdateView
 	Uptime  *UptimeView
+	// Routing is the domains, instant address and password (Domains).
+	Routing *RoutingView
 	// Selected is the deploy whose log the Deploys section shows; 0 shows
 	// the newest and follows the next one that starts.
 	Selected int
@@ -269,10 +271,9 @@ templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follo
 // appAddressesSection answers "where is it reached?": the instant address
 // and the domains in one place, with the password and the uptime checks.
 templ appAddressesSection(view AppPageView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
-	<div hx-get={ appPath + "/routing" } hx-trigger="load" hx-swap="outerHTML">
-		@AppRouting(RoutingView{App: view.App})
-	</div>
+	if view.Routing != nil {
+		@AppRouting(*view.Routing)
+	}
 	if view.Uptime != nil {
 		@AppUptimeBody(*view.Uptime)
 	}

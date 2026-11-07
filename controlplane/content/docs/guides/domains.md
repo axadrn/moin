@@ -12,14 +12,14 @@ Every app answers with HTTPS right after its first deploy, at its instant addres
 Add one or several at once, such as the domain with and without `www.`:
 
 ```surfaces
-Web: the app, **Domains**, **Add domain**
+Web: the app page, **Domains**, **Add a domain**, then **Add**
 CLI: moin domains add <domain> www.<domain>
 TUI: on the app, `o`, `a`, then type the domain
 API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
 
-Then, where you bought the domain, add an **A record**: name the domain, value the server's IPv4 address. If the server has IPv6, add an **AAAA record** too. moin shows both addresses and the record. Once DNS points at the server, usually after a few minutes, the domain gets HTTPS by itself. Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), moin sets the DNS for you when the domain is in your Cloudflare account.
+Then, where you bought the domain, add an **A record**: name the domain, value the server's IPv4 address. If the server has IPv6, add an **AAAA record** too. When you add a domain, moin says whether it already points at the server, or the record to set; **Check** next to the domain asks again later. Once DNS points at the server, usually after a few minutes, the domain gets HTTPS by itself. Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), moin sets the DNS for you when the domain is in your Cloudflare account.
 
 Saving never restarts the app: a change of the domains, the password or the instant address waits for the next restart, start or deploy (before the first deploy, for that one), so you can make several at once. The app page and `moin apps <app>` say how many changes wait.
 
@@ -55,7 +55,7 @@ The providers are `sslip.io` (the default) and `nip.io`: if one is down, switch 
 ## Check the DNS
 
 ```surfaces
-Web: the app, **Domains**
+Web: the app page, **Domains**, **Check** next to the domain
 CLI: moin domains
 TUI: on the app, `o`
 API: GET /api/v1/apps/{app}/domains
@@ -87,7 +87,7 @@ The web, the CLI and the TUI ask first; `--yes` skips it. The API and MCP take t
 Pick the main domain; the others redirect to it for good.
 
 ```surfaces
-Web: the app, **Domains**, **Make canonical** on a domain
+Web: the app page, **Domains**, **Canonical**
 CLI: moin domains canonical <domain>
 TUI: on the app, `o`, pick the domain, then `c`
 API: PUT /api/v1/apps/{app}/domains
@@ -101,7 +101,7 @@ MCP: set_domains
 A username and password in front of the app, for staging or a preview. Visitors see their browser's sign-in box. moin stores only a hash.
 
 ```surfaces
-Web: the app, **Password**, **Protect with password**
+Web: the app page, **Domains**, **Ask for a password**, then **Set password**
 CLI: moin protect --user <username>
 TUI: on the app, `o`, `p`, then type `<username>:<password>`
 API: PUT /api/v1/apps/{app}/protection
@@ -111,7 +111,7 @@ MCP: set_protection
 The username is `moin` unless you pick one with `--user`. The CLI reads the password from stdin. To make the app public again:
 
 ```surfaces
-Web: the app, **Password**, **Remove password**
+Web: the app page, **Domains**, **Remove password**
 CLI: moin protect off
 TUI: on the app, `o`, `p`, then `y`
 API: DELETE /api/v1/apps/{app}/protection
@@ -123,7 +123,7 @@ MCP: remove_protection
 An app with several services, such as `web` and `api`, can give each its own domains. The main service keeps the plain ones:
 
 ```surfaces
-Web: the app, **Domains**, the domain and its service, **Add domain**
+Web: the app page, **Domains**, the domain and its service, **Add**
 CLI: moin domains add --service api api.<domain>
 TUI: on the app, `o`, `a`, then type `api:api.<domain>`
 API: PUT /api/v1/apps/{app}/domains with "service": "api"

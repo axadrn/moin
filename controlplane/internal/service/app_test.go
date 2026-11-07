@@ -526,8 +526,19 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 		t.Fatalf("changes waiting after the restart = %d", n)
 	}
 	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
-	if err != nil || len(checks) != 1 || checks[0].Address != "203.0.113.5" || checks[0].Points {
+	if err != nil || len(checks) != 1 || checks[0].Address != "203.0.113.5" || checks[0].Points || !checks[0].Checked {
 		t.Fatalf("checks = %+v, %v", checks, err)
+	}
+	// The web lists them without a lookup, and checks only the one asked.
+	listed, err := apps.Domains(owner.WorkspaceID, "blog")
+	if err != nil || len(listed) != 1 || listed[0].Checked || listed[0].Advice != "A record to 203.0.113.5" {
+		t.Fatalf("domains = %+v, %v", listed, err)
+	}
+	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "other.de"); err != nil || checks[0].Checked {
+		t.Fatalf("check of another domain = %+v, %v", checks, err)
+	}
+	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "blog.de"); err != nil || !checks[0].Checked {
+		t.Fatalf("check of blog.de = %+v, %v", checks, err)
 	}
 	// A redeploy builds the source again.
 	redeploy, err := apps.Redeploy(owner, "blog")
