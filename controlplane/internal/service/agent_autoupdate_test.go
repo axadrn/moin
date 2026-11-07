@@ -18,7 +18,7 @@ func TestAgentsUpdateThemselves(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	audit := repository.NewWorkspaceAudit(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	servers.downloads = t.TempDir()
 	if err := os.WriteFile(filepath.Join(servers.downloads, build.Name+"-linux-arm64"), []byte("new agent"), 0o755); err != nil {
 		t.Fatal(err)

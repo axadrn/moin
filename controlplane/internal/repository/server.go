@@ -16,38 +16,15 @@ var (
 	ErrServerHasApps   = errors.New("server still has apps")
 )
 
-type ServerRepository interface {
-	Create(server *model.Server) error
-	ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.Server, error)
-	ByInstallTokenHash(hash string) (*model.Server, error)
-	ByAgentTokenHash(hash string) (*model.Server, error)
-	ListByWorkspaceID(workspaceID string) ([]model.Server, error)
-	Register(id, agentTokenHash string, hello model.Server) error
-	UpdateHello(id string, hello model.Server) error
-	TouchLastSeen(id string, at time.Time) error
-	DeleteForWorkspace(id, workspaceID string) error
-	DeleteWithApps(id, workspaceID string) (apps []string, err error)
-	Rename(id, workspaceID, name string) error
-	SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error
-	SetSecurity(server model.Server) error
-	SetSecurityReport(id, report string) error
-	Integrations(workspaceID string) (model.Integrations, error)
-	SetIntegrations(integrations model.Integrations) error
-	AutoUpdateAgents(workspaceID string) (bool, error)
-	SetAutoUpdateAgents(workspaceID string, on bool) error
-	// DiskFull reports whether the server's disk was over the alert line
-	// when it last crossed it; SetDiskFull stores a crossing.
-	DiskFull(id string) (bool, error)
-	SetDiskFull(id string, full bool, at time.Time) error
-}
-
-func (r *serverRepository) DiskFull(id string) (bool, error) {
+// DiskFull reports whether the server's disk was over the alert line
+// when it last crossed it; SetDiskFull stores a crossing.
+func (r *Servers) DiskFull(id string) (bool, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(*) FROM disk_alerts WHERE server_id = $1`, id)
 	return count > 0, err
 }
 
-func (r *serverRepository) SetDiskFull(id string, full bool, at time.Time) error {
+func (r *Servers) SetDiskFull(id string, full bool, at time.Time) error {
 	if !full {
 		_, err := r.db.Exec(`DELETE FROM disk_alerts WHERE server_id = $1`, id)
 		return err
@@ -57,15 +34,16 @@ func (r *serverRepository) SetDiskFull(id string, full bool, at time.Time) error
 	return err
 }
 
-type serverRepository struct {
+// Servers stores the servers of each workspace and what their agents report.
+type Servers struct {
 	db *sqlx.DB
 }
 
-func NewServerRepository(db *sqlx.DB) ServerRepository {
-	return &serverRepository{db: db}
+func NewServers(db *sqlx.DB) *Servers {
+	return &Servers{db: db}
 }
 
-func (r *serverRepository) Create(server *model.Server) error {
+func (r *Servers) Create(server *model.Server) error {
 	_, err := r.db.Exec(`
 		INSERT INTO servers (id, workspace_id, name, install_token_hash, install_expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -76,7 +54,7 @@ func (r *serverRepository) Create(server *model.Server) error {
 	return err
 }
 
-func (r *serverRepository) get(query string, args ...any) (*model.Server, error) {
+func (r *Servers) get(query string, args ...any) (*model.Server, error) {
 	server := &model.Server{}
 	err := r.db.Get(server, query, args...)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -90,20 +68,20 @@ func (r *serverRepository) get(query string, args ...any) (*model.Server, error)
 
 // ByIDOrNameForWorkspace finds a server of the user by its ID or its name, so the
 // CLI can say `moin servers rm prod`.
-func (r *serverRepository) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.Server, error) {
+func (r *Servers) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.Server, error) {
 	return r.get(`SELECT * FROM servers WHERE workspace_id = $1 AND (id = $2 OR name = $2)`, workspaceID, idOrName)
 }
 
-func (r *serverRepository) ByInstallTokenHash(hash string) (*model.Server, error) {
+func (r *Servers) ByInstallTokenHash(hash string) (*model.Server, error) {
 	return r.get(`SELECT * FROM servers WHERE install_token_hash = $1`, hash)
 }
 
-func (r *serverRepository) ByAgentTokenHash(hash string) (*model.Server, error) {
+func (r *Servers) ByAgentTokenHash(hash string) (*model.Server, error) {
 	return r.get(`SELECT * FROM servers WHERE agent_token_hash = $1`, hash)
 }
 
 // ListByWorkspaceID returns the servers of a user by name.
-func (r *serverRepository) ListByWorkspaceID(workspaceID string) ([]model.Server, error) {
+func (r *Servers) ListByWorkspaceID(workspaceID string) ([]model.Server, error) {
 	servers := []model.Server{}
 	err := r.db.Select(&servers, `SELECT * FROM servers WHERE workspace_id = $1 ORDER BY name, id`, workspaceID)
 	return servers, err
@@ -111,7 +89,7 @@ func (r *serverRepository) ListByWorkspaceID(workspaceID string) ([]model.Server
 
 // Register clears the install token, so it works once, and stores the agent
 // token and what the agent said about its server.
-func (r *serverRepository) Register(id, agentTokenHash string, hello model.Server) error {
+func (r *Servers) Register(id, agentTokenHash string, hello model.Server) error {
 	_, err := r.db.Exec(`
 		UPDATE servers
 		SET install_token_hash = NULL, install_expires_at = NULL, agent_token_hash = $1,
@@ -121,20 +99,20 @@ func (r *serverRepository) Register(id, agentTokenHash string, hello model.Serve
 	return err
 }
 
-func (r *serverRepository) UpdateHello(id string, hello model.Server) error {
+func (r *Servers) UpdateHello(id string, hello model.Server) error {
 	_, err := r.db.Exec(`
 		UPDATE servers SET hostname = $1, os = $2, arch = $3, agent_version = $4, last_seen_at = $5, address = $6, rules = $7, addresses = $8 WHERE id = $9
 	`, hello.Hostname, hello.OS, hello.Arch, hello.AgentVersion, hello.LastSeenAt, hello.Address, hello.Rules, hello.Addresses, id)
 	return err
 }
 
-func (r *serverRepository) TouchLastSeen(id string, at time.Time) error {
+func (r *Servers) TouchLastSeen(id string, at time.Time) error {
 	_, err := r.db.Exec(`UPDATE servers SET last_seen_at = $1 WHERE id = $2`, at, id)
 	return err
 }
 
 // DeleteForWorkspace deletes a server. Another user's server is not found.
-func (r *serverRepository) DeleteForWorkspace(id, workspaceID string) error {
+func (r *Servers) DeleteForWorkspace(id, workspaceID string) error {
 	result, err := r.db.Exec(`DELETE FROM servers WHERE id = $1 AND workspace_id = $2`, id, workspaceID)
 	if err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
 		return ErrServerHasApps
@@ -154,7 +132,7 @@ func (r *serverRepository) DeleteForWorkspace(id, workspaceID string) error {
 
 // DeleteWithApps deletes a server and its apps in one go and returns the
 // names of the apps. Another user's server is not found.
-func (r *serverRepository) DeleteWithApps(id, workspaceID string) ([]string, error) {
+func (r *Servers) DeleteWithApps(id, workspaceID string) ([]string, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return nil, err
@@ -180,7 +158,7 @@ func (r *serverRepository) DeleteWithApps(id, workspaceID string) ([]string, err
 }
 
 // Rename gives a server a new name, unique in its workspace.
-func (r *serverRepository) Rename(id, workspaceID, name string) error {
+func (r *Servers) Rename(id, workspaceID, name string) error {
 	result, err := r.db.Exec(`UPDATE servers SET name = $1 WHERE id = $2 AND workspace_id = $3`, name, id, workspaceID)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: servers.workspace_id, servers.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateServer
@@ -200,7 +178,7 @@ func (r *serverRepository) Rename(id, workspaceID, name string) error {
 
 // SetInstallToken replaces the install token of a server; the old one
 // stops working.
-func (r *serverRepository) SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error {
+func (r *Servers) SetInstallToken(id, workspaceID, hash string, expiresAt time.Time) error {
 	result, err := r.db.Exec(`UPDATE servers SET install_token_hash = $1, install_expires_at = $2 WHERE id = $3 AND workspace_id = $4`, hash, expiresAt, id, workspaceID)
 	if err != nil {
 		return err
@@ -215,19 +193,19 @@ func (r *serverRepository) SetInstallToken(id, workspaceID, hash string, expires
 	return nil
 }
 
-func (r *serverRepository) SetSecurity(server model.Server) error {
+func (r *Servers) SetSecurity(server model.Server) error {
 	_, err := r.db.Exec(`UPDATE servers SET tunnel = $1, tunnel_id = $2, tunnel_token = $3, ssh_tailscale = $4, firewall = $5 WHERE id = $6`,
 		server.Tunnel, server.TunnelID, server.TunnelToken, server.SSHTailscale, server.Firewall, server.ID)
 	return err
 }
 
-func (r *serverRepository) SetSecurityReport(id, report string) error {
+func (r *Servers) SetSecurityReport(id, report string) error {
 	_, err := r.db.Exec(`UPDATE servers SET security = $1 WHERE id = $2`, report, id)
 	return err
 }
 
 // Integrations returns the user's keys; a user without any gets empty ones.
-func (r *serverRepository) Integrations(workspaceID string) (model.Integrations, error) {
+func (r *Servers) Integrations(workspaceID string) (model.Integrations, error) {
 	integrations := model.Integrations{WorkspaceID: workspaceID}
 	err := r.db.Get(&integrations, `SELECT * FROM integrations WHERE workspace_id = $1`, workspaceID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -236,7 +214,7 @@ func (r *serverRepository) Integrations(workspaceID string) (model.Integrations,
 	return integrations, err
 }
 
-func (r *serverRepository) SetIntegrations(integrations model.Integrations) error {
+func (r *Servers) SetIntegrations(integrations model.Integrations) error {
 	_, err := r.db.Exec(`
 		INSERT INTO integrations (workspace_id, cloudflare_token, cloudflare_account, tailscale_key, updated_at) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (workspace_id) DO UPDATE SET cloudflare_token = excluded.cloudflare_token, cloudflare_account = excluded.cloudflare_account,
@@ -247,7 +225,7 @@ func (r *serverRepository) SetIntegrations(integrations model.Integrations) erro
 
 // AutoUpdateAgents reports whether the control plane updates the agents of
 // the workspace by itself.
-func (r *serverRepository) AutoUpdateAgents(workspaceID string) (bool, error) {
+func (r *Servers) AutoUpdateAgents(workspaceID string) (bool, error) {
 	var on bool
 	err := r.db.Get(&on, `SELECT auto_update_agents FROM workspaces WHERE id = $1`, workspaceID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -256,7 +234,7 @@ func (r *serverRepository) AutoUpdateAgents(workspaceID string) (bool, error) {
 	return on, err
 }
 
-func (r *serverRepository) SetAutoUpdateAgents(workspaceID string, on bool) error {
+func (r *Servers) SetAutoUpdateAgents(workspaceID string, on bool) error {
 	_, err := r.db.Exec(`UPDATE workspaces SET auto_update_agents = $1 WHERE id = $2`, on, workspaceID)
 	return err
 }

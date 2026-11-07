@@ -73,7 +73,7 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "other"})
-	servers := NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
 	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
 	if err != nil {
 		t.Fatal(err)

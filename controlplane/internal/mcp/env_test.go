@@ -59,7 +59,7 @@ func newEnvironment(t *testing.T) *environment {
 	env.services.Workspaces = workspaces
 	env.services.Subscriptions = subscriptions
 	env.services.Invitations = middleware.NewWorkspaceInvitationLimiter()
-	env.services.Servers = service.NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAudit(database), "https://app.example.com")
+	env.services.Servers = service.NewServerService(repository.NewServers(database), repository.NewWorkspaceAudit(database), "https://app.example.com")
 	env.services.Servers.RequirePlanFor(subscriptions.Access)
 	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
 	if err != nil {

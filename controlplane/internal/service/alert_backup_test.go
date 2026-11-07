@@ -90,7 +90,7 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	audit := repository.NewWorkspaceAudit(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 		servers.checkDisk(server.ID, used<<30, total)
 	}
 	// A new control plane process, the disk still full.
-	restarted := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	restarted := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	connect(restarted)
 	for _, used := range []uint64{93, 91, 80, 82} {
 		restarted.checkDisk(server.ID, used<<30, total)
@@ -198,7 +198,7 @@ func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	audit := repository.NewWorkspaceAudit(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	apps := NewAppService(repository.NewAppRepository(database, database), servers, testBox(t))
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {

@@ -20,7 +20,7 @@ func TestUpdateAgent(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	audit := repository.NewWorkspaceAudit(database)
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	servers.downloads = t.TempDir()
 	server, installToken, err := servers.Create(owner, "web-1")
 	if err != nil {

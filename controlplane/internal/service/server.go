@@ -44,7 +44,7 @@ func (e *AgentError) Error() string { return "agent: " + e.Message }
 // sessions live in memory: there is one control plane process.
 type ServerService struct {
 	audit   *repository.WorkspaceAudit
-	servers repository.ServerRepository
+	servers *repository.Servers
 	appURL  string
 	now     func() time.Time
 	// downloads holds the binaries agents update to.
@@ -85,7 +85,7 @@ type agentSession struct {
 	goneOnce sync.Once
 }
 
-func NewServerService(servers repository.ServerRepository, audit *repository.WorkspaceAudit, appURL string) *ServerService {
+func NewServerService(servers *repository.Servers, audit *repository.WorkspaceAudit, appURL string) *ServerService {
 	return &ServerService{
 		audit:       audit,
 		servers:     servers,

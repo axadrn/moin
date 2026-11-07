@@ -93,7 +93,7 @@ func newAlertFixture(t *testing.T) alertFixture {
 	apps := repository.NewAppRepository(database, database)
 	audit := repository.NewWorkspaceAudit(database)
 	alerts := NewAlertService(NewEmailService(testutil.NewMemoryMailer(), "https://moin.example.com", "moin"), repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), apps, repository.NewAlertDestinations(database), audit, testBox(t))
-	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
+	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)
