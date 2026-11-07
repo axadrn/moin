@@ -58,15 +58,15 @@ func (h *WorkspaceHandler) Page(w http.ResponseWriter, r *http.Request) {
 // renders only the next rows, for "Show older".
 func (h *WorkspaceHandler) ActivityPage(w http.ResponseWriter, r *http.Request) {
 	member := ctxkeys.WorkspaceMember(r.Context())
-	if !member.Can(model.WorkspacePermissionViewAuditLog) {
+	query := r.URL.Query()
+	after := query.Get("after")
+	filter := model.ActivityFilter{App: query.Get("app"), Server: query.Get("server"), User: query.Get("user")}
+	events, next, err := h.workspaces.AuditEventsPage(member, filter, after, 50)
+	if errors.Is(err, service.ErrActivityPermission) {
 		w.WriteHeader(http.StatusForbidden)
 		render(w, r, pages.ErrorPage(http.StatusForbidden, "Access denied", "You do not have permission to view workspace activity."))
 		return
 	}
-	query := r.URL.Query()
-	after := query.Get("after")
-	filter := model.ActivityFilter{App: query.Get("app"), Server: query.Get("server"), User: query.Get("user")}
-	events, next, err := h.workspaces.AuditEventsPage(member.WorkspaceID, filter, after, 50)
 	var choices model.ActivityChoices
 	if err == nil && after == "" {
 		choices, err = h.workspaces.ActivityChoices(member.WorkspaceID)

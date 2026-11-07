@@ -28,9 +28,6 @@ var (
 	// ErrInvalidCursor is returned for an activity cursor that does not
 	// decode or points to an event that no longer exists.
 	ErrInvalidCursor = errors.New("invalid activity cursor")
-	// ErrActivityPermission is returned to members who may not view workspace
-	// activity.
-	ErrActivityPermission = errors.New("workspace activity permission required")
 )
 
 // WorkspaceHandler serves workspaces, their members and invitations, and
@@ -385,12 +382,9 @@ func (h *WorkspaceHandler) Activity(w http.ResponseWriter, r *http.Request) {
 // NewActivityPage loads up to limit events of the member's workspace that
 // match the filter, newest first, after the event cursor points to. An empty cursor starts with the
 // newest event. Members who may not view the audit log get
-// ErrActivityPermission. A cursor that does not decode or no longer exists
-// returns ErrInvalidCursor.
+// service.ErrActivityPermission. A cursor that does not decode or no longer
+// exists returns ErrInvalidCursor.
 func NewActivityPage(workspaces *service.WorkspaceService, member *model.WorkspaceMember, filter model.ActivityFilter, cursor string, limit int) (ActivityPage, error) {
-	if !member.Can(model.WorkspacePermissionViewAuditLog) {
-		return ActivityPage{}, ErrActivityPermission
-	}
 	afterID := ""
 	if cursor != "" {
 		decoded, err := base64.RawURLEncoding.DecodeString(cursor)
@@ -400,7 +394,7 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 		afterID = string(decoded)
 	}
 
-	events, next, err := workspaces.AuditEventsPage(member.WorkspaceID, filter, afterID, limit)
+	events, next, err := workspaces.AuditEventsPage(member, filter, afterID, limit)
 	if errors.Is(err, repository.ErrAuditCursorNotFound) {
 		return ActivityPage{}, ErrInvalidCursor
 	}
