@@ -72,7 +72,7 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 	}
 
 	query := func(sql string, params []any, write bool) (protocol.DBResult, error) {
-		return a.pgQuery(ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: "pgtest", Database: database.Path}, SQL: sql, Params: params, Write: write, Limit: 10}, database)
+		return a.pgQuery(ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: "pgtest", Database: database.Path}, SQL: sql, Params: params, Write: write, Limit: 10}, database, nil)
 	}
 	// A param is data, never SQL.
 	evil := "x'); DROP TABLE users; --"
@@ -171,7 +171,7 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 	}
 
 	// The limit truncates.
-	result, err = a.pgQuery(ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: "pgtest"}, SQL: `SELECT generate_series(1, 50) AS n`, Limit: 5}, database)
+	result, err = a.pgQuery(ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: "pgtest"}, SQL: `SELECT generate_series(1, 50) AS n`, Limit: 5}, database, nil)
 	if err != nil || len(result.Rows) != 5 || !result.Truncated {
 		t.Errorf("limit: %d rows, truncated %v, %v", len(result.Rows), result.Truncated, err)
 	}

@@ -12,7 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +38,7 @@ type backupTest struct {
 	app      string
 	bucket   *protocol.Bucket
 	database protocol.Database
+	mu       sync.Mutex
 	sent     []protocol.Backups
 }
 
@@ -51,7 +54,9 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	test.a = newApps(t.TempDir(), nil)
 	test.b = newBackups(test.a, func(kind protocol.MessageType, _ string, data any) {
 		if backups, ok := data.(protocol.Backups); ok && kind == protocol.TypeBackupStatus {
+			test.mu.Lock()
 			test.sent = append(test.sent, backups)
+			test.mu.Unlock()
 		}
 	})
 	test.a.backups = test.b
@@ -75,19 +80,15 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	return test
 }
 
-// copyNow has the next tick take a copy, as when its time came.
+// copyNow takes the copy that is due, as the tick does once its time
+// came, and deletes the old ones.
 func (test *backupTest) copyNow() protocol.Copy {
 	test.t.Helper()
-	test.b.mu.Lock()
-	test.b.state(test.app, test.database).copied = time.Now().Add(-time.Hour)
-	test.b.mu.Unlock()
 	time.Sleep(1100 * time.Millisecond) // a new ID
-	test.b.tick(test.ctx)
-	copies := test.copies()
-	if status := test.b.status(test.ctx, test.app, test.database, false); status.Error != "" || len(copies) == 0 {
-		test.t.Fatalf("the copy failed: %s", status.Error)
+	if err := test.b.copyDue(test.ctx, test.app, test.database, 0); err != nil {
+		test.t.Fatalf("the copy failed: %v", err)
 	}
-	return copies[0]
+	return test.copies()[0]
 }
 
 func (test *backupTest) copies() []protocol.Copy {
@@ -142,8 +143,13 @@ func (test *backupTest) putBroken() {
 // control plane heard of it.
 func (test *backupTest) check() string {
 	test.t.Helper()
+	time.Sleep(100 * time.Millisecond) // the report of the last restore
+	test.mu.Lock()
 	test.sent = nil
+	test.mu.Unlock()
 	test.b.checkAll(test.ctx)
+	test.mu.Lock()
+	defer test.mu.Unlock()
 	if len(test.sent) != 1 || test.sent[0].Databases[0].CheckedAt == nil {
 		test.t.Fatalf("the check was not reported: %+v", test.sent)
 	}
@@ -303,6 +309,13 @@ func TestBackupSQLite(t *testing.T) {
 	var n int
 	if err := opened.QueryRow(`SELECT count(*) FROM notes`).Scan(&n); err != nil || n != 4 {
 		t.Fatalf("the download: %d rows, %v", n, err)
+	}
+	// An edit through moin takes a copy just before it: "Before your
+	// edit" is that copy.
+	time.Sleep(1100 * time.Millisecond)
+	result, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app, Database: "/data/app.db"}, SQL: `INSERT INTO notes (body) VALUES ('g')`, Write: true})
+	if err != nil || result.Before == nil || !slices.ContainsFunc(test.copies(), func(copy protocol.Copy) bool { return copy.ID == result.Before.Format(protocol.CopyIDLayout) }) {
+		t.Fatalf("the copy before an edit: %+v %v", result.Before, err)
 	}
 	// Turning Every change off removes what it wrote down.
 	test.b.configure(test.bucket, nil, map[string]protocol.Schedule{app: {Every: 15, Keep: 1}})
