@@ -273,16 +273,6 @@ func (h *AuthHandler) writeSession(w http.ResponseWriter, r *http.Request, sessi
 	})
 }
 
-// writeUser answers {"user": ...} with the fresh user.
-func (h *AuthHandler) writeUser(w http.ResponseWriter, userID string) {
-	user, err := h.userService.ByID(userID)
-	if err != nil {
-		ServiceError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, UserResponse{User: NewUser(user)})
-}
-
 // requestsCookieSession reports whether a sign-in asks for the session as
 // the HttpOnly cookie of a same-origin browser app. CSRFProtection requires
 // the X-CSRF-Token header on these requests.

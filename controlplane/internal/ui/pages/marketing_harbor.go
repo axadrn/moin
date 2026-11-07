@@ -159,5 +159,3 @@ func harborSideBottom(x, y, d int) string {
 }
 
 func harborN(n int) string { return strconv.Itoa(n) }
-
-func harborF(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }

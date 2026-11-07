@@ -35,7 +35,6 @@ import (
 // setting changes, and the counts per domain and hour in one transaction
 // every few minutes.
 const (
-	uptimeEvery = time.Minute
 	// uptimeTimeout is how long a visitor waits for the answer.
 	uptimeTimeout    = 10 * time.Second
 	uptimeRetryAfter = 5 * time.Second
