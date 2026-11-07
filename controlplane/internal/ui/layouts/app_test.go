@@ -11,54 +11,16 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
-func TestAppLayoutAlwaysShowsWorkspaceMenu(t *testing.T) {
-	oneWorkspace := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	for _, expected := range []string{"Switch workspace", "Current workspace", "Team", "New workspace", "Owner"} {
-		if !strings.Contains(oneWorkspace, expected) {
-			t.Fatalf("single-workspace menu does not contain %q", expected)
-		}
-	}
-
-	twoWorkspaces := renderAppLayout(t, model.WorkspaceRoleOwner, 2)
-	if !strings.Contains(twoWorkspaces, "Second Workspace") || !strings.Contains(twoWorkspaces, "Member") {
-		t.Fatal("multi-workspace layout does not show both workspace choices")
-	}
-}
-
-func TestAppLayoutHidesBillingFromNonOwners(t *testing.T) {
-	owner := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	if !strings.Contains(owner, "Billing</span>") {
-		t.Fatal("owner layout hides billing")
-	}
-
-	admin := renderAppLayout(t, model.WorkspaceRoleAdmin, 1)
-	if strings.Contains(admin, "Billing</span>") {
-		t.Fatal("admin layout shows owner-only billing")
-	}
-}
-
-func TestAppLayoutShowsAdminLinkOnlyToOperators(t *testing.T) {
-	ordinary := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	if strings.Contains(ordinary, `href="/admin"`) {
-		t.Fatal("ordinary layout shows the Admin link")
-	}
-
-	admin := renderAppLayoutWithAdmin(t)
-	if !strings.Contains(admin, `href="/admin"`) {
-		t.Fatal("operator layout hides the Admin link")
-	}
-}
-
-// The panel has one bar and no sidebar: the bar carries what the search,
-// the menus and the identity updates need.
+// The panel has one quiet bar and no sidebar or menus: the wordmark, the
+// search that opens the palette, and your picture, which opens Settings.
 func TestAppLayoutHasTheBarAndNoSidebar(t *testing.T) {
-	page := renderAppLayout(t, model.WorkspaceRoleOwner, 1)
-	for _, hook := range []string{`id="app-bar"`, `id="bar-workspace"`, `id="bar-avatar"`, `id="user-menu-label"`, `id="search"`, `id="search-results"`, "data-app-base=", `hx-post="/auth/logout"`, `popovertarget="user-menu"`, `id="app-shortcuts"`} {
+	page := renderAppLayout(t, model.WorkspaceRoleOwner, 2)
+	for _, hook := range []string{`id="app-bar"`, `id="bar-avatar"`, `href="/app/first-workspace/settings"`, "data-open-palette", `id="palette"`, `id="search"`, `id="search-results"`, "data-app-base=", `id="app-shortcuts"`} {
 		if !strings.Contains(page, hook) {
 			t.Fatalf("the bar lost %s", hook)
 		}
 	}
-	for _, gone := range []string{`data-slot="sidebar`, "window.templ.sidebar", "app-command"} {
+	for _, gone := range []string{`data-slot="sidebar`, "window.templ.sidebar", "app-command", "popovertarget=", "Second Workspace", "Billing"} {
 		if strings.Contains(page, gone) {
 			t.Fatalf("the panel still has %s", gone)
 		}
@@ -88,26 +50,6 @@ func TestBaseLayoutShowsReadOnlyImpersonationBanner(t *testing.T) {
 	if !strings.Contains(html, "viewing the application as another user") || !strings.Contains(html, "/admin/impersonation/stop") || !strings.Contains(html, "csrf-token") {
 		t.Fatal("impersonation banner is incomplete")
 	}
-}
-
-func renderAppLayoutWithAdmin(t *testing.T) string {
-	t.Helper()
-	workspace := &model.Workspace{ID: "workspace-1", Name: "First Workspace", Slug: "first-workspace"}
-	member := &model.WorkspaceMember{ID: "member-1", WorkspaceID: workspace.ID, UserID: "user-1", Role: model.WorkspaceRoleOwner}
-	ctx := context.Background()
-	ctx = ctxkeys.WithRenderConfig(ctx, config.RenderConfig{SupportEmail: "support@example.com", Billing: true})
-	ctx = ctxkeys.WithURLPath(ctx, "/app/first-workspace/dashboard")
-	ctx = ctxkeys.WithUser(ctx, &model.User{ID: "user-1", Email: "user@example.com", Name: "Test User"})
-	ctx = ctxkeys.WithWorkspace(ctx, workspace)
-	ctx = ctxkeys.WithWorkspaceMember(ctx, member)
-	ctx = ctxkeys.WithWorkspaces(ctx, []model.WorkspaceMembership{{Workspace: *workspace, Role: member.Role}})
-	ctx = ctxkeys.WithAdmin(ctx, true)
-
-	var output bytes.Buffer
-	if err := App("Dashboard").Render(ctx, &output); err != nil {
-		t.Fatalf("render App(): %v", err)
-	}
-	return output.String()
 }
 
 func renderAppLayout(t *testing.T, role string, workspaceCount int) string {
