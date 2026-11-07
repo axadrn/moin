@@ -12,7 +12,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
@@ -176,10 +175,11 @@ templ catalogScript() {
 				for (const a of root.querySelectorAll("[data-catalog-sort]")) a.href = link(root.dataset.category, a.dataset.catalogSort, q);
 			});
 			search.closest("form").addEventListener("submit", (event) => event.preventDefault());
-			// The category select on small screens goes to its category.
+			// The category select (on small screens, and in the app) goes to
+			// its category, the order select of the app to its order.
 			root.addEventListener("change", (event) => {
-				if (event.target.name !== "category-select") return;
-				location.href = link(event.target.value, root.dataset.sort, search.value.trim());
+				if (event.target.name === "category-select") location.href = link(event.target.value, root.dataset.sort, search.value.trim());
+				if (event.target.name === "sort-select") location.href = link(root.dataset.category, event.target.value, search.value.trim());
 			});
 		})();
 	</script>
@@ -381,94 +381,140 @@ templ catalogVersions(view CatalogEntryView, limit int) {
 
 // ---------------------------------------------------------------- app
 
-// CatalogInApp is the catalog inside a workspace.
+// CatalogInApp is the catalog inside a workspace: a search, a category and
+// an order, and the apps as rows that open their install page. The search
+// filters as you type, like the public catalog (catalogScript).
 templ CatalogInApp(view CatalogView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	{{ shown := 0 }}
 	@layouts.App("Catalog") {
 		@panelPage() {
-			@pageHeader("Catalog", "Open source apps to install in one click. Their databases backed up, every change.")
-			@catalogBody(view, nil)
+			@kit.Header(kit.Back{Label: "New app", Href: basePath + "/apps/new"}, "Catalog")
+			<div class="flex min-w-0 flex-col gap-6" data-catalog data-base={ view.Base } data-category={ categorySlug(view.Category) } data-sort={ view.Sort }>
+				<form method="get" action={ templ.SafeURL(view.Base) } role="search" class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_12rem]">
+					<label for="catalog-search" class="sr-only">Search apps</label>
+					@kit.Input(templ.Attributes{"id": "catalog-search", "name": "q", "type": "search", "value": view.Query, "placeholder": "Search apps", "autocomplete": "off", "spellcheck": "false", "data-catalog-search": true, "data-hotkey-focus": true})
+					<div class="grid grid-cols-2 gap-2 sm:contents">
+						@kit.Select(kit.SelectProps{ID: "catalog-category", Name: "category-select", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
+						@kit.Select(kit.SelectProps{ID: "catalog-sort", Name: "sort-select", Label: "Order", Options: []kit.Option{{Value: SortUpdated, Label: "Updated"}, {Value: SortName, Label: "Name"}}, Value: view.Sort})
+					</div>
+				</form>
+				<section class="flex flex-col gap-2" aria-label="Apps">
+					<p class="px-1 text-sm font-medium text-muted-foreground" data-catalog-count>{ strconv.Itoa(len(view.Apps)) } apps</p>
+					<div class="flex flex-col rounded-4xl bg-card p-1.5 [&:not(:has(>:not([hidden])))]:hidden" role="list" data-catalog-grid>
+						for _, app := range view.Apps {
+							{{ hit := catalogMatches(app, view.Query) }}
+							if hit {
+								{{ shown++ }}
+							}
+							@catalogRow(view.Base, app, now, hit)
+						}
+					</div>
+					<p class="px-1 text-sm text-muted-foreground" hidden?={ shown > 0 } data-catalog-empty>
+						No app called “<span class="text-foreground" data-catalog-query>{ view.Query }</span>” yet.
+						<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline underline-offset-4">Ask for it</a>
+					</p>
+				</section>
+			</div>
+			@catalogScript()
 		}
 	}
 }
 
-// CatalogInstall is the install form of a catalog app in a workspace.
+// catalogRow is one app of the in-app catalog: its tile, name and pitch,
+// and its newest release.
+templ catalogRow(base string, app CatalogEntryView, now time.Time, shown bool) {
+	<a
+		href={ templ.SafeURL(base + "/" + app.Entry.Slug) }
+		role="listitem"
+		hidden?={ !shown }
+		class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 outline-none before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:bg-foreground/4 hover:before:opacity-0 focus-visible:bg-foreground/4 [&:hover+*]:before:opacity-0"
+		data-catalog-app={ app.Entry.Slug }
+		data-search={ catalogSearchText(app) }
+		data-name={ strings.ToLower(app.Entry.Name) }
+		data-released={ releaseUnix(app) }
+	>
+		@catalogTile(app.Entry, "size-10 p-1.5 text-base")
+		@kit.RowText(app.Entry.Name, app.Entry.Pitch)
+		if latest, ok := app.Latest(); ok {
+			<span class="hidden shrink-0 text-xs text-muted-foreground sm:inline" title={ released(latest, now) }><span class="font-mono">{ latest.Tag }</span></span>
+		}
+		<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+	</a>
+}
+
+// CatalogInstall is the install form of a catalog app in a workspace, and
+// its releases.
 templ CatalogInstall(view CatalogInstallView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ entry := view.App.Entry }}
 	@layouts.App("Install " + entry.Name) {
 		@panelPage() {
-			<div class="flex min-w-0 items-start gap-4">
-				@catalogTile(entry, "size-14 p-3 text-2xl")
-				<div class="min-w-0">
-					<h1 class="text-2xl font-semibold tracking-[-0.02em]">{ entry.Name }</h1>
-					<p class="mt-1 text-muted-foreground">{ entry.Pitch }</p>
-					if note := entry.DatabaseNote(); note != "" {
-						<p class="mt-2 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
-					}
-				</div>
-			</div>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-				@panel(panelProps{Heading: "catalog-install-heading", Title: "Install", Description: "moin makes the app on the server, generates its secrets as env vars and deploys it. Every deploy snapshots its database first.", Docs: "/docs/guides/catalog"}) {
-					if len(view.Servers) == 0 {
-						<p class="text-sm text-muted-foreground">Add a server first. <a class="underline underline-offset-4" href={ templ.SafeURL(basePath + "/servers") }>Servers</a></p>
-					} else {
-						<form
-							id="catalog-install-form"
-							class="flex flex-col gap-4"
-							hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
-							hx-swap="none"
-							hx-disable="find button[type='submit']"
-						>
-							@csrf.Token()
-							@field.Field(field.Props{Class: "gap-1.5"}) {
-								@field.Label(field.LabelProps{For: "catalog-version"}) {
-									Version
-								}
-								@kit.Select(kit.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
-							}
-							@field.Field(field.Props{Class: "gap-1.5"}) {
-								@field.Label(field.LabelProps{For: "catalog-server"}) {
-									Server
-								}
-								@kit.Select(kit.SelectProps{ID: "catalog-server", Name: "server", Label: "Server", Options: serverOptions(view.Servers)})
-							}
-							@field.Field(field.Props{Class: "gap-1.5"}) {
-								@field.Label(field.LabelProps{For: "catalog-name"}) {
-									App name
-								}
-								@input.Input(input.Props{ID: "catalog-name", Name: "name", Type: "text", Value: entry.Slug, Class: "font-mono", Attributes: templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "aria-describedby": "catalog-name-hint"}})
-								@fieldHint("catalog-name", "") {
-									Lowercase letters, digits and dashes.
-								}
-							}
-							@field.Field(field.Props{Class: "gap-1.5"}) {
-								@field.Label(field.LabelProps{For: "catalog-domain"}) {
-									if entry.NeedsURL() {
-										Domain
-									} else {
-										Domain, optional
-									}
-								}
-								@input.Input(input.Props{ID: "catalog-domain", Name: "domain", Type: "text", Placeholder: entry.Slug + ".example.com", Class: "font-mono placeholder:font-sans", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": "catalog-domain-hint"}})
-								@fieldHint("catalog-domain", "") {
-									if entry.NeedsURL() {
-										{ entry.Name } needs one: its links and sign-in point to it. Point its DNS to the server first.
-									} else {
-										Point its DNS to the server. Add or change it later on the app page.
-									}
-								}
-							}
-							<div>
-								@button.Button(button.Props{Type: button.TypeSubmit, Class: "gap-2", Attributes: templ.Attributes{"data-catalog-submit": true}}) {
-									@icon.Download(icon.Props{Class: "size-4"})
-									Install { entry.Name }
-								}
-							</div>
-						</form>
+			@kit.Header(kit.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry.Name)
+			if len(view.Servers) == 0 {
+				@kit.List() {
+					@kit.Row(basePath + "/servers") {
+						@kit.RowText("Connect a server first", "Apps run on your servers")
 					}
 				}
-				@catalogVersions(view.App, 8)
-			</div>
+			} else {
+				@kit.Card("", nil) {
+					<form
+						id="catalog-install-form"
+						class="flex flex-col gap-4"
+						hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@csrf.Token()
+						if note := entry.DatabaseNote(); note != "" {
+							<p class="px-1 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
+						}
+						<div class="grid items-start gap-4 sm:grid-cols-2">
+							@kit.Field("Version", "catalog-version", "") {
+								@kit.Select(kit.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
+							}
+							@kit.Field("Server", "catalog-server", "") {
+								@kit.Select(kit.SelectProps{ID: "catalog-server", Name: "server", Label: "Server", Options: serverOptions(view.Servers)})
+							}
+							@kit.Field("App name", "catalog-name", "Lowercase letters, digits and dashes") {
+								@kit.Input(templ.Attributes{"id": "catalog-name", "name": "name", "type": "text", "value": entry.Slug, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
+							}
+							@kit.Field(ifElse(entry.NeedsURL(), "Domain", "Domain, optional"), "catalog-domain", ifElse(entry.NeedsURL(), entry.Name+" links to it. Point its DNS to the server first", "Point its DNS to the server")) {
+								@kit.Input(templ.Attributes{"id": "catalog-domain", "name": "domain", "type": "text", "placeholder": entry.Slug + ".example.com", "autocomplete": "off", "spellcheck": "false"})
+							}
+						</div>
+						<div class="flex justify-end">
+							@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-catalog-submit": true}) {
+								Install { entry.Name }
+							}
+						</div>
+					</form>
+				}
+			}
+			@kit.Section("Versions", nil) {
+				<div data-catalog-versions>
+					@kit.List() {
+						if len(view.App.Versions) == 0 {
+							@kit.Row("") {
+								@kit.RowText("Not known yet", "The registry has not answered. Try again in a minute.")
+							}
+						}
+						for _, version := range shownVersions(view.App.Versions, 8) {
+							@kit.Row("") {
+								<span class="min-w-0 flex-1 truncate font-mono text-sm">{ version.Tag }</span>
+								<span class="shrink-0 text-sm text-muted-foreground">{ released(version, time.Now()) }</span>
+							}
+						}
+						if more := len(view.App.Versions) - 8; more > 0 {
+							@kit.Row("") {
+								<span class="text-sm text-muted-foreground">and { strconv.Itoa(more) } older, every one installable</span>
+							}
+						}
+					}
+				</div>
+			}
 		}
 	}
 }
