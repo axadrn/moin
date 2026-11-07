@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
 	"strconv"
 
@@ -17,8 +18,8 @@ import (
 // the next one that starts; then AppDetail sends it again, out of band.
 templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	<div id="deploy-log-panel" class="flex min-w-0" data-following?={ follow } hx-swap-oob?={ oob }>
-		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(deploy), Body: panelBodyFlush}) {
+	<div id="deploy-log-panel" class="flex min-w-0 *:flex-1" data-following?={ follow } hx-swap-oob?={ oob }>
+		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(app, deploy), Body: panelBodyFlush}) {
 			<div class="flex max-h-[32rem] flex-1 flex-col-reverse overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:min-h-72" tabindex="0" aria-label="Deploy log">
 				if deploy == nil {
 					<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet.</p>
@@ -36,11 +37,26 @@ templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 	</div>
 }
 
-templ deployLogActions(deploy *api.Deploy) {
+// deployLogActions are the version, its state, Copy, and Roll back when the
+// deploy shown can run again: the one place to roll back, on the deploy
+// you look at.
+templ deployLogActions(app model.App, deploy *api.Deploy) {
 	if deploy != nil {
 		<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
 		@deployLogState(deploy.Status, false)
 		@copyButton("", "#deploy-log", "Copy the log")
+		if canRollBack(app, *deploy) {
+			@kit.Button(kit.Secondary, "", templ.Attributes{
+				"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/rollback",
+				"hx-vals":       fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
+				"hx-swap":       "none",
+				"hx-disable":    "this",
+				"hx-confirm":    fmt.Sprintf("Roll back to v%d? It runs that deploy again.", deploy.Number),
+				"data-rollback": true,
+			}) {
+				Roll back
+			}
+		}
 	}
 }
 
