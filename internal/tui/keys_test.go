@@ -118,8 +118,8 @@ func TestDashboardTabMovesBetweenPanels(t *testing.T) {
 func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 	m := press(fixture(120, 40), "space")
 	for _, h := range m.hits() {
-		if h.e.kind == "section" || h.e.kind == "action" {
-			t.Fatalf("on the dashboard nothing typed lists places only, got %s %q", h.e.kind, h.e.title)
+		if h.Item.kind == "section" || h.Item.kind == "action" {
+			t.Fatalf("on the dashboard nothing typed lists places only, got %s %q", h.Item.kind, h.Item.title)
 		}
 	}
 	m = press(m, "b", "l", "o", "g", "enter")
@@ -134,8 +134,8 @@ func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 	}
 	keys := map[string]string{}
 	for i, e := range here {
-		if hs[i].e.title != e.title {
-			t.Fatalf("what is here comes first: row %d is %q, want %q", i, hs[i].e.title, e.title)
+		if hs[i].Item.title != e.title {
+			t.Fatalf("what is here comes first: row %d is %q, want %q", i, hs[i].Item.title, e.title)
 		}
 		if e.key == "" {
 			t.Errorf("%q shows no key", e.title)
@@ -157,7 +157,7 @@ func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 	}
 	at := 0
 	for i, h := range hs {
-		if h.e.title == "redeploy blog" {
+		if h.Item.title == "redeploy blog" {
 			at = i
 		}
 	}
@@ -169,7 +169,7 @@ func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 		t.Fatal("enter on redeploy blog asks before it redeploys")
 	}
 	m = press(fixture(120, 40), "s", "enter", "space")
-	if hs := m.hits(); len(hs) < 2 || hs[0].e.title != "update the agent on web-1" || hs[0].e.key != "u" {
+	if hs := m.hits(); len(hs) < 2 || hs[0].Item.title != "update the agent on web-1" || hs[0].Item.key != "u" {
 		t.Fatalf("on a server its actions come first, got %v", titles(hs))
 	}
 }
@@ -211,13 +211,13 @@ func TestPickerFiltersAndJumps(t *testing.T) {
 	m := press(fixture(120, 40), "ctrl+k")
 	all := m.hits()
 	for _, h := range all {
-		if h.e.kind != "app" && h.e.kind != "server" && h.e.kind != "place" && h.e.kind != "keys" {
-			t.Fatalf("without a query the list shows places only, got %s %q", h.e.kind, h.e.title)
+		if h.Item.kind != "app" && h.Item.kind != "server" && h.Item.kind != "place" && h.Item.kind != "keys" {
+			t.Fatalf("without a query the list shows places only, got %s %q", h.Item.kind, h.Item.title)
 		}
 	}
 	m = press(m, "b", "l", "o", "g", "space", "l", "o")
 	hs := m.hits()
-	if len(hs) == 0 || hs[0].e.title != "blog logs" {
+	if len(hs) == 0 || hs[0].Item.title != "blog logs" {
 		t.Fatalf("blog lo finds blog logs first, got %v", titles(hs))
 	}
 	m = press(m, "enter")
@@ -225,7 +225,7 @@ func TestPickerFiltersAndJumps(t *testing.T) {
 		t.Fatalf("enter jumps to blog logs, got %+v", m.cur)
 	}
 	m = press(m, "ctrl+k", "e", "d", "g", "e", "down", "up")
-	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "edge-02" || m.pick.at != 0 {
+	if hs := m.hits(); len(hs) == 0 || hs[0].Item.title != "edge-02" || m.pick.at != 0 {
 		t.Fatalf("edge finds the server, got %v at %d", titles(hs), m.pick.at)
 	}
 	m = press(m, "backspace", "backspace", "backspace", "backspace", "r", "e", "d", "e", "p", "l", "o", "y", "space", "a", "p", "i", "enter")
@@ -241,7 +241,7 @@ func TestPickerFiltersAndJumps(t *testing.T) {
 func titles(hs []hit) []string {
 	var out []string
 	for _, h := range hs {
-		out = append(out, h.e.title)
+		out = append(out, h.Item.title)
 	}
 	return out
 }
@@ -561,7 +561,7 @@ func TestPasteGoesIntoTheOpenInput(t *testing.T) {
 
 func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 	m := press(fixture(120, 40), "ctrl+k", "l", "o", "g", "s", "space", "b", "l", "o", "g")
-	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
+	if hs := m.hits(); len(hs) == 0 || hs[0].Item.title != "blog logs" {
 		t.Fatalf("logs blog finds blog logs, got %v", titles(hs))
 	}
 	if found, _ := find.Name("lo bl", "blog logs"); fmt.Sprint(found.Positions) != "[5 6 0 1]" {
@@ -576,7 +576,7 @@ func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 		t.Errorf("the order as typed scores best: %d <= %d", inOrder.Score, anyOrder.Score)
 	}
 	m = press(m, "enter", "esc", "ctrl+k")
-	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
+	if hs := m.hits(); len(hs) == 0 || hs[0].Item.title != "blog logs" {
 		t.Fatalf("without a query the last pick comes first, got %v", titles(hs))
 	}
 	if n := len(m.hits()); n != 1+len(m.apps)+len(m.servers)+len(m.places()) {

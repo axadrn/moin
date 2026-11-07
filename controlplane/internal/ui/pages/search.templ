@@ -2,7 +2,6 @@ package pages
 
 import (
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -199,71 +198,53 @@ func HereItems(in SearchInput) []SearchItem {
 	return nil
 }
 
-// MatchSearch is the palette's answer to query. Typed, it is every item
-// that matches (find.Name, the same matching as the terminal UI), the best
-// first, those picked often and lately (recent, the IDs best first) lifted,
-// grouped in the order of their best answer, the docs last and at most
-// three of them. Not typed, it is what goes with this page (here), the
-// recent picks, then the apps and the places.
+// MatchSearch is the palette's answer to query, in the order of the
+// terminal UI's (find.Rank and find.Start). Typed, it is every item that
+// matches, the best first, those picked often and lately (recent, the IDs
+// best first) lifted, grouped in the order of their best answer, the docs
+// last and at most three of them. Not typed, it is what goes with this
+// page (here), the five latest picks, then the apps and the places.
 func MatchSearch(items []SearchItem, here []SearchItem, recent []string, query string, limit int) []SearchItem {
-	byID := map[string]SearchItem{}
-	for _, item := range items {
-		if _, ok := byID[item.ID()]; !ok {
-			byID[item.ID()] = item
-		}
-	}
 	if strings.TrimSpace(query) == "" {
-		out := slices.Clone(here)
-		seen := map[string]bool{}
-		for _, item := range here {
-			seen[item.ID()] = true
-		}
-		for _, id := range recent {
-			if item, ok := byID[id]; ok && !seen[id] && len(out) < len(here)+5 {
-				item.Group = groupRecent
-				out = append(out, item)
-				seen[id] = true
-			}
-		}
+		byID := map[string]SearchItem{}
 		for _, item := range items {
-			if (item.Group == groupApps || (item.Group == groupPages && item.Where == "")) && !seen[item.ID()] {
-				out = append(out, item)
-				seen[item.ID()] = true
+			if _, ok := byID[item.ID()]; !ok {
+				byID[item.ID()] = item
 			}
 		}
+		var picks []SearchItem
+		for _, id := range recent {
+			if item, ok := byID[id]; ok && len(picks) < 5 {
+				item.Group = groupRecent
+				picks = append(picks, item)
+			}
+		}
+		var basics []SearchItem
+		for _, item := range items {
+			if item.Group == groupApps || (item.Group == groupPages && item.Where == "") {
+				basics = append(basics, item)
+			}
+		}
+		out := find.Start(here, picks, basics, SearchItem.ID)
 		return out[:min(len(out), limit+len(here))]
 	}
-	type hit struct {
-		item  SearchItem
-		score int
-	}
-	var hits []hit
-	for _, item := range items {
-		m, ok := find.Name(query, item.Title+" "+item.Where)
-		if !ok {
-			continue
-		}
-		score := m.Score
-		if i := slices.Index(recent, item.ID()); i >= 0 {
-			score += 20 - min(i, 19)
-		}
-		hits = append(hits, hit{item, score})
-	}
-	sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
+	text := func(item SearchItem) string { return item.Title + " " + item.Where }
+	picked := func(item SearchItem) int { return slices.Index(recent, item.ID()) }
+	hits := find.Rank(query, items, text, picked)
 	var order []string
 	byGroup := map[string][]SearchItem{}
 	docs := 0
 	for _, h := range hits {
-		if h.item.Group == groupDocs {
+		if h.Item.Group == groupDocs {
 			if docs == 3 {
 				continue
 			}
 			docs++
 		}
-		if _, ok := byGroup[h.item.Group]; !ok && h.item.Group != groupDocs {
-			order = append(order, h.item.Group)
+		if _, ok := byGroup[h.Item.Group]; !ok && h.Item.Group != groupDocs {
+			order = append(order, h.Item.Group)
 		}
-		byGroup[h.item.Group] = append(byGroup[h.item.Group], h.item)
+		byGroup[h.Item.Group] = append(byGroup[h.Item.Group], h.Item)
 	}
 	order = append(order, groupDocs)
 	out := []SearchItem{}
