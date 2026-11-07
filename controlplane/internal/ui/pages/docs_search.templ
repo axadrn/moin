@@ -61,28 +61,27 @@ func FindDocs(groups []model.DocGroup, query string, limit int) []DocHit {
 	return out
 }
 
-// docsSearchField is the search on top of the docs home. Typing asks the
-// server (htmx active search), which answers the list under it and keeps
-// the address bar in step; without JavaScript, Enter loads /docs?q=, which
-// renders the same list.
+// docsSearchField is the big search on top of the docs home. It is the
+// door to the one docs search: a click, a key or ⌘K opens the palette in
+// the middle, the same as on every docs page. Without JavaScript it is a
+// plain form: Enter loads /docs?q=, which lists what it finds.
 templ docsSearchField(query string) {
-	<form method="get" action="/docs" role="search">
+	<form method="get" action="/docs" role="search" class="relative">
 		<label for="docs-q" class="sr-only">Search the docs</label>
 		@kit.Input(templ.Attributes{
 			"id": "docs-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs",
-			"autocomplete": "off", "spellcheck": "false", "aria-keyshortcuts": "Meta+K /",
-			"hx-get": "/docs", "hx-trigger": "input changed delay:80ms", "hx-target": "#docs-results", "hx-swap": "outerHTML", "hx-sync": "this:replace",
+			"autocomplete": "off", "spellcheck": "false", "aria-keyshortcuts": "Meta+K /", "data-docs-search-open": true,
 		})
+		<kbd class="pointer-events-none absolute top-1/2 right-4 hidden -translate-y-1/2 font-sans text-xs text-muted-foreground sm:block">⌘K</kbd>
 	</form>
 }
 
 // DocsResults is the body of the docs home: every page under its topic,
-// or, once something is typed, what the search finds. It is also the
-// answer to every keystroke of the search.
+// or, with ?q= (the search without JavaScript), what the search finds.
 templ DocsResults(groups []model.DocGroup, query string, hits []DocHit) {
 	<div id="docs-results" class="flex flex-col gap-8">
 		if strings.TrimSpace(query) == "" {
-			<div class="grid items-start gap-8 md:grid-cols-2">
+			<div class="flex flex-col gap-8">
 				for _, group := range groups {
 					@kit.Section(group.Title, nil) {
 						@kit.List() {
@@ -109,8 +108,9 @@ templ DocsResults(groups []model.DocGroup, query string, hits []DocHit) {
 	</div>
 }
 
-// docsSearch is the search of a docs page, in the middle of the screen:
-// ⌘K, ctrl+k, / or the search button open it. What you type goes to the
+// docsSearch is the one docs search, in the middle of the screen like the
+// app's palette: ⌘K, ctrl+k, /, the search button or the big field of the
+// docs home open it. What you type goes to the
 // server (DocsSearchOptions), the arrows pick, Enter opens, Escape or a
 // click outside closes it.
 templ docsSearch(groups []model.DocGroup) {
@@ -166,9 +166,9 @@ templ DocsSearchOptions(query string, hits []DocHit) {
 
 var docsSearchOnce = templ.NewOnceHandle()
 
-// docsSearchScript opens and closes the search of a docs page and moves
-// through its answers; the server finds them. On the docs home, ⌘K and /
-// go to its field instead.
+// docsSearchScript opens and closes the docs search and moves through its
+// answers like the app's palette (arrows, ctrl+j / ctrl+k); the server
+// finds them.
 templ docsSearchScript() {
 	@docsSearchOnce.Once() {
 		<script nonce={ templ.GetNonce(ctx) }>
@@ -181,11 +181,13 @@ templ docsSearchScript() {
 					for (const each of options()) each.setAttribute("aria-selected", String(each === option));
 					option?.scrollIntoView({ block: "nearest" });
 				};
-				const open = () => {
-					const home = document.getElementById("docs-q");
-					if (home) return home.focus();
+				const open = (text) => {
 					if (!dialog() || dialog().open) return;
 					dialog().showModal();
+					if (text) {
+						field().value = text;
+						htmx.trigger(field(), "input");
+					}
 					field().select();
 				};
 				document.addEventListener("click", (event) => {
@@ -194,23 +196,37 @@ templ docsSearchScript() {
 						open();
 					} else if (event.target === dialog()) dialog().close();
 				});
+				// The big field of the home: focusing or typing in it opens the
+				// palette with what is typed.
+				document.addEventListener("focusin", (event) => {
+					if (!event.target.matches("input[data-docs-search-open]")) return;
+					event.target.blur();
+					open(event.target.value);
+				});
 				document.addEventListener("mouseover", (event) => {
 					const option = event.target.closest("#docs-search [role=option]");
 					if (option && option.getAttribute("aria-selected") !== "true") pick(option);
 				});
 				document.addEventListener("keydown", (event) => {
-					if (!dialog() && !document.getElementById("docs-q")) return;
-					if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
+					if (!dialog()) return;
+					const ctrl = event.ctrlKey && !event.metaKey;
+					const down = event.key === "ArrowDown" || (ctrl && (event.key === "j" || event.key === "n"));
+					const up = event.key === "ArrowUp" || (ctrl && (event.key === "k" || event.key === "p"));
+					if (!dialog().open && ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target)))) {
 						event.preventDefault();
 						open();
 						return;
 					}
-					if (!dialog() || event.target !== field()) return;
+					if (event.target !== field()) return;
 					const list = options();
 					const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
-					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+					// Escape closes at once; a search field would only empty itself.
+					if ((event.key === "k" && event.metaKey) || event.key === "Escape") {
 						event.preventDefault();
-						pick(list[(at + (event.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]);
+						dialog().close();
+					} else if (down || up) {
+						event.preventDefault();
+						pick(list[(at + (down ? 1 : -1) + list.length) % list.length]);
 					} else if (event.key === "Enter") {
 						event.preventDefault();
 						(list[at] || list[0])?.click();

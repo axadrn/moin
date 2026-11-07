@@ -43,16 +43,9 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(docsIndexMarkdown(groups)))
 			return
 		}
+		// ?q= is the search without JavaScript: the home lists what it finds.
 		query := strings.TrimSpace(r.URL.Query().Get("q"))
-		hits := pages.FindDocs(groups, query, docsHits)
-		w.Header().Add("Vary", "HX-Request")
-		// A keystroke of the search on the home (htmx) gets only the list.
-		if isAction(r) {
-			w.Header().Set("HX-Replace-Url", docsSearchURL(query))
-			render(w, r, pages.DocsResults(groups, query, hits))
-			return
-		}
-		render(w, r, pages.DocsHome(groups, query, hits))
+		render(w, r, pages.DocsHome(groups, query, pages.FindDocs(groups, query, docsHits)))
 		return
 	}
 	// The introduction became Get started.

@@ -2,10 +2,12 @@ package blocks
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/githubstars"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/icons"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
@@ -59,9 +61,21 @@ templ Navbar() {
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-1">
-				<span class="lg:hidden">
-					@NavbarDocsMobile()
-				</span>
+				// The docs search sits where the app keeps its search: top
+				// right, on every docs page. Without JavaScript it is the
+				// docs home with its field.
+				{{ inDocs := strings.HasPrefix(ctxkeys.URLPath(ctx), "/docs") }}
+				if inDocs {
+					<a href="/docs" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
+						@icon.Search(icon.Props{Class: "size-5"})
+					</a>
+				}
+				// On a phone in the docs the search takes the place of Docs.
+				if !inDocs {
+					<span class="lg:hidden">
+						@NavbarDocsMobile()
+					</span>
+				}
 				// The star count shows from starsShowAt on: a small one says
 				// "nobody uses this", like the live numbers of the home page.
 				{{ stars := githubstars.Count() }}
