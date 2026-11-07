@@ -90,7 +90,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.CatalogService).Search)
 	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(content.Root, app.Cfg.AppURL, build.Name))
-	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
+	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)

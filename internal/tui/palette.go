@@ -135,13 +135,6 @@ type hit struct {
 	pos   []int
 }
 
-// match scores q against s: find.Name, the same matching as the web
-// palette. pos are the rune positions that matched.
-func match(q, s string) (int, []int, bool) {
-	m, ok := find.Name(q, s)
-	return m.Score, m.Positions, ok
-}
-
 const recentMax = 8
 
 // remember puts a pick first in the recent ones.
@@ -191,14 +184,15 @@ func (m model) hits() []hit {
 	}
 	var out []hit
 	for _, e := range entries {
-		sc, pos, ok := match(q, e.title)
+		// The same matching as the web palette.
+		found, ok := find.Name(q, e.title)
 		if !ok {
 			continue
 		}
 		if i := slices.Index(m.recent, e.title); i >= 0 {
-			sc += recentMax - i
+			found.Score += recentMax - i
 		}
-		out = append(out, hit{e, sc, pos})
+		out = append(out, hit{e, found.Score, found.Positions})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].score > out[j].score })
 	return out

@@ -244,11 +244,6 @@ func (s *CatalogService) version(entry catalog.Entry, wanted string) (string, er
 	return wanted, nil
 }
 
-// App is the app named idOrName.
-func (s *CatalogService) App(workspaceID, idOrName string) (*model.App, error) {
-	return s.apps.Get(workspaceID, idOrName)
-}
-
 // Info says what the catalog knows of app; ok is false for an app of your
 // own.
 func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, bool) {

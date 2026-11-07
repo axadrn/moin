@@ -539,7 +539,7 @@ func printDeploys(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	for _, deploy := range detail.Deploys {
 		took := "-"
 		if deploy.FinishedAt != nil {
-			took = duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+			took = style.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
 		}
 		status := deploy.Status
 		if deploy.Number == detail.App.LiveNumber && status == "succeeded" {
@@ -556,7 +556,7 @@ func printDeploys(stdout io.Writer, detail client.AppDetail, now time.Time) {
 func deployTimes(deploy client.Deploy, now time.Time) string {
 	text := "started " + since(deploy.CreatedAt, now)
 	if deploy.FinishedAt != nil {
-		text += ", took " + duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+		text += ", took " + style.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
 	}
 	return text
 }
