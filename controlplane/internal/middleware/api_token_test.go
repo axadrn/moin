@@ -41,9 +41,9 @@ func identify(t *testing.T, environment bearerTestEnvironment, path, authorizati
 
 func TestAPITokenAuthenticatesOnlyTheJSONAPI(t *testing.T) {
 	environment := newBearerTestEnvironment(t)
-	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "agent", Email: "agent@example.com", Name: "Agent", Verified: true})
+	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "claude", Email: "claude@example.com", Name: "Claude", Verified: true})
 	_, raw, err := environment.tokens.Create(fixture.User.ID, service.CreateAPITokenInput{
-		Name:        "Agent",
+		Name:        "Claude",
 		WorkspaceID: fixture.Workspace.ID,
 	})
 	if err != nil {

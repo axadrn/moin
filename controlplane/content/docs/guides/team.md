@@ -133,6 +133,6 @@ API: DELETE /api/v1/workspaces/{slug}
 
 ## Good to know
 
-- Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. An API token, and so the CLI, the TUI and agents, cannot, so a leaked token never locks your team out.
+- Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. An API token, and so the CLI, the TUI and AI agents, cannot, so a leaked token never locks your team out.
 - A personal API token belongs to one workspace. For another workspace, log in with one of its tokens: `moin login --token pat_…`.
 - Every change goes into the [activity](/docs/guides/activity).

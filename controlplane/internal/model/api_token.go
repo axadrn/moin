@@ -12,7 +12,7 @@ const (
 	APITokenScopeWrite = "write"
 
 	// APITokenKindPersonal is a token made in Settings, for scripts, CI
-	// and agents.
+	// and AI agents.
 	APITokenKindPersonal = "personal"
 	// APITokenKindDevice is the token of one computer, from `moin login`
 	// in the browser. It expires after DeviceTokenIdle without use.

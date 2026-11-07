@@ -82,7 +82,7 @@ func result(output any) *mcpsdk.CallToolResult {
 }
 
 // ToolError is a failed tool call. Its text is the error envelope of the JSON
-// API, so agents see the same codes and field messages.
+// API, so AI agents see the same codes and field messages.
 type ToolError struct {
 	Code    string
 	Message string

@@ -17,7 +17,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Update an agent | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
 | Pin an app | ✓ | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
-| Deploy this directory | Your files are on your computer, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An agent has no directory to upload: use the CLI. |
+| Deploy this directory | Your files are on your computer, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An AI agent has no directory to upload: use the CLI. |
 | Deploy an image from CI | ✓ | ✓ `deploy --image` | ✓ `I` | ✓ | ✓ |
 | Deploy a branch, tag or commit | ✓ | ✓ `deploy --ref` | ✓ `B` | ✓ | ✓ |
 | Redeploy | ✓ | ✓ `redeploy` | ✓ `R` | ✓ | ✓ |
@@ -81,12 +81,12 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
-| Sign up, sign in, passwords, email | ✓ | `login` signs this computer in; the rest is the web. | Signs in with the browser; the rest is the web. | ✓ with a session | Agents use a token, never your password. |
+| Sign up, sign in, passwords, email | ✓ | `login` signs this computer in; the rest is the web. | Signs in with the browser; the rest is the web. | ✓ with a session | AI agents use a token, never your password. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |
 | API tokens | ✓ | A token can't make tokens. | A token can't make tokens. | ✓ with a session | A token can't make tokens. |
 | Name, picture | ✓ | Set it in the web. | Set it in the web. | ✓ | Set it in the web. |
 | Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided with a password. | Web only. | ✓ with a session | Web only. |
 | Create a workspace, accept an invitation | ✓ | It starts with a signed-in browser. | Web only. | ✓ with a session | Web only. |
 | Plan and trial | ✓ | Web only. | Web only. | ✓ | ✓ `get_billing` |
-| Checkout, card, invoices | ✓ | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | Agents never move money. |
-| Delete your account | ✓ | Web only, with your password. | Web only. | ✓ with a session | Agents never delete accounts. |
+| Checkout, card, invoices | ✓ | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
+| Delete your account | ✓ | Web only, with your password. | Web only. | ✓ with a session | AI agents never delete accounts. |

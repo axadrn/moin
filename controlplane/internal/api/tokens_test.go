@@ -193,8 +193,8 @@ func TestReadTokenCannotWrite(t *testing.T) {
 
 func TestTokensCannotReachSessionOnlyRoutes(t *testing.T) {
 	environment := newAPIEnvironment(t)
-	owner := seedTokenOwner(t, environment, "agent")
-	created := createAPIToken(t, environment, owner, `"name":"Agent","scopes":["read","write"]`)
+	owner := seedTokenOwner(t, environment, "claude")
+	created := createAPIToken(t, environment, owner, `"name":"Claude","scopes":["read","write"]`)
 	denied := []apiRequest{
 		{method: http.MethodGet, path: "/api/v1/account/tokens"},
 		{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, `"name":"Child"`)},
@@ -203,9 +203,9 @@ func TestTokensCannotReachSessionOnlyRoutes(t *testing.T) {
 		{method: http.MethodDelete, path: "/api/v1/account/sessions"},
 		{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"new@example.com"}`},
 		{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"another long password"}`},
-		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"agent@example.com"}`},
+		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"claude@example.com"}`},
 		{method: http.MethodPost, path: "/api/v1/auth/logout"},
-		{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"agent@example.com","password":"` + testPassword + `"}`},
+		{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"claude@example.com","password":"` + testPassword + `"}`},
 		{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"Side project"}`},
 		{method: http.MethodDelete, path: "/api/v1/workspaces/" + owner.workspaceSlug},
 		{method: http.MethodPost, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/leave"},
@@ -246,7 +246,7 @@ func TestAPITokensNeverManageMembers(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
 	owner := tokenOwner{id: "owner", session: seeded.owner, workspaceID: seeded.workspace.ID, workspaceSlug: seeded.workspace.Slug}
-	created := createAPIToken(t, environment, owner, `"name":"Agent","scopes":["read","write"]`)
+	created := createAPIToken(t, environment, owner, `"name":"Claude","scopes":["read","write"]`)
 	role := apiRequest{method: http.MethodPatch, path: seeded.path("/members/member-member/role"), body: `{"role":"admin"}`}
 	removal := apiRequest{method: http.MethodDelete, path: seeded.path("/members/member-member")}
 	for _, request := range []apiRequest{role, removal} {

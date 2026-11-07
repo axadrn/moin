@@ -1,6 +1,6 @@
 ---
 title: "AI agents (MCP)"
-description: "Let Claude, Cursor and other agents run moin for you"
+description: "Let Claude, Cursor and other AI agents run moin for you"
 group: "Team"
 order: 4
 ---
@@ -9,7 +9,7 @@ MCP lets an AI agent such as Claude or Cursor use moin for you: *"roll back my a
 
 [Create an API token](/docs/guides/account#create-an-api-token), **Read and write** to change things or **Read only** to look, and put it where `pat_…` stands.
 
-## Connect an agent
+## Connect an AI agent
 
 Claude Code:
 
@@ -28,7 +28,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 
 ## Good to know
 
-- No login tool and no browser login: the token is all an agent needs.
+- No login tool and no browser login: the token is all an AI agent needs.
 - A read-only token calls the read tools; changes need read and write.
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
 - Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.

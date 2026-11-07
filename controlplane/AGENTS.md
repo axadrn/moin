@@ -51,7 +51,7 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 - JSON handlers live in `internal/api` and call the same services as the HTML handlers. Never duplicate a rule or a permission check there.
 - Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
 - Clients sign in with an `/api/v1/auth` endpoint and send the returned token as `Authorization: Bearer <token>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`.
-- Personal API tokens (`pat_...`) let scripts and agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`. A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
+- Personal API tokens (`pat_...`) let scripts and AI agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an AI agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`. A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
 - Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
 - `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
 - Magic link, password reset, and email change emails link to the HTML routes under `APP_URL/auth/...`. An API client that receives the token another way calls the matching `/api/v1/auth/.../verify` endpoint.
@@ -59,11 +59,11 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 ## MCP server
 
 - `internal/mcp` serves an MCP server at `/mcp`: Streamable HTTP, stateless, `POST` only. It is a third transport next to the HTML handlers and the JSON API. Tools call the same services and never repeat a rule or a permission check.
-- Agents authenticate with a personal API token as `Authorization: Bearer pat_...`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, revoked or expired tokens.
+- AI agents authenticate with a personal API token as `Authorization: Bearer pat_...`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, revoked or expired tokens.
 - Built-in tools: `whoami`, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `rename_workspace`. `registerTools` in `internal/mcp/tools.go` registers them in one place.
 - Wrap a tool body in `mcp.Read` when it only reads and in `mcp.Write` when it changes data. A read-only token gets `insufficient_scope` from a `Write` tool. Workspace tools take an optional `workspace` slug, default to the token's workspace, and answer `not_found` for every other workspace.
 - Failed calls return the JSON API error envelope as the tool result. Return service errors unchanged; `api.ErrorFor` maps them to the same codes as the API. Use `mcp.InvalidField` for a `validation_failed` field.
-- Tools are a curated list for agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, passwords, or email.
+- Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, passwords, or email.
 - `mcp.Services` in `internal/mcp/server.go` lists the services tools may call. Add your service there and pass it where `internal/routes/routes.go` calls `mcp.NewServer`.
 - Raise `mcp.Version` when the tool list or a tool's schema changes.
 
@@ -92,7 +92,7 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 }
 ```
 
-The description tells the agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
+The description tells the AI agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
 
 Client setup, with a token from Settings, Tokens and the public URL of this server:
 
@@ -117,7 +117,7 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/handler` parses requests and renders responses.
 - `internal/handler/htmx.go` contains the selected frontend's native response behavior.
 - `internal/api` parses JSON requests and writes JSON responses.
-- `internal/mcp` serves the MCP tools for agents.
+- `internal/mcp` serves the MCP tools for AI agents.
 - `internal/service` owns business rules.
 - `internal/repository` owns raw SQL.
 - `internal/ui` has three flat folders, each answering one question. `kit/`: what pages are built from (rows, buttons, fields, dialog, icons, chart, wordmark); it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A part goes to `kit/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. No fourth folder without a good reason, no subfolders.

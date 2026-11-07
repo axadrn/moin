@@ -19,7 +19,7 @@ import (
 // next to them: wrap the body in Read or Write, call your service, and return
 // a struct the SDK turns into the output schema.
 //
-// Tools are a curated list for agents, not a copy of the JSON API. Keep
+// Tools are a curated list for AI agents, not a copy of the JSON API. Keep
 // money-moving and account actions out: checkout, billing management,
 // account or workspace deletion, role changes, member removal, admin,
 // passwords and email. Every server and app action is a tool, with

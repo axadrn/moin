@@ -1,6 +1,6 @@
 // Package mcp serves the MCP server at /mcp. It is a third transport next to
 // the HTML handlers and the JSON API: tools call the same services and report
-// errors with the codes of the JSON API envelope. Agents authenticate with a
+// errors with the codes of the JSON API envelope. AI agents authenticate with a
 // personal API token, and the scopes of that token decide which tools work.
 package mcp
 

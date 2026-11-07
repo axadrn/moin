@@ -105,7 +105,7 @@ func seedOwner(t *testing.T, env *environment, id string) owner {
 func createToken(t *testing.T, env *environment, owner owner, scopes ...string) (*model.APIToken, string) {
 	t.Helper()
 	token, raw, err := env.tokens.Create(owner.user.ID, service.CreateAPITokenInput{
-		Name:        "Agent",
+		Name:        "Claude",
 		Scopes:      scopes,
 		WorkspaceID: owner.workspace.ID,
 	})
@@ -148,7 +148,7 @@ func connect(t *testing.T, ctx context.Context, server *mcpsdk.Server, clientTra
 		}
 		t.Cleanup(func() { _ = serverSession.Close() })
 	}
-	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "test-agent", Version: "1.0.0"}, nil)
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "test-client", Version: "1.0.0"}, nil)
 	session, err := client.Connect(context.Background(), clientTransport, nil)
 	if err != nil {
 		t.Fatalf("client Connect() error = %v", err)

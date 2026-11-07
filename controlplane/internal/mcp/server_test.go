@@ -57,7 +57,7 @@ func TestWhoAmIReturnsTheTokenUser(t *testing.T) {
 
 	result := call(t, session, "whoami", nil)
 	whoami := output[mcp.WhoAmI](t, result)
-	if whoami.User.ID != owner.user.ID || whoami.User.Email != "ada@example.com" || whoami.Token.Name != "Agent" || strings.Join(whoami.Token.Scopes, ",") != "read" {
+	if whoami.User.ID != owner.user.ID || whoami.User.Email != "ada@example.com" || whoami.Token.Name != "Claude" || strings.Join(whoami.Token.Scopes, ",") != "read" {
 		t.Fatalf("whoami = %#v", whoami)
 	}
 	if whoami.Workspace == nil || whoami.Workspace.Workspace.ID != owner.workspace.ID || whoami.Workspace.Role != "owner" {

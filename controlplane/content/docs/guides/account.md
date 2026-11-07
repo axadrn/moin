@@ -30,11 +30,11 @@ Only approve a code you started yourself: someone who sends you a link to `/devi
 - It ends after 90 days without use; every use starts the 90 days again. Logging in again on the same computer replaces the last login.
 - The TUI uses the same login, and starts it itself when there is none.
 - The API answers the polls with the codes of RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token` and `invalid_grant`.
-- MCP has no login: agents send a personal API token, see [MCP](/docs/guides/mcp).
+- MCP has no login: AI agents send a personal API token, see [MCP](/docs/guides/mcp).
 
 ## Create an API token
 
-For CI, the GitHub Action, scripts and agents. Each token belongs to one workspace and can **Read only**, or **Read and write**, which the CLI needs and the form starts at. A read-only token cannot add servers, deploy, or read rows and env values.
+For CI, the GitHub Action, scripts and AI agents. Each token belongs to one workspace and can **Read only**, or **Read and write**, which the CLI needs and the form starts at. A read-only token cannot add servers, deploy, or read rows and env values.
 
 ```surfaces
 Web: **Settings**, **Account**, **Tokens** tab, **Create token**
