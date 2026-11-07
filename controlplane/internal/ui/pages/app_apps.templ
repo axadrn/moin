@@ -10,7 +10,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
 )
@@ -93,7 +92,7 @@ templ AppAddForm(servers []model.Server) {
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
-		@csrf.Token()
+		@kit.CSRF()
 		<label for="app-name" class="sr-only">App name</label>
 		@kit.Input(templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like blog", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
 		<div class="flex gap-2 sm:w-64">
@@ -633,7 +632,7 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 				}
 				@kit.RowForm(templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}) {
 					<div class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
-						@csrf.Token()
+						@kit.CSRF()
 						<label for="env-key" class="sr-only">Name</label>
 						<div class="sm:w-56 sm:shrink-0">
 							@kit.Input(templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true})

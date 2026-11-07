@@ -7,7 +7,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -281,7 +280,7 @@ templ homePlanRows(rows ...string) {
 templ HomeEnd() {
 	<section id="start" class={ homeSection, "items-start" }>
 		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8 sm:p-14">
-			@blocks.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
+			@kit.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
 			<p class="text-lg text-muted-foreground sm:text-xl">
 				<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
 			</p>

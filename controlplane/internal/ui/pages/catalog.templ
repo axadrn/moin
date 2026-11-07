@@ -7,7 +7,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -97,7 +96,7 @@ templ CatalogInstall(view CatalogInstallView) {
 						hx-swap="none"
 						hx-disable="find button[type='submit']"
 					>
-						@csrf.Token()
+						@kit.CSRF()
 						if note := entry.DatabaseNote(); note != "" {
 							<p class="px-1 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
 						}
@@ -286,7 +285,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 					hx-disable="find button[type='submit']"
 					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
 				>
-					@csrf.Token()
+					@kit.CSRF()
 					<div class="min-w-0 flex-1 sm:w-36 sm:flex-none">
 						@kit.Select(kit.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Value: view.Latest.Tag, Disabled: len(view.Versions) == 0})
 					</div>

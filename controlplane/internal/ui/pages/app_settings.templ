@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -54,7 +53,7 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 templ settingsNameCard(user *model.User) {
 	@kit.Card("Name", nil) {
 		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/profile/name" } hx-swap="none" hx-disable="find button[type='submit']">
-			@csrf.Token()
+			@kit.CSRF()
 			<label for="name" class="sr-only">Name</label>
 			@kit.Inline() {
 				@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": user.Name, "placeholder": "Your name", "autocomplete": "name", "maxlength": "100"})
@@ -71,7 +70,7 @@ templ settingsNameCard(user *model.User) {
 templ settingsEmailCard(user *model.User) {
 	@kit.Card("Email", nil) {
 		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/account/email" } hx-swap="none" hx-disable="find button[type='submit']">
-			@csrf.Token()
+			@kit.CSRF()
 			<label for="email" class="sr-only">Email</label>
 			@kit.Inline() {
 				@kit.Input(templ.Attributes{"id": "email", "name": "email", "type": "email", "value": user.Email, "placeholder": "you@example.com", "autocomplete": "email"})
@@ -107,7 +106,7 @@ templ settingsPasswordCard() {
 		@kit.Card("Password", nil) {
 			if user.HasPassword() {
 				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password" } hx-swap="none" hx-disable="find button[type='submit']">
-					@csrf.Token()
+					@kit.CSRF()
 					<div class="grid items-start gap-4 md:grid-cols-3">
 						@formField("Current password", "current_password", "", "") {
 							@kit.Input(templ.Attributes{"id": "current_password", "aria-describedby": "current_password-hint", "name": "current_password", "type": "password", "autocomplete": "current-password"})
@@ -127,7 +126,7 @@ templ settingsPasswordCard() {
 				</form>
 			} else {
 				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password/set" } hx-swap="none" hx-disable="find button[type='submit']">
-					@csrf.Token()
+					@kit.CSRF()
 					<div class="grid items-start gap-4 md:grid-cols-2">
 						@formField("New password", "new_password", "At least 12 characters.", "") {
 							@kit.Input(templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"})
@@ -231,7 +230,7 @@ templ deleteAccountDialog() {
 			hx-swap="none"
 			hx-disable="find button[type='submit']"
 		>
-			@csrf.Token()
+			@kit.CSRF()
 			@formField("Type DELETE to confirm", "delete-confirmation", "", "") {
 				@kit.Input(templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "data-delete-confirmation": true})
 			}

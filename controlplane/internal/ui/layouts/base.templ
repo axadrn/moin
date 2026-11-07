@@ -1,10 +1,9 @@
 package layouts
 
+import "github.com/axadrn/moin/controlplane/internal/ui/kit"
+
 import "github.com/axadrn/moin/controlplane/internal/brand"
 import "github.com/axadrn/moin/controlplane/internal/ctxkeys"
-import "github.com/axadrn/moin/controlplane/internal/ui/blocks"
-import "github.com/axadrn/moin/controlplane/internal/ui/csrf"
-import tuiutils "github.com/axadrn/moin/controlplane/internal/ui/utils"
 
 type SEOProps struct {
 	Title        string
@@ -36,14 +35,14 @@ templ Base(props ...SEOProps) {
 			// first paint is already in Geist.
 			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
 			<link rel="preload" href="/assets/fonts/satoshi/satoshi-black.woff2" as="font" type="font/woff2" crossorigin/>
-			<link href={ tuiutils.ScriptURL("/assets/css/output.css") } rel="stylesheet"/>
+			<link href={ kit.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
 			// Scripts in swapped content get the page's nonce, so the CSP lets
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
 			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
 			// Server-sent events swap HTML as it streams (hx-sse:connect).
 			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
-			<script defer nonce={ templ.GetNonce(ctx) } src={ tuiutils.ScriptURL("/assets/js/moin.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/moin.js") }></script>
 			// A link starts loading when the pointer rests on it, so the page
 			// is there on the click (Chrome and Edge; others ignore it). Only
 			// pages: never sign in or out, GitHub or the API.
@@ -71,14 +70,14 @@ templ Base(props ...SEOProps) {
 						hx-swap="none"
 						hx-disable="find button[type='submit']"
 					>
-						@csrf.Token()
+						@kit.CSRF()
 						<button type="submit" class="font-medium underline-offset-4 hover:underline">Return to Admin</button>
 					</form>
 				</div>
 			}
 			{ children... }
 			<div id="feedback" hidden></div>
-			@blocks.ConfirmDialog()
+			@kit.ConfirmDialog()
 		</body>
 	</html>
 }
@@ -116,7 +115,7 @@ templ seo(props SEOProps) {
 	<meta property="og:url" content={ baseURL + props.Path }/>
 	<meta property="og:site_name" content={ appName }/>
 	// OpenGraph Image
-	<meta property="og:image" content={ baseURL + tuiutils.ScriptURL("/assets/img/og.png") }/>
+	<meta property="og:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
 	<meta property="og:image:width" content="1200"/>
 	<meta property="og:image:height" content="630"/>
 	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
@@ -124,7 +123,7 @@ templ seo(props SEOProps) {
 	<meta name="twitter:card" content="summary_large_image"/>
 	<meta name="twitter:title" content={ fullTitle }/>
 	<meta name="twitter:description" content={ props.Description }/>
-	<meta name="twitter:image" content={ baseURL + tuiutils.ScriptURL("/assets/img/og.png") }/>
+	<meta name="twitter:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
 	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
 	// Theme Color
 	<meta name="theme-color" content="#000000"/>

@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -59,7 +58,7 @@ templ Device(view DeviceView) {
 	} else {
 		@authScreen(deviceSEO, "Log in "+deviceName(view.Login)+"?") {
 			<form id="device-approve-form" action="/device/approve" method="POST" class="flex flex-col gap-4">
-				@csrf.Token()
+				@kit.CSRF()
 				<input type="hidden" name="code" value={ view.Code }/>
 				<div class="flex flex-col items-center gap-2 rounded-4xl bg-card px-6 py-5">
 					<p class="font-mono text-2xl font-semibold tracking-tight" data-device-code>{ view.Code }</p>

@@ -1,4 +1,4 @@
-package blocks
+package kit
 
 templ HighlightScripts() {
 	<script nonce={ templ.GetNonce(ctx) }>
@@ -21,7 +21,7 @@ templ HighlightScripts() {
 			pre.parentNode.insertBefore(block, pre);
 			block.appendChild(pre);
 
-			// Create the copy button with the classes of kit.Command.
+			// Create the copy button with the classes of Command.
 			const button = document.createElement('button');
 			button.setAttribute('data-slot', 'code-copy-button');
 			button.setAttribute('type', 'button');

@@ -1,0 +1,10 @@
+package kit
+
+
+// ThemeSwitcher is the round button that switches between light and dark;
+// the layout's script (data-theme-switcher) does the switching.
+templ ThemeSwitcher() {
+	@IconButton("Switch the theme", templ.Attributes{"type": "button", "data-theme-switcher": true}) {
+		@IconTheme("")
+	}
+}

@@ -88,7 +88,7 @@ func FindDocs(groups []model.DocGroup, query string, limit int) []SiteHit {
 }
 
 // SiteSearchOptions are the answers in the palette of the public site
-// (blocks.SiteSearch), the first one picked so Enter opens it.
+// (layouts.SiteSearch), the first one picked so Enter opens it.
 templ SiteSearchOptions(query string, hits []SiteHit) {
 	if len(hits) == 0 {
 		<p class="px-4 py-3 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>

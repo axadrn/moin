@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -17,7 +16,7 @@ templ appCI(appName string, hook bool) {
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
 			>
-				@csrf.Token()
+				@kit.CSRF()
 				@kit.Field("Deploy an image", "image-ref", "") {
 					@kit.Inline() {
 						@kit.Input(templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "placeholder": "ghcr.io/me/" + appName + ":3f2a9c1", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})

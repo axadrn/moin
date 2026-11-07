@@ -6,7 +6,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
@@ -65,7 +64,7 @@ templ ServerAddForm() {
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
-		@csrf.Token()
+		@kit.CSRF()
 		<label for="server-name" class="sr-only">Server name</label>
 		@kit.Inline() {
 			@kit.Input(templ.Attributes{"id": "server-name", "name": "name", "type": "text", "placeholder": "Name, or empty for a made-up one", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})

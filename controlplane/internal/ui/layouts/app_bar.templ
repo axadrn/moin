@@ -3,7 +3,6 @@ package layouts
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -17,7 +16,7 @@ templ AppBar() {
 	<header id="app-bar" class="moin-bar sticky top-0 z-40 bg-background/85 backdrop-blur-xl" data-app-base={ basePath }>
 		<div class={ kit.Page, "flex h-16 items-center gap-1" }>
 			<a href={ templ.SafeURL(basePath + "/overview") } class="mr-3 flex shrink-0 items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
-				@blocks.Wordmark("text-xl leading-none")
+				@kit.Wordmark("text-xl leading-none")
 			</a>
 			<span class="flex-1"></span>
 			<button type="button" class="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Search" aria-keyshortcuts="Meta+K /" data-open-palette>

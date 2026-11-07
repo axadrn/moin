@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/protocol"
 	"strings"
@@ -52,7 +51,7 @@ templ AppRouting(view RoutingView) {
 // canonicalRow picks the domain the others redirect to; it saves itself.
 templ canonicalRow(options []kit.Option, canonical, routingPath string) {
 	@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/canonical", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "data-canonical": true}) {
-		@csrf.Token()
+		@kit.CSRF()
 		@kit.RowLabel("canonical-domain", "Canonical", "")
 		<div class="w-44 shrink-0 sm:w-64">
 			@kit.Select(kit.SelectProps{ID: "canonical-domain", Name: "domain", Label: "Canonical domain", Options: options, Value: canonical})
@@ -126,7 +125,7 @@ templ domainRow(check service.DomainCheck, appName, routingPath string) {
 // another service of compose.yml.
 templ addDomainRow(routingPath string) {
 	@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/add", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}) {
-		@csrf.Token()
+		@kit.CSRF()
 		<div class="min-w-0 flex-1 pb-2">
 			@kit.Field("Add a domain", "domain-name", "") {
 				@kit.Inline() {
@@ -153,7 +152,7 @@ templ instantSection(view RoutingView, routingPath string) {
 		<div data-instant>
 			@kit.List() {
 				@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-					@csrf.Token()
+					@kit.CSRF()
 					<input type="hidden" name="switch" value="1"/>
 					<div class="min-w-0 flex-1">
 						if instant.URL != "" {
@@ -168,7 +167,7 @@ templ instantSection(view RoutingView, routingPath string) {
 				}
 				if on {
 					@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "data-instant-provider": true}) {
-						@csrf.Token()
+						@kit.CSRF()
 						@kit.RowLabel("instant-provider", "Provider", "")
 						<div class="w-36 shrink-0">
 							@kit.Select(kit.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
@@ -176,7 +175,7 @@ templ instantSection(view RoutingView, routingPath string) {
 					}
 					if instant.URL != "" {
 						@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-							@csrf.Token()
+							@kit.CSRF()
 							<input type="hidden" name="password" value="1"/>
 							@kit.RowLabel("instant-password-on", "Password", instantSignIn(instant))
 							@kit.Switch(templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open})
@@ -224,7 +223,7 @@ templ passwordSection(app model.App, routingPath string) {
 			@kit.List() {
 				@kit.RowMore("Ask for a password") {
 					@kit.RowForm(templ.Attributes{"id": "protect-form", "hx-post": routingPath + "/protect", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}) {
-						@csrf.Token()
+						@kit.CSRF()
 						<div class="flex min-w-0 flex-1 flex-col gap-4 pt-1 pb-2">
 							<div class="grid gap-4 sm:grid-cols-2">
 								@kit.Field("Username", "protect-user", "") {

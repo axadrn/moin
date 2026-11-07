@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -33,7 +32,7 @@ templ AuthMagicLinkResend(email string, sent bool) {
 			hx-swap="outerHTML"
 			hx-disable="find button[type='submit']"
 		>
-			@csrf.Token()
+			@kit.CSRF()
 			<input type="hidden" name="email" value={ email }/>
 			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
 				if sent {

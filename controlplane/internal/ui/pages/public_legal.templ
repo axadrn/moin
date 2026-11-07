@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -25,7 +24,7 @@ templ Legal(page *service.LegalPage) {
 				<p class="px-1 text-xs text-muted-foreground">Last updated { page.LastUpdated }</p>
 			</div>
 			<article class="max-w-2xl min-w-0 text-base">
-				@blocks.Typeset(page.Content)
+				@kit.Typeset(page.Content)
 			</article>
 		</main>
 	}

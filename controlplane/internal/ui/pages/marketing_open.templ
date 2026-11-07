@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
 // HomeOpen is what the changelog says about how moin ships: how many
@@ -33,7 +33,7 @@ templ HomeOpenSection(open HomeOpen) {
 		<section id="open" class={ homeSection }>
 			<h2 class={ homeStatement }>Built in the open.</h2>
 			@kit.List() {
-				@kit.Row(blocks.GitHubURL) {
+				@kit.Row(layouts.GitHubURL) {
 					@kit.RowText("Open source", "AGPL-3.0, every line on GitHub")
 				}
 				@kit.Row("/changelog") {

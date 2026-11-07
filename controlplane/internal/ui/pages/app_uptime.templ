@@ -8,7 +8,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -149,7 +148,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
 	@kit.List() {
 		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
-			@csrf.Token()
+			@kit.CSRF()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
 			<div class="min-w-0 flex-1 pb-2">
 				@kit.Field("Path", id+"-path", "") {
@@ -171,7 +170,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
 	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-		@csrf.Token()
+		@kit.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
 		@kit.RowLabel(id+"-on", "Check every minute", "")
 		@kit.Switch(templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused})

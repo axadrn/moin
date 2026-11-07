@@ -2,7 +2,6 @@ package layouts
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -15,7 +14,7 @@ templ Admin(title string) {
 		<header id="app-bar" class="moin-bar sticky top-0 z-40 bg-background/85 backdrop-blur-xl">
 			<div class={ kit.Page, "flex h-16 items-center gap-1" }>
 				<a href="/app" class="mr-3 flex shrink-0 items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
-					@blocks.Wordmark("text-xl leading-none")
+					@kit.Wordmark("text-xl leading-none")
 				</a>
 			</div>
 		</header>

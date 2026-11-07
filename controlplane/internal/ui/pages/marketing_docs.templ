@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -48,7 +47,7 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
 			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title)
 			<article class="min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
-				@blocks.Typeset(page.HTMLContent)
+				@kit.Typeset(page.HTMLContent)
 			</article>
 			<div class="flex flex-col gap-3">
 				if next != nil {
@@ -64,7 +63,7 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 			</div>
 		</main>
 		@docsSurfaces()
-		@blocks.HighlightScripts()
+		@kit.HighlightScripts()
 	}
 }
 

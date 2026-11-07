@@ -7,7 +7,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
 // appKind is the status symbol of an app: its newest deploy.
@@ -177,7 +176,7 @@ templ appSection(appName, section string) {
 // switch in the app's settings that saves itself (DESIGN.md, Feedback).
 templ PinSwitch(app model.App) {
 	@kit.RowForm(templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin", "hx-trigger": "change", "hx-swap": "none"}) {
-		@csrf.Token()
+		@kit.CSRF()
 		@kit.RowLabel("pin-on", "Pin to the top", "")
 		@kit.Switch(templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
 	}
