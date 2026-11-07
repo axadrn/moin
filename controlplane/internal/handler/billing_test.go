@@ -11,11 +11,31 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
+
+// newBillingHandler is the billing pages with provider and a workspace
+// service of its own database.
+func newBillingHandler(t *testing.T, provider *paymentProviderStub) *BillingHandler {
+	t.Helper()
+	database := testutil.NewDatabase(t)
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	workspaces := service.NewWorkspaceService(
+		repository.NewWorkspaceRepository(database),
+		repository.NewWorkspaceMemberRepository(database),
+		repository.NewWorkspaceInvitationRepository(database),
+		repository.NewWorkspaceAuditRepository(database),
+		repository.NewUserRepository(database),
+		subscriptions,
+		service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App"),
+	)
+	return NewBillingHandler(provider, workspaces)
+}
 
 func TestCreateCheckoutUsesAuthenticatedUserAndDefaultInterval(t *testing.T) {
 	provider := &paymentProviderStub{checkoutURL: "https://payments.example.com/checkout"}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	form := url.Values{"plan_id": {model.SubscriptionPlanPro}}
 	request := authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", form)
 	recorder := httptest.NewRecorder()
@@ -39,7 +59,7 @@ func TestCreateCheckoutUsesAuthenticatedUserAndDefaultInterval(t *testing.T) {
 func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 	t.Run("missing plan", func(t *testing.T) {
 		provider := &paymentProviderStub{checkoutURL: "https://payments.example.com/checkout"}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", nil))
@@ -51,7 +71,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 	t.Run("unknown plan", func(t *testing.T) {
 		provider := &paymentProviderStub{}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {"invented"}}))
 		if recorder.Code != http.StatusBadRequest || provider.checkoutCalls != 0 {
@@ -61,7 +81,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 	t.Run("invalid interval", func(t *testing.T) {
 		provider := &paymentProviderStub{}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}, "interval": {"weekly"}}))
 		if recorder.Code != http.StatusBadRequest || provider.checkoutCalls != 0 {
@@ -71,7 +91,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 	t.Run("provider failure", func(t *testing.T) {
 		provider := &paymentProviderStub{checkoutErr: errors.New("provider unavailable")}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		form := url.Values{"plan_id": {model.SubscriptionPlanPro}, "interval": {model.SubscriptionIntervalYearly}}
 		recorder := httptest.NewRecorder()
 
@@ -84,7 +104,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 	t.Run("checkout already pending", func(t *testing.T) {
 		provider := &paymentProviderStub{checkoutErr: repository.ErrCheckoutPending}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}}))
@@ -96,7 +116,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 	t.Run("different checkout already open", func(t *testing.T) {
 		provider := &paymentProviderStub{checkoutErr: repository.ErrCheckoutSelection}
-		handler := NewBillingHandler(provider, nil)
+		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}}))
@@ -109,7 +129,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 
 func TestBillingRequiresOwner(t *testing.T) {
 	provider := &paymentProviderStub{}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	request := authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}})
 	request = request.WithContext(ctxkeys.WithWorkspaceMember(request.Context(), &model.WorkspaceMember{WorkspaceID: "workspace-1", UserID: "user-1", Role: model.WorkspaceRoleAdmin}))
 	recorder := httptest.NewRecorder()
@@ -122,7 +142,7 @@ func TestBillingRequiresOwner(t *testing.T) {
 
 func TestBillingWebhookDelegatesPayloadAndHeaders(t *testing.T) {
 	provider := &paymentProviderStub{}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	request := httptest.NewRequest(http.MethodPost, "/webhooks/payment", strings.NewReader(`{"type":"subscription.updated"}`))
 	request.Header.Set("Webhook-Signature", "signature")
 	recorder := httptest.NewRecorder()
@@ -139,7 +159,7 @@ func TestBillingWebhookDelegatesPayloadAndHeaders(t *testing.T) {
 
 func TestBillingWebhookReturnsBadRequestForProviderError(t *testing.T) {
 	provider := &paymentProviderStub{webhookErr: errors.New("invalid signature")}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	recorder := httptest.NewRecorder()
 
 	handler.Webhook(recorder, httptest.NewRequest(http.MethodPost, "/webhooks/payment", strings.NewReader("{}")))
@@ -151,7 +171,7 @@ func TestBillingWebhookReturnsBadRequestForProviderError(t *testing.T) {
 
 func TestBillingWebhookRejectsPayloadLargerThanOneMegabyte(t *testing.T) {
 	provider := &paymentProviderStub{}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	recorder := httptest.NewRecorder()
 
 	handler.Webhook(recorder, httptest.NewRequest(http.MethodPost, "/webhooks/payment", strings.NewReader(strings.Repeat("x", (1<<20)+1))))
@@ -166,11 +186,21 @@ func TestBillingWebhookRejectsPayloadLargerThanOneMegabyte(t *testing.T) {
 
 func TestBillingManagementRedirectsToProvider(t *testing.T) {
 	provider := &paymentProviderStub{portalURL: "https://payments.example.com/portal"}
-	handler := NewBillingHandler(provider, nil)
+	handler := newBillingHandler(t, provider)
 	recorder := httptest.NewRecorder()
 
-	handler.BillingManagement(recorder, authenticatedBillingRequest(http.MethodGet, "/app/test-workspace/billing/manage", nil))
+	request := authenticatedBillingRequest(http.MethodGet, "/app/test-workspace/billing/manage", nil)
 
+	// Without a customer at the provider there is nothing to manage.
+	handler.BillingManagement(recorder, request)
+	if recorder.Code != http.StatusInternalServerError || provider.portalWorkspaceID != "" {
+		t.Fatalf("free: status = %d, portal workspace = %q", recorder.Code, provider.portalWorkspaceID)
+	}
+
+	customer := "customer-1"
+	request = request.WithContext(ctxkeys.WithSubscription(request.Context(), &model.Subscription{WorkspaceID: "workspace-1", ProviderCustomerID: &customer}))
+	recorder = httptest.NewRecorder()
+	handler.BillingManagement(recorder, request)
 	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != provider.portalURL {
 		t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
 	}

@@ -1,13 +1,10 @@
 package api
 
 import (
-	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/service/payment"
 )
@@ -24,10 +21,6 @@ func NewBillingHandler(paymentService payment.Provider, workspaceService *servic
 	return &BillingHandler{paymentService: paymentService, workspaceService: workspaceService}
 }
 
-// ErrBillingPermission is returned to members whose role may not manage
-// billing.
-var ErrBillingPermission = errors.New("workspace billing permission required")
-
 // Billing returns the workspace subscription, its access, and the
 // purchasable plans.
 func (h *BillingHandler) Billing(w http.ResponseWriter, r *http.Request) {
@@ -40,10 +33,10 @@ func (h *BillingHandler) Billing(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewWorkspaceBilling returns the billing summary of a workspace for a member
-// who may manage billing, and ErrBillingPermission for everyone else.
+// who may manage billing, and service.ErrBillingPermission for everyone else.
 func NewWorkspaceBilling(member *model.WorkspaceMember, subscription *model.Subscription) (Billing, error) {
-	if !member.Can(model.WorkspacePermissionManageBilling) {
-		return Billing{}, ErrBillingPermission
+	if err := service.ManageBilling(member); err != nil {
+		return Billing{}, err
 	}
 	return NewBilling(subscription), nil
 }
@@ -51,32 +44,16 @@ func NewWorkspaceBilling(member *model.WorkspaceMember, subscription *model.Subs
 // CreateCheckout starts a provider checkout for the workspace and returns
 // its URL.
 func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
-	workspace := ctxkeys.Workspace(r.Context())
-	if !canManageBilling(w, r) {
-		return
-	}
 	var request checkoutRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	if !checkoutSelection(w, &request) {
-		return
-	}
-
-	checkoutURL, err := h.paymentService.CreateCheckoutURL(workspace.ID, workspace.Slug, request.PlanID, request.Interval, user.Email, workspace.Name)
+	ctx := r.Context()
+	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), request.PlanID, request.Interval, source(r), h.paymentService.CreateCheckoutURL)
 	if err != nil {
-		if errors.Is(err, repository.ErrCheckoutPending) || errors.Is(err, repository.ErrCheckoutSelection) || errors.Is(err, repository.ErrSubscriptionAlreadyPaid) {
-			ServiceError(w, err)
-			return
-		}
-		slog.Error("failed to create checkout", "error", err, "workspace_id", workspace.ID, "plan_id", request.PlanID, "provider", h.paymentService.Name())
-		Error(w, http.StatusInternalServerError, "internal", "Checkout could not be started. Please try again.")
+		ServiceError(w, err)
 		return
 	}
-
-	h.recordBillingAction(r, workspace.ID, user.ID, "billing.checkout_started")
-	slog.Info("checkout created", "workspace_id", workspace.ID, "provider", h.paymentService.Name())
 	JSON(w, http.StatusOK, URLResponse{URL: checkoutURL})
 }
 
@@ -84,39 +61,11 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 // the workspace. A workspace without a provider customer gets 409
 // no_billing_account.
 func (h *BillingHandler) BillingManagement(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
-	workspace := ctxkeys.Workspace(r.Context())
-	if !canManageBilling(w, r) {
-		return
-	}
-	if !hasBillingAccount(ctxkeys.Subscription(r.Context())) {
-		noBillingAccount(w)
-		return
-	}
-
-	managementURL, err := h.paymentService.BillingManagementURL(workspace.ID, workspace.Slug)
+	ctx := r.Context()
+	managementURL, err := h.workspaceService.BillingManagement(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.Subscription(ctx), source(r), h.paymentService.BillingManagementURL)
 	if err != nil {
-		slog.Error("failed to get billing management URL", "error", err, "workspace_id", workspace.ID, "provider", h.paymentService.Name())
-		Error(w, http.StatusInternalServerError, "internal", "Billing management could not be opened. Please try again.")
+		ServiceError(w, err)
 		return
 	}
-	h.recordBillingAction(r, workspace.ID, user.ID, "billing.management_opened")
 	JSON(w, http.StatusOK, URLResponse{URL: managementURL})
-}
-
-func (h *BillingHandler) recordBillingAction(r *http.Request, workspaceID, userID, action string) {
-	err := h.workspaceService.RecordBillingAction(workspaceID, userID, action, source(r))
-	if err != nil {
-		slog.Warn("failed to record billing audit event", "error", err, "workspace_id", workspaceID)
-	}
-}
-
-// canManageBilling answers 403 forbidden for members whose role may not
-// manage billing.
-func canManageBilling(w http.ResponseWriter, r *http.Request) bool {
-	if ctxkeys.WorkspaceMember(r.Context()).Can(model.WorkspacePermissionManageBilling) {
-		return true
-	}
-	ServiceError(w, ErrBillingPermission)
-	return false
 }
