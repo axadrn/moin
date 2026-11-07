@@ -4,7 +4,7 @@ package layouts
 // AppShortcuts is the dialog ? opens: every key of the panel, the same as
 // in the terminal UI.
 templ AppShortcuts() {
-	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop:bg-black/30">
+	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-black/30">
 		<h2 id="app-shortcuts-title" class="text-base font-medium">Keys</h2>
 		<dl class="mt-5 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 text-sm">
 			@shortcut([]string{"⌘", "K"}, "The palette: find and do anything")

@@ -509,7 +509,7 @@ templ CatalogInstall(view CatalogInstallView) {
 						}
 						if more := len(view.App.Versions) - 8; more > 0 {
 							@kit.Row("") {
-								<span class="text-sm text-muted-foreground">and { strconv.Itoa(more) } older, every one installable</span>
+								<span class="text-sm text-muted-foreground">{ strconv.Itoa(more) } older</span>
 							}
 						}
 					}

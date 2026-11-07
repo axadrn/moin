@@ -162,7 +162,8 @@
   --foreground: #ffffff;
   --card: #1c1c1e;
   --card-foreground: #ffffff;
-  --popover: #1c1c1e;
+  /* Overlays float one step above what they cover (DESIGN.md, Geometry). */
+  --popover: #2c2c2e;
   --popover-foreground: #ffffff;
   --primary: oklch(0.96 0 0);
   --primary-foreground: oklch(0.13 0 0);

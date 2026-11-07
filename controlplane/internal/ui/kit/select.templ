@@ -26,6 +26,15 @@ templ Select(p SelectProps) {
 				select.querySelector("[data-select-label]").textContent = event.target.closest("label").textContent.trim();
 				select.querySelector("[popover]").hidePopover();
 			});
+			// Like the palette, one option is lit at a time: the one the
+			// mouse points at or the arrows are on. Open, the picked one is.
+			document.addEventListener("mouseover", (event) => {
+				const option = event.target.closest("[data-select] [role=listbox] label");
+				option?.querySelector("input")?.focus({ preventScroll: true });
+			});
+			document.addEventListener("toggle", (event) => {
+				if (event.newState === "open" && event.target.closest?.("[data-select]")) event.target.querySelector("input:checked")?.focus({ preventScroll: true });
+			}, true);
 		</script>
 	}
 	<div class="relative w-full min-w-0" data-select>
@@ -47,11 +56,11 @@ templ Select(p SelectProps) {
 			id={ p.ID + "-list" }
 			role="listbox"
 			aria-label={ p.Label }
-			class="m-0 max-h-72 flex-col gap-0.5 overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 open:flex"
+			class="m-0 max-h-72 flex-col gap-0.5 overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl open:flex"
 			style={ templ.SafeCSS("inset: auto; position-anchor: --" + p.ID + "; top: anchor(bottom); left: anchor(left); width: anchor-size(width); min-width: 12rem; margin-top: 8px") }
 		>
 			for _, o := range p.Options {
-				<label class="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-sm has-checked:font-medium has-focus:bg-muted">
+				<label class={ OptionClass, "cursor-pointer has-checked:font-medium has-focus:bg-foreground/8" }>
 					<input type="radio" name={ p.Name } value={ o.Value } checked?={ o.Value == selectValue(p) } autocomplete="off" class="peer sr-only"/>
 					<span class="min-w-0 flex-1 truncate">{ o.Label }</span>
 					<svg aria-hidden="true" viewBox="0 0 16 16" class="hidden size-4 shrink-0 peer-checked:block"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -86,3 +95,7 @@ func selectLabel(p SelectProps) string {
 	}
 	return ""
 }
+
+// OptionClass is one option of a list you pick from: a Select's list and
+// the palette. Each lights the one it is on, and only that one.
+const OptionClass = "flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm outline-none"
