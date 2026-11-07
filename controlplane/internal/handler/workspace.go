@@ -11,7 +11,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
@@ -224,7 +223,6 @@ func (h *WorkspaceHandler) renderWorkspaceAction(w http.ResponseWriter, r *http.
 	r = r.WithContext(ctx)
 
 	render(w, r, pages.WorkspaceContent(members, invitations))
-	render(w, r, layouts.WorkspaceUpdate(workspace, workspaces))
 	answerDone(w, r, title, description)
 }
 

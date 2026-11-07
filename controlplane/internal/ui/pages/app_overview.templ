@@ -32,10 +32,9 @@ templ Overview(view OverviewView) {
 	{{ now := time.Now() }}
 	@layouts.App("Overview") {
 		@panelPage() {
-			<header class="flex flex-col gap-1 pt-2">
-				<h1 class="text-3xl font-semibold tracking-tight text-balance" data-overview-headline>{ overviewHeadline(view) }</h1>
-				<p class="text-muted-foreground">{ overviewSummary(view.Status) }</p>
-			</header>
+			@kit.Header(kit.Back{}, overviewHeadline(view)) {
+				<p class="w-full text-muted-foreground">{ overviewSummary(view.Status) }</p>
+			}
 			if len(view.Servers) == 0 {
 				@overviewStart(basePath)
 			} else {

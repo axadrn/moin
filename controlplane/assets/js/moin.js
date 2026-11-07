@@ -4,23 +4,20 @@
 
 const typing = (target) => target instanceof Element && target.closest("input, textarea, select, [contenteditable]");
 
-// Menus are native popovers. Choosing an item closes its menu, unless the
-// item stays open on purpose (the theme switch).
-document.addEventListener("click", (event) => {
-  const item = event.target.closest("[popover] [role=menuitem]");
-  if (item && !item.hasAttribute("data-menu-keep")) item.closest("[popover]").hidePopover();
-});
-
-// The search in the bar. / or ⌘K jumps in, the arrows pick an answer, Enter
-// opens it, Escape or a click elsewhere closes the list.
+// The palette: the search in the middle of the screen. ⌘K, ctrl+k, / or the
+// search button open it; the arrows pick an answer, Enter opens it, Escape
+// or a click outside closes it (DESIGN.md, Navigation).
+const palette = () => document.getElementById("palette");
 const searchField = () => document.getElementById("search");
-const searchList = () => document.getElementById("search-results");
 const answers = () => [...document.querySelectorAll("#search-results [role=option]")];
 
-function closeSearch() {
-  const list = searchList();
-  if (list) list.innerHTML = "";
-  searchField()?.setAttribute("aria-expanded", "false");
+function openPalette() {
+  const dialog = palette();
+  if (!dialog || dialog.open) return;
+  // On an app's page, what you can do with that app comes first.
+  document.getElementById("search-here").value = document.querySelector("[data-app-page]")?.dataset.appPage || "";
+  dialog.showModal();
+  searchField().focus();
 }
 
 function pick(option) {
@@ -29,16 +26,27 @@ function pick(option) {
   searchField()?.setAttribute("aria-activedescendant", option?.id || "");
 }
 
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-open-palette]")) openPalette();
+  // A click on the dim around the palette, or on an answer, closes it.
+  if (event.target === palette() || event.target.closest("#search-results [role=option]")) palette().close();
+});
+
+document.addEventListener("close", (event) => {
+  if (event.target !== palette()) return;
+  searchField().value = "";
+  document.getElementById("search-results").innerHTML = "";
+  searchField().setAttribute("aria-expanded", "false");
+}, true);
+
 document.addEventListener("keydown", (event) => {
-  const field = searchField();
-  if (!field) return;
   if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
+    if (!palette()) return;
     event.preventDefault();
-    field.focus();
-    field.select();
+    openPalette();
     return;
   }
-  if (event.target !== field) return;
+  if (event.target !== searchField()) return;
   const list = answers();
   const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -48,9 +56,6 @@ document.addEventListener("keydown", (event) => {
   } else if (event.key === "Enter") {
     event.preventDefault();
     (list[at] || list[0])?.click();
-  } else if (event.key === "Escape") {
-    closeSearch();
-    field.blur();
   }
 });
 
@@ -58,22 +63,10 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("mouseover", (event) => {
   const option = event.target.closest("#search-results [role=option]");
   if (option && option.getAttribute("aria-selected") !== "true") pick(option);
-  const item = event.target.closest("[popover] [role=menuitem]");
-  if (item && document.activeElement !== item) item.focus({ preventScroll: true });
 });
 
 document.addEventListener("htmx:after:swap", (event) => {
   if (event.target.id === "search-results") searchField()?.setAttribute("aria-expanded", String(answers().length > 0));
-});
-
-document.addEventListener("click", (event) => {
-  if (event.target.closest("#search-results [role=option]")) {
-    closeSearch();
-    searchField().value = "";
-    searchField().blur();
-  } else if (!event.target.closest("[data-search]")) {
-    closeSearch();
-  }
 });
 
 // ? shows every key, as in the terminal UI.
@@ -81,19 +74,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "?" && !typing(event.target) && !event.metaKey && !event.ctrlKey) {
     document.getElementById("app-shortcuts")?.showModal();
   }
-});
-
-// space shows what you can do here, like the TUI: the search, already
-// narrowed to the app the page is about.
-document.addEventListener("keydown", (event) => {
-  if (event.key !== " " || typing(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
-  const field = searchField();
-  const page = document.querySelector("[data-app-page]");
-  if (!field || event.target.closest("button, a, [role=menuitem], [role=option]")) return;
-  event.preventDefault();
-  field.value = page ? page.dataset.appPage + " " : "";
-  field.focus();
-  field.dispatchEvent(new Event("input", { bubbles: true }));
 });
 
 // A page back from the back-forward cache has its live streams closed
@@ -189,3 +169,20 @@ document.addEventListener("moin:invalid", (event) => {
     if (hint) delete hint.dataset.invalid;
   }, { once: true });
 });
+
+// Appearance in Settings: System, Light or Dark, kept in this browser.
+const markTheme = () => {
+  const theme = window.themeUtils?.getThemePreference() || "system";
+  document.querySelectorAll("[data-theme-set]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.themeSet === theme)));
+};
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-theme-set]");
+  if (!button) return;
+  try {
+    if (button.dataset.themeSet === "system") localStorage.removeItem("theme");
+    else localStorage.setItem("theme", button.dataset.themeSet);
+  } catch {}
+  window.themeUtils?.applyTheme();
+  markTheme();
+});
+markTheme();

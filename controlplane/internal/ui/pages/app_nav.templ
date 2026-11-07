@@ -40,19 +40,16 @@ var appSections = []struct{ ID, Label, Path, Key string }{
 // start, deploy.
 templ appHeader(app model.App, section string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	<div class="flex flex-col gap-5 pt-2">
-		<div class="flex flex-wrap items-center gap-x-2 gap-y-3">
-			<h1 class="mr-2 text-3xl font-semibold tracking-tight">{ app.Name }</h1>
-			@appSummary(app)
-			<div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-				@PinButton(app)
-				@appPower(app)
-				@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true, "title": "Build the newest source again"}) {
-					Deploy
-				}
-			</div>
+	@kit.Header(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, app.Name) {
+		@appSummary(app)
+		<div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+			@PinButton(app)
+			@appPower(app)
+			@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true, "title": "Build the newest source again"}) {
+				Deploy
+			}
 		</div>
-	</div>
+	}
 }
 
 // appTabs are the sections of an app as a segmented control, each a link

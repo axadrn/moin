@@ -502,3 +502,20 @@
     color: var(--failed);
   }
 }
+
+/* The bar shows a line under it only once the page scrolls under it. */
+@layer components {
+  .moin-bar {
+    animation: moin-bar-line linear both;
+    animation-timeline: scroll();
+    animation-range: 0 1.5rem;
+  }
+}
+@keyframes moin-bar-line {
+  from {
+    box-shadow: 0 1px 0 transparent;
+  }
+  to {
+    box-shadow: 0 1px 0 var(--border);
+  }
+}

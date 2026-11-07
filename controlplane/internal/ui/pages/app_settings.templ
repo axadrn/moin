@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -21,10 +22,10 @@ import (
 // tokenSections are the cards of the tokens tab.
 templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, tokenSections ...templ.Component) {
 	{{ user := ctxkeys.User(ctx) }}
-	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings" }}
-	@layouts.App("Settings") {
+	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
+	@layouts.App("Account · Settings") {
 		@panelPage() {
-			@pageHeader("Settings", "Your profile, how you sign in, and the tokens your scripts and servers use.")
+			@kit.Header(kit.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, "Account")
 			if passwordRemoved {
 				<p class="text-sm text-muted-foreground">Password removed. Set a new one if you like.</p>
 			}

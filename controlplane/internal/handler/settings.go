@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
@@ -22,6 +23,46 @@ func NewSettingsHandler(authService *service.AuthService, apiTokens *service.API
 	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps}
 }
 
+// Home is Settings: you, your workspaces, this workspace, moin, sign out.
+func (h *SettingsHandler) Home(w http.ResponseWriter, r *http.Request) {
+	var view pages.SettingsHomeView
+	installations, enabled, err := h.gitHub(r)
+	if err != nil {
+		renderError(w, "load github installations failed", err)
+		return
+	}
+	view.GitHub = enabled
+	for _, installation := range installations {
+		view.GitHubAccounts = append(view.GitHubAccounts, installation.Account)
+	}
+	render(w, r, pages.SettingsHome(view))
+}
+
+// GitHub is the GitHub connection of the workspace, for every app.
+func (h *SettingsHandler) GitHub(w http.ResponseWriter, r *http.Request) {
+	installations, enabled, err := h.gitHub(r)
+	if err != nil {
+		renderError(w, "load github installations failed", err)
+		return
+	}
+	if !enabled {
+		http.NotFound(w, r)
+		return
+	}
+	render(w, r, pages.SettingsGitHub(installations))
+}
+
+// gitHub is the accounts the workspace connected, and whether this control
+// plane has the GitHub App at all.
+func (h *SettingsHandler) gitHub(r *http.Request) ([]model.GitHubInstallation, bool, error) {
+	if _, err := h.apps.GitHubInstallURL(actor(r)); err != nil {
+		return nil, false, nil
+	}
+	installations, err := h.apps.GitHubInstallations(ctxkeys.Workspace(r.Context()).ID)
+	return installations, true, err
+}
+
+// SettingsPage is your account: profile, how you sign in, and tokens.
 func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	sessions, err := h.authService.Sessions(user.ID)
@@ -89,7 +130,7 @@ func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) 
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
 	}
-	location := fmt.Sprintf("/app/%s/settings?tab=security", ctxkeys.Workspace(r.Context()).Slug)
+	location := fmt.Sprintf("/app/%s/settings/account?tab=security", ctxkeys.Workspace(r.Context()).Slug)
 	if !isAction(r) {
 		redirect(w, r, location, http.StatusSeeOther)
 		return
