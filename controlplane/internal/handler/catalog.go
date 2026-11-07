@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/a-h/templ"
+
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -30,16 +32,17 @@ func NewCatalogHandler(catalog *service.CatalogService, servers *service.ServerS
 	return &CatalogHandler{catalog: catalog, servers: servers, workspaces: workspaces, appURL: appURL}
 }
 
-// view is the catalog, filtered by the category in the query.
+// view is the catalog: the apps of the category in the query that the
+// search finds, in the order it asks.
 func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 	store := h.catalog.Store()
-	view := pages.CatalogView{Base: base, Counts: map[string]int{}}
+	view := pages.CatalogView{Base: base}
+	counts := map[string]int{}
 	for _, entry := range store.Entries() {
-		view.Counts[entry.Category]++
-		view.Total++
+		counts[entry.Category]++
 	}
 	for _, category := range catalog.Categories {
-		if view.Counts[category] > 0 {
+		if counts[category] > 0 {
 			view.Categories = append(view.Categories, category)
 		}
 	}
@@ -53,10 +56,20 @@ func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 	for _, entry := range store.Entries() {
 		all = append(all, pages.CatalogEntryView{Entry: entry, Versions: store.Versions(entry.Slug)})
 	}
-	// Every app of the category stays in the page: the search hides
-	// the others, so clearing it brings them back without a reload.
-	view.Apps = pages.FilterCatalog(all, view.Category, "", view.Sort)
+	view.Apps = pages.FilterCatalog(all, view.Category, view.Query, view.Sort)
 	return view
+}
+
+// renderCatalog is the catalog page, or for a keystroke of its search
+// (htmx) only the list, with the address bar set to the search.
+func renderCatalog(w http.ResponseWriter, r *http.Request, view pages.CatalogView, page templ.Component) {
+	w.Header().Add("Vary", "HX-Request")
+	if isAction(r) {
+		w.Header().Set("HX-Replace-Url", view.URL())
+		render(w, r, pages.CatalogResults(view))
+		return
+	}
+	render(w, r, page)
 }
 
 // entry is the catalog app the path names, with its releases.
@@ -71,7 +84,8 @@ func (h *CatalogHandler) entry(r *http.Request) (pages.CatalogEntryView, bool) {
 
 // List is the public catalog.
 func (h *CatalogHandler) List(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Catalog(h.view(r, "/apps")))
+	view := h.view(r, "/catalog")
+	renderCatalog(w, r, view, pages.Catalog(view))
 }
 
 // Show is the public page of a catalog app.
@@ -107,7 +121,7 @@ func (h *CatalogHandler) Logo(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(view.Entry.Logo)
 }
 
-// Start sends the "Install on your server" button of the site to the
+// Start sends the "Deploy with moin" button of the site to the
 // install form in the user's first workspace.
 func (h *CatalogHandler) Start(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
@@ -121,7 +135,8 @@ func (h *CatalogHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 // InApp is the catalog inside a workspace.
 func (h *CatalogHandler) InApp(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.CatalogInApp(h.view(r, ctxkeys.AppBasePath(r.Context())+"/catalog")))
+	view := h.view(r, ctxkeys.AppBasePath(r.Context())+"/catalog")
+	renderCatalog(w, r, view, pages.CatalogInApp(view))
 }
 
 // InstallPage is the install form of a catalog app.

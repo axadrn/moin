@@ -10,9 +10,9 @@ import (
 )
 
 // DocsHome is /docs, like a support site: the search on top, then every
-// page under its topic, as grouped rows. No sidebar: a topic is a list, a
-// page is a row.
-templ DocsHome(groups []model.DocGroup) {
+// page under its topic, as grouped rows, or what the search finds. No
+// sidebar: a topic is a list, a page is a row.
+templ DocsHome(groups []model.DocGroup, query string, hits []DocHit) {
 	@layouts.Home(layouts.SEOProps{
 		Title:        "Docs",
 		Description:  "Get started, every guide and the reference of moin.",
@@ -21,22 +21,10 @@ templ DocsHome(groups []model.DocGroup) {
 	}) {
 		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
 			@kit.Header(kit.Back{}, "Docs")
-			@docsSearchField()
-			<div class="grid items-start gap-8 md:grid-cols-2">
-				for _, group := range groups {
-					@kit.Section(group.Title, nil) {
-						@kit.List() {
-							for _, page := range group.Pages {
-								@kit.Row(docsPageURL(page)) {
-									@kit.RowText(page.Title, "")
-								}
-							}
-						}
-					}
-				}
-			</div>
+			@docsSearchField(query)
+			@DocsResults(groups, query, hits)
 		</main>
-		@docsSearch(groups)
+		@docsSearchScript()
 	}
 }
 
@@ -51,9 +39,9 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 	}) {
 		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
 			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title) {
-				<button type="button" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:ml-auto">
+				<a href="/docs" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:ml-auto">
 					@icon.Search(icon.Props{Class: "size-5"})
-				</button>
+				</a>
 			}
 			<article class="max-w-2xl min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
 				@blocks.Typeset(page.HTMLContent)

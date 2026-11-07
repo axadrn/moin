@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
+	"unicode"
+
+	"github.com/axadrn/moin/internal/find"
 
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -27,7 +29,8 @@ func (v CatalogEntryView) Latest() (catalog.Version, bool) {
 	return v.Versions[0], true
 }
 
-// CatalogView is the catalog page: every app, or those of one category.
+// CatalogView is the catalog page: the apps of the category the search
+// finds.
 type CatalogView struct {
 	Apps       []CatalogEntryView
 	Categories []string
@@ -36,17 +39,18 @@ type CatalogView struct {
 	// Base is where the pages of the apps live: /apps on the site,
 	// <workspace>/catalog in the app.
 	Base string
-	// Query is the search, on name and pitch; Sort is SortUpdated or
+	// Query is the search (FilterCatalog); Sort is SortUpdated or
 	// SortName. Both, and the category, live in the URL.
 	Query string
 	Sort  string
-	// Counts are the apps of each category, Total of all of them.
-	Counts map[string]int
-	Total  int
 }
 
-// categoryItems are the categories for the select on small screens, with
-// their counts, All first.
+// URL is the catalog as it is now, for the address bar.
+func (v CatalogView) URL() string {
+	return catalogURL(v.Base, v.Category, v.Query, v.Sort)
+}
+
+// categoryOptions are the categories for the select, All first.
 func categoryOptions(view CatalogView) []kit.Option {
 	options := []kit.Option{{Value: "", Label: "All categories"}}
 	for _, category := range view.Categories {
@@ -61,30 +65,69 @@ const (
 	SortName    = "name"
 )
 
-// FilterCatalog keeps the apps of category whose name or pitch has query,
-// in the order sort asks: the newest release first, apps without a date
-// last, or by name.
+// FilterCatalog keeps the apps of category that the search finds, with
+// find.Name like the palette, so a typo like "nfty" still finds ntfy: on
+// their name first, then on their name, category and pitch together. A
+// search puts the best answers first; else sort orders them: the newest
+// release first, apps without a date last, or by name.
 func FilterCatalog(apps []CatalogEntryView, category, query, sort string) []CatalogEntryView {
-	needle := strings.ToLower(strings.TrimSpace(query))
-	var kept []CatalogEntryView
+	type hit struct {
+		app   CatalogEntryView
+		score int
+	}
+	var hits []hit
 	for _, app := range apps {
 		if category != "" && app.Entry.Category != category {
 			continue
 		}
-		if needle != "" && !strings.Contains(strings.ToLower(app.Entry.Name+" "+app.Entry.Pitch), needle) {
+		score, ok := catalogScore(app.Entry, query)
+		if !ok {
 			continue
 		}
-		kept = append(kept, app)
+		hits = append(hits, hit{app, score})
 	}
-	slices.SortStableFunc(kept, func(a, b CatalogEntryView) int {
+	slices.SortStableFunc(hits, func(a, b hit) int {
+		if a.score != b.score {
+			return b.score - a.score
+		}
 		if sort != SortName {
-			if order := releaseTime(b).Compare(releaseTime(a)); order != 0 {
+			if order := releaseTime(b.app).Compare(releaseTime(a.app)); order != 0 {
 				return order
 			}
 		}
-		return strings.Compare(strings.ToLower(a.Entry.Name), strings.ToLower(b.Entry.Name))
+		return strings.Compare(strings.ToLower(a.app.Entry.Name), strings.ToLower(b.app.Entry.Name))
 	})
+	kept := make([]CatalogEntryView, 0, len(hits))
+	for _, h := range hits {
+		kept = append(kept, h.app)
+	}
 	return kept
+}
+
+// catalogScore is how well query finds an app: a match on its name beats
+// one that needs its category or pitch. An empty query finds every app.
+func catalogScore(entry catalog.Entry, query string) (int, bool) {
+	if strings.TrimSpace(query) == "" {
+		return 0, true
+	}
+	if m, ok := find.Name(query, entry.Name); ok {
+		return 1000 + m.Score, true
+	}
+	text := entry.Name + " " + entry.Category + " " + entry.Pitch
+	if len(strings.Fields(query)) > 1 {
+		m, ok := find.Name(query, text)
+		return m.Score, ok
+	}
+	// One word is matched against each word on its own: against the whole
+	// text find.Name would also take letters strewn over many words
+	// ("nfty" in "Nextcloud … files … your").
+	best, found := 0, false
+	for _, word := range strings.FieldsFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if m, ok := find.Name(query, word); ok && (!found || m.Score > best) {
+			best, found = m.Score, true
+		}
+	}
+	return best, found
 }
 
 // releaseTime is when the app's newest release came out; zero sorts last.
@@ -110,15 +153,6 @@ func catalogURL(base, category, query, sort string) string {
 		return base
 	}
 	return base + "?" + values.Encode()
-}
-
-// releaseUnix is the newest release as a number for the sort in the page.
-func releaseUnix(app CatalogEntryView) string {
-	at := releaseTime(app)
-	if at.IsZero() {
-		return "0"
-	}
-	return strconv.FormatInt(at.Unix(), 10)
 }
 
 // CatalogInstallView is the install form of a catalog app in a workspace.
@@ -152,14 +186,6 @@ func CategoryFromSlug(slug string, categories []string) string {
 	return ""
 }
 
-// monogram is the first letter of an app's name, for its tile.
-func monogram(name string) string {
-	for _, r := range name {
-		return strings.ToUpper(string(r))
-	}
-	return "?"
-}
-
 // released says when a version came out: "released 2d ago", or nothing
 // when the registry does not say.
 func released(version catalog.Version, now time.Time) string {
@@ -167,44 +193,6 @@ func released(version catalog.Version, now time.Time) string {
 		return ""
 	}
 	return "released " + ago(version.Date, now)
-}
-
-// releasedShort is when a release came out, always relative: "8 days
-// ago", "2 years ago".
-func releasedShort(version catalog.Version, now time.Time) string {
-	if version.Date.IsZero() {
-		return ""
-	}
-	days := int(now.Sub(version.Date).Hours() / 24)
-	switch {
-	case days < 1:
-		return "today"
-	case days == 1:
-		return "yesterday"
-	case days < 31:
-		return strconv.Itoa(days) + " days ago"
-	case days < 365:
-		if months := days / 30; months > 1 {
-			return strconv.Itoa(months) + " months ago"
-		}
-		return "a month ago"
-	default:
-		if years := days / 365; years > 1 {
-			return strconv.Itoa(years) + " years ago"
-		}
-		return "a year ago"
-	}
-}
-
-// databaseSentence says in words what moin does for the app's database.
-func databaseSentence(entry catalog.Entry) string {
-	if entry.BackedUp() {
-		return "Every change backed up, every restore tested"
-	}
-	if entry.Database == "mysql" {
-		return "Runs on MySQL: moin backups for MySQL come next"
-	}
-	return "Runs on " + entry.DatabaseName() + ": moin doesn't back it up yet"
 }
 
 // catalogJSONLD describes the app for search engines, as JSON-LD.
@@ -228,7 +216,7 @@ func catalogJSONLD(view CatalogEntryView, url string) string {
 	return `<script type="application/ld+json">` + string(body) + `</script>`
 }
 
-// versionItems are the releases for the version select, newest first.
+// versionOptions are the releases for the version select, newest first.
 func versionOptions(versions []catalog.Version) []kit.Option {
 	options := make([]kit.Option, 0, len(versions))
 	for _, version := range versions {
@@ -242,13 +230,40 @@ func shownVersions(versions []catalog.Version, limit int) []catalog.Version {
 	return versions[:min(len(versions), limit)]
 }
 
-// catalogSearchText is what the search looks in: name and pitch, lowercase.
-func catalogSearchText(app CatalogEntryView) string {
-	return strings.ToLower(app.Entry.Name + " " + app.Entry.Pitch)
+// catalogLogo is where a catalog app's icon is: its logo, or its first
+// letter when it has none (CatalogHandler.Logo).
+func catalogLogo(entry catalog.Entry) string {
+	return "/catalog/" + entry.Slug + "/logo"
 }
 
-// catalogMatches reports whether the search finds the app.
-func catalogMatches(app CatalogEntryView, query string) bool {
-	needle := strings.ToLower(strings.TrimSpace(query))
-	return needle == "" || strings.Contains(catalogSearchText(app), needle)
+// websiteHost is the host of an app's website, for its row: grafana.com.
+func websiteHost(website string) string {
+	u, err := url.Parse(website)
+	if err != nil || u.Host == "" {
+		return website
+	}
+	return strings.TrimPrefix(u.Host, "www.")
+}
+
+// imageURL is the registry page of an image: Docker Hub for a plain name
+// (wordpress, grafana/grafana), quay.io's repository page, and the image
+// itself on another registry: ghcr.io sends a browser on to its package
+// page.
+func imageURL(image string) string {
+	host, path, found := strings.Cut(image, "/")
+	if found && (strings.ContainsAny(host, ".:") || host == "localhost") {
+		switch host {
+		case "docker.io", "index.docker.io", "registry-1.docker.io":
+			image = path
+		case "quay.io":
+			return "https://quay.io/repository/" + path
+		default:
+			return "https://" + image
+		}
+	}
+	image = strings.TrimPrefix(image, "library/")
+	if !strings.Contains(image, "/") {
+		return "https://hub.docker.com/_/" + image
+	}
+	return "https://hub.docker.com/r/" + image
 }

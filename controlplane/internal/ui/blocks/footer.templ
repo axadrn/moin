@@ -29,7 +29,7 @@ templ Footer() {
 					<a href={ templ.SafeURL("mailto:" + brand.SupportEmail) } class="mt-4 inline-block text-sm text-foreground underline-offset-4 hover:underline">{ brand.SupportEmail }</a>
 				</div>
 				@footerColumn("Product") {
-					@footerLink("/apps", "Apps")
+					@footerLink("/catalog", "Catalog")
 					if ctxkeys.RenderConfig(ctx).Billing {
 						@footerLink("/#pricing", "Pricing")
 					}
