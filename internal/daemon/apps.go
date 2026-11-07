@@ -376,7 +376,7 @@ func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, com
 	if previous > 0 {
 		// A copy of each database just before the new release touches the
 		// data: the hub names it "Before v12".
-		if before := a.backups.copyBefore(ctx, start.App, ""); before != nil {
+		if before := a.backups.copyBefore(ctx, start.App, "", logf); before != nil {
 			logf("copied the data before v%d", start.Number)
 			a.mu.Lock()
 			a.befores[start.DeployID] = *before

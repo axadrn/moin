@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -264,8 +265,12 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	}
 	var before *time.Time
 	if request.Write {
+		// A restore works on the data: the edit would be lost, or lose it.
+		if a.backups != nil && a.backups.busy(request.App) {
+			return protocol.DBResult{}, fmt.Errorf("a restore of %s runs: edit its data when it is done", request.App)
+		}
 		// A copy just before the change, so "Before your edit" is exact.
-		before = a.backups.copyBefore(ctx, request.App, database.Path)
+		before = a.backups.copyBefore(ctx, request.App, database.Path, func(format string, args ...any) { slog.Warn("backup: " + fmt.Sprintf(format, args...)) })
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()

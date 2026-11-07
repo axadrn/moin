@@ -141,9 +141,10 @@ type BackupRestore struct {
 
 // DatabaseFolder is the folder of a database in its app's bucket:
 // <path>/<workspace>/<app>/<app ID>/<database>, its path in the container
-// without slashes, like data-app.db or postgres-db.
+// with ~ for /, like data~app.db, postgres-db or postgres-db~analytics.
 func DatabaseFolder(bucket Bucket, app, appID, database string) string {
-	name := strings.ReplaceAll(strings.Trim(database, "/"), "/", "-")
+	// Each / becomes ~, so /data/app.db and /data-app.db never share one.
+	name := strings.NewReplacer("%", "%25", "~", "%7E", "/", "~").Replace(strings.Trim(database, "/"))
 	return strings.Trim(path.Join(bucket.Path, bucket.Workspace, app, appID, name), "/")
 }
 

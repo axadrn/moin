@@ -261,10 +261,17 @@ func TestBackupSQLite(t *testing.T) {
 	if got := rows(); got != "a,b,c,d,e" {
 		t.Fatalf("after the restore to a minute: %q", got)
 	}
+	// Every change starts a new generation from the restored file; the
+	// one before stays in the bucket until it is older than the app keeps.
+	test.b.tick(test.ctx)
+	_, folder, _ = test.b.where(app, test.database)
+	if generations := folders(test.ctx, s3Client(test.bucket), "moin-test", folder+"/litestream/"); len(generations) != 2 {
+		t.Fatalf("generations %v", generations)
+	}
 
 	// A crash at each step of the switch: the app runs on a whole
 	// database, and the result says which.
-	for _, step := range []string{"built", "aside", "switched"} {
+	for _, step := range []string{"switching", "aside", "switched"} {
 		want := rows()
 		if step == "switched" {
 			want = "a,b,c"
@@ -277,10 +284,33 @@ func TestBackupSQLite(t *testing.T) {
 		if step == "switched" && state.State != protocol.RestoreDone || step != "switched" && (state.State != protocol.RestoreFailed || !strings.Contains(state.Error, "as it was before")) {
 			t.Fatalf("crash at %s: %+v", step, state)
 		}
-		if exists(live + ".restore") {
+		if exists(live + ".moin-restore") {
 			t.Fatalf("crash at %s left the restore", step)
 		}
 	}
+	// A crash between the renames, and the app made an empty file in the
+	// live place on its start: the data comes back, the empty file is an
+	// undo of its own.
+	undos, _ = test.b.engine(app, test.database).Undos(test.ctx)
+	want := rows()
+	test.b.crash = func(at string) bool {
+		if at == "aside" {
+			os.WriteFile(live, nil, 0o644)
+		}
+		return at == "aside"
+	}
+	if state := test.restore(protocol.BackupRestore{Copy: second.ID}); state.State != protocol.RestoreFailed || rows() != want {
+		t.Fatalf("a stray file: %+v, %q", state, rows())
+	}
+	if after, _ := test.b.engine(app, test.database).Undos(test.ctx); len(after) != len(undos)+1 {
+		t.Fatalf("the stray file is no undo: %d, %d", len(after), len(undos))
+	}
+	// No edit while a restore works on the app.
+	test.b.restoring[app] = true
+	if _, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app}, SQL: `DELETE FROM notes`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
+		t.Fatalf("an edit during a restore: %v", err)
+	}
+	delete(test.b.restoring, app)
 	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone || rows() != "a,b,c,d" {
 		t.Fatalf("back to the third copy: %+v", state)
 	}
@@ -316,6 +346,17 @@ func TestBackupSQLite(t *testing.T) {
 	result, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app, Database: "/data/app.db"}, SQL: `INSERT INTO notes (body) VALUES ('g')`, Write: true})
 	if err != nil || result.Before == nil || !slices.ContainsFunc(test.copies(), func(copy protocol.Copy) bool { return copy.ID == result.Before.Format(protocol.CopyIDLayout) }) {
 		t.Fatalf("the copy before an edit: %+v %v", result.Before, err)
+	}
+	// A copy from the future, after the clock jumped, does not stop the
+	// copies.
+	before := len(test.copies())
+	test.b.mu.Lock()
+	test.b.state(app, test.database).copied = time.Now().Add(time.Hour)
+	test.b.mu.Unlock()
+	time.Sleep(1100 * time.Millisecond)
+	test.b.tick(test.ctx)
+	if len(test.copies()) != before+1 {
+		t.Fatalf("no copy after a copy from the future: %d", len(test.copies()))
 	}
 	// Turning Every change off removes what it wrote down.
 	test.b.configure(test.bucket, nil, map[string]protocol.Schedule{app: {Every: 15, Keep: 1}})
@@ -374,6 +415,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	}
 	rows := func() string { return sql(`SELECT coalesce(string_agg(body, ',' ORDER BY id), '') FROM notes;`) }
 	sql(`CREATE TABLE notes (id serial PRIMARY KEY, body text); INSERT INTO notes (body) VALUES ('a'), ('b');`)
+	sql(`CREATE ROLE keeper; ALTER DATABASE shop OWNER TO keeper;`)
 	test.b.tick(test.ctx)
 	first := test.copies()[0]
 	sql(`INSERT INTO notes (body) VALUES ('c');`)
@@ -384,6 +426,10 @@ func testBackupPostgres(t *testing.T, image string) {
 	}
 	if got := rows(); got != "a,b" || !test.running() {
 		t.Fatalf("after the restore: %q, running %v", got, test.running())
+	}
+	// The restored database keeps the owner of the live one.
+	if owner := sql(`SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'shop';`); owner != "keeper" {
+		t.Fatalf("the owner after the restore: %q", owner)
 	}
 	// The sequence came back too: a new row gets the next ID.
 	sql(`INSERT INTO notes (body) VALUES ('x'); DELETE FROM notes WHERE body = 'x';`)
@@ -401,7 +447,7 @@ func testBackupPostgres(t *testing.T, image string) {
 		t.Fatalf("Postgres went back to a minute: %+v", state)
 	}
 
-	for _, step := range []string{"built", "aside", "switched"} {
+	for _, step := range []string{"switching", "aside", "switched"} {
 		want := "a,b,c"
 		if step == "switched" {
 			want = "a,b"
@@ -414,8 +460,8 @@ func testBackupPostgres(t *testing.T, image string) {
 		if step == "switched" && state.State != protocol.RestoreDone || step != "switched" && (state.State != protocol.RestoreFailed || !strings.Contains(state.Error, "as it was before")) {
 			t.Fatalf("crash at %s: %+v", step, state)
 		}
-		if sql(`SELECT count(*) FROM pg_database WHERE datname = 'shop_restore';`) != "0" {
-			t.Fatalf("crash at %s left shop_restore", step)
+		if sql(`SELECT count(*) FROM pg_database WHERE datname LIKE 'moin\_restore\_%';`) != "0" {
+			t.Fatalf("crash at %s left the restore", step)
 		}
 		if step == "switched" {
 			test.restore(protocol.BackupRestore{Copy: second.ID})
