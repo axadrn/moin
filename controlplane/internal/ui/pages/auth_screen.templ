@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -29,7 +28,7 @@ templ authFrame(title string) {
 	<div class="flex min-h-svh flex-col bg-background">
 		<header class={ kit.Page, "flex h-16 shrink-0 items-center" }>
 			<a href="/" class="flex items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home" }>
-				@blocks.Wordmark("text-xl leading-none")
+				@kit.Wordmark("text-xl leading-none")
 			</a>
 		</header>
 		<main class="flex flex-1 justify-center px-4 pt-10 pb-16 sm:pt-24">

@@ -14,7 +14,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
@@ -412,7 +411,7 @@ func columnNote(column protocol.DBColumn) string {
 // closes with Cancel.
 templ newRowForm(dataPath, database string, table protocol.DBTable) {
 	<form id="new-row" hidden class="flex flex-col gap-4" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
-		@csrf.Token()
+		@kit.CSRF()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
 		<div class="grid items-start gap-4 sm:grid-cols-2">
@@ -453,7 +452,7 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 		hx-trigger="submit, change"
 		data-cell={ state }
 	>
-		@csrf.Token()
+		@kit.CSRF()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table }/>
 		if ref.Key != "" {
@@ -488,7 +487,7 @@ templ dataConsole(view DataView) {
 	@kit.Section("SQL", nil) {
 		@kit.Card("", nil) {
 			<form class="flex flex-col gap-4" hx-post={ dataPath(ctx, view.App.Name) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
-				@csrf.Token()
+				@kit.CSRF()
 				<input type="hidden" name="db" value={ view.Database }/>
 				<label for="sql" class="sr-only">SQL</label>
 				@kit.TextArea(templ.Attributes{"id": "sql", "name": "sql", "rows": "4", "placeholder": sqlPlaceholder(view), "spellcheck": "false", "autocomplete": "off", "data-sql": true})

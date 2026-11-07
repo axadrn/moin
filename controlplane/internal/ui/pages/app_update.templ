@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/internal/build"
 )
@@ -77,7 +76,7 @@ templ UpdateNotice(info model.VersionInfo) {
 						<div class="flex flex-wrap items-center gap-2">
 							if info.CanUpdate {
 								<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button">
-									@csrf.Token()
+									@kit.CSRF()
 									@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
 										Update now
 									}

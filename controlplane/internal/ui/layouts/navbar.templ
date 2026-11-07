@@ -1,4 +1,4 @@
-package blocks
+package layouts
 
 import (
 	"fmt"
@@ -12,22 +12,6 @@ import (
 // GitHubURL is the open source repository of moin.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
-// Wordmark is "moin." in Satoshi Black, the full stop Satoshi's own round
-// one, like the dot on the i. Its box is trimmed to the
-// lowercase letters, from the baseline to the x-height (text-box), so a
-// label centered next to it sits on the middle of the letters the eye sees,
-// not on the empty room the font keeps above them.
-templ Wordmark(class ...string) {
-	<span class={ "inline-flex items-baseline font-wordmark text-foreground [text-box:trim-both_ex_alphabetic]", class }>
-		{ brand.Name }<span aria-hidden="true">.</span>
-	</span>
-}
-
-// BetaBadge says moin is in beta, next to the wordmark, centered on it with
-// items-center: Wordmark trims its box to its lowercase letters.
-templ BetaBadge(class string) {
-	<span class={ "rounded-full bg-muted px-2 py-0.5 font-sans text-xs font-medium text-muted-foreground", class }>Beta</span>
-}
 
 templ navLink(href, label string) {
 	<a href={ templ.SafeURL(href) } class="flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">{ label }</a>
@@ -46,13 +30,16 @@ templ Navbar() {
 		<nav class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 rounded-full bg-card/85 pr-1.5 pl-5 shadow-sm ring-1 ring-foreground/5 backdrop-blur-xl sm:h-16 sm:pr-2.5 sm:pl-6" aria-label="Main">
 			<div class="flex min-w-0 items-center gap-4">
 				<a href="/" class="flex items-center gap-2 text-xl leading-none outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home, beta" }>
-					@Wordmark()
-					@BetaBadge("max-sm:hidden")
+					@kit.Wordmark()
+					@kit.BetaBadge("max-sm:hidden")
 				</a>
 				<div class="hidden items-center lg:flex">
 					@navLink("/catalog", "Catalog")
-					@NavbarDocsDesktop()
-					@NavbarPricingDesktop()
+					@navLink("/docs", "Docs")
+					// A self-hosted control plane has no prices to show.
+					if ctxkeys.RenderConfig(ctx).Billing {
+						@navLink("/#pricing", "Pricing")
+					}
 					@navLink("/changelog", "Changelog")
 				</div>
 			</div>
@@ -64,7 +51,7 @@ templ Navbar() {
 					@kit.IconSearch("size-5")
 				</a>
 				<span class="lg:hidden">
-					@NavbarDocsMobile()
+					@navLink("/docs", "Docs")
 				</span>
 				// The star count shows from starsShowAt on: a small one says
 				// "nobody uses this", like the live numbers of the home page.

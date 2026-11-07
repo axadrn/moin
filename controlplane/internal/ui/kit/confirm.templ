@@ -1,6 +1,5 @@
-package blocks
+package kit
 
-import "github.com/axadrn/moin/controlplane/internal/ui/kit"
 
 // ConfirmDialog asks before every request whose element has hx-confirm
 // (DESIGN.md, Asking first). The question is the hx-confirm text: up to the
@@ -10,20 +9,20 @@ import "github.com/axadrn/moin/controlplane/internal/ui/kit"
 // once that name is typed, for what is big and cannot be undone; the name
 // has a copy button.
 templ ConfirmDialog() {
-	@kit.Dialog("confirm-dialog", "", "") {
+	@Dialog("confirm-dialog", "", "") {
 		<div class="flex flex-col gap-3" data-confirm-typed hidden>
 			<div data-confirm-shown>
-				@kit.Command("")
+				@Command("")
 			</div>
-			@kit.Field("Type it to confirm", "confirm-name", "") {
-				@kit.Input(templ.Attributes{"id": "confirm-name", "type": "text", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "data-confirm-input": true})
+			@Field("Type it to confirm", "confirm-name", "") {
+				@Input(templ.Attributes{"id": "confirm-name", "type": "text", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "data-confirm-input": true})
 			}
 		</div>
-		@kit.DialogButtons() {
-			@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+		@DialogButtons() {
+			@Button(Secondary, "", CloseDialog()) {
 				Cancel
 			}
-			@kit.Button(kit.Danger, "", templ.Attributes{"type": "button", "data-confirm-accept": true}) {
+			@Button(Danger, "", templ.Attributes{"type": "button", "data-confirm-accept": true}) {
 				Continue
 			}
 		}
@@ -57,7 +56,7 @@ templ confirmScript() {
 				const name = event.target.closest("[data-confirm-name]")?.dataset.confirmName || "";
 				const typed = part("typed");
 				typed.hidden = name === "";
-				// The name shows with its copy button (kit.Command).
+				// The name shows with its copy button (Command).
 				part("shown").querySelector("code").textContent = name;
 				part("shown").querySelector("[data-copy]").dataset.copy = name;
 				const field = part("input");

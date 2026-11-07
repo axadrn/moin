@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -23,7 +22,7 @@ templ Changelog(html string) {
 				</span>
 			}
 			<article class="max-w-2xl min-w-0 text-base">
-				@blocks.Typeset(html)
+				@kit.Typeset(html)
 			</article>
 		</main>
 	}

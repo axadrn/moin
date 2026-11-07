@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -30,7 +29,7 @@ templ NewWorkspaceForm(errorMsg string) {
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
 	>
-		@csrf.Token()
+		@kit.CSRF()
 		@formField("Name", "workspace-name", "Like your company or a project.", errorMsg) {
 			@kit.Input(templ.Attributes{"id": "workspace-name", "name": "name", "type": "text", "placeholder": "Acme", "aria-invalid": ariaInvalid(errorMsg), "aria-describedby": "workspace-name-hint", "autocomplete": "off", "autofocus": true, "required": true})
 		}

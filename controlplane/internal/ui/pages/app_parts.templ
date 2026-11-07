@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 )
 
 // The parts every page of the control panel is built from.
@@ -70,7 +68,7 @@ templ panel(p panelProps) {
 		if p.ID != "" {
 			id={ p.ID }
 		}
-		class={ utils.CN("flex h-full min-w-0 flex-col gap-4 rounded-4xl bg-card py-6", p.Class) }
+		class={ "flex h-full min-w-0 flex-col gap-4 rounded-4xl bg-card py-6", p.Class }
 		{ attrs... }
 	>
 		<div class="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-6">
@@ -129,7 +127,7 @@ templ copyButton(value, target, label string) {
 // answer swaps the row.
 templ switchForm(id, action, switchID, name, note string, on bool) {
 	@kit.RowForm(templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-		@csrf.Token()
+		@kit.CSRF()
 		@kit.RowLabel(switchID, name, note)
 		@kit.Switch(templ.Attributes{"id": switchID, "name": "on", "value": "1", "checked": on})
 	}

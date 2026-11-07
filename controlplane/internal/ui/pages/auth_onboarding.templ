@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -48,7 +47,7 @@ templ AuthOnboarding(form OnboardingForm) {
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
 			>
-				@csrf.Token()
+				@kit.CSRF()
 				<button type="submit" class="mx-auto flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
 					Not you? Sign out
 				</button>
@@ -71,7 +70,7 @@ templ AuthOnboardingForm(form OnboardingForm) {
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
 	>
-		@csrf.Token()
+		@kit.CSRF()
 		@formField("Your name", "name", onboardingEmail(user), nameError) {
 			@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Ada Lovelace", "aria-invalid": ariaInvalid(nameError), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": true, "required": true, "maxlength": "100"})
 		}

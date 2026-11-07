@@ -6,10 +6,8 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
@@ -43,7 +41,7 @@ templ ServerSecurity(view SecurityView) {
 						hx-disable="find button[type='submit']"
 						data-rename-server
 					>
-						@csrf.Token()
+						@kit.CSRF()
 						<label for="server-rename" class="sr-only">Server name</label>
 						@kit.Inline() {
 							@kit.Input(templ.Attributes{"id": "server-rename", "name": "name", "type": "text", "value": server.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
@@ -77,7 +75,7 @@ templ ServerSecurity(view SecurityView) {
 						"hx-delete":          basePath + "/servers/" + server.ID,
 						"hx-swap":            "none",
 						"hx-disable":         "this",
-						"hx-confirm":         utils.IfElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its agent and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin agent uninstall --apps."),
+						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its agent and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin agent uninstall --apps."),
 						"data-confirm-name":  server.Name,
 						"data-confirm-action": "Remove server",
 						"data-remove-server": server.Name,
@@ -98,7 +96,7 @@ templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
 	<div id="security-state" class="flex flex-col gap-6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
 		<form class="flex flex-col gap-3" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
-			@csrf.Token()
+			@kit.CSRF()
 			// What the page showed: Apply changes only the switches flipped here
 			// and keeps what changed elsewhere meanwhile.
 			<input type="hidden" name="was_tunnel" value={ onValue(view.Server.Tunnel) }/>
@@ -149,7 +147,7 @@ templ securityFact(name, note, value string) {
 templ securityToggle(name, title, note string, on, locked bool, lockedNote string) {
 	{{ id := "security-" + strings.ReplaceAll(name, "_", "-") }}
 	@kit.RowControl(nil) {
-		@kit.RowLabel(id, title, utils.IfElse(locked && !on, lockedNote, note))
+		@kit.RowLabel(id, title, ifElse(locked && !on, lockedNote, note))
 		@kit.Switch(templ.Attributes{"id": id, "name": name, "value": "1", "checked": on, "disabled": locked && !on, "data-toggle": name})
 	}
 }
@@ -161,7 +159,7 @@ templ securityKeys(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@kit.Card("Keys for every server", nil) {
 		<form class="flex flex-col gap-4" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
-			@csrf.Token()
+			@kit.CSRF()
 			@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount, "Tunnel Edit and DNS Edit; Zone Settings Edit for Always Use HTTPS")
 			@keyField("tailscale-key", "tailscale_key", "Tailscale auth key", "tskey-auth-…", view.Integrations.Tailscale, "Stored", "A reusable auth key")
 			<div class="flex justify-end">
@@ -174,8 +172,8 @@ templ securityKeys(view SecurityView) {
 }
 
 templ keyField(id, name, label, placeholder string, stored bool, storedText, help string) {
-	@kit.Field(label, id, utils.IfElse(stored, "✓ "+storedText, help)) {
-		@kit.Input(templ.Attributes{"id": id, "name": name, "type": "password", "placeholder": utils.IfElse(stored, "Paste a new one to replace it", placeholder), "autocomplete": "off"})
+	@kit.Field(label, id, ifElse(stored, "✓ "+storedText, help)) {
+		@kit.Input(templ.Attributes{"id": id, "name": name, "type": "password", "placeholder": ifElse(stored, "Paste a new one to replace it", placeholder), "autocomplete": "off"})
 	}
 }
 
