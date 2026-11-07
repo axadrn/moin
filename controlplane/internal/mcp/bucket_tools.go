@@ -81,8 +81,13 @@ type BucketList struct {
 
 // Bucket is the output of add_bucket, edit_bucket and set_default_bucket.
 type Bucket struct {
-	api.Bucket
+	bucket
 }
+
+// bucket is api.Bucket under another name: embedded as api.Bucket, its
+// field bucket would hide behind the embedded field Bucket in the output
+// schema.
+type bucket = api.Bucket
 
 func (t moinTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {
 	buckets, err := t.services.Apps.Buckets(caller.Token.WorkspaceID)
