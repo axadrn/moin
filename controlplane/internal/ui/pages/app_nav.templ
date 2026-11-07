@@ -60,7 +60,7 @@ templ appHeader(app model.App, section string) {
 		</div>
 	}
 	<div class={ templ.KV("hidden sm:block", section != "app") }>
-		@kit.Header(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, app.Name) {
+		@kit.HeaderIcon(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, kit.AppIcon(app.Name, appLogo(app), true), app.Name) {
 			@appStateLine(app)
 			@appActions(app)
 		}
@@ -193,4 +193,13 @@ templ dataNav(appName, active string) {
 		{Label: "Browse", Href: appPath + "/data", Active: active == "browse"},
 		{Label: "Backups", Href: appPath + "/backups", Active: active == "backups"},
 	})
+}
+
+// appLogo is the logo of an app from the catalog, empty for your own app:
+// kit.AppIcon shows its first letter then.
+func appLogo(app model.App) string {
+	if app.Catalog == "" {
+		return ""
+	}
+	return "/apps/" + app.Catalog + "/logo"
 }
