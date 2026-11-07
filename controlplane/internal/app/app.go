@@ -143,7 +143,7 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("initialize secrets: %w", err)
 	}
 	serverService := service.NewServerService(repository.NewServers(database), workspaceAuditEvents, cfg.AppURL)
-	appService := service.NewAppService(repository.NewAppRepository(database, history), serverService, secrets)
+	appService := service.NewAppService(repository.NewApps(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
 	// The catalog ships in content/catalog; its releases come from the
 	// registries, asked by this control plane itself.
@@ -155,7 +155,7 @@ func New(cfg *config.Config) (*App, error) {
 	catalogCache := repository.NewCatalogCache(history)
 	catalogStore.UseCache(catalog.Cache{Load: catalogCache.Load, Save: catalogCache.Save})
 	catalogService := service.NewCatalogService(catalogStore, appService)
-	alertService := service.NewAlertService(email, workspaces, members, repository.NewAppRepository(database, history), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
+	alertService := service.NewAlertService(email, workspaces, members, repository.NewApps(database, history), repository.NewAlertDestinations(database), workspaceAuditEvents, secrets)
 	// The hosted plane posts alerts only to public addresses.
 	if cfg.Billing && !cfg.IsDevelopment() {
 		alertService.AllowOnlyPublicTargets()

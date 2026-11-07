@@ -68,7 +68,7 @@ var (
 // AppService manages apps, their deploys and their env. Deploys run on the
 // agent; their log lines live in memory until the deploy ends.
 type AppService struct {
-	apps       repository.AppRepository
+	apps       *repository.Apps
 	servers    *ServerService
 	box        *secret.Box
 	github     *GitHub
@@ -99,7 +99,7 @@ type liveDeploy struct {
 	followers   map[chan struct{}]struct{}
 }
 
-func NewAppService(apps repository.AppRepository, servers *ServerService, box *secret.Box) *AppService {
+func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Box) *AppService {
 	service := &AppService{
 		apps:        apps,
 		servers:     servers,

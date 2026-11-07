@@ -41,7 +41,7 @@ func newSwitches(t *testing.T) *switches {
 		t.Fatal(err)
 	}
 	servers := service.NewServerService(repository.NewServers(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
-	apps := service.NewAppService(repository.NewAppRepository(database, database), servers, box)
+	apps := service.NewAppService(repository.NewApps(database, database), servers, box)
 	users := service.NewUserService(repository.NewUsers(database), nil, nil, nil)
 	s := &switches{t: t, database: database, ada: ada, apps: apps, servers: servers, users: users, handler: NewAppsHandler(apps, servers, users, nil)}
 	server, _, err := servers.Create(s.actor(), "web-1")
@@ -166,7 +166,7 @@ func TestAutoDeploySwitch(t *testing.T) {
 // linkWithoutGitHub stores a linked repo as GitHub would have confirmed it.
 func linkWithoutGitHub(t *testing.T, s *switches, repo, branch string) {
 	t.Helper()
-	if err := repository.NewAppRepository(s.database, s.database).SetRepo(s.app().ID, repo, branch, true, 7); err != nil {
+	if err := repository.NewApps(s.database, s.database).SetRepo(s.app().ID, repo, branch, true, 7); err != nil {
 		t.Fatal(err)
 	}
 }

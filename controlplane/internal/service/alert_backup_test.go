@@ -199,13 +199,13 @@ func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	audit := repository.NewWorkspaceAudit(database)
 	servers := NewServerService(repository.NewServers(database), audit, "https://moin.example.com")
-	apps := NewAppService(repository.NewAppRepository(database, database), servers, testBox(t))
+	apps := NewAppService(repository.NewApps(database, database), servers, testBox(t))
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	app := &model.App{ID: "app-shop", WorkspaceID: owner.WorkspaceID, ServerID: server.ID, Name: "shop", Domains: "[]", CreatedAt: time.Now()}
-	if err := repository.NewAppRepository(database, database).Create(app); err != nil {
+	if err := repository.NewApps(database, database).Create(app); err != nil {
 		t.Fatal(err)
 	}
 	broken := protocol.Backups{App: "shop", Databases: []protocol.DatabaseBackup{{Database: "postgres-db", Kind: "postgres", Error: "continuous backup: not running"}}}
