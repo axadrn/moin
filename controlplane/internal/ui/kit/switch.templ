@@ -1,0 +1,12 @@
+package kit
+
+// Switch is on or off: a real checkbox drawn as a switch, so the browser
+// holds its state and a form sends it. Attributes carry id, name, checked,
+// disabled and htmx. Put it at the end of a Row, with the row's words as
+// its label (a <label> row, or aria-label).
+templ Switch(attributes templ.Attributes) {
+	<span class="relative inline-flex h-7 w-12 shrink-0">
+		<input type="checkbox" role="switch" autocomplete="off" class="peer m-0 size-full cursor-pointer appearance-none rounded-full bg-foreground/15 transition-colors outline-none checked:bg-live focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-40" { attributes... }/>
+		<span aria-hidden="true" class="pointer-events-none absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-disabled:opacity-60"></span>
+	</span>
+}

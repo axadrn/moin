@@ -12,7 +12,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/switch"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/tooltip"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
@@ -318,7 +317,7 @@ templ switchForm(id, action string) {
 // savedSwitch is the switch of a switchForm. Its id keeps the focus on it
 // when the answer swaps the form.
 templ savedSwitch(id string, on bool) {
-	@switchcomp.Switch(switchcomp.Props{ID: id, Name: "on", Value: "1", Checked: on})
+	@kit.Switch(templ.Attributes{"id": id, "name": "on", "value": "1", "checked": on})
 }
 
 // docsLink is the quiet link from an empty state to its guide.
