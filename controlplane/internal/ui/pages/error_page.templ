@@ -2,14 +2,9 @@ package pages
 
 import (
 	"strconv"
-	"strings"
 
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/empty"
-
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
 	"github.com/axadrn/moin/controlplane/internal/ui/components"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 templ ErrorPage(status int, title, description string) {
@@ -35,43 +30,18 @@ templ ErrorPage(status int, title, description string) {
 	</html>
 }
 
-// StatusScreen is the full page for 404s and errors, built from the empty
-// component: an icon, what happened in words, the code as a log line, and
-// the way back.
+// StatusScreen is the full page for 404s and errors: what happened, the
+// way back, and the code as a log line.
 templ StatusScreen(title, description, line string) {
-	<div class="flex min-h-svh flex-col bg-background">
-		<header class="mx-auto flex h-20 w-full max-w-6xl items-center px-5 sm:px-8">
-			<a href="/" class="text-[22px] leading-none">
-				@blocks.Wordmark()
-			</a>
-		</header>
-		<main class="flex flex-1 items-center justify-center px-5 pb-24 sm:px-8">
-			@empty.Empty() {
-				@empty.Header() {
-					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-						if strings.HasPrefix(line, "404") {
-							@icon.SearchX()
-						} else {
-							@icon.TriangleAlert()
-						}
-					}
-					@empty.Title() {
-						{ title }
-					}
-					@empty.Description() {
-						{ description }
-					}
-				}
-				@empty.Content(empty.ContentProps{Class: "flex-row flex-wrap justify-center gap-2"}) {
-					@button.Button(button.Props{Href: "/"}) {
-						Back to home
-					}
-					@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline}) {
-						Read the docs
-					}
-				}
-				<p class="font-mono text-xs text-muted-foreground">{ line }</p>
+	@authFrame(title) {
+		@authLine() {
+			{ description }
+		}
+		@authStack() {
+			@kit.Button(kit.Primary, "/", nil) {
+				Back to home
 			}
-		</main>
-	</div>
+		}
+		<p class="text-center font-mono text-xs break-all text-muted-foreground">{ line }</p>
+	}
 }

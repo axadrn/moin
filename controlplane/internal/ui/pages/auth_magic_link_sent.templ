@@ -2,40 +2,32 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
-	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
+// AuthMagicLinkSent says where the link went, and sends it again.
 templ AuthMagicLinkSent(email string) {
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "Check Your Email",
-		Description: "Magic link sent to your email",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Check your email", "We sent a sign-in link to "+email+". It works once and expires soon.") {
-				@field.Group() {
-					@field.Field() {
-						@AuthMagicLinkResend(email, false)
-						@field.Description(field.DescriptionProps{Class: "text-center"}) {
-							<a href="/auth">Use another email</a>
-						}
-					}
-				}
+	@authScreen(layouts.SEOProps{Title: "Check your email", Description: "Sign-in link sent to your email"}, "Check your email") {
+		@authLine() {
+			We sent a link to <span class="font-medium text-foreground">{ email }</span>.
+		}
+		@authStack() {
+			@AuthMagicLinkResend(email, false)
+			@authLink("/auth") {
+				Use another email
 			}
 		}
 	}
 }
 
+// AuthMagicLinkResend sends the link once more; sent says it went.
 templ AuthMagicLinkResend(email string, sent bool) {
-	<div id="magic-link-resend" class="space-y-2">
+	<div id="magic-link-resend" class="flex flex-col gap-3">
 		<form
 			id="magic-link-resend-form"
+			class="flex flex-col"
 			hx-post="/auth/magic-link?resend=true"
 			hx-target="#magic-link-resend"
 			hx-swap="outerHTML"
@@ -43,19 +35,16 @@ templ AuthMagicLinkResend(email string, sent bool) {
 		>
 			@csrf.Token()
 			<input type="hidden" name="email" value={ email }/>
-			@button.Button(button.Props{Size: button.SizeLg, Variant: button.VariantSecondary, Class: blocks.AuthSecondary, Type: button.TypeSubmit}) {
+			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
 				if sent {
-					Resend again
+					Send again
 				} else {
-					Resend email
+					Send a new link
 				}
 			}
 		</form>
 		if sent {
-			<p role="status" class="flex items-center justify-center gap-1.5 text-center text-sm text-live">
-				@icon.Check(icon.Props{Class: "size-4"})
-				Sent. A new link is on its way.
-			</p>
+			<p role="status" class="text-center text-sm text-muted-foreground">A new link is on its way.</p>
 		}
 	</div>
 }
@@ -63,21 +52,14 @@ templ AuthMagicLinkResend(email string, sent bool) {
 // AuthPrivate is what a new address sees while sign-up is closed: only
 // admins and invited people get in.
 templ AuthPrivate() {
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "This " + brand.Name + " is private",
-		Description: "Ask its admin for an invitation",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("This "+brand.Name+" is private", "Ask its admin for an invitation.") {
-				@field.Group() {
-					@field.Field(field.Props{Attributes: templ.Attributes{"data-private": true}}) {
-						@field.Description(field.DescriptionProps{Class: "text-center"}) {
-							<a href="/auth">Use another email</a>
-						}
-					}
-				}
-			}
+	@authScreen(layouts.SEOProps{Title: "This " + brand.Name + " is private", Description: "Ask its admin for an invitation"}, "This "+brand.Name+" is private") {
+		@authLine() {
+			Ask its admin for an invitation.
 		}
+		<div class="flex flex-col" data-private>
+			@authLink("/auth") {
+				Use another email
+			}
+		</div>
 	}
 }

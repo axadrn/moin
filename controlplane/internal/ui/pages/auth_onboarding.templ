@@ -1,15 +1,11 @@
 package pages
 
 import (
-	"strconv"
-
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
@@ -31,37 +27,32 @@ func (f OnboardingForm) errorFor(field string) string {
 	return ""
 }
 
-func onboardingTitle(form OnboardingForm) (string, string) {
+func onboardingTitle(form OnboardingForm) string {
 	if form.AskWorkspace {
-		return "Welcome to " + brand.Name, "Your name and a name for your workspace. You can change both later in the settings."
+		return "Welcome to " + brand.Name
 	}
-	return "One last thing", "What should we call you?"
+	return "What's your name?"
 }
 
+// AuthOnboarding is the first page after the first sign-in: two names,
+// one button.
 templ AuthOnboarding(form OnboardingForm) {
-	{{ title, description := onboardingTitle(form) }}
-	@layouts.Auth(layouts.SEOProps{Title: "Complete Your Profile", Description: "Tell us your name", Path: ctxkeys.URLPath(ctx)}) {
-		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard(title, description) {
-				@field.Group() {
-					@AuthOnboardingForm(form)
-					@field.Separator() {
-						Not you? 
-					}
-					<form
-						action="/auth/logout"
-						method="POST"
-						hx-post="/auth/logout"
-						hx-swap="none"
-						hx-disable="find button[type='submit']"
-					>
-						@csrf.Token()
-						@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: blocks.AuthSecondary}) {
-							Sign out 
-						}
-					</form>
-				}
-			}
+	@authScreen(layouts.SEOProps{Title: "Welcome", Description: "Tell us your name"}, onboardingTitle(form)) {
+		@authStack() {
+			@AuthOnboardingForm(form)
+			<form
+				action="/auth/logout"
+				method="POST"
+				class="flex flex-col"
+				hx-post="/auth/logout"
+				hx-swap="none"
+				hx-disable="find button[type='submit']"
+			>
+				@csrf.Token()
+				<button type="submit" class="mx-auto flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
+					Not you? Sign out
+				</button>
+			</form>
 		}
 	}
 }
@@ -74,40 +65,32 @@ templ AuthOnboardingForm(form OnboardingForm) {
 		id="onboarding-form"
 		action="/auth/onboarding"
 		method="POST"
+		class="flex flex-col gap-4"
 		hx-post="/auth/onboarding"
 		hx-target="#onboarding-form"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		@field.Group() {
-			@field.Field() {
-				@field.Label(field.LabelProps{For: "name"}) {
-					Your name 
-				}
-				@input.Input(input.Props{
-					Class: "h-11 text-base", ID: "name", Name: "name", Type: "text", Value: form.Name, Placeholder: "Ada Lovelace", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(nameError != ""), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": "", "required": "", "maxlength": "100"}})
-				@fieldHint("name", nameError) {
-					if user != nil {
-						Continue as <strong>{ user.Email }</strong>.
-					}
-				}
-			}
-			if form.AskWorkspace {
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "workspace"}) {
-						Workspace name 
-					}
-					@input.Input(input.Props{
-						Class: "h-11 text-base", ID: "workspace", Name: "workspace", Type: "text", Value: form.Workspace, Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(workspaceError != ""), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": "", "minlength": "2", "maxlength": "80"}})
-					@fieldHint("workspace", workspaceError) {
-						Your servers and apps live here. Invite your team later.
-					}
-				}
-			}
-			@button.Button(button.Props{Size: button.SizeLg, Type: button.TypeSubmit, Class: blocks.AuthPrimary}) {
-				Continue 
+		@formField("Your name", "name", onboardingEmail(user), nameError) {
+			@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Ada Lovelace", "aria-invalid": ariaInvalid(nameError), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": true, "required": true, "maxlength": "100"})
+		}
+		if form.AskWorkspace {
+			@formField("Name your workspace", "workspace", "Your apps and servers live here.", workspaceError) {
+				@kit.Input(templ.Attributes{"id": "workspace", "name": "workspace", "type": "text", "value": form.Workspace, "placeholder": "Acme", "aria-invalid": ariaInvalid(workspaceError), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": true, "minlength": "2", "maxlength": "80"})
 			}
 		}
+		@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			Continue
+		}
 	</form>
+}
+
+// onboardingEmail is the hint under the name: the address you signed in
+// with, so you see it is you.
+func onboardingEmail(user *model.User) string {
+	if user == nil {
+		return ""
+	}
+	return "Signed in as " + user.Email
 }

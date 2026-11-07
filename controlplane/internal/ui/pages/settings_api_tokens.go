@@ -1,10 +1,11 @@
 package pages
 
 import (
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 // APITokensView is the data of the API tokens card in account settings.
@@ -51,25 +52,39 @@ func NewAPITokenForm(workspaceID string) APITokenForm {
 	return APITokenForm{Access: APITokenAccessWrite, Expiry: "90", WorkspaceID: workspaceID}
 }
 
-var apiTokenAccessItems = []selectcomp.ItemData{
+var apiTokenAccessOptions = []kit.Option{
 	{Value: APITokenAccessWrite, Label: "Read and write"},
 	{Value: APITokenAccessRead, Label: "Read only"},
 }
 
-var apiTokenExpiryItems = []selectcomp.ItemData{
+var apiTokenExpiryOptions = []kit.Option{
 	{Value: "7", Label: "7 days"},
 	{Value: "30", Label: "30 days"},
 	{Value: "90", Label: "90 days"},
 	{Value: "365", Label: "1 year"},
-	{Value: APITokenExpiryNever, Label: "No expiration"},
+	{Value: APITokenExpiryNever, Label: "Never"},
 }
 
-func (v APITokensView) workspaceItems() []selectcomp.ItemData {
-	items := make([]selectcomp.ItemData, 0, len(v.Workspaces))
+func (v APITokensView) workspaceOptions() []kit.Option {
+	options := make([]kit.Option, 0, len(v.Workspaces))
 	for _, workspace := range v.Workspaces {
-		items = append(items, selectcomp.ItemData{Value: workspace.ID, Label: workspace.Name})
+		options = append(options, kit.Option{Value: workspace.ID, Label: workspace.Name})
 	}
-	return items
+	return options
+}
+
+// apiTokenNote is the line under a token: its prefix, a browser login, its
+// workspace, what it may do, when it was last used and when it ends.
+func apiTokenNote(token model.APIToken, view APITokensView) string {
+	parts := []string{"pat_" + token.Prefix + "…"}
+	if token.IsDevice() {
+		parts = append(parts, "browser login")
+	}
+	if name := view.WorkspaceNames[token.ID]; name != "" {
+		parts = append(parts, name)
+	}
+	parts = append(parts, apiTokenAccessLabel(token), apiTokenLastUsed(token), apiTokenExpiry(token, view.Now))
+	return strings.Join(parts, " · ")
 }
 
 func apiTokenAccessLabel(token model.APIToken) string {
@@ -97,13 +112,4 @@ func apiTokenExpiry(token model.APIToken, now time.Time) string {
 		return "Expires " + token.ExpiresAt.Local().Format("Jan 2, 2006") + " unless used"
 	}
 	return "Expires " + token.ExpiresAt.Local().Format("Jan 2, 2006")
-}
-
-// apiTokenInvalid is the aria-invalid value of a field with this error
-// message. Styles match aria-invalid="true" only.
-func apiTokenInvalid(message string) string {
-	if message == "" {
-		return "false"
-	}
-	return "true"
 }

@@ -1,65 +1,66 @@
 package pages
 
 import (
+	"strings"
+
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
+// WorkspaceInvitation asks whether to join the workspace someone invited
+// you to: who, as what, and one button.
 templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage string) {
 	{{ user := ctxkeys.User(ctx) }}
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "Workspace invitation",
-		Description: "Accept a workspace invitation",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		<div class="flex min-h-screen items-center justify-center p-4">
-			@card.Card(card.Props{Class: "w-full max-w-md"}) {
-				@card.Header() {
-					@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
-						if invitation != nil {
-							Join { invitation.WorkspaceName }
-						} else {
-							Invitation not available
-						}
-					}
-					@card.Description() {
-						if invitation != nil {
-							{ invitation.InviterName } invited you as { model.WorkspaceRoleLabel(invitation.Role) }.
-						} else {
-							It expired, was revoked or was used already. Ask for a new one.
-						}
+	{{ seo := layouts.SEOProps{Title: "Workspace invitation", Description: "Accept a workspace invitation"} }}
+	if invitation == nil {
+		@authScreen(seo, "Invitation not available") {
+			@authLine() {
+				{ invitationProblem(errorMessage) }
+			}
+			<div class="flex flex-col">
+				@authLink("/") {
+					{ "Back to " + brand.Name }
+				}
+			</div>
+		}
+	} else {
+		@authScreen(seo, "Join "+invitation.WorkspaceName) {
+			@authStack() {
+				@kit.List() {
+					@factRow("From", invitation.InviterName)
+					@factRow("Role", model.WorkspaceRoleLabel(invitation.Role))
+					@factRow("For", invitation.Email)
+					if user != nil && !strings.EqualFold(user.Email, invitation.Email) {
+						@factRow("You", user.Email)
 					}
 				}
-				@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {
-					if errorMessage != "" {
-						@stateAlert(nil) {
-							{ errorMessage }
+				if user != nil {
+					<form action={ templ.SafeURL(ctxkeys.URLPath(ctx)) } method="POST" class="relative flex flex-col">
+						@csrf.Token()
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+							{ "Join " + invitation.WorkspaceName }
 						}
-					}
-					if invitation != nil && user != nil {
-						<p class="text-sm text-muted-foreground">
-							You are signed in as <span class="font-medium text-foreground">{ user.Email }</span>. The invitation is for <span class="font-medium text-foreground">{ invitation.Email }</span>; the two must match.
-						</p>
-						<form
-							action={ templ.SafeURL(ctxkeys.URLPath(ctx)) }
-							method="POST"
-						>
-							@csrf.Token()
-							@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
-								Join { invitation.WorkspaceName }
-							}
-						</form>
-					}
-					@button.Button(button.Props{Href: "/", Variant: button.VariantGhost, Class: "w-full"}) {
-						Back to { brand.Name }
-					}
+					</form>
+				}
+				if errorMessage != "" {
+					<p class="px-1 text-center text-sm text-failed" role="alert">{ errorMessage }</p>
+				}
+				@authLink("/") {
+					{ "Back to " + brand.Name }
 				}
 			}
-		</div>
+		}
 	}
+}
+
+// invitationProblem is why there is nothing to join.
+func invitationProblem(message string) string {
+	if message == "" {
+		return "It expired, was revoked or was used already. Ask for a new one."
+	}
+	return message
 }

@@ -2,279 +2,116 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/dialog"
-	field "github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
-// SettingsAPITokensSection is the API tokens card of the tokens tab.
-// Requests replace its parts by id: the create dialog, the token list and
-// the one-time reveal. The card and its script are only rendered with the
-// page.
+// SettingsAPITokensSection is the API tokens of the tokens tab: a new
+// token once it is made, the list, and the form for another. Requests
+// replace its parts by id.
 templ SettingsAPITokensSection(view APITokensView) {
-	@panel(panelProps{
-		ID:          "settings-api-tokens",
-		Title:       "API tokens",
-		Docs:        "/docs/guides/account#create-an-api-token",
-		Description: "For the CLI, scripts and AI agents. Keep them like passwords.",
-		Action:      APITokenCreateDialog(view),
-		Body:        panelBodyRows,
-	}) {
+	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true"></div>
+	@kit.Section("API tokens", nil) {
 		@APITokenList(view)
-		<div id="api-token-reveal" hx-swap-oob="true"></div>
 	}
-	@apiTokenScript()
+	@APITokenCreate(view)
 }
 
-// APITokenCreateDialog is the create button with its dialog. A successful
-// create replaces it, which closes the dialog and resets the form.
-templ APITokenCreateDialog(view APITokensView) {
+// APITokenCreate is the card that makes a token. A successful create
+// replaces it, which empties the form.
+templ APITokenCreate(view APITokensView) {
 	<div id="api-token-create" hx-swap-oob="true">
-		@dialog.Dialog(dialog.Props{ID: "api-token-create-dialog"}) {
-			@button.Button(button.Props{Size: button.SizeSm, Attributes: dialog.Trigger(ctx)}) {
-				@icon.Plus()
-				Create token
-			}
-			@dialog.Content(dialog.ContentProps{Class: "sm:max-w-md"}) {
-				@dialog.Header() {
-					@dialog.Title() {
-						Create an API token
-					}
-					@dialog.Description() {
-						You see the token once, right after you create it.
-					}
-				}
-				@APITokenCreateForm(view, false)
-			}
+		@kit.Card("New token", nil) {
+			@APITokenCreateForm(view, false)
 		}
 	</div>
 }
 
-// APITokenCreateForm is the create form. With oob it replaces the form in the
-// open dialog, for example to show validation errors.
+// APITokenCreateForm is the create form. With oob it replaces the form on
+// the page, to show what is wrong with it.
 templ APITokenCreateForm(view APITokensView, oob bool) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ form := view.Form }}
 	<form
 		id="api-token-form"
 		if oob {
 			hx-swap-oob="true"
 		}
-		class="flex flex-col gap-3"
-		hx-post={ basePath + "/settings/api-tokens" }
+		class="flex flex-col gap-4"
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/settings/api-tokens" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		@field.Field(field.Props{Class: "gap-1"}) {
-			@field.Label(field.LabelProps{For: "api-token-name"}) {
-				Name
+		<div class="grid items-start gap-4 md:grid-cols-2">
+			@formField("Name", "api-token-name", "", form.Errors["name"]) {
+				@kit.Input(templ.Attributes{"id": "api-token-name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Like ci or Claude", "required": true, "maxlength": "64", "autocomplete": "off", "aria-invalid": ariaInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"})
 			}
-			@input.Input(input.Props{
-				ID:          "api-token-name",
-				Name:        "name",
-				Type:        "text",
-				Value:       form.Name,
-				Placeholder: "Claude Desktop",
-				Required:    true,
-				Attributes:  templ.Attributes{"maxlength": "64", "autocomplete": "off", "aria-invalid": apiTokenInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"},
-			})
-			@fieldHint("api-token-name", form.Errors["name"]) {
-				Where the token is used.
+			@formField("Expires", "api-token-expiry", "", form.Errors["expiry"]) {
+				@kit.Select(kit.SelectProps{ID: "api-token-expiry", Name: "expiry", Label: "Expires", Options: apiTokenExpiryOptions, Value: form.Expiry})
 			}
-		}
-		@field.Field(field.Props{Class: "gap-1"}) {
-			@field.Label(field.LabelProps{For: "api-token-access"}) {
-				Access
-			}
-			@selectcomp.Select(selectcomp.Props{Name: "access", DefaultValue: form.Access, Items: apiTokenAccessItems}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-access", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["access"]), "aria-describedby": "api-token-access-hint"}}) {
-					@selectcomp.Value()
-				}
-				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					@selectcomp.Group() {
-						for _, item := range apiTokenAccessItems {
-							@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
-								{ item.Label.(string) }
-							}
-						}
-					}
+			if len(view.Workspaces) > 0 {
+				@formField("Workspace", "api-token-workspace", "", form.Errors["workspace_id"]) {
+					@kit.Select(kit.SelectProps{ID: "api-token-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: form.WorkspaceID})
 				}
 			}
-			@fieldHint("api-token-access", form.Errors["access"]) {
-				The CLI needs Read and write to add servers and deploy. Pick Read only for a script or agent that should only look.
+			@formField("Access", "access-"+form.Access, "", form.Errors["access"]) {
+				@kit.Choice("access", "Access", apiTokenAccessOptions, form.Access)
 			}
-		}
-		@field.Field(field.Props{Class: "gap-1"}) {
-			@field.Label(field.LabelProps{For: "api-token-expiry"}) {
-				Expiration
-			}
-			@selectcomp.Select(selectcomp.Props{Name: "expiry", DefaultValue: form.Expiry, Items: apiTokenExpiryItems}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-expiry", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["expiry"]), "aria-describedby": "api-token-expiry-hint"}}) {
-					@selectcomp.Value()
-				}
-				@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-					@selectcomp.Group() {
-						for _, item := range apiTokenExpiryItems {
-							@selectcomp.Item(selectcomp.ItemProps{Value: item.Value}) {
-								{ item.Label.(string) }
-							}
-						}
-					}
-				}
-			}
-			@fieldHint("api-token-expiry", form.Errors["expiry"]) {
-				After that, requests with it fail.
-			}
-		}
-		if len(view.Workspaces) > 0 {
-			@field.Field(field.Props{Class: "gap-1"}) {
-				@field.Label(field.LabelProps{For: "api-token-workspace"}) {
-					Workspace
-				}
-				@selectcomp.Select(selectcomp.Props{Name: "workspace_id", DefaultValue: form.WorkspaceID, Items: view.workspaceItems()}) {
-					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "api-token-workspace", Class: "w-full", Attributes: templ.Attributes{"aria-invalid": apiTokenInvalid(form.Errors["workspace_id"]), "aria-describedby": "api-token-workspace-hint"}}) {
-						@selectcomp.Value()
-					}
-					@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-						@selectcomp.Group() {
-							for _, workspace := range view.Workspaces {
-								@selectcomp.Item(selectcomp.ItemProps{Value: workspace.ID}) {
-									{ workspace.Name }
-								}
-							}
-						}
-					}
-				}
-				@fieldHint("api-token-workspace", form.Errors["workspace_id"]) {
-					The token can only reach this workspace.
-				}
-			}
-		}
-		@dialog.Footer() {
-			@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Attributes: dialog.CloseFor("api-token-create-dialog")}) {
-				Cancel
-			}
-			@button.Button(button.Props{Type: "submit"}) {
+		</div>
+		<div class="flex justify-end">
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
 				Create token
 			}
-		}
+		</div>
 	</form>
 }
 
-// APITokenList lists the tokens with a revoke button each.
+// APITokenList lists the tokens, each with Revoke.
 templ APITokenList(view APITokensView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="api-token-list" hx-swap-oob="true">
-		if len(view.Tokens) == 0 {
-			<div class="px-3">
-				@emptyHint("No API tokens yet. Create one to connect the CLI, a script or an AI agent.", "")
-			</div>
-		} else {
-			<ul class="flex flex-col gap-1" role="list">
-				for _, token := range view.Tokens {
-					<li class="flex items-center justify-between gap-4 rounded-xl px-3 py-2.5 hover:bg-muted/60" data-api-token-row={ token.ID }>
-						<div class="flex min-w-0 flex-col gap-0.5">
-							<div class="flex min-w-0 flex-wrap items-center gap-2">
-								<p class="truncate text-sm font-medium">{ token.Name }</p>
-								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-									{ apiTokenAccessLabel(token) }
-								}
-								if token.IsDevice() {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										browser login
-									}
-								}
-								if token.IsExpired(view.Now) {
-									@badge.Badge(badge.Props{Class: "bg-failed/12 text-failed"}) {
-										expired
-									}
-								}
-							</div>
-							<p class="truncate text-xs text-muted-foreground">
-								<span class="font-mono">pat_{ token.Prefix }…</span>
-								if view.WorkspaceNames[token.ID] != "" {
-									{ " · " + view.WorkspaceNames[token.ID] }
-								}
-								{ " · " + apiTokenLastUsed(token) + " · " + apiTokenExpiry(token, view.Now) }
-							</p>
+		@kit.List() {
+			if len(view.Tokens) == 0 {
+				@kit.Row("") {
+					<p class="text-sm text-muted-foreground">No tokens yet.</p>
+				}
+			}
+			for _, token := range view.Tokens {
+				<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden" data-api-token-row={ token.ID }>
+					<div class="min-w-0 flex-1">
+						<div class="flex min-w-0 items-center gap-2">
+							<span class="truncate font-medium">{ token.Name }</span>
+							if token.IsExpired(view.Now) {
+								<span class="shrink-0 text-sm text-failed">expired</span>
+							}
 						</div>
-						@button.Button(button.Props{
-							Type:    "button",
-							Variant: button.VariantGhost,
-							Size:    button.SizeSm,
-							Attributes: templ.Attributes{
-								"aria-label": "Revoke " + token.Name,
-								"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
-								"hx-swap":    "none",
-								"hx-disable": "this",
-								"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
-							},
-						}) {
-							Revoke
-						}
-					</li>
-				}
-			</ul>
-		}
-	</div>
-}
-
-// APITokenReveal shows a new raw token once, in a dialog that opens when it
-// arrives. Closing it removes the token from the page.
-templ APITokenReveal(raw string) {
-	<div id="api-token-reveal" hx-swap-oob="true">
-		@dialog.Dialog(dialog.Props{ID: "api-token-reveal-dialog", DefaultOpen: true, DisablePointerDismissal: true}) {
-			@dialog.Content(dialog.ContentProps{Class: "sm:max-w-md"}) {
-				@dialog.Header() {
-					@dialog.Title() {
-						Copy your new token
-					}
-					@dialog.Description() {
-						This is the only time the token is shown. Store it somewhere safe, for example in your password manager.
-					}
-				}
-				@field.Field(field.Props{Class: "gap-1"}) {
-					@field.Label(field.LabelProps{For: "api-token-value"}) {
-						Token
-					}
-					<div class="flex gap-2">
-						@input.Input(input.Props{ID: "api-token-value", Type: "text", Value: raw, ReadOnly: true, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
-						@button.Button(button.Props{Type: "button", Variant: button.VariantSecondary, Class: "group/copy", Attributes: templ.Attributes{"data-copy": "", "data-copy-target": "#api-token-value"}}) {
-							@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
-							@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
-							Copy
-						}
+						<div class="text-sm text-muted-foreground">{ apiTokenNote(token, view) }</div>
 					</div>
-				}
-				@dialog.Footer() {
-					@button.Button(button.Props{Attributes: dialog.Close(ctx)}) {
-						Done
+					@kit.Button(kit.Secondary, "", templ.Attributes{
+						"type":       "button",
+						"aria-label": "Revoke " + token.Name,
+						"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
+					}) {
+						Revoke
 					}
-				}
+				</div>
 			}
 		}
 	</div>
 }
 
-// apiTokenScript removes a revealed token from the page when its dialog
-// closes. It is rendered once with the page, so swapped parts carry no
-// script; it stops listening when the page goes.
-templ apiTokenScript() {
-	<script nonce={ templ.GetNonce(ctx) }>
-		(function () {
-			const gone = new AbortController();
-			document.addEventListener("htmx:before:history:update", () => gone.abort(), { once: true });
-			document.addEventListener("dialog-close", function (event) {
-				if (!(event.target instanceof Element) || event.target.id !== "api-token-reveal-dialog") return;
-				document.getElementById("api-token-reveal")?.replaceChildren();
-			}, { signal: gone.signal });
-		})();
-	</script>
+// APITokenReveal shows a new token once, at the top of the tab, until the
+// page is left.
+templ APITokenReveal(raw string) {
+	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true">
+		@kit.Card("Copy your new token", nil) {
+			@kit.Command(raw)
+			@kit.Quiet() {
+				It shows only this once.
+			}
+		}
+	</div>
 }

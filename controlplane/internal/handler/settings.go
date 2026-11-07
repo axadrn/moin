@@ -90,7 +90,7 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	registries, err := h.apps.Registries(user.ID)
+	registries, err := h.apps.Registries(ctxkeys.Workspace(r.Context()).ID)
 	if err != nil {
 		slog.Error("failed to list registries", "error", err, "user_id", user.ID)
 		w.WriteHeader(http.StatusInternalServerError)
