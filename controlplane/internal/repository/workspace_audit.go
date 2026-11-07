@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/jmoiron/sqlx"
@@ -22,6 +23,9 @@ type WorkspaceAuditRepository interface {
 	// AppServer returns the name of an app, given by ID or name, and of its
 	// server. Both are empty for an app that is gone.
 	AppServer(workspaceID, idOrName string) (app, server string, err error)
+	// CountAppChanges counts the events of an app with one of actions since
+	// a time.
+	CountAppChanges(workspaceID, app string, actions []string, since time.Time) (int, error)
 }
 
 type workspaceAuditRepository struct {
@@ -146,4 +150,14 @@ func (r *workspaceAuditRepository) Choices(workspaceID string) (model.ActivityCh
 		ORDER BY email
 	`, workspaceID)
 	return choices, err
+}
+
+func (r *workspaceAuditRepository) CountAppChanges(workspaceID, app string, actions []string, since time.Time) (int, error) {
+	query, args, err := sqlx.In(`SELECT COUNT(*) FROM workspace_audit_events WHERE workspace_id = ? AND app = ? AND action IN (?) AND created_at > ?`, workspaceID, app, actions, since.UTC())
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	err = r.db.Get(&count, r.db.Rebind(query), args...)
+	return count, err
 }

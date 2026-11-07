@@ -149,7 +149,7 @@ func TestServerSecurity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = apps.SetDomains(owner, app.ID, []string{"blog.de"}, "")
+	_, err = apps.SetDomains(owner, app.ID, []string{"blog.de"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

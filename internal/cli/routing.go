@@ -381,22 +381,21 @@ func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	return nil
 }
 
-// reportChange follows the deploy that applies a change, or says when it applies.
+// reportChange says when a saved change applies: saving never restarts an
+// app. An older control plane that still restarts on its own is followed.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
-	if change.Unchanged {
+	switch {
+	case change.Unchanged:
 		done(stdout, "Nothing changed.")
-		return
-	}
-	if change.Deploy == nil && change.App.Stopped {
+	case change.Deploy != nil:
+		if err := follow(ctx, api, name, *change.Deploy, "Restart", false, stdout); err != nil {
+			printError(stdout, err)
+		}
+	case change.App.Stopped:
 		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
-		return
-	}
-	if change.Deploy == nil {
-		hint(stdout, "It applies with the next deploy:", build.Name+" deploy "+name)
-		return
-	}
-	err := follow(ctx, api, name, *change.Deploy, "Restart", false, stdout)
-	if err != nil {
-		printError(stdout, err)
+	case change.App.LiveNumber == 0:
+		hint(stdout, "It applies with the first deploy:", build.Name+" deploy "+name)
+	default:
+		hint(stdout, "It applies when the app restarts. Now:", build.Name+" restart "+name)
 	}
 }

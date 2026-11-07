@@ -2012,7 +2012,7 @@ paths:
               $ref: '#/components/schemas/DomainsRequest'
       responses:
         '200':
-          description: The app, and the deploy that applies the change to the running release; `deploy` is null when the next deploy applies it.
+          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (control planes before saving waited could answer the restart they started).
           content:
             application/json:
               schema:
@@ -2077,7 +2077,7 @@ paths:
       tags: [Apps]
       operationId: setInstant
       summary: Set the instant address
-      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it, then applies it to the running release. Empty `provider` keeps it; no `open` keeps the password as it is. `x-moin.instant` in compose.yml wins.'
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it. The change waits for the next restart. Empty `provider` keeps it; no `open` keeps the password as it is. `x-moin.instant` in compose.yml wins.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2090,7 +2090,7 @@ paths:
               $ref: '#/components/schemas/InstantRequest'
       responses:
         '200':
-          description: The app, and the deploy that applies the change to the running release; `deploy` is null when the next deploy applies it.
+          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (control planes before saving waited could answer the restart they started).
           content:
             application/json:
               schema:
@@ -2132,7 +2132,7 @@ paths:
               $ref: '#/components/schemas/ProtectionRequest'
       responses:
         '200':
-          description: The app, and the deploy that applies the change to the running release; `deploy` is null when the next deploy applies it.
+          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (control planes before saving waited could answer the restart they started).
           content:
             application/json:
               schema:
@@ -2163,7 +2163,7 @@ paths:
         - apiTokenAuth: [write]
       responses:
         '200':
-          description: The app, and the deploy that applies the change to the running release; `deploy` is null when the next deploy applies it.
+          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (control planes before saving waited could answer the restart they started).
           content:
             application/json:
               schema:
@@ -5262,6 +5262,9 @@ components:
         stopped:
           type: boolean
           description: The app was stopped. A deploy, a restart or a start runs it again.
+        changes_waiting:
+          type: integer
+          description: Changes saved since the live release started (env vars, domains, password, instant address, bucket). Saving never restarts an app; a restart applies them. Only GET /apps/{app} fills it.
         repo:
           type: string
           description: The GitHub repo the app follows, as owner/name. Empty for none.

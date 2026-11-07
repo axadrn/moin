@@ -4,7 +4,7 @@ description: "Encrypted settings and secrets per app"
 order: 10
 ---
 
-Env vars are the settings and secrets of an app, such as `DATABASE_URL` or an API key. moin stores them encrypted and hands them to every service it builds on a restart, a start or the next deploy. So after you change one, restart the app. A rollback keeps the env vars of its release.
+Env vars are the settings and secrets of an app, such as `DATABASE_URL` or an API key. moin stores them encrypted and hands them to every service it builds on a restart, a start or the next deploy. Saving never restarts the app, so you can change several and restart once; the app page says how many changes wait. A rollback keeps the env vars of its release.
 
 ## See the env vars
 

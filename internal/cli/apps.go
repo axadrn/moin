@@ -200,6 +200,10 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	for _, row := range rows {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-9s", row[0]))+" "+row[1])
 	}
+	if app.ChangesWaiting > 0 {
+		fmt.Fprintln(stdout)
+		hint(stdout, changesWaiting(app.ChangesWaiting)+". A restart applies them:", build.Name+" restart "+app.Name)
+	}
 	fmt.Fprintln(stdout)
 	printDeploys(stdout, detail, now)
 }
@@ -1082,4 +1086,12 @@ func logLine(line string) string {
 		return line
 	}
 	return style.Muted.Render(prefix+" |") + " " + rest
+}
+
+// changesWaiting says how many saved changes wait for a restart.
+func changesWaiting(n int) string {
+	if n == 1 {
+		return "1 change waiting"
+	}
+	return fmt.Sprintf("%d changes waiting", n)
 }

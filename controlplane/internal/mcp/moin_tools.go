@@ -130,19 +130,19 @@ func registerOpsTools(server *mcpsdk.Server, services Services) {
 		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-moin.domains in compose.yml sets; they change there. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, add("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none), then applies them to the running release. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, add("get_instant", "Get the instant address",
 		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which show returns with a token that may write. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getInstant)))
 	mcpsdk.AddTool(server, add("set_instant", "Set the instant address",
-		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it, then applies it to the running release. x-moin.instant in compose.yml wins. Needs a token with read and write access.",
+		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it. The change waits for restart_app, a start or a deploy. x-moin.instant in compose.yml wins. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setInstant)))
 	mcpsdk.AddTool(server, add("set_protection", "Protect with a password",
-		"Puts basic auth in front of an app with a username and a password of at least 8 characters, then applies it. Needs a token with read and write access.",
+		"Puts basic auth in front of an app with a username and a password of at least 8 characters. The change waits for restart_app, a start or a deploy. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setProtection)))
 	mcpsdk.AddTool(server, add("remove_protection", "Remove the password",
-		"Takes the password away from an app, then applies it; the app is public again. Needs a token with read and write access.",
+		"Takes the password away from an app; it is public again after restart_app, a start or a deploy. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeProtection)))
 	mcpsdk.AddTool(server, add("get_logs", "Get app logs",
 		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
@@ -954,7 +954,7 @@ func (c Change) Summary() string {
 		return "Nothing changed."
 	}
 	if c.Deploy == nil {
-		return "Saved. The app takes it with its next deploy or start."
+		return "Saved. The app takes it with its next restart, start or deploy (restart_app)."
 	}
 	return fmt.Sprintf("Saved. Deploy v%d applies it now.", c.Deploy.Number)
 }
@@ -973,21 +973,20 @@ func (t moinTools) change(caller Caller, app string, deploy *model.Deploy, chang
 }
 
 func (t moinTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
-	var deploy *model.Deploy
 	var changed bool
 	var err error
 	if input.Service != "" {
 		if input.Canonical != "" {
 			return Change{}, InvalidField("canonical", "canonical is for the main service only.")
 		}
-		deploy, changed, err = t.services.Apps.SetServiceDomains(caller.actor(), input.App, input.Service, input.Domains)
+		changed, err = t.services.Apps.SetServiceDomains(caller.actor(), input.App, input.Service, input.Domains)
 	} else {
-		deploy, changed, err = t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
+		changed, err = t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
 	}
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, deploy, changed)
+	return t.change(caller, input.App, nil, changed)
 }
 
 // InstantInput is the input of get_instant.
@@ -1035,11 +1034,11 @@ type SetInstantInput struct {
 }
 
 func (t moinTools) setInstant(_ context.Context, caller Caller, input SetInstantInput) (Change, error) {
-	deploy, changed, err := t.services.Apps.SetInstant(caller.actor(), input.App, input.Provider, input.Open)
+	changed, err := t.services.Apps.SetInstant(caller.actor(), input.App, input.Provider, input.Open)
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, deploy, changed)
+	return t.change(caller, input.App, nil, changed)
 }
 
 // ProtectionInput is the input of set_protection.
@@ -1053,19 +1052,19 @@ func (t moinTools) setProtection(_ context.Context, caller Caller, input Protect
 	if input.Password == "" {
 		return Change{}, InvalidField("password", "Enter a password of at least 8 characters.")
 	}
-	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.App, input.Username, input.Password)
+	changed, err := t.services.Apps.SetProtection(caller.actor(), input.App, input.Username, input.Password)
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, deploy, changed)
+	return t.change(caller, input.App, nil, changed)
 }
 
 func (t moinTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
-	deploy, changed, err := t.services.Apps.SetProtection(caller.actor(), input.app(), "", "")
+	changed, err := t.services.Apps.SetProtection(caller.actor(), input.app(), "", "")
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.app(), deploy, changed)
+	return t.change(caller, input.app(), nil, changed)
 }
 
 // Logs is the output of get_logs.
