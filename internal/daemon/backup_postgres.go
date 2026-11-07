@@ -96,12 +96,16 @@ func dbExists(ctx context.Context, t pgTarget, name string) (bool, error) {
 	return out == "1", err
 }
 
-// rename renames a database once nobody is connected to it.
-func rename(ctx context.Context, t pgTarget, from, to string) error {
+// swap renames live to aside and built to live in one transaction, once
+// nobody is connected to either.
+func swap(ctx context.Context, t pgTarget, live, aside, built string) error {
 	var err error
 	for try := 0; try < 10; try++ {
-		_, err = admin(ctx, t, `SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = :'from' AND pid <> pg_backend_pid();
-ALTER DATABASE :"from" RENAME TO :"to";`, map[string]string{"from": from, "to": to})
+		_, err = admin(ctx, t, `SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname IN (:'live', :'built') AND pid <> pg_backend_pid();
+BEGIN;
+ALTER DATABASE :"live" RENAME TO :"aside";
+ALTER DATABASE :"built" RENAME TO :"live";
+COMMIT;`, map[string]string{"live": live, "aside": aside, "built": built})
 		if err == nil || !strings.Contains(err.Error(), "being accessed") {
 			return err
 		}
@@ -149,10 +153,11 @@ func pgRoom(ctx context.Context, t pgTarget) error {
 
 // Restore loads a copy into moin_restore_<hash> while the app runs, with
 // the owner of the live database. Then, with the app's other services
-// stopped, it renames the live database to moin_before_<id>_<hash>, the
-// undo, and the built one in. Settings and grants of the database itself
-// (ALTER DATABASE … SET, GRANT … ON DATABASE) are not in a copy.
-func (e *postgresEngine) Restore(ctx context.Context, from source, id string, step func(string) error) error {
+// stopped, one transaction renames the live database to
+// moin_before_<id>_<hash>, the undo, and the built one in: never none.
+// Settings and grants of the database itself (ALTER DATABASE … SET,
+// GRANT … ON DATABASE) are not in a copy.
+func (e *postgresEngine) Restore(ctx context.Context, from source, id string) error {
 	t, err := e.target(ctx)
 	if err != nil {
 		return err
@@ -176,22 +181,14 @@ ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "bu
 		}
 	}
 	ctx = context.WithoutCancel(ctx)
-	if err := step("switching"); errors.Is(err, errCrash) {
-		return err
-	} else if err != nil {
-		return errors.Join(fmt.Errorf("write the restore down: %w; nothing changed", err), start())
+	if e.b.crash != nil && e.b.crash("before") {
+		return errCrash
 	}
-	if err := rename(ctx, t, live, aside); err != nil {
+	if err := swap(ctx, t, live, aside, built); err != nil {
 		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
 	}
-	if err := step("aside"); err != nil {
-		return err
-	}
-	if err := rename(ctx, t, built, live); err != nil {
-		return errors.Join(fmt.Errorf("switch: %w", err), rename(ctx, t, aside, live), start())
-	}
-	if err := step("switched"); err != nil {
-		return err
+	if e.b.crash != nil && e.b.crash("after") {
+		return errCrash
 	}
 	if err := start(); err != nil {
 		return fmt.Errorf("the restored data is in place, but %w", err)
@@ -215,9 +212,9 @@ func (e *postgresEngine) others() []string {
 	return others
 }
 
-// Recover puts the database back by the crash rule (recoverFrom), once
-// the Postgres answers, up to two minutes: a database in the live place
-// that is not the restored one goes aside as an undo.
+// Recover tells from the undo, once the Postgres answers, up to two
+// minutes: there means the switch happened, as both renames are one
+// transaction.
 func (e *postgresEngine) Recover(ctx context.Context, mark restoreMark) (bool, error) {
 	t, err := e.target(ctx)
 	if err == nil {
@@ -232,34 +229,10 @@ func (e *postgresEngine) Recover(ctx context.Context, mark restoreMark) (bool, e
 	if err != nil {
 		return false, err
 	}
-	live, aside, built := t.database, undoName(t.database, mark.Undo), moinName("restore", t.database)
-	if mark.From != "" {
-		built = undoName(live, mark.From)
+	switched, err := dbExists(ctx, t, undoName(t.database, mark.Undo))
+	if err == nil && !switched && mark.From == "" {
+		_, err = admin(ctx, t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": moinName("restore", t.database)})
 	}
-	asideThere, err1 := dbExists(ctx, t, aside)
-	builtThere, err2 := dbExists(ctx, t, built)
-	liveThere, err3 := dbExists(ctx, t, live)
-	if err := errors.Join(err1, err2, err3); err != nil {
-		return false, err
-	}
-	switched, err := recoverFrom(mark.Step, asideThere, builtThere || !liveThere, func() error {
-		if liveThere {
-			// The app stops first, so it writes into no undo.
-			if others := e.others(); len(others) > 0 {
-				if _, err := e.b.apps.stopServices(ctx, e.app, others...); err != nil {
-					return err
-				}
-			}
-			if err := rename(ctx, t, live, undoName(live, strayID(mark.Undo))); err != nil {
-				return err
-			}
-		}
-		return rename(ctx, t, aside, live)
-	})
-	if err != nil {
-		return false, err
-	}
-	_, err = admin(ctx, t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": moinName("restore", live)})
 	return switched, err
 }
 
@@ -294,7 +267,7 @@ func (e *postgresEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
 	for _, line := range strings.Split(out, "\n") {
 		name, size, _ := strings.Cut(line, " ")
 		id := strings.ToUpper(strings.TrimSuffix(strings.TrimPrefix(name, "moin_before_"), "_"+hash))
-		if at, err := time.Parse(protocol.CopyIDLayout, id); err == nil {
+		if at, ok := protocol.CopyTime(id); ok {
 			var bytes int64
 			fmt.Sscan(size, &bytes)
 			undos = append(undos, protocol.Copy{ID: id, At: at, Size: bytes})

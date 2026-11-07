@@ -26,44 +26,44 @@ func TestBackupFile(t *testing.T) {
 	}
 }
 
-// The crash rule of SQLite, by the step the mark reached: before the
-// switch nothing moved; between the renames the undo goes back, and a
-// file the app made in the live place meanwhile goes aside as an undo of
-// its own; after the switch the restore is done. A half built restore
-// goes.
-func TestSQLiteCrashRule(t *testing.T) {
-	const id = "20261107T140000Z"
-	for _, test := range []struct {
-		name, step         string
-		live, aside, built string
-		want               string
-		switched, stray    bool
-	}{
-		{name: "building", step: "", live: "before", built: "half", want: "before"},
-		{name: "switching, nothing moved", step: "switching", live: "before", built: "half", want: "before"},
-		{name: "between the renames", step: "aside", aside: "before", built: "restored", want: "before"},
-		{name: "the second rename done", step: "aside", live: "restored", aside: "before", want: "restored", switched: true},
-		{name: "switched", step: "switched", live: "restored", aside: "before", want: "restored", switched: true},
-	} {
+// After a crash the undo tells: a second name of the live file means the
+// switch never happened, and it goes; another file means it did. A half
+// built restore goes.
+func TestSQLiteRecover(t *testing.T) {
+	const id = "20261107T140000Z-000001"
+	for _, switched := range []bool{false, true} {
 		dir := t.TempDir()
 		live := filepath.Join(dir, "app.db")
-		for file, body := range map[string]string{live: test.live, undoFile(live, id): test.aside, live + ".moin-restore": test.built} {
-			if body != "" {
-				os.WriteFile(file, []byte(body), 0o600)
-			}
+		os.WriteFile(live, []byte("before"), 0o600)
+		os.WriteFile(live+".moin-restore", []byte("half"), 0o600)
+		os.Link(live, undoFile(live, id))
+		if switched {
+			os.Rename(live+".moin-restore", live)
 		}
 		e := &sqliteEngine{b: newBackups(newApps(dir, nil), nil), database: protocol.Database{HostPath: live}}
-		switched, err := e.Recover(context.Background(), restoreMark{Undo: id, Step: test.step})
-		if err != nil || switched != test.switched {
-			t.Fatalf("%s: switched %v, %v", test.name, switched, err)
+		got, err := e.Recover(context.Background(), restoreMark{Undo: id})
+		if err != nil || got != switched {
+			t.Fatalf("switched %v: Recover says %v, %v", switched, got, err)
 		}
-		if body, _ := os.ReadFile(live); string(body) != test.want {
-			t.Errorf("%s: the live file is %q, want %q", test.name, body, test.want)
+		if exists(undoFile(live, id)) != switched || exists(live+".moin-restore") || !exists(live) {
+			t.Errorf("switched %v: undo %v, built %v", switched, exists(undoFile(live, id)), exists(live+".moin-restore"))
 		}
-		undos, _ := e.Undos(context.Background())
-		if exists(live+".moin-restore") || test.stray != (len(undos) == 1 && !switched && test.step == "aside") {
-			t.Errorf("%s: left %v, undos %+v", test.name, exists(live+".moin-restore"), undos)
-		}
+	}
+}
+
+// Copy IDs are sorted by time, apart within one second, and the old
+// IDs of only the time stay valid.
+func TestCopyIDs(t *testing.T) {
+	at := time.Date(2026, 11, 7, 14, 0, 0, 0, time.UTC)
+	one, two := protocol.NewCopyID(at), protocol.NewCopyID(at)
+	if got, ok := protocol.CopyTime(one); !ok || !got.Equal(at) || !protocol.ValidCopyID("20261107T140000Z") || protocol.ValidCopyID("../x") {
+		t.Fatalf("%s: %v %v", one, got, ok)
+	}
+	for one == two {
+		two = protocol.NewCopyID(at)
+	}
+	if protocol.NewCopyID(at.Add(time.Second)) <= one {
+		t.Error("IDs are not sorted by time")
 	}
 }
 
@@ -71,7 +71,7 @@ func TestSQLiteCrashRule(t *testing.T) {
 // keeps its copies a week, with every change.
 func TestScheduleDefaults(t *testing.T) {
 	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.configure(nil, nil, map[string]protocol.Schedule{"shop": {Every: 15, Keep: 3}, "broken": {}})
+	b.configure(protocol.BackupConfig{Bucket: nil, Schedules: map[string]protocol.Schedule{"shop": {Every: 15, Keep: 3}, "broken": {}}})
 	if got := b.schedule("shop"); got != (protocol.Schedule{Every: 15, Keep: 3}) {
 		t.Errorf("shop: %+v", got)
 	}
@@ -92,35 +92,13 @@ func TestCopyKey(t *testing.T) {
 	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil {
 		t.Fatal("a folder without a bucket")
 	}
-	b.configure(&protocol.Bucket{Bucket: "b", Path: "moin", Workspace: "ws"}, nil, nil)
+	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Path: "moin", Workspace: "ws"}})
 	_, folder, err := b.where("shop", protocol.Database{Path: "/data/app.db"})
 	if err != nil || folder != "moin/ws/shop/id-1/data~app.db" {
 		t.Fatalf("folder %q %v", folder, err)
 	}
 	if _, _, err := b.where("blog", protocol.Database{Path: "/data/app.db"}); err == nil {
 		t.Fatal("an app without an ID has a folder")
-	}
-}
-
-// The crash rule the same for every engine, by the step the mark reached.
-func TestRecoverFrom(t *testing.T) {
-	for _, test := range []struct {
-		step                  string
-		aside, built          bool
-		switched, putBackRuns bool
-	}{
-		{"", true, true, false, false},
-		{"switching", false, true, false, false},
-		{"switching", true, true, false, true},
-		{"aside", true, true, false, true},
-		{"aside", true, false, true, false},
-		{"switched", true, false, true, false},
-	} {
-		ran := false
-		switched, err := recoverFrom(test.step, test.aside, test.built, func() error { ran = true; return nil })
-		if err != nil || switched != test.switched || ran != test.putBackRuns {
-			t.Errorf("%+v: switched %v, put back %v, %v", test, switched, ran, err)
-		}
 	}
 }
 
@@ -186,7 +164,7 @@ func TestCopyBeforeSaysWhenItFails(t *testing.T) {
 	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
 	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
 	b := newBackups(a, nil)
-	b.configure(&protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws", AccessKey: "x", SecretKey: "y"}, nil, nil)
+	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws", AccessKey: "x", SecretKey: "y"}})
 	var logged []string
 	if at := b.copyBefore(context.Background(), "shop", "", func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }); at != nil || len(logged) != 1 || !strings.Contains(logged[0], "before the change failed") {
 		t.Fatalf("copy before: %v %v", at, logged)
@@ -209,7 +187,7 @@ func sqliteDatabase(t *testing.T) (string, *sql.DB) {
 // default would be a guess.
 func TestNoPruneWithoutSchedule(t *testing.T) {
 	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.configure(&protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws"}, nil, map[string]protocol.Schedule{})
+	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws"}, Schedules: map[string]protocol.Schedule{}})
 	old := protocol.Copy{ID: "20200101T000000Z", At: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
 	if err := b.prune(context.Background(), "shop", protocol.Database{Path: "/data/app.db"}, []protocol.Copy{{At: time.Now()}, old}); err != nil {
 		t.Fatalf("prune touched the bucket: %v", err)
@@ -241,4 +219,42 @@ func TestEditsTakeTheAppLock(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
+}
+
+// An app the hub cannot open the bucket of is paused: nothing of it is
+// copied or deleted, and it says why.
+func TestPausedApp(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	os.MkdirAll(a.appDir("shop"), 0o700)
+	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
+	b := newBackups(a, nil)
+	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Workspace: "ws"}, Paused: map[string]string{"shop": "the bucket of shop cannot be opened"}})
+	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil || !strings.Contains(err.Error(), "cannot be opened") {
+		t.Fatalf("a paused app: %v", err)
+	}
+}
+
+// A restore that waits for the app's lock already keeps edits out: none
+// slips in between.
+func TestEditsRefusedWhileARestoreWaits(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	file, _ := sqliteDatabase(t)
+	release := a.releaseDir("shop", 1)
+	os.MkdirAll(release, 0o700)
+	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
+	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
+	a.backups = newBackups(a, nil)
+	unlock := a.lock("shop")
+	done := make(chan error, 1)
+	go func() {
+		done <- a.backups.restore(context.Background(), protocol.BackupRestore{ID: "r1", App: "shop", Copy: "20261107T140000Z"})
+	}()
+	for !a.backups.busy("shop") {
+		time.Sleep(time.Millisecond)
+	}
+	if _, err := a.query(context.Background(), protocol.DBQuery{DBRequest: protocol.DBRequest{App: "shop"}, SQL: `INSERT INTO notes DEFAULT VALUES`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
+		t.Fatalf("an edit while a restore waits: %v", err)
+	}
+	unlock()
+	<-done
 }

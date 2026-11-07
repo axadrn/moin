@@ -95,7 +95,7 @@ type DeployDone struct {
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
 	// Before is when the daemon took the copies just before the new
-	// release started over an older one, which is their ID in
-	// CopyIDLayout: the hub names them "Before v12".
+	// release started over an older one, the time in their IDs: the hub
+	// names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
 }

@@ -170,7 +170,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	// before backups stop; one that does not is ended by the next start.
 	defer func() {
 		daemon.waitIdle(stopWait)
-		daemon.backups.configure(nil, nil, nil)
+		daemon.backups.configure(protocol.BackupConfig{})
 	}()
 	go daemon.backups.loop(ctx)
 	go daemon.apps.cleanups(ctx)

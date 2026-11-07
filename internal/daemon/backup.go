@@ -42,14 +42,11 @@ type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
 	// Restore builds the database beside the live one, stops the app,
-	// renames the live one aside as the undo id and the built one in,
-	// and starts the app. It calls step with "switching" before the
-	// first rename, "aside" after it and "switched" after the second, so
-	// the mark says how far it came.
-	Restore(ctx context.Context, from source, id string, step func(string) error) error
-	// Recover is the crash rule of the restore a mark names, decided by
-	// the step it reached (see recoverFrom). switched says the restore
-	// had switched.
+	// switches in one atomic step, the live one kept as the undo id, and
+	// starts the app. There is never a moment without a live database.
+	Restore(ctx context.Context, from source, id string) error
+	// Recover tidies after a restore the daemon stopped in and says
+	// whether it had switched, from what is there.
 	Recover(ctx context.Context, mark restoreMark) (switched bool, err error)
 	// Check restores a copy into a throwaway database and reads it all.
 	Check(ctx context.Context, copy io.Reader) error
@@ -83,22 +80,25 @@ type backups struct {
 	buckets   map[string]*protocol.Bucket
 	schedules map[string]protocol.Schedule
 	states    map[string]*state
-	// restoring are the apps a restore works on: no copy, no edit.
+	// restoring are the apps a restore works on: no copy, no edit;
+	// paused the apps the hub cannot open the bucket of, with why.
 	restoring map[string]bool
+	paused    map[string]string
 	// stores and watched are Litestream's, see backup_sqlite.go.
 	stores  map[int]*litestream.Store
 	watched map[string]watched
 	// copying takes one copy at a time, ticking one round.
 	copying, ticking sync.Mutex
-	// crash ends a restore at a step as a killed daemon would, in tests.
-	crash func(step string) bool
+	// crash ends a restore "before" or "after" the switch as a killed
+	// daemon would, in tests.
+	crash func(when string) bool
 }
 
 // state is what the daemon knows of one database: its newest copy, why
 // the last one failed, the newest daily check and what the hub heard
 // last.
 type state struct {
-	copied, lastID     time.Time
+	copied             time.Time
 	failed             string
 	checkedAt          time.Time
 	checkErr, reported string
@@ -107,7 +107,7 @@ type state struct {
 var errCrash = errors.New("the daemon stopped here")
 
 func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups {
-	return &backups{apps: a, send: send, states: map[string]*state{}, restoring: map[string]bool{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
+	return &backups{apps: a, send: send, states: map[string]*state{}, restoring: map[string]bool{}, paused: map[string]string{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
 }
 
 func (b *backups) engine(app string, database protocol.Database) engine {
@@ -130,12 +130,11 @@ func (b *backups) state(app string, database protocol.Database) *state {
 	return b.states[k]
 }
 
-func newCopyID() string { return time.Now().UTC().Format(protocol.CopyIDLayout) }
-
 // configure sets the buckets and schedules; a nil bucket stops backups.
-func (b *backups) configure(bucket *protocol.Bucket, buckets map[string]*protocol.Bucket, schedules map[string]protocol.Schedule) {
+func (b *backups) configure(config protocol.BackupConfig) {
+	bucket := config.Bucket
 	b.mu.Lock()
-	b.bucket, b.buckets, b.schedules = bucket, buckets, schedules
+	b.bucket, b.buckets, b.schedules, b.paused = bucket, config.AppBuckets, config.Schedules, config.Paused
 	b.mu.Unlock()
 	if bucket == nil {
 		b.forget(nil)
@@ -161,11 +160,14 @@ func (b *backups) schedule(app string) protocol.Schedule {
 // <path>/<workspace>/<app>/<app ID>/<database>.
 func (b *backups) where(app string, database protocol.Database) (*protocol.Bucket, string, error) {
 	b.mu.Lock()
-	bucket := b.buckets[app]
+	bucket, paused := b.buckets[app], b.paused[app]
 	if bucket == nil {
 		bucket = b.bucket
 	}
 	b.mu.Unlock()
+	if paused != "" {
+		return nil, "", errors.New(paused)
+	}
 	if bucket == nil {
 		return nil, "", errors.New("backups are not set up: add a bucket under Data")
 	}
@@ -176,24 +178,16 @@ func (b *backups) where(app string, database protocol.Database) (*protocol.Bucke
 	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
 }
 
-// copy streams a copy of a database into the bucket as id, or as the
-// next second when a copy of the database already has id: the IDs of a
-// database only grow, so no copy overwrites another. It returns the ID.
-func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
+// copy streams a copy of a database taken at at into the bucket and
+// returns its ID.
+func (b *backups) copy(ctx context.Context, app string, database protocol.Database, at time.Time) (string, error) {
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
 		return "", err
 	}
 	b.copying.Lock()
 	defer b.copying.Unlock()
-	at, _ := time.Parse(protocol.CopyIDLayout, id)
-	b.mu.Lock()
-	s := b.state(app, database)
-	if !at.After(s.lastID) {
-		at = s.lastID.Add(time.Second)
-	}
-	s.lastID, id = at, at.Format(protocol.CopyIDLayout)
-	b.mu.Unlock()
+	id := protocol.NewCopyID(at)
 	ctx, cancel := context.WithTimeout(ctx, copyTimeout)
 	defer cancel()
 	reader, writer := io.Pipe()
@@ -206,7 +200,7 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
 	b.mu.Lock()
-	if at.After(s.copied) {
+	if s := b.state(app, database); at.After(s.copied) {
 		s.copied = at
 	}
 	b.mu.Unlock()
@@ -228,7 +222,7 @@ func (b *backups) copies(ctx context.Context, app string, database protocol.Data
 		}
 		for _, object := range page.Contents {
 			id := strings.TrimSuffix(path.Base(aws.ToString(object.Key)), path.Base(protocol.CopyFile("", database.Postgres())))
-			if at, err := time.Parse(protocol.CopyIDLayout, id); err == nil {
+			if at, ok := protocol.CopyTime(id); ok {
 				copies = append(copies, protocol.Copy{ID: id, At: at, Size: aws.ToInt64(object.Size)})
 			}
 		}
@@ -363,11 +357,11 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 		b.mu.Unlock()
 		return nil
 	}
-	id, err := b.copy(ctx, app, database, newCopyID())
+	at := time.Now().UTC().Truncate(time.Second)
+	id, err := b.copy(ctx, app, database, at)
 	if err != nil {
 		return err
 	}
-	at, _ := time.Parse(protocol.CopyIDLayout, id)
 	return b.prune(ctx, app, database, append([]protocol.Copy{{ID: id, At: at}}, copies...))
 }
 
@@ -460,23 +454,22 @@ func (b *backups) checkAll(ctx context.Context) {
 }
 
 // copyBefore copies the app's databases, or the one named, just before a
-// deploy or an edit, and returns the ID of the copies; nil without
-// backups or when none worked. logf says when one failed.
+// deploy or an edit, and returns when: the time in the copies' IDs; nil
+// without backups or when none worked. logf says when one failed.
 func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(string, ...any)) *time.Time {
 	if b == nil || !b.on() {
 		return nil
 	}
-	id, took := newCopyID(), false
+	at, took := time.Now().UTC().Truncate(time.Second), false
 	for _, database := range b.databases(ctx, app) {
 		if only == "" || database.Path == only {
-			_, err := b.copy(ctx, app, database, id)
+			_, err := b.copy(ctx, app, database, at)
 			if err != nil {
 				logf("the copy of %s before the change failed: %s", database.Path, err)
 			}
 			took = took || err == nil
 		}
 	}
-	at, _ := time.Parse(protocol.CopyIDLayout, id)
 	if !took {
 		return nil
 	}
@@ -528,14 +521,13 @@ func (b *backups) list(ctx context.Context, request protocol.BackupRequest) prot
 // restoreMark is a restore in restores/<id>.json in the daemon's folder,
 // written whole before anything changes, so a start after a crash knows
 // it ran. Undo names the state before, which it leaves; From the undo it
-// goes back to, if it does; Step how far it came.
+// goes back to, if it does.
 type restoreMark struct {
 	ID         string     `json:"id"`
 	App        string     `json:"app"`
 	Database   string     `json:"database"`
 	Undo       string     `json:"undo"`
 	From       string     `json:"from,omitempty"`
-	Step       string     `json:"step,omitempty"`
 	State      string     `json:"state"`
 	Error      string     `json:"error,omitempty"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
@@ -557,19 +549,16 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	if err != nil {
 		return err
 	}
-	// The undo's ID grows past every undo there, as a copy's does.
-	undo := newCopyID()
-	if undos, _ := b.engine(request.App, database).Undos(ctx); len(undos) > 0 && undo <= undos[0].ID {
-		undo = strayID(undos[0].ID)
-	}
-	mark := restoreMark{ID: request.ID, App: request.App, Database: database.Path, Undo: undo, From: request.Undo, State: protocol.RestoreRunning}
+	mark := restoreMark{ID: request.ID, App: request.App, Database: database.Path, Undo: protocol.NewCopyID(time.Now()), From: request.Undo, State: protocol.RestoreRunning}
 	if err := writeState(b.markFile(mark.ID), mark); err != nil {
 		return fmt.Errorf("write the restore down: %w", err)
 	}
-	defer b.apps.lock(request.App)()
+	// Edits are refused from here on, and those that hold the lock end
+	// first.
 	b.mu.Lock()
 	b.restoring[request.App] = true
 	b.mu.Unlock()
+	defer b.apps.lock(request.App)()
 	var from source
 	switch {
 	case protocol.ValidCopyID(request.Copy):
@@ -585,22 +574,8 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	default:
 		err = errors.New("pick a copy, a minute or an undo to go back to")
 	}
-	// Each step is written down before the next: the crash rule reads
-	// it. Only "switching" must be: the rule reads a mark left there.
-	step := func(reached string) error {
-		mark.Step = reached
-		if err := writeState(b.markFile(mark.ID), mark); err != nil && reached == "switching" {
-			return err
-		} else if err != nil {
-			slog.Warn("backup: write down the step of a restore", "step", reached, "error", err)
-		}
-		if b.crash != nil && b.crash(reached) {
-			return errCrash
-		}
-		return nil
-	}
 	if err == nil {
-		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo, step)
+		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo)
 	}
 	b.mu.Lock()
 	delete(b.restoring, request.App)
@@ -654,11 +629,11 @@ func (b *backups) restoreStates(app string) []protocol.RestoreState {
 	return states
 }
 
-// recover ends the restores a stopped daemon left running: the crash rule
-// puts a whole database in place, the app starts, the result is written
-// down. When the rule cannot act, the mark stays and the next start
-// tries again. Then it sweeps what stopped copies and checks left. The
-// daemon runs it when it starts.
+// recover ends the restores a stopped daemon left running: the database
+// is whole either way, the app starts again, and the result says which
+// database it runs on. When it cannot tell, the mark stays and the next
+// start tries again. Then it sweeps what stopped copies and checks left.
+// The daemon runs it when it starts.
 func (b *backups) recover(ctx context.Context) {
 	for _, mark := range b.marks() {
 		if mark.State != protocol.RestoreRunning {
@@ -689,29 +664,6 @@ func (b *backups) recover(ctx context.Context) {
 			}
 		}
 	}
-}
-
-// recoverFrom is the crash rule, the same for every engine: before
-// "switching" nothing moved; at "switched" the restore is done. Between,
-// the aside missing means nothing moved, the built one still there means
-// the second rename never happened, so the aside goes back, and what
-// stands in the live place meanwhile (an app that made an empty database
-// on its start) goes aside as an undo of its own. Else it switched.
-func recoverFrom(step string, aside, built bool, putBack func() error) (bool, error) {
-	switch {
-	case step == "", step != "switched" && !aside:
-		return false, nil
-	case step != "switched" && built:
-		return false, putBack()
-	}
-	return true, nil
-}
-
-// strayID is the ID a second after an undo's: for what stood in the live
-// place during a restore, or the next restore's undo.
-func strayID(undo string) string {
-	at, _ := time.Parse(protocol.CopyIDLayout, undo)
-	return at.Add(time.Second).Format(protocol.CopyIDLayout)
 }
 
 // busy says a restore works on an app: its data waits.

@@ -49,7 +49,7 @@ func (r *runner) backupConfig(message protocol.Message, rules *protocol.Rules) {
 		}
 	}
 	r.apps.keepIDs(config.Apps)
-	r.backups.configure(config.Bucket, config.AppBuckets, config.Schedules)
+	r.backups.configure(config)
 	go r.backups.tick(context.Background())
 	r.send(protocol.TypeOK, message.RequestID, nil)
 }

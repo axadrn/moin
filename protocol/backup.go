@@ -40,6 +40,9 @@ type BackupConfig struct {
 	AppBuckets map[string]*Bucket  `json:"app_storage,omitempty"`
 	Apps       map[string]string   `json:"apps,omitempty"`
 	Schedules  map[string]Schedule `json:"schedules,omitempty"`
+	// Paused are the apps whose bucket the hub cannot open, with why:
+	// the daemon copies and deletes nothing of them until it can.
+	Paused map[string]string `json:"paused,omitempty"`
 }
 
 // Schedule is how an app is backed up: a copy every Every minutes, each
@@ -117,7 +120,8 @@ type DatabaseBackup struct {
 }
 
 // Copy is one copy of a database in the bucket, or one state before a
-// restore on the server. Its ID is when it was taken, in CopyIDLayout.
+// restore on the server. Its ID starts with when it was taken
+// (NewCopyID).
 // Size is 0 when moin does not know it.
 type Copy struct {
 	ID   string    `json:"id"`

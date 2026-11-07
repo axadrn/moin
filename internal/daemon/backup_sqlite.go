@@ -96,10 +96,11 @@ func fileSize(name string) int64 {
 }
 
 // Restore builds app.db.moin-restore and checks it, or takes the undo
-// app.db.moin-before-<undo>. With the app stopped it folds the live
-// file's log into it, renames it to app.db.moin-before-<id> and the built
-// file in its place.
-func (e *sqliteEngine) Restore(ctx context.Context, from source, id string, step func(string) error) (err error) {
+// app.db.moin-before-<undo>. With the app stopped and the live file's log
+// folded in, it links the live file as app.db.moin-before-<id>, the undo,
+// and renames the built file over it: one atomic step, the old file
+// before it, the new one after, never none.
+func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err error) {
 	live := e.database.HostPath
 	aside, built := undoFile(live, id), live+".moin-restore"
 	if from.undo != "" {
@@ -113,7 +114,6 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string, step
 		}
 		removeDatabase(built)
 		defer func() {
-			// After a crash the crash rule needs it (and tests crash here).
 			if !errors.Is(err, errCrash) {
 				removeDatabase(built)
 			}
@@ -141,23 +141,20 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string, step
 	if err := checkpoint(ctx, live); err != nil {
 		return errors.Join(fmt.Errorf("fold the log into the database: %w; nothing changed", err), start())
 	}
-	if err := step("switching"); errors.Is(err, errCrash) {
-		return err
-	} else if err != nil {
-		return errors.Join(fmt.Errorf("write the restore down: %w; nothing changed", err), start())
+	if e.b.crash != nil && e.b.crash("before") {
+		return errCrash
 	}
-	if err := os.Rename(live, aside); err != nil {
-		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
-	}
-	if err := step("aside"); err != nil {
-		return err
+	if err := errors.Join(os.Link(live, aside), syncFile(filepath.Dir(live))); err != nil {
+		os.Remove(aside)
+		return errors.Join(fmt.Errorf("keep the undo: %w; nothing changed", err), start())
 	}
 	if err := os.Rename(built, live); err != nil {
-		return errors.Join(fmt.Errorf("switch: %w", err), os.Rename(aside, live), start())
+		os.Remove(aside)
+		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
 	}
 	_ = syncFile(filepath.Dir(live))
-	if err := step("switched"); err != nil {
-		return err
+	if e.b.crash != nil && e.b.crash("after") {
+		return errCrash
 	}
 	// Every change starts again from the restored file.
 	_ = os.RemoveAll(litestreamState(live))
@@ -196,39 +193,24 @@ func (e *sqliteEngine) build(ctx context.Context, from source, target string) er
 	return errors.Join(err, out.Close())
 }
 
-// Recover puts the file back by the crash rule (recoverFrom): a file in
-// the live place that is not the restored one goes aside as an undo.
+// Recover tells from the undo: a second name of the live file means the
+// switch never happened, and it goes; another file means it did.
 func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, error) {
 	live := e.database.HostPath
-	aside, built := undoFile(live, mark.Undo), live+".moin-restore"
-	if mark.From != "" {
-		built = undoFile(live, mark.From)
+	aside := undoFile(live, mark.Undo)
+	liveInfo, err1 := os.Stat(live)
+	asideInfo, err2 := os.Stat(aside)
+	switched := err1 == nil && err2 == nil && !os.SameFile(liveInfo, asideInfo)
+	if !switched && err2 == nil {
+		os.Remove(aside)
 	}
-	// No live file is never switched: the built one is what would be there.
-	switched, err := recoverFrom(mark.Step, exists(aside), exists(built) || !exists(live), func() error {
-		if exists(live) {
-			// The app stops first, so it writes into no undo, and the
-			// stray file goes with its log, so no foreign log is replayed.
-			if _, err := e.b.apps.stopServices(ctx, e.app); err != nil {
-				return err
-			}
-			stray := undoFile(live, strayID(mark.Undo))
-			for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
-				if err := os.Rename(live+suffix, stray+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
-					return err
-				}
-			}
-		}
-		return errors.Join(os.Rename(aside, live), syncFile(filepath.Dir(live)))
-	})
-	if err != nil {
-		return false, err
+	if mark.From == "" {
+		removeDatabase(live + ".moin-restore")
 	}
-	removeDatabase(live + ".moin-restore")
 	if switched {
-		err = os.RemoveAll(litestreamState(live))
+		return true, os.RemoveAll(litestreamState(live))
 	}
-	return switched, err
+	return false, nil
 }
 
 // Check unpacks a copy next to the database and runs SQLite's integrity
@@ -251,8 +233,8 @@ func (e *sqliteEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
 	undos := []protocol.Copy{}
 	for index := len(files) - 1; index >= 0; index-- {
 		id := strings.TrimPrefix(files[index], undoFile(e.database.HostPath, ""))
-		at, parseErr := time.Parse(protocol.CopyIDLayout, id)
-		if info, statErr := os.Stat(files[index]); parseErr == nil && statErr == nil {
+		at, ok := protocol.CopyTime(id)
+		if info, statErr := os.Stat(files[index]); ok && statErr == nil {
 			undos = append(undos, protocol.Copy{ID: id, At: at, Size: info.Size()})
 		}
 	}
@@ -299,7 +281,7 @@ func (b *backups) record(ctx context.Context, app string, database protocol.Data
 		return nil
 	}
 	if generation(live) == "" {
-		if err := errors.Join(os.RemoveAll(litestreamState(live)), os.MkdirAll(litestreamState(live), 0o700), os.WriteFile(generationFile(live), []byte(newCopyID()), 0o600)); err != nil {
+		if err := errors.Join(os.RemoveAll(litestreamState(live)), os.MkdirAll(litestreamState(live), 0o700), os.WriteFile(generationFile(live), []byte(protocol.NewCopyID(time.Now())), 0o600)); err != nil {
 			return err
 		}
 	}
