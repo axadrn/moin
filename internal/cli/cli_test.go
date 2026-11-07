@@ -181,7 +181,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
 		{"env", "rm", "--app", "shop", "KEY"},
-		{"domains", "rm", "--app", "shop", "blog.de"},
+		{"domains", "rm", "--app", "shop", "blog.example.com"},
 		{"unlink", "shop"},
 		{"hook", "shop"},
 		{"buckets", "rm", "client-a"},
@@ -189,7 +189,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		// The big ones want the name, the others --yes.
 		if code != 1 || (!strings.Contains(stderr, "--yes") && !strings.Contains(stderr, "--confirm "+args[2])) {
@@ -488,11 +488,11 @@ func TestOneNamePerCommand(t *testing.T) {
 // moin apps shop shows one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
 	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true},
-		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.de"],"config":{"domains":["shop.de"]}}}]}`
+		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"],"config":{"domains":["shop.example.com"]}}}]}`
 	for _, args := range [][]string{{"apps", "shop"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.de, from compose.yml") || !strings.Contains(stdout, "me/shop, branch main, auto deploy on") || !strings.Contains(stdout, "v2") {
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "me/shop, branch main, auto deploy on") || !strings.Contains(stdout, "v2") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
 	}
@@ -504,7 +504,7 @@ func TestAppsWithANameShowsTheApp(t *testing.T) {
 
 // Domains that x-moin sets are marked, with where to change them.
 func TestDomainsFromComposeAreMarked(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.de","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.example.com","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
 	code, stdout, stderr := runCLI(t, api, "domains", "shop")
 	if code != 0 || strings.Contains(stdout, "no domains yet") || !strings.Contains(stdout, "canonical, from compose.yml") || !strings.Contains(stdout, "change them there and deploy") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)

@@ -34,7 +34,7 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 
 | Key | Does |
 | --- | --- |
-| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `shop logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs. [Palette and keys](/docs/reference/palette) |
+| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `my-app logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs. [Palette and keys](/docs/reference/palette) |
 | `esc` | back one level; closes what is open first |
 | `?` | every key of this place and the ones that work everywhere; `↑` `↓` scroll them on a small screen |
 | `q` | quits on the overview, goes back elsewhere |
@@ -48,7 +48,7 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 
 | | |
 | --- | --- |
-| A question, like "Stop shop?" | `y` does it, `esc` cancels |
+| A question, like "Stop my-app?" | `y` does it, `esc` cancels |
 | A restore | cannot be undone: type the app's name, then `enter`; paste works |
 | A line to type into | `enter` takes it, `esc` cancels, `ctrl+u` clears it, `ctrl+w` deletes the last word |
 | A switch, a paused check, an env var | changes on the screen at once; if the hub refuses, the footer says why in red and the tab loads what is true again |

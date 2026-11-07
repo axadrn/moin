@@ -16,7 +16,7 @@ MCP: get_metrics
 ```
 
 ```bash
-moin metrics shop --range 24h
+moin metrics my-app --range 24h
 ```
 
 Ranges are the last hour, 24 hours, 7 or 30 days. The last hour has every sample and updates itself every 15 seconds; longer ranges show averages. `moin metrics` takes an app or a server: a name that is no app is looked up as a server.

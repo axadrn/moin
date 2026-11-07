@@ -42,7 +42,7 @@ func (u Uptime) Summary() string {
 	return summary
 }
 
-// domainSummary is one domain in a few words: "blog.de up, 99.9% in 24h".
+// domainSummary is one domain in a few words: "my-app.example.com up, 99.9% in 24h".
 func domainSummary(domain api.UptimeDomain) string {
 	text := domain.Domain + " " + domain.State
 	if domain.State == "down" && domain.Error != "" {

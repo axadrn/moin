@@ -21,12 +21,12 @@ func TestAppDomainsRules(t *testing.T) {
 	reader := environment.token(t, "ada", ada.Workspace.ID, "read")
 
 	fields := expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
-		body: `{"service":"api","domains":["api.shop.de"],"canonical":"api.shop.de"}`}), http.StatusUnprocessableEntity, "validation_failed").Fields
+		body: `{"service":"api","domains":["api.shop.example.com"],"canonical":"api.shop.example.com"}`}), http.StatusUnprocessableEntity, "validation_failed").Fields
 	if fields["canonical"] != "canonical is for the main service only." {
 		t.Fatalf("fields = %v", fields)
 	}
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
-		body: `{"service":"api","domains":["api.shop.de"]}`}), http.StatusNotFound, "not_found")
+		body: `{"service":"api","domains":["api.shop.example.com"]}`}), http.StatusNotFound, "not_found")
 
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/apps/shop/instant?show=true", bearer: reader}), http.StatusForbidden, "insufficient_scope")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/apps/shop/instant?show=true", bearer: writer}), http.StatusNotFound, "not_found")

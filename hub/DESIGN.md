@@ -100,7 +100,7 @@ Every page is a full page load; there is no hx-boost and no client router.
 - **htmx only acts on the page:** save, delete, a switch, a search, a part
   that reloads itself. Never to switch pages.
 - **One tab bar per page at most** (`kit.Segmented`). A second level is a
-  list that drills down to its own page ("‹ shop" back), never a second tab
+  list that drills down to its own page ("‹ my-app" back), never a second tab
   bar. Filters that only narrow (a time range) are a `kit.Select`.
 - **Tabs only on an app's top level.** App, Deploys, Domains, Logs, Data
   and Settings have the app's head and its tabs. Anything one level deeper

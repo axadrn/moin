@@ -49,7 +49,7 @@ Servers
   servers            List servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets the next free web-N
   servers rm         Remove a server: servers rm web-1 [--confirm web-1]
-  servers rename     Rename a server: servers rename web-1 shop-1
+  servers rename     Rename a server: servers rename web-1 web-2
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
   servers update     Update the daemon to the hub's version now: servers update [web-1]
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
@@ -80,9 +80,9 @@ Deploys
 
 Domains
   domains            List domains and their DNS: domains [app]
-  domains add        Add domains: domains add blog.de www.blog.de, or for another service: --service api api.blog.de
-  domains rm         Remove domains: domains rm www.blog.de [--yes]
-  domains canonical  Redirect the others to one: domains canonical blog.de|none
+  domains add        Add domains: domains add my-app.example.com www.my-app.example.com, or for another service: --service api api.my-app.example.com
+  domains rm         Remove domains: domains rm www.my-app.example.com [--yes]
+  domains canonical  Redirect the others to one: domains canonical my-app.example.com|none
   instant            The instant address, https://<app>.<ip>.sslip.io: instant [--show] [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
   instant open       No password on the instant address; protect puts it back: instant open [app]
@@ -91,9 +91,9 @@ Domains
 
 Uptime
   uptime             Uptime of every domain, 24 hours, 7 and 30 days, and the last outages: uptime [app]
-  uptime path        The path uptime visits on a domain: uptime path blog.de /health, or default
-  uptime pause       Pause uptime of a domain: uptime pause blog.de
-  uptime resume      Visit it every minute again: uptime resume blog.de
+  uptime path        The path uptime visits on a domain: uptime path my-app.example.com /health, or default
+  uptime pause       Pause uptime of a domain: uptime pause my-app.example.com
+  uptime resume      Visit it every minute again: uptime resume my-app.example.com
 
 Metrics
   metrics            CPU, memory and network of an app now, with a sparkline: metrics [app] [--range 1h|24h|7d|30d]
@@ -120,9 +120,9 @@ Catalog
 
 Data
   db                 Tables, rows and migration of the app's database, SQLite or Postgres: db [app]
-  db rows            A page of a table, newest first: db rows orders [--limit 20] [--offset 20]
+  db rows            A page of a table, newest first: db rows users [--limit 20] [--offset 20]
   db schema          The CREATE statements: db schema [table]
-  sql                Run SQL, read only: sql "SELECT * FROM orders LIMIT 5"
+  sql                Run SQL, read only: sql "SELECT * FROM users LIMIT 5"
   sql --write        Run SQL that changes data, in one transaction; DROP or DELETE asks [--yes]
 
 Backups

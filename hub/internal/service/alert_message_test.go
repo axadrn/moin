@@ -17,12 +17,12 @@ var alertMessageCases = []struct {
 	details        map[string]string
 	want           string
 }{
-	{"uptime.down", "shop", map[string]string{"domain": "shop.de", "reason": "HTTP 502"},
-		`🔴 shop.de is down | App: shop / Since: 2026-11-03 14:02 UTC / Reason: HTTP 502 | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.down","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"shop.de","reason":"HTTP 502","since":"2026-11-03T14:02:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
+	{"uptime.down", "shop", map[string]string{"domain": "shop.example.com", "reason": "HTTP 502"},
+		`🔴 shop.example.com is down | App: shop / Since: 2026-11-03 14:02 UTC / Reason: HTTP 502 | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.down","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"shop.example.com","reason":"HTTP 502","since":"2026-11-03T14:02:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
 	{"uptime.down", "shop", nil,
 		`🔴  is down | App: shop / Since: 2026-11-03 14:02 UTC / Reason: - | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.down","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"","reason":"","since":"2026-11-03T14:02:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
-	{"uptime.up", "shop", map[string]string{"domain": "shop.de", "duration": "4m30s"},
-		`🟢 shop.de is back up | App: shop / It was down for 4 minutes 30 seconds. | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.up","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"shop.de","reason":"","since":"","duration":"4m30s","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
+	{"uptime.up", "shop", map[string]string{"domain": "shop.example.com", "duration": "4m30s"},
+		`🟢 shop.example.com is back up | App: shop / It was down for 4 minutes 30 seconds. | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.up","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"shop.example.com","reason":"","since":"","duration":"4m30s","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
 	{"uptime.up", "shop", nil,
 		`🟢  is back up | App: shop / It was down for -. | https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime | {"event":"uptime.up","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"","reason":"","since":"","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"}`},
 	{"server.down", "web-1", map[string]string{"since": "2026-11-03 14:02 UTC"},

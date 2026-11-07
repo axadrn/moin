@@ -18,8 +18,8 @@ func TestUptimeShowsEveryDomain(t *testing.T) {
 	view := UptimeView{App: model.App{Name: "shop", ServerName: "web-1"}, Now: now, Uptime: service.AppUptime{
 		State: model.UptimeDown, Server: "web-1",
 		Domains: []service.UptimeDomain{
-			{Domain: "shop.de", Path: "/health", State: model.UptimeUp, Uptime24h: &full, Uptime7d: &some},
-			{Domain: "www.shop.de", Path: "/", State: model.UptimeDown, Error: "HTTP 502", Outages: []model.UptimeOutage{{StartedAt: started, EndedAt: &ended, Reason: "HTTP 502"}}},
+			{Domain: "shop.example.com", Path: "/health", State: model.UptimeUp, Uptime24h: &full, Uptime7d: &some},
+			{Domain: "www.shop.example.com", Path: "/", State: model.UptimeDown, Error: "HTTP 502", Outages: []model.UptimeOutage{{StartedAt: started, EndedAt: &ended, Reason: "HTTP 502"}}},
 		},
 	}}
 	var html strings.Builder
@@ -27,7 +27,7 @@ func TestUptimeShowsEveryDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-uptime-domain="shop.de"`, `data-uptime-domain="www.shop.de"`, `placeholder="/health"`, "100%", "99.50%", "down for 30m · HTTP 502", "data-server-offline", `data-uptime-state="down"`} {
+	for _, want := range []string{`data-uptime-domain="shop.example.com"`, `data-uptime-domain="www.shop.example.com"`, `placeholder="/health"`, "100%", "99.50%", "down for 30m · HTTP 502", "data-server-offline", `data-uptime-state="down"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}

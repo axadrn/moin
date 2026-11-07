@@ -89,7 +89,7 @@ func uptime(ctx context.Context, args []string, stdout io.Writer) error {
 
 func printUptime(w io.Writer, answer client.Uptime, now time.Time) {
 	if len(answer.Domains) == 0 {
-		fmt.Fprintf(w, "%s has no domains to visit. Add one: %s\n", answer.App, command(w, build.Name+" domains add blog.de"))
+		fmt.Fprintf(w, "%s has no domains to visit. Add one: %s\n", answer.App, command(w, build.Name+" domains add my-app.example.com"))
 		return
 	}
 	rows := [][]string{}

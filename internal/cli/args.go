@@ -54,7 +54,7 @@ func (f *flagSet) withConfirm() *flagSet {
 }
 
 // parse reads flags before, between and after the arguments, so
-// `rollback v3 --app shop` works like `rollback --app shop v3`. After
+// `rollback v3 --app my-app` works like `rollback --app my-app v3`. After
 // "--" everything is an argument.
 func (f *flagSet) parse(args []string) error {
 	return f.check(parseAnywhere(f.FlagSet, args), args)
@@ -167,7 +167,7 @@ func (h helpError) print(w io.Writer) {
 }
 
 // parseAnywhere parses flags before and after the arguments, so
-// `db rows orders --limit 5` works like `db rows --limit 5 orders`. After
+// `db rows users --limit 5` works like `db rows --limit 5 users`. After
 // "--" everything is an argument.
 func parseAnywhere(flags *flag.FlagSet, args []string) error {
 	positional := []string{}

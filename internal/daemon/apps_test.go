@@ -257,18 +257,18 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.de"}}, &protocol.Domains{Domains: []string{"Blog.de", "www.blog.de"}, Protect: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.example.com"}}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Protect: "me:$2y$05$abc"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detected.Domains[0] != "blog.de" || detected.Canonical != "blog.de" || !detected.Protected {
+	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" || !detected.Protected {
 		t.Fatalf("detected = %+v", detected)
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
 	addRouters(config, service, "blog", project("blog"), detected.Domains, detected.Canonical, detected.Port, "me:$2y$05$abc", "", "")
 	labels := service["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.de`) || Host(`www.blog.de`)" {
+	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
 	}
 	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical,moin-blog-auth" {
@@ -277,7 +277,7 @@ func TestRouterLabels(t *testing.T) {
 	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"] != "me:$$2y$$05$$abc" {
 		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"])
 	}
-	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.de)(:[0-9]+)?(.*)` {
+	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.example\.com)(:[0-9]+)?(.*)` {
 		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
 	}
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {

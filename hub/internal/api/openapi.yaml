@@ -5303,7 +5303,7 @@ components:
               type: string
         instant:
           type: string
-          description: The app's instant address, such as https://shop.203-0-113-7.sslip.io. Empty when it has none.
+          description: The app's instant address, such as https://my-app.203-0-113-7.sslip.io. Empty when it has none.
         instant_provider:
           type: string
           enum: [sslip.io, nip.io, 'off']
@@ -5487,10 +5487,10 @@ components:
           type: array
           items:
             type: string
-          example: [blog.de, www.blog.de]
+          example: [my-app.example.com, www.my-app.example.com]
         canonical:
           type: string
-          example: blog.de
+          example: my-app.example.com
         service:
           type: string
           description: Set the domains of this service of compose.yml, not the main one. `canonical` is for the main service only.

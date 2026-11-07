@@ -95,7 +95,7 @@ templ AppAddForm(servers []model.Server) {
 	>
 		@kit.CSRF()
 		<label for="app-name" class="sr-only">App name</label>
-		@kit.Input(templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like blog", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+		@kit.Input(templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like my-app", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
 		<div class="flex gap-2 sm:w-64">
 			@kit.Select(kit.SelectProps{ID: "app-server", Name: "server", Label: "Server", Options: serverOptions(servers)})
 			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {

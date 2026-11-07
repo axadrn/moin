@@ -49,7 +49,7 @@ func appSectionLabel(id string) string {
 // its buttons (Restart or Start, Deploy), and under them its state, the one
 // answer of the page: under the name, before the buttons on a phone, under
 // both from sm. On a phone a section other than App is a page of its
-// own: "‹ shop" and the section's name, like a list that drills down.
+// own: "‹ my-app" and the section's name, like a list that drills down.
 templ appHeader(app model.App, section string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	if section != "app" {

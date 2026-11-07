@@ -12,9 +12,9 @@ The palette is a box in the middle of the screen: type what you want, press `ent
  │
  ▼
 ┌────────────────────────────────┐
-│ shop lo                        │
+│ my-app lo                      │
 ├────────────────────────────────┤
-│ ▸ Logs    shop               L │
+│ ▸ Logs    my-app             L │
 │   ...                          │
 └────────────────────────────────┘
   ↓ ↑ pick   enter go   esc close
@@ -45,10 +45,10 @@ You do not have to type it right.
 
 | You type | It finds |
 | --- | --- |
-| `shop logs` or `logs shop` | the logs of shop: words in any order |
+| `my-app logs` or `logs my-app` | the logs of my-app: words in any order |
 | `deplyo`, `setings` | deploy, settings: one typo is fine in words of four letters or more |
 | `dply` | deploy: the letters in order are enough |
-| `sl` | shop logs: the first letters of several words |
+| `ml` | my-app logs: the first letters of several words |
 
 Every answer shows its key at the right: the key that does the same without the palette.
 

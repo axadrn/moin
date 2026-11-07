@@ -102,21 +102,21 @@ The same for Postgres, with databases instead of files:
 
 ```
 1 build beside, the app runs
-  shop             live
+  my-app           live
   moin_restore_…   built
 
 2 stop the app, switch
   in one transaction:
-  shop ─▶ moin_before_…
-  moin_restore_… ─▶ shop
+  my-app ─▶ moin_before_…
+  moin_restore_… ─▶ my-app
 
 3 start the app
-  shop             restored
+  my-app           restored
   moin_before_…    the undo
 ```
 
 - **SQLite.** moin unpacks the copy into `app.db.moin-restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, gives it a second name, `app.db.moin-before-<time>` (a hard link: the same file, no copy), and renames the restored file over `app.db` in one step. Then it starts the app. The stop lasts a moment.
-- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `moin_before_<time>_<hash>` and the built one to `shop` in one transaction, so both happen or neither, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
+- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `my-app` to `moin_before_<time>_<hash>` and the built one to `my-app` in one transaction, so both happen or neither, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
 
 Both need room for one more database beside the live one: moin looks first. While a restore runs, edits through moin are refused (they would be lost, or lose it): make them when it is done. During a deploy they wait until the new version is up.
 

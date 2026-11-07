@@ -143,7 +143,7 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		done(stdout, "Removed %s. Its data stays on the server", style.Bold.Render(name))
 		return nil
 	}
-	// apps shop shows one app, the way people try it after apps.
+	// apps my-app shows one app, the way people try it after apps.
 	if len(args) > 0 {
 		return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+command, build.Name)
 	}

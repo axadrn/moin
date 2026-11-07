@@ -121,7 +121,7 @@ func protectHash(domains *protocol.Domains) string {
 // addRouters puts a service of app on the proxy network and labels its routes:
 // every domain over HTTPS, the other domains redirecting to the canonical
 // one, and basic auth when a password is set. name names its router, such
-// as moin-shop for the main service; instant, when set, is the instant
+// as moin-my-app for the main service; instant, when set, is the instant
 // address on a router of its own, with instantProtect in front of it.
 func addRouters(config, service map[string]any, app, name string, domains []string, canonical string, port int, protect, instant, instantProtect string) {
 	labels := map[string]any{

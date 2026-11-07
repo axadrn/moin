@@ -11,23 +11,23 @@ import (
 // the map form of x-moin, x-moin winning per service; the main service's
 // entry of the map is its domains; a domain on two services fails.
 func TestRouteServices(t *testing.T) {
-	domains := &protocol.Domains{Domains: []string{"shop.com"}, Services: map[string][]string{"api": {"API.shop.com"}, "admin": {"admin.shop.com"}}}
-	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"admin": {"desk.shop.com"}}}}, domains)
+	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"api": {"API.shop.example.net"}, "admin": {"admin.shop.example.net"}}}
+	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"admin": {"desk.shop.example.net"}}}}, domains)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(detected.Domains, []string{"shop.com"}) || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.com"}) || !slices.Equal(detected.ServiceDomains["admin"], []string{"desk.shop.com"}) {
+	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) || !slices.Equal(detected.ServiceDomains["admin"], []string{"desk.shop.example.net"}) {
 		t.Errorf("domains %v, services %v", detected.Domains, detected.ServiceDomains)
 	}
-	detected, err = route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"web": {"x.com"}, "api": {"api.x.com"}}}}, nil)
-	if err != nil || !slices.Equal(detected.Domains, []string{"x.com"}) || len(detected.ServiceDomains) != 1 {
+	detected, err = route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"web": {"x.example.com"}, "api": {"api.x.example.com"}}}}, nil)
+	if err != nil || !slices.Equal(detected.Domains, []string{"x.example.com"}) || len(detected.ServiceDomains) != 1 {
 		t.Errorf("map form with the main service: %v %v %v", detected.Domains, detected.ServiceDomains, err)
 	}
-	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.com"}, Services: map[string][]string{"api": {"x.com"}}}); err == nil {
+	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.example.com"}, Services: map[string][]string{"api": {"x.example.com"}}}); err == nil {
 		t.Error("a domain on two services passed")
 	}
 	// The hub's settings are not changed by route.
-	if domains.Services["api"][0] != "API.shop.com" {
+	if domains.Services["api"][0] != "API.shop.example.net" {
 		t.Errorf("route changed the domains it was given: %v", domains.Services)
 	}
 }
@@ -60,10 +60,10 @@ func TestRouteInstant(t *testing.T) {
 func TestDomainsByService(t *testing.T) {
 	config := map[string]any{}
 	web := map[string]any{}
-	addRouters(config, web, "shop", project("shop"), []string{"shop.com"}, "", 3000, "", "shop.203-0-113-7.sslip.io", "moin:$2y$05$abc")
+	addRouters(config, web, "shop", project("shop"), []string{"shop.example.net"}, "", 3000, "", "shop.203-0-113-7.sslip.io", "moin:$2y$05$abc")
 	labels := web["labels"].(map[string]any)
 	for key, want := range map[string]string{
-		"traefik.http.routers.moin-shop.rule":                             "Host(`shop.com`)",
+		"traefik.http.routers.moin-shop.rule":                             "Host(`shop.example.net`)",
 		"traefik.http.routers.moin-shop-instant.rule":                     "Host(`shop.203-0-113-7.sslip.io`)",
 		"traefik.http.routers.moin-shop-instant.service":                  "moin-shop",
 		"traefik.http.routers.moin-shop-instant.middlewares":              "moin-shop-instant-auth",
@@ -85,9 +85,9 @@ func TestDomainsByService(t *testing.T) {
 		t.Errorf("instant only: %v", labels)
 	}
 	api := map[string]any{}
-	addRouters(config, api, "shop", serviceRouter("shop", "api"), []string{"api.shop.com"}, "", 9000, "me:$2y$05$x", "", "")
+	addRouters(config, api, "shop", serviceRouter("shop", "api"), []string{"api.shop.example.net"}, "", 9000, "me:$2y$05$x", "", "")
 	labels = api["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.com`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" || labels["traefik.http.routers.moin-shop-svc-api.middlewares"] != "moin-shop-svc-api-auth" {
+	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" || labels["traefik.http.routers.moin-shop-svc-api.middlewares"] != "moin-shop-svc-api-auth" {
 		t.Errorf("api labels: %v", labels)
 	}
 	if config["networks"].(map[string]any)["default"].(map[string]any)["name"] != "moin-shop_default" {

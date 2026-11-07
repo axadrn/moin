@@ -58,14 +58,14 @@ templ DevKit() {
 				@kit.Card("Domain", nil) {
 					@kit.Field("Domain", "kit-domain", "") {
 						@kit.Inline() {
-							@kit.Input(templ.Attributes{"id": "kit-domain", "placeholder": "shop.example.com"})
+							@kit.Input(templ.Attributes{"id": "kit-domain", "placeholder": "my-app.example.com"})
 							@kit.Button(kit.Primary, "", nil) {
 								Add
 							}
 						}
 					}
 					@kit.Field("Wrong", "kit-wrong", "Not a domain.") {
-						@kit.Input(templ.Attributes{"id": "kit-wrong", "value": "shop", "aria-invalid": "true"})
+						@kit.Input(templ.Attributes{"id": "kit-wrong", "value": "my-app", "aria-invalid": "true"})
 					}
 					@kit.Field("Branch", "kit-branch", "") {
 						@kit.Select(kit.SelectProps{ID: "kit-branch", Name: "branch", Label: "Branch", Options: []kit.Option{{Value: "main", Label: "main"}, {Value: "next", Label: "next"}}, Value: "main"})
@@ -158,7 +158,7 @@ templ DevKit() {
 						<div class="min-w-0 flex-1">
 							@kit.Field("Add a domain", "kit-row-domain", "") {
 								@kit.Inline() {
-									@kit.Input(templ.Attributes{"id": "kit-row-domain", "placeholder": "shop.example.com"})
+									@kit.Input(templ.Attributes{"id": "kit-row-domain", "placeholder": "my-app.example.com"})
 									@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button"}) {
 										Add
 									}
@@ -276,11 +276,11 @@ templ DevKit() {
 					@kit.RowButton(false, kit.OpenDialog("kit-dialog")) {
 						<span class="font-medium">Open the dialog</span>
 					}
-					@kit.RowButton(true, templ.Attributes{"hx-confirm": "Stop shop? It goes offline until you start it.", "hx-post": "/dev/null"}) {
+					@kit.RowButton(true, templ.Attributes{"hx-confirm": "Stop my-app? It goes offline until you start it.", "hx-post": "/dev/null"}) {
 						<span class="font-medium">Stop</span>
 					}
 				}
-				@kit.Dialog("kit-dialog", "Stop shop?", "It goes offline until you start it.") {
+				@kit.Dialog("kit-dialog", "Stop my-app?", "It goes offline until you start it.") {
 					@kit.DialogButtons() {
 						@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
 							Cancel
@@ -298,7 +298,7 @@ templ DevKit() {
 					}
 				}
 				@kit.Card("With an action", devKitAction()) {
-					@kit.Command("moin deploy shop")
+					@kit.Command("moin deploy my-app")
 				}
 			}
 			@kit.Section("Feedback", nil) {

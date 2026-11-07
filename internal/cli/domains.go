@@ -128,7 +128,7 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		if detail.App.Instant != "" {
 			fmt.Fprintln(stdout, "  "+name+" answers at its instant address "+detail.App.Instant+" until it has a domain.")
 		}
-		hint(stdout, name+" has no domains yet. Add one:", build.Name+" domains add blog.de www.blog.de")
+		hint(stdout, name+" has no domains yet. Add one:", build.Name+" domains add my-app.example.com www.my-app.example.com")
 		return nil
 	}
 	rows := make([][]string, 0, len(checks))

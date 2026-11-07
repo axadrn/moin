@@ -129,7 +129,7 @@ templ addDomainRow(domainsPath string) {
 		<div class="min-w-0 flex-1 pb-2">
 			@kit.Field("Add a domain", "domain-name", "") {
 				@kit.Inline() {
-					@kit.Input(templ.Attributes{"id": "domain-name", "name": "domain", "type": "text", "placeholder": "shop.example.com", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})
+					@kit.Input(templ.Attributes{"id": "domain-name", "name": "domain", "type": "text", "placeholder": "my-app.example.com", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})
 					<label for="domain-service" class="sr-only">Service, empty for the main one</label>
 					<div class="sm:w-40 sm:shrink-0">
 						@kit.Input(templ.Attributes{"id": "domain-service", "name": "service", "type": "text", "placeholder": "service", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "title": "A service of compose.yml other than the main one, such as api"})

@@ -59,13 +59,13 @@ func TestUptimeStateKeepsThePause(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	app, _ := apps.Get(owner.WorkspaceID, "blog")
-	stale := model.DomainUptime{AppID: app.ID, Domain: "blog.de", State: model.UptimeUp}
+	stale := model.DomainUptime{AppID: app.ID, Domain: "blog.example.com", State: model.UptimeUp}
 	paused := true
-	if _, _, err := apps.SetUptime(owner, "blog", "blog.de", nil, &paused); err != nil {
+	if _, _, err := apps.SetUptime(owner, "blog", "blog.example.com", nil, &paused); err != nil {
 		t.Fatal(err)
 	}
 	if err := apps.apps.SaveUptimeState(stale); err != nil {

@@ -44,8 +44,8 @@ func Name(query, name string) (Match, bool) {
 	if m, ok := byWords(words, parts); ok {
 		return m, true
 	}
-	// One word may also be the letters of several, in order: "sl" for
-	// shop logs.
+	// One word may also be the letters of several, in order: "ml" for
+	// my-app logs.
 	if len(words) == 1 {
 		if positions, ok := loose(words[0], lower); ok {
 			return Match{Score: scoreAcross - gaps(positions)/4, Positions: positions}, true

@@ -76,7 +76,7 @@ func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database
 // Query runs SQL on one of the app's databases. A read returns at most
 // limit rows and cannot change anything; a write runs in one transaction
 // and goes into the activity with what it did and how many rows it changed,
-// such as "UPDATE on orders", never its SQL: that may hold your users' data.
+// such as "UPDATE on users", never its SQL: that may hold your users' data.
 func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database, sql string, params []any, write bool, limit int) (protocol.DBResult, error) {
 	if write {
 		if err := s.servers.RequireChanges(actor.WorkspaceID); err != nil {
@@ -94,7 +94,7 @@ func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database,
 	return result, err
 }
 
-// query runs SQL; edit says what a write is, such as sql or cell:orders,
+// query runs SQL; edit says what a write is, such as sql or cell:users,
 // and is empty for a read. moin copies the database before each write.
 func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database, sql string, params []any, edit string, limit int) (protocol.DBResult, error) {
 	write := edit != ""

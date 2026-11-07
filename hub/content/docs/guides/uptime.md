@@ -34,7 +34,7 @@ The visit goes to the health path from `x-moin.health` in `compose.yml` ([Config
 
 ```surfaces
 Web: the app, **Domains**, a domain under **Uptime**, its **Path**, then **Save**
-CLI: moin uptime path blog.de /health
+CLI: moin uptime path my-app.example.com /health
 TUI: on the app, `u`, pick the domain, `c`, type `/health`, then `enter`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"path": "/health"}
 MCP: set_uptime
@@ -46,7 +46,7 @@ For maintenance, or a domain whose DNS is not set yet. A paused domain counts ne
 
 ```surfaces
 Web: the app, **Domains**, a domain under **Uptime**, its **Visit every minute** switch
-CLI: moin uptime pause blog.de, then moin uptime resume blog.de
+CLI: moin uptime pause my-app.example.com, then moin uptime resume my-app.example.com
 TUI: on the app, `u`, pick the domain, then `p`
 API: PUT /api/v1/apps/{app}/uptime/{domain} {"paused": true}
 MCP: set_uptime

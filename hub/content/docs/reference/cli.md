@@ -211,17 +211,17 @@ These run on a server, as root.
 
 A command that works on an app takes it as an argument or as `--app`, then from `x-moin.app` in `compose.yml`, then from the name of the directory. When there is no such app, the error names it and where the name came from.
 
-Flags may come before or after the arguments: `moin rollback v3 --app shop` is `moin rollback --app shop v3`. Every command has one name, the one on this page.
+Flags may come before or after the arguments: `moin rollback v3 --app my-app` is `moin rollback --app my-app v3`. Every command has one name, the one on this page.
 
 ## Asking first
 
 | | Commands | Asks |
 | --- | --- | --- |
-| Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type shop to confirm:` |
+| Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
 | Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
-`--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm shop`, and the hub checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
+`--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm my-app`, and the hub checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
 
 ## Daemon updates
 

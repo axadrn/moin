@@ -24,7 +24,7 @@ One line says how each database stands: "Last copy 12m ago · checked 2h ago", o
 
 ```surfaces
 Web: the app, **Data**, a database
-CLI: moin backups shop
+CLI: moin backups my-app
 TUI: on the app, `b`
 API: GET /api/v1/apps/{app}/backups
 MCP: get_backups
@@ -40,7 +40,7 @@ Two settings per app, for all of its databases:
 
 ```surfaces
 Web: the app, **Data**, a database: **How often**, **Keep**, **Every change**
-CLI: moin backups shop --every 15m --keep 30d --every-change on
+CLI: moin backups my-app --every 15m --keep 30d --every-change on
 TUI: on the app, `b`; the settings open on the web
 API: PUT /api/v1/apps/{app}/backups
 MCP: set_backups
@@ -68,7 +68,7 @@ Besides the schedule, moin takes one extra copy right before every deploy, every
 - **At 14:00**: a copy from your schedule. One from another day says it: **Nov 6 at 14:00**
 - **Before v12**: right before a deploy started v12
 - **Before the update to 3.4.1**: right before a catalog update
-- **Before your SQL change**, **Before your edit in orders**, **Before the row added to orders**: right before a data edit
+- **Before your SQL change**, **Before your edit in users**, **Before the row added to users**: right before a data edit
 - **1 minute ago**, **15 minutes ago**, **1 hour ago**, **Yesterday this time**: SQLite with Every change
 - **Before the restore at 14:05**: the database as it was before a restore; going back to it undoes the restore
 
@@ -86,7 +86,7 @@ build beside ─▶ switch ─▶ start
 
 ```surfaces
 Web: the app, **Data**, a database: pick a moment under **Go back to**, **Restore**, then type the app name
-CLI: moin restore shop --to before-v12
+CLI: moin restore my-app --to before-v12
 TUI: on the app, `b`, pick a moment, `enter`, then type the app name
 API: POST /api/v1/apps/{app}/restores
 MCP: restore_app
@@ -100,7 +100,7 @@ Every restore keeps the database as it was right before, as long as you keep cop
 
 ```surfaces
 Web: the app, **Data**, a database: **Before the restore at 14:05**, **Restore**
-CLI: moin restore shop --to undo-20261107T140500Z
+CLI: moin restore my-app --to undo-20261107T140500Z
 TUI: on the app, `b`, pick **Before the restore at …**, `enter`
 API: POST /api/v1/apps/{app}/restores
 MCP: restore_app
@@ -114,7 +114,7 @@ A link to a copy in your bucket: the newest one, or the one you name. The link w
 
 ```surfaces
 Web: the app, **Data**, a database, **Download a copy**
-CLI: moin backup download shop
+CLI: moin backup download my-app
 TUI: on the app, `b`, then `c`
 API: POST /api/v1/apps/{app}/backups/download
 MCP: download_backup
@@ -131,12 +131,12 @@ services:
   web:
     build: .
     environment:
-      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/shop
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
   db:
     image: postgres:17
     environment:
       POSTGRES_USER: app
-      POSTGRES_DB: shop
+      POSTGRES_DB: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data

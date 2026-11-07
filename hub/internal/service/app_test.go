@@ -458,7 +458,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed, err := apps.SetDomains(owner, "blog", "", []string{"Blog.de", "www.blog.de", "blog.de"}, "blog.de")
+	changed, err := apps.SetDomains(owner, "blog", "", []string{"Blog.example.com", "www.blog.example.com", "blog.example.com"}, "blog.example.com")
 	if err != nil || !changed {
 		t.Fatalf("set domains before a deploy = %v, %v", changed, err)
 	}
@@ -468,7 +468,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
 		t.Fatalf("bad domain: err = %v", err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, "other.de"); !errors.Is(err, ErrCanonical) {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, "other.example.org"); !errors.Is(err, ErrCanonical) {
 		t.Fatalf("bad canonical: err = %v", err)
 	}
 	first, err := deployUpload(apps)
@@ -477,7 +477,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.de" || start.Domains.Canonical != "blog.de" {
+	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.example.com" || start.Domains.Canonical != "blog.example.com" {
 		t.Fatalf("domains = %+v", start.Domains)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
@@ -505,7 +505,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
 		t.Fatalf("set protection = %v, %v", changed, err)
 	}
-	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil || !changed {
+	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || !changed {
 		t.Fatalf("set domains = %v, %v", changed, err)
 	}
 	if daemon.count(protocol.TypeDeployStart) != sent {
@@ -518,7 +518,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed {
 		t.Fatalf("the same password = %v, %v", changed, err)
 	}
-	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil || changed {
+	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || changed {
 		t.Fatalf("the same domains = %v, %v", changed, err)
 	}
 
@@ -545,11 +545,11 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if err != nil || len(listed) != 1 || listed[0].Checked || listed[0].Advice != "A record to 203.0.113.5" {
 		t.Fatalf("domains = %+v, %v", listed, err)
 	}
-	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "other.de"); err != nil || checks[0].Checked {
+	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "other.example.org"); err != nil || checks[0].Checked {
 		t.Fatalf("check of another domain = %+v, %v", checks, err)
 	}
-	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "blog.de"); err != nil || !checks[0].Checked {
-		t.Fatalf("check of blog.de = %+v, %v", checks, err)
+	if checks, err := apps.CheckDomain(context.Background(), owner.WorkspaceID, "blog", "blog.example.com"); err != nil || !checks[0].Checked {
+		t.Fatalf("check of blog.example.com = %+v, %v", checks, err)
 	}
 	// A redeploy builds the source again.
 	redeploy, err := apps.Redeploy(owner, "blog")
@@ -569,13 +569,13 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	detected := protocol.Detected{Kind: "compose", Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de", Config: &protocol.Config{Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de"}}
+	detected := protocol.Detected{Kind: "compose", Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Config: &protocol.Config{Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com"}}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
 	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
-	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.de" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
+	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.example.com" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
 		t.Fatalf("checks = %+v, %v", checks, err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); !errors.Is(err, ErrComposeDomains) {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); !errors.Is(err, ErrComposeDomains) {
 		t.Fatalf("set domains under x-moin: err = %v", err)
 	}
 }
@@ -666,7 +666,7 @@ func TestStopStartAndRestart(t *testing.T) {
 	}
 
 	// A stopped app keeps a domain change for its start.
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatalf("set domains of a stopped app: %v", err)
 	}
 

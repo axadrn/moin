@@ -19,7 +19,7 @@ The web, the CLI, the terminal UI, the [API](/docs/reference/api) and AI agents 
 
 ```
 workspace            your team, your bucket and your servers
-├── server web-1     app shop, app blog
+├── server web-1     app my-app, app blog
 └── server web-2     app api
 
 moin deploy   laptop ──▶ your bucket ──▶ web-1     (your code, gone after the deploy)
@@ -42,7 +42,7 @@ The five that matter most are in [moin in five words](/docs/moin-in-five-words).
 | **service** | one part of an app, such as its website or its database: one container of its `compose.yml` |
 | **deploy** | a new version of your app, put live: v1, v2, v3. Also the verb |
 | **restart** | starts the live deploy again, so the changes that wait take effect |
-| **domain** | the name people type to reach your app, such as `shop.example.com`, always with HTTPS. Every app also gets an [instant address](/docs/guides/domains#instant-address) |
+| **domain** | the name people type to reach your app, such as `my-app.example.com`, always with HTTPS. Every app also gets an [instant address](/docs/guides/domains#instant-address) |
 | **env vars** | the settings and secrets of an app, such as a password it needs, kept encrypted |
 | **bucket** | your own box on the internet, for example at Cloudflare R2: your backups and uploads go there, not to us |
 | **backup** | a copy of your app's database in your bucket, on the schedule you pick; with SQLite moin can also write down every change. Every day it checks that a copy restores |

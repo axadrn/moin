@@ -11,7 +11,7 @@ var (
 	sqlVerb     = regexp.MustCompile(`(?i)^\s*(insert\s+or\s+\w+\s+into|insert\s+into|replace\s+into|update(?:\s+or\s+\w+)?|delete\s+from|create\s+(?:unique\s+)?(?:table|index|view|trigger)(?:\s+if\s+not\s+exists)?|alter\s+table|drop\s+(?:table|index|view|trigger)(?:\s+if\s+exists)?)\s+([A-Za-z_][\w.]*|"[^"]{1,64}"|` + "`[^`]{1,64}`" + `|\[[^\]]{1,64}\])`)
 )
 
-// sqlSummary names what a SQL write did, such as "UPDATE on orders" or
+// sqlSummary names what a SQL write did, such as "UPDATE on users" or
 // "INSERT into users, DELETE from sessions", without a single value: quoted
 // text and comments go first, and only keywords and table names stay.
 func sqlSummary(sql string) string {

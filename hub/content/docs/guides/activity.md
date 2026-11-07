@@ -17,13 +17,13 @@ MCP: list_activity
 
 | When (UTC) | Who | Via | What |
 | --- | --- | --- | --- |
-| 2026-11-02 14:03:07 | Ada Lovelace | CLI, token ci | deployed shop v42 from main at 3f2a9c1 |
-| 2026-11-02 14:03:51 | moin | moin | made v42 of shop live after 44s |
-| 2026-11-02 14:10:12 | Ben Okafor | Web | set STRIPE_KEY in the env of shop |
-| 2026-11-02 14:12:30 | Ben Okafor | Web | edited status of row 1182 in orders of shop |
-| 2026-11-02 14:25:44 | Ada Lovelace | MCP, token claude | ran UPDATE on orders in shop, 3 rows changed |
-| 2026-11-02 16:40:02 | Ada Lovelace | Web | set the backups of shop to every 15 minutes, kept 30 days, every change on |
-| 2026-11-03 03:00:18 | moin | moin | checked that the newest copy of app.db of shop restores |
+| 2026-11-02 14:03:07 | Ada Lovelace | CLI, token ci | deployed my-app v42 from main at 3f2a9c1 |
+| 2026-11-02 14:03:51 | moin | moin | made v42 of my-app live after 44s |
+| 2026-11-02 14:10:12 | Ben Okafor | Web | set STRIPE_KEY in the env of my-app |
+| 2026-11-02 14:12:30 | Ben Okafor | Web | edited email of row 1182 in users of my-app |
+| 2026-11-02 14:25:44 | Ada Lovelace | MCP, token claude | ran UPDATE on users in my-app, 3 rows changed |
+| 2026-11-02 16:40:02 | Ada Lovelace | Web | set the backups of my-app to every 15 minutes, kept 30 days, every change on |
+| 2026-11-03 03:00:18 | moin | moin | checked that the newest copy of app.db of my-app restores |
 
 ## Find one change
 
@@ -65,7 +65,7 @@ It covers deploys and how they ended, redeploys, restarts, starts, stops, rollba
 
 - Env var values: only their names.
 - Secrets, tokens and passwords.
-- Your SQL: a write keeps the kind of statement, the tables and the row count, such as `UPDATE on orders, 3 rows changed`.
+- Your SQL: a write keeps the kind of statement, the tables and the row count, such as `UPDATE on users, 3 rows changed`.
 - Rows and cell values: a row edit keeps the table, the row and the column.
 - File contents and the log lines of your apps.
 

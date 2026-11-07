@@ -8,8 +8,8 @@ order: 7
 When something breaks, moin tells you: the owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
 
 ```text
-🔴 shop.example.com is down
-App: shop
+🔴 my-app.example.com is down
+App: my-app
 Since: 2026-11-03 14:05 UTC
 Reason: HTTP 502
 Open in moin
@@ -96,13 +96,13 @@ Each alert comes as a JSON `POST`; fields that do not belong to the event are em
 {
   "event": "uptime.down",
   "workspace": "acme",
-  "app": "shop",
+  "app": "my-app",
   "server": "web-1",
-  "domain": "shop.example.com",
+  "domain": "my-app.example.com",
   "reason": "HTTP 502",
   "since": "2026-11-03T14:05:00Z",
   "duration": "",
-  "url": "https://moin.example.com/app/acme/apps/shop/uptime"
+  "url": "https://moin.example.com/app/acme/apps/my-app/uptime"
 }
 ```
 

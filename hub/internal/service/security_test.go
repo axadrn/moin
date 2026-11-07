@@ -51,7 +51,7 @@ func (f *fakeCloudflare) serve() *httptest.Server {
 			answer("tunnel-token-123456")
 		case call == "PUT /accounts/acc1/cfd_tunnel/tun1/configurations", call == "DELETE /accounts/acc1/cfd_tunnel/tun1":
 			answer(map[string]string{})
-		case call == "GET /zones" && r.URL.Query().Get("name") == "blog.de":
+		case call == "GET /zones" && r.URL.Query().Get("name") == "blog.example.com":
 			answer([]map[string]string{{"id": "zone1"}})
 		case call == "GET /zones":
 			answer([]map[string]string{})
@@ -149,7 +149,7 @@ func TestServerSecurity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = apps.SetDomains(owner, app.ID, "", []string{"blog.de"}, "")
+	_, err = apps.SetDomains(owner, app.ID, "", []string{"blog.example.com"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestServerSecurity(t *testing.T) {
 		}
 	}
 	ingress := fake.body["PUT /accounts/acc1/cfd_tunnel/tun1/configurations"]
-	if !strings.Contains(ingress, `"hostname":"blog.de"`) || !strings.Contains(ingress, "http://moin-traefik:8080") || !strings.Contains(ingress, "http_status:404") {
+	if !strings.Contains(ingress, `"hostname":"blog.example.com"`) || !strings.Contains(ingress, "http://moin-traefik:8080") || !strings.Contains(ingress, "http_status:404") {
 		t.Fatalf("ingress = %s", ingress)
 	}
 	if !strings.Contains(fake.body["POST /zones/zone1/dns_records"], `"content":"tun1.cfargotunnel.com"`) {
@@ -231,7 +231,7 @@ func TestServerSecurity(t *testing.T) {
 	fake.noSettings = true
 	fake.mu.Unlock()
 	problems, err := apps.syncTunnel(ctx, secured)
-	if err != nil || len(problems) != 1 || !strings.HasPrefix(problems[0], "Always Use HTTPS for blog.de") {
+	if err != nil || len(problems) != 1 || !strings.HasPrefix(problems[0], "Always Use HTTPS for blog.example.com") {
 		t.Fatalf("problems without Zone Settings Edit = %q, %v", problems, err)
 	}
 

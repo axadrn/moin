@@ -9,10 +9,10 @@ import (
 // a map, domains by service.
 func TestConfigDomainForms(t *testing.T) {
 	var list, byService Config
-	if err := json.Unmarshal([]byte(`{"domains":["shop.com"],"port":3000}`), &list); err != nil || len(list.Domains) != 1 || list.Port != 3000 {
+	if err := json.Unmarshal([]byte(`{"domains":["shop.example.net"],"port":3000}`), &list); err != nil || len(list.Domains) != 1 || list.Port != 3000 {
 		t.Errorf("list: %+v %v", list, err)
 	}
-	if err := json.Unmarshal([]byte(`{"domains":{"web":["shop.com"],"api":["api.shop.com"]},"ports":{"api":9000},"instant":"nip.io"}`), &byService); err != nil || len(byService.Domains) != 0 || byService.ServiceDomains["api"][0] != "api.shop.com" || byService.Ports["api"] != 9000 || byService.Instant != "nip.io" {
+	if err := json.Unmarshal([]byte(`{"domains":{"web":["shop.example.net"],"api":["api.shop.example.net"]},"ports":{"api":9000},"instant":"nip.io"}`), &byService); err != nil || len(byService.Domains) != 0 || byService.ServiceDomains["api"][0] != "api.shop.example.net" || byService.Ports["api"] != 9000 || byService.Instant != "nip.io" {
 		t.Errorf("map: %+v %v", byService, err)
 	}
 	var bad Config

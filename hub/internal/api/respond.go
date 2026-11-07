@@ -248,7 +248,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrAlertLimit, status: http.StatusConflict, code: "alert_limit", message: "A workspace has at most 20 alert destinations. Remove one first."},
 	{err: repository.ErrDuplicateAlertDestination, field: "name", message: "An alert destination with this name already exists."},
 	{err: repository.ErrAlertDestinationNotFound, status: http.StatusNotFound, code: "not_found", message: "The alert destination was not found."},
-	{err: service.ErrDomain, field: "domains", message: "Use host names like blog.de."},
+	{err: service.ErrDomain, field: "domains", message: "Use host names like my-app.example.com."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrServiceCanonical, field: "canonical", message: "canonical is for the main service only."},
 	{err: service.ErrInstantShow, status: http.StatusForbidden, code: "insufficient_scope", message: "Showing the password needs a token with read and write access."},

@@ -8,7 +8,7 @@ order: 3
 Run a command inside your app, as if you typed it on the server, and see what it prints: one command in a container of your app, its output as it comes and the exit code at the end. For migrations, the first admin user or a look at a file. No SSH, no key on your laptop.
 
 ```text
-you: moin exec shop -- ls /data
+you: moin exec my-app -- ls /data
   │                       ▲
   ▼                       │
 hub                       │
@@ -18,7 +18,7 @@ daemon, on the line       │
 it already has open       │
   │                       │
   ▼                       │
-container of shop ────────┘
+container of my-app ──────┘
 runs ls /data      what it prints,
                    then the exit code
 ```
@@ -34,14 +34,14 @@ MCP: exec_command
 ```
 
 ```bash
-moin exec shop -- rails db:migrate
-moin exec shop -- php artisan migrate
-moin exec shop -- rails runner 'User.create!(email: "me@example.com", admin: true)'
-moin exec shop -- ls /data
-moin exec shop --service db -- psql -U shop -d shop -c "select count(*) from orders"
+moin exec my-app -- rails db:migrate
+moin exec my-app -- php artisan migrate
+moin exec my-app -- rails runner 'User.create!(email: "me@example.com", admin: true)'
+moin exec my-app -- ls /data
+moin exec my-app --service db -- psql -U app -d app -c "select count(*) from users"
 ```
 
-Everything after `--` is the command, word by word. For pipes and the like, ask for a shell: `moin exec shop -- sh -c 'ls /data | wc -l'`. `moin exec` exits with the command's exit code, so it fits in a script. It runs in the main service unless `--service` names another; the web offers the main service and the database.
+Everything after `--` is the command, word by word. For pipes and the like, ask for a shell: `moin exec my-app -- sh -c 'ls /data | wc -l'`. `moin exec` exits with the command's exit code, so it fits in a script. It runs in the main service unless `--service` names another; the web offers the main service and the database.
 
 ## Good to know
 

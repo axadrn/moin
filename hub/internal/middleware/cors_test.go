@@ -61,7 +61,7 @@ func TestCORSExposesRetryAfterOnRateLimitedAnswers(t *testing.T) {
 }
 
 func TestCORSIgnoresUnlistedOrigins(t *testing.T) {
-	for _, origin := range []string{"https://evil.example.com", "https://app.example.com.evil.com", "http://app.example.com", "null"} {
+	for _, origin := range []string{"https://evil.example.com", "https://app.example.com.evil.example.net", "http://app.example.com", "null"} {
 		t.Run(origin, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil)
 			request.Header.Set("Origin", origin)

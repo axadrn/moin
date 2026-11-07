@@ -45,7 +45,7 @@ var (
 	ErrDeployHook     = errors.New("deploy hook is invalid")
 	ErrRegistryHost   = errors.New("registry host must be a host name like ghcr.io")
 	ErrRegistryLogin  = errors.New("registry username and password are required")
-	ErrDomain         = errors.New("domains must be host names like blog.de")
+	ErrDomain         = errors.New("domains must be host names like my-app.example.com")
 	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
 	ErrComposeDomains = errors.New("the domains of this app come from x-moin.domains in compose.yml")
 	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")

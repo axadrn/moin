@@ -69,12 +69,12 @@ moin deploy
 ```
 
 ```text
-Created app shop on web-1
+Created app my-app on web-1
 Uploading 42 files to your bucket (18.3 KB)
-Deploy v1 of shop started
+Deploy v1 of my-app started
   detected go, service web on port 8080
   v1 is live
-✓ moin. shop is live at https://shop.203-0-113-7.sslip.io
+✓ moin. my-app is live at https://my-app.203-0-113-7.sslip.io
 ```
 
 No Dockerfile needed: moin builds Node, Bun, Python, Ruby, PHP, Go and more, or uses your `Dockerfile` or `compose.yml`. The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password in front; `moin instant --show` prints both.
@@ -88,7 +88,7 @@ No Dockerfile needed: moin builds Node, Bun, Python, Ruby, PHP, Go and more, or 
 - On a self-hosted hub only the admins and invited teammates sign up: [Who signs in](/docs/self-hosting#who-signs-in).
 - Not logged in to the server as root? Put `sudo` before `sh`.
 - More than one server? `moin deploy --server web-1`. A failed deploy ends its log with the reason; `moin deploys v1` shows it again.
-- The instant address needs ports 80 and 443, so a server behind a Cloudflare Tunnel has none. For your visitors, [add a domain](/docs/guides/domains): `moin domains add shop.example.com`, then an A record at your DNS provider.
+- The instant address needs ports 80 and 443, so a server behind a Cloudflare Tunnel has none. For your visitors, [add a domain](/docs/guides/domains): `moin domains add my-app.example.com`, then an A record at your DNS provider.
 
 ## Next
 

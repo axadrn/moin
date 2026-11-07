@@ -21,7 +21,7 @@ moin holds no SSH key to your servers, your code and backups stay in your own bu
 
 ## Do I need a domain?
 
-Not to start. Every app answers at its [instant address](/docs/guides/domains#instant-address), like `https://shop.203-0-113-7.sslip.io`, with HTTPS and a password in front. It needs ports 80 and 443, so a server behind a Cloudflare Tunnel has none.
+Not to start. Every app answers at its [instant address](/docs/guides/domains#instant-address), like `https://my-app.203-0-113-7.sslip.io`, with HTTPS and a password in front. It needs ports 80 and 443, so a server behind a Cloudflare Tunnel has none.
 
 ## Can I install apps like n8n or Umami?
 

@@ -156,7 +156,7 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // copyName is the file a copy saves to: the app, the database and the
-// copy's name in the bucket, like shop-data-app.db-20261107T140000Z.db.gz.
+// copy's name in the bucket, like my-app-data-app.db-20261107T140000Z.db.gz.
 func copyName(app, link string) string {
 	parsed, err := url.Parse(link)
 	if err != nil {

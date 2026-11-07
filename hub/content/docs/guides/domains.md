@@ -5,24 +5,24 @@ group: "Apps"
 order: 2
 ---
 
-A domain is the name people type to reach your app, like `shop.example.com`. Every app gets one right after its first deploy, its instant address; add your own when you are ready. HTTPS is always on.
+A domain is the name people type to reach your app, like `my-app.example.com`. Every app gets one right after its first deploy, its instant address; add your own when you are ready. HTTPS is always on.
 
 ```text
-browser   opens shop.example.com
+browser     opens my-app.example.com
    │
    ▼
-DNS       shop.example.com is
-   │      203.0.113.7: your A record
+DNS         my-app.example.com is
+   │        203.0.113.7: your A record
    ▼
-server    203.0.113.7, port 443
+server      203.0.113.7, port 443
    │
    ▼
-Traefik   HTTPS with a Let's Encrypt
-   │      certificate; finds the app
-   │      by its domain
+Traefik     HTTPS with a Let's Encrypt
+   │        certificate; finds the app
+   │        by its domain
    ▼
-app shop  on its port, 8080 unless
-          you say so
+app my-app  on its port, 8080 unless
+            you say so
 ```
 
 DNS is the phone book of the internet: it turns a name into the server's address. Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), the browser reaches Cloudflare instead, and Cloudflare passes the visit to Traefik through the tunnel.
@@ -47,7 +47,7 @@ Saving never restarts the app: a change of the domains, the password or the inst
 
 ```text
 https://<app>.<server IPv4 with dashes>.sslip.io
-https://shop.203-0-113-7.sslip.io
+https://my-app.203-0-113-7.sslip.io
 ```
 
 The name carries the server's IP, so it needs no DNS, and Let's Encrypt gives it a certificate like any domain. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.

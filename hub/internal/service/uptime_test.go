@@ -82,12 +82,12 @@ func TestUptimeEveryDomainAndRecordsOutages(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de", "www.blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com", "www.blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	// Before the first deploy nothing is visited.
 	apps.VisitUptime(ctx)
-	if len(sites.visits("blog.de")) != 0 {
+	if len(sites.visits("blog.example.com")) != 0 {
 		t.Fatal("an app without a live deploy was visited")
 	}
 	_, uptime, err := apps.Uptime(owner.WorkspaceID, "blog")
@@ -99,11 +99,11 @@ func TestUptimeEveryDomainAndRecordsOutages(t *testing.T) {
 		t.Fatal(err)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{
-		Kind: "compose", Domains: []string{"blog.de", "www.blog.de"}, Config: &protocol.Config{Health: "/health"},
+		Kind: "compose", Domains: []string{"blog.example.com", "www.blog.example.com"}, Config: &protocol.Config{Health: "/health"},
 	}})
 
 	apps.VisitUptime(ctx)
-	if visits := sites.visits("blog.de"); len(visits) != 1 || visits[0] != "/health" {
+	if visits := sites.visits("blog.example.com"); len(visits) != 1 || visits[0] != "/health" {
 		t.Fatalf("visits = %v, want one to the health path", visits)
 	}
 	_, uptime, err = apps.Uptime(owner.WorkspaceID, "blog")
@@ -111,17 +111,17 @@ func TestUptimeEveryDomainAndRecordsOutages(t *testing.T) {
 		t.Fatalf("uptime = %+v, %v", uptime, err)
 	}
 	first := uptime.Domains[0]
-	if first.Domain != "blog.de" || first.Path != "/health" || first.CustomPath || first.StatusCode != 200 || first.VisitedAt == nil || first.Uptime24h == nil || *first.Uptime24h != 100 {
-		t.Fatalf("blog.de = %+v", first)
+	if first.Domain != "blog.example.com" || first.Path != "/health" || first.CustomPath || first.StatusCode != 200 || first.VisitedAt == nil || first.Uptime24h == nil || *first.Uptime24h != 100 {
+		t.Fatalf("blog.example.com = %+v", first)
 	}
 
 	// A 502 is down only after the retry fails too, and goes to the
 	// activity once.
-	sites.set("www.blog.de", http.StatusBadGateway)
+	sites.set("www.blog.example.com", http.StatusBadGateway)
 	apps.VisitUptime(ctx)
 	apps.VisitUptime(ctx)
-	if visits := sites.visits("www.blog.de"); len(visits) != 5 {
-		t.Fatalf("www.blog.de was visited %d times, want 1 and 2 with retries", len(visits))
+	if visits := sites.visits("www.blog.example.com"); len(visits) != 5 {
+		t.Fatalf("www.blog.example.com was visited %d times, want 1 and 2 with retries", len(visits))
 	}
 	_, uptime, _ = apps.Uptime(owner.WorkspaceID, "blog")
 	www := uptime.Domains[1]
@@ -129,20 +129,20 @@ func TestUptimeEveryDomainAndRecordsOutages(t *testing.T) {
 		t.Fatalf("down = %+v", uptime)
 	}
 	if *www.Uptime24h > 34 || *www.Uptime24h < 33 {
-		t.Fatalf("uptime of www.blog.de = %v, want a third", *www.Uptime24h)
+		t.Fatalf("uptime of www.blog.example.com = %v, want a third", *www.Uptime24h)
 	}
 	actions := activityActions(t, servers)
-	if strings.Count(strings.Join(actions, ","), "uptime.down") != 1 || !hasAction(actions, "uptime.down www.blog.de") {
+	if strings.Count(strings.Join(actions, ","), "uptime.down") != 1 || !hasAction(actions, "uptime.down www.blog.example.com") {
 		t.Fatalf("activity = %v", actions)
 	}
 
-	sites.set("www.blog.de", http.StatusOK)
+	sites.set("www.blog.example.com", http.StatusOK)
 	apps.VisitUptime(ctx)
 	_, uptime, _ = apps.Uptime(owner.WorkspaceID, "blog")
 	if uptime.State != model.UptimeUp || uptime.Domains[1].Outages[0].EndedAt == nil {
 		t.Fatalf("back up = %+v", uptime)
 	}
-	if !hasAction(activityActions(t, servers), "uptime.up www.blog.de") {
+	if !hasAction(activityActions(t, servers), "uptime.up www.blog.example.com") {
 		t.Fatal("back up is not in the activity")
 	}
 }
@@ -154,7 +154,7 @@ func TestUptimeVisitSettings(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	deploy, err := deployUpload(apps)
@@ -164,32 +164,32 @@ func TestUptimeVisitSettings(t *testing.T) {
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 
 	path := "/up"
-	if _, _, err := apps.SetUptime(owner, "blog", "other.de", &path, nil); !errors.Is(err, ErrUptimeDomain) {
+	if _, _, err := apps.SetUptime(owner, "blog", "other.example.org", &path, nil); !errors.Is(err, ErrUptimeDomain) {
 		t.Fatalf("another domain: err = %v", err)
 	}
 	bad := "no slash"
-	if _, _, err := apps.SetUptime(owner, "blog", "blog.de", &bad, nil); !errors.Is(err, ErrUptimePath) {
+	if _, _, err := apps.SetUptime(owner, "blog", "blog.example.com", &bad, nil); !errors.Is(err, ErrUptimePath) {
 		t.Fatalf("bad path: err = %v", err)
 	}
-	if _, _, err := apps.SetUptime(other, "blog", "blog.de", &path, nil); err == nil {
+	if _, _, err := apps.SetUptime(other, "blog", "blog.example.com", &path, nil); err == nil {
 		t.Fatal("another workspace changed the visit")
 	}
-	_, domain, err := apps.SetUptime(owner, "blog", "Blog.de", &path, nil)
+	_, domain, err := apps.SetUptime(owner, "blog", "Blog.example.com", &path, nil)
 	if err != nil || domain.Path != "/up" || !domain.CustomPath {
 		t.Fatalf("set path = %+v, %v", domain, err)
 	}
 	apps.VisitUptime(ctx)
-	if visits := sites.visits("blog.de"); len(visits) != 1 || visits[0] != "/up" {
+	if visits := sites.visits("blog.example.com"); len(visits) != 1 || visits[0] != "/up" {
 		t.Fatalf("visits = %v", visits)
 	}
 
 	paused := true
-	_, domain, err = apps.SetUptime(owner, "blog", "blog.de", nil, &paused)
+	_, domain, err = apps.SetUptime(owner, "blog", "blog.example.com", nil, &paused)
 	if err != nil || domain.State != model.UptimePaused || !domain.Paused {
 		t.Fatalf("pause = %+v, %v", domain, err)
 	}
 	apps.VisitUptime(ctx)
-	if len(sites.visits("blog.de")) != 1 {
+	if len(sites.visits("blog.example.com")) != 1 {
 		t.Fatal("a paused visit ran")
 	}
 
@@ -200,7 +200,7 @@ func TestUptimeVisitSettings(t *testing.T) {
 		t.Fatalf("after a restart = %+v", uptime)
 	}
 	actions := activityActions(t, servers)
-	if !hasAction(actions, "uptime.path_set blog.de") || !hasAction(actions, "uptime.paused blog.de") {
+	if !hasAction(actions, "uptime.path_set blog.example.com") || !hasAction(actions, "uptime.paused blog.example.com") {
 		t.Fatalf("activity = %v", actions)
 	}
 }
@@ -213,7 +213,7 @@ func TestRunUptimeAtTheOffsetAndStops(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	deploy, err := deployUpload(apps)
@@ -222,7 +222,7 @@ func TestRunUptimeAtTheOffsetAndStops(t *testing.T) {
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	// The clock stands one second before the domain's offset.
-	offset := uptimeOffset(uptimeKey{deploy.AppID, "blog.de"})
+	offset := uptimeOffset(uptimeKey{deploy.AppID, "blog.example.com"})
 	start := time.Date(2026, 11, 3, 12, 0, (offset+59)%60, 0, time.UTC)
 	began := time.Now()
 	apps.now = func() time.Time { return start.Add(time.Since(began)) }
@@ -233,10 +233,10 @@ func TestRunUptimeAtTheOffsetAndStops(t *testing.T) {
 		close(stopped)
 	}()
 	deadline := time.Now().Add(10 * time.Second)
-	for len(sites.visits("blog.de")) == 0 && time.Now().Before(deadline) {
+	for len(sites.visits("blog.example.com")) == 0 && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 	}
-	if len(sites.visits("blog.de")) == 0 {
+	if len(sites.visits("blog.example.com")) == 0 {
 		t.Fatal("RunUptime did not visit the domain at its second")
 	}
 	cancel()
@@ -245,7 +245,7 @@ func TestRunUptimeAtTheOffsetAndStops(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("RunUptime did not stop")
 	}
-	if counts, _ := apps.apps.UptimeCounts(deploy.AppID, "blog.de", start.Add(-time.Hour)); counts.Visits != 1 {
+	if counts, _ := apps.apps.UptimeCounts(deploy.AppID, "blog.example.com", start.Add(-time.Hour)); counts.Visits != 1 {
 		t.Fatalf("counts after the stop = %+v, want the visit written", counts)
 	}
 }

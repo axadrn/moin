@@ -49,14 +49,14 @@ A query only reads, unless you say it may change data.
 
 ```surfaces
 Web: the app page, **Data**, a database, **SQL**, **Run**
-CLI: moin sql "SELECT status, count(*) FROM orders GROUP BY status"
+CLI: moin sql "SELECT plan, count(*) FROM users GROUP BY plan"
 TUI: opens the web: `w`, then `d`
 API: POST /api/v1/apps/{app}/databases/query
 MCP: query_database
 ```
 
 ```bash
-moin db rows orders --limit 5
+moin db rows users --limit 5
 echo "SELECT * FROM customers" | moin sql
 ```
 

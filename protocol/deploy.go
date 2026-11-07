@@ -71,7 +71,7 @@ type Domains struct {
 var InstantProviders = []string{"sslip.io", "nip.io"}
 
 // InstantHost is the instant address of an app on a server with the public
-// IPv4 ip, such as shop.203-0-113-7.sslip.io, or "" when the provider is
+// IPv4 ip, such as my-app.203-0-113-7.sslip.io, or "" when the provider is
 // none of InstantProviders or the IP is not IPv4.
 func InstantHost(app, ip, provider string) string {
 	address, err := netip.ParseAddr(ip)

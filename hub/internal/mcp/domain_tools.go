@@ -71,7 +71,7 @@ func (t moinTools) checkDomains(ctx context.Context, caller Caller, input AppInp
 // DomainsInput is the input of set_domains.
 type DomainsInput struct {
 	App       string   `json:"app" jsonschema:"the app name or ID"`
-	Domains   []string `json:"domains" jsonschema:"every domain the app answers on, like blog.de and www.blog.de"`
+	Domains   []string `json:"domains" jsonschema:"every domain the app answers on, like my-app.example.com and www.my-app.example.com"`
 	Canonical string   `json:"canonical,omitempty" jsonschema:"the domain the others redirect to; empty for none"`
 	Service   string   `json:"service,omitempty" jsonschema:"a service of compose.yml other than the main one, to set its domains; empty for the main one"`
 }

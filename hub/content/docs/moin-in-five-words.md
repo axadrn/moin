@@ -47,11 +47,11 @@ moin (hub)
  ▲
  │ the daemon calls moin,
  │ nobody calls in
-┌┴─────────────┐
-│ server       │
-│   daemon     │
-│   app shop ◀─┼── visitors
-└┬─────────────┘
+┌┴───────────────┐
+│ server         │
+│   daemon       │
+│   app my-app ◀─┼── visitors
+└┬───────────────┘
  │ copies
  ▼
 your bucket

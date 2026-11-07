@@ -82,7 +82,7 @@ type Config struct {
 	Protect   bool     `json:"protect,omitempty"`
 	Database  string   `json:"database,omitempty"`
 	// ServiceDomains are domains by service, from the map form of domains:
-	// domains: {web: [shop.com], api: [api.shop.com]}. Ports are the ports
+	// domains: {web: [my-app.example.com], api: [api.my-app.example.com]}. Ports are the ports
 	// of services moin cannot tell. Instant picks the instant address
 	// provider, or off.
 	ServiceDomains map[string][]string `json:"service_domains,omitempty"`

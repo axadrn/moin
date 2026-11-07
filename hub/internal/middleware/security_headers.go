@@ -101,7 +101,7 @@ func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler 
 		// Format: feature=(allowed-origins)
 		//   () = disabled for everyone including your site
 		//   (self) = enabled only for your origin
-		//   (self "https://trusted.com") = enabled for your origin + specific domain
+		//   (self "https://trusted.example.com") = enabled for your origin + specific domain
 		//
 		// We disable features that most SaaS apps don't need. Uncomment/modify
 		// if your app needs specific features:
@@ -125,7 +125,7 @@ func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler 
 		// How CSP prevents XSS:
 		//   1. Attacker injects: <script>alert('XSS')</script>
 		//   2. CSP blocks it because inline scripts without nonce are not allowed
-		//   3. Even if attacker injects: <script src="http://evil.com/xss.js">
+		//   3. Even if attacker injects: <script src="http://evil.example.com/xss.js">
 		//   4. CSP blocks it because only whitelisted domains are allowed
 		//
 		// CSP Directives explained:

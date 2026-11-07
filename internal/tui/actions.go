@@ -47,7 +47,7 @@ func (m model) appActions(name string) []action {
 			return m.ask1("Roll back "+name+"?", "The deploy before the live one starts again.", "roll back", false, m.rollback(name, 0)), nil
 		}},
 		action{"I", "deploy image", func(m model) (tea.Model, tea.Cmd) {
-			return m.input("Deploy an image to "+name, "an image built in CI, like ghcr.io/acme/shop:1.4", "", func(m model, v string) (model, tea.Cmd) {
+			return m.input("Deploy an image to "+name, "an image built in CI, like ghcr.io/acme/my-app:1.4", "", func(m model, v string) (model, tea.Cmd) {
 				if v == "" {
 					return m, nil
 				}
