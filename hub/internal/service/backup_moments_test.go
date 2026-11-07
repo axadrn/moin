@@ -596,7 +596,14 @@ func TestStoppedAppRests(t *testing.T) {
 // A new app gets its schedule at once, so its copies are kept and
 // pruned as it says; a stopped app is never late.
 func TestNewAppGetsItsSchedule(t *testing.T) {
-	apps, _, server, daemon := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
+	// The sends to one server go one at a time: the daemon answers.
+	go func() {
+		for range 3 {
+			daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupConfig, protocol.TypeOK, nil)
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
 	if _, err := apps.Create(owner, "shop", server.ID); err != nil {
 		t.Fatal(err)
 	}
