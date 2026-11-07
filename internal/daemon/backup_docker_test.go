@@ -289,17 +289,17 @@ func TestBackupSQLite(t *testing.T) {
 	}
 	// Two copies in one second never overwrite each other.
 	at := time.Now().UTC().Truncate(time.Second)
-	one, err1 := test.b.copy(test.ctx, app, test.database, at)
-	two, err2 := test.b.copy(test.ctx, app, test.database, at)
+	one, err1 := test.b.copy(test.ctx, app, test.database, protocol.NewCopyID(at))
+	two, err2 := test.b.copy(test.ctx, app, test.database, protocol.NewCopyID(at))
 	if err1 != nil || err2 != nil || one == two {
 		t.Fatalf("two copies in one second: %s %s %v %v", one, two, err1, err2)
 	}
 	// No edit while a restore works on the app.
-	test.b.restoring[app] = true
+	test.b.restoring[app]++
 	if _, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app}, SQL: `DELETE FROM notes`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
 		t.Fatalf("an edit during a restore: %v", err)
 	}
-	delete(test.b.restoring, app)
+	test.b.restoring[app]--
 	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone || rows() != "a,b,c,d" {
 		t.Fatalf("back to the third copy: %+v", state)
 	}

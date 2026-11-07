@@ -163,8 +163,9 @@ func Run(ctx context.Context, dir string, state State) error {
 	daemon.security = newSecurity(dir, daemon.apps)
 	daemon.apps.proxyMode = daemon.security.proxyMode
 	daemon.updater = newUpdater(state.URL)
-	// A restore the daemon stopped in the middle of ends first: the crash
-	// rule puts a whole database in place and the app runs again.
+	// A restore the daemon stopped in the middle of ends first: its
+	// switch is one step, so the database is whole; the app runs again
+	// and the result says which database it runs on.
 	daemon.backups.recover(ctx)
 	// On a stop, a deploy or a restore that runs gets a moment to end
 	// before backups stop; one that does not is ended by the next start.

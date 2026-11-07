@@ -49,6 +49,37 @@ func TestSQLiteRecover(t *testing.T) {
 			t.Errorf("switched %v: undo %v, built %v", switched, exists(undoFile(live, id)), exists(live+".moin-restore"))
 		}
 	}
+	// No live file, the undo there: the undo goes back.
+	dir := t.TempDir()
+	live := filepath.Join(dir, "app.db")
+	os.WriteFile(undoFile(live, id), []byte("before"), 0o600)
+	e := &sqliteEngine{b: newBackups(newApps(dir, nil), nil), database: protocol.Database{HostPath: live}}
+	if got, err := e.Recover(context.Background(), restoreMark{Undo: id}); err != nil || got {
+		t.Fatalf("no live file: %v %v", got, err)
+	}
+	if body, _ := os.ReadFile(live); string(body) != "before" {
+		t.Fatalf("the live file is %q", body)
+	}
+}
+
+// The copies before a change have an ID no scheduled copy has, and two
+// in one second wait for the next.
+func TestBeforeCopyIDs(t *testing.T) {
+	at := time.Date(2026, 11, 7, 14, 0, 0, 0, time.UTC)
+	for range 1000 {
+		if protocol.NewCopyID(at) == protocol.BeforeCopyID(at) {
+			t.Fatal("a scheduled copy has the ID of a copy before a change")
+		}
+	}
+	b := newBackups(newApps(t.TempDir(), nil), nil)
+	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Workspace: "ws"}})
+	first := b.copyBefore(context.Background(), "shop", "", func(string, ...any) {})
+	b.before["shop"] = time.Now().UTC().Truncate(time.Second)
+	started := time.Now()
+	b.copyBefore(context.Background(), "shop", "", func(string, ...any) {})
+	if first != nil || !b.before["shop"].After(started.Truncate(time.Second)) {
+		t.Fatalf("two copies before a change in one second: %v", b.before["shop"])
+	}
 }
 
 // Copy IDs are sorted by time, apart within one second, and the old

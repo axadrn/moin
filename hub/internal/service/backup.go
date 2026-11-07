@@ -210,7 +210,14 @@ func (s *AppService) configureDaemons(workspaceID string) {
 	wait.Wait()
 }
 
+// configuring keeps the sends to one server in a row, each with the
+// config as it is then: the last one sent is the latest.
+var configuring sync.Map
+
 func (s *AppService) configureDaemon(serverID, workspaceID string) {
+	lock, _ := configuring.LoadOrStore(serverID, &sync.Mutex{})
+	lock.(*sync.Mutex).Lock()
+	defer lock.(*sync.Mutex).Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	config, err := s.backupConfig(workspaceID, serverID)
@@ -321,7 +328,8 @@ func Moments(backup protocol.DatabaseBackup, remembered []model.BackupMoment, no
 	for _, copy := range backup.Copies {
 		moment := Moment{ID: copy.ID, Label: atWhen(copy.At, now), At: copy.At, Kind: MomentCopy, Copy: copy.ID}
 		for _, named := range remembered {
-			if named.At.Equal(copy.At) && (named.Database == "" || named.Database == backup.Database) {
+			// The copy before a change by its full ID; old ones by the time.
+			if (copy.ID == protocol.BeforeCopyID(named.At) || copy.ID == named.At.UTC().Format(protocol.CopyIDLayout)) && (named.Database == "" || named.Database == backup.Database) {
 				moment.ID, moment.Label, moment.Kind = rememberedMoment(named)
 			}
 		}

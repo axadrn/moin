@@ -82,8 +82,10 @@ type backups struct {
 	states    map[string]*state
 	// restoring are the apps a restore works on: no copy, no edit;
 	// paused the apps the hub cannot open the bucket of, with why.
-	restoring map[string]bool
+	restoring map[string]int
 	paused    map[string]string
+	// before is when the newest copy before a change of each app was.
+	before map[string]time.Time
 	// stores and watched are Litestream's, see backup_sqlite.go.
 	stores  map[int]*litestream.Store
 	watched map[string]watched
@@ -107,7 +109,7 @@ type state struct {
 var errCrash = errors.New("the daemon stopped here")
 
 func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups {
-	return &backups{apps: a, send: send, states: map[string]*state{}, restoring: map[string]bool{}, paused: map[string]string{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
+	return &backups{apps: a, send: send, states: map[string]*state{}, restoring: map[string]int{}, paused: map[string]string{}, before: map[string]time.Time{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
 }
 
 func (b *backups) engine(app string, database protocol.Database) engine {
@@ -178,16 +180,15 @@ func (b *backups) where(app string, database protocol.Database) (*protocol.Bucke
 	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
 }
 
-// copy streams a copy of a database taken at at into the bucket and
-// returns its ID.
-func (b *backups) copy(ctx context.Context, app string, database protocol.Database, at time.Time) (string, error) {
+// copy streams a copy of a database into the bucket as id.
+func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
 		return "", err
 	}
 	b.copying.Lock()
 	defer b.copying.Unlock()
-	id := protocol.NewCopyID(at)
+	at, _ := protocol.CopyTime(id)
 	ctx, cancel := context.WithTimeout(ctx, copyTimeout)
 	defer cancel()
 	reader, writer := io.Pipe()
@@ -314,7 +315,7 @@ func (b *backups) tick(ctx context.Context) {
 		schedule := b.schedule(app)
 		for _, database := range databases {
 			b.mu.Lock()
-			s, busy := *b.state(app, database), b.restoring[app]
+			s, busy := *b.state(app, database), b.restoring[app] > 0
 			b.mu.Unlock()
 			if busy {
 				continue
@@ -358,7 +359,7 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 		return nil
 	}
 	at := time.Now().UTC().Truncate(time.Second)
-	id, err := b.copy(ctx, app, database, at)
+	id, err := b.copy(ctx, app, database, protocol.NewCopyID(at))
 	if err != nil {
 		return err
 	}
@@ -460,10 +461,18 @@ func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(st
 	if b == nil || !b.on() {
 		return nil
 	}
+	// Two in one second would share an ID: the second waits for the next.
 	at, took := time.Now().UTC().Truncate(time.Second), false
+	b.mu.Lock()
+	if !at.After(b.before[app]) {
+		at = b.before[app].Add(time.Second)
+	}
+	b.before[app] = at
+	b.mu.Unlock()
+	time.Sleep(time.Until(at))
 	for _, database := range b.databases(ctx, app) {
 		if only == "" || database.Path == only {
-			_, err := b.copy(ctx, app, database, at)
+			_, err := b.copy(ctx, app, database, protocol.BeforeCopyID(at))
 			if err != nil {
 				logf("the copy of %s before the change failed: %s", database.Path, err)
 			}
@@ -556,7 +565,7 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	// Edits are refused from here on, and those that hold the lock end
 	// first.
 	b.mu.Lock()
-	b.restoring[request.App] = true
+	b.restoring[request.App]++
 	b.mu.Unlock()
 	defer b.apps.lock(request.App)()
 	var from source
@@ -578,7 +587,7 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo)
 	}
 	b.mu.Lock()
-	delete(b.restoring, request.App)
+	b.restoring[request.App]--
 	b.mu.Unlock()
 	if errors.Is(err, errCrash) {
 		return err
@@ -631,8 +640,8 @@ func (b *backups) restoreStates(app string) []protocol.RestoreState {
 
 // recover ends the restores a stopped daemon left running: the database
 // is whole either way, the app starts again, and the result says which
-// database it runs on. When it cannot tell, the mark stays and the next
-// start tries again. Then it sweeps what stopped copies and checks left.
+// database it runs on. When it cannot tell, the app starts all the same,
+// and the mark stays for the next start to tell. Then it sweeps what stopped copies and checks left.
 // The daemon runs it when it starts.
 func (b *backups) recover(ctx context.Context) {
 	for _, mark := range b.marks() {
@@ -644,11 +653,13 @@ func (b *backups) recover(ctx context.Context) {
 		if err == nil {
 			switched, err = b.engine(mark.App, database).Recover(ctx, mark)
 		}
+		// The switch is one step: whatever is live is whole, so the app
+		// starts either way.
+		start := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
 		if err != nil {
-			slog.Error("backup: a restore the daemon stopped in is not ended", "app", mark.App, "database", mark.Database, "error", err)
+			slog.Error("backup: how a restore the daemon stopped in ended is not known yet", "app", mark.App, "database", mark.Database, "error", err)
 			continue
 		}
-		start := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
 		switch {
 		case !switched:
 			err = errors.New("the daemon stopped during the restore; the data is as it was before")
@@ -670,7 +681,7 @@ func (b *backups) recover(ctx context.Context) {
 func (b *backups) busy(app string) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.restoring[app]
+	return b.restoring[app] > 0
 }
 
 // writeState writes a file whole: a temp file, synced, renamed over the

@@ -26,8 +26,13 @@ var copyID = regexp.MustCompile(`^\d{8}T\d{6}Z(-\d{6})?$`)
 
 // NewCopyID is the ID of a copy taken at at.
 func NewCopyID(at time.Time) string {
-	return at.UTC().Format(CopyIDLayout) + "-" + fmt.Sprintf("%06d", rand.IntN(1000000))
+	return at.UTC().Format(CopyIDLayout) + "-" + fmt.Sprintf("%06d", 1+rand.IntN(999999))
 }
+
+// BeforeCopyID is the ID of the copies taken at at just before a deploy
+// or an edit, the hub finds them by: the digits 000000, which no other
+// copy has.
+func BeforeCopyID(at time.Time) string { return at.UTC().Format(CopyIDLayout) + "-000000" }
 
 // CopyTime is the time in a copy's ID.
 func CopyTime(id string) (time.Time, bool) {

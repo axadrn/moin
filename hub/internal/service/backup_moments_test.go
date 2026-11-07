@@ -617,3 +617,18 @@ func TestNewAppGetsItsSchedule(t *testing.T) {
 		t.Error("late for a stopped app, or not for a running one")
 	}
 }
+
+// A scheduled copy in the same second as the copy before a deploy keeps
+// its own label: the copy before a change goes by its full ID.
+func TestBeforeLabelByID(t *testing.T) {
+	now := time.Date(2026, 11, 7, 14, 30, 0, 0, time.UTC)
+	at := now.Add(-10 * time.Minute)
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Copies: []protocol.Copy{{ID: protocol.BeforeCopyID(at), At: at}, {ID: protocol.NewCopyID(at), At: at}}}
+	labels := []string{}
+	for _, moment := range Moments(backup, []model.BackupMoment{{ID: 1, Kind: model.MomentDeploy, Detail: "12", At: at}}, now) {
+		labels = append(labels, moment.Label)
+	}
+	if strings.Join(labels, "|") != "Before v12|At 14:20" && strings.Join(labels, "|") != "At 14:20|Before v12" {
+		t.Fatalf("labels %v", labels)
+	}
+}

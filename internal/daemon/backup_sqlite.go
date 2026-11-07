@@ -201,7 +201,13 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 	liveInfo, err1 := os.Stat(live)
 	asideInfo, err2 := os.Stat(aside)
 	switched := err1 == nil && err2 == nil && !os.SameFile(liveInfo, asideInfo)
-	if !switched && err2 == nil {
+	switch {
+	case err1 != nil && err2 == nil:
+		// No live file: the undo is the only one, it goes back.
+		if err := os.Rename(aside, live); err != nil {
+			return false, err
+		}
+	case !switched && err2 == nil:
 		os.Remove(aside)
 	}
 	if mark.From == "" {

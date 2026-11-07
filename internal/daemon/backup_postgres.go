@@ -185,7 +185,10 @@ ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "bu
 		return errCrash
 	}
 	if err := swap(ctx, t, live, aside, built); err != nil {
-		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
+		// A COMMIT whose answer got lost may have switched: the undo says.
+		if switched, _ := dbExists(ctx, t, aside); !switched {
+			return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
+		}
 	}
 	if e.b.crash != nil && e.b.crash("after") {
 		return errCrash
