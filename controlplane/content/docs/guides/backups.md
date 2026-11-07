@@ -144,7 +144,9 @@ volumes:
   pgdata:
 ```
 
-In moin this database is `postgres-db` (`postgres-<service>`): in the bucket, in the app's backups and in `--db postgres-db`. moin copies the database `POSTGRES_DB` names (the user's name when it is not set).
+In moin this database is `postgres-db` (`postgres-<service>`): in the bucket, in the app's backups and in `--db postgres-db`. That is the database `POSTGRES_DB` names (the user's name when it is not set).
+
+moin backs up every database of the service, not only that one. One you made yourself, like `analytics`, is `postgres-db/analytics`: its own copies, its own **Go back to** list on the page of `postgres-db`, `--db postgres-db/analytics` in the CLI. Each one restores on its own; the others stay as they are.
 
 ## Requirements
 

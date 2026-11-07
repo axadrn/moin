@@ -797,7 +797,7 @@ func (s *AppService) LatestRestore(workspaceID, idOrName, database string) (*Res
 		return nil, err
 	}
 	for _, restore := range restores {
-		if (database == "" || restore.Database == database) && (restore.Active() || s.now().Sub(restore.StartedAt) < 24*time.Hour) {
+		if (database == "" || restore.Database == database || strings.HasPrefix(restore.Database, database+"/")) && (restore.Active() || s.now().Sub(restore.StartedAt) < 24*time.Hour) {
 			return &restore, nil
 		}
 	}

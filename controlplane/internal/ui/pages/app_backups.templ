@@ -40,6 +40,18 @@ func (view BackupsView) backupOf(database string) (service.DatabaseBackups, bool
 	return service.DatabaseBackups{}, false
 }
 
+// othersOf are the other databases of a Postgres service, which moin
+// backs up too: postgres-db/<name>.
+func (view BackupsView) othersOf(database string) []service.DatabaseBackups {
+	others := []service.DatabaseBackups{}
+	for _, backup := range view.Databases {
+		if strings.HasPrefix(backup.Database, database+"/") {
+			others = append(others, backup)
+		}
+	}
+	return others
+}
+
 // BackupSettings is where the backups of all the app's databases go: the
 // bucket. Without a bucket, the way to add one.
 templ BackupSettings(view BackupsView) {
@@ -127,7 +139,6 @@ func appBucketOptions(buckets []service.Bucket) []kit.Option {
 // the moments to go back to with Restore. A restore shows it runs in the
 // first row while it does.
 templ DatabaseBackups(view BackupsView, database string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	{{ backup, known := view.backupOf(database) }}
 	<div id="db-backups" class="group/backups flex flex-col gap-6" data-database-backup={ database }>
 		if view.Bucket == nil {
@@ -151,38 +162,15 @@ templ DatabaseBackups(view BackupsView, database string) {
 					@backupDownload(view, backup, database)
 				}
 			}
-			@kit.Section("Go back to", nil) {
-				<form
-					class="flex flex-col gap-2"
-					hx-post={ appPath + "/backups/restore" }
-					hx-target="#db-backups"
-					hx-swap="outerHTML"
-					hx-disable="find button[type='submit']"
-					hx-confirm={ "Restore " + databaseName(database) + " to the moment you picked? It replaces the data there now. moin keeps the data of now beside it, so you can undo this; the app stops for a moment." }
-					data-confirm-name={ view.App.Name }
-					data-confirm-action="Restore"
-					data-restore
-				>
-					@kit.CSRF()
-					<input type="hidden" name="database" value={ database }/>
+			@backupGoBack(view, backup, database, database, "Go back to")
+			for _, other := range view.othersOf(database) {
+				@kit.Section(databaseName(other.Database), nil) {
 					@kit.List() {
-						if len(backup.Moments) == 0 {
-							@kit.Row("") {
-								<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
-							}
-						}
-						for _, moment := range backup.Moments {
-							@momentPick(moment, view.Now)
-						}
+						@backupState(other, true, other.Database, view.Now)
+						@backupDownload(view, other, other.Database)
 					}
-					if len(backup.Moments) > 0 {
-						<div class="flex justify-end">
-							@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
-								Restore
-							}
-						</div>
-					}
-				</form>
+				}
+				@backupGoBack(view, other, other.Database, database, "Go back to · "+databaseName(other.Database))
 			}
 		}
 	</div>
@@ -200,6 +188,47 @@ templ DatabaseBackups(view BackupsView, database string) {
 }
 
 var backupScript = templ.NewOnceHandle()
+
+// backupGoBack is the list of moments of one database to go back to,
+// with Restore; page is the database the page is about.
+templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, page, title string) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	@kit.Section(title, nil) {
+		<form
+			class="flex flex-col gap-2"
+			hx-post={ appPath + "/backups/restore" }
+			hx-target="#db-backups"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+			hx-confirm={ "Restore " + databaseName(database) + " to the moment you picked? It replaces the data there now. moin keeps the data of now beside it, so you can undo this; the app stops for a moment." }
+			data-confirm-name={ view.App.Name }
+			data-confirm-action="Restore"
+			data-restore
+		>
+			@kit.CSRF()
+			<input type="hidden" name="database" value={ database }/>
+			<input type="hidden" name="page" value={ page }/>
+			@kit.List() {
+				if len(backup.Moments) == 0 {
+					@kit.Row("") {
+						<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
+					}
+				}
+				for _, moment := range backup.Moments {
+					@momentPick(moment, view.Now)
+				}
+			}
+			if len(backup.Moments) > 0 {
+				<div class="flex justify-end">
+					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
+						Restore
+					}
+				</div>
+			}
+		</form>
+	}
+}
+
 
 // backupState is the first row of a database's backup: backed up and when
 // it was last checked, or why it does not work in one sentence with the

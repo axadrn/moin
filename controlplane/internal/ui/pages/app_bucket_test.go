@@ -114,6 +114,20 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	}
 	view.Restore = nil
 
+	// The other databases of a Postgres service show on its page, each
+	// with its own moments to go back to.
+	other := service.DatabaseBackups{DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db/analytics", Kind: "postgres", CopiedAt: &copied},
+		Moments: []service.Moment{{ID: "20261103T114800Z", Label: "At 11:48", At: copied, Kind: service.MomentCopy}}}
+	view.Databases = append(view.Databases, other)
+	html.Reset()
+	DatabaseBackups(view, "/data/app.db").Render(ctx, &html)
+	for _, want := range []string{"Go back to · analytics", `value="/data/app.db/analytics"`, `name="page" value="/data/app.db"`, `data-moment="20261103T114800Z"`} {
+		if !strings.Contains(html.String(), want) {
+			t.Errorf("the other database has no %q", want)
+		}
+	}
+	view.Databases = view.Databases[:1]
+
 	// Postgres has no Every change; without a copy there is nothing to
 	// download.
 	view.Databases[0].Kind, view.Databases[0].Copies = "postgres", nil

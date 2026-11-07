@@ -216,10 +216,16 @@ func (h *AppsHandler) renderDatabaseBackups(w http.ResponseWriter, r *http.Reque
 		renderError(w, "load app failed", err)
 		return
 	}
-	view, err := h.backupsView(r, app, true, r.FormValue("database"))
+	// The page is about one database; a Postgres service shows its other
+	// databases on it too.
+	page := r.FormValue("page")
+	if page == "" {
+		page = r.FormValue("database")
+	}
+	view, err := h.backupsView(r, app, true, page)
 	if err != nil {
 		renderError(w, "load backups failed", err)
 		return
 	}
-	render(w, r, pages.DatabaseBackups(view, r.FormValue("database")))
+	render(w, r, pages.DatabaseBackups(view, page))
 }

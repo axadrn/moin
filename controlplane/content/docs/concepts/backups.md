@@ -58,7 +58,7 @@ your server       your bucket
 nothing waits on the disk
 ```
 
-`pg_dump` comes with every Postgres image, Alpine too, so every Postgres is backed up. moin runs it inside your Postgres container: no password leaves it.
+`pg_dump` comes with every Postgres image, Alpine too, so every Postgres is backed up. moin runs it inside your Postgres container: no password leaves it. It copies every database in it, each into a file of its own, so each one goes back on its own.
 
 ## Every change (SQLite)
 

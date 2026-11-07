@@ -219,6 +219,10 @@ func databaseName(database string) string {
 	if strings.HasPrefix(database, "/") {
 		return path.Base(database)
 	}
+	// Another database of a Postgres service: postgres-db/analytics.
+	if _, name, ok := strings.Cut(database, "/"); ok {
+		return name
+	}
 	return database
 }
 
