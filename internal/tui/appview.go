@@ -319,7 +319,7 @@ func (m model) backupsTab(u ui, w, h int) string {
 		switch {
 		case d.Problem != "":
 			word = "failed"
-		case d.Since == nil:
+		case d.CopiedAt == nil:
 			word = "waiting"
 		}
 		kind := d.Kind
@@ -331,10 +331,13 @@ func (m model) backupsTab(u ui, w, h int) string {
 		switch {
 		case d.Problem != "":
 			kv("backup", u.bad(d.Problem))
-		case d.Since == nil:
+		case d.CopiedAt == nil:
 			kv("backup", u.faint("starting"))
 		default:
-			kv("backup", u.good("every change")+u.muted(" · back to "+d.Since.Local().Format("Jan 2 15:04")))
+			kv("last copy", u.good(human.Ago(*d.CopiedAt, now)))
+			if d.Since != nil {
+				kv("every change", u.muted("back to "+d.Since.Local().Format("Jan 2 15:04")))
+			}
 		}
 		switch {
 		case d.CheckError != "":
@@ -344,25 +347,12 @@ func (m model) backupsTab(u ui, w, h int) string {
 		default:
 			kv("daily check", u.faint("not yet"))
 		}
-		if d.Problem != "" {
-			for j, l := range wrap(d.Error, liw-2) {
-				if j < 2 {
-					st = append(st, "  "+u.faint(l))
-				}
-			}
-		}
-		if d.Note != "" {
-			for j, l := range wrap(d.Note, liw-2) {
-				if j < 2 {
-					st = append(st, "  "+u.faint(l))
-				}
-			}
-		}
 	}
 	if b.Bucket != "" {
 		st = append(st, "", "  "+padR(u.muted("bucket"), 16)+u.text(b.Bucket))
+		st = append(st, "  "+padR(u.muted("schedule"), 16)+u.text(scheduleText(b.BackupSchedule))+u.faint("  w: change it on the web"))
 	}
-	st = append(st, "  "+padR(u.muted("a full copy"), 16)+u.faint("c downloads one"))
+	st = append(st, "  "+padR(u.muted("a copy"), 16)+u.faint("c downloads the newest"))
 	moments := m.moments()
 	sw := w
 	if wide {
@@ -707,4 +697,19 @@ func (m model) outLine(u ui, l string) string {
 		return "  " + u.bad(text)
 	}
 	return "  " + u.faint(text)
+}
+
+// scheduleText is how often and how long, like "hourly, kept 7 days,
+// every change on".
+func scheduleText(s client.BackupSchedule) string {
+	every := map[int]string{15: "every 15 minutes", 60: "hourly", 1440: "daily"}[s.EveryMinutes]
+	kept := fmt.Sprintf("kept %d days", s.KeepDays)
+	if s.KeepDays == 1 {
+		kept = "kept 1 day"
+	}
+	change := "every change off"
+	if s.EveryChange {
+		change = "every change on"
+	}
+	return every + ", " + kept + ", " + change
 }

@@ -152,7 +152,17 @@ var backupSummaries = map[string]summarize{
 		return "restored " + target + " to " + d["at"]
 	},
 	"backup.downloaded": func(target string, d map[string]string) string {
+		if d["database"] != "" {
+			return "downloaded a copy of " + d["database"] + " of " + target
+		}
 		return "downloaded a copy of " + target
+	},
+	"backup.scheduled": func(target string, d map[string]string) string {
+		after := func(key string) string {
+			_, value, _ := strings.Cut(d[key], " → ")
+			return value
+		}
+		return "set the backups of " + target + " to " + after("every") + ", kept " + after("keep") + ", every change " + after("every_change")
 	},
 	// Gone with backups as one history.
 	"backup.snapshot_before_changes": func(target string, d map[string]string) string {
@@ -165,13 +175,13 @@ var backupSummaries = map[string]summarize{
 		return "backs up " + d["database"] + " of " + target + " again"
 	},
 	"backup.checked": func(target string, d map[string]string) string {
-		return "checked that " + d["database"] + " of " + target + " can go back"
+		return "checked that the newest copy of " + d["database"] + " of " + target + " restores"
 	},
 	"check.failed": func(target string, d map[string]string) string {
-		return "could not go back with " + d["database"] + " of " + target + " in the daily check: " + d["error"]
+		return "could not restore the newest copy of " + d["database"] + " of " + target + " in the daily check"
 	},
 	"check.recovered": func(target string, d map[string]string) string {
-		return "goes back with " + d["database"] + " of " + target + " in the daily check again"
+		return "restores the newest copy of " + d["database"] + " of " + target + " in the daily check again"
 	},
 	"data.sql": sqlSummary,
 	"data.cell_updated": func(target string, d map[string]string) string {

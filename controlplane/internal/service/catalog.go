@@ -168,7 +168,7 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 }
 
 // Update sets the app to version, the newest release when empty, and
-// deploys it. moin remembers the moment before, so a restore can go back
+// deploys it. moin copies the data just before, so a restore can go back
 // to it. An older version goes too, but migrations may not go back.
 func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, version string) (*model.App, *model.Deploy, error) {
 	app, err := s.apps.Get(actor.WorkspaceID, idOrName)

@@ -19,7 +19,7 @@ func registerDataTools(server *mcpsdk.Server, services Services) {
 		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.queryDatabase)))
 	mcpsdk.AddTool(server, newTool("execute_sql", "Change a database",
-		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin remembers the moment before, so restore_app can go back to it. Needs a token with read and write access.",
+		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin takes a copy just before, so restore_app can go back to it. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.executeSQL)))
 }
 

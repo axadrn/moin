@@ -125,9 +125,9 @@ Data
   sql --write        Run SQL that changes data, in one transaction; DROP or DELETE asks [--yes]
 
 Backups
-  backups            How each database is backed up, the moments to go back to: backups [app]
-  restore            Go back to a moment, to the minute; can be undone for 7 days: restore [app] --to 1h|before-v12|14:01 [--yes]
-  backup download    Save a full copy of a database from your bucket: backup download [app] [--db <path>] [--link]
+  backups            The copies of each database, the moments to go back to, how often: backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d] [--every-change on|off]
+  restore            Go back to a copy, or a minute with every change; can be undone: restore [app] --to before-v12|1h|14:01 [--confirm <app>]
+  backup download    Save a copy of a database from your bucket: backup download [app] [--db <path>] [--to <moment>] [--link]
 
 Buckets
   buckets            Your buckets, the default first, and the apps that use each

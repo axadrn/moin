@@ -156,7 +156,7 @@ func (s *AlertService) backupFailedMessage(e alertEvent) alertMessage {
 		Lines: []string{
 			"Database: " + e.details["database"] + ", app " + e.target + ".",
 			"Error: " + orDash(reason),
-			"New changes are not in your bucket until this is fixed. What is there stays. See: moin backups " + e.target,
+			"New copies do not reach your bucket until this is fixed. The copies there stay. See: moin backups " + e.target,
 		},
 		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
@@ -166,7 +166,7 @@ func (s *AlertService) backupFailedMessage(e alertEvent) alertMessage {
 func (s *AlertService) backupRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Backups of " + e.target + " work again",
-		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Every change goes to your bucket again."},
+		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Its copies reach your bucket again."},
 		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}
@@ -179,7 +179,7 @@ func (s *AlertService) checkFailedMessage(e alertEvent) alertMessage {
 		Lines: []string{
 			"Database: " + e.details["database"] + ", app " + e.target + ".",
 			"Error: " + orDash(reason),
-			"The daily check could not go back to the newest state. Download a copy now and look: moin backups " + e.target,
+			"The daily check could not restore the newest copy. Download it and look: moin backup download " + e.target,
 		},
 		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
@@ -189,7 +189,7 @@ func (s *AlertService) checkFailedMessage(e alertEvent) alertMessage {
 func (s *AlertService) checkRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Daily check of " + e.target + " passes again",
-		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Going back works again."},
+		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". The newest copy restores again."},
 		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}

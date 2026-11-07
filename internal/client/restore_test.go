@@ -43,11 +43,11 @@ func TestRestoreWaitsThroughOutages(t *testing.T) {
 	}))
 	defer server.Close()
 	api, _ := New(Config{URL: server.URL, Token: "pat_x"})
-	if err := api.Restore(context.Background(), "shop", "", "1h", nil); err != nil {
+	if err := api.Restore(context.Background(), "shop", "", "1h", nil, "shop"); err != nil {
 		t.Fatalf("restore through outages: %v", err)
 	}
 	// Nothing left to answer: a not found ends the wait at once.
-	err := api.Restore(context.Background(), "shop", "", "1h", nil)
+	err := api.Restore(context.Background(), "shop", "", "1h", nil, "shop")
 	if err == nil || !strings.Contains(err.Error(), "no such restore") {
 		t.Fatalf("a restore that is gone: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestRestoreUnknownEnds(t *testing.T) {
 	defer server.Close()
 	api, _ := New(Config{URL: server.URL, Token: "pat_x"})
 	start := time.Now()
-	err := api.Restore(context.Background(), "shop", "", "1h", nil)
+	err := api.Restore(context.Background(), "shop", "", "1h", nil, "shop")
 	if err == nil || !strings.Contains(err.Error(), "does not know yet how it ended") || !strings.Contains(err.Error(), "moin backups shop") {
 		t.Fatalf("an unknown restore: %v", err)
 	}

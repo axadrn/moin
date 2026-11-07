@@ -85,10 +85,8 @@ type AppService struct {
 	mu          sync.Mutex
 	live        map[string]*liveDeploy
 	subscribers map[string]map[chan struct{}]struct{}
-	// downloads are the copies being made or made for a download, by ID;
-	// updates the catalog version each running update deploy brings.
-	downloads map[string]*Download
-	updates   map[string]string
+	// updates is the catalog version each running update deploy brings.
+	updates map[string]string
 	// waiting are the restores this control plane waits for the agent's
 	// answer to; restoreMu keeps reserving and ending restores apart.
 	waiting   map[string]bool

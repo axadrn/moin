@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -10,6 +11,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
+	"github.com/axadrn/moin/protocol"
 )
 
 // BackupRestore puts a database back to the moment picked.
@@ -19,7 +21,8 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 		answerFailed(w, r, "Not restored", "Pick a moment.")
 		return
 	}
-	_, err := h.apps.StartRestore(r.Context(), actor(r), r.PathValue("app"), service.RestoreTarget{Database: r.FormValue("database"), Moment: moment})
+	// The confirm dialog sends the name the user typed.
+	_, err := h.apps.StartRestore(r.Context(), actor(r), r.PathValue("app"), service.RestoreTarget{Database: r.FormValue("database"), Moment: moment, Confirm: r.Header.Get("X-Moin-Confirm")})
 	if err != nil {
 		failed(w, r, "Not restored", err, nil)
 		return
@@ -28,15 +31,28 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 	h.renderDatabaseBackups(w, r)
 }
 
-// BackupDownload starts a full copy of the database for a download. The
-// row says it runs, and turns into the link once the copy is ready.
+// BackupDownload sends the browser to the newest copy of the database,
+// in the user's own bucket, through a link that lasts 15 minutes.
 func (h *AppsHandler) BackupDownload(w http.ResponseWriter, r *http.Request) {
-	_, err := h.apps.StartDownload(actor(r), r.PathValue("app"), r.FormValue("database"))
+	download, err := h.apps.Download(r.Context(), actor(r), r.PathValue("app"), r.FormValue("database"), "")
 	if err != nil {
-		failed(w, r, "No copy", err, nil)
+		http.Error(w, errorMessage(err), http.StatusConflict)
 		return
 	}
+	http.Redirect(w, r, download.Link, http.StatusSeeOther)
+}
+
+// BackupSchedule saves how often the app's databases are copied, how long
+// each copy stays and Every change. A failed save answers the rows as
+// stored, with why.
+func (h *AppsHandler) BackupSchedule(w http.ResponseWriter, r *http.Request) {
+	every, _ := strconv.Atoi(r.FormValue("every"))
+	keep, _ := strconv.Atoi(r.FormValue("keep"))
+	_, err := h.apps.SetBackupSchedule(actor(r), r.PathValue("app"), protocol.Schedule{Every: every, Keep: keep, EveryChange: r.FormValue("every_change") == "1"})
 	h.renderDatabaseBackups(w, r)
+	if err != nil {
+		answerError(w, r, "Not saved", errorMessage(err))
+	}
 }
 
 // SetAppBucket moves the app's uploads and new backups to another bucket.
@@ -55,7 +71,7 @@ func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	if app.BucketName != "" {
 		bucket = app.BucketName
 	}
-	answerDone(w, r, "Uploads and backups go to "+bucket, "The history starts again there.")
+	answerDone(w, r, "Uploads and backups go to "+bucket, "Its copies start again there.")
 }
 
 // Bucket is the buckets page.
@@ -115,7 +131,7 @@ func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their history starts again there.")
+	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their copies start again there.")
 }
 
 // RemoveBucket forgets a bucket nothing uses.
@@ -179,10 +195,6 @@ func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool, d
 		_, view.Databases, err = h.apps.Backups(r.Context(), workspace.ID, app.ID)
 		if err != nil {
 			view.Error = errorMessage(err)
-		}
-		view.Download, err = h.apps.LatestDownload(r.Context(), workspace.ID, app.ID, database)
-		if err != nil {
-			return view, err
 		}
 		view.Restore, err = h.apps.LatestRestore(workspace.ID, app.ID, database)
 		if err != nil {

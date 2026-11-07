@@ -66,12 +66,12 @@ func TestBuckets(t *testing.T) {
 		t.Errorf("use --default: code %d, requests %v", code, api.requests)
 	}
 
-	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "Before v12", "--yes")
-	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restores {"database":"","moment":"Before v12"}`) {
+	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "Before v12", "--confirm", "shop")
+	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restores {"confirm":"shop","database":"","moment":"Before v12"}`) {
 		t.Errorf("restore to a moment: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
-	code, _, stderr = runCLI(t, api, "restore", "--app", "shop", "--to", "2026-11-07 14:01", "--db", "/data/app.db", "--yes")
-	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restores {"at":"2026-11-07T14:01:00Z","database":"/data/app.db"}`) {
+	code, _, stderr = runCLI(t, api, "restore", "--app", "shop", "--to", "2026-11-07 14:01", "--db", "/data/app.db", "--confirm", "shop")
+	if code != 0 || !api.seen(`POST /api/v1/apps/shop/restores {"at":"2026-11-07T14:01:00Z","confirm":"shop","database":"/data/app.db"}`) {
 		t.Errorf("restore to a time: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 

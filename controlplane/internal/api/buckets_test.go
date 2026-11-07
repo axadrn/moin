@@ -49,6 +49,7 @@ func TestBucketRoutes(t *testing.T) {
 		"DELETE /api/v1/buckets/{name}":    handler.DeleteBucket,
 		"PUT /api/v1/apps/{app}/bucket":    handler.SetAppBucket,
 		"POST /api/v1/apps/{app}/restores": handler.StartRestore,
+		"PUT /api/v1/apps/{app}/backups":   handler.SetBackupSchedule,
 	} {
 		mux.HandleFunc(pattern, serve)
 	}
@@ -110,6 +111,18 @@ func TestBucketRoutes(t *testing.T) {
 	}
 	if status, answer := send("POST", "/api/v1/apps/blog/restores", `{"moment":""}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {
 		t.Fatalf("a restore without a moment: %d %v", status, answer)
+	}
+	// The app's name, typed out, is required: 422 confirm_mismatch.
+	for _, body := range []string{`{"moment":"1h"}`, `{"moment":"1h","confirm":"shop"}`} {
+		if status, answer := send("POST", "/api/v1/apps/blog/restores", body); status != http.StatusUnprocessableEntity || code(answer) != "confirm_mismatch" {
+			t.Fatalf("a restore with %s: %d %v", body, status, answer)
+		}
+	}
+	if status, answer := send("PUT", "/api/v1/apps/blog/backups", `{"every_minutes":15,"keep_days":3,"every_change":true}`); status != http.StatusOK || answer["every_minutes"] != float64(15) || answer["keep_days"] != float64(3) {
+		t.Fatalf("set the schedule: %d %v", status, answer)
+	}
+	if status, answer := send("PUT", "/api/v1/apps/blog/backups", `{"every_minutes":5,"keep_days":3}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {
+		t.Fatalf("a wrong schedule: %d %v", status, answer)
 	}
 
 	// A rename keeps the stored secret key: no secret_key needed.

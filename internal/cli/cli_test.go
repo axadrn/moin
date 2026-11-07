@@ -174,10 +174,13 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 			t.Errorf("%v: requests %v, want %s", args, api.requests, want)
 		}
 	}
+	// A restore asks for the name; without a terminal it wants --confirm.
+	if code, _, stderr := runCLI(t, &fakeAPI{}, "restore", "--app", "shop", "--to", "1h"); code != 1 || !strings.Contains(stderr, "--confirm shop") {
+		t.Errorf("restore: code %d, stderr %q", code, stderr)
+	}
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
 		{"env", "rm", "--app", "shop", "KEY"},
-		{"restore", "--app", "shop", "--to", "1h"},
 		{"domains", "rm", "--app", "shop", "blog.de"},
 		{"unlink", "shop"},
 		{"hook", "shop"},

@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -115,7 +116,7 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 					status.BackupsChecked++
 				}
 				if message := backup.BackupError(); message != "" {
-					status.Issues = append(status.Issues, StatusIssue{Kind: IssueBackupFailed, Target: app.Name, Detail: "backups of " + backup.Database + " stopped: " + clipText(message, 120), Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
+					status.Issues = append(status.Issues, StatusIssue{Kind: IssueBackupFailed, Target: app.Name, Detail: "backups of " + backup.Database + " stopped: " + inSentence(BackupProblem(message)), Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
 				}
 				if backup.CheckError != "" {
 					status.Issues = append(status.Issues, StatusIssue{Kind: IssueCheckFailed, Target: app.Name, Detail: "the daily check of " + backup.Database + " failed", Path: path + "/data?db=" + url.QueryEscape(backup.Database)})
@@ -144,4 +145,14 @@ func deployFailedDetail(app model.App) string {
 		detail += ", v" + strconv.Itoa(app.LiveNumber) + " still runs"
 	}
 	return detail
+}
+
+// inSentence puts a sentence of its own into another one: "The bucket
+// can't be reached." becomes "the bucket can't be reached".
+func inSentence(sentence string) string {
+	sentence = strings.TrimSuffix(sentence, ".")
+	if sentence == "" {
+		return sentence
+	}
+	return strings.ToLower(sentence[:1]) + sentence[1:]
 }

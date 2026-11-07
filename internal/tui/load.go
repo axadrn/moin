@@ -336,32 +336,22 @@ func (m model) deployDir() tea.Cmd {
 func (m model) restoreCmd(app, database, moment string, at *time.Time) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		if err := api.Restore(ctx, app, database, moment, at); err != nil {
+		// The name was typed out to get here (confirmName).
+		if err := api.Restore(ctx, app, database, moment, at, app); err != nil {
 			return errMsg{err}
 		}
 		return reloadMsg{notice: "Restored " + app + ". It runs again; the newest undo moment undoes it"}
 	}
 }
 
-// downloadCopy has the agent make a full copy of a database in the app's
-// bucket, waits for it and opens its link, or shows it.
+// downloadCopy opens the link to the newest copy of a database in the
+// app's bucket, or shows it.
 func (m model) downloadCopy(app, database string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		download, err := api.StartDownload(ctx, app, database)
-		for err == nil && download.State == "running" {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-time.After(time.Second):
-			}
-			download, err = api.Download(ctx, app, download.ID)
-		}
+		download, err := api.Download(ctx, app, database, "")
 		if err != nil {
 			return errMsg{err}
-		}
-		if download.State != "ready" {
-			return errMsg{fmt.Errorf("the copy failed: %s", download.Error)}
 		}
 		if openBrowser(download.Link) == nil {
 			return noticeMsg("The copy of " + download.Database + " downloads in your browser")

@@ -28,11 +28,11 @@ func TestBackupChanges(t *testing.T) {
 	day1 := time.Date(2026, 11, 4, 3, 0, 0, 0, time.UTC)
 	day2 := day1.Add(24 * time.Hour)
 	ok := model.BackupStatus{Database: "data/app.db", CheckedAt: &day1}
-	broken := model.BackupStatus{Database: "data/app.db", CheckedAt: &day1, Error: "continuous backup: access denied"}
-	checkBad := model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "restore check failed: checksum", CheckError: "restore check failed: checksum"}
+	broken := model.BackupStatus{Database: "data/app.db", CheckedAt: &day1, Error: "copy app.db: upload: access denied"}
+	checkBad := model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: checksum", CheckError: "the daily check failed: checksum"}
 	day3 := day2.Add(24 * time.Hour)
 	checkGood := model.BackupStatus{Database: "data/app.db", CheckedAt: &day3}
-	restarted := model.BackupStatus{Database: "data/app.db", CheckError: "restore check failed: checksum"}
+	restarted := model.BackupStatus{Database: "data/app.db", CheckError: "the daily check failed: checksum"}
 	for _, test := range []struct {
 		name            string
 		previous        model.BackupStatus
@@ -41,14 +41,15 @@ func TestBackupChanges(t *testing.T) {
 		want, wantError string
 	}{
 		{"first report healthy", model.BackupStatus{}, false, ok, "backup.checked", ""},
-		{"breaks", ok, true, broken, "backup.failed", "continuous backup: access denied"},
+		// The one short sentence, never the raw output.
+		{"breaks", ok, true, broken, "backup.failed", "The bucket refuses the keys."},
 		{"still broken: no second alert", broken, true, broken, "", ""},
 		{"works again", broken, true, ok, "backup.recovered", ""},
-		{"restore check fails, backups fine", ok, true, checkBad, "check.failed", "restore check failed: checksum"},
+		{"restore check fails, backups fine", ok, true, checkBad, "check.failed", "The daily check could not restore the newest copy."},
 		{"restore check still failing", checkBad, true, checkBad, "", ""},
 		{"agent restarted, no check yet", checkBad, true, restarted, "", ""},
 		{"restore check passes again", checkBad, true, checkGood, "check.recovered,backup.checked", ""},
-		{"old agent: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "restore check failed: x"}, "backup.failed,backup.checked", "restore check failed: x"},
+		{"old agent: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: x"}, "backup.failed,backup.checked", "The daily check could not restore the newest copy."},
 	} {
 		changes := backupChanges(test.previous, test.known, test.now)
 		if got := actions(changes); got != test.want {
@@ -142,13 +143,13 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	servers := "https://moin.example.com/app/owner-workspace/servers"
 
 	f.alerts.Send(owner.WorkspaceID, "backup.failed", "shop", map[string]string{"database": "postgres-db", "error": "continuous backup: <denied> & co"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Backups of shop stopped*\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\n<"+backups+"|Open in moin>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Backups of shop stopped*\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew copies do not reach your bucket until this is fixed. The copies there stay. See: moin backups shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack backup.failed = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🔴 Backups of shop stopped**\nDatabase: postgres-db, app shop.\nError: continuous backup: <denied> & co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\nOpen in moin: <"+backups+">" {
+	if text := decoded(t, f.chat.last(t, "/discord/api/webhooks/1/abc").body)["content"]; text != "**🔴 Backups of shop stopped**\nDatabase: postgres-db, app shop.\nError: continuous backup: <denied> & co\nNew copies do not reach your bucket until this is fixed. The copies there stay. See: moin backups shop\nOpen in moin: <"+backups+">" {
 		t.Errorf("discord backup.failed = %q", text)
 	}
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Backups of shop stopped</b>\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew changes are not in your bucket until this is fixed. What is there stays. See: moin backups shop\n<a href=\""+backups+"\">Open in moin</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Backups of shop stopped</b>\nDatabase: postgres-db, app shop.\nError: continuous backup: &lt;denied&gt; &amp; co\nNew copies do not reach your bucket until this is fixed. The copies there stay. See: moin backups shop\n<a href=\""+backups+"\">Open in moin</a>" {
 		t.Errorf("telegram backup.failed = %q", text)
 	}
 	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"backup.failed","workspace":"owner-workspace","app":"shop","server":"web-1","domain":"","reason":"continuous backup: <denied> & co","since":"","duration":"","url":"`+backups+`"}` {
@@ -156,11 +157,11 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	}
 
 	f.alerts.Send(owner.WorkspaceID, "backup.recovered", "shop", map[string]string{"database": "postgres-db"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🟢 Backups of shop work again*\nDatabase: postgres-db, app shop. Every change goes to your bucket again.\n<"+backups+"|Open in moin>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🟢 Backups of shop work again*\nDatabase: postgres-db, app shop. Its copies reach your bucket again.\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack backup.recovered = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "check.failed", "shop", map[string]string{"database": "data/app.db", "error": "restore check failed: integrity check"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Daily check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore check failed: integrity check\nThe daily check could not go back to the newest state. Download a copy now and look: moin backups shop\n<"+backups+"|Open in moin>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Daily check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore check failed: integrity check\nThe daily check could not restore the newest copy. Download it and look: moin backup download shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack check.failed = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "check.recovered", "shop", map[string]string{"database": "data/app.db"}, at)

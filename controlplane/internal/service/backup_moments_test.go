@@ -13,19 +13,23 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestMoments: the quick moments inside the history, then the remembered
-// ones of the database and the copies before restores, newest first.
+// TestMoments: the quick minutes inside what Every change reaches, then
+// the copies and the undos, newest first; a copy moin took before a
+// change carries its name.
 func TestMoments(t *testing.T) {
 	now := time.Date(2026, 11, 7, 14, 30, 0, 0, time.UTC)
 	since := now.Add(-2 * time.Hour)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, ReplicatedAt: &now,
-		Copies: []protocol.Copy{{ID: "20261107T140200Z", At: now.Add(-28 * time.Minute)}, {ID: "20261030T140200Z", At: now.Add(-8 * 24 * time.Hour)}}}
+	copyAt := func(at time.Time) protocol.Copy {
+		return protocol.Copy{ID: at.Format(protocol.CopyIDLayout), At: at}
+	}
+	deployed, edited, other := now.Add(-10*time.Minute), now.Add(-40*time.Minute), now.Add(-5*time.Minute)
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now,
+		Copies: []protocol.Copy{copyAt(other), copyAt(deployed), copyAt(now.Add(-20 * time.Minute)), copyAt(edited)},
+		Undos:  []protocol.Copy{copyAt(now.Add(-28 * time.Minute))}}
 	remembered := []model.BackupMoment{
-		{ID: 1, Kind: model.MomentDeploy, Detail: "12", At: now.Add(-10 * time.Minute)},
-		{ID: 2, Database: "/data/app.db", Kind: model.MomentEdit, Detail: "sql", At: now.Add(-40 * time.Minute)},
-		{ID: 3, Database: "/data/other.db", Kind: model.MomentEdit, Detail: "cell:orders", At: now.Add(-5 * time.Minute)},
-		{ID: 4, Kind: model.MomentUpdate, Detail: "11 3.4.1", At: now.Add(-3 * time.Hour)},
-		{ID: 5, Database: "/data/app.db", Kind: model.MomentEdit, Detail: "delete:orders", At: now.Add(-50 * time.Minute)},
+		{ID: 1, Kind: model.MomentDeploy, Detail: "12", At: deployed},
+		{ID: 2, Database: "/data/app.db", Kind: model.MomentEdit, Detail: "sql", At: edited},
+		{ID: 3, Database: "/data/other.db", Kind: model.MomentEdit, Detail: "cell:orders", At: other},
 	}
 	got := []string{}
 	for _, moment := range Moments(backup, remembered, now) {
@@ -33,52 +37,49 @@ func TestMoments(t *testing.T) {
 	}
 	want := []string{
 		"1m 1 minute ago", "15m 15 minutes ago", "1h 1 hour ago",
-		"before-v12 Before v12", "undo-20261107T140200Z Before the restore at 14:02", "edit-2 Before your SQL change", "edit-5 Before the row deleted from orders",
+		"20261107T142500Z At 14:25", "before-v12 Before v12", "20261107T141000Z At 14:10", "undo-20261107T140200Z Before the restore at 14:02", "edit-2 Before your SQL change",
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("moments\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-
-	// A day of history offers yesterday too; an update says its version.
-	since = now.Add(-25 * time.Hour)
 	moments := Moments(backup, remembered, now)
-	if _, err := findMoment(moments, "yesterday this time"); err != nil {
-		t.Error("no yesterday with a day of history")
+	if moment, err := findMoment(moments, "BEFORE V12"); err != nil || moment.Copy != deployed.Format(protocol.CopyIDLayout) || moment.Undo != "" {
+		t.Errorf("before v12: %+v %v", moment, err)
 	}
-	if _, err := findMoment(moments, "BEFORE V11"); !errors.Is(err, ErrMoment) {
-		t.Error("an update reads as a plain deploy")
-	}
-	if moment, err := findMoment(moments, "before the update to 3.4.1"); err != nil || moment.ID != "before-v11" {
-		t.Errorf("update moment %+v", moment)
+	if moment, err := findMoment(moments, "undo-20261107T140200Z"); err != nil || moment.Undo != "20261107T140200Z" || moment.Copy != "" {
+		t.Errorf("undo: %+v %v", moment, err)
 	}
 
-	// A broken backup reaches only to its newest change in the bucket.
+	// A broken Every change reaches only to its newest change.
 	newest := now.Add(-20 * time.Minute)
-	backup.ReplicatedAt, backup.Error = &newest, "dial tcp: i/o timeout"
+	backup.Until, backup.Error = &newest, "dial tcp: i/o timeout"
 	for _, moment := range Moments(backup, remembered, now) {
-		if moment.Kind != MomentUndo && moment.At.After(newest) {
+		if moment.Kind == MomentMinute && moment.At.After(newest) {
 			t.Errorf("%s offered after the newest change", moment.ID)
 		}
 	}
-	// Without a history only the copies before restores are left.
+	// Without Every change (Postgres, or switched off) only the copies
+	// and the undos.
 	backup.Since = nil
-	if moments := Moments(backup, remembered, now); len(moments) != 1 || moments[0].Kind != MomentUndo {
-		t.Errorf("without a history: %+v", moments)
+	for _, moment := range Moments(backup, remembered, now) {
+		if moment.Kind == MomentMinute {
+			t.Errorf("a minute without Every change: %+v", moment)
+		}
 	}
 }
 
 func TestBackupProblem(t *testing.T) {
 	for raw, want := range map[string]string{
 		"": "",
-		"writing down the changes: dial tcp 1.2.3.4:443: i/o timeout":                                                "The bucket can't be reached.",
-		"upload: operation error S3: PutObject, https response error StatusCode: 403, api error AccessDenied":        "The bucket refuses the keys.",
-		"NoSuchBucket: The specified bucket does not exist":                                                          "The bucket does not exist.",
-		"deploy shop once more to start its backups":                                                                 "Deploy the app once more to start its backups.",
-		"Backups need a Debian-based Postgres image, such as postgres:17: WAL-G does not run in postgres:17-alpine.": "Backups need a Debian-based Postgres image, such as postgres:17.",
-		"the daily check failed: integrity check: page 4":                                                            "The daily check could not go back to the newest state.",
-		"the Postgres service db of shop is not running":                                                             "The database is not running.",
-		"write /data/x: no space left on device":                                                                     "The server's disk is full.",
-		"something else entirely":                                                                                    "The backup does not work.",
+		"copy /data/app.db: dial tcp 1.2.3.4:443: i/o timeout":                                                "The bucket can't be reached.",
+		"upload: operation error S3: PutObject, https response error StatusCode: 403, api error AccessDenied": "The bucket refuses the keys.",
+		"NoSuchBucket: The specified bucket does not exist":                                                   "The bucket does not exist.",
+		"deploy shop once more to start its backups":                                                          "Deploy the app once more to start its backups.",
+		"the daily check failed: integrity check: page 4":                                                     "The daily check could not restore the newest copy.",
+		"the Postgres service db of shop is not running":                                                      "The database is not running.",
+		"write /data/x: no space left on device":                                                              "The server's disk is full.",
+		"writing down every change: database is locked":                                                       "Every change is not written down.",
+		"something else entirely":                                                                             "The backup does not work.",
 	} {
 		if got := BackupProblem(raw); got != want {
 			t.Errorf("BackupProblem(%q) = %q, want %q", raw, got, want)
@@ -93,31 +94,35 @@ func backupAgent(t *testing.T, apps *AppService, servers *ServerService, server 
 }
 
 // TestRestoreToMoments: a restore resolves the moment, by ID or label, to
-// a time or a copy; a time outside the history is refused before the
-// agent gets anything.
+// a copy, an undo or a minute; a time goes to that minute inside Every
+// change, else to the newest copy at or before it; a moment that is not
+// there is refused before the agent gets anything.
 func TestRestoreToMoments(t *testing.T) {
 	apps, servers, server, agent := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Second)
 	since := now.Add(-3 * time.Hour)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, ReplicatedAt: &now, Copies: []protocol.Copy{{ID: "20261107T140200Z", At: now.Add(-time.Hour)}}}
-	before := now.Add(-30 * time.Minute)
+	copied, before := now.Add(-2*time.Hour), now.Add(-30*time.Minute)
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now,
+		Copies: []protocol.Copy{{ID: before.Format(protocol.CopyIDLayout), At: before}, {ID: copied.Format(protocol.CopyIDLayout), At: copied}},
+		Undos:  []protocol.Copy{{ID: "20261107T140200Z", At: now.Add(-time.Hour)}}}
 	apps.remember(app, "", model.MomentDeploy, "7", before)
 	ctx := context.Background()
 
-	restore := func(target RestoreTarget) (protocol.BackupRestore, error) {
+	restore := func(target RestoreTarget) (protocol.BackupRestore, string, error) {
 		t.Helper()
 		agent.mu.Lock()
 		agent.sent = nil
 		agent.mu.Unlock()
 		backupAgent(t, apps, servers, server, agent, backup)
 		var sent protocol.BackupRestore
+		target.Confirm = "shop"
 		started, err := apps.StartRestore(ctx, owner, "shop", target)
 		if err != nil {
-			return sent, err
+			return sent, "", err
 		}
 		for deadline := time.Now().Add(5 * time.Second); agent.count(protocol.TypeBackupRestore) == 0; time.Sleep(time.Millisecond) {
 			if time.Now().After(deadline) {
@@ -127,38 +132,52 @@ func TestRestoreToMoments(t *testing.T) {
 		agent.last(t, protocol.TypeBackupRestore, &sent)
 		agentAnswers(servers, server.ID, agent, protocol.TypeBackupRestore, protocol.TypeOK, nil)
 		waitRestore(t, apps, started.ID, RestoreDone)
-		return sent, nil
+		return sent, started.To, nil
 	}
 
-	sent, err := restore(RestoreTarget{Moment: "before v7"})
-	if err != nil || sent.At == nil || !sent.At.Equal(before) || sent.Database != "/data/app.db" || sent.Copy != "" {
+	// The name typed out is checked here, for every surface.
+	for _, typed := range []string{"", "blog", "shop2"} {
+		if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h", Confirm: typed}); !errors.Is(err, ErrConfirm) {
+			t.Fatalf("confirm %q: %v", typed, err)
+		}
+	}
+	if agent.count(protocol.TypeBackupRestore) != 0 || agent.count(protocol.TypeBackupList) != 0 {
+		t.Fatal("a restore without the name reached the agent")
+	}
+	sent, to, err := restore(RestoreTarget{Moment: "before v7"})
+	if err != nil || sent.Copy != before.Format(protocol.CopyIDLayout) || sent.At != nil || sent.Database != "/data/app.db" || to != "Before v7" {
 		t.Fatalf("before v7: %+v %v", sent, err)
 	}
-	sent, err = restore(RestoreTarget{Moment: "15m"})
-	if err != nil || sent.At == nil || time.Since(*sent.At) < 14*time.Minute || time.Since(*sent.At) > 16*time.Minute {
+	sent, _, err = restore(RestoreTarget{Moment: "15m"})
+	if err != nil || sent.At == nil || time.Since(*sent.At) < 14*time.Minute || time.Since(*sent.At) > 16*time.Minute || sent.Copy != "" {
 		t.Fatalf("15m: %+v %v", sent, err)
 	}
-	sent, err = restore(RestoreTarget{Moment: "undo-20261107T140200Z"})
-	if err != nil || sent.Copy != "20261107T140200Z" || sent.At != nil {
+	sent, _, err = restore(RestoreTarget{Moment: "undo-20261107T140200Z"})
+	if err != nil || sent.Undo != "20261107T140200Z" || sent.At != nil || sent.Copy != "" {
 		t.Fatalf("undo: %+v %v", sent, err)
 	}
 	at := now.Add(-time.Hour).Truncate(time.Minute)
-	sent, err = restore(RestoreTarget{At: &at})
-	if err != nil || !sent.At.Equal(at) {
-		t.Fatalf("a time: %+v %v", sent, err)
+	sent, _, err = restore(RestoreTarget{At: &at})
+	if err != nil || sent.At == nil || !sent.At.Equal(at) {
+		t.Fatalf("a minute: %+v %v", sent, err)
 	}
+	// Before Every change reaches: the newest copy at or before it.
 	early := now.Add(-5 * time.Hour)
-	var outside *MomentOutsideError
-	if _, err := restore(RestoreTarget{At: &early}); !errors.As(err, &outside) {
-		t.Fatalf("before the history: %v", err)
+	if _, _, err := restore(RestoreTarget{At: &early}); !errors.Is(err, ErrMomentOutside) {
+		t.Fatalf("before every copy: %v", err)
 	}
-	if _, err := restore(RestoreTarget{Moment: "before v99"}); !errors.Is(err, ErrMoment) {
+	backup.Since = nil
+	sent, _, err = restore(RestoreTarget{At: &at})
+	if err != nil || sent.Copy != copied.Format(protocol.CopyIDLayout) || sent.At != nil {
+		t.Fatalf("a time without Every change: %+v %v", sent, err)
+	}
+	if _, _, err := restore(RestoreTarget{Moment: "before v99"}); !errors.Is(err, ErrMoment) {
 		t.Fatalf("a moment that is not there: %v", err)
 	}
 	if agent.count(protocol.TypeBackupRestore) != 0 {
 		t.Error("a refused restore reached the agent")
 	}
-	if _, err := restore(RestoreTarget{Database: "/data/other.db", Moment: "1h"}); !errors.Is(err, ErrNoDatabase) {
+	if _, _, err := restore(RestoreTarget{Database: "/data/other.db", Moment: "1h"}); !errors.Is(err, ErrNoDatabase) {
 		t.Fatalf("another database: %v", err)
 	}
 }
@@ -190,17 +209,17 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	since := now.Add(-3 * time.Hour)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, ReplicatedAt: &now}
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now}
 	ctx := context.Background()
 	backupAgent(t, apps, servers, server, agent, backup)
-	restore, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h"})
+	restore, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"})
 	if err != nil || restore.State != RestoreRunning || restore.To != "1 hour ago" || restore.Database != "/data/app.db" {
 		t.Fatalf("start: %+v %v", restore, err)
 	}
 	if latest, err := apps.LatestRestore(owner.WorkspaceID, "shop", "/data/app.db"); err != nil || latest == nil || latest.ID != restore.ID {
 		t.Fatalf("latest: %+v %v", latest, err)
 	}
-	if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h"}); !errors.Is(err, ErrRestoreRunning) {
+	if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"}); !errors.Is(err, ErrRestoreRunning) {
 		t.Fatalf("a second restore while one runs: %v", err)
 	}
 	if _, err := apps.RestoreOf(other.WorkspaceID, "shop", restore.ID); err == nil {
@@ -219,7 +238,7 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	agent.sent = nil
 	agent.mu.Unlock()
 	backupAgent(t, apps, servers, server, agent, backup)
-	restore, err = apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h"})
+	restore, err = apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +269,7 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	if gone := waitRestore(t, apps, restore.ID, RestoreUnknown); !strings.Contains(gone.Error, "went offline") || gone.FinishedAt != nil {
 		t.Fatalf("gone: %+v", gone)
 	}
-	if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Moment: "1h"}); !errors.Is(err, ErrRestoreRunning) {
+	if _, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"}); !errors.Is(err, ErrRestoreRunning) {
 		t.Fatalf("a restore while one is unknown: %v", err)
 	}
 
@@ -321,11 +340,11 @@ func TestOneRestoreAtATime(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	since := now.Add(-3 * time.Hour)
-	backupAgent(t, apps, servers, server, agent, protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, ReplicatedAt: &now})
+	backupAgent(t, apps, servers, server, agent, protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now})
 	results := make(chan error, 2)
 	for range 2 {
 		go func() {
-			_, err := apps.StartRestore(context.Background(), owner, "shop", RestoreTarget{Moment: "1h"})
+			_, err := apps.StartRestore(context.Background(), owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"})
 			results <- err
 		}()
 	}
@@ -341,9 +360,12 @@ func TestOneRestoreAtATime(t *testing.T) {
 func TestUndoLabelsCarryTheDay(t *testing.T) {
 	now := time.Date(2026, 11, 7, 18, 0, 0, 0, time.UTC)
 	since := now.Add(-6 * 24 * time.Hour)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, ReplicatedAt: &now, Copies: []protocol.Copy{
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now, Undos: []protocol.Copy{
 		{ID: "20261107T150400Z", At: time.Date(2026, 11, 7, 15, 4, 0, 0, time.UTC)},
 		{ID: "20261106T150400Z", At: time.Date(2026, 11, 6, 15, 4, 0, 0, time.UTC)},
+	}, Copies: []protocol.Copy{
+		{ID: "20261107T170000Z", At: now.Add(-time.Hour)},
+		{ID: "20261107T160000Z", At: now.Add(-2 * time.Hour)},
 	}}
 	remembered := []model.BackupMoment{
 		{ID: 1, Database: "/data/app.db", Kind: model.MomentEdit, Detail: "sql", At: now.Add(-time.Hour)},
@@ -357,7 +379,7 @@ func TestUndoLabelsCarryTheDay(t *testing.T) {
 	if labels["undo-20261107T150400Z"] != "Before the restore at 15:04" || labels["undo-20261106T150400Z"] != "Before the restore on Nov 6 at 15:04" {
 		t.Fatalf("labels %v", labels)
 	}
-	if moment, err := findMoment(moments, "before the restore on nov 6 at 15:04"); err != nil || moment.Copy != "20261106T150400Z" {
+	if moment, err := findMoment(moments, "before the restore on nov 6 at 15:04"); err != nil || moment.Undo != "20261106T150400Z" {
 		t.Fatalf("by the label with its day: %+v %v", moment, err)
 	}
 	var ambiguous *AmbiguousMomentError
@@ -418,7 +440,7 @@ func TestOldAgentGetsAnUpdateAnswer(t *testing.T) {
 	old.ProtocolVersion = 1
 	sent := 0
 	servers.Connect(server, old, "203.0.113.5", func() {}, func(message protocol.Message) error {
-		if message.Type == protocol.TypeBackupList || message.Type == protocol.TypeBackupRestore || message.Type == protocol.TypeBackupDownload {
+		if message.Type == protocol.TypeBackupList || message.Type == protocol.TypeBackupRestore {
 			sent++
 		}
 		return nil
@@ -435,45 +457,72 @@ func TestOldAgentGetsAnUpdateAnswer(t *testing.T) {
 	}
 }
 
-// TestDownloads: a copy runs on its own; once the agent put it in the
-// app's bucket it has a short-lived signed link to there, and another
-// workspace never sees it.
+// TestDownloads: a download is a signed link to the newest copy, or the
+// one named, in the app's own bucket; it expires, and an app without a
+// copy says so.
 func TestDownloads(t *testing.T) {
 	apps, servers, server, agent := newAppService(t)
-	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
+	app, err := apps.Create(owner, "shop", "web-1")
+	if err != nil {
 		t.Fatal(err)
 	}
-	download, err := apps.StartDownload(owner, "shop", "")
-	if err != nil || download.State != DownloadRunning {
-		t.Fatalf("start: %+v %v", download, err)
-	}
 	ctx := context.Background()
-	if running, err := apps.DownloadOf(ctx, owner.WorkspaceID, "shop", download.ID); err != nil || running.State != DownloadRunning || running.Link != "" {
-		t.Fatalf("running: %+v %v", running, err)
+	newest, older := time.Date(2026, 11, 7, 14, 2, 0, 0, time.UTC), time.Date(2026, 11, 7, 13, 2, 0, 0, time.UTC)
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Copies: []protocol.Copy{{ID: "20261107T140200Z", At: newest, Size: 42}, {ID: "20261107T130200Z", At: older, Size: 40}}}
+	answer := func(backup protocol.DatabaseBackup) {
+		agent.mu.Lock()
+		agent.sent = nil
+		agent.mu.Unlock()
+		backupAgent(t, apps, servers, server, agent, backup)
 	}
-	key := owner.WorkspaceID + "/shop/x/downloads/shop-data-app.db-20261107T140200Z.db.gz"
-	agentAnswers(servers, server.ID, agent, protocol.TypeBackupDownload, protocol.TypeBackupFile, protocol.BackupFile{Database: "/data/app.db", Key: key, Size: 42})
-	var ready *Download
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		ready, err = apps.DownloadOf(ctx, owner.WorkspaceID, "shop", download.ID)
-		if err == nil && ready.State == DownloadReady {
-			break
-		}
+	answer(backup)
+	download, err := apps.Download(ctx, owner, "shop", "", "")
+	if err != nil || download.Copy != "20261107T140200Z" || download.Size != 42 || download.Database != "/data/app.db" {
+		t.Fatalf("newest: %+v %v", download, err)
 	}
-	if ready == nil || ready.State != DownloadReady || ready.Size != 42 || ready.Database != "/data/app.db" {
-		t.Fatalf("ready: %+v %v", ready, err)
+	key := owner.WorkspaceID + "/shop/" + app.ID + "/data-app.db/copies/20261107T140200Z.db.gz"
+	if !strings.HasPrefix(download.Link, "https://s3.example.com/owner/"+key) || !strings.Contains(download.Link, "X-Amz-Expires=900") {
+		t.Fatalf("link %s", download.Link)
 	}
-	// The link points into the user's own bucket and expires.
-	if !strings.HasPrefix(ready.Link, "https://s3.example.com/owner/"+key) || !strings.Contains(ready.Link, "X-Amz-Expires=900") {
-		t.Fatalf("link %s", ready.Link)
+	answer(backup)
+	if download, err := apps.Download(ctx, owner, "shop", "", "20261107T130200Z"); err != nil || download.Copy != "20261107T130200Z" {
+		t.Fatalf("named: %+v %v", download, err)
 	}
-	if latest, err := apps.LatestDownload(ctx, owner.WorkspaceID, "shop", "/data/app.db"); err != nil || latest == nil || latest.ID != download.ID {
-		t.Fatalf("latest %+v %v", latest, err)
+	answer(protocol.DatabaseBackup{Database: "/data/app.db"})
+	if _, err := apps.Download(ctx, owner, "shop", "", ""); !errors.Is(err, ErrNoCopy) {
+		t.Fatalf("no copy: %v", err)
 	}
-	if _, err := apps.DownloadOf(ctx, other.WorkspaceID, "shop", download.ID); err == nil {
-		t.Fatal("another workspace sees the download")
+	if _, err := apps.Download(ctx, other, "shop", "", ""); err == nil {
+		t.Fatal("another workspace downloads the copy")
 	}
-	if _, err := apps.DownloadOf(ctx, owner.WorkspaceID, "shop", "nope"); !errors.Is(err, ErrDownloadNotFound) {
-		t.Fatalf("unknown download: %v", err)
+}
+
+// TestBackupSchedule: the schedule takes only the choices, goes into the
+// activity with before and after, and reaches the agent.
+func TestBackupSchedule(t *testing.T) {
+	apps, _, _, _ := newAppService(t)
+	app, err := apps.Create(owner, "shop", "web-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.BackupEvery != 60 || app.BackupKeep != 7 || !app.BackupEveryChange {
+		t.Fatalf("defaults: %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
+	}
+	if _, err := apps.SetBackupSchedule(owner, "shop", protocol.Schedule{Every: 5, Keep: 7}); !errors.Is(err, ErrBackupEvery) {
+		t.Fatalf("every 5: %v", err)
+	}
+	if _, err := apps.SetBackupSchedule(owner, "shop", protocol.Schedule{Every: 15, Keep: 2}); !errors.Is(err, ErrBackupKeep) {
+		t.Fatalf("keep 2: %v", err)
+	}
+	if _, err := apps.SetBackupSchedule(owner, "shop", protocol.Schedule{Every: 15, Keep: 30}); err != nil {
+		t.Fatal(err)
+	}
+	app, _ = apps.Get(owner.WorkspaceID, "shop")
+	if app.BackupEvery != 15 || app.BackupKeep != 30 || app.BackupEveryChange {
+		t.Fatalf("stored: %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
+	}
+	config := apps.backupConfig(owner.WorkspaceID, app.ServerID)
+	if got := config.Schedules["shop"]; got != (protocol.Schedule{Every: 15, Keep: 30}) {
+		t.Fatalf("to the agent: %+v", got)
 	}
 }

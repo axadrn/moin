@@ -53,13 +53,19 @@ type App struct {
 	CatalogNotified string `db:"catalog_notified"`
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
-	BucketID      *string `db:"bucket_id"`
-	BucketName    string  `db:"bucket_name"`
-	ServerName    string  `db:"server_name"`
-	WorkspaceSlug string  `db:"workspace_slug"`
-	LatestNumber  int     `db:"latest_number"`
-	LatestStatus  string  `db:"latest_status"`
-	LiveNumber    int     `db:"live_number"`
+	BucketID *string `db:"bucket_id"`
+	// BackupEvery is how often the agent copies the app's databases, in
+	// minutes; BackupKeep how many days it keeps each copy.
+	// BackupEveryChange also records every change of a SQLite file.
+	BackupEvery       int    `db:"backup_every"`
+	BackupKeep        int    `db:"backup_keep"`
+	BackupEveryChange bool   `db:"backup_every_change"`
+	BucketName        string `db:"bucket_name"`
+	ServerName        string `db:"server_name"`
+	WorkspaceSlug     string `db:"workspace_slug"`
+	LatestNumber      int    `db:"latest_number"`
+	LatestStatus      string `db:"latest_status"`
+	LiveNumber        int    `db:"live_number"`
 }
 
 // Deploy statuses.
@@ -139,22 +145,25 @@ type Bucket struct {
 	CreatedAt   time.Time `db:"created_at"`
 }
 
-// BackupStatus is what the agent last reported about one database.
+// BackupStatus is what the agent last reported about one database:
+// its newest copy, how far Every change reaches (Since, Until) and the
+// newest daily check.
 type BackupStatus struct {
-	AppID        string     `db:"app_id"`
-	Database     string     `db:"database"`
-	Since        *time.Time `db:"since"`
-	ReplicatedAt *time.Time `db:"replicated_at"`
-	CheckedAt    *time.Time `db:"checked_at"`
-	Error        string     `db:"error"`
-	UpdatedAt    time.Time  `db:"updated_at"`
+	AppID     string     `db:"app_id"`
+	Database  string     `db:"database"`
+	CopiedAt  *time.Time `db:"copied_at"`
+	Since     *time.Time `db:"since"`
+	Until     *time.Time `db:"replicated_at"`
+	CheckedAt *time.Time `db:"checked_at"`
+	Error     string     `db:"error"`
+	UpdatedAt time.Time  `db:"updated_at"`
 	// CheckError is why the newest daily check failed.
 	CheckError string `db:"check_error"`
 }
 
-// BackupMoment is a moment moin remembers so a restore can go back to
-// it: just before a deploy, a data edit or a catalog update, by the
-// server's clock. Database is empty for every database of the app.
+// BackupMoment names the copy the agent took just before a deploy, a
+// data edit or a catalog update: At is its ID, by the server's clock.
+// Database is empty for every database of the app.
 type BackupMoment struct {
 	ID        int64     `db:"id"`
 	AppID     string    `db:"app_id"`

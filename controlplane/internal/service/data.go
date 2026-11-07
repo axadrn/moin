@@ -12,7 +12,10 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-const dataTimeout = 40 * time.Second
+const (
+	dataTimeout  = 40 * time.Second
+	writeTimeout = 15 * time.Minute
+)
 
 var (
 	ErrNoDatabase = errors.New("the live deploy has no database: no SQLite file on a volume, no Postgres service")
@@ -92,7 +95,7 @@ func (s *AppService) Query(ctx context.Context, actor Actor, idOrName, database,
 }
 
 // query runs SQL; edit says what a write is, such as sql or cell:orders,
-// and is empty for a read. moin remembers the moment before each write.
+// and is empty for a read. moin copies the database before each write.
 func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database, sql string, params []any, edit string, limit int) (protocol.DBResult, error) {
 	write := edit != ""
 	if strings.TrimSpace(sql) == "" {
@@ -105,7 +108,12 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	if len(databases) == 0 {
 		return protocol.DBResult{}, ErrNoDatabase
 	}
-	ctx, cancel := context.WithTimeout(ctx, dataTimeout)
+	// A write waits for the copy the agent takes just before it.
+	timeout := dataTimeout
+	if write {
+		timeout = writeTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	query := protocol.DBQuery{
 		DBRequest: protocol.DBRequest{App: app.Name, Database: database},

@@ -90,10 +90,6 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &ambiguous) {
 		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"moment": strings.ToUpper(ambiguous.Error()[:1]) + ambiguous.Error()[1:] + "."}}, true
 	}
-	var outside *service.MomentOutsideError
-	if errors.As(err, &outside) {
-		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"at": strings.ToUpper(outside.Error()[:1]) + outside.Error()[1:] + "."}}, true
-	}
 	var inUse *service.BucketInUseError
 	if errors.As(err, &inUse) {
 		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true
@@ -299,9 +295,13 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBackupAccess, field: "secret_key", message: "moin could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
 	{err: service.ErrRestoreTarget, field: "moment", message: "Pick a moment to go back to, from moin backups."},
 	{err: service.ErrMoment, field: "moment", message: "There is no such moment. Pick one from moin backups, like 1h or before-v12."},
-	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one to restore."},
-	{err: service.ErrDownloadNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such download. A copy lasts a day; make a new one."},
-	{err: service.ErrRestoreNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such restore. moin keeps how a restore ended for a day."},
+	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one."},
+	{err: service.ErrConfirm, status: http.StatusUnprocessableEntity, code: "confirm_mismatch", message: "Type the app's name to confirm."},
+	{err: service.ErrMomentOutside, field: "at", message: "There is no copy that old. Pick a moment from moin backups."},
+	{err: service.ErrNoCopy, status: http.StatusConflict, code: "no_copy", message: "There is no copy yet. The first one is taken within a minute of a deploy with a bucket."},
+	{err: service.ErrBackupEvery, field: "every_minutes", message: "Copy every 15 minutes (15), hourly (60) or daily (1440)."},
+	{err: service.ErrBackupKeep, field: "keep_days", message: "Keep each copy 1, 3, 7 or 30 days."},
+	{err: service.ErrRestoreNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such restore. moin keeps how a restore ended for a week."},
 	{err: service.ErrRestoreRunning, status: http.StatusConflict, code: "restore_running", message: "A restore of this app runs. Wait until it is done."},
 	{err: service.ErrAgentGone, status: http.StatusConflict, code: "server_offline", message: "The server went offline before it answered. What it did may still finish there."},
 	{err: service.ErrAgentOutdated, status: http.StatusConflict, code: "agent_outdated", message: "The agent on this server is too old for this. Update it with moin servers update."},

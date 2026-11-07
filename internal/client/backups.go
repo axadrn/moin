@@ -13,26 +13,35 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// AppBackups are the backups of an app's databases. Bucket is where the
-// history goes, the user's own; OlderBuckets are the buckets the app left.
+// AppBackups are the backups of an app's databases: the bucket the
+// copies go to, the user's own, the schedule and each database.
 type AppBackups struct {
-	Bucket       string            `json:"bucket"`
-	OlderBuckets []string          `json:"older_buckets"`
-	Databases    []DatabaseBackups `json:"databases"`
+	Bucket string `json:"bucket"`
+	BackupSchedule
+	Databases []DatabaseBackups `json:"databases"`
+}
+
+// BackupSchedule is how an app is backed up: a copy every EveryMinutes,
+// each kept KeepDays; EveryChange records every change of a SQLite file.
+type BackupSchedule struct {
+	EveryMinutes int  `json:"every_minutes"`
+	KeepDays     int  `json:"keep_days"`
+	EveryChange  bool `json:"every_change"`
 }
 
 // DatabaseBackup is how one database is backed up, as the agent reports
 // it: protocol.DatabaseBackup under the API's own names.
 type DatabaseBackup struct {
-	Database     string          `json:"database"`
-	Kind         string          `json:"kind,omitempty"`
-	Since        *time.Time      `json:"since,omitempty"`
-	ReplicatedAt *time.Time      `json:"replicated_at,omitempty"`
-	CheckedAt    *time.Time      `json:"checked_at,omitempty"`
-	Copies       []protocol.Copy `json:"copies,omitempty"`
-	Error        string          `json:"error,omitempty"`
-	CheckError   string          `json:"check_error,omitempty"`
-	Note         string          `json:"note,omitempty"`
+	Database   string          `json:"database"`
+	Kind       string          `json:"kind,omitempty"`
+	CopiedAt   *time.Time      `json:"copied_at,omitempty"`
+	CheckedAt  *time.Time      `json:"checked_at,omitempty"`
+	CheckError string          `json:"check_error,omitempty"`
+	Since      *time.Time      `json:"since,omitempty"`
+	Until      *time.Time      `json:"until,omitempty"`
+	Copies     []protocol.Copy `json:"copies"`
+	Undos      []protocol.Copy `json:"undos"`
+	Error      string          `json:"error,omitempty"`
 }
 
 // DatabaseBackups is the backup of one database: how it stands, Problem
@@ -52,18 +61,16 @@ type Moment struct {
 	Kind  string    `json:"kind"`
 }
 
-// Download is a full copy of a database being made in the app's bucket.
-// Link is a signed link to it there, valid 15 minutes, once State is
-// ready.
+// Download is a copy of a database in the app's bucket; Link is a signed
+// link to it there, valid 15 minutes.
 type Download struct {
-	ID        string    `json:"id"`
-	App       string    `json:"app"`
-	Database  string    `json:"database"`
-	State     string    `json:"state"`
-	Size      int64     `json:"size"`
-	Link      string    `json:"link"`
-	Error     string    `json:"error"`
-	StartedAt time.Time `json:"started_at"`
+	App      string    `json:"app"`
+	Database string    `json:"database"`
+	Copy     string    `json:"copy"`
+	Label    string    `json:"label"`
+	At       time.Time `json:"at"`
+	Size     int64     `json:"size"`
+	Link     string    `json:"link"`
 }
 
 // Bucket is one bucket of the workspace, without its secret key. Apps use
@@ -151,12 +158,23 @@ func (c *Client) Backups(ctx context.Context, app string) (AppBackups, error) {
 	return backups, err
 }
 
+// SetBackupSchedule sets how often an app is copied and how long each
+// copy stays.
+func (c *Client) SetBackupSchedule(ctx context.Context, app string, schedule BackupSchedule) (BackupSchedule, error) {
+	var answer BackupSchedule
+	err := c.do(ctx, http.MethodPut, appPath(app, "backups"), schedule, &answer)
+	return answer, err
+}
+
 // Restore puts a database back to a moment from Backups, by its ID or
-// label, or to a time in its history.
+// label, or to a time: that minute with Every change, else the newest
+// copy at or before it.
 // It waits until the agent is done: a restore runs on its own on the
 // control plane, as a big database takes a while.
-func (c *Client) Restore(ctx context.Context, app, database, moment string, at *time.Time) error {
-	body := map[string]any{"database": database}
+// confirm is the app's name as the user typed it; the control plane
+// refuses a restore without it.
+func (c *Client) Restore(ctx context.Context, app, database, moment string, at *time.Time, confirm string) error {
+	body := map[string]any{"database": database, "confirm": confirm}
 	if moment != "" {
 		body["moment"] = moment
 	}
@@ -240,18 +258,11 @@ type Restore struct {
 	Error    string `json:"error"`
 }
 
-// StartDownload has the agent make a full copy of a database in the app's
-// bucket.
-func (c *Client) StartDownload(ctx context.Context, app, database string) (Download, error) {
+// Download signs a link to a copy of a database: the newest, or the one
+// moment names.
+func (c *Client) Download(ctx context.Context, app, database, moment string) (Download, error) {
 	var download Download
-	err := c.do(ctx, http.MethodPost, appPath(app, "backups/downloads"), map[string]string{"database": database}, &download)
-	return download, err
-}
-
-// Download says how a copy stands, with a fresh link once it is ready.
-func (c *Client) Download(ctx context.Context, app, id string) (Download, error) {
-	var download Download
-	err := c.do(ctx, http.MethodGet, appPath(app, "backups/downloads/"+url.PathEscape(id)), nil, &download)
+	err := c.do(ctx, http.MethodPost, appPath(app, "backups/download"), map[string]string{"database": database, "moment": moment}, &download)
 	return download, err
 }
 
