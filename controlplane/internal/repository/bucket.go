@@ -15,41 +15,17 @@ var (
 	ErrDuplicateBucket = errors.New("bucket name already exists")
 )
 
-// BucketRepository keeps the buckets of a workspace and which bucket each
-// app uses. An app without a bucket of its own uses the default one.
-type BucketRepository interface {
-	// Buckets lists the buckets of a workspace, the default first.
-	Buckets(workspaceID string) ([]model.Bucket, error)
-	Bucket(workspaceID, name string) (*model.Bucket, error)
-	// DefaultBucket returns ErrNoBackupStorage when the workspace has no
-	// bucket.
-	DefaultBucket(workspaceID string) (*model.Bucket, error)
-	// CreateBucket stores a new bucket; with IsDefault set it becomes the
-	// default and the apps that follow the default move with it.
-	CreateBucket(bucket model.Bucket) error
-	// UpdateBucket changes a bucket by its ID, the same way.
-	UpdateBucket(bucket model.Bucket) error
-	// DeleteBucket removes a bucket. When it was the default, the oldest
-	// one left becomes the default.
-	DeleteBucket(workspaceID, id string) error
-	// BucketApps names the apps that use a bucket now, and the apps that
-	// left it and keep older backups there.
-	BucketApps(workspaceID, id string) (current, older []string, err error)
-	// SetAppBucket moves an app to a bucket, nil for the default. from is
-	// the bucket it used so far: its older backups stay there.
-	SetAppBucket(appID string, bucketID *string, from string, at time.Time) error
-	// OlderBuckets are the buckets an app left, which keep its older
-	// backups.
-	OlderBuckets(appID string) ([]model.Bucket, error)
-}
+// The buckets of a workspace and which bucket each app uses. An app without
+// a bucket of its own uses the default one.
 
-func (r *appRepository) Buckets(workspaceID string) ([]model.Bucket, error) {
+// Buckets lists the buckets of a workspace, the default first.
+func (r *Apps) Buckets(workspaceID string) ([]model.Bucket, error) {
 	buckets := []model.Bucket{}
 	err := r.db.Select(&buckets, `SELECT * FROM buckets WHERE workspace_id = $1 ORDER BY is_default DESC, name`, workspaceID)
 	return buckets, err
 }
 
-func (r *appRepository) Bucket(workspaceID, name string) (*model.Bucket, error) {
+func (r *Apps) Bucket(workspaceID, name string) (*model.Bucket, error) {
 	var bucket model.Bucket
 	err := r.db.Get(&bucket, `SELECT * FROM buckets WHERE workspace_id = $1 AND name = $2`, workspaceID, name)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -58,7 +34,9 @@ func (r *appRepository) Bucket(workspaceID, name string) (*model.Bucket, error) 
 	return &bucket, err
 }
 
-func (r *appRepository) DefaultBucket(workspaceID string) (*model.Bucket, error) {
+// DefaultBucket returns ErrNoBackupStorage when the workspace has no
+// bucket.
+func (r *Apps) DefaultBucket(workspaceID string) (*model.Bucket, error) {
 	var bucket model.Bucket
 	err := r.db.Get(&bucket, `SELECT * FROM buckets WHERE workspace_id = $1 AND is_default = 1`, workspaceID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -67,13 +45,16 @@ func (r *appRepository) DefaultBucket(workspaceID string) (*model.Bucket, error)
 	return &bucket, err
 }
 
-func (r *appRepository) CreateBucket(bucket model.Bucket) error {
+// CreateBucket stores a new bucket; with IsDefault set it becomes the
+// default and the apps that follow the default move with it.
+func (r *Apps) CreateBucket(bucket model.Bucket) error {
 	return r.writeBucket(bucket, `
 		INSERT INTO buckets (id, workspace_id, name, is_default, endpoint, region, bucket, path, access_key, secret_key, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`)
 }
 
-func (r *appRepository) UpdateBucket(bucket model.Bucket) error {
+// UpdateBucket changes a bucket by its ID, the same way.
+func (r *Apps) UpdateBucket(bucket model.Bucket) error {
 	return r.writeBucket(bucket, `
 		UPDATE buckets SET workspace_id = $2, name = $3, is_default = $4, endpoint = $5, region = $6, bucket = $7,
 			path = $8, access_key = $9, secret_key = $10, created_at = $11
@@ -82,7 +63,7 @@ func (r *appRepository) UpdateBucket(bucket model.Bucket) error {
 
 // writeBucket stores a bucket with query. A new default takes over from
 // the old one, and the apps that follow the default leave the old one.
-func (r *appRepository) writeBucket(bucket model.Bucket, query string) error {
+func (r *Apps) writeBucket(bucket model.Bucket, query string) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -132,7 +113,9 @@ func moveDefault(tx *sqlx.Tx, workspaceID, id string, at time.Time) error {
 	return err
 }
 
-func (r *appRepository) DeleteBucket(workspaceID, id string) error {
+// DeleteBucket removes a bucket. When it was the default, the oldest
+// one left becomes the default.
+func (r *Apps) DeleteBucket(workspaceID, id string) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -155,7 +138,9 @@ func (r *appRepository) DeleteBucket(workspaceID, id string) error {
 	return tx.Commit()
 }
 
-func (r *appRepository) BucketApps(workspaceID, id string) (current, older []string, err error) {
+// BucketApps names the apps that use a bucket now, and the apps that
+// left it and keep older backups there.
+func (r *Apps) BucketApps(workspaceID, id string) (current, older []string, err error) {
 	current, older = []string{}, []string{}
 	err = r.db.Select(&current, `
 		SELECT a.name FROM apps a
@@ -171,7 +156,9 @@ func (r *appRepository) BucketApps(workspaceID, id string) (current, older []str
 	return current, older, err
 }
 
-func (r *appRepository) SetAppBucket(appID string, bucketID *string, from string, at time.Time) error {
+// SetAppBucket moves an app to a bucket, nil for the default. from is
+// the bucket it used so far: its older backups stay there.
+func (r *Apps) SetAppBucket(appID string, bucketID *string, from string, at time.Time) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -205,7 +192,9 @@ func (r *appRepository) SetAppBucket(appID string, bucketID *string, from string
 	return tx.Commit()
 }
 
-func (r *appRepository) OlderBuckets(appID string) ([]model.Bucket, error) {
+// OlderBuckets are the buckets an app left, which keep its older
+// backups.
+func (r *Apps) OlderBuckets(appID string) ([]model.Bucket, error) {
 	buckets := []model.Bucket{}
 	err := r.db.Select(&buckets, `
 		SELECT b.* FROM app_buckets ab JOIN buckets b ON b.id = ab.bucket_id

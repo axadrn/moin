@@ -6,28 +6,13 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
-// MetricsRepository stores the metrics of servers and apps: a row per
-// minute and one per hour. The control plane keeps the samples in memory and
-// writes minutes in one batch a minute, to history.db.
-type MetricsRepository interface {
-	// AddMetricsMinutes writes minutes in one transaction; a minute that is
-	// there already takes the new values.
-	AddMetricsMinutes(rows []model.MetricsRow) error
-	// RollUpMetrics averages the minutes from from to to into their hours.
-	RollUpMetrics(from, to int64) error
-	MetricsMinutes(target string, from, to int64) ([]model.MetricsRow, error)
-	MetricsHours(target string, from, to int64) ([]model.MetricsRow, error)
-	// PruneMetrics forgets the minutes before minutesBefore and the hours
-	// before hoursBefore.
-	PruneMetrics(minutesBefore, hoursBefore int64) error
-	// MetricsApps are all apps, to find an app by its server and name.
-	MetricsApps() ([]model.MetricsApp, error)
-	// LiveDeploys are the deploys of an app that went live since a time,
-	// oldest first.
-	LiveDeploys(appID string, since time.Time) ([]model.MetricsDeploy, error)
-}
+// The metrics of servers and apps: a row per minute and one per hour. The
+// control plane keeps the samples in memory and writes minutes in one batch a
+// minute, to history.db.
 
-func (r *appRepository) AddMetricsMinutes(rows []model.MetricsRow) error {
+// AddMetricsMinutes writes minutes in one transaction; a minute that is
+// there already takes the new values.
+func (r *Apps) AddMetricsMinutes(rows []model.MetricsRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -52,7 +37,8 @@ func (r *appRepository) AddMetricsMinutes(rows []model.MetricsRow) error {
 	return tx.Commit()
 }
 
-func (r *appRepository) RollUpMetrics(from, to int64) error {
+// RollUpMetrics averages the minutes from from to to into their hours.
+func (r *Apps) RollUpMetrics(from, to int64) error {
 	_, err := r.history.Exec(`
 		INSERT OR REPLACE INTO metrics_hours (target, hour, cpu, memory, disk, net_rx, net_tx, load)
 		SELECT target, minute - minute % 3600, CAST(AVG(cpu) AS INTEGER), CAST(AVG(memory) AS INTEGER),
@@ -62,7 +48,7 @@ func (r *appRepository) RollUpMetrics(from, to int64) error {
 	return err
 }
 
-func (r *appRepository) MetricsMinutes(target string, from, to int64) ([]model.MetricsRow, error) {
+func (r *Apps) MetricsMinutes(target string, from, to int64) ([]model.MetricsRow, error) {
 	rows := []model.MetricsRow{}
 	err := r.history.Select(&rows, `
 		SELECT target, minute AS at, cpu, memory, disk, net_rx, net_tx, load FROM metrics_minutes
@@ -70,7 +56,7 @@ func (r *appRepository) MetricsMinutes(target string, from, to int64) ([]model.M
 	return rows, err
 }
 
-func (r *appRepository) MetricsHours(target string, from, to int64) ([]model.MetricsRow, error) {
+func (r *Apps) MetricsHours(target string, from, to int64) ([]model.MetricsRow, error) {
 	rows := []model.MetricsRow{}
 	err := r.history.Select(&rows, `
 		SELECT target, hour AS at, cpu, memory, disk, net_rx, net_tx, load FROM metrics_hours
@@ -78,7 +64,9 @@ func (r *appRepository) MetricsHours(target string, from, to int64) ([]model.Met
 	return rows, err
 }
 
-func (r *appRepository) PruneMetrics(minutesBefore, hoursBefore int64) error {
+// PruneMetrics forgets the minutes before minutesBefore and the hours
+// before hoursBefore.
+func (r *Apps) PruneMetrics(minutesBefore, hoursBefore int64) error {
 	_, err := r.history.Exec(`DELETE FROM metrics_minutes WHERE minute < $1`, minutesBefore)
 	if err != nil {
 		return err
@@ -87,13 +75,16 @@ func (r *appRepository) PruneMetrics(minutesBefore, hoursBefore int64) error {
 	return err
 }
 
-func (r *appRepository) MetricsApps() ([]model.MetricsApp, error) {
+// MetricsApps are all apps, to find an app by its server and name.
+func (r *Apps) MetricsApps() ([]model.MetricsApp, error) {
 	apps := []model.MetricsApp{}
 	err := r.db.Select(&apps, `SELECT id, server_id, name FROM apps`)
 	return apps, err
 }
 
-func (r *appRepository) LiveDeploys(appID string, since time.Time) ([]model.MetricsDeploy, error) {
+// LiveDeploys are the deploys of an app that went live since a time,
+// oldest first.
+func (r *Apps) LiveDeploys(appID string, since time.Time) ([]model.MetricsDeploy, error) {
 	deploys := []model.MetricsDeploy{}
 	err := r.db.Select(&deploys, `
 		SELECT number, finished_at FROM deploys

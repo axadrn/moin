@@ -6,38 +6,12 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
-// UptimeRepository stores the uptime checks of domains and the outages of
-// domains and servers. The checker keeps the newest results in memory and
-// writes here only when something changes, and its counts in batches.
-type UptimeRepository interface {
-	// UptimeTargets are the apps with a live release that are not stopped.
-	UptimeTargets() ([]model.UptimeTarget, error)
-	// UptimeChecks returns the stored checks of every app.
-	UptimeChecks() ([]model.UptimeCheck, error)
-	SaveUptimeCheck(check model.UptimeCheck) error
-	// SaveUptimeState stores what the checks found, the state and since,
-	// and leaves the path and the pause as the user set them: a check that
-	// finishes after a change must not undo it.
-	SaveUptimeState(check model.UptimeCheck) error
-	DeleteUptimeCheck(appID, domain string) error
-	// AddUptimeHours adds counts to their hours, all in one transaction.
-	// Counts of an app that is gone are dropped.
-	AddUptimeHours(hours []model.UptimeHour) error
-	UptimeCounts(appID, domain string, since time.Time) (model.UptimeCounts, error)
-	StartUptimeOutage(appID, domain string, at time.Time, reason string) error
-	EndUptimeOutage(appID, domain string, at time.Time) error
-	UptimeOutages(appID, domain string, limit int) ([]model.UptimeOutage, error)
-	// PruneUptime forgets the hours before hoursBefore and the ended
-	// outages before outagesBefore.
-	PruneUptime(hoursBefore, outagesBefore time.Time) error
+// The uptime checks of domains and the outages of domains and servers. The
+// checker keeps the newest results in memory and writes here only when
+// something changes, and its counts in batches.
 
-	// ServersSeen are the servers whose agent connected once.
-	ServersSeen() ([]model.ServerSeen, error)
-	StartServerOutage(serverID string, at time.Time) error
-	EndServerOutage(serverID string, at time.Time) error
-}
-
-func (r *appRepository) UptimeTargets() ([]model.UptimeTarget, error) {
+// UptimeTargets are the apps with a live release that are not stopped.
+func (r *Apps) UptimeTargets() ([]model.UptimeTarget, error) {
 	targets := []model.UptimeTarget{}
 	err := r.db.Select(&targets, `
 		SELECT a.id, a.workspace_id, a.name, a.domains, d.detected
@@ -49,13 +23,14 @@ func (r *appRepository) UptimeTargets() ([]model.UptimeTarget, error) {
 	return targets, err
 }
 
-func (r *appRepository) UptimeChecks() ([]model.UptimeCheck, error) {
+// UptimeChecks returns the stored checks of every app.
+func (r *Apps) UptimeChecks() ([]model.UptimeCheck, error) {
 	checks := []model.UptimeCheck{}
 	err := r.db.Select(&checks, `SELECT * FROM uptime_checks ORDER BY app_id, domain`)
 	return checks, err
 }
 
-func (r *appRepository) SaveUptimeCheck(check model.UptimeCheck) error {
+func (r *Apps) SaveUptimeCheck(check model.UptimeCheck) error {
 	_, err := r.db.Exec(`
 		INSERT INTO uptime_checks (app_id, domain, path, paused, state, since)
 		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
@@ -65,7 +40,10 @@ func (r *appRepository) SaveUptimeCheck(check model.UptimeCheck) error {
 	return err
 }
 
-func (r *appRepository) SaveUptimeState(check model.UptimeCheck) error {
+// SaveUptimeState stores what the checks found, the state and since,
+// and leaves the path and the pause as the user set them: a check that
+// finishes after a change must not undo it.
+func (r *Apps) SaveUptimeState(check model.UptimeCheck) error {
 	_, err := r.db.Exec(`
 		INSERT INTO uptime_checks (app_id, domain, path, paused, state, since)
 		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
@@ -74,12 +52,14 @@ func (r *appRepository) SaveUptimeState(check model.UptimeCheck) error {
 	return err
 }
 
-func (r *appRepository) DeleteUptimeCheck(appID, domain string) error {
+func (r *Apps) DeleteUptimeCheck(appID, domain string) error {
 	_, err := r.db.Exec(`DELETE FROM uptime_checks WHERE app_id = $1 AND domain = $2`, appID, domain)
 	return err
 }
 
-func (r *appRepository) AddUptimeHours(hours []model.UptimeHour) error {
+// AddUptimeHours adds counts to their hours, all in one transaction.
+// Counts of an app that is gone are dropped.
+func (r *Apps) AddUptimeHours(hours []model.UptimeHour) error {
 	if len(hours) == 0 {
 		return nil
 	}
@@ -124,7 +104,7 @@ func (r *appRepository) AddUptimeHours(hours []model.UptimeHour) error {
 	return tx.Commit()
 }
 
-func (r *appRepository) UptimeCounts(appID, domain string, since time.Time) (model.UptimeCounts, error) {
+func (r *Apps) UptimeCounts(appID, domain string, since time.Time) (model.UptimeCounts, error) {
 	var counts model.UptimeCounts
 	err := r.history.Get(&counts, `
 		SELECT COALESCE(SUM(checks), 0) AS checks, COALESCE(SUM(up), 0) AS up,
@@ -134,7 +114,7 @@ func (r *appRepository) UptimeCounts(appID, domain string, since time.Time) (mod
 	return counts, err
 }
 
-func (r *appRepository) StartUptimeOutage(appID, domain string, at time.Time, reason string) error {
+func (r *Apps) StartUptimeOutage(appID, domain string, at time.Time, reason string) error {
 	_, err := r.db.Exec(`
 		INSERT INTO uptime_outages (app_id, domain, started_at, reason)
 		SELECT $1, $2, $3, $4 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
@@ -142,12 +122,12 @@ func (r *appRepository) StartUptimeOutage(appID, domain string, at time.Time, re
 	return err
 }
 
-func (r *appRepository) EndUptimeOutage(appID, domain string, at time.Time) error {
+func (r *Apps) EndUptimeOutage(appID, domain string, at time.Time) error {
 	_, err := r.db.Exec(`UPDATE uptime_outages SET ended_at = $1 WHERE app_id = $2 AND domain = $3 AND ended_at IS NULL`, at.UTC(), appID, domain)
 	return err
 }
 
-func (r *appRepository) UptimeOutages(appID, domain string, limit int) ([]model.UptimeOutage, error) {
+func (r *Apps) UptimeOutages(appID, domain string, limit int) ([]model.UptimeOutage, error) {
 	outages := []model.UptimeOutage{}
 	err := r.db.Select(&outages, `
 		SELECT domain, started_at, ended_at, reason FROM uptime_outages
@@ -156,7 +136,9 @@ func (r *appRepository) UptimeOutages(appID, domain string, limit int) ([]model.
 	return outages, err
 }
 
-func (r *appRepository) PruneUptime(hoursBefore, outagesBefore time.Time) error {
+// PruneUptime forgets the hours before hoursBefore and the ended
+// outages before outagesBefore.
+func (r *Apps) PruneUptime(hoursBefore, outagesBefore time.Time) error {
 	_, err := r.history.Exec(`DELETE FROM uptime_hours WHERE hour < $1`, hoursBefore.UTC())
 	if err != nil {
 		return err
@@ -169,7 +151,8 @@ func (r *appRepository) PruneUptime(hoursBefore, outagesBefore time.Time) error 
 	return err
 }
 
-func (r *appRepository) ServersSeen() ([]model.ServerSeen, error) {
+// ServersSeen are the servers whose agent connected once.
+func (r *Apps) ServersSeen() ([]model.ServerSeen, error) {
 	servers := []model.ServerSeen{}
 	err := r.db.Select(&servers, `
 		SELECT s.id, s.workspace_id, s.name, s.last_seen_at, o.started_at AS down_since
@@ -179,12 +162,12 @@ func (r *appRepository) ServersSeen() ([]model.ServerSeen, error) {
 	return servers, err
 }
 
-func (r *appRepository) StartServerOutage(serverID string, at time.Time) error {
+func (r *Apps) StartServerOutage(serverID string, at time.Time) error {
 	_, err := r.db.Exec(`INSERT INTO server_outages (server_id, started_at) VALUES ($1, $2) ON CONFLICT DO NOTHING`, serverID, at.UTC())
 	return err
 }
 
-func (r *appRepository) EndServerOutage(serverID string, at time.Time) error {
+func (r *Apps) EndServerOutage(serverID string, at time.Time) error {
 	_, err := r.db.Exec(`UPDATE server_outages SET ended_at = $1 WHERE server_id = $2 AND ended_at IS NULL`, at.UTC(), serverID)
 	return err
 }

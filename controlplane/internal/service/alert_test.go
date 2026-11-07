@@ -36,7 +36,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 		}
 	}
 	mails := testutil.NewMemoryMailer()
-	apps := repository.NewAppRepository(database, database)
+	apps := repository.NewApps(database, database)
 	alerts := NewAlertService(NewEmailService(mails, "https://moin.example.com", "moin"), repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), apps, repository.NewAlertDestinations(database), repository.NewWorkspaceAudit(database), testBox(t))
 	servers := NewServerService(repository.NewServers(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
