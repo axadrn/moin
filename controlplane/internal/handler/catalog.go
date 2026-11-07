@@ -3,9 +3,11 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -87,8 +89,16 @@ func (h *CatalogHandler) Show(w http.ResponseWriter, r *http.Request) {
 // site. An SVG runs no script here: the policy forbids it.
 func (h *CatalogHandler) Logo(w http.ResponseWriter, r *http.Request) {
 	view, ok := h.entry(r)
-	if !ok || len(view.Entry.Logo) == 0 {
+	if !ok {
 		http.NotFound(w, r)
+		return
+	}
+	if len(view.Entry.Logo) == 0 {
+		// An app without a logo gets its first letter, so every icon shows.
+		first, _ := utf8.DecodeRuneInString(view.Entry.Name)
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		fmt.Fprintf(w, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="600" fill="#1c1c1e">%s</text></svg>`, html.EscapeString(strings.ToUpper(string(first))))
 		return
 	}
 	w.Header().Set("Content-Type", view.Entry.LogoType)

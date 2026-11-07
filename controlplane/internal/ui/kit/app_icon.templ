@@ -1,0 +1,35 @@
+package kit
+
+import (
+	"strings"
+	"unicode/utf8"
+)
+
+// AppIcon is an app's icon, like on a phone's home screen: the logo of a
+// catalog app on a white tile in both themes (logos are drawn for a white
+// page), or the first letter of the app on an ink tile. Every list of apps
+// and an app's head show it, so the names line up. head makes it as high
+// as a title (44 px); else it fits a row.
+templ AppIcon(name, logo string, head bool) {
+	if logo != "" {
+		<span class={ appIconClass(head), "bg-white p-[14%] ring-1 ring-black/5 dark:ring-white/15" } aria-hidden="true">
+			<img src={ logo } alt="" class="size-full object-contain" loading="lazy" decoding="async"/>
+		</span>
+	} else {
+		<span class={ appIconClass(head), "bg-foreground font-semibold text-background" } aria-hidden="true">
+			{ appInitial(name) }
+		</span>
+	}
+}
+
+func appIconClass(head bool) string {
+	if head {
+		return "flex size-11 shrink-0 items-center justify-center rounded-[28%] text-lg"
+	}
+	return "flex size-9 shrink-0 items-center justify-center rounded-[28%] text-sm"
+}
+
+func appInitial(name string) string {
+	first, _ := utf8.DecodeRuneInString(name)
+	return strings.ToUpper(string(first))
+}
