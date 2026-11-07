@@ -26,7 +26,7 @@ Everything runs in the agent on your server. Your data goes from your server to 
 Tells moin which bucket to back up into. One bucket serves all your apps, and it is the same bucket `moin deploy` uses. An app can also [have its own bucket](/docs/guides/bucket#more-than-one-bucket).
 
 ```surfaces
-Web: **Buckets** in the sidebar, then **Add bucket**
+Web: **Settings**, **Bucket**, then **Add bucket**
 CLI: moin buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --region auto \
@@ -65,7 +65,7 @@ A snapshot is a plain gzipped SQLite file: `gunzip` it and open it with `sqlite3
 Shows which buckets moin uses, without their secret keys, and which apps use each one. The **Backups** tab of an app shows its bucket.
 
 ```surfaces
-Web: **Buckets** in the sidebar
+Web: **Settings**, **Bucket**
 CLI: moin buckets
 TUI: opens the web: `w`, then `k`
 API: GET /api/v1/buckets
@@ -168,7 +168,7 @@ moin then takes a snapshot before a [deploy](/docs/guides/deploy) (`before-v4`),
 Removing a bucket from moin stops its backups. What is in the bucket stays there.
 
 ```surfaces
-Web: **Buckets** in the sidebar, **Remove** on the bucket
+Web: **Settings**, **Bucket**, **Remove** on the bucket
 CLI: moin buckets rm <name>
 TUI: opens the web: `w`, then `k`
 API: DELETE /api/v1/buckets/{name}

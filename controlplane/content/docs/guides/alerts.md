@@ -66,7 +66,7 @@ Every member sees the destinations. Only **owners** and **admins** add, test and
 ### Add a destination
 
 ```surfaces
-Web: **Alerts** in the sidebar (`g` then `l`), **Add a destination**
+Web: **Settings**, **Alerts** (`g` then `l`), **Add a destination**
 CLI: moin alerts add slack team-chat, then the URL on stdin; moin alerts add telegram phone --chat -1001234567890, then the bot token; --events deploy.failed,uptime.down picks events
 TUI: opens the web: `w`, then `n`
 API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-chat", "url": "https://hooks.slack.com/services/…"}

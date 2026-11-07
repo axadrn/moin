@@ -46,7 +46,7 @@ moin keeps none of your data. Your code and your data live on your server and in
 Lists who changed what, newest first.
 
 ```surfaces
-Web: **Activity** in the sidebar
+Web: **Settings**, **Activity**
 CLI: moin activity
 TUI: `a` on the dashboard, or `activity` in the palette (`space`)
 API: GET /api/v1/activity
@@ -60,7 +60,7 @@ On the web, `g` then `y` opens it too.
 Narrow it to one app, one server or one member. A server shows its own changes and the ones of its apps.
 
 ```surfaces
-Web: **Activity**, pick an app, a server or a member, then **Filter**
+Web: **Activity**, pick an app, a server or a person; the list follows
 CLI: moin activity --app <app-name> --server <server-name> --user <email>
 TUI: not here: it shows all of it; filter in the CLI or the web
 API: GET /api/v1/activity?app=<app-name>&server=<server-name>&user=<email>

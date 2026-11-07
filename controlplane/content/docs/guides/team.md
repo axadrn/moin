@@ -66,7 +66,7 @@ MCP: invite_member
 Sends the email again, for example when it landed in spam.
 
 ```surfaces
-Web: **Team**, **Pending invitations**, **Resend**
+Web: **Team**, **Invitations**, **Resend**
 CLI: moin team resend <email>
 TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations/{id}/resend
@@ -80,7 +80,7 @@ Only the new link works.
 Takes an invitation back before someone accepts it.
 
 ```surfaces
-Web: **Team**, **Pending invitations**, **Revoke**
+Web: **Team**, **Invitations**, **Revoke**
 CLI: moin team revoke <email>
 TUI: opens the web: `w`, then `t`
 API: DELETE /api/v1/workspaces/{slug}/invitations/{id}
@@ -104,7 +104,7 @@ MCP: rename_workspace
 Makes a member an admin, or the other way round. Only an owner makes someone an owner or changes an owner's role.
 
 ```surfaces
-Web: **Team**, **Members**, the role next to the person, then **Save**
+Web: **Team**, the role next to the person; it saves at once
 API: PATCH /api/v1/workspaces/{slug}/members/{id}/role
 ```
 
@@ -113,7 +113,7 @@ API: PATCH /api/v1/workspaces/{slug}/members/{id}/role
 Takes someone out of the workspace. Their API tokens for it stop working right away.
 
 ```surfaces
-Web: **Team**, **Members**, **Remove** next to the person
+Web: **Team**, **Remove** next to the person
 API: DELETE /api/v1/workspaces/{slug}/members/{id}
 ```
 
@@ -124,7 +124,7 @@ API: DELETE /api/v1/workspaces/{slug}/members/{id}
 **Delete workspace** removes the workspace with its members, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner deletes a workspace, and you type its name first. It cannot be undone. A paid plan must be cancelled and run out first.
 
 ```surfaces
-Web: **Team**, **Leave**, then **Leave workspace**
+Web: **Team**, **Leave workspace**
 Web: **Team**, **Delete workspace**, then type its name
 API: POST /api/v1/workspaces/{slug}/leave
 API: DELETE /api/v1/workspaces/{slug}
