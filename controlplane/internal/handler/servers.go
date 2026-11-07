@@ -74,8 +74,8 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, pages.ServerAddForm())
-	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
-	answerDone(w, r, server.Name+" added", "Run the install command on the server.")
+	render(w, r, pages.ServerAdded(pages.AddedServer{ID: server.ID, Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
+	answerDone(w, r, server.Name+" added", "")
 }
 
 // NewInstall answers a new install command for a server in the same panel
@@ -86,8 +86,25 @@ func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "No new install command", err, nil)
 		return
 	}
-	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
+	render(w, r, pages.ServerAdded(pages.AddedServer{ID: server.ID, Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
 	answerDone(w, r, "New install command for "+server.Name, "Run it on the server within the hour. The old one stops working.")
+}
+
+// Install answers whether the install command on the page is still needed.
+// It works once: while it is unused the server still holds its token and
+// the page keeps it; once an agent used it, the answer takes its place.
+func (h *ServersHandler) Install(w http.ResponseWriter, r *http.Request) {
+	server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id"))
+	switch {
+	case errors.Is(err, repository.ErrServerNotFound):
+		render(w, r, pages.ServerGone())
+	case err != nil:
+		renderError(w, "get server failed", err)
+	case server.InstallTokenHash != nil:
+		w.Header().Set("HX-Reswap", "none")
+	default:
+		render(w, r, pages.ServerConnected(server.Name))
+	}
 }
 
 // Delete removes a server from its page and goes back to the list.

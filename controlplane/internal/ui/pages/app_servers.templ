@@ -1,23 +1,21 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 )
 
 // AddedServer is the one-time install command of a server just added.
 type AddedServer struct {
+	ID      string
 	Name    string
 	Command string
 }
@@ -29,27 +27,31 @@ type RemovedServer struct {
 	Command string
 }
 
+// Servers is every server of the workspace, live: the list, adding one,
+// and whether agents update by themselves.
 templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Servers") {
 		@panelPage() {
-			@pageHeader("Servers", "Every server runs the moin agent. It dials out to moin, so nothing on your server listens for us.") {
-				if canAdd {
-					@ServerAddForm()
-				}
-			}
+			@kit.Header(kit.Back{Label: "Overview", Href: basePath + "/overview"}, "Servers")
 			<div id="server-added" class="empty:hidden">
 				if removed != nil {
 					@serverRemoved(*removed)
 				}
 			</div>
-			<div data-server-list-wrap>
-				@ServerList(servers)
-			</div>
-			@panel(panelProps{Title: "Agent updates", Docs: "/docs/guides/servers#updates"}) {
-				@AgentUpdatesForm(autoUpdate)
+			@ServerList(servers)
+			if canAdd {
+				@kit.Card("Add a server", nil) {
+					@ServerAddForm()
+				}
 			}
+			@kit.Section("Agents", nil) {
+				@kit.List() {
+					@AgentUpdatesForm(autoUpdate)
+				}
+			}
+			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
 		}
-		@serversScript()
 	}
 }
 
@@ -60,79 +62,77 @@ templ ServerAddForm() {
 	<form
 		id="server-add-form"
 		hx-swap-oob="true"
-		class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
 		hx-post={ basePath + "/servers" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
 		<label for="server-name" class="sr-only">Server name</label>
-		@input.Input(input.Props{
-			ID:          "server-name",
-			Name:        "name",
-			Type:        "text",
-			Placeholder: "Leave empty for a name like brave-otter",
-			Class:       "min-w-0 sm:w-72",
-			Attributes:  templ.Attributes{"maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true},
-		})
-		@button.Button(button.Props{Type: button.TypeSubmit}) {
-			@icon.Plus()
-			Add server
+		@kit.Inline() {
+			@kit.Input(templ.Attributes{"id": "server-name", "name": "name", "type": "text", "placeholder": "Name, or empty for a made-up one", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				Add server
+			}
 		}
 	</form>
 }
 
-// ServerAdded shows the install command of the server just added: what to
-// do, the command, and that the page notices the agent by itself.
+// ServerAdded shows the install command of the server just added. It stays
+// until the server's agent connects: on every change of the servers it asks
+// (ServerInstall), and the answer replaces it with ServerConnected.
 templ ServerAdded(added AddedServer) {
-	<div id="server-added" hx-swap-oob="true" data-server-added={ added.Name }>
-		<div data-server-greeting hidden>
-			@status.Status(status.Props{Kind: status.KindLive}) {
-				moin from { added.Name }. It is online; deploy an app to it.
+	<div
+		id="server-added"
+		hx-swap-oob="true"
+		hx-get={ ctxkeys.AppBasePath(ctx) + "/servers/" + added.ID + "/install" }
+		hx-trigger="servers from:body"
+		hx-swap="outerHTML"
+		data-server-added={ added.Name }
+	>
+		@kit.Card("Install the agent on "+added.Name, nil) {
+			@kit.Quiet() {
+				Run it on the server as root. It works once, for an hour.
 			}
-		</div>
-		<div data-server-install>
-			@panel(panelProps{
-				Heading:     "server-added-heading",
-				Title:       "Install the agent on " + added.Name,
-				Description: "Run it on the server as root. It works once, for an hour, and shows only now.",
-				Docs:        "/docs/guides/servers#add-a-server",
-			}) {
-				<div class="flex flex-col gap-4">
-					<div class="flex items-start gap-2 rounded-2xl bg-muted py-2 pr-2 pl-4 font-mono text-xs">
-						<span class="pt-2 text-muted-foreground select-none" aria-hidden="true">$</span>
-						<code id="install-command" class="min-w-0 flex-1 py-2 leading-relaxed break-all whitespace-pre-wrap" data-install-command>{ added.Command }</code>
-						@button.Button(button.Props{
-							Size:       button.SizeSm,
-							Class:      "group/copy font-sans",
-							Attributes: templ.Attributes{"data-copy-target": "#install-command", "data-copy": ""},
-						}) {
-							@icon.Copy(icon.Props{Class: "group-data-copied/copy:hidden"})
-							@icon.Check(icon.Props{Class: "hidden group-data-copied/copy:block"})
-							Copy
-						}
-					</div>
-					@status.Status(status.Props{Kind: status.KindWaiting}) {
-						Waiting for the agent. This page shows the server online when it connects.
-					}
-				</div>
+			<div data-install-command>
+				@kit.Command(added.Command)
+			</div>
+			@status.Status(status.Props{Kind: status.KindWaiting}) {
+				Waiting for the agent
 			}
-		</div>
+		}
 	</div>
+}
+
+// ServerConnected takes the place of the install command once the agent of
+// the server just added has connected.
+templ ServerConnected(name string) {
+	<div id="server-added" data-server-greeting={ name }>
+		@kit.List() {
+			@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/new") {
+				@status.Symbol(status.KindLive)
+				@kit.RowText(name+" is online", "Deploy an app to it")
+			}
+		}
+	</div>
+}
+
+// ServerGone empties the place of the install command when its server was
+// removed meanwhile.
+templ ServerGone() {
+	<div id="server-added" class="empty:hidden"></div>
 }
 
 // serverRemoved tells that the agent of a server just removed is still
 // installed, with the command that removes it there.
 templ serverRemoved(removed RemovedServer) {
-	@panel(panelProps{
-		Heading:     "server-removed-heading",
-		Title:       removed.Name + " is removed",
-		Docs:        "/docs/guides/servers#remove-a-server",
-		Description: "Run it on the server as root. Its apps keep running; --apps removes them too.",
-		Attrs:       templ.Attributes{"data-server-removed": removed.Name},
-	}) {
-		@command(removed.Command)
-	}
+	<div data-server-removed={ removed.Name }>
+		@kit.Card(removed.Name+" is removed", nil) {
+			@kit.Quiet() {
+				Run this on the server as root to remove its agent. Its apps keep running; --apps removes them too.
+			}
+			@kit.Command(removed.Command)
+		}
+	</div>
 }
 
 // ServerList is the list of servers. The page reloads it on every change the
@@ -150,7 +150,7 @@ templ ServerList(servers []model.Server) {
 		@kit.List() {
 			if len(servers) == 0 {
 				@kit.Row("") {
-					@kit.RowText("No servers yet", "Add one above, then run its install command on the server.")
+					@kit.RowText("No servers yet", "Add one, then run its install command on it.")
 				}
 			}
 			for _, server := range servers {
@@ -167,7 +167,7 @@ templ ServerList(servers []model.Server) {
 func serverNote(server model.Server, now time.Time) string {
 	switch {
 	case server.LastSeenAt == nil:
-		return "Its agent never connected. Run the install command on it."
+		return "Its agent never connected"
 	case !server.Online:
 		return "Last seen " + serverLastSeen(server, now)
 	case agentOutdated(server):
@@ -179,7 +179,7 @@ func serverNote(server model.Server, now time.Time) string {
 // serverState is the mark at the end of a server's row: a dot while it is
 // online, a word when it is not.
 templ serverState(server model.Server) {
-	switch {
+	switch  {
 		case server.Online:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Online">
 				@status.Symbol(status.KindLive)
@@ -196,103 +196,41 @@ templ serverState(server model.Server) {
 	}
 }
 
-// serverFact is a label with its value on a server card. No value is a
-// muted dash.
-templ serverFact(label, value, title string) {
-	<div class="flex min-w-0 flex-col gap-1">
-		<dt class="text-xs text-muted-foreground">{ label }</dt>
-		if value != "" {
-			<dd class="truncate text-sm font-medium tabular-nums" title={ title }>{ value }</dd>
-		} else {
-			<dd class="text-sm text-muted-foreground">—</dd>
-		}
-	</div>
-}
-
+// serverStatus is the chip next to a server's name on its pages.
 templ serverStatus(server model.Server) {
 	switch  {
 		case server.Online:
 			@status.Status(status.Props{Kind: status.KindLive, Chip: true}) {
-				online
+				Online
 			}
 		case server.LastSeenAt == nil:
 			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true}) {
-				waiting
+				Waiting
 			}
 		default:
 			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
-				offline
+				Offline
 			}
 	}
 }
 
-// serversScript keeps the page live: the list reloads on every change.
-templ serversScript() {
-	@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			// The install command works once: when its agent is online it
-			// goes, the server says moin, and after a while that goes too.
-			const hideUsedCommand = () => {
-				const added = document.querySelector("[data-server-added]");
-				const install = added?.querySelector("[data-server-install]");
-				if (install && document.querySelector(`[data-server="${CSS.escape(added.dataset.serverAdded)}"][data-online]`)) {
-					install.remove();
-					added.querySelector("[data-server-greeting]").hidden = false;
-					setTimeout(() => added.isConnected && added.replaceWith(Object.assign(document.createElement("div"), { id: "server-added", className: "empty:hidden" })), 15000);
-				}
-			};
-			const wrap = document.querySelector("[data-server-list-wrap]");
-			if (wrap) {
-				new MutationObserver(hideUsedCommand).observe(wrap, { childList: true });
-			}
-		})();
-	</script>
-}
-
-func serversSummary(servers []model.Server) string {
-	online := 0
-	for _, server := range servers {
-		if server.Online {
-			online++
-		}
+// serverHead is the head of a server's pages: the way back to Servers, its
+// name and status, and its two pages.
+templ serverHead(server model.Server, active string) {
+	{{ serverPath := ctxkeys.AppBasePath(ctx) + "/servers/" + server.ID }}
+	@kit.Header(kit.Back{Label: "Servers", Href: ctxkeys.AppBasePath(ctx) + "/servers"}, server.Name) {
+		@serverStatus(server)
 	}
-	return fmt.Sprintf("%s · %d online", plural(len(servers), "server", "servers"), online)
-}
-
-// serverReach says in a few words how apps on the server are reached.
-func serverReach(server model.Server) string {
-	reach := "ports 80, 443"
-	if server.Tunnel {
-		reach = "Cloudflare Tunnel"
-	}
-	if server.Firewall {
-		reach += ", firewall"
-	}
-	if server.SSHTailscale {
-		reach += ", SSH on Tailscale"
-	}
-	return reach
-}
-
-func serverSystem(server model.Server) string {
-	if server.OS == "" {
-		return ""
-	}
-	return server.OS + "/" + server.Arch
+	@kit.Segmented("server-sections", "Server", []kit.Segment{
+		{Label: "Security", Href: serverPath + "/security", Active: active == "security"},
+		{Label: "Metrics", Href: serverPath + "/metrics", Active: active == "metrics"},
+	})
 }
 
 // agentOutdated reports whether the agent runs another version than the
 // control plane. Development builds never count.
 func agentOutdated(server model.Server) bool {
 	return build.Version != "dev" && server.AgentVersion != "" && server.AgentVersion != build.Version
-}
-
-func serverLastSeenTitle(server model.Server) string {
-	if server.LastSeenAt == nil {
-		return "Never connected"
-	}
-	return stamp(*server.LastSeenAt)
 }
 
 func serverLastSeen(server model.Server, now time.Time) string {
@@ -313,5 +251,3 @@ func serverLastSeen(server model.Server, now time.Time) string {
 	}
 	return fmt.Sprintf("%dd ago", int(age.Hours()/24))
 }
-
-

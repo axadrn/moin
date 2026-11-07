@@ -18,7 +18,7 @@ Numbers only: never a request, a log line or anything from your data.
 The newest numbers, and a chart per number over the last hour, 24 hours, 7 or 30 days. The last hour has every sample and updates itself every 15 seconds; longer ranges show averages. A server lists its apps by the memory they take, so you see at once who eats the RAM.
 
 ```surfaces
-Web: the server's **Metrics** tab, from **Metrics** on its card; the app's **Metrics** tab
+Web: **Servers**, the server, **Metrics**; the app's **Metrics** tab
 CLI: moin metrics <app-name>, or moin metrics --server web-1; --range 24h
 TUI: on the app, `m`, or on a server; `[` `]` change the range
 API: GET /api/v1/apps/{app}/metrics?range=1h, GET /api/v1/servers/{id}/metrics?range=24h

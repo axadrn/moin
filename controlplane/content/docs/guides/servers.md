@@ -73,7 +73,7 @@ MCP: rename_server
 Switch it off for your workspace with **Update agents automatically**:
 
 ```surfaces
-Web: **Servers**, **Agent updates**
+Web: **Servers**, **Update agents automatically**
 CLI: moin servers auto-update on|off
 TUI: opens the web: `w`, then `a`
 API: PUT /api/v1/agent-updates
@@ -83,7 +83,7 @@ MCP: set_agent_updates
 Update an agent by hand:
 
 ```surfaces
-Web: **Servers**, **Update agent** on the server
+Web: **Servers**, open the server, **Update agent**
 CLI: moin servers update <server-name>
 TUI: on the server, `u`, then `y`
 API: POST /api/v1/servers/{id}/update
