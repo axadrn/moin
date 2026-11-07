@@ -82,6 +82,11 @@ instead of on every page.
 | Inside a group: rows, boxes, a log | the group's radius minus its padding (`rounded-3xl`), so the curves run parallel |
 | Page | `kit.Page`: one width (`max-w-5xl`), 16 px gutters on phones, 24 px from `sm` |
 
+Overlays (the palette, a select's list, the keys, the confirm dialog) float:
+one step lighter than what they cover (`bg-popover`: white in light, #2c2c2e
+in dark), a shadow, no border. What is lit inside them is `bg-foreground/8`,
+so it shows on any surface.
+
 Never a card in a card. Marketing illustrations (terminal, chat, the
 product frame) keep their own shapes.
 
@@ -143,6 +148,13 @@ Rules every page follows:
   iOS), `kit.Section` (a quiet title over a list), `kit.Grid` (cards side by
   side, as high as the highest), `kit.Field`, `kit.Input`, `kit.Select`,
   `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.Command`.
+- **Only what does something lights up.** A row that opens a page or does
+  something lights up under the mouse and ends in a chevron or names its
+  action; a row that only tells (a version, a fact) stays still. The kit
+  does it: `kit.Row` with an href, `kit.RowButton`.
+- **One look for picking.** The palette and every `kit.Select` list share
+  `kit.OptionClass`: the option the mouse or the arrows are on is lit, only
+  that one.
 - **No explaining.** No description line under a title, no help icon next
   to it. A card about an empty thing says what is missing in one sentence
   and shows the one button or command that fills it.

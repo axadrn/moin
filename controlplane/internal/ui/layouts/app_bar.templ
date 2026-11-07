@@ -44,7 +44,7 @@ templ AppBar() {
 // closes it.
 templ palette(basePath string) {
 	<dialog id="palette" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search">
-		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10" data-search>
+		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl" data-search>
 			<div class="relative shrink-0">
 				<label for="search" class="sr-only">Search or run a command</label>
 				@icon.Search(icon.Props{Class: "pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground"})
