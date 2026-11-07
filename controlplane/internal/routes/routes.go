@@ -19,7 +19,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-var immutableAssetPathPattern = regexp.MustCompile(`^/?js/(?:.+\.[0-9a-f]{8}(?:\.min)?|shadcn-templ-[0-9a-f]{16})\.js$`)
+var immutableAssetPathPattern = regexp.MustCompile(`^/?js/.+\.[0-9a-f]{8}(?:\.min)?\.js$`)
 
 // fontAssetPathPattern is the font files. Their names carry no hash, but a
 // font changes so rarely that browsers may keep it for a year.

@@ -20,6 +20,9 @@ type SelectProps struct {
 templ Select(p SelectProps) {
 	@selectOnce.Once() {
 		<script nonce={ templ.GetNonce(ctx) }>
+			// A part that htmx swaps in brings this script again: listen once.
+			if (!window.moinSelect) {
+			window.moinSelect = true;
 			document.addEventListener("change", (event) => {
 				const select = event.target.closest("[data-select]");
 				if (!select || event.target.type !== "radio") return;
@@ -35,6 +38,7 @@ templ Select(p SelectProps) {
 			document.addEventListener("toggle", (event) => {
 				if (event.newState === "open" && event.target.closest?.("[data-select]")) event.target.querySelector("input:checked")?.focus({ preventScroll: true });
 			}, true);
+			}
 		</script>
 	}
 	<div class="relative w-full min-w-0" data-select>

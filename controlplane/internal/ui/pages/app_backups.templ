@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
@@ -209,16 +208,16 @@ var backupScript = templ.NewOnceHandle()
 templ backupState(backup service.DatabaseBackups, known bool, database string, now time.Time) {
 	@kit.RowControl(templ.Attributes{"data-backup-state": true}) {
 		<div class="hidden min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:flex" role="status">
-			@status.Symbol(status.KindRunning)
+			@kit.Dot(kit.StateRunning)
 			<span class="truncate font-medium">Restoring { databaseName(database) }</span>
 		</div>
 		<div class="flex min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:hidden">
 			switch  {
 				case !known:
-					@status.Symbol(status.KindRunning)
+					@kit.Dot(kit.StateRunning)
 					@kit.RowText("Starting", "")
 				case backup.Problem != "":
-					@status.Symbol(status.KindFailed)
+					@kit.Dot(kit.StateFailed)
 					<div class="min-w-0 flex-1">
 						<div class="font-medium text-failed" data-backup-problem>{ backup.Problem }</div>
 						<details class="group/details text-sm text-muted-foreground">
@@ -227,10 +226,10 @@ templ backupState(backup service.DatabaseBackups, known bool, database string, n
 						</details>
 					</div>
 				case backup.Since != nil:
-					@status.Symbol(status.KindLive)
+					@kit.Dot(kit.StateLive)
 					<span class="min-w-0 flex-1 truncate font-medium" data-verified?={ backup.VerifiedAt != nil } title={ verifiedStamp(backup) }>{ "Backed up · " + checkedText(backup, now) }</span>
 				default:
-					@status.Symbol(status.KindRunning)
+					@kit.Dot(kit.StateRunning)
 					@kit.RowText("Starting", "")
 			}
 		</div>
@@ -276,7 +275,7 @@ templ backupDownload(view BackupsView, database string) {
 	{{ download := view.Download }}
 	if download != nil && download.State == service.DownloadRunning {
 		@kit.RowControl(templ.Attributes{"id": "db-download", "hx-get": databaseURL(ctx, view.App.Name, database), "hx-trigger": "apps from:body", "hx-select": "#db-download", "hx-swap": "outerHTML", "data-download-running": true}) {
-			@status.Symbol(status.KindRunning)
+			@kit.Dot(kit.StateRunning)
 			<span class="min-w-0 flex-1 truncate font-medium">Making a copy</span>
 		}
 	} else if download != nil && download.State == service.DownloadReady && download.Link != "" {

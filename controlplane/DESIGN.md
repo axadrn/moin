@@ -154,7 +154,12 @@ Rules every page follows:
   `kit.List` and `kit.Row` (grouped rows, a line between rows, inset like
   iOS), `kit.Section` (a quiet title over a list), `kit.Grid` (cards side by
   side, as high as the highest), `kit.Field`, `kit.Input`, `kit.Select`,
-  `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.Command`.
+  `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.IconButton`,
+  `kit.Command`, `kit.Dialog`, `kit.Status` / `kit.Chip` / `kit.Dot` (a
+  state in words, as a pill, or as a dot), `kit.Chart` (drawn by the
+  server as SVG), and the icons of `kit/icons.templ`. Nothing comes from a
+  UI library: a page that needs a new part adds it to the kit and to
+  `/dev/kit`.
 - **One list, a few kinds of row.** Every group of rows is a `kit.List`;
   a page never draws a row of its own. Only what does something lights up,
   and the lines next to a lit row give way so the light fills the gap:
