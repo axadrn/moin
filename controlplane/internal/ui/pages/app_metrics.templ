@@ -3,11 +3,10 @@ package pages
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/chart"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -29,7 +28,8 @@ templ AppMetricsPage(view AppMetricsView) {
 // 15 seconds on the last hour, and when another range is picked.
 templ appMetricsPanel(view AppMetricsView, path string) {
 	{{ m := view.Metrics }}
-	{{ rows := metricsRows(m.Points, m.Deploys, true) }}
+	{{ times := metricsTimes(m.Points) }}
+	{{ marks := deployMarks(m.Points, m.Deploys) }}
 	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.ServerOnline && m.Server != "" {
 			<p class="px-1 text-sm text-failed" data-server-offline>{ m.Server } is offline: its agent sends no metrics.</p>
@@ -52,7 +52,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 			</div>
 		}
 		@kit.Section(rangeTitle(m.Range), nil) {
-			if len(rows) == 0 {
+			if len(times) == 0 {
 				@kit.Card("", nil) {
 					@kit.Quiet() {
 						No metrics yet. The agent sends them every 15 seconds while the app runs.
@@ -61,9 +61,9 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 				}
 			} else {
 				@kit.Grid() {
-					@serverChart("CPU", metricsChartProps{ID: "app-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Deploys: true})
-					@serverChart("Memory", metricsChartProps{ID: "app-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Deploys: true})
-					@serverChart("Network", metricsChartProps{ID: "app-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText, Deploys: true})
+					@serverChart("CPU", metricsChartProps{ID: "app-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Marks: marks}, times, m.Range)
+					@serverChart("Memory", metricsChartProps{ID: "app-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: bytesText, Marks: marks}, times, m.Range)
+					@serverChart("Network", metricsChartProps{ID: "app-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText, Marks: marks}, times, m.Range)
 				}
 			}
 		}
@@ -89,50 +89,6 @@ func rangeTitle(r service.MetricsRange) string {
 	return "Last hour, every 15 seconds, live"
 }
 
-templ metricsChart(p metricsChartProps) {
-	@chart.Container(chart.ContainerProps{ID: p.ID, Config: p.Config, Class: "aspect-auto h-[200px] w-full"}) {
-		@chart.LineChart(chart.LineChartProps{AccessibilityLayer: true, Data: p.Rows, Margin: &chart.Margin{Top: 12, Right: 12, Bottom: 0, Left: 0}}) {
-			@chart.CartesianGrid(chart.CartesianGridProps{Vertical: chart.Bool(false)})
-			@chart.XAxis(chart.XAxisProps{DataKey: "t", TickMargin: 8, MinTickGap: 32, TickFormatter: metricsTick(p.Range)})
-			@chart.YAxis(chart.YAxisProps{Width: 64, TickCount: 4, TickFormatter: axisValue(p.Value), Domain: p.Domain})
-			@chart.Tooltip(chart.TooltipProps{Content: chart.TooltipContentProps{Indicator: "line", LabelFormatter: metricsLabel, Formatter: metricsTooltip(p.Config, p.Value)}})
-			for index, series := range p.Config {
-				@chart.Line(chart.LineProps{DataKey: series.Key, Type: chart.CurveMonotone, Stroke: "var(--color-" + series.Key + ")", StrokeWidth: 2, Dot: deployDot(p.Deploys && index == 0, series.Key)})
-			}
-		}
-	}
-}
-
-// deployDot marks the points where a deploy went live, nil for none.
-func deployDot(on bool, key string) *chart.DotProps {
-	if !on {
-		return nil
-	}
-	return &chart.DotProps{
-		Icon: icon.GitCommitVertical(icon.Props{Class: "fill-background stroke-(--color-" + key + ")"}),
-		Size: 20,
-		Show: func(_ int, row chart.Datum) bool {
-			_, ok := row["deploy"]
-			return ok
-		},
-	}
-}
-
-templ metricsTooltipRow(label, value, deploy string) {
-	<div class="flex min-w-[140px] flex-col gap-1 text-xs">
-		<div class="flex items-center gap-2 text-muted-foreground">
-			{ label }
-			<span class="ml-auto font-mono font-medium text-foreground tabular-nums">{ value }</span>
-		</div>
-		if deploy != "" {
-			<div class="flex items-center gap-1 font-medium text-foreground">
-				@icon.GitCommitVertical(icon.Props{Class: "size-3.5"})
-				{ deploy } went live
-			</div>
-		}
-	</div>
-}
-
 // ServerMetricsPage is the metrics of a server: CPU, memory, the data
 // disk, network and load now and over a range, and its apps by memory.
 templ ServerMetricsPage(view ServerMetricsView) {
@@ -150,7 +106,7 @@ templ ServerMetricsPage(view ServerMetricsView) {
 // 15 seconds on the last hour, and when another range is picked.
 templ serverMetricsPanel(view ServerMetricsView, path string) {
 	{{ m := view.Metrics }}
-	{{ rows := metricsRows(m.Points, nil, false) }}
+	{{ times := metricsTimes(m.Points) }}
 	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.Online {
 			<p class="px-1 text-sm text-failed" data-server-offline>The server is offline: its agent sends no metrics.</p>
@@ -174,7 +130,7 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 			</div>
 		}
 		@kit.Section(rangeTitle(m.Range), nil) {
-			if len(rows) == 0 {
+			if len(times) == 0 {
 				@kit.Card("", nil) {
 					@kit.Quiet() {
 						No metrics yet. The agent sends them every 15 seconds.
@@ -183,10 +139,10 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 				}
 			} else {
 				@kit.Grid() {
-					@serverChart("CPU", metricsChartProps{ID: "server-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Domain: []any{0, 100}})
-					@serverChart("Memory", metricsChartProps{ID: "server-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Domain: totalDomain(m.Now, false)})
-					@serverChart("Disk", metricsChartProps{ID: "server-disk", Config: diskConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Domain: totalDomain(m.Now, true)})
-					@serverChart("Network", metricsChartProps{ID: "server-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText})
+					@serverChart("CPU", metricsChartProps{ID: "server-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Top: 100}, times, m.Range)
+					@serverChart("Memory", metricsChartProps{ID: "server-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: bytesText, Top: totalTop(m.Now, false)}, times, m.Range)
+					@serverChart("Disk", metricsChartProps{ID: "server-disk", Lines: []kit.ChartLine{metricsLine("Disk", m.Points, diskOf)}, Value: bytesText, Top: totalTop(m.Now, true)}, times, m.Range)
+					@serverChart("Network", metricsChartProps{ID: "server-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText}, times, m.Range)
 				}
 			}
 		}
@@ -235,10 +191,10 @@ templ serverStat(name, note, value string) {
 }
 
 // serverChart is a card with one chart.
-templ serverChart(title string, p metricsChartProps) {
+templ serverChart(title string, p metricsChartProps, times []time.Time, r service.MetricsRange) {
 	<div class="grid min-w-0" data-metrics-chart={ p.ID }>
 		@kit.Card(title, nil) {
-			@metricsChart(p)
+			@kit.Chart(metricsChart(p, times, r))
 		}
 	</div>
 }
@@ -251,19 +207,16 @@ func cpuNote(now *service.MetricsNow) string {
 	return note
 }
 
-// totalDomain lets a chart of memory or disk reach up to the total.
-func totalDomain(now *service.MetricsNow, disk bool) []any {
+// totalTop lets a chart of memory or disk reach up to the total, 0 when
+// it is not known.
+func totalTop(now *service.MetricsNow, disk bool) float64 {
 	if now == nil {
-		return nil
+		return 0
 	}
-	total := now.MemoryTotal
 	if disk {
-		total = now.DiskTotal
+		return float64(now.DiskTotal)
 	}
-	if total == 0 {
-		return nil
-	}
-	return []any{0, float64(total)}
+	return float64(now.MemoryTotal)
 }
 
 // serverAppsMetrics lists the apps of the server, the one with the most
