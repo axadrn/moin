@@ -30,26 +30,26 @@ var servicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
 const instantUser = build.Name
 
 // SetServiceDomains replaces the domains of one of the app's services other
-// than the main one, then applies them like SetDomains. An empty list
-// removes the service's domains.
-func (s *AppService) SetServiceDomains(actor Actor, idOrName, service string, domains []string) (deploy *model.Deploy, changed bool, err error) {
+// than the main one, like SetDomains. An empty list removes the service's
+// domains.
+func (s *AppService) SetServiceDomains(actor Actor, idOrName, service string, domains []string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	service = strings.TrimSpace(service)
 	if !servicePattern.MatchString(service) {
-		return nil, false, ErrService
+		return false, ErrService
 	}
 	if main := s.mainService(app); main != "" && main == service {
-		return nil, false, ErrMainService
+		return false, ErrMainService
 	}
 	if len(s.composeServiceDomains(app)[service]) > 0 {
-		return nil, false, ErrComposeDomains
+		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	all := app.ServiceDomainMap()
 	taken := slices.Clone(app.DomainList())
@@ -60,11 +60,11 @@ func (s *AppService) SetServiceDomains(actor Actor, idOrName, service string, do
 	}
 	for _, domain := range clean {
 		if slices.Contains(taken, domain) {
-			return nil, false, ErrDomainTaken
+			return false, ErrDomainTaken
 		}
 	}
 	if slices.Equal(clean, all[service]) {
-		return nil, false, nil
+		return false, nil
 	}
 	before := strings.Join(all[service], ", ")
 	if len(clean) == 0 {
@@ -75,12 +75,12 @@ func (s *AppService) SetServiceDomains(actor Actor, idOrName, service string, do
 	body, _ := json.Marshal(all)
 	err = s.apps.SetServiceDomains(app.ID, string(body))
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	app.ServiceDomains = string(body)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"service": service, "from": before, "domains": strings.Join(clean, ", ")})
-	deploy, err = s.applyIfLive(actor, app)
-	return deploy, true, err
+	s.notify(actor.WorkspaceID)
+	return true, nil
 }
 
 // cleanDomains lowercases the domains, drops empty ones and repeats, and
@@ -176,31 +176,30 @@ func (s *AppService) Instant(workspaceID, idOrName string, show bool) (Instant, 
 }
 
 // SetInstant picks the provider of the app's instant address, or off, and
-// whether it is open to everyone, then applies it to the running release.
-// An empty provider keeps the one it has; open nil keeps the password as
-// it is.
-func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bool) (deploy *model.Deploy, changed bool, err error) {
+// whether it is open to everyone; the app takes it on its next restart. An
+// empty provider keeps the one it has; open nil keeps the password as it is.
+func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bool) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if provider == "" {
 		provider = app.Instant
 	}
 	if provider != "off" && !slices.Contains(protocol.InstantProviders, provider) {
-		return nil, false, ErrInstantProvider
+		return false, ErrInstantProvider
 	}
 	isOpen := app.InstantOpen
 	if open != nil {
 		isOpen = *open
 	}
 	if provider == app.Instant && isOpen == app.InstantOpen {
-		return nil, false, nil
+		return false, nil
 	}
 	err = s.apps.SetInstant(app.ID, provider, isOpen)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	details := map[string]string{"from": app.Instant, "provider": provider}
 	if isOpen != app.InstantOpen {
@@ -208,8 +207,8 @@ func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bo
 	}
 	app.Instant, app.InstantOpen = provider, isOpen
 	s.servers.record(actor, "app.instant_set", "app", app.Name, details)
-	deploy, err = s.applyIfLive(actor, app)
-	return deploy, true, err
+	s.notify(actor.WorkspaceID)
+	return true, nil
 }
 
 func boolWord(value bool) string {

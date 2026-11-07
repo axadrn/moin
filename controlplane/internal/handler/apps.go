@@ -11,7 +11,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
@@ -477,12 +476,12 @@ func (h *AppsHandler) changeDomains(w http.ResponseWriter, r *http.Request, done
 		return
 	}
 	domains, canonical := change(app.DomainList(), app.Canonical)
-	deploy, changed, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
+	changed, err := h.apps.SetDomains(actor(r), app.ID, domains, canonical)
 	if err != nil {
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name"})
 		return
 	}
-	h.routingChanged(w, r, done, deploy, changed)
+	h.routingChanged(w, r, done, changed)
 }
 
 func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Request, service, done, notDone string, change func([]string) []string) {
@@ -493,18 +492,18 @@ func (h *AppsHandler) changeServiceDomains(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	domains := change(slices.Clone(app.ServiceDomainMap()[service]))
-	deploy, changed, err := h.apps.SetServiceDomains(actor(r), app.ID, service, domains)
+	changed, err := h.apps.SetServiceDomains(actor(r), app.ID, service, domains)
 	if err != nil {
 		failed(w, r, notDone, err, map[string]string{"domains": "domain-name", "service": "domain-service"})
 		return
 	}
-	h.routingChanged(w, r, done, deploy, changed)
+	h.routingChanged(w, r, done, changed)
 }
 
 // SetInstant picks the provider of the instant address, or off.
 func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	provider := r.FormValue("provider")
-	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
 	if err != nil {
 		failed(w, r, "Instant address not changed", err, nil)
 		return
@@ -513,7 +512,7 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	if provider == "off" {
 		done = "Instant address off"
 	}
-	h.routingChanged(w, r, done, deploy, changed)
+	h.routingChanged(w, r, done, changed)
 }
 
 // SetInstantPassword is the switch that puts the password in front of the
@@ -521,31 +520,26 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 // failed save flips the switch back.
 func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request) {
 	open := r.FormValue("on") != "1"
-	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
 	done := "Password on the instant address"
 	if open {
 		done = "Instant address open to everyone"
 	}
 	switch {
-	case err != nil && changed:
-		// Saved, but the deploy that applies it did not start.
-		h.renderRouting(w, r)
-		answerNote(w, r, done, "Not applied yet: "+errorMessage(err))
 	case err != nil:
 		h.renderRouting(w, r)
 		answerError(w, r, "Password not changed", errorMessage(err))
 	default:
-		h.routingChanged(w, r, done, deploy, changed)
+		h.routingChanged(w, r, done, changed)
 	}
 }
 
 // Protect puts a password in front of the app. A wrong field says the
 // rule of its hint line again, in red.
 func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
-	var deploy *model.Deploy
 	changed, err := false, service.ErrProtect
 	if r.FormValue("password") != "" {
-		deploy, changed, err = h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
+		changed, err = h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
 	}
 	switch {
 	case errors.Is(err, service.ErrProtectUser):
@@ -558,31 +552,29 @@ func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Password not set", err, nil)
 		return
 	}
-	h.routingChanged(w, r, "Password set", deploy, changed)
+	h.routingChanged(w, r, "Password set", changed)
 }
 
 // Unprotect makes the app public again.
 func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
-	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
 	if err != nil {
 		failed(w, r, "Password not removed", err, nil)
 		return
 	}
-	h.routingChanged(w, r, "Password removed", deploy, changed)
+	h.routingChanged(w, r, "Password removed", changed)
 }
 
 // routingChanged answers a saved change of the domains or the password: the
-// panel as it is now and a line with what applies it.
-func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, deploy *model.Deploy, changed bool) {
+// panel as it is now and a check on the button. The app takes it on its
+// next restart; its head says so (changes waiting).
+func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, changed bool) {
 	h.renderRouting(w, r)
-	switch {
-	case !changed:
-		answerDone(w, r, "Nothing changed", "It was like this already.")
-	case deploy == nil:
-		answerDone(w, r, done, "The app takes it with its next deploy or start.")
-	default:
-		answerDone(w, r, done, "Deploy v"+strconv.Itoa(deploy.Number)+" applies it now.")
+	if !changed {
+		answerDone(w, r, "Nothing changed", "")
+		return
 	}
+	answerDone(w, r, done, "")
 }
 
 func (h *AppsHandler) renderRouting(w http.ResponseWriter, r *http.Request) {

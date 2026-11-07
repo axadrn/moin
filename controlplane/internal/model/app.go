@@ -44,6 +44,10 @@ type App struct {
 	// Stopped is set when its owner stopped the app. A deploy, a restart
 	// or a start clears it.
 	Stopped bool `db:"stopped"`
+	// ChangesWaiting counts the changes since the live release started,
+	// which the next restart applies (AppService.ChangesWaiting). Only
+	// AppService.Deploys fills it.
+	ChangesWaiting int `db:"-"`
 	// Catalog is the slug of the catalog entry the app was installed
 	// from, such as umami; empty for an app of your own.
 	Catalog string `db:"catalog"`

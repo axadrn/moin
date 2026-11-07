@@ -35,6 +35,9 @@ type App struct {
 	InstantProvider string `json:"instant_provider"`
 	InstantOpen     bool   `json:"instant_open"`
 	Stopped         bool   `json:"stopped"`
+	// ChangesWaiting counts the changes saved since the live release
+	// started; a restart applies them. Only App fills it.
+	ChangesWaiting int `json:"changes_waiting"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
 	Repo                  string `json:"repo"`
 	Branch                string `json:"branch"`

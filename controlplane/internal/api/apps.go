@@ -49,6 +49,10 @@ type App struct {
 	// Stopped is set when the app was stopped; a deploy, restart or start
 	// runs it again.
 	Stopped bool `json:"stopped"`
+	// ChangesWaiting counts the changes saved since the live release
+	// started (env vars, domains, password, instant address, bucket); a
+	// restart applies them. Only GET /apps/{app} fills it.
+	ChangesWaiting int `json:"changes_waiting"`
 	// Repo and Branch are the GitHub repo the app follows, if any.
 	Repo       string `json:"repo"`
 	Branch     string `json:"branch"`
@@ -152,6 +156,7 @@ func NewApp(app model.App) App {
 		InstantProvider:       app.Instant,
 		InstantOpen:           app.InstantOpen,
 		Stopped:               app.Stopped,
+		ChangesWaiting:        app.ChangesWaiting,
 		Repo:                  app.Repo,
 		Branch:                app.Branch,
 		AutoDeploy:            app.AutoDeploy,
@@ -767,19 +772,18 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	var deploy *model.Deploy
 	var changed bool
 	var err error
 	if request.Service != "" {
-		deploy, changed, err = h.apps.SetServiceDomains(actor(r), r.PathValue("app"), request.Service, request.Domains)
+		changed, err = h.apps.SetServiceDomains(actor(r), r.PathValue("app"), request.Service, request.Domains)
 	} else {
-		deploy, changed, err = h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
+		changed, err = h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
 	}
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
 // GetInstant answers the app's instant address; with show=true the
@@ -807,12 +811,12 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	deploy, changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider, request.Open)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider, request.Open)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
 // SetProtection puts a password in front of the app.
@@ -826,23 +830,23 @@ func (h *AppsHandler) SetProtection(w http.ResponseWriter, r *http.Request) {
 		ValidationError(w, map[string]string{"password": "Enter a password of at least 8 characters."})
 		return
 	}
-	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
+	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
 // DeleteProtection takes the password away.
 func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	deploy, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), deploy, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
 // Restart starts the live release again with the env and routing as they

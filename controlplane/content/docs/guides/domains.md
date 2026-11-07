@@ -58,7 +58,7 @@ MCP: set_domains
 
 3. Point each domain at the server. Open the DNS settings where you bought the domain and add an **A record**: its name is the domain, its value the server's IPv4 address. If the server has an IPv6 address, add an **AAAA record** with it too. moin shows both addresses and the record to set.
 
-Changes apply right away: moin restarts the running release with the new routing, without a build. Before the first deploy they wait for it.
+Saving never restarts the app. Changes wait for its next restart, start or deploy, so you can make several at once; the app page and `moin apps <app>` say how many are waiting. Before the first deploy they wait for it.
 
 DNS takes a few minutes, sometimes longer. HTTPS starts once the domain points at the server: Traefik then gets a certificate by itself. Using a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel)? Then moin sets the DNS for you, as long as the domain is in your Cloudflare account.
 
@@ -136,7 +136,7 @@ API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
 
-A change of the domains or the password restarts the app so it applies. If nothing changes, like the same domains again or `protect off` on an app without a password, moin says "Nothing changed" and restarts nothing. The API answers with `"unchanged": true`.
+A change of the domains or the password waits for the next restart. If nothing changes, like the same domains again or `protect off` on an app without a password, moin says "Nothing changed". The API answers with `"unchanged": true`.
 
 ## Domains per service
 
@@ -180,6 +180,6 @@ Fields in `x-moin` win over the settings in moin. [Config in the repo](/docs/gui
 
 Once a deploy with `x-moin.domains` is live, every surface lists those domains, marked **from compose.yml**. moin cannot add or remove them then: change them in `compose.yml` and deploy. Trying it anyway in moin says so, with the API code `domains_from_compose`.
 
-## Restart by hand
+## Apply the changes
 
-Domain and password changes restart the app by themselves. [Restart](/docs/guides/deploy#restart) starts the live release again by hand, with the env vars, domains and password as they are now, without a build.
+[Restart](/docs/guides/deploy#restart) starts the live release again with the env vars, domains and password as they are now, without a build. It applies every change that waits.

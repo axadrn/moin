@@ -190,6 +190,10 @@ func (s *AppService) Deploys(workspaceID, idOrName string, limit int) (*model.Ap
 	for index := range deploys {
 		s.expire(&deploys[index])
 	}
+	app.ChangesWaiting, err = s.ChangesWaiting(workspaceID, app)
+	if err != nil {
+		return nil, nil, err
+	}
 	return app, deploys, nil
 }
 
@@ -442,106 +446,106 @@ func (s *AppService) apply(actor Actor, action, idOrName string) (*model.Deploy,
 	return s.start(actor, action, app, deploy, protocol.DeployStart{})
 }
 
-// SetDomains replaces the app's domains and the canonical one ("" for none),
-// then applies them to the running release. The deploy is nil when there is
-// nothing to apply yet, or the server is offline or busy: the next deploy
-// takes them. changed is false when the app had these domains already;
-// then nothing restarts.
-func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, canonical string) (deploy *model.Deploy, changed bool, err error) {
+// SetDomains replaces the app's domains and the canonical one ("" for none).
+// The app takes them on its next restart, start or deploy (ChangesWaiting).
+// changed is false when the app had these domains already.
+func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, canonical string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	// x-moin wins, so a change here would never reach the app.
 	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
-		return nil, false, ErrComposeDomains
+		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	for _, list := range app.ServiceDomainMap() {
 		for _, domain := range clean {
 			if slices.Contains(list, domain) {
-				return nil, false, ErrDomainTaken
+				return false, ErrDomainTaken
 			}
 		}
 	}
 	canonical = strings.ToLower(strings.TrimSpace(canonical))
 	if canonical != "" && !slices.Contains(clean, canonical) {
-		return nil, false, ErrCanonical
+		return false, ErrCanonical
 	}
 	if slices.Equal(clean, app.DomainList()) && canonical == app.Canonical {
-		return nil, false, nil
+		return false, nil
 	}
 	before := strings.Join(app.DomainList(), ", ")
 	body, _ := json.Marshal(clean)
 	err = s.apps.SetRouting(app.ID, string(body), canonical)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	app.Domains = string(body)
 	s.syncTunnelOf(app)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"from": before, "domains": strings.Join(clean, ", "), "canonical": canonical})
-	deploy, err = s.applyIfLive(actor, app)
-	return deploy, true, err
+	s.notify(actor.WorkspaceID)
+	return true, nil
 }
 
 // SetProtection puts a password in front of the app, or takes it away when
-// password is empty, then applies it to the running release. changed is
-// false when the app had this password, or none, already; then nothing
-// restarts.
-func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (deploy *model.Deploy, changed bool, err error) {
+// password is empty. The app takes it on its next restart. changed is false
+// when the app had this password, or none, already.
+func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	protect := ""
 	if password != "" {
 		username = strings.TrimSpace(username)
 		if username == "" || strings.ContainsAny(username, ": ") {
-			return nil, false, ErrProtectUser
+			return false, ErrProtectUser
 		}
 		if len(password) < 8 || len(password) > 72 {
-			return nil, false, ErrProtect
+			return false, ErrProtect
 		}
 		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-			return nil, false, nil
+			return false, nil
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, false, err
+			return false, err
 		}
 		protect = username + ":" + string(hash)
 	} else if app.Protect == "" {
-		return nil, false, nil
+		return false, nil
 	}
 	err = s.apps.SetProtect(app.ID, protect)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	action := "app.protected"
 	if protect == "" {
 		action = "app.unprotected"
 	}
 	s.servers.record(actor, action, "app", app.Name, nil)
-	deploy, err = s.applyIfLive(actor, app)
-	return deploy, true, err
+	s.notify(actor.WorkspaceID)
+	return true, nil
 }
 
-// applyIfLive applies a change to the running release. The change itself is
-// in the activity, so the restart is not.
-func (s *AppService) applyIfLive(actor Actor, app *model.App) (*model.Deploy, error) {
-	s.notify(actor.WorkspaceID)
-	// A stopped app takes the change when it starts.
-	if app.LiveNumber == 0 || app.Stopped || !s.servers.Online(app.ServerID) {
-		return nil, nil
+// waitingActions are the changes an app takes only on its next restart,
+// start or deploy: saving never restarts it (DESIGN.md, Feedback).
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set"}
+
+// ChangesWaiting counts the changes made to an app since its live release
+// started, which its next restart applies. A stopped app or one never
+// deployed has none waiting: it takes them when it starts.
+func (s *AppService) ChangesWaiting(workspaceID string, app *model.App) (int, error) {
+	if app.LiveNumber == 0 || app.Stopped {
+		return 0, nil
 	}
-	deploy, err := s.apply(actor, "", app.ID)
-	if errors.Is(err, ErrDeployRunning) || errors.Is(err, ErrServerOffline) {
-		return nil, nil
+	live, err := s.apps.Deploy(app.ID, app.LiveNumber)
+	if err != nil {
+		return 0, err
 	}
-	return deploy, err
+	return s.servers.audit.CountAppChanges(workspaceID, app.Name, waitingActions, live.CreatedAt)
 }
 
 // DomainCheck says whether a domain points at the app's server.

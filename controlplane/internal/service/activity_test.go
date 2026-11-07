@@ -25,7 +25,7 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 	if err := apps.SetRegistry(owner, "ghcr.io", "ada", secrets[1]); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := apps.SetProtection(owner, "blog", "ada", secrets[2]); err != nil {
+	if _, err := apps.SetProtection(owner, "blog", "ada", secrets[2]); err != nil {
 		t.Fatal(err)
 	}
 	hook, err := apps.RotateDeployHook(owner, "blog")
