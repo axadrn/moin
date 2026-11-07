@@ -15,6 +15,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/handler"
 	"github.com/axadrn/moin/controlplane/internal/mcp"
 	"github.com/axadrn/moin/controlplane/internal/middleware"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -145,6 +146,12 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.Home))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/account", workspace(settings.SettingsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/github", workspace(settings.GitHub))
+	if app.Cfg.IsDevelopment() {
+		// The gallery of the kit (DESIGN.md, Geometry), never in production.
+		mux.HandleFunc("GET /app/{workspaceSlug}/dev/kit", workspace(func(w http.ResponseWriter, r *http.Request) {
+			_ = pages.DevKit().Render(r.Context(), w)
+		}))
+	}
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
