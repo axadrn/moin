@@ -173,7 +173,7 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 			if config.Paused == nil {
 				config.Paused = map[string]string{}
 			}
-			config.Paused[app.Name] = "the bucket of " + app.Name + " cannot be opened: " + err.Error()
+			config.Paused[app.Folder] = "the bucket of " + app.Name + " cannot be opened: " + err.Error()
 			continue
 		}
 		if config.AppBuckets == nil {

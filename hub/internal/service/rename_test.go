@@ -94,7 +94,10 @@ func TestRenameApp(t *testing.T) {
 	if metrics.Now == nil || metrics.Now.MemoryUsed != 42<<20 {
 		t.Fatalf("metrics of the renamed app = %+v", metrics.Now)
 	}
-	config := apps.backupConfig(owner.WorkspaceID, server.ID)
+	config, err := apps.backupConfig(owner.WorkspaceID, server.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := config.Schedules["blog"]; !ok {
 		t.Fatalf("backup schedules = %v, want the folder", config.Schedules)
 	}
