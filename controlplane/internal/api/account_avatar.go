@@ -1,11 +1,12 @@
 package api
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/validation"
+	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
 // MaxAvatarBytes caps an avatar upload request.
@@ -37,17 +38,12 @@ func (h *AccountHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	err = validation.ValidateFile(header, validation.ImageConstraints)
-	if err != nil {
-		ValidationError(w, map[string]string{"file": FieldMessage(err)})
+	err = h.fileService.SetAvatar(user.ID, file, header)
+	var invalid *service.InvalidFileError
+	if errors.As(err, &invalid) {
+		ValidationError(w, map[string]string{"file": FieldMessage(invalid.Reason)})
 		return
 	}
-
-	err = h.fileService.DeleteUserAvatar(user.ID)
-	if err != nil {
-		slog.Warn("failed to delete old avatar", "error", err, "user_id", user.ID)
-	}
-	_, err = h.fileService.Upload(user.ID, "user", user.ID, "avatar", file, header, true)
 	if err != nil {
 		slog.Error("failed to upload avatar", "error", err, "user_id", user.ID)
 		ServiceError(w, err)

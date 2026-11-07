@@ -1,13 +1,15 @@
 package handler
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
-	"github.com/axadrn/moin/controlplane/internal/ui/pages"
-	"github.com/axadrn/moin/controlplane/internal/validation"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
 func (h *AccountHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
@@ -28,15 +30,13 @@ func (h *AccountHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if err := validation.ValidateFile(header, validation.ImageConstraints); err != nil {
+	err = h.fileService.SetAvatar(user.ID, file, header)
+	var invalid *service.InvalidFileError
+	if errors.As(err, &invalid) {
 		answerFailed(w, r, "Picture not uploaded", fileProblem(err))
 		return
 	}
-
-	if err := h.fileService.DeleteUserAvatar(user.ID); err != nil {
-		slog.Warn("failed to delete old avatar", "error", err, "user_id", user.ID)
-	}
-	if _, err := h.fileService.Upload(user.ID, "user", user.ID, "avatar", file, header, true); err != nil {
+	if err != nil {
 		slog.Error("failed to upload avatar", "error", err, "user_id", user.ID)
 		answerFailed(w, r, "Picture not uploaded", "Something went wrong. Please try again.")
 		return

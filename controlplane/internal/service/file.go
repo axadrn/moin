@@ -11,10 +11,31 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/storage"
+	"github.com/axadrn/moin/controlplane/internal/validation"
 	"github.com/google/uuid"
 )
 
 var ErrFilePermission = errors.New("file does not belong to this user")
+
+// InvalidFileError is a file the service refuses, and why.
+type InvalidFileError struct {
+	Reason error
+}
+
+func (e *InvalidFileError) Error() string { return e.Reason.Error() }
+
+// SetAvatar replaces the user's picture with a JPEG, PNG or WebP of at most
+// 5 MB; another file is an InvalidFileError.
+func (s *FileService) SetAvatar(userID string, file multipart.File, header *multipart.FileHeader) error {
+	if err := validation.ValidateFile(header, validation.ImageConstraints); err != nil {
+		return &InvalidFileError{Reason: err}
+	}
+	if err := s.DeleteUserAvatar(userID); err != nil {
+		slog.Warn("failed to delete old avatar", "error", err, "user_id", userID)
+	}
+	_, err := s.Upload(userID, "user", userID, "avatar", file, header, true)
+	return err
+}
 
 type FileService struct {
 	fileRepo *repository.Files
@@ -28,8 +49,8 @@ func NewFileService(fileRepo *repository.Files, storage storage.Storage) *FileSe
 	}
 }
 
-// Upload uploads a file and creates a database record
-// Note: File validation (type, size, content) should be done by the caller before calling Upload
+// Upload uploads a file and creates a database record. It checks no type
+// or size: SetAvatar does for pictures.
 func (s *FileService) Upload(userID, ownerType, ownerID, fileType string, file multipart.File, header *multipart.FileHeader, isPublic bool) (*model.File, error) {
 	// Generate unique filename
 	ext := filepath.Ext(header.Filename)
