@@ -14,8 +14,8 @@ import (
 )
 
 type SubscriptionService struct {
-	repo       repository.SubscriptionRepository
-	adminAudit repository.AdminRepository
+	repo       *repository.Subscriptions
+	adminAudit *repository.Admin
 	// activity, when set, gets plan and status changes of a workspace.
 	activity repository.WorkspaceAuditRepository
 }
@@ -46,7 +46,7 @@ func (s *SubscriptionService) current(workspaceID string) *model.Subscription {
 	return sub
 }
 
-func NewSubscriptionService(repo repository.SubscriptionRepository, adminAudit repository.AdminRepository) *SubscriptionService {
+func NewSubscriptionService(repo *repository.Subscriptions, adminAudit *repository.Admin) *SubscriptionService {
 	return &SubscriptionService{repo: repo, adminAudit: adminAudit}
 }
 

@@ -31,7 +31,7 @@ var (
 )
 
 type AdminService struct {
-	repository  repository.AdminRepository
+	repository  *repository.Admin
 	users       *repository.Users
 	auth        *AuthService
 	adminEmails map[string]struct{}
@@ -39,13 +39,13 @@ type AdminService struct {
 	network func() model.Network
 	// subscriptions and activity, when set, show and change who is free
 	// forever.
-	subscriptions repository.SubscriptionRepository
+	subscriptions *repository.Subscriptions
 	activity      repository.WorkspaceAuditRepository
 	// oldAddress counts what still arrives on old addresses.
 	oldAddress *OldAddressService
 }
 
-func NewAdminService(repo repository.AdminRepository, users *repository.Users, auth *AuthService, adminEmails []string) *AdminService {
+func NewAdminService(repo *repository.Admin, users *repository.Users, auth *AuthService, adminEmails []string) *AdminService {
 	allowed := make(map[string]struct{}, len(adminEmails))
 	for _, email := range adminEmails {
 		allowed[strings.ToLower(strings.TrimSpace(email))] = struct{}{}
@@ -55,7 +55,7 @@ func NewAdminService(repo repository.AdminRepository, users *repository.Users, a
 
 // UsePlans shows the plan of every user and lets admins make them free
 // forever. Without billing there are no plans to show.
-func (s *AdminService) UsePlans(subscriptions repository.SubscriptionRepository, activity repository.WorkspaceAuditRepository) {
+func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activity repository.WorkspaceAuditRepository) {
 	s.subscriptions = subscriptions
 	s.activity = activity
 }

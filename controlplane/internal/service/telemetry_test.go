@@ -26,7 +26,7 @@ func TestSelfHostedReportsAndHostedCounts(t *testing.T) {
 	if _, _, err := servers.Register(installToken, testHello); err != nil {
 		t.Fatal(err)
 	}
-	hosted := NewTelemetryService(repository.NewTelemetryRepository(hostedDB), "", "v1", false)
+	hosted := NewTelemetryService(repository.NewTelemetry(hostedDB), "", "v1", false)
 	var body string
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var report model.TelemetryReport
@@ -53,7 +53,7 @@ func TestSelfHostedReportsAndHostedCounts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	self := NewTelemetryService(repository.NewTelemetryRepository(selfDB), receiver.URL, "v2", true)
+	self := NewTelemetryService(repository.NewTelemetry(selfDB), receiver.URL, "v2", true)
 	if err := self.Report(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestSelfHostedReportsAndHostedCounts(t *testing.T) {
 }
 
 func TestReceiveRejectsWhatIsNotAReport(t *testing.T) {
-	hosted := NewTelemetryService(repository.NewTelemetryRepository(testutil.NewDatabase(t)), "", "v1", false)
+	hosted := NewTelemetryService(repository.NewTelemetry(testutil.NewDatabase(t)), "", "v1", false)
 	if err := hosted.Receive(model.TelemetryReport{InstanceID: "not-an-id"}); err == nil {
 		t.Fatal("a report without an ID was taken")
 	}

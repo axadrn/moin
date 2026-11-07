@@ -10,30 +10,16 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type AdminRepository interface {
-	Metrics(now time.Time) (model.AdminMetrics, error)
-	ListUsers(query string, limit, offset int, now time.Time) ([]model.AdminUser, int, error)
-	// User is one user as the list shows it; ErrUserNotFound when there is
-	// none.
-	User(id string, now time.Time) (*model.AdminUser, error)
-	CreateAuditEvent(event *model.AdminAuditEvent) error
-	StopImpersonationSession(sessionID, targetUserID, operatorUserID string, event *model.AdminAuditEvent) error
-	ListAuditEvents(limit int) ([]model.AdminAuditEvent, error)
-	DeleteAuditEventsBefore(cutoff time.Time) error
-	// FirstWorkspace returns the first workspace the user created, nil when
-	// there is none.
-	FirstWorkspace(userID string) (*model.Workspace, error)
-}
-
-type adminRepository struct {
+// Admin reads what the operator pages show and stores their audit events.
+type Admin struct {
 	db *sqlx.DB
 }
 
-func NewAdminRepository(db *sqlx.DB) AdminRepository {
-	return &adminRepository{db: db}
+func NewAdmin(db *sqlx.DB) *Admin {
+	return &Admin{db: db}
 }
 
-func (r *adminRepository) Metrics(now time.Time) (model.AdminMetrics, error) {
+func (r *Admin) Metrics(now time.Time) (model.AdminMetrics, error) {
 	var metrics model.AdminMetrics
 	queries := []struct {
 		target *int
@@ -58,7 +44,7 @@ func (r *adminRepository) Metrics(now time.Time) (model.AdminMetrics, error) {
 	return metrics, nil
 }
 
-func (r *adminRepository) ListUsers(query string, limit, offset int, now time.Time) ([]model.AdminUser, int, error) {
+func (r *Admin) ListUsers(query string, limit, offset int, now time.Time) ([]model.AdminUser, int, error) {
 	pattern := "%" + strings.ToLower(strings.TrimSpace(query)) + "%"
 	where := `WHERE ($1 = '%%' OR LOWER(u.email) LIKE $1 OR LOWER(u.name) LIKE $1)`
 
@@ -94,7 +80,9 @@ const adminUserSelect = `
 		LEFT JOIN sessions s ON s.user_id = u.id
 		`
 
-func (r *adminRepository) User(id string, now time.Time) (*model.AdminUser, error) {
+// User is one user as the list shows it; ErrUserNotFound when there is
+// none.
+func (r *Admin) User(id string, now time.Time) (*model.AdminUser, error) {
 	var user model.AdminUser
 	err := r.db.Get(&user, adminUserSelect+`
 		WHERE u.id = $1
@@ -109,7 +97,7 @@ func (r *adminRepository) User(id string, now time.Time) (*model.AdminUser, erro
 	return &user, nil
 }
 
-func (r *adminRepository) CreateAuditEvent(event *model.AdminAuditEvent) error {
+func (r *Admin) CreateAuditEvent(event *model.AdminAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -129,7 +117,7 @@ func (r *adminRepository) CreateAuditEvent(event *model.AdminAuditEvent) error {
 	return tx.Commit()
 }
 
-func (r *adminRepository) StopImpersonationSession(sessionID, targetUserID, operatorUserID string, event *model.AdminAuditEvent) error {
+func (r *Admin) StopImpersonationSession(sessionID, targetUserID, operatorUserID string, event *model.AdminAuditEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -159,7 +147,7 @@ func (r *adminRepository) StopImpersonationSession(sessionID, targetUserID, oper
 	return tx.Commit()
 }
 
-func (r *adminRepository) ListAuditEvents(limit int) ([]model.AdminAuditEvent, error) {
+func (r *Admin) ListAuditEvents(limit int) ([]model.AdminAuditEvent, error) {
 	events := []model.AdminAuditEvent{}
 	err := r.db.Select(&events, `
 		SELECT e.*, COALESCE(u.email, '') AS actor_email
@@ -171,12 +159,14 @@ func (r *adminRepository) ListAuditEvents(limit int) ([]model.AdminAuditEvent, e
 	return events, err
 }
 
-func (r *adminRepository) DeleteAuditEventsBefore(cutoff time.Time) error {
+func (r *Admin) DeleteAuditEventsBefore(cutoff time.Time) error {
 	_, err := r.db.Exec(`DELETE FROM admin_audit_events WHERE created_at < $1`, cutoff)
 	return err
 }
 
-func (r *adminRepository) FirstWorkspace(userID string) (*model.Workspace, error) {
+// FirstWorkspace returns the first workspace the user created, nil when
+// there is none.
+func (r *Admin) FirstWorkspace(userID string) (*model.Workspace, error) {
 	var workspace model.Workspace
 	err := r.db.Get(&workspace, `SELECT * FROM workspaces WHERE created_by = $1 ORDER BY created_at, id LIMIT 1`, userID)
 	if errors.Is(err, sql.ErrNoRows) {

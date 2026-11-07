@@ -145,7 +145,7 @@ func TestMagicLinkVerifyRejectsExpiredToken(t *testing.T) {
 	user := seedVerifiedUser(t, environment, "expired", "Expired")
 	raw := strings.Repeat("ab", 32)
 	hash := sha256.Sum256([]byte(raw))
-	err := repository.NewTokenRepository(environment.database).Create(&model.Token{
+	err := repository.NewTokens(environment.database).Create(&model.Token{
 		UserID:    user.ID,
 		Type:      model.TokenTypeMagicLink,
 		TokenHash: hex.EncodeToString(hash[:]),

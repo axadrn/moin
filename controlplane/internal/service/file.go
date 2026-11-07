@@ -17,11 +17,11 @@ import (
 var ErrFilePermission = errors.New("file does not belong to this user")
 
 type FileService struct {
-	fileRepo repository.FileRepository
+	fileRepo *repository.Files
 	storage  storage.Storage
 }
 
-func NewFileService(fileRepo repository.FileRepository, storage storage.Storage) *FileService {
+func NewFileService(fileRepo *repository.Files, storage storage.Storage) *FileService {
 	return &FileService{
 		fileRepo: fileRepo,
 		storage:  storage,

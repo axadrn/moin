@@ -14,7 +14,7 @@ func TestFileServiceDeleteRequiresOwner(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "file-owner"})
 	attacker := testutil.SeedUser(t, database, testutil.UserOptions{ID: "file-attacker"})
-	files := repository.NewFileRepository(database)
+	files := repository.NewFiles(database)
 	file := &model.File{ID: "owned-file", UserID: owner.User.ID, OwnerType: "user", OwnerID: owner.User.ID, Type: "document", Filename: "file.txt", OriginalName: "file.txt", MimeType: "text/plain", Size: 4, StoragePath: "private/documents/file.txt", CreatedAt: time.Now()}
 	if err := files.Create(file); err != nil {
 		t.Fatalf("Create() error = %v", err)

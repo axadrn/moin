@@ -17,7 +17,7 @@ import (
 )
 
 func TestHomeIsTheLandingPageOnlyWithBilling(t *testing.T) {
-	telemetry := service.NewTelemetryService(repository.NewTelemetryRepository(testutil.NewDatabase(t)), "", "test", false)
+	telemetry := service.NewTelemetryService(repository.NewTelemetry(testutil.NewDatabase(t)), "", "test", false)
 	for _, test := range []struct {
 		name     string
 		billing  bool
@@ -73,10 +73,10 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 			users := repository.NewUsers(database)
 			email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 			auth := service.NewAuthService(
-				users, repository.NewTokenRepository(database), repository.NewSessionRepository(database), workspaces, email,
+				users, repository.NewTokens(database), repository.NewSessionRepository(database), workspaces, email,
 				false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 			)
-			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitationRepository(database), repository.NewSubscriptionRepository(database)))
+			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitationRepository(database), repository.NewSubscriptions(database)))
 			form := url.Values{"email": {test.email}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/magic-link", strings.NewReader(form.Encode()))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")

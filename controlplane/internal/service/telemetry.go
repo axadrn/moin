@@ -31,7 +31,7 @@ const (
 // few counts every five minutes to the hosted one, which adds them to its own for
 // the landing page. Nothing else ever goes out: no name, domain or address.
 type TelemetryService struct {
-	repo    repository.TelemetryRepository
+	repo    *repository.Telemetry
 	url     string
 	version string
 	send    bool
@@ -46,7 +46,7 @@ type TelemetryService struct {
 }
 
 // NewTelemetryService reports to url when send is true.
-func NewTelemetryService(repo repository.TelemetryRepository, url, version string, send bool) *TelemetryService {
+func NewTelemetryService(repo *repository.Telemetry, url, version string, send bool) *TelemetryService {
 	return &TelemetryService{
 		repo: repo, url: url, version: version, send: send,
 		client: &http.Client{Timeout: 10 * time.Second}, now: time.Now, firstAfter: 10 * time.Second,

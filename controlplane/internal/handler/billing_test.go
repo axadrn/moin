@@ -20,7 +20,7 @@ import (
 func newBillingHandler(t *testing.T, provider *paymentProviderStub) *BillingHandler {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),

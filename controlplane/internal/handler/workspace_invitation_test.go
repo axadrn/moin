@@ -91,7 +91,7 @@ func TestInvitationTerminalOutcomesClearPendingCookie(t *testing.T) {
 			show: true,
 			setup: func(t *testing.T, database *sqlx.DB, workspaces *service.WorkspaceService, owner testutil.UserFixture, invitee *model.User, _, token string) {
 				owner.Subscription.PlanID = model.SubscriptionPlanPro
-				if err := repository.NewSubscriptionRepository(database).Update(owner.Subscription); err != nil {
+				if err := repository.NewSubscriptions(database).Update(owner.Subscription); err != nil {
 					t.Fatalf("upgrade subscription: %v", err)
 				}
 				if _, err := workspaces.AcceptInvitation(token, invitee, service.Source{Via: "web"}); err != nil {
@@ -166,7 +166,7 @@ func TestInvitationSeatLimitClearsPendingCookieForRecovery(t *testing.T) {
 	}
 	token := invitationToken(t, mailer)
 	owner.Subscription.PlanID = model.SubscriptionPlanFree
-	if err := repository.NewSubscriptionRepository(database).Update(owner.Subscription); err != nil {
+	if err := repository.NewSubscriptions(database).Update(owner.Subscription); err != nil {
 		t.Fatalf("downgrade subscription: %v", err)
 	}
 	request := httptest.NewRequest(http.MethodPost, "/workspaces/invitations/"+token, nil)
@@ -244,12 +244,12 @@ func invitationHandlerTestSetup(t *testing.T) (*sqlx.DB, *service.WorkspaceServi
 		repository.NewWorkspaceInvitationRepository(database),
 		repository.NewWorkspaceAuditRepository(database),
 		users,
-		service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database)),
+		service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database)),
 		email,
 	)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "handler-owner", Email: "owner@example.com", Name: "Owner"})
 	owner.Subscription.PlanID = model.SubscriptionPlanPro
-	if err := repository.NewSubscriptionRepository(database).Update(owner.Subscription); err != nil {
+	if err := repository.NewSubscriptions(database).Update(owner.Subscription); err != nil {
 		t.Fatalf("upgrade handler workspace: %v", err)
 	}
 	return database, workspaces, owner, mailer

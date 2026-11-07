@@ -14,7 +14,7 @@ import (
 func TestTokenCanBeConsumedOnlyOnce(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{Verified: true})
-	tokenRepository := repository.NewTokenRepository(database)
+	tokenRepository := repository.NewTokens(database)
 	token := &model.Token{
 		UserID:    fixture.User.ID,
 		Type:      model.TokenTypeMagicLink,
@@ -43,7 +43,7 @@ func TestTokenCanBeConsumedOnlyOnce(t *testing.T) {
 func TestTokenConsumptionIsAtomic(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{Verified: true})
-	tokenRepository := repository.NewTokenRepository(database)
+	tokenRepository := repository.NewTokens(database)
 	token := &model.Token{
 		UserID:    fixture.User.ID,
 		Type:      model.TokenTypeMagicLink,
@@ -86,7 +86,7 @@ func TestTokenConsumptionIsAtomic(t *testing.T) {
 func TestExpiredTokenCannotBeConsumed(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{Verified: true})
-	tokenRepository := repository.NewTokenRepository(database)
+	tokenRepository := repository.NewTokens(database)
 	token := &model.Token{
 		UserID:    fixture.User.ID,
 		Type:      model.TokenTypeEmailChange,
@@ -105,7 +105,7 @@ func TestExpiredTokenCannotBeConsumed(t *testing.T) {
 func TestDeleteByUserAndTypePreservesOtherTokens(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{Verified: true})
-	tokenRepository := repository.NewTokenRepository(database)
+	tokenRepository := repository.NewTokens(database)
 	for _, tokenType := range []string{model.TokenTypeMagicLink, model.TokenTypeEmailChange} {
 		token := &model.Token{
 			UserID:    fixture.User.ID,

@@ -10,28 +10,18 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type TelemetryRepository interface {
-	// InstanceID returns the random ID of this control plane, made once.
-	InstanceID() (string, error)
-	// Counts counts what this control plane runs: registered servers, apps
-	// with a live release and every deploy.
-	Counts() (model.Counts, error)
-	// HostedWorkspaces counts the workspaces with at least one server.
-	HostedWorkspaces() (int, error)
-	Save(report model.TelemetryReport) error
-	// SelfHosted sums the newest reports seen since the given time.
-	SelfHosted(since time.Time) (int, model.Counts, error)
-}
-
-type telemetryRepository struct {
+// Telemetry counts what this control plane runs and keeps the reports of
+// others.
+type Telemetry struct {
 	db *sqlx.DB
 }
 
-func NewTelemetryRepository(db *sqlx.DB) TelemetryRepository {
-	return &telemetryRepository{db: db}
+func NewTelemetry(db *sqlx.DB) *Telemetry {
+	return &Telemetry{db: db}
 }
 
-func (r *telemetryRepository) InstanceID() (string, error) {
+// InstanceID returns the random ID of this control plane, made once.
+func (r *Telemetry) InstanceID() (string, error) {
 	var id string
 	err := r.db.Get(&id, `SELECT id FROM instance LIMIT 1`)
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -45,7 +35,9 @@ func (r *telemetryRepository) InstanceID() (string, error) {
 	return id, err
 }
 
-func (r *telemetryRepository) Counts() (model.Counts, error) {
+// Counts counts what this control plane runs: registered servers, apps
+// with a live release and every deploy.
+func (r *Telemetry) Counts() (model.Counts, error) {
 	var counts model.Counts
 	err := r.db.Get(&counts, `
 		SELECT
@@ -56,13 +48,14 @@ func (r *telemetryRepository) Counts() (model.Counts, error) {
 	return counts, err
 }
 
-func (r *telemetryRepository) HostedWorkspaces() (int, error) {
+// HostedWorkspaces counts the workspaces with at least one server.
+func (r *Telemetry) HostedWorkspaces() (int, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(DISTINCT workspace_id) FROM servers WHERE agent_token_hash IS NOT NULL`)
 	return count, err
 }
 
-func (r *telemetryRepository) Save(report model.TelemetryReport) error {
+func (r *Telemetry) Save(report model.TelemetryReport) error {
 	_, err := r.db.Exec(`
 		INSERT INTO telemetry (instance_id, version, servers, apps, deploys, seen_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -73,7 +66,8 @@ func (r *telemetryRepository) Save(report model.TelemetryReport) error {
 	return err
 }
 
-func (r *telemetryRepository) SelfHosted(since time.Time) (int, model.Counts, error) {
+// SelfHosted sums the newest reports seen since the given time.
+func (r *Telemetry) SelfHosted(since time.Time) (int, model.Counts, error) {
 	var sum struct {
 		Instances int `db:"instances"`
 		model.Counts

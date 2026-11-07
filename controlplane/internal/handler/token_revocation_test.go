@@ -37,7 +37,7 @@ func newTokenRevocationTest(t *testing.T) *tokenRevocationTest {
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	test := &tokenRevocationTest{mailer: mailer}
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),
@@ -47,8 +47,8 @@ func newTokenRevocationTest(t *testing.T) *tokenRevocationTest {
 		subscriptions,
 		email,
 	)
-	test.auth = service.NewAuthService(users, repository.NewTokenRepository(database), repository.NewSessionRepository(database), workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	userService := service.NewUserService(users, service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage()), email, workspaces)
+	test.auth = service.NewAuthService(users, repository.NewTokens(database), repository.NewSessionRepository(database), workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	userService := service.NewUserService(users, service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage()), email, workspaces)
 	test.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
 	test.login = NewAuthHandler(test.auth, userService, workspaces, &config.Config{})
 	test.auth.UseAPITokens(test.tokens)

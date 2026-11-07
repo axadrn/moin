@@ -140,7 +140,7 @@ func TestAuthMiddlewarePrefersImpersonationAndFallsBackToOperator(t *testing.T) 
 		t.Fatalf("fallback cleared cookies = %#v", cookies)
 	}
 
-	adminService := service.NewAdminService(repository.NewAdminRepository(database), repository.NewUsers(database), authService, []string{"operator@example.com"})
+	adminService := service.NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), authService, []string{"operator@example.com"})
 	adminRequest := httptest.NewRequest(http.MethodGet, "/admin", nil)
 	ctx := ctxkeys.WithUser(adminRequest.Context(), operator.User)
 	ctx = ctxkeys.WithSession(ctx, operatorSession)
@@ -258,7 +258,7 @@ func TestWithWorkspaceLoadsWorkspaceAndRejectsCrossTenantAccess(t *testing.T) {
 	alice := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-alice", Name: "Alice"})
 	bob := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-bob", Name: "Bob"})
 	users := repository.NewUsers(database)
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),
@@ -311,7 +311,7 @@ func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
 		t.Fatalf("delete fixture subscription: %v", err)
 	}
 	users := repository.NewUsers(database)
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),
@@ -341,9 +341,9 @@ func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
 
 func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.UserService, *service.SubscriptionService) {
 	userRepository := repository.NewUsers(database)
-	subscriptionRepository := repository.NewSubscriptionRepository(database)
-	fileService := service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
-	subscriptionService := service.NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))
+	subscriptionRepository := repository.NewSubscriptions(database)
+	fileService := service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
+	subscriptionService := service.NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 	emailService := service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	workspaceService := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
@@ -356,7 +356,7 @@ func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.U
 	)
 	authService := service.NewAuthService(
 		userRepository,
-		repository.NewTokenRepository(database),
+		repository.NewTokens(database),
 		repository.NewSessionRepository(database),
 		workspaceService,
 		emailService,

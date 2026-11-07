@@ -86,11 +86,11 @@ func New(cfg *config.Config) (*App, error) {
 	}()
 
 	users := repository.NewUsers(database)
-	tokens := repository.NewTokenRepository(database)
+	tokens := repository.NewTokens(database)
 	sessions := repository.NewSessionRepository(database)
-	files := repository.NewFileRepository(database)
-	subscriptions := repository.NewSubscriptionRepository(database)
-	adminEvents := repository.NewAdminRepository(database)
+	files := repository.NewFiles(database)
+	subscriptions := repository.NewSubscriptions(database)
+	adminEvents := repository.NewAdmin(database)
 	workspaces := repository.NewWorkspaceRepository(database)
 	members := repository.NewWorkspaceMemberRepository(database)
 	invitations := repository.NewWorkspaceInvitationRepository(database)
@@ -205,7 +205,7 @@ func New(cfg *config.Config) (*App, error) {
 		BetaService:         beta,
 		PaymentService:      paymentProvider,
 		// Only a self-hosted control plane reports; the hosted one counts.
-		TelemetryService: service.NewTelemetryService(repository.NewTelemetryRepository(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
+		TelemetryService: service.NewTelemetryService(repository.NewTelemetry(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
 		// Only a self-hosted control plane offers updates; the Deploy
 		// workflow updates the hosted one.
 		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, workspaceAuditEvents),

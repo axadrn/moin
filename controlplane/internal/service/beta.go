@@ -21,11 +21,11 @@ type BetaService struct {
 	open          bool
 	admins        map[string]struct{}
 	invitations   repository.WorkspaceInvitationRepository
-	subscriptions repository.SubscriptionRepository
+	subscriptions *repository.Subscriptions
 	now           func() time.Time
 }
 
-func NewBetaService(open bool, adminEmails []string, invitations repository.WorkspaceInvitationRepository, subscriptions repository.SubscriptionRepository) *BetaService {
+func NewBetaService(open bool, adminEmails []string, invitations repository.WorkspaceInvitationRepository, subscriptions *repository.Subscriptions) *BetaService {
 	admins := make(map[string]struct{}, len(adminEmails))
 	for _, address := range adminEmails {
 		admins[strings.ToLower(strings.TrimSpace(address))] = struct{}{}
