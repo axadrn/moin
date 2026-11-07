@@ -77,7 +77,7 @@ templ APITokenList(view APITokensView) {
 				}
 			}
 			for _, token := range view.Tokens {
-				<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden" data-api-token-row={ token.ID }>
+				@kit.RowControl(templ.Attributes{"data-api-token-row": token.ID}) {
 					<div class="min-w-0 flex-1">
 						<div class="flex min-w-0 items-center gap-2">
 							<span class="truncate font-medium">{ token.Name }</span>
@@ -97,7 +97,7 @@ templ APITokenList(view APITokensView) {
 					}) {
 						Revoke
 					}
-				</div>
+				}
 			}
 		}
 	</div>

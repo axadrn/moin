@@ -303,21 +303,18 @@ templ docsButton(href, label, class string) {
 	}
 }
 
-// switchForm is a switch that saves itself (DESIGN.md, Feedback): a change
+// switchForm is a switch that saves itself (DESIGN.md, Feedback), a row of
+// a kit.List: its words and the switch with the id switchID. A change
 // posts the switch, as "on", to action, which saves only that and answers
-// this form as stored. The switch is disabled while it saves, so a second
-// click cannot overtake the first.
-templ switchForm(id, action string) {
-	<form id={ id } hx-post={ action } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+// this row as stored. The switch is disabled while it saves, so a second
+// click cannot overtake the first; its id keeps the focus on it when the
+// answer swaps the row.
+templ switchForm(id, action, switchID, name, note string, on bool) {
+	@kit.RowForm(templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
 		@csrf.Token()
-		{ children... }
-	</form>
-}
-
-// savedSwitch is the switch of a switchForm. Its id keeps the focus on it
-// when the answer swaps the form.
-templ savedSwitch(id string, on bool) {
-	@kit.Switch(templ.Attributes{"id": id, "name": "on", "value": "1", "checked": on})
+		@kit.RowLabel(switchID, name, note)
+		@kit.Switch(templ.Attributes{"id": switchID, "name": "on", "value": "1", "checked": on})
+	}
 }
 
 // docsLink is the quiet link from an empty state to its guide.

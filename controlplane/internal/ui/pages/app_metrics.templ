@@ -225,12 +225,11 @@ func rangeLabel(name string) string {
 // serverStat is one number of the server now: its name and a note left,
 // the value right.
 templ serverStat(name, note, value string) {
-	@kit.Row("") {
-		@kit.RowText(name, note)
+	@kit.RowFact(name, note) {
 		if value != "" {
-			<span class="shrink-0 font-medium tabular-nums">{ value }</span>
+			{ value }
 		} else {
-			<span class="shrink-0 text-muted-foreground">—</span>
+			—
 		}
 	}
 }
@@ -279,7 +278,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 					}
 				}
 				for _, app := range apps {
-					<a href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/metrics") } role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 outline-none before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:bg-foreground/4 hover:before:opacity-0 focus-visible:bg-foreground/4 [&:hover+*]:before:opacity-0" data-app-metrics-row={ app.Name }>
+					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
 						if now := app.Now; now != nil {
 							@kit.RowText(app.Name, "CPU "+percentText(now.CPU)+" · network "+rateText(now.NetRx+now.NetTx))
 							<span class="shrink-0 font-medium tabular-nums">{ bytesText(float64(now.MemoryUsed)) }</span>
@@ -287,8 +286,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 							@kit.RowText(app.Name, "")
 							<span class="shrink-0 text-sm text-muted-foreground">not running</span>
 						}
-						<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-					</a>
+					}
 				}
 			}
 		</div>

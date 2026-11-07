@@ -102,6 +102,13 @@ Every page is a full page load; there is no hx-boost and no client router.
 - **One tab bar per page at most** (`kit.Segmented`). A second level is a
   list that drills down to its own page ("‹ shop" back), never a second tab
   bar. Filters that only narrow (a time range) are a `kit.Select`.
+- **Tabs only on an app's top level.** App, Deploys, Domains, Logs, Data
+  and Settings have the app's head and its tabs. Anything one level deeper
+  is a page of its own, the same on a phone and the desktop: one back
+  link that names the page one level up, its own title, no app head, no
+  tabs, no trail ("Data › postgres-db"). A database is "‹ Data" /
+  "postgres-db", its table "‹ postgres-db" / "comments", the metrics
+  "‹ blog" / "Metrics", the uptime "‹ Domains" / "Uptime".
 - **On a phone** an app's sections are a list on its first page, each row
   with its value ("Deploys · v12 live ›"); on the desktop they are the tab
   bar. The same links either way.
@@ -148,10 +155,19 @@ Rules every page follows:
   iOS), `kit.Section` (a quiet title over a list), `kit.Grid` (cards side by
   side, as high as the highest), `kit.Field`, `kit.Input`, `kit.Select`,
   `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.Command`.
-- **Only what does something lights up.** A row that opens a page or does
-  something lights up under the mouse and ends in a chevron or names its
-  action; a row that only tells (a version, a fact) stays still. The kit
-  does it: `kit.Row` with an href, `kit.RowButton`.
+- **One list, a few kinds of row.** Every group of rows is a `kit.List`;
+  a page never draws a row of its own. Only what does something lights up,
+  and the lines next to a lit row give way so the light fills the gap:
+
+  | Row | Kit | Looks |
+  | --- | --- | --- |
+  | opens something | `kit.Row(href)`, `kit.RowAttrs`; another site `kit.RowExternal`; more in place `kit.RowMore` | lights up, ends in a chevron (↗ and a new tab for another site) |
+  | does something | `kit.RowButton` | lights up, names its action, no chevron |
+  | is picked | `kit.RowPick`, a radio of a form | the picked one is lit like under the mouse and ends in a check; no ring, no border |
+  | only tells | `kit.Row("")`, `kit.RowFact` | still: no light, the lines stay |
+  | holds a control | `kit.RowControl`, `kit.RowForm`, with `kit.RowLabel` | still: the switch, select or field is what you press |
+
+  `/dev/kit` shows each kind.
 - **Icons only in the catalog.** A catalog app shows its logo
   (`kit.AppIcon`) where you browse and pick; your own apps go by their
   names everywhere else.

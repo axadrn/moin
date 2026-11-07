@@ -70,9 +70,9 @@ templ DevKit() {
 				}
 			}
 			@kit.Section("Tabs", nil) {
-				@kit.Segmented("kit-tabs", "Sections", []kit.Segment{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#", Key: "d"}, {Label: "Addresses", Href: "#", Key: "o"}, {Label: "Logs", Href: "#", Key: "l"}})
+				@kit.Segmented("kit-tabs", "Sections", []kit.Segment{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#", Key: "d"}, {Label: "Domains", Href: "#", Key: "o"}, {Label: "Logs", Href: "#", Key: "l"}})
 			}
-			@kit.Section("List", nil) {
+			@kit.Section("Rows that open", nil) {
 				@kit.List() {
 					@kit.Row("#") {
 						@kit.RowText("A row that opens a page", "")
@@ -81,17 +81,85 @@ templ DevKit() {
 						@kit.RowText("With a second line", "Only when there is something to say")
 						<span class="text-sm text-muted-foreground">value</span>
 					}
-					<label role="listitem" class="relative flex min-h-16 items-center gap-3 px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border">
-						<span class="flex-1 font-medium">A switch</span>
-						@kit.Switch(templ.Attributes{"checked": true})
-					</label>
-					<label role="listitem" class="relative flex min-h-16 items-center gap-3 px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border">
-						<span class="flex-1 font-medium">Off, and one that cannot change</span>
-						@kit.Switch(nil)
-						@kit.Switch(templ.Attributes{"disabled": true})
-					</label>
+					@kit.RowExternal("https://example.com") {
+						@kit.RowText("Another site", "In a new tab")
+					}
+					@kit.RowMore("2 more") {
+						@kit.Row("") {
+							@kit.RowText("Opened in place", "")
+						}
+						@kit.Row("#") {
+							@kit.RowText("A row in it that opens", "")
+						}
+					}
+				}
+			}
+			@kit.Section("Rows that do", nil) {
+				@kit.List() {
+					@kit.RowButton(false, nil) {
+						<span class="font-medium">Back up now</span>
+					}
 					@kit.RowButton(true, nil) {
 						<span class="font-medium">Remove</span>
+					}
+				}
+			}
+			@kit.Section("Rows that are picked", nil) {
+				<form>
+					@kit.List() {
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "a"}) {
+							@kit.RowText("Nov 7, 09:00 UTC", "Hourly · 2.1 MB")
+						}
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "b", "checked": true}) {
+							@kit.RowText("Nov 7, 08:00 UTC", "Hourly · 2.0 MB")
+						}
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "c"}) {
+							@kit.RowText("Nov 6, 23:12 UTC", "By hand · 1.9 MB")
+						}
+					}
+				</form>
+			}
+			@kit.Section("Rows that tell", nil) {
+				@kit.List() {
+					@kit.RowFact("Version", "") {
+						v1.0.0
+					}
+					@kit.RowFact("Last 24 hours", "182 ms on average") {
+						99.98%
+					}
+					@kit.Row("") {
+						@kit.RowText("A row with its own parts", "Still, its lines stay")
+					}
+				}
+			}
+			@kit.Section("Rows that hold a control", nil) {
+				@kit.List() {
+					@kit.RowControl(nil) {
+						@kit.RowLabel("kit-switch", "A switch", "")
+						@kit.Switch(templ.Attributes{"id": "kit-switch", "checked": true})
+					}
+					@kit.RowControl(nil) {
+						@kit.RowLabel("kit-switch-off", "Off, and one that cannot change", "")
+						@kit.Switch(templ.Attributes{"id": "kit-switch-off"})
+						@kit.Switch(templ.Attributes{"disabled": true, "aria-label": "Cannot change"})
+					}
+					@kit.RowForm(nil) {
+						@kit.RowLabel("kit-provider", "Provider", "")
+						<div class="w-36 shrink-0">
+							@kit.Select(kit.SelectProps{ID: "kit-provider", Name: "provider", Label: "Provider", Options: []kit.Option{{Value: "nip.io", Label: "nip.io"}, {Value: "sslip.io", Label: "sslip.io"}}, Value: "nip.io"})
+						</div>
+					}
+					@kit.RowForm(nil) {
+						<div class="min-w-0 flex-1">
+							@kit.Field("Add a domain", "kit-row-domain", "") {
+								@kit.Inline() {
+									@kit.Input(templ.Attributes{"id": "kit-row-domain", "placeholder": "shop.example.com"})
+									@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button"}) {
+										Add
+									}
+								}
+							}
+						</div>
 					}
 				}
 			}

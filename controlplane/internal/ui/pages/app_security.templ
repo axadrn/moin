@@ -139,9 +139,8 @@ templ securityState(view SecurityView, securityPath string) {
 // securityFact is a row of what the agent set up: the name and a note
 // left, the value right.
 templ securityFact(name, note, value string) {
-	@kit.Row("") {
-		@kit.RowText(name, note)
-		<span class="max-w-1/2 shrink-0 truncate text-right font-mono text-sm text-muted-foreground">{ value }</span>
+	@kit.RowFact(name, note) {
+		<span class="font-mono">{ value }</span>
 	}
 }
 
@@ -149,7 +148,8 @@ templ securityFact(name, note, value string) {
 // cannot be turned on and says what it needs.
 templ securityToggle(name, title, note string, on, locked bool, lockedNote string) {
 	{{ id := "security-" + strings.ReplaceAll(name, "_", "-") }}
-	@switchRow(id, title, utils.IfElse(locked && !on, lockedNote, note)) {
+	@kit.RowControl(nil) {
+		@kit.RowLabel(id, title, utils.IfElse(locked && !on, lockedNote, note))
 		@kit.Switch(templ.Attributes{"id": id, "name": name, "value": "1", "checked": on, "disabled": locked && !on, "data-toggle": name})
 	}
 }

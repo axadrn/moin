@@ -90,24 +90,21 @@ templ bucketPanel(bucket service.Bucket) {
 
 // bucketFact is one fact of a bucket: its name left, the value right.
 templ bucketFact(name, value string, mono bool, attributes templ.Attributes) {
-	@kit.Row("") {
-		<span class="shrink-0 font-medium">{ name }</span>
-		<span class={ "min-w-0 flex-1 truncate text-right text-sm text-muted-foreground", templ.KV("font-mono", mono) } { attributes... }>{ value }</span>
+	@kit.RowFact(name, "") {
+		<span class={ templ.KV("font-mono", mono) } { attributes... }>{ value }</span>
 	}
 }
 
-// bucketDisclosure is a row of a List that opens what is under it, a form,
-// in place: a native details, so there is no script.
+// bucketDisclosure is a row of a List that opens a form under it, in
+// place (kit.RowMore).
 templ bucketDisclosure(label string) {
-	<details class="group/open relative before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden">
-		<summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-3xl px-5 py-3 font-medium outline-none hover:bg-foreground/4 focus-visible:bg-foreground/4 [&::-webkit-details-marker]:hidden">
-			<span class="flex-1">{ label }</span>
-			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground transition-transform group-open/open:rotate-90"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-		</summary>
-		<div class="px-5 pt-2 pb-5">
-			{ children... }
-		</div>
-	</details>
+	@kit.RowMore(label) {
+		@kit.RowControl(nil) {
+			<div class="min-w-0 flex-1 pt-1 pb-2">
+				{ children... }
+			</div>
+		}
+	}
 }
 
 // bucketAdd adds a bucket. Without any bucket its form is open.

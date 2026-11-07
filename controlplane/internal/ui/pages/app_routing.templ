@@ -37,9 +37,9 @@ templ AppRouting(view RoutingView) {
 					@canonicalRow(options, view.App.Canonical, routingPath)
 				}
 				if fromCompose(view.Checks) {
-					<div role="listitem" class={ routingRow } data-domains-from-compose>
+					@kit.RowAttrs("", templ.Attributes{"data-domains-from-compose": true}) {
 						<p class="min-w-0 flex-1 text-sm text-muted-foreground">Change them in compose.yml (<span class="font-mono">x-moin.domains</span>) and deploy.</p>
-					</div>
+					}
 				} else {
 					@addDomainRow(routingPath)
 				}
@@ -50,22 +50,15 @@ templ AppRouting(view RoutingView) {
 	</div>
 }
 
-// routingRow is a row of a kit.List that holds a form or a control: the
-// same height, edge and line as kit.Row.
-const routingRow = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden"
-
-// routingFieldRow is a row of a kit.List that holds a field with its label.
-const routingFieldRow = "relative block w-full rounded-3xl px-5 pt-3 pb-5 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden"
-
 // canonicalRow picks the domain the others redirect to; it saves itself.
 templ canonicalRow(options []kit.Option, canonical, routingPath string) {
-	<form role="listitem" class={ routingRow } hx-post={ routingPath + "/canonical" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML" data-canonical>
+	@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/canonical", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "data-canonical": true}) {
 		@csrf.Token()
-		<label for="canonical-domain" class="min-w-0 flex-1 font-medium">Canonical</label>
+		@kit.RowLabel("canonical-domain", "Canonical", "")
 		<div class="w-44 shrink-0 sm:w-64">
 			@kit.Select(kit.SelectProps{ID: "canonical-domain", Name: "domain", Label: "Canonical domain", Options: options, Value: canonical})
 		</div>
-	</form>
+	}
 }
 
 // domainRow is one domain: its name, a quiet word for what it is
@@ -73,7 +66,7 @@ templ canonicalRow(options []kit.Option, canonical, routingPath string) {
 // and its actions. On a phone the actions go under the name when they do
 // not fit next to it.
 templ domainRow(check service.DomainCheck, appName, routingPath string) {
-	<div role="listitem" data-domain={ check.Domain } class={ routingRow, "flex-wrap" }>
+	@kit.RowControl(templ.Attributes{"data-domain": check.Domain}) {
 		<div class="min-w-36 flex-1">
 			<a href={ templ.SafeURL("https://" + check.Domain) } target="_blank" rel="noopener" class="block truncate font-medium underline-offset-4 hover:underline">{ check.Domain }</a>
 			if note := domainNote(check); note != "" {
@@ -127,14 +120,15 @@ templ domainRow(check service.DomainCheck, appName, routingPath string) {
 				</button>
 			}
 		</div>
-	</div>
+	}
 }
 
 // addDomainRow is the field that adds a domain, to the main service or to
 // another service of compose.yml.
 templ addDomainRow(routingPath string) {
-	<form role="listitem" class={ routingFieldRow } hx-post={ routingPath + "/add" } hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find button[type='submit']">
+	@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/add", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}) {
 		@csrf.Token()
+		<div class="min-w-0 flex-1 pb-2">
 		@kit.Field("Add a domain", "domain-name", "") {
 			@kit.Inline() {
 				@kit.Input(templ.Attributes{"id": "domain-name", "name": "domain", "type": "text", "placeholder": "shop.example.com", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})
@@ -147,7 +141,8 @@ templ addDomainRow(routingPath string) {
 				}
 			}
 		}
-	</form>
+		</div>
+	}
 }
 
 // instantSection is the instant address: a switch, where it is or why the
@@ -158,7 +153,7 @@ templ instantSection(view RoutingView, routingPath string) {
 	@kit.Section("Instant address", nil) {
 		<div data-instant>
 			@kit.List() {
-				<form role="listitem" class={ routingRow } hx-post={ routingPath + "/instant" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+				@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
 					@csrf.Token()
 					<input type="hidden" name="switch" value="1"/>
 					<div class="min-w-0 flex-1">
@@ -171,32 +166,27 @@ templ instantSection(view RoutingView, routingPath string) {
 						}
 					</div>
 					@kit.Switch(templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true})
-				</form>
+				}
 				if on {
-					<form role="listitem" class={ routingRow } hx-post={ routingPath + "/instant" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML" data-instant-provider>
+					@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "data-instant-provider": true}) {
 						@csrf.Token()
-						<label for="instant-provider" class="min-w-0 flex-1 font-medium">Provider</label>
+						@kit.RowLabel("instant-provider", "Provider", "")
 						<div class="w-36 shrink-0">
 							@kit.Select(kit.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
 						</div>
-					</form>
+					}
 					if instant.URL != "" {
-						<form role="listitem" class={ routingRow } hx-post={ routingPath + "/instant-password" } hx-trigger="change" hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+						@kit.RowForm(templ.Attributes{"hx-post": routingPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
 							@csrf.Token()
 							<input type="hidden" name="password" value="1"/>
-							<label for="instant-password-on" class="min-w-0 flex-1 cursor-pointer">
-								<span class="block font-medium">Password</span>
-								if note := instantSignIn(instant); note != "" {
-									<span class="block truncate text-sm text-muted-foreground">{ note }</span>
-								}
-							</label>
+							@kit.RowLabel("instant-password-on", "Password", instantSignIn(instant))
 							@kit.Switch(templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open})
-						</form>
+						}
 						if !instant.Open && !instant.OwnPassword {
 							if instant.Password != "" {
-								<div role="listitem" class={ routingRow }>
+								@kit.Row("") {
 									<span class="min-w-0 flex-1 truncate font-mono text-sm select-all" data-instant-password>{ instant.Password }</span>
-								</div>
+								}
 							} else {
 								@kit.RowButton(false, templ.Attributes{"hx-get": routingPath + "?show=true", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}) {
 									<span class="font-medium">Show password</span>
@@ -232,14 +222,11 @@ templ passwordSection(app model.App, routingPath string) {
 				}
 			}
 		} else {
-			<div class="group/protect">
-				@kit.List() {
-					<label role="listitem" class={ routingRow, "cursor-pointer" }>
-						<span class="min-w-0 flex-1 font-medium">Ask for a password</span>
-						@kit.Switch(templ.Attributes{"id": "protect-on", "aria-controls": "protect-form"})
-					</label>
-					<form id="protect-form" role="listitem" class={ routingRow, "hidden flex-col items-stretch gap-4 group-has-[#protect-on:checked]/protect:flex" } hx-post={ routingPath + "/protect" } hx-target="#app-routing" hx-swap="outerHTML" hx-disable="find button[type='submit']">
+			@kit.List() {
+				@kit.RowMore("Ask for a password") {
+					@kit.RowForm(templ.Attributes{"id": "protect-form", "hx-post": routingPath + "/protect", "hx-target": "#app-routing", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}) {
 						@csrf.Token()
+						<div class="flex min-w-0 flex-1 flex-col gap-4 pt-1 pb-2">
 						<div class="grid gap-4 sm:grid-cols-2">
 							@kit.Field("Username", "protect-user", "") {
 								@kit.Input(templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": "moin", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})
@@ -253,9 +240,10 @@ templ passwordSection(app model.App, routingPath string) {
 								Set password
 							}
 						</div>
-					</form>
+						</div>
+					}
 				}
-			</div>
+			}
 		}
 	}
 }

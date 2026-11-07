@@ -15,7 +15,18 @@ templ Section(title string, action templ.Component) {
 }
 
 // List is a group of rows on one card, a thin line between two rows, inset
-// like iOS; a hovered row lights up inside the card.
+// like iOS. Its rows are of a few kinds, and only what does something
+// lights up (DESIGN.md, Pages):
+//
+//   - opens something: Row with an href (a chevron), RowExternal (↗, a new
+//     tab), RowMore (opens what is under it in place);
+//   - does something: RowButton;
+//   - is picked: RowPick, a radio of a form;
+//   - only tells: Row without an href, RowFact;
+//   - holds a control (a switch, a select, a field): RowControl, or
+//     RowForm when the row is the form.
+//
+// A lit row and the lines next to it give way, so the light fills the gap.
 templ List() {
 	<div class="flex flex-col rounded-4xl bg-card p-1.5" role="list">
 		{ children... }
@@ -23,35 +34,139 @@ templ List() {
 }
 
 // Row is one line of a List. With an href the whole row is a link and ends
-// in a chevron. The first child is the main part; status and actions go
-// after it.
+// in a chevron; without one it only tells and stays still. The first child
+// is the main part; status and values go after it.
 templ Row(href string) {
+	@RowAttrs(href, nil) {
+		{ children... }
+	}
+}
+
+// RowAttrs is a Row with attributes on the row: data-* for tests and
+// scripts, and aria-current on a link lights it as the one that is open
+// (the deploy whose log shows).
+templ RowAttrs(href string, attributes templ.Attributes) {
 	if href != "" {
-		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + rowLit }>
+		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + rowLit } { attributes... }>
 			{ children... }
-			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+			@chevron()
 		</a>
 	} else {
-		<div role="listitem" class={ rowClass }>
+		<div role="listitem" class={ rowClass } { attributes... }>
 			{ children... }
 		</div>
 	}
 }
 
-const rowClass = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden"
-
-// rowLit is what a row that does something adds: it lights up under the
-// mouse, and the lines around it give way. A row that only tells stays
-// still (DESIGN.md, Pages).
-const rowLit = " outline-none hover:bg-foreground/4 hover:before:opacity-0 focus-visible:bg-foreground/4 active:bg-foreground/7 [&:hover+*]:before:opacity-0"
+// RowExternal is a Row that opens another site, in a new tab: it ends in ↗
+// instead of the chevron.
+templ RowExternal(href string) {
+	<a href={ templ.SafeURL(href) } target="_blank" rel="noopener" role="listitem" class={ rowClass + rowLit }>
+		{ children... }
+		<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="M5.5 10.5 10.5 5.5M6.5 5.5h4v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+		<span class="sr-only">(opens in a new tab)</span>
+	</a>
+}
 
 // RowButton is a Row that does something on the page instead of opening
 // one: Attributes carry hx-post and the like. Danger makes its words red.
+// It names its action, so it has no chevron.
 templ RowButton(danger bool, attributes templ.Attributes) {
 	<button type="button" role="listitem" class={ rowClass + rowLit, templ.KV("text-failed", danger) } { attributes... }>
 		{ children... }
 	</button>
 }
+
+// RowPick is a Row to pick one of a List, inside a form: a radio with the
+// row as its label. Attributes go on the radio (name, value, checked). The
+// picked row is lit like a row under the mouse and shows a check at its
+// end; the lines next to it give way the same way.
+templ RowPick(attributes templ.Attributes) {
+	<label role="listitem" class={ rowClass + rowLit + pickLit }>
+		<input type="radio" autocomplete="off" class="peer sr-only" { attributes... }/>
+		{ children... }
+		<svg aria-hidden="true" viewBox="0 0 16 16" class="invisible size-4 shrink-0 peer-checked:visible"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+	</label>
+}
+
+// RowControl is a Row that holds a control: a switch, a select, a field,
+// buttons of its own. It stays still, as the control is what you press.
+// Start it with RowLabel, so a tap on its words works the control. On a
+// narrow phone what does not fit next to the words goes under them.
+templ RowControl(attributes templ.Attributes) {
+	<div role="listitem" class={ rowClass + rowControl } { attributes... }>
+		{ children... }
+	</div>
+}
+
+// RowForm is a RowControl that is the form: a switch or a select that
+// saves itself (hx-trigger "change"), a field with its button. Attributes
+// carry the form's htmx.
+templ RowForm(attributes templ.Attributes) {
+	<form role="listitem" class={ rowClass + rowControl } { attributes... }>
+		{ children... }
+	</form>
+}
+
+// RowLabel is the words of a RowControl: a name, a second line only when
+// there is something to say, as the label of the control with id forID.
+templ RowLabel(forID, name, note string) {
+	<label for={ forID } class="min-w-0 flex-1 cursor-pointer">
+		<span class="block font-medium">{ name }</span>
+		if note != "" {
+			<span class="block text-sm text-muted-foreground">{ note }</span>
+		}
+	</label>
+}
+
+// RowFact is a Row that only tells: a name (and a note) left, its value
+// (children) right, quiet, like iOS Settings, About.
+templ RowFact(name, note string) {
+	<div role="listitem" class={ rowClass }>
+		@RowText(name, note)
+		<span class="max-w-1/2 shrink-0 truncate text-right text-sm text-muted-foreground tabular-nums">
+			{ children... }
+		</span>
+	</div>
+}
+
+// RowMore is a Row that opens what is under it in place, a native
+// details: its label lights up like a RowButton, and its chevron turns
+// down while it is open. Children are rows.
+templ RowMore(label string) {
+	<details class={ "group/more relative " + rowLine + " has-[>summary:hover]:before:opacity-0 has-[>summary:focus-visible]:before:opacity-0 [&:has(>summary:hover)+*]:before:opacity-0 [&:has(>summary:hover)>div>:first-child]:before:opacity-0" }>
+		<summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-3xl px-5 py-3 font-medium outline-none hover:bg-foreground/4 focus-visible:bg-foreground/4 active:bg-foreground/7 [&::-webkit-details-marker]:hidden">
+			<span class="min-w-0 flex-1 truncate">{ label }</span>
+			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground transition-transform group-open/more:rotate-90"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+		</summary>
+		<div class="flex flex-col [&>:first-child]:before:block!">
+			{ children... }
+		</div>
+	</details>
+}
+
+templ chevron() {
+	<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+}
+
+// rowLine is the thin line over every row but the first, inset like iOS.
+const rowLine = "before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden"
+
+const rowClass = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left " + rowLine
+
+// rowLit is what a row that does something adds: it lights up under the
+// mouse, on the keys and as the one open (aria-current), and the lines
+// around it give way. A row that only tells stays still (DESIGN.md,
+// Pages).
+const rowLit = " outline-none hover:bg-foreground/4 hover:before:opacity-0 focus-visible:bg-foreground/4 focus-visible:before:opacity-0 active:bg-foreground/7 [&[aria-current]]:bg-foreground/4 [&[aria-current]]:before:opacity-0 [&:hover+*]:before:opacity-0 [&:focus-visible+*]:before:opacity-0 [&[aria-current]+*]:before:opacity-0"
+
+// pickLit lights a RowPick while it is picked or has the keys, the same
+// light as under the mouse, never a ring.
+const pickLit = " cursor-pointer has-checked:bg-foreground/4 has-checked:before:opacity-0 has-focus-visible:bg-foreground/4 has-focus-visible:before:opacity-0 [&:has(:checked)+*]:before:opacity-0 [&:has(:focus-visible)+*]:before:opacity-0"
+
+// rowControl lets what does not fit next to a control row's words go
+// under them.
+const rowControl = " flex-wrap"
 
 // RowText is the main part of a Row: a name, and a second line only when
 // there is something to say.
