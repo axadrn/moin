@@ -1,34 +1,26 @@
 package layouts
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
+// Admin is the shell of the operator pages: the same quiet bar as the
+// panel (h-16, the wordmark back into the panel), and the page under it.
+// The pages bring their own panelPage, so their titles sit where every
+// other title sits.
 templ Admin(title string) {
 	@Base(SEOProps{Title: title, Description: "Operator administration", Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
-		<div class="min-h-screen bg-background">
-			<header class="sticky top-0 z-20 border-b bg-background">
-				<div class={ kit.Page, "flex h-12 items-center gap-3" }>
-					<a href="/admin" class="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
-						@blocks.Wordmark("text-[1.125rem] leading-none")
-						<span class="text-sm font-medium text-muted-foreground">Admin</span>
-					</a>
-					<div class="ml-auto flex items-center gap-2">
-						@blocks.ThemeSwitcher()
-						@button.Button(button.Props{Href: "/app", Variant: button.VariantSecondary, Size: button.SizeSm}) {
-							@icon.ArrowLeft(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
-							Back to the panel
-						}
-					</div>
-				</div>
-			</header>
-			<main class={ kit.Page, "pt-6 pb-16" }>
-				{ children... }
-			</main>
+		<header id="app-bar" class="moin-bar sticky top-0 z-40 bg-background/85 backdrop-blur-xl">
+			<div class={ kit.Page, "flex h-16 items-center gap-1" }>
+				<a href="/app" class="mr-3 flex shrink-0 items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
+					@blocks.Wordmark("text-xl leading-none")
+				</a>
+			</div>
+		</header>
+		<div id="main">
+			{ children... }
 		</div>
 	}
 }
