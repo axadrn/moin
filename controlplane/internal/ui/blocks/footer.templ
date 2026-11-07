@@ -6,21 +6,22 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
-// Footer is the site footer in columns, like a product's: the wordmark and
-// the promise, then Product, Docs, Open source and Company, then a line with
-// the company and the maker. The maker's other open source projects sit in
-// the Open source column next to moin, as one family.
+// Footer is the site footer: the wordmark and the promise, then Product,
+// Docs, Open source and Company, then a line with the company and the
+// maker. The maker's other open source projects sit in the Open source
+// column next to moin, as one family.
 templ Footer() {
-	<footer class="border-t border-border">
-		<div class="mx-auto max-w-[1240px] px-4 pt-14 pb-10 sm:px-8 sm:pt-20">
+	<footer class="bg-card">
+		<div class={ kit.Page, "pt-14 pb-10 sm:pt-20" }>
 			<div class="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4 lg:grid-cols-[1.6fr_repeat(4,1fr)]">
 				<div class="col-span-2 sm:col-span-4 lg:col-span-1">
-					<a href="/" class="inline-block text-[26px] leading-none" aria-label={ brand.Name + " home" }>
+					<a href="/" class="inline-block text-2xl leading-none" aria-label={ brand.Name + " home" }>
 						@Wordmark()
 					</a>
-					<p class="mt-5 text-sm leading-6 text-muted-foreground">
+					<p class="mt-5 text-sm text-muted-foreground">
 						Deploy anything.
 						<br/>
 						Lose nothing.
@@ -47,14 +48,19 @@ templ Footer() {
 					@footerOut("https://goilerplate.com/?ref=moin-footer", "goilerplate")
 				}
 				@footerColumn("Company") {
-					@footerLink("/#why-moin", "Why "+brand.Name)
+					@footerLink("/docs/why-moin", "Why "+brand.Name)
 					@footerLink("/legal/terms", "Terms")
 					@footerLink("/legal/privacy", "Privacy")
 				}
 			</div>
-			<div class="mt-14 flex flex-col gap-2 border-t border-border pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+			<div class="mt-12 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
 				<span>© { strconv.Itoa(time.Now().Year()) } { brand.Company }</span>
-				<span>Made by <a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="text-foreground underline-offset-4 hover:underline">Axel Adrian</a></span>
+				<span class="flex items-center justify-between gap-4">
+					<span>Made by <a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="text-foreground underline-offset-4 hover:underline">Axel Adrian</a></span>
+					<span class="lg:hidden">
+						@ThemeSwitcher(ThemeSwitcherProps{Class: "size-11 rounded-full bg-muted text-muted-foreground hover:text-foreground"})
+					</span>
+				</span>
 			</div>
 		</div>
 		@FooterNewsletter()
@@ -63,17 +69,17 @@ templ Footer() {
 
 templ footerColumn(title string) {
 	<nav aria-label={ title }>
-		<p class="text-sm font-semibold text-foreground">{ title }</p>
-		<ul class="mt-4 flex flex-col gap-3 text-sm text-muted-foreground">
+		<p class="text-sm font-medium text-foreground">{ title }</p>
+		<ul class="mt-2 flex flex-col text-sm text-muted-foreground">
 			{ children... }
 		</ul>
 	</nav>
 }
 
 templ footerLink(href, label string) {
-	<li><a href={ templ.SafeURL(href) } class="transition-colors hover:text-foreground">{ label }</a></li>
+	<li><a href={ templ.SafeURL(href) } class="flex min-h-11 items-center hover:text-foreground">{ label }</a></li>
 }
 
 templ footerOut(href, label string) {
-	<li><a href={ templ.SafeURL(href) } target="_blank" rel="noopener" class="transition-colors hover:text-foreground">{ label }</a></li>
+	<li><a href={ templ.SafeURL(href) } target="_blank" rel="noopener" class="flex min-h-11 items-center hover:text-foreground">{ label }</a></li>
 }

@@ -1,573 +1,129 @@
 package pages
 
 import (
-	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/breadcrumb"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/separator"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/sidebar"
-	"github.com/axadrn/moin/controlplane/internal/ui/icons"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.DocPage, nextPage *model.DocPage) {
-	{{ cfg := ctxkeys.RenderConfig(ctx) }}
-	@layouts.Base(layouts.SEOProps{
-		Title:        fmt.Sprintf("%s · Docs", currentPage.Title),
-		Description:  currentPage.Description,
-		Path:         ctxkeys.URLPath(ctx),
-		MarkdownPath: docsMarkdownURL(currentPage),
-		Public:       true,
+// DocsHome is /docs, like a support site: the search on top, then every
+// page under its topic, as grouped rows. No sidebar: a topic is a list, a
+// page is a row.
+templ DocsHome(groups []model.DocGroup) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        "Docs",
+		Description:  "Get started, every guide and the reference of moin.",
+		Path:         "/docs",
+		MarkdownPath: "/docs.md",
 	}) {
-		@sidebar.Provider() {
-			@sidebar.Sidebar() {
-				@sidebar.Header(sidebar.HeaderProps{Class: "h-14 justify-center border-b px-4"}) {
-					<a href="/" class="flex items-center gap-2.5 text-[19px] leading-none">
-						@blocks.Wordmark()
-						@badge.Badge(badge.Props{Class: "h-auto leading-normal rounded-full bg-secondary px-2.5 py-1 text-[12px] font-semibold text-muted-foreground"}) {
-							Docs
-						}
-						@blocks.BetaBadge("")
-					</a>
-				}
-				@sidebar.Content(sidebar.ContentProps{Class: "pt-2"}) {
-					@renderDocsNav(docsTree, currentPage)
-				}
-				@sidebar.Footer(sidebar.FooterProps{Class: "border-t"}) {
-					@sidebar.Menu() {
-						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: blocks.GitHubURL, Size: sidebar.MenuButtonSizeSm, Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-								@icons.Github(icons.Props{Class: "size-4"})
-								<span>GitHub</span>
-							}
-						}
-						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/llms.txt", Size: sidebar.MenuButtonSizeSm, Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-								@icon.FileText(icon.Props{Class: "size-4"})
-								<span>llms.txt</span>
-							}
-						}
-						if cfg.SupportEmail != "" {
-							@sidebar.MenuItem() {
-								@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "mailto:" + cfg.SupportEmail, Size: sidebar.MenuButtonSizeSm}) {
-									@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
-									<span>Support</span>
+		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{}, "Docs")
+			@docsSearchField()
+			<div class="grid items-start gap-8 md:grid-cols-2">
+				for _, group := range groups {
+					@kit.Section(group.Title, nil) {
+						@kit.List() {
+							for _, page := range group.Pages {
+								@kit.Row(docsPageURL(page)) {
+									@kit.RowText(page.Title, "")
 								}
 							}
 						}
 					}
 				}
-				@sidebar.Rail()
+			</div>
+		</main>
+		@docsSearch(groups)
+	}
+}
+
+// Docs is one page: the way back, the title, the text in a column short
+// enough to read, and a row to the next page at the end.
+templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        page.Title + " · Docs",
+		Description:  page.Description,
+		Path:         ctxkeys.URLPath(ctx),
+		MarkdownPath: docsMarkdownURL(page),
+	}) {
+		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title) {
+				<button type="button" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:ml-auto">
+					@icon.Search(icon.Props{Class: "size-5"})
+				</button>
 			}
-			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background"}) {
-				// Top Navigation Bar
-				<header class="sticky top-0 z-10 bg-background">
-					<div class="flex h-14 items-center gap-3 px-4 sm:px-6">
-						@sidebar.Trigger()
-						@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-4 data-vertical:self-auto"})
-						@templ.Fragment("docs-breadcrumb") {
-							<div id="docs-breadcrumb" class="min-w-0 flex-1 overflow-hidden" hx-swap-oob="true">
-								@breadcrumb.Breadcrumb() {
-									@breadcrumb.List(breadcrumb.ListProps{Class: "min-w-0 flex-nowrap"}) {
-										@breadcrumb.Item(breadcrumb.ItemProps{Class: "hidden sm:inline-flex"}) {
-											@breadcrumb.Link(breadcrumb.LinkProps{Href: "/"}) {
-												{ brand.Name }
-											}
-										}
-										@breadcrumb.Item() {
-											@breadcrumb.Separator(breadcrumb.SeparatorProps{Class: "hidden sm:inline-flex"})
-											if docsPageURL(currentPage) != "/docs" {
-												@breadcrumb.Link(breadcrumb.LinkProps{Href: "/docs"}) {
-													Docs
-												}
-											} else {
-												@breadcrumb.Page() {
-													Docs
-												}
-											}
-										}
-										if docsPageURL(currentPage) != "/docs" {
-											@breadcrumb.Item(breadcrumb.ItemProps{Class: "min-w-0"}) {
-												@breadcrumb.Separator()
-												@breadcrumb.Page(breadcrumb.ItemProps{Class: "block min-w-0 truncate"}) {
-													{ currentPage.Title }
-												}
-											}
-										}
-									}
-								}
-							</div>
+			<article class="max-w-2xl min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
+				@blocks.Typeset(page.HTMLContent)
+			</article>
+			<div class="flex max-w-2xl flex-col gap-3">
+				if next != nil {
+					@kit.List() {
+						@kit.Row(docsPageURL(next)) {
+							<div class="min-w-0 flex-1 truncate font-medium"><span class="text-muted-foreground">Next: </span>{ next.Title }</div>
 						}
-						// The right side never shrinks; the breadcrumb takes what is left
-						// and truncates, so nothing overlaps on a phone.
-						<div class="ml-auto flex shrink-0 items-center gap-1">
-							@docsSearch(docsTree)
-							@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIconSm, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": "moin on GitHub"}}) {
-								@icons.Github(icons.Props{Class: "size-4"})
-							}
-							@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground hover:text-foreground"})
-							if ctxkeys.User(ctx) != nil {
-								@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Class: "ml-1.5 text-[13.5px]"}) {
-									Dashboard
-								}
-							} else {
-								@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Class: "ml-1.5 text-[13.5px]"}) {
-									Deploy now
-								}
-							}
-						</div>
-					</div>
-				</header>
-				<div class="xl:grid xl:grid-cols-[minmax(0,1fr)_15rem]">
-					<div class="min-w-0">
-						<main class="min-h-[calc(100svh-3.5rem)]">
-							// Documentation content with the partial-navigation target wrapper
-							<div class="mx-auto max-w-[46rem] px-5 pt-10 pb-16 sm:px-8 sm:pt-14 xl:mx-0 xl:ml-[max(2rem,calc((100%-46rem)/2))]" id="docs-content-wrapper">
-								@templ.Fragment("docs-content") {
-									// Documentation Content
-									<article id="docs-content" style="--docs-heading-offset: 80px;">
-										// Page Title
-										<div class="mb-10 border-b border-border pb-8">
-											<h1 class="font-display text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-balance sm:text-[2.6rem]">{ currentPage.Title }</h1>
-											if currentPage.Description != "" {
-												<p class="mt-3 text-lg leading-7 text-muted-foreground text-pretty">{ currentPage.Description }</p>
-											}
-											@docsPageActions(currentPage)
-										</div>
-										// Content
-										<div class="[&_h2]:scroll-mt-[var(--docs-heading-offset)] [&_h3]:scroll-mt-[var(--docs-heading-offset)]">
-											@blocks.Typeset(currentPage.HTMLContent)
-										</div>
-										// Navigation Footer
-										if prevPage != nil || nextPage != nil {
-											<nav class="mt-16 grid gap-3 sm:grid-cols-2" aria-label="Pages">
-												if prevPage != nil {
-													@docsPager(prevPage, "Previous", false)
-												} else {
-													<span class="hidden sm:block"></span>
-												}
-												if nextPage != nil {
-													@docsPager(nextPage, "Next", true)
-												}
-											</nav>
-										}
-									</article>
-								}
-							</div>
-						</main>
-						<footer class="border-t border-border">
-							<div class="mx-auto flex max-w-[46rem] flex-col gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 xl:mx-0 xl:ml-[max(2rem,calc((100%-46rem)/2))]">
-								<a href="/" class="text-[18px] leading-none">
-									@blocks.Wordmark()
-								</a>
-								<div class="flex flex-wrap gap-x-5 gap-y-2">
-									if cfg.Billing {
-										<a href="/#pricing" class="transition-colors hover:text-foreground">Pricing</a>
-									}
-									<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="transition-colors hover:text-foreground">GitHub</a>
-									if cfg.Billing {
-										<a href="/legal/terms" class="transition-colors hover:text-foreground">Terms</a>
-										<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
-									}
-								</div>
-							</div>
-						</footer>
-					</div>
-					@renderPageTOC(currentPage.Headings)
-				</div>
-			}
-			// Partial-navigation active state updater
-			<script nonce={ templ.GetNonce(ctx) }>
-				let docsTOCScrollHandler = null;
-				// A clicked TOC entry stays active until the reader scrolls
-				// themselves, even when the page cannot scroll it to the top.
-				let pinnedDocsTOCId = null;
-				document.addEventListener('click', event => {
-					const link = event.target.closest('[data-docs-toc-link]');
-					if (!link) return;
-					pinnedDocsTOCId = link.dataset.docsTocLink;
-					setActiveDocsTOCLink(pinnedDocsTOCId);
-				});
-				['wheel', 'touchmove', 'keydown'].forEach(type => {
-					window.addEventListener(type, () => { pinnedDocsTOCId = null; }, { passive: true });
-				});
-
-				document.addEventListener('click', async event => {
-					const button = event.target.closest('[data-docs-copy]');
-					if (!button) return;
-					const response = await fetch(button.dataset.docsCopy, { headers: { Accept: 'text/markdown' } });
-					if (!response.ok) return;
-					await navigator.clipboard.writeText(await response.text());
-					button.querySelector('[data-copy-default]')?.classList.add('hidden');
-					button.querySelector('[data-copy-success]')?.classList.remove('hidden');
-					window.setTimeout(() => {
-						button.querySelector('[data-copy-default]')?.classList.remove('hidden');
-						button.querySelector('[data-copy-success]')?.classList.add('hidden');
-					}, 1600);
-				});
-
-				// Surfaces blocks (Web | CLI | TUI | API | MCP tabs) share one
-				// choice: picking a surface opens it on every block of the page,
-				// and the browser keeps it for the next pages and visits. This
-				// script lives outside the swapped docs content and runs once
-				// per document, so its listener stays.
-				const surfaceKey = 'moin-docs-surface';
-				function showSurface(value, picked) {
-					if (!/^[a-z]+$/.test(value || '')) return;
-					// The block that was clicked stays where it is on the screen
-					// while the blocks above it change height.
-					const top = picked?.getBoundingClientRect().top;
-					document.querySelectorAll('[data-surfaces]').forEach(root => {
-						if (root === picked) return;
-						if (root.querySelector(`[data-slot="tabs-trigger"][data-templ-value="${value}"]`)) {
-							window.templ?.tabs?.setActive(root, value);
-						}
-					});
-					if (picked) window.scrollBy(0, picked.getBoundingClientRect().top - top);
-				}
-				function initSurfaces() {
-					let value = null;
-					try { value = localStorage.getItem(surfaceKey); } catch {}
-					showSurface(value, null);
-				}
-				document.addEventListener('tabs-value-change', event => {
-					if (!event.target.hasAttribute?.('data-surfaces')) return;
-					try { localStorage.setItem(surfaceKey, event.detail.value); } catch {}
-					showSurface(event.detail.value, event.target);
-				});
-
-				document.addEventListener('htmx:after:settle', event => {
-					if (event.target?.id === 'docs-content-wrapper') {
-						document.dispatchEvent(new CustomEvent('moin:docs:navigated'));
 					}
-				});
-
-				function setActiveDocsTOCLink(activeId) {
-					document.querySelectorAll('[data-docs-toc-link]').forEach(link => {
-						const isActive = link.dataset.docsTocLink === activeId;
-
-						link.classList.toggle('text-foreground', isActive);
-						link.classList.toggle('font-medium', isActive);
-						link.classList.toggle('text-muted-foreground', !isActive);
-
-						if (isActive) {
-							link.setAttribute('aria-current', 'location');
-						} else {
-							link.removeAttribute('aria-current');
-						}
-					});
 				}
-
-				function initDocsTOC() {
-					const tocLinks = Array.from(document.querySelectorAll('[data-docs-toc-link]'));
-					if (docsTOCScrollHandler) {
-						window.removeEventListener('scroll', docsTOCScrollHandler);
-						docsTOCScrollHandler = null;
-					}
-
-					if (!tocLinks.length) {
-						return;
-					}
-
-					const headings = tocLinks
-						.map(link => document.getElementById(link.dataset.docsTocLink || ''))
-						.filter(Boolean);
-
-					if (!headings.length) {
-						return;
-					}
-
-					const activationOffset = parseInt(
-						getComputedStyle(document.getElementById('docs-content'))
-							.getPropertyValue('--docs-heading-offset'),
-						10,
-					) || 96;
-
-					const updateActiveDocsTOC = () => {
-						if (pinnedDocsTOCId) {
-							setActiveDocsTOCLink(pinnedDocsTOCId);
-							return;
-						}
-						// Near the end of a page the last headings never reach the
-						// top, so the line that activates them slides down to the
-						// bottom of the window over the last half screen of scrolling.
-						const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-						const tail = Math.min(maxScroll, window.innerHeight / 2);
-						const progress = tail > 0 ? Math.max(0, 1 - (maxScroll - window.scrollY) / tail) : 0;
-						const line = activationOffset + (window.innerHeight - activationOffset) * progress;
-						let activeId = headings[0]?.id ?? '';
-						for (const heading of headings) {
-							if (heading.getBoundingClientRect().top <= line) {
-								activeId = heading.id;
-							} else {
-								break;
-							}
-						}
-
-						setActiveDocsTOCLink(activeId);
-					};
-
-					pinnedDocsTOCId = null;
-					docsTOCScrollHandler = updateActiveDocsTOC;
-					window.addEventListener('scroll', docsTOCScrollHandler, { passive: true });
-					updateActiveDocsTOC();
-				}
-
-				// Update active states after partial navigation.
-				document.addEventListener('moin:docs:navigated', () => {
-					const currentPath = window.location.pathname;
-					
-					// Update all sidebar menu buttons
-					document.querySelectorAll('[data-sidebar="menu-button"]').forEach(button => {
-						const href = button.getAttribute('href');
-						if (href) {
-							if (href === currentPath) {
-								button.setAttribute('data-active', '');
-							} else {
-								button.removeAttribute('data-active');
-							}
-						}
-					});
-					
-					// Update all sidebar menu sub-buttons
-					document.querySelectorAll('[data-sidebar="menu-sub-button"]').forEach(button => {
-						const href = button.getAttribute('href');
-						if (href) {
-							if (href === currentPath) {
-								button.setAttribute('data-active', '');
-							} else {
-								button.removeAttribute('data-active');
-							}
-						}
-					});
-
-					initDocsTOC();
-					initSurfaces();
-					window.scrollTo(0, 0);
-
-					window.templ?.sidebar?.setOpenMobile(false);
-				});
-
-				initDocsTOC();
-				// The component bundle loads deferred, after this script on the
-				// first load: the tabs API is there by DOMContentLoaded.
-				if (window.templ?.tabs) initSurfaces();
-				else document.addEventListener('DOMContentLoaded', initSurfaces, { once: true });
-			</script>
-		}
+				<p class="px-1 text-xs text-muted-foreground">
+					<a href={ templ.SafeURL(docsMarkdownURL(page)) } class="underline-offset-4 hover:text-foreground hover:underline">This page as Markdown</a>
+				</p>
+			</div>
+		</main>
+		@docsSearch(groups)
+		@docsSurfaces()
 		@blocks.HighlightScripts()
 	}
 }
 
-// Helper function to check if a node or any of its descendants contains the current page
-func nodeContainsCurrentPage(node *model.DocPage, currentPage *model.DocPage) bool {
-	if node.Slug == currentPage.Slug {
-		return true
-	}
-	for _, child := range node.Children {
-		if nodeContainsCurrentPage(child, currentPage) {
-			return true
-		}
-	}
-	return false
-}
-
-func docsPageURL(node *model.DocPage) string {
-	if node == nil || node.Slug == "" || node.Slug == "introduction" {
+func docsPageURL(page *model.DocPage) string {
+	if page == nil || page.Slug == "" {
 		return "/docs"
 	}
-	return "/docs/" + node.Slug
+	return "/docs/" + page.Slug
 }
 
-func docsMarkdownURL(node *model.DocPage) string {
-	return docsPageURL(node) + ".md"
+func docsMarkdownURL(page *model.DocPage) string {
+	return docsPageURL(page) + ".md"
 }
 
-// docsActionClasses keeps the page actions quiet next to the headline.
-const docsActionClasses = "text-[12.5px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+// docsSurfacesOnce keeps the script of the surfaces blocks once on a page.
+var docsSurfacesOnce = templ.NewOnceHandle()
 
-templ docsPageActions(node *model.DocPage) {
-	<div class="mt-5 flex flex-wrap items-center gap-2">
-		@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Class: docsActionClasses, Attributes: templ.Attributes{"data-docs-copy": docsMarkdownURL(node)}}) {
-			<span data-copy-default>
-				@icon.Copy(icon.Props{Class: "size-3.5"})
-			</span>
-			<span data-copy-success class="hidden text-live">
-				@icon.Check(icon.Props{Class: "size-3.5"})
-			</span>
-			Copy page
-		}
-		@button.Button(button.Props{Href: docsMarkdownURL(node), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Class: docsActionClasses, Attributes: templ.Attributes{"rel": "noopener"}}) {
-			@icon.FileText(icon.Props{Class: "size-3.5"})
-			Markdown
-		}
-	</div>
-}
-
-templ docsPager(page *model.DocPage, label string, next bool) {
-	<a
-		href={ templ.SafeURL(docsPageURL(page)) }
-		hx-get={ docsPageURL(page) }
-		hx-target="#docs-content-wrapper"
-		hx-push-url="true"
-		hx-swap="innerHTML"
-		hx-sync="#docs-content-wrapper:replace"
-		hx-status:4xx="swap:none push:false"
-		hx-status:5xx="swap:none push:false"
-		class={ "group flex flex-col gap-1 rounded-4xl bg-card px-6 py-5 transition-opacity hover:opacity-80", templ.KV("sm:items-end sm:text-right", next) }
-	>
-		<span class="text-[13px] text-muted-foreground">{ label }</span>
-		<span class="flex items-center gap-1.5 font-medium">
-			if !next {
-				@icon.ArrowLeft(icon.Props{Class: "size-3.5 text-muted-foreground transition-transform group-hover:-translate-x-0.5"})
-			}
-			{ page.Title }
-			if next {
-				@icon.ArrowRight(icon.Props{Class: "size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5"})
-			}
-		</span>
-	</a>
-}
-
-templ renderDocsNav(node *model.DocPage, currentPage *model.DocPage) {
-	@sidebar.Group() {
-		@sidebar.GroupLabel() {
-			Overview
-		}
-		@sidebar.GroupContent() {
-			@sidebar.Menu() {
-				for _, child := range node.Children {
-					if len(child.Children) == 0 {
-						@renderDocsMenuLeaf(child, currentPage)
-					}
-				}
-			}
-		}
-	}
-	for _, child := range node.Children {
-		if len(child.Children) > 0 {
-			@renderDocsSection(child, currentPage)
-		}
-	}
-}
-
-templ renderDocsSection(node *model.DocPage, currentPage *model.DocPage) {
-	@sidebar.Group() {
-		@sidebar.GroupLabel() {
-			{ node.Title }
-		}
-		@sidebar.GroupContent() {
-			@sidebar.Menu() {
-				for _, child := range node.Children {
-					if len(child.Children) > 0 {
-						@renderDocsCollapsibleMenu(child, currentPage)
-					} else {
-						@renderDocsMenuLeaf(child, currentPage)
-					}
-				}
-			}
-		}
-	}
-}
-
-templ renderDocsCollapsibleMenu(node *model.DocPage, currentPage *model.DocPage) {
-	@collapsible.Collapsible(collapsible.Props{
-		DefaultOpen: nodeContainsCurrentPage(node, currentPage),
-		Class:       "group/collapsible",
-	}) {
-		@sidebar.MenuItem() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{
-				IsActive:   nodeContainsCurrentPage(node, currentPage),
-				Attributes: collapsible.Trigger(ctx),
-			}) {
-				<span>{ node.Title }</span>
-				@icon.ChevronRight(icon.Props{Class: "ml-auto size-4 transition-transform duration-200 group-data-open/collapsible:rotate-90"})
-			}
-			@collapsible.Content() {
-				@sidebar.MenuSub() {
-					for _, child := range node.Children {
-						@sidebar.MenuSubItem() {
-							@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
-								Href:     docsPageURL(child),
-								IsActive: ctxkeys.URLPath(ctx) == docsPageURL(child),
-								Attributes: templ.Attributes{
-									"hx-get":        docsPageURL(child),
-									"hx-target":     "#docs-content-wrapper",
-									"hx-push-url":   "true",
-									"hx-swap":       "innerHTML",
-									"hx-sync":       "#docs-content-wrapper:replace",
-									"hx-status:4xx": "swap:none push:false",
-									"hx-status:5xx": "swap:none push:false",
-								},
-							}) {
-								{ child.Title }
-							}
+// docsSurfaces makes the surfaces blocks (Web | CLI | TUI | API | MCP tabs)
+// share one choice: picking a surface opens it on every block of the page,
+// and the browser keeps it for the next pages. The block that was clicked
+// stays where it is on the screen while the blocks above it change height.
+templ docsSurfaces() {
+	@docsSurfacesOnce.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			(() => {
+				const key = "moin-docs-surface";
+				const show = (value, picked) => {
+					if (!/^[a-z]+$/.test(value || "") || !window.templ?.tabs) return;
+					const top = picked?.getBoundingClientRect().top;
+					document.querySelectorAll("[data-surfaces]").forEach((root) => {
+						if (root !== picked && root.querySelector(`[data-slot="tabs-trigger"][data-templ-value="${value}"]`)) {
+							window.templ.tabs.setActive(root, value);
 						}
-					}
-				}
-			}
-		}
-	}
-}
-
-templ renderDocsMenuLeaf(node *model.DocPage, currentPage *model.DocPage) {
-	@sidebar.MenuItem() {
-		@sidebar.MenuButton(sidebar.MenuButtonProps{
-			Href:     docsPageURL(node),
-			IsActive: ctxkeys.URLPath(ctx) == docsPageURL(node),
-			Attributes: templ.Attributes{
-				"hx-get":        docsPageURL(node),
-				"hx-target":     "#docs-content-wrapper",
-				"hx-push-url":   "true",
-				"hx-swap":       "innerHTML",
-				"hx-sync":       "#docs-content-wrapper:replace",
-				"hx-status:4xx": "swap:none push:false",
-				"hx-status:5xx": "swap:none push:false",
-			},
-		}) {
-			<span>{ node.Title }</span>
-		}
-	}
-}
-
-templ renderPageTOC(headings []model.DocHeading) {
-	@templ.Fragment("docs-toc") {
-		if len(headings) > 0 {
-			<aside id="docs-toc" class="hidden self-stretch xl:block" hx-swap-oob="true">
-				<div class="sticky top-14 max-h-[calc(100svh-3.5rem)] overflow-y-auto pl-6 pr-4 pt-14 pb-10">
-					<p class="mb-3 text-[13px] font-semibold">On this page</p>
-					<nav class="flex flex-col gap-0.5 border-l border-border">
-						for _, heading := range headings {
-							if heading.Level == 3 {
-								<a
-									href={ fmt.Sprintf("#%s", heading.ID) }
-									data-docs-toc-link={ heading.ID }
-									class="-ml-px block border-l border-transparent py-1 pl-6 text-[13px] leading-5 text-muted-foreground transition-colors hover:text-foreground aria-[current=location]:border-foreground aria-[current=location]:text-foreground"
-								>
-									{ heading.Text }
-								</a>
-							} else {
-								<a
-									href={ fmt.Sprintf("#%s", heading.ID) }
-									data-docs-toc-link={ heading.ID }
-									class="-ml-px block border-l border-transparent py-1 pl-3 text-[13px] leading-5 text-muted-foreground transition-colors hover:text-foreground aria-[current=location]:border-foreground aria-[current=location]:text-foreground"
-								>
-									{ heading.Text }
-								</a>
-							}
-						}
-					</nav>
-				</div>
-			</aside>
-		} else {
-			<aside id="docs-toc" class="hidden" hx-swap-oob="true"></aside>
-		}
+					});
+					if (picked) window.scrollBy(0, picked.getBoundingClientRect().top - top);
+				};
+				document.addEventListener("tabs-value-change", (event) => {
+					if (!event.target.hasAttribute?.("data-surfaces")) return;
+					try { localStorage.setItem(key, event.detail.value); } catch {}
+					show(event.detail.value, event.target);
+				});
+				const restore = () => {
+					let value = null;
+					try { value = localStorage.getItem(key); } catch {}
+					show(value, null);
+				};
+				// The component bundle loads deferred, after this script.
+				if (window.templ?.tabs) restore();
+				else document.addEventListener("DOMContentLoaded", restore, { once: true });
+			})();
+		</script>
 	}
 }

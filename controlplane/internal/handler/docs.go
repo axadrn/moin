@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
@@ -16,52 +18,55 @@ func NewDocsHandler(docsService *service.DocsService) *DocsHandler {
 	handler := &DocsHandler{
 		docsService: docsService,
 	}
-
-	// Build the docs tree on initialization
-	err := handler.docsService.BuildDocsTree()
-	if err != nil {
-		// Silently continue. Docs might be added later
-		_ = err
-	}
-
+	// Docs might be added later: a page that is missing says so.
+	_ = handler.docsService.BuildDocsTree()
 	return handler
 }
 
+// ShowDocs is the docs: /docs the topics with every page, /docs/<slug> one
+// page, and either with .md its Markdown. Every link is a full page load.
 func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	slug := ""
-	markdown := strings.HasSuffix(path, ".md")
-	if markdown {
-		path = strings.TrimSuffix(path, ".md")
-	} else {
-		w.Header().Add("Vary", "HX-Request")
-	}
+	markdown := strings.HasSuffix(r.URL.Path, ".md")
+	slug := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, ".md"), "/docs"), "/")
 
-	if path != "/docs" && path != "/docs/" {
-		slug = strings.TrimPrefix(path, "/docs/")
-		slug = strings.TrimSuffix(slug, "/")
+	if _, err := h.docsService.DocsTree(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Docs unavailable", "The docs could not be loaded. Try again."))
+		return
 	}
-	if slug == "introduction" {
-		target := "/docs"
+	groups := h.docsService.Groups()
+
+	if slug == "" {
 		if markdown {
-			target = "/docs.md"
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+			_, _ = w.Write([]byte(docsIndexMarkdown(groups)))
+			return
+		}
+		render(w, r, pages.DocsHome(groups))
+		return
+	}
+	// The introduction became Get started.
+	if slug == "introduction" {
+		target := "/docs/getting-started"
+		if markdown {
+			target += ".md"
 		}
 		http.Redirect(w, r, target, http.StatusPermanentRedirect)
 		return
 	}
-	// Get the requested page
 	page, err := h.docsService.DocPage(slug)
 	if err != nil {
 		if markdown {
-			http.Error(w, "Documentation page not found", http.StatusNotFound)
-			return
-		}
-		if isAction(r) {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "Docs page not found", http.StatusNotFound)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
 		render(w, r, pages.NotFound())
+		return
+	}
+	// A folder (guides, reference) is no page: its pages are on the home.
+	if len(page.Children) > 0 {
+		http.Redirect(w, r, "/docs", http.StatusFound)
 		return
 	}
 	if markdown {
@@ -69,25 +74,24 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(page.Content))
 		return
 	}
+	_, next := h.docsService.PrevNextPages(page)
+	render(w, r, pages.Docs(page, groups, next))
+}
 
-	// Get the full docs tree for navigation
-	docsTree, err := h.docsService.DocsTree()
-	if err != nil {
-		if isAction(r) {
-			answerFailed(w, r, "Documentation unavailable", "The documentation could not be loaded. Please try again.")
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Documentation unavailable", "The documentation could not be loaded. Please try again."))
+// docsIndexMarkdown is /docs.md: every page under its topic, linked to its
+// Markdown.
+func docsIndexMarkdown(groups []model.DocGroup) string {
+	var b strings.Builder
+	b.WriteString("# Docs\n")
+	for _, group := range groups {
+		fmt.Fprintf(&b, "\n## %s\n\n", group.Title)
+		for _, page := range group.Pages {
+			fmt.Fprintf(&b, "- [%s](/docs/%s.md)", page.Title, page.Slug)
+			if page.Description != "" {
+				fmt.Fprintf(&b, ": %s", page.Description)
+			}
+			b.WriteString("\n")
 		}
-		return
 	}
-
-	// Get previous and next pages
-	prevPage, nextPage := h.docsService.PrevNextPages(page)
-
-	if isAction(r) {
-		renderFragment(w, r, pages.Docs(page, docsTree, prevPage, nextPage), "docs-content", "seo-title", "seo-markdown", "docs-breadcrumb", "docs-toc")
-	} else {
-		render(w, r, pages.Docs(page, docsTree, prevPage, nextPage))
-	}
+	return b.String()
 }

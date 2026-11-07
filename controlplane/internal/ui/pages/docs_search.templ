@@ -1,101 +1,154 @@
 package pages
 
 import (
+	"strings"
+
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	commandmenu "github.com/axadrn/moin/controlplane/internal/ui/components/command"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/dialog"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/kbd"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 )
 
-// docsSearch is the ⌘K search of the docs, the same as shadcn's: the
-// library's command dialog with its fuzzy filter over every page and every
-// section of a page. ⌘K, ctrl+K or "/" opens it; enter goes there.
-templ docsSearch(tree *model.DocPage) {
-	@button.Button(button.Props{
-		Variant:    button.VariantSecondary,
-		Class:      "w-9 px-0 font-normal text-muted-foreground sm:w-56 sm:justify-start sm:px-3",
-		Attributes: utils.MergeAttributes(dialog.TriggerFor("docs-search"), templ.Attributes{"aria-label": "Search the docs", "data-docs-search-open": true}),
-	}) {
-		@icon.Search(icon.Props{Class: "size-4 shrink-0"})
-		<span class="hidden sm:inline">Search the docs…</span>
-		@kbd.Kbd(kbd.Props{Class: "ml-auto hidden sm:inline-flex"}) {
-			⌘K
-		}
-	}
-	@commandmenu.Dialog(commandmenu.DialogProps{
-		ID:          "docs-search",
-		Title:       "Search the docs",
-		Description: "Find a page or a section of the docs",
-		Class:       "top-[15%] sm:max-w-lg",
-	}) {
-		@commandmenu.Command(commandmenu.Props{ID: "docs-search-command", Label: "Search the docs"}) {
-			@commandmenu.Input(commandmenu.InputProps{Placeholder: "Search the docs…"})
-			@commandmenu.List(commandmenu.ListProps{Class: "min-h-80"}) {
-				@commandmenu.Empty() {
-					Nothing found.
-				}
-				@commandmenu.Group(commandmenu.GroupProps{Heading: "Overview"}) {
-					for _, page := range tree.Children {
-						if len(page.Children) == 0 {
-							@docsSearchPage(page)
-						}
-					}
-				}
-				for _, section := range tree.Children {
-					if len(section.Children) > 0 {
-						@commandmenu.Group(commandmenu.GroupProps{Heading: section.Title}) {
-							for _, page := range section.Children {
-								@docsSearchPage(page)
+// docsSearchField is the search on top of the docs home: it looks like a
+// field and opens the search in the middle of the screen.
+templ docsSearchField() {
+	<button type="button" data-docs-search-open aria-keyshortcuts="Meta+K /" class="flex h-11 w-full items-center gap-3 rounded-full bg-card px-5 text-left text-base text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm">
+		@icon.Search(icon.Props{Class: "size-5 shrink-0"})
+		<span class="flex-1">Search the docs</span>
+		<kbd class="hidden font-sans text-xs sm:inline">⌘K</kbd>
+	</button>
+}
+
+// docsSearch is the search over every page and every section of the docs,
+// in the middle of the screen: ⌘K, ctrl+k, / or a search button open it.
+// Every page and section is in the page already, so typing filters at once
+// with no request; the arrows pick, Enter opens, Escape or a click outside
+// closes it.
+templ docsSearch(groups []model.DocGroup) {
+	<dialog id="docs-search" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search the docs">
+		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10">
+			<div class="relative shrink-0">
+				<label for="docs-search-input" class="sr-only">Search the docs</label>
+				@icon.Search(icon.Props{Class: "pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground"})
+				<input
+					id="docs-search-input"
+					type="search"
+					autocomplete="off"
+					spellcheck="false"
+					placeholder="Search the docs"
+					role="combobox"
+					aria-expanded="true"
+					aria-controls="docs-search-results"
+					aria-autocomplete="list"
+					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+				/>
+			</div>
+			<div id="docs-search-results" role="listbox" aria-label="Pages" class="flex flex-col gap-0.5 overflow-y-auto border-t border-border p-1.5">
+				for _, group := range groups {
+					for _, page := range group.Pages {
+						@docsSearchOption(docsPageURL(page), page.Title, group.Title, page.Title+" "+page.Description+" "+group.Title, false)
+						for _, heading := range page.Headings {
+							if heading.Level == 2 {
+								@docsSearchOption(docsPageURL(page)+"#"+heading.ID, heading.Text, page.Title, page.Title+" "+heading.Text, true)
 							}
 						}
 					}
 				}
-			}
-		}
-	}
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			// ⌘K, ctrl+K or "/" opens the search, unless typing somewhere.
-			document.addEventListener("keydown", (event) => {
-				const shortcut = (event.key === "k" && (event.metaKey || event.ctrlKey)) || event.key === "/";
-				const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || event.target.closest("input, textarea, select"));
-				if (!shortcut || typing) return;
-				event.preventDefault();
-				window.templ.dialog.toggle("docs-search");
-			});
-			// Enter or a click goes to the page or section.
-			document.addEventListener("command-select", (event) => {
-				const item = event.target instanceof Element && event.target.closest("#docs-search-command [data-href]");
-				if (!item) return;
-				window.templ.dialog.close("docs-search");
-				window.location.href = item.dataset.href;
-			});
-		})();
-	</script>
+				<p data-docs-search-none hidden class="order-last px-4 py-3 text-sm text-muted-foreground">Nothing found.</p>
+			</div>
+		</div>
+	</dialog>
+	@docsSearchScript()
 }
 
-// docsSearchPage is a page and its sections. The value the fuzzy filter
-// reads holds the title, the description and, for a section, its page.
-templ docsSearchPage(page *model.DocPage) {
-	@commandmenu.Item(commandmenu.ItemProps{
-		Value:      page.Title + " " + page.Description,
-		Attributes: templ.Attributes{"data-href": docsPageURL(page)},
-	}) {
-		@icon.FileText()
-		<span class="truncate">{ page.Title }</span>
-	}
-	for _, heading := range page.Headings {
-		if heading.Level == 2 {
-			@commandmenu.Item(commandmenu.ItemProps{
-				Value:      page.Title + " " + heading.Text,
-				Attributes: templ.Attributes{"data-href": docsPageURL(page) + "#" + heading.ID},
-			}) {
-				@icon.Hash()
-				<span class="truncate"><span class="text-muted-foreground">{ page.Title } › </span>{ heading.Text }</span>
-			}
+// docsSearchOption is a page, or a section of one (shown only once you
+// type). The words it is found by are in data-find.
+templ docsSearchOption(href, name, where, find string, section bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		role="option"
+		aria-selected="false"
+		data-find={ strings.ToLower(find) }
+		if section {
+			data-section
+			hidden
 		}
+		class="flex min-h-11 items-center gap-3 rounded-3xl px-4 py-2 text-sm outline-none aria-selected:bg-foreground/6"
+	>
+		<span class="min-w-0 flex-1 truncate font-medium">{ name }</span>
+		<span class="shrink-0 truncate text-xs text-muted-foreground">{ where }</span>
+	</a>
+}
+
+var docsSearchOnce = templ.NewOnceHandle()
+
+templ docsSearchScript() {
+	@docsSearchOnce.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			(() => {
+				const dialog = () => document.getElementById("docs-search");
+				const field = () => document.getElementById("docs-search-input");
+				const options = () => [...dialog().querySelectorAll("[role=option]")];
+				const shown = () => options().filter((option) => !option.hidden).sort((a, b) => a.style.order - b.style.order);
+				const typing = (target) => target instanceof Element && target.closest("input, textarea, select, [contenteditable]");
+				const pick = (option) => {
+					for (const each of options()) each.setAttribute("aria-selected", String(each === option));
+					option?.scrollIntoView({ block: "nearest" });
+				};
+				// Without words it lists the pages; with words, the pages and
+				// sections that hold every one of them.
+				const filter = () => {
+					const words = field().value.toLowerCase().split(/\s+/).filter(Boolean);
+					const typed = words.join(" ");
+					for (const option of options()) {
+						option.hidden = words.length === 0 ? option.hasAttribute("data-section") : !words.every((word) => option.dataset.find.includes(word));
+						// A name that starts with what you typed comes first,
+						// then pages, then sections.
+						const name = option.firstElementChild.textContent.toLowerCase();
+						option.style.order = typed && name.startsWith(typed) ? 0 : option.hasAttribute("data-section") ? 2 : 1;
+					}
+					dialog().querySelector("[data-docs-search-none]").hidden = shown().length > 0;
+					pick(shown()[0]);
+				};
+				const open = () => {
+					if (!dialog() || dialog().open) return;
+					field().value = "";
+					filter();
+					dialog().showModal();
+					field().focus();
+				};
+				document.addEventListener("click", (event) => {
+					if (event.target.closest("[data-docs-search-open]")) open();
+					else if (event.target === dialog()) dialog().close();
+				});
+				document.addEventListener("input", (event) => {
+					if (event.target === field()) filter();
+				});
+				document.addEventListener("mouseover", (event) => {
+					const option = event.target.closest("#docs-search [role=option]");
+					if (option && option.getAttribute("aria-selected") !== "true") pick(option);
+				});
+				document.addEventListener("keydown", (event) => {
+					if (!dialog()) return;
+					if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
+						event.preventDefault();
+						open();
+						return;
+					}
+					if (event.target !== field()) return;
+					const list = shown();
+					const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
+					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+						event.preventDefault();
+						pick(list[(at + (event.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]);
+					} else if (event.key === "Enter") {
+						event.preventDefault();
+						(list[at] || list[0])?.click();
+					}
+				});
+				// A section on the page you are on only scrolls: close first.
+				document.addEventListener("click", (event) => {
+					if (event.target.closest("#docs-search [role=option]")) dialog().close();
+				});
+			})();
+		</script>
 	}
 }

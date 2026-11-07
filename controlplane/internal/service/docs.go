@@ -132,6 +132,10 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*model.DocPage, err
 		page.Title = s.titleFromSlug(slug)
 	}
 
+	if group, ok := meta["group"].(string); ok {
+		page.Group = group
+	}
+
 	description, ok := meta["description"].(string)
 	if ok {
 		page.Description = description
@@ -282,25 +286,66 @@ func (s *DocsService) DocsTree() (*model.DocPage, error) {
 	return s.docsTree, nil
 }
 
-// FlatDocsList returns all documentation pages in a flat list, in the order they appear in the sidebar
-func (s *DocsService) FlatDocsList() []*model.DocPage {
-	if s.docsTree == nil {
-		return []*model.DocPage{}
-	}
+// docsGroups are the topics of the docs home, in their order. A page names
+// its topic in its front matter (group); a page without one, or with
+// another, goes under "More" at the end.
+var docsGroups = []string{"Start", "Apps", "Every day", "Servers and data", "Team", "Reference"}
 
+// Groups are the pages of the docs home: every page under its topic, the
+// topics in the order of docsGroups, the pages by their order.
+func (s *DocsService) Groups() []model.DocGroup {
+	if s.docsTree == nil {
+		return nil
+	}
+	var leaves []*model.DocPage
+	s.collectPagesInOrder(s.docsTree, &leaves)
+	groups := make([]model.DocGroup, len(docsGroups))
+	for i, title := range docsGroups {
+		groups[i].Title = title
+	}
+	var more []*model.DocPage
+	for _, page := range leaves {
+		at := -1
+		for i, title := range docsGroups {
+			if page.Group == title {
+				at = i
+			}
+		}
+		if at < 0 {
+			more = append(more, page)
+			continue
+		}
+		groups[at].Pages = append(groups[at].Pages, page)
+	}
+	if len(more) > 0 {
+		groups = append(groups, model.DocGroup{Title: "More", Pages: more})
+	}
+	kept := groups[:0]
+	for _, group := range groups {
+		sort.SliceStable(group.Pages, func(i, j int) bool { return group.Pages[i].Order < group.Pages[j].Order })
+		if len(group.Pages) > 0 {
+			kept = append(kept, group)
+		}
+	}
+	return kept
+}
+
+// FlatDocsList is every page in the order of the docs home, so "Next" walks
+// through the docs the way the home lists them.
+func (s *DocsService) FlatDocsList() []*model.DocPage {
 	var pages []*model.DocPage
-	s.collectPagesInOrder(s.docsTree, &pages)
+	for _, group := range s.Groups() {
+		pages = append(pages, group.Pages...)
+	}
 	return pages
 }
 
-// collectPagesInOrder recursively collects all pages in sidebar order
+// collectPagesInOrder collects every page that is no directory, in the
+// order of the tree.
 func (s *DocsService) collectPagesInOrder(node *model.DocPage, pages *[]*model.DocPage) {
-	// Don't add the root node or category pages (nodes with children are categories)
 	if node.Slug != "" && len(node.Children) == 0 {
 		*pages = append(*pages, node)
 	}
-
-	// Add all children recursively
 	for _, child := range node.Children {
 		s.collectPagesInOrder(child, pages)
 	}
