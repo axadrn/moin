@@ -64,6 +64,21 @@ func (s *security) proxyMode() string {
 	return "direct"
 }
 
+// serverConfig answers server.config (ServerConfig) unless the rules say
+// network: locked.
+func (r *runner) serverConfig(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+	var config protocol.ServerConfig
+	if err := message.Decode(&config); err != nil {
+		r.fail(message, err)
+		return
+	}
+	if rules != nil && rules.NetworkLocked {
+		r.fail(message, refused(r.rulesFile, "network: locked"))
+		return
+	}
+	r.send(protocol.TypeServerConfigResult, message.RequestID, r.security.apply(ctx, config))
+}
+
 // apply sets up the proxy, the tunnel, Tailscale and the firewall. A part
 // that fails is reported and the rest still applies; SSH only closes when
 // Tailscale answers.

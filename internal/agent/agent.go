@@ -308,9 +308,6 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 
 // handle runs one request from the control plane.
 func (r *runner) handle(ctx context.Context, message protocol.Message) {
-	fail := func(err error) {
-		r.send(protocol.TypeError, message.RequestID, protocol.Error{Message: err.Error()})
-	}
 	// A rules file with a mistake refuses everything until it is fixed.
 	rules, err := LoadRules(r.rulesFile)
 	if err != nil {
@@ -320,222 +317,49 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 			_ = message.Decode(&start)
 			r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
 		} else if message.RequestID != "" {
-			fail(err)
+			r.fail(message, err)
 		}
 		return
 	}
 	switch message.Type {
 	case protocol.TypeDeployStart:
-		var start protocol.DeployStart
-		if err := message.Decode(&start); err != nil {
-			slog.Error("bad deploy.start", "error", err)
-			return
-		}
-		if err := checkDeploy(rules, r.rulesFile, start); err != nil {
-			slog.Warn("deploy refused", "app", start.App, "number", start.Number, "error", err)
-			r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
-			return
-		}
-		slog.Info("deploy", "app", start.App, "number", start.Number)
-		r.deploying.Add(1)
-		defer r.deploying.Add(-1)
-		r.apps.deploy(ctx, start)
+		r.deployStart(ctx, message, rules)
 	case protocol.TypeLogs:
-		var request protocol.LogsRequest
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if rules != nil && rules.LogsOff {
-			fail(refused(r.rulesFile, "logs: off"))
-			return
-		}
-		result, err := r.apps.logs(ctx, request)
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeLogsResult, message.RequestID, result)
+		r.sendLogs(ctx, message, rules)
 	case protocol.TypeAppRemove:
-		var request protocol.AppRemove
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if err := r.apps.remove(ctx, request.App); err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeOK, message.RequestID, nil)
+		r.removeApp(ctx, message)
 	case protocol.TypeAppStop:
-		var request protocol.AppStop
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if err := r.apps.stop(ctx, request.App); err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeOK, message.RequestID, nil)
+		r.stopApp(ctx, message)
 	case protocol.TypeDBTables:
-		var request protocol.DBRequest
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if rules != nil && rules.DataOff {
-			fail(refused(r.rulesFile, "data: off"))
-			return
-		}
-		result, err := r.apps.tables(ctx, request)
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeDBTablesResult, message.RequestID, result)
+		r.dbTables(ctx, message, rules)
 	case protocol.TypeDBQuery:
-		var request protocol.DBQuery
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if rules != nil && rules.DataOff {
-			fail(refused(r.rulesFile, "data: off"))
-			return
-		}
-		result, err := r.apps.query(ctx, request)
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeDBQueryResult, message.RequestID, result)
+		r.dbQuery(ctx, message, rules)
 	case protocol.TypeServerConfig:
-		var config protocol.ServerConfig
-		if err := message.Decode(&config); err != nil {
-			fail(err)
-			return
-		}
-		if rules != nil && rules.NetworkLocked {
-			fail(refused(r.rulesFile, "network: locked"))
-			return
-		}
-		r.send(protocol.TypeServerConfigResult, message.RequestID, r.security.apply(ctx, config))
+		r.serverConfig(ctx, message, rules)
 	case protocol.TypeBackupConfig:
-		var config protocol.BackupConfig
-		if err := message.Decode(&config); err != nil {
-			fail(err)
-			return
-		}
-		if err := checkStorage(rules, r.rulesFile, config.Storage); err != nil {
-			fail(err)
-			return
-		}
-		for _, storage := range config.AppStorage {
-			if err := checkStorage(rules, r.rulesFile, storage); err != nil {
-				fail(err)
-				return
-			}
-		}
-		kept := r.apps.keepIDs(config.Apps)
-		if err := r.backups.configure(ctx, config.Storage, config.AppStorage); err != nil {
-			fail(err)
-			return
-		}
-		if kept {
-			r.backups.reconcile()
-		}
-		r.send(protocol.TypeOK, message.RequestID, nil)
+		r.backupConfig(ctx, message, rules)
 	case protocol.TypeBackupList:
-		var request protocol.BackupRequest
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		result, err := r.backups.list(ctx, request)
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeBackupsResult, message.RequestID, result)
+		r.backupList(ctx, message)
 	case protocol.TypeBackupRestore:
-		var request protocol.BackupRestore
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		if err := r.backups.restore(ctx, request); err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeOK, message.RequestID, nil)
+		r.backupRestore(ctx, message)
 	case protocol.TypeBackupDownload:
-		var request protocol.BackupRequest
-		if err := message.Decode(&request); err != nil {
-			fail(err)
-			return
-		}
-		file, err := r.backups.download(ctx, request)
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeBackupFile, message.RequestID, file)
+		r.backupDownload(ctx, message)
 	case protocol.TypeExecStart:
-		var start protocol.ExecStart
-		if err := message.Decode(&start); err != nil {
-			fail(err)
-			return
-		}
-		if rules != nil && rules.ExecOff {
-			fail(refused(r.rulesFile, "exec: off"))
-			return
-		}
-		slog.Info("exec", "app", start.App, "service", start.Service)
-		done, err := r.apps.runExec(ctx, start, func(data string) {
-			r.send(protocol.TypeExecOutput, message.RequestID, protocol.ExecOutput{Data: data})
-		})
-		if err != nil {
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeExecDone, message.RequestID, done)
+		r.execStart(ctx, message, rules)
 	case protocol.TypeAgentURL:
-		var moved protocol.AgentURL
-		if err := message.Decode(&moved); err != nil {
-			slog.Error("bad agent.url", "error", err)
-			return
-		}
-		r.move(ctx, moved.URL)
+		r.agentURL(ctx, message)
 	case protocol.TypeAgentUpdate:
-		var update protocol.AgentUpdate
-		if err := message.Decode(&update); err != nil {
-			fail(err)
-			return
-		}
-		// A new binary could allow what the rules stop, so with rules only
-		// the owner updates it, on the server.
-		if rules != nil {
-			fail(fmt.Errorf("this server has rules in %s, so only its owner updates the agent, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH)))
-			return
-		}
-		if r.deploying.Load() > 0 {
-			fail(errors.New("a deploy is running: update the agent when it is done"))
-			return
-		}
-		slog.Info("update", "from", build.Version, "to", update.Version)
-		if err := r.updater.install(ctx, update); err != nil {
-			slog.Error("update failed", "error", err)
-			fail(err)
-			return
-		}
-		r.send(protocol.TypeOK, message.RequestID, nil)
-		r.updater.restart()
+		r.agentUpdate(ctx, message, rules)
 	default:
 		if message.RequestID != "" {
-			fail(fmt.Errorf("this agent does not know %q: update it", message.Type))
+			r.fail(message, fmt.Errorf("this agent does not know %q: update it", message.Type))
 		}
 	}
+}
+
+// fail answers a request with the error that stopped it.
+func (r *runner) fail(message protocol.Message, err error) {
+	r.send(protocol.TypeError, message.RequestID, protocol.Error{Message: err.Error()})
 }
 
 // url is the control plane's address.
@@ -543,6 +367,17 @@ func (r *runner) url() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.state.URL
+}
+
+// agentURL moves to the control plane's new address (AgentURL). It has no
+// answer.
+func (r *runner) agentURL(ctx context.Context, message protocol.Message) {
+	var moved protocol.AgentURL
+	if err := message.Decode(&moved); err != nil {
+		slog.Error("bad agent.url", "error", err)
+		return
+	}
+	r.move(ctx, moved.URL)
 }
 
 // moveCheck is how long the new address has to answer.
