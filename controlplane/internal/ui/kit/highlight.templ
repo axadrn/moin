@@ -48,7 +48,7 @@ templ HighlightScripts() {
 				const text = code ? code.textContent : pre.textContent;
 
 				try {
-					await navigator.clipboard.writeText(text);
+					if (!(await window.moinCopy(text))) return;
 					// Show check icon
 					clipboardSpan.classList.add('hidden');
 					checkSpan.classList.remove('hidden');

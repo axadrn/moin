@@ -281,3 +281,29 @@ document.addEventListener("click", (event) => {
     if (!inside) dialog.close();
   }
 });
+
+// Copy: a [data-copy] button copies its value, or the value or text of the
+// element its data-copy-target selects, and is marked data-copied for a
+// moment, so its icon turns into a check without changing its size. The
+// browser's clipboard works on https and on localhost. moinCopy is there
+// for scripts too.
+window.moinCopy = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy]");
+  if (!button) return;
+  event.preventDefault();
+  const target = button.dataset.copyTarget && document.querySelector(button.dataset.copyTarget);
+  const text = target ? ("value" in target ? target.value : target.textContent).trim() : button.dataset.copy;
+  if (!text || !(await window.moinCopy(text))) return;
+  button.dataset.copied = "";
+  clearTimeout(button.copyTimer);
+  button.copyTimer = setTimeout(() => delete button.dataset.copied, 1400);
+});

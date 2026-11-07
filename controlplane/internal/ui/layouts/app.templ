@@ -52,9 +52,7 @@ templ AppShell(p AppProps) {
 }
 
 // appShellScript adds what every page of the panel shares: copy buttons
-// ([data-copy] copies its value, or the value or text of the element its
-// data-copy-target selects, and is marked data-copied for a moment, so its
-// icon turns into a check without changing its size), the go-to keys (g then h, s, b, y, t, l or ,) and n to
+// (copying with [data-copy] lives in moin.js, for every page), the go-to keys (g then h, s, b, y, t, l or ,) and n to
 // focus the page's main field ([data-hotkey-focus]). / is the search (moin.js).
 templ appShellScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
@@ -80,33 +78,6 @@ templ appShellScript() {
 				markChangelog();
 			});
 			markChangelog();
-			const copy = async (text) => {
-				try {
-					await navigator.clipboard.writeText(text);
-					return true;
-				} catch {
-					const area = document.createElement("textarea");
-					area.value = text;
-					area.style.position = "fixed";
-					area.style.opacity = "0";
-					document.body.appendChild(area);
-					area.select();
-					const done = document.execCommand("copy");
-					area.remove();
-					return done;
-				}
-			};
-			document.addEventListener("click", async (event) => {
-				const button = event.target.closest("[data-copy]");
-				if (!button) return;
-				event.preventDefault();
-				const target = button.dataset.copyTarget && document.querySelector(button.dataset.copyTarget);
-				const text = target ? ("value" in target ? target.value : target.textContent).trim() : button.dataset.copy;
-				if (!text || !(await copy(text))) return;
-				button.dataset.copied = "";
-				clearTimeout(button.copyTimer);
-				button.copyTimer = setTimeout(() => delete button.dataset.copied, 1400);
-			});
 			const places = { h: "/overview", o: "/overview", a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
 			let leader = 0;
 			document.addEventListener("keydown", (event) => {
