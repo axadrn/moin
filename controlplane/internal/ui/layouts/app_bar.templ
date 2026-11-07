@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -22,7 +21,7 @@ templ AppBar() {
 			</a>
 			<span class="flex-1"></span>
 			<button type="button" class="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Search" aria-keyshortcuts="Meta+K /" data-open-palette>
-				@icon.Search(icon.Props{Class: "size-5"})
+				@kit.IconSearch("size-5")
 			</button>
 			if user != nil {
 				<a href={ templ.SafeURL(basePath + "/settings") } class="flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Settings">
@@ -44,7 +43,7 @@ templ palette(basePath string) {
 		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl" data-search>
 			<div class="relative shrink-0">
 				<label for="search" class="sr-only">Search or run a command</label>
-				@icon.Search(icon.Props{Class: "pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground"})
+				@kit.IconSearch("pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground")
 				<input
 					id="search"
 					name="q"

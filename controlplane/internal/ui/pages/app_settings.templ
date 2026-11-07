@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/dialog"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -212,7 +211,7 @@ templ settingsAccountDanger() {
 					<span class="font-medium">Remove password</span>
 				}
 			}
-			@kit.RowButton(true, deleteAccountTrigger()) {
+			@kit.RowButton(true, kit.OpenDialog("delete-account-dialog")) {
 				<span class="font-medium">Delete account</span>
 			}
 		}
@@ -220,48 +219,31 @@ templ settingsAccountDanger() {
 	</div>
 }
 
-// deleteAccountTrigger opens the dialog; RowButton brings the type.
-func deleteAccountTrigger() templ.Attributes {
-	attributes := dialog.TriggerFor("delete-account-dialog")
-	delete(attributes, "type")
-	return attributes
-}
-
 // deleteAccountDialog is the one question of its own (DESIGN.md, Asking
 // first): the server checks the typed DELETE.
 templ deleteAccountDialog() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
-		@dialog.Content(dialog.ContentProps{HideCloseButton: true}) {
-			@dialog.Header() {
-				@dialog.Title() {
-					Delete your account?
+	@kit.Dialog("delete-account-dialog", "Delete your account?", "Your account, picture, sessions and API tokens are deleted. This cannot be undone.") {
+		<form
+			id="delete-account-form"
+			class="flex flex-col gap-5"
+			hx-delete={ basePath + "/account" }
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@csrf.Token()
+			@formField("Type DELETE to confirm", "delete-confirmation", "", "") {
+				@kit.Input(templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "data-delete-confirmation": true})
+			}
+			@kit.DialogButtons() {
+				@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+					Cancel
 				}
-				@dialog.Description() {
-					Your account, picture, sessions and API tokens are deleted. This cannot be undone.
+				@kit.Button(kit.Danger, "", templ.Attributes{"type": "submit", "disabled": true, "data-delete-submit": true}) {
+					Delete my account
 				}
 			}
-			<form
-				id="delete-account-form"
-				class="flex flex-col gap-6"
-				hx-delete={ basePath + "/account" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@csrf.Token()
-				@formField("Type DELETE to confirm", "delete-confirmation", "", "") {
-					@kit.Input(templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "spellcheck": "false", "data-delete-confirmation": true})
-				}
-				@dialog.Footer() {
-					@kit.Button(kit.Secondary, "", dialogClose("delete-account-dialog")) {
-						Cancel
-					}
-					@kit.Button(kit.Danger, "", templ.Attributes{"type": "submit", "disabled": true, "data-delete-submit": true}) {
-						Delete my account
-					}
-				}
-			</form>
-		}
+		</form>
 	}
 	@deleteAccountOnce.Once() {
 		<script nonce={ templ.GetNonce(ctx) }>
@@ -271,21 +253,14 @@ templ deleteAccountDialog() {
 				if (!event.target.matches("[data-delete-confirmation]")) return;
 				event.target.form.querySelector("[data-delete-submit]").disabled = event.target.value.trim() !== "DELETE";
 			});
-			document.addEventListener("dialog-close", (event) => {
+			document.addEventListener("close", (event) => {
 				const form = event.target instanceof Element && event.target.querySelector("#delete-account-form");
 				if (!form) return;
 				form.reset();
 				form.querySelector("[data-delete-submit]").disabled = true;
-			});
+			}, true);
 		</script>
 	}
 }
 
 var deleteAccountOnce = templ.NewOnceHandle()
-
-// dialogClose is a button that closes the dialog id.
-func dialogClose(id string) templ.Attributes {
-	attributes := dialog.CloseFor(id)
-	attributes["type"] = "button"
-	return attributes
-}

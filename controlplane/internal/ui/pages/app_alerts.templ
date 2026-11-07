@@ -6,7 +6,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
@@ -93,7 +92,7 @@ templ alertDestinations(view AlertsView) {
 							</div>
 							if destination.FailingSince != nil {
 								<div class="flex min-w-0 items-center gap-2 pt-1 text-sm text-failed" data-alert-failing>
-									@status.Symbol(status.KindFailed)
+									@kit.Dot(kit.StateFailed)
 									<span class="truncate">{ "Failing since " + ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
 								</div>
 							}

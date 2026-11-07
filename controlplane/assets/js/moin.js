@@ -266,3 +266,18 @@ document.addEventListener("keydown", (event) => {
     }
   }
 });
+
+// Dialogs (kit.Dialog): a button with data-open-dialog opens its dialog, one
+// with data-close-dialog closes the dialog it is in, and a click beside the
+// dialog closes it, as Escape does.
+document.addEventListener("click", (event) => {
+  const opener = event.target.closest("[data-open-dialog]");
+  if (opener) document.getElementById(opener.dataset.openDialog)?.showModal();
+  if (event.target.closest("[data-close-dialog]")) event.target.closest("dialog")?.close();
+  const dialog = event.target;
+  if (dialog instanceof HTMLDialogElement && dialog.matches("[data-dialog]")) {
+    const box = dialog.getBoundingClientRect();
+    const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    if (!inside) dialog.close();
+  }
+});

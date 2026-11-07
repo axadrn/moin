@@ -9,8 +9,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
@@ -170,20 +168,20 @@ func serverOnline(servers []model.Server, id string) bool {
 templ appState(app model.App) {
 	switch  {
 		case app.LatestNumber == 0 || app.Stopped:
-			@status.Status(status.Props{Kind: status.KindIdle, Chip: true}) {
+			@kit.Chip(kit.StateIdle) {
 				{ ifElse(app.Stopped, "Stopped", "New") }
 			}
 		case app.LatestStatus == model.DeployRunning:
-			@status.Status(status.Props{Kind: status.KindRunning, Chip: true}) {
+			@kit.Chip(kit.StateRunning) {
 				{ fmt.Sprintf("Deploying v%d", app.LatestNumber) }
 			}
 		case app.LatestStatus == model.DeployFailed:
-			@status.Status(status.Props{Kind: status.KindFailed, Chip: true}) {
+			@kit.Chip(kit.StateFailed) {
 				{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 			}
 		default:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Live">
-				@status.Symbol(status.KindLive)
+				@kit.Dot(kit.StateLive)
 				<span class="sr-only">Live</span>
 			</span>
 	}
@@ -196,9 +194,6 @@ func ifElse(ok bool, yes, no string) string {
 	return no
 }
 
-
-
-
 // overviewNewApp is the action next to the apps: start a new one.
 templ overviewNewApp(basePath string) {
 	<a href={ templ.SafeURL(basePath + "/apps/new") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
@@ -209,7 +204,7 @@ templ overviewStart(basePath string) {
 	@kit.List() {
 		@kit.Row(basePath + "/servers") {
 			<span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background" aria-hidden="true">
-				@icon.Server(icon.Props{Class: "size-5"})
+				@kit.IconServer("size-5")
 			</span>
 			@kit.RowText("Connect your first server", "Any Linux box you own. One command, no open port.")
 		}
@@ -219,17 +214,17 @@ templ overviewStart(basePath string) {
 templ overviewIssueIcon(kind string) {
 	switch kind {
 		case service.IssueServerDown:
-			@icon.ServerOff(icon.Props{Class: "size-4"})
+			@kit.IconServerOff("size-4")
 		case service.IssueDeployFailed:
-			@icon.CircleX(icon.Props{Class: "size-4"})
+			@kit.IconFailed("size-4")
 		case service.IssueBackupFailed, service.IssueDrillFailed:
-			@icon.ShieldOff(icon.Props{Class: "size-4"})
+			@kit.IconShieldOff("size-4")
 		case service.IssueDomainDown:
-			@icon.Globe(icon.Props{Class: "size-4"})
+			@kit.IconGlobe("size-4")
 		case service.IssueDiskFull:
-			@icon.HardDrive(icon.Props{Class: "size-4"})
+			@kit.IconDisk("size-4")
 		default:
-			@icon.RefreshCw(icon.Props{Class: "size-4"})
+			@kit.IconRestart("size-4")
 	}
 }
 

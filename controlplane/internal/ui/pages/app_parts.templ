@@ -1,19 +1,12 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/empty"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"time"
 
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/tooltip"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 )
 
 // The parts every page of the control panel is built from.
@@ -28,62 +21,6 @@ templ panelPage(attrs ...templ.Attributes) {
 	<div class={ kit.Page, "flex flex-col gap-6 pt-6 pb-20" } { a... }>
 		{ children... }
 	</div>
-}
-
-// pageHeader is the title of a page, its one line, and its actions
-// (children) right aligned, below on phones.
-templ pageHeader(title, description string) {
-	@statusHeader(title, nil, description) {
-		{ children... }
-	}
-}
-
-// statusHeader is the header of a page about one thing, a server or an
-// app: its name with its status chip, one line and the actions (children).
-templ statusHeader(title string, chip templ.Component, description string) {
-	<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-		<div class="min-w-0">
-			<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-				<h1 class="truncate text-3xl font-bold tracking-tight">{ title }</h1>
-				if chip != nil {
-					@chip
-				}
-			</div>
-			if description != "" {
-				<p class="mt-1 max-w-2xl text-sm text-pretty text-muted-foreground">{ description }</p>
-			}
-		</div>
-		<div class="flex flex-wrap items-center gap-2 empty:hidden">
-			{ children... }
-		</div>
-	</header>
-}
-
-// tabNav is a row of tabs, a segmented control of plain links (tabLink),
-// one per page.
-templ tabNav(label string) {
-	<nav class="flex h-9 w-full max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] sm:w-fit" aria-label={ label }>
-		{ children... }
-	</nav>
-}
-
-// tabLink is one tab of a tabNav; the active one is the current page.
-templ tabLink(href, label string, active bool, attrs templ.Attributes) {
-	<a
-		href={ templ.SafeURL(href) }
-		class={ "flex h-full flex-1 shrink-0 items-center justify-center rounded-full px-3 text-sm sm:px-4 font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none",
-			templ.KV("bg-background text-foreground shadow-sm", active),
-			templ.KV("text-muted-foreground hover:text-foreground", !active) }
-		if active {
-			aria-current="page"
-		}
-		{ attrs... }
-	>{ label }</a>
-}
-
-// sectionTitle heads a block of a page outside a card.
-templ sectionTitle(title string) {
-	<h2 class="text-base font-semibold">{ title }</h2>
 }
 
 // panelBody is how the body of a panel sits in its card.
@@ -170,137 +107,18 @@ func panelBodyClass(body panelBody) string {
 	return "min-w-0 px-6"
 }
 
-// statGrid is a row of up to four statCards of the same height.
-templ statGrid(attrs ...templ.Attributes) {
-	{{ var a templ.Attributes }}
-	if len(attrs) > 0 {
-		{{ a = attrs[0] }}
-	}
-	<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-4" { a... }>
-		{ children... }
-	</dl>
-}
-
-// statCard is a number with its label and a small note. An empty value
-// shows as a muted dash. Children add lines below the note.
-templ statCard(label, value, note string, attrs ...templ.Attributes) {
-	{{ var a templ.Attributes }}
-	if len(attrs) > 0 {
-		{{ a = attrs[0] }}
-	}
-	@card.Card(card.Props{Class: "h-full min-w-0 gap-1 px-6", Attributes: a}) {
-		<dt class="truncate text-sm text-muted-foreground">{ label }</dt>
-		<dd class="min-w-0">
-			if value != "" {
-				<span class="block truncate text-2xl font-semibold tracking-tight tabular-nums">{ value }</span>
-			} else {
-				<span class="block text-2xl font-semibold tracking-tight text-muted-foreground">—</span>
-			}
-			if note != "" {
-				<span class="mt-1 block text-xs text-muted-foreground">{ note }</span>
-			}
-			{ children... }
-		</dd>
-	}
-}
-
-// panelActionStack puts a card's actions under its title and description on
-// phones, so the description keeps the full width.
-const panelHeaderStack = "max-sm:has-data-[slot=card-action]:grid-cols-1"
-
-const panelActionStack = "max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-auto max-sm:justify-self-start max-sm:pt-2"
-
-// dangerPanel is the last card of a page: one destructive action (children),
-// what it does and the docs section, with its anchor, that explains it.
-templ dangerPanel(title, body, docs string) {
-	@card.Card(card.Props{Class: "min-w-0"}) {
-		@card.Header(card.HeaderProps{Class: panelHeaderStack}) {
-			@card.Title(card.TitleProps{Class: "text-base font-semibold", Attributes: templ.Attributes{"role": "heading", "aria-level": "2"}}) {
-				{ title }
-			}
-			@card.Description() {
-				{ body }
-			}
-			@card.Action(card.ActionProps{Class: utils.CN("flex flex-wrap items-center gap-2", panelActionStack)}) {
-				@docsButton(docs, "How it works", "max-sm:-ml-2")
-				{ children... }
-			}
-		}
-	}
-}
-
-// command is a command to copy: a prompt, the command, a copy button.
-templ command(cmd string) {
-	<div class="group/cmd flex h-10 max-w-full min-w-0 items-center gap-2.5 rounded-full bg-muted pr-1 pl-4 text-left font-mono text-xs">
-		<span class="text-muted-foreground select-none" aria-hidden="true">$</span>
-		<code class="min-w-0 flex-1 truncate">{ cmd }</code>
-		@copyButton(cmd, "", "Copy command")
-	</div>
-}
-
-// copyButton copies value, or the text of the element target selects.
+// copyButton copies value, or the text of the element target selects: a
+// small round button whose icon turns into a check for a moment
+// (data-copy, in the panel script).
 templ copyButton(value, target, label string) {
 	{{ attrs := templ.Attributes{"data-copy": value, "aria-label": label, "title": label} }}
 	if target != "" {
 		{{ attrs["data-copy-target"] = target }}
 	}
-	@button.Button(button.Props{
-		Variant:    button.VariantGhost,
-		Size:       button.SizeIconSm,
-		Class:      "group/copy text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:ring-ring focus-visible:ring-offset-0",
-		Attributes: attrs,
-	}) {
-		@icon.Copy(icon.Props{Class: "size-3.5 group-data-copied/copy:hidden"})
-		@icon.Check(icon.Props{Class: "hidden size-3.5 text-live group-data-copied/copy:block"})
-	}
-}
-
-// fieldHint is the line under a field of a form with labels above its
-// fields: the hint (children, may be empty), or the message when the field
-// is wrong (DESIGN.md, Feedback). The line is there from the start, so a
-// message only swaps text; err shows one the page renders with, the
-// moin:invalid event of a handler one it answers with. The field points at
-// it with aria-describedby id-hint.
-templ fieldHint(id, err string) {
-	@field.Description(field.DescriptionProps{
-		ID:         id + "-hint",
-		Class:      "group/hint min-h-4 text-xs leading-4",
-		Attributes: templ.Attributes{"data-field-hint": id, "data-invalid": err != "", "aria-live": "polite"},
-	}) {
-		<span class="group-data-invalid/hint:hidden">
-			{ children... }
-		</span>
-		<span data-hint-error class="hidden text-failed group-data-invalid/hint:inline">{ err }</span>
-	}
-}
-
-// stateAlert is a state that lasts while the page is open, like data that
-// could not be read (DESIGN.md, Feedback). It renders with the page or the
-// panel it is about, never as the answer to a click.
-templ stateAlert(attrs templ.Attributes) {
-	@alert.Alert(alert.Props{Class: "border-0 bg-failed/12 text-failed", Attributes: attrs}) {
-		@icon.CircleAlert()
-		@alert.Title(alert.TitleProps{Class: "font-medium"}) {
-			{ children... }
-		}
-	}
-}
-
-// docsButton is the docs page that explains a card: a small book in the
-// card's header, named by a tooltip. label says it, like "How it works";
-// class moves it, so the glyph lines up when it sits under the title.
-templ docsButton(href, label, class string) {
-	@tooltip.Tooltip() {
-		{{ attrs := tooltip.Trigger(ctx) }}
-		{{ attrs["aria-label"] = label }}
-		{{ attrs["data-docs"] = href }}
-		@button.Button(button.Props{Href: href, Variant: button.VariantGhost, Size: button.SizeIconSm, Class: utils.CN("-my-1 text-muted-foreground", class), Attributes: attrs}) {
-			@icon.BookOpen(icon.Props{Class: "size-4"})
-		}
-		@tooltip.Content() {
-			{ label }
-		}
-	}
+	<button type="button" class="group/copy flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30" { attrs... }>
+		@kit.IconCopy("size-4 group-data-copied/copy:hidden")
+		@kit.IconCheck("hidden size-4 text-live group-data-copied/copy:block")
+	</button>
 }
 
 // switchForm is a switch that saves itself (DESIGN.md, Feedback), a row of
@@ -316,72 +134,6 @@ templ switchForm(id, action, switchID, name, note string, on bool) {
 		@kit.Switch(templ.Attributes{"id": switchID, "name": "on", "value": "1", "checked": on})
 	}
 }
-
-// docsLink is the quiet link from an empty state to its guide.
-templ docsLink(href, label string) {
-	@button.Button(button.Props{Href: href, Variant: button.VariantSecondary, Size: button.SizeSm}) {
-		@icon.BookOpen(icon.Props{Class: "size-3.5"})
-		{ label }
-	}
-}
-
-// emptyState is a card that says what is missing, what makes it appear
-// and the command that adds it.
-templ emptyState(title, body, cmd string) {
-	{{ var bodyText templ.Component }}
-	if body != "" {
-		{{ bodyText = plainText(body) }}
-	}
-	@emptyStateWith(title, bodyText, cmd) {
-		{ children... }
-	}
-}
-
-templ plainText(text string) {
-	{ text }
-}
-
-// emptyStateWith is emptyState with a body that has markup, like a path.
-templ emptyStateWith(title string, body templ.Component, cmd string) {
-	@card.Card(card.Props{Class: "min-w-0"}) {
-		@empty.Empty(empty.Props{Class: "gap-4 p-6 sm:p-10"}) {
-			@empty.Header(empty.HeaderProps{Class: "max-w-md gap-1"}) {
-				@empty.Title(empty.TitleProps{Class: "text-base font-semibold"}) {
-					{ title }
-				}
-				if body != nil {
-					@empty.Description(empty.DescriptionProps{Class: "text-sm text-pretty"}) {
-						@body
-					}
-				}
-			}
-			if cmd != "" {
-				@empty.Content(empty.ContentProps{Class: "max-w-xs items-stretch"}) {
-					@command(cmd)
-				}
-			}
-			{ children... }
-		}
-	}
-}
-
-// emptyHint is the empty state inside a card that already has a title: one
-// muted sentence and the command that fills it.
-templ emptyHint(text, cmd string) {
-	<div class="flex flex-col items-start gap-3">
-		<p class="text-sm text-muted-foreground">{ text }</p>
-		if cmd != "" {
-			<div class="w-full max-w-sm">
-				@command(cmd)
-			</div>
-		}
-	</div>
-}
-
-// panelClasses turn a card into a panel of the control panel: the card's
-// look without its padding, the content brings its own. Kept for pages not
-// yet on panel; new code uses panel.
-const panelClasses = "block gap-0 py-0 text-base"
 
 // ago is how long ago t was, short: "now", "4m ago", "3h ago", "12d ago".
 func ago(t time.Time, now time.Time) string {

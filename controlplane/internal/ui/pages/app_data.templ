@@ -14,7 +14,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
@@ -268,7 +267,9 @@ templ dataRows(view DataView) {
 								<th scope="col" class={ dataHead, templ.KV("text-right", isNumeric(column)) }>
 									<span class="inline-flex items-center gap-1.5">
 										if column.PrimaryKey {
-											@icon.KeyRound(icon.Props{Class: "size-3.5", Attributes: templ.Attributes{"aria-label": "primary key"}})
+											<span role="img" aria-label="primary key">
+												@kit.IconKey("size-3.5")
+											</span>
 										}
 										<span class="text-foreground">{ column.Name }</span>
 										<span class="font-mono text-xs font-normal">{ strings.ToLower(column.Type) }</span>
@@ -309,7 +310,7 @@ templ dataRows(view DataView) {
 											hx-confirm={ "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone." }
 											data-confirm-action="Delete"
 										>
-											@icon.Trash2()
+											@kit.IconTrash("")
 										</button>
 									</td>
 								}
@@ -578,7 +579,7 @@ templ DataResult(result protocol.DBResult, write bool, message string) {
 		<p role="alert" class="px-1 font-mono text-sm break-words text-failed" data-sql-error>{ message }</p>
 	} else if write {
 		<p role="status" class="flex items-center gap-2 px-1 text-sm font-medium" data-sql-changes>
-			@icon.Check(icon.Props{Class: "size-4 shrink-0 text-live"})
+			@kit.IconCheck("size-4 shrink-0 text-live")
 			{ plural(int(result.Changes), "row changed", "rows changed") }
 		</p>
 	} else {

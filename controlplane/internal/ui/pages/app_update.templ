@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/internal/build"
@@ -33,7 +32,7 @@ templ UpdateNotice(info model.VersionInfo) {
 			switch  {
 				case running:
 					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@status.Status(status.Props{Kind: status.KindRunning}) {
+						@kit.Status(kit.StateRunning, nil) {
 							{ "Updating " + build.Name + " to " + update.Version }
 						}
 						@kit.Quiet() {
@@ -42,7 +41,7 @@ templ UpdateNotice(info model.VersionInfo) {
 					}
 				case update != nil && (update.State == "rolled_back" || update.State == "failed"):
 					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@status.Status(status.Props{Kind: status.KindFailed}) {
+						@kit.Status(kit.StateFailed, nil) {
 							{ "The update to " + update.Version + " did not work" }
 						}
 						@kit.Quiet() {
@@ -56,7 +55,7 @@ templ UpdateNotice(info model.VersionInfo) {
 					}
 				case update != nil && update.State == "done" && update.Version == info.Version && time.Since(update.At) < 10*time.Minute:
 					@updateLine(templ.Attributes{"data-update-state": "done"}) {
-						@status.Status(status.Props{Kind: status.KindLive}) {
+						@kit.Status(kit.StateLive, nil) {
 							{ build.Name + " " + info.Version + " runs now" }
 						}
 						<div>

@@ -7,21 +7,20 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
 // appKind is the status symbol of an app: its newest deploy.
-func appKind(app model.App) status.Kind {
+func appKind(app model.App) kit.State {
 	switch {
 	case app.LatestNumber == 0:
-		return status.KindIdle
+		return kit.StateIdle
 	case app.LatestStatus == model.DeployRunning:
-		return status.KindRunning
+		return kit.StateRunning
 	case app.LatestStatus == model.DeployFailed:
-		return status.KindFailed
+		return kit.StateFailed
 	}
-	return status.KindLive
+	return kit.StateLive
 }
 
 // appSections are the parts of an app, each one question: does it run,
@@ -109,7 +108,7 @@ func deployKind(app model.App) kit.Kind {
 // what waits for a restart.
 templ appStateLine(app model.App) {
 	<p id="app-state" hx-swap-oob="true" class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium sm:order-last" data-status>
-		@status.Symbol(appStateKind(app))
+		@kit.Dot(appStateKind(app))
 		<span>{ appStateWords(app) }</span>
 		if app.ChangesWaiting > 0 {
 			<span class="text-muted-foreground">·</span>
@@ -118,9 +117,9 @@ templ appStateLine(app model.App) {
 	</p>
 }
 
-func appStateKind(app model.App) status.Kind {
+func appStateKind(app model.App) kit.State {
 	if app.Stopped {
-		return status.KindIdle
+		return kit.StateIdle
 	}
 	return appKind(app)
 }
@@ -183,4 +182,3 @@ templ PinSwitch(app model.App) {
 		@kit.Switch(templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
 	}
 }
-

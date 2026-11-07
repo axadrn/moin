@@ -11,7 +11,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
@@ -24,7 +23,7 @@ type SearchItem struct {
 	Where string
 	// Key is the key that does the same without the palette.
 	Key  string
-	Icon func(...icon.Props) templ.Component
+	Icon func(string) templ.Component
 	Href string
 	// External opens Href in a new tab, like the app's own site.
 	External bool
@@ -83,14 +82,14 @@ const (
 func SearchItems(in SearchInput) []SearchItem {
 	items := []SearchItem{}
 	for _, app := range in.Apps {
-		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: icon.Box, Href: in.Base + "/apps/" + app.Name})
+		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: kit.IconApp, Href: in.Base + "/apps/" + app.Name})
 	}
 	for _, server := range in.Servers {
 		path := in.Base + "/servers/" + server.ID
 		items = append(items,
-			SearchItem{Group: groupServers, Title: server.Name, Where: "Servers", Icon: icon.Server, Href: path + "/security"},
-			SearchItem{Group: groupPages, Title: "Security", Where: server.Name, Icon: icon.Shield, Href: path + "/security"},
-			SearchItem{Group: groupPages, Title: "Metrics", Where: server.Name, Icon: icon.Activity, Href: path + "/metrics"},
+			SearchItem{Group: groupServers, Title: server.Name, Where: "Servers", Icon: kit.IconServer, Href: path + "/security"},
+			SearchItem{Group: groupPages, Title: "Security", Where: server.Name, Icon: kit.IconShield, Href: path + "/security"},
+			SearchItem{Group: groupPages, Title: "Metrics", Where: server.Name, Icon: kit.IconActivity, Href: path + "/metrics"},
 		)
 	}
 	for _, app := range in.Apps {
@@ -98,28 +97,28 @@ func SearchItems(in SearchInput) []SearchItem {
 		for _, section := range appSections[1:] {
 			items = append(items, SearchItem{Group: groupPages, Title: section.Label, Where: app.Name, Key: strings.ToUpper(section.Key), Icon: sectionIcon(section.ID), Href: path + section.Path})
 		}
-		items = append(items, SearchItem{Group: groupPages, Title: "Metrics", Where: app.Name, Icon: icon.Activity, Href: path + "/metrics"})
+		items = append(items, SearchItem{Group: groupPages, Title: "Metrics", Where: app.Name, Icon: kit.IconActivity, Href: path + "/metrics"})
 	}
 	places := []SearchItem{
-		{Title: "Overview", Key: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
-		{Title: "Apps", Key: "G A", Icon: icon.Boxes, Href: in.Base + "/apps"},
-		{Title: "New app", Where: "Apps", Icon: icon.Plus, Href: in.Base + "/apps/new"},
-		{Title: "Catalog", Where: "Apps › New app", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
-		{Title: "Servers", Key: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
-		{Title: "Settings", Key: "G ,", Icon: icon.Settings, Href: in.Base + "/settings"},
-		{Title: "Team", Where: "Settings", Key: "G T", Icon: icon.Users, Href: in.Base + "/workspace"},
-		{Title: "Alerts", Where: "Settings", Key: "G L", Icon: icon.Bell, Href: in.Base + "/alerts"},
-		{Title: "Bucket", Where: "Settings", Key: "G B", Icon: icon.Archive, Href: in.Base + "/bucket"},
-		{Title: "Activity", Where: "Settings", Key: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
-		{Title: "Account", Where: "Settings", Icon: icon.User, Href: in.Base + "/settings/account"},
-		{Title: "Security", Where: "Settings › Account", Icon: icon.Shield, Href: in.Base + "/settings/account?tab=security"},
-		{Title: "Tokens", Where: "Settings › Account", Icon: icon.Key, Href: in.Base + "/settings/account?tab=tokens"},
+		{Title: "Overview", Key: "G H", Icon: kit.IconGauge, Href: in.Base + "/overview"},
+		{Title: "Apps", Key: "G A", Icon: kit.IconApps, Href: in.Base + "/apps"},
+		{Title: "New app", Where: "Apps", Icon: kit.IconPlus, Href: in.Base + "/apps/new"},
+		{Title: "Catalog", Where: "Apps › New app", Icon: kit.IconCatalog, Href: in.Base + "/catalog"},
+		{Title: "Servers", Key: "G S", Icon: kit.IconServer, Href: in.Base + "/servers"},
+		{Title: "Settings", Key: "G ,", Icon: kit.IconSettings, Href: in.Base + "/settings"},
+		{Title: "Team", Where: "Settings", Key: "G T", Icon: kit.IconUsers, Href: in.Base + "/workspace"},
+		{Title: "Alerts", Where: "Settings", Key: "G L", Icon: kit.IconBell, Href: in.Base + "/alerts"},
+		{Title: "Bucket", Where: "Settings", Key: "G B", Icon: kit.IconBucket, Href: in.Base + "/bucket"},
+		{Title: "Activity", Where: "Settings", Key: "G Y", Icon: kit.IconActivity, Href: in.Base + "/activity"},
+		{Title: "Account", Where: "Settings", Icon: kit.IconUser, Href: in.Base + "/settings/account"},
+		{Title: "Security", Where: "Settings › Account", Icon: kit.IconShield, Href: in.Base + "/settings/account?tab=security"},
+		{Title: "Tokens", Where: "Settings › Account", Icon: kit.IconKey, Href: in.Base + "/settings/account?tab=tokens"},
 	}
 	if in.GitHub {
-		places = append(places, SearchItem{Title: "GitHub", Where: "Settings", Icon: icon.Github, Href: in.Base + "/settings/github"})
+		places = append(places, SearchItem{Title: "GitHub", Where: "Settings", Icon: kit.IconGitHub, Href: in.Base + "/settings/github"})
 	}
 	if in.IsOwner {
-		places = append(places, SearchItem{Title: "Billing", Where: "Settings", Icon: icon.CreditCard, Href: in.Base + "/billing"})
+		places = append(places, SearchItem{Title: "Billing", Where: "Settings", Icon: kit.IconCard, Href: in.Base + "/billing"})
 	}
 	for _, place := range places {
 		place.Group = groupPages
@@ -130,10 +129,10 @@ func SearchItems(in SearchInput) []SearchItem {
 	}
 	// The catalog: an app you can install, on its page in the workspace.
 	for _, entry := range in.Catalog {
-		items = append(items, SearchItem{Group: groupCatalog, Title: entry.Name, Where: "Catalog › " + entry.Category, Icon: icon.Package, Href: in.Base + "/catalog/" + entry.Slug})
+		items = append(items, SearchItem{Group: groupCatalog, Title: entry.Name, Where: "Catalog › " + entry.Category, Icon: kit.IconPackage, Href: in.Base + "/catalog/" + entry.Slug})
 	}
 	for _, doc := range in.Docs {
-		items = append(items, SearchItem{Group: groupDocs, Title: doc.Title, Where: "Docs › " + doc.Group, Icon: icon.BookOpen, Href: doc.Href})
+		items = append(items, SearchItem{Group: groupDocs, Title: doc.Title, Where: "Docs › " + doc.Group, Icon: kit.IconBook, Href: doc.Href})
 	}
 	return items
 }
@@ -146,39 +145,39 @@ func paletteActions(in SearchInput, app model.App) []SearchItem {
 	path := in.Base + "/apps/" + app.Name
 	var items []SearchItem
 	for _, domain := range appAddresses(app) {
-		items = append(items, SearchItem{Group: groupActions, Title: "Open " + domain, Where: app.Name, Icon: icon.ExternalLink, Href: "https://" + domain, External: true})
+		items = append(items, SearchItem{Group: groupActions, Title: "Open " + domain, Where: app.Name, Icon: kit.IconExternal, Href: "https://" + domain, External: true})
 		break
 	}
 	if !in.CanChange {
 		return items
 	}
 	if app.Stopped {
-		return append(items, SearchItem{Group: groupActions, Title: "Start " + app.Name, Where: app.Name, Icon: icon.Play, Post: path + "/start"})
+		return append(items, SearchItem{Group: groupActions, Title: "Start " + app.Name, Where: app.Name, Icon: kit.IconPlay, Post: path + "/start"})
 	}
 	if app.LatestNumber > 0 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Deploy " + app.Name, Where: app.Name, Icon: icon.Rocket, Post: path + "/redeploy"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Deploy " + app.Name, Where: app.Name, Icon: kit.IconDeploy, Post: path + "/redeploy"})
 	}
 	if app.LiveNumber > 0 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Restart " + app.Name, Where: app.Name, Icon: icon.RotateCw, Post: path + "/restart"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Restart " + app.Name, Where: app.Name, Icon: kit.IconRestart, Post: path + "/restart"})
 	}
 	if app.LiveNumber > 1 {
-		items = append(items, SearchItem{Group: groupActions, Title: "Roll back " + app.Name, Where: app.Name + " › to v" + strconv.Itoa(app.LiveNumber-1), Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Roll back " + app.Name + " to v" + strconv.Itoa(app.LiveNumber-1) + "? It runs that deploy again.", Accept: "Roll back"})
+		items = append(items, SearchItem{Group: groupActions, Title: "Roll back " + app.Name, Where: app.Name + " › to v" + strconv.Itoa(app.LiveNumber-1), Icon: kit.IconUndo, Post: path + "/rollback", Confirm: "Roll back " + app.Name + " to v" + strconv.Itoa(app.LiveNumber-1) + "? It runs that deploy again.", Accept: "Roll back"})
 	}
 	return items
 }
 
-func sectionIcon(id string) func(...icon.Props) templ.Component {
+func sectionIcon(id string) func(string) templ.Component {
 	switch id {
 	case "deploys":
-		return icon.Rocket
+		return kit.IconDeploy
 	case "addresses":
-		return icon.Globe
+		return kit.IconGlobe
 	case "logs":
-		return icon.ScrollText
+		return kit.IconLogs
 	case "data":
-		return icon.Database
+		return kit.IconDatabase
 	}
-	return icon.Settings
+	return kit.IconSettings
 }
 
 // HereItems are what goes with the page you are on: the sections and the
@@ -331,7 +330,7 @@ const searchOptionClass = kit.OptionClass + " aria-selected:bg-foreground/8"
 // it, and its key.
 templ searchOption(item SearchItem) {
 	<span class="flex size-9 shrink-0 items-center justify-center rounded-[28%] bg-foreground/8 [&_svg]:size-4">
-		@item.Icon()
+		@item.Icon("")
 	</span>
 	<span class="flex min-w-0 flex-1 flex-col">
 		<span class="truncate font-medium">{ item.Title }</span>
