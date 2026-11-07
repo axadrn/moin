@@ -1,23 +1,11 @@
 ---
 title: "Alerts"
-description: "A mail, a Slack or Discord message, a Telegram message or a webhook when a site goes down, a server goes offline, a deploy fails, backups stop or a disk fills up"
-order: 11
+description: "A mail, Slack, Discord, Telegram or a webhook when a site goes down, a server goes offline, a deploy fails, backups stop or a disk fills up"
+group: "Every day"
+order: 7
 ---
 
-**The short version:** when something breaks, the owners and admins of the workspace get a mail. There is nothing to set up. Add Slack, Discord, Telegram or a webhook under **Alerts** to tell the team where it already is.
-
-## What sends an alert
-
-One alert per event, never one per minute:
-
-- **A site goes down**, with the app, since when and the reason, such as `HTTP 502` or `no answer within 10s`. And one when it is **back up**, with how long it was down. See [Uptime](/docs/guides/uptime#down-and-back-up).
-- **A server goes offline**: its agent has not answered for two minutes. The alert names the apps on it. And one when it is **back online**, with how long it was offline. See [Servers](/docs/guides/servers).
-- **A deploy fails**, with its number and the error. A failed deploy leaves the live version running, or starts it again; the alert says which version that is. See [What a deploy does](/docs/guides/deploy#what-a-deploy-does).
-- **Backups stop**: the continuous backup of a SQLite or Postgres database fails for three minutes, a snapshot cannot be uploaded, or WAL-G lost its place in the log. What is in your bucket stays; new changes are not there until it works again. And one when it does. See [Backups](/docs/guides/backups).
-- **The daily restore check fails**: the newest backup did not restore cleanly. And one when a check passes again.
-- **A disk is almost full**: the disk that holds the apps' data is over 90%. A full disk stops databases from writing. And one when it is under 85% again, so a disk at 88% does not alert back and forth.
-
-Every alert links to the page in moin: the uptime of the app, the servers, the app with its deploys, or its backups. Mails and messages say the same:
+When something breaks, the owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
 
 ```text
 🔴 shop.example.com is down
@@ -27,41 +15,37 @@ Reason: HTTP 502
 Open in moin
 ```
 
+## What sends an alert
+
+One alert per event, never one per minute, and one when it is fixed. Each links to its page in moin.
+
+| Event | When |
+| --- | --- |
+| `uptime.down`, `uptime.up` | a site goes down, with the reason such as `HTTP 502`; back up, with how long it was down ([Uptime](/docs/guides/uptime#down-and-back-up)) |
+| `server.down`, `server.up` | an agent has not answered for two minutes, with the apps on the server; back online |
+| `deploy.failed` | a deploy fails, with its number, the error and the version that runs now ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
+| `backup.failed`, `backup.recovered` | the continuous backup of a database fails for three minutes, a full backup cannot be uploaded, or WAL-G lost its place in the log; and when it works again. What is in the bucket stays ([Backups](/docs/guides/backups)) |
+| `drill.failed`, `drill.recovered` | the daily restore check fails; passes again |
+| `disk.full`, `disk.ok` | the data disk of a server is over 90%; under 85% again |
+| `update.available` | a newer version of a [catalog](/docs/guides/catalog) app is out, once per version |
+
 ## Who gets it
 
-Every **owner** and **admin** of the workspace whose **Email me alerts** is on, at the address of their account. Members get none. Only a verified address gets alerts. It is on for everyone by default.
-
-## Turn it off
-
-For you, in every workspace:
+Every **owner** and **admin** whose **Email me alerts** is on, at the verified address of their account. On by default. Members get no mail.
 
 ```surfaces
-Web: **Settings**, **Profile** tab, **Email me alerts**
+Web: **Settings**, **Account**, **Email me alerts**
 CLI: moin alerts off, then moin alerts on; moin alerts shows it
 TUI: opens the web: `w`, then `s`
 API: PUT /api/v1/account/email-alerts {"on": false}
 MCP: set_email_alerts
 ```
 
-`GET /api/v1/account` and the MCP tool `whoami` return it as `email_alerts`.
+It counts for you in every workspace. `GET /api/v1/account` and `whoami` return it as `email_alerts`.
 
 ## Slack, Discord, Telegram and webhooks
 
-Besides the mails, a workspace sends its alerts to up to 20 destinations. Each gets the events it is set for, all of them by default:
-
-| Event | When |
-| --- | --- |
-| `uptime.down`, `uptime.up` | a site goes down, and is back up |
-| `server.down`, `server.up` | a server goes offline, and is back online |
-| `deploy.failed` | a deploy fails |
-| `backup.failed`, `backup.recovered` | backups of a database stop, and work again |
-| `drill.failed`, `drill.recovered` | the daily restore check fails, and passes again |
-| `disk.full`, `disk.ok` | a server's disk is over 90%, and under 85% again |
-| `update.available` | a newer release of an app from the [catalog](/docs/guides/catalog) is out, once per version |
-
-A destination that got every event before new ones came gets the new ones too.
-
-Every member sees the destinations. Only **owners** and **admins** add, test and remove them.
+A workspace sends its alerts to up to 20 destinations, each with all events or the ones you pick.
 
 ### Add a destination
 
@@ -73,35 +57,29 @@ API: POST /api/v1/alert-destinations {"kind": "slack", "name": "team-chat", "url
 MCP: add_alert_destination
 ```
 
-- **Slack**: an [incoming webhook](https://api.slack.com/messaging/webhooks) of the channel, `https://hooks.slack.com/services/…`.
-- **Discord**: the channel's **Edit Channel**, **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**, `https://discord.com/api/webhooks/…`. Messages never ping anyone.
-- **Telegram**: make a bot with [@BotFather](https://t.me/BotFather) and add it to the chat. moin needs its token, like `123456:ABC-DEF…`, and the chat ID: a number like `-1001234567890` for a group or channel, or `@channelname` for a public channel.
-- **Webhook**: any `http` or `https` URL of your own. See [Webhooks](#webhooks).
-
-The URL and the bot token are stored encrypted, like your registry passwords, and never shown again in full: the lists show the host and the last characters, like `hooks.slack.com/…WXYZ`. They never go in the activity. The hosted control plane posts only to public addresses.
+| Kind | What it needs |
+| --- | --- |
+| **Slack** | an [incoming webhook](https://api.slack.com/messaging/webhooks) of the channel, `https://hooks.slack.com/services/…` |
+| **Discord** | the channel's **Edit Channel**, **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**, `https://discord.com/api/webhooks/…`; messages never ping anyone |
+| **Telegram** | a bot from [@BotFather](https://t.me/BotFather) in the chat: its token, like `123456:ABC-DEF…`, and the chat ID, like `-1001234567890` for a group or channel, or `@channelname` for a public channel |
+| **Webhook** | any `http` or `https` URL of your own, see [Webhooks](#webhooks) |
 
 ### Send a test
 
-A test shows that the destination takes alerts, right after you add it or whenever you like:
-
 ```surfaces
-Web: **Alerts**, **Send test** next to the destination
+Web: **Settings**, **Alerts**, **Send test** next to the destination
 CLI: moin alerts test team-chat
 TUI: opens the web: `w`, then `n`
 API: POST /api/v1/alert-destinations/team-chat/test
 MCP: test_alert_destination
 ```
 
-moin waits up to 10 seconds for the answer. A refused test says why, such as `HTTP 404: no_service`, and the API answers `424` with `alert_send_failed`.
-
-### A destination that fails
-
-Each destination gets 10 seconds per alert. One that does not take an alert is marked **failing**, with the reason, on every surface, and the activity says so once, not for every alert. The next alert or test that works clears it, and the activity says so too. Mails go out either way.
+moin waits up to 10 seconds. A refused test says why, such as `HTTP 404: no_service`; the API answers `424` with `alert_send_failed`.
 
 ### Remove a destination
 
 ```surfaces
-Web: **Alerts**, **Remove** next to the destination
+Web: **Settings**, **Alerts**, **Remove** next to the destination
 CLI: moin alerts rm team-chat
 TUI: opens the web: `w`, then `n`
 API: DELETE /api/v1/alert-destinations/team-chat
@@ -112,7 +90,7 @@ To change one, remove it and add it again.
 
 ## Webhooks
 
-A webhook gets each alert as a JSON `POST`. Fields that do not belong to the event are empty:
+Each alert comes as a JSON `POST`; fields that do not belong to the event are empty:
 
 ```json
 {
@@ -128,9 +106,9 @@ A webhook gets each alert as a JSON `POST`. Fields that do not belong to the eve
 }
 ```
 
-`event` is one of the five above, or `test`. `reason` is why a site is down or the error of a failed deploy. `since` is when a site or server went down, `duration` how long it was down, like `4m30s`.
+`event` is one of the events above, or `test`. `reason` is why a site is down or the error of a failed deploy; `since` when a site or server went down; `duration` how long, like `4m30s`.
 
-A new webhook comes with a **signing secret**, shown this once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body with it. Check it before you trust a post:
+A new webhook comes with a **signing secret**, shown once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body. Check it:
 
 ```go
 mac := hmac.New(sha256.New, []byte(secret))
@@ -139,3 +117,12 @@ ok := hmac.Equal([]byte(r.Header.Get("X-Moin-Signature")), []byte("sha256="+hex.
 ```
 
 Answer with any `2xx`; moin follows no redirects. A lost secret cannot be shown again: remove the webhook and add it again.
+
+## Good to know
+
+- The team sees the destinations; only owners and admins add, test and remove them.
+- A destination that got every event keeps getting new kinds of events too.
+- Each destination gets 10 seconds per alert. One that fails is marked **failing** with the reason on every surface, once in the activity; the next alert or test that works clears it. Mails go out either way.
+- URLs and bot tokens are stored encrypted and never shown again in full, only the host and the last characters, like `hooks.slack.com/…WXYZ`. They never go in the activity.
+- The hosted control plane posts only to public addresses.
+- A disk at 88% does not alert back and forth: it alerts over 90% and clears under 85%.

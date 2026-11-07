@@ -1,49 +1,42 @@
 ---
 title: "Data"
 description: "Browse, edit and query the database of an app, SQLite or Postgres"
-order: 6
+group: "Every day"
+order: 4
 ---
 
-moin reads your app's database live from its server, SQLite or Postgres. You can browse tables, edit a cell, add or delete a row and run SQL. Nothing is copied to moin: every read goes to the server and back.
-
-moin finds the database by itself: every SQLite file on a [volume](/docs/guides/deploy#your-data-survives-every-deploy) of the live release, up to three folders deep, and every service that runs [Postgres](/docs/guides/backups#postgres), named `postgres-<service>`. When there are several, name one with `x-moin.database` in [the repo](/docs/guides/config), or pick one with `--db <path>` or `--db postgres-db` in the CLI.
-
-For Postgres, moin runs `psql` inside your Postgres container over its local socket: no password leaves the container. It shows the tables of the `public` schema. Every value you type travels as a psql variable, never as SQL.
-
-moin edits a row by its rowid on SQLite and by its primary key on Postgres. A table without a primary key has no name for a single row: add rows there, and change them with SQL.
+Browse the tables of your app's live database, edit a cell, add or delete a row and run SQL, on SQLite or Postgres. Every read goes to the server and back; nothing is copied to moin.
 
 ## See the tables
 
-Lists the tables of the database with their row counts.
-
 ```surfaces
-Web: the app page, **Data** tab
+Web: the app, **Data**
 CLI: moin db
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
 MCP: list_tables
 ```
 
+Tables with their row counts, and the migration tool with its newest version when moin finds one.
+
 ## Browse rows
 
-Shows the rows of one table, newest first.
+Newest first, at most 1000 rows. `--limit` (CLI) or `limit` (API, MCP) chooses fewer; outside 1 to 1000 it is refused.
 
 ```surfaces
-Web: the app page, **Data** tab, click a table
+Web: the app, **Data**, click a table
 CLI: moin db rows <table>
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/rows
 MCP: query_database
 ```
 
-A read returns at most 1000 rows. `--limit` in the CLI and `limit` in the API and MCP choose fewer; a limit outside 1 to 1000 is refused.
-
 ## See the schema
 
-Shows how a table is built: its `CREATE` statement and its indexes.
+A table's `CREATE` statement and its indexes.
 
 ```surfaces
-Web: the app page, **Data** tab, a table, **Schema**
+Web: the app, **Data**, a table, **Schema**
 CLI: moin db schema <table>
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
@@ -52,22 +45,27 @@ MCP: list_tables
 
 ## Run SQL
 
-Runs a query on the live database. A query only reads, unless you say it may change data.
+A query only reads, unless you say it may change data.
 
 ```surfaces
-Web: the app page, **Data** tab, the **SQL** box, **Run**
+Web: the app, **Data**, the **SQL** box, **Run**
 CLI: moin sql "SELECT status, count(*) FROM orders GROUP BY status"
 TUI: opens the web: `w`, then `d`
 API: POST /api/v1/apps/{app}/databases/query
 MCP: query_database
 ```
 
+```bash
+moin db rows orders --limit 5
+echo "SELECT * FROM customers" | moin sql
+```
+
 ## Change data
 
-Edits a cell, adds a row or deletes one. With [backups](/docs/guides/backups) set up, moin takes a snapshot first.
+Edit a cell, add a row or delete one. With [backups](/docs/guides/backups) set up, moin takes a full backup first, so one restore undoes it.
 
 ```surfaces
-Web: the app page, **Data** tab: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
+Web: the app, **Data**: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
 Web: or tick **Allow changes** in the **SQL** box
 CLI: moin sql --write "UPDATE settings SET value = 'on' WHERE key = 'maintenance'"
 TUI: opens the web: `w`, then `d`
@@ -77,36 +75,21 @@ MCP: execute_sql
 
 The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. It names a row by `rowid` on SQLite, or by `key`, every column of the primary key, such as `{"id": "42"}`. Agents see `execute_sql` as destructive, so they ask first.
 
-## Reads cannot change anything
-
-A query opens the database read-only; on Postgres it runs in a `READ ONLY` transaction and as one statement. A statement that would change data fails, so a typo cannot delete rows. To change data you say so, as above. Every change runs in one transaction.
-
-More from the CLI:
-
-```bash
-moin db                              # tables, rows, migration
-moin db rows orders --limit 5        # newest rows first
-echo "SELECT * FROM customers" | moin sql
-```
-
 ## The schema belongs to your code
 
-moin changes data, never the schema. Tables, columns and indexes change through migrations in your repo, which your app runs when it starts: goose, golang-migrate, Prisma, Drizzle or your own. That keeps the database on the server and the code in the repo the same.
+moin changes data, not tables, columns or indexes: those change through the migrations your app runs when it starts (goose, golang-migrate, Prisma, Drizzle or your own). SQL that creates, alters or drops still works for an emergency; the web warns that the next deploy will not know about it.
 
-moin shows where the migrations are. The data page, `moin db` and `list_tables` name the tool and its newest version when they find a `goose_db_version`, `schema_migrations`, `_prisma_migrations` or `__drizzle_migrations` table.
+## Good to know
 
-SQL that creates, alters or drops is still possible for an emergency. The web warns you that the next deploy will not know about it.
-
-## Who may read data
-
-Rows are your users' data, as sensitive as secrets. The API and MCP need a token with write access to read rows or run SQL. A read-only token sees the tables and their row counts.
+- **Reads cannot change anything.** A read opens the database read-only (on Postgres a `READ ONLY` transaction, one statement), so a typo cannot delete rows. Every change runs in one transaction.
+- **Which database.** moin finds every SQLite file on a volume of the live deploy, up to three folders deep, and every Postgres service, named `postgres-<service>`. With several, set `x-moin.database` in [the repo](/docs/guides/config), or `--db <path>` / `--db postgres-db` in the CLI.
+- **Rows by key.** moin edits a row by its rowid on SQLite and by its primary key on Postgres. A table without a primary key takes new rows; change them with SQL.
+- **Who may read.** Rows are your users' data: the API and MCP need a token with write access to read rows or run SQL. A read-only token sees the tables and row counts.
+- **Off on a server.** `data: off` in the [rules](/docs/guides/security#rules) refuses reading and changing data through moin there.
+- More on how reads and Postgres work: [How moin reads your database](/docs/concepts/how-moin-works#how-moin-reads-your-database).
 
 ## Requirements
 
-The app keeps SQLite on a volume, as `/data/app.db` in the compose file moin writes. WAL mode is best: your app and moin then read and write at the same time without waiting. Your app turns it on with `PRAGMA journal_mode=WAL`.
-
-Postgres needs the official image or one built on it (`postgres`, `postgis/postgis`, `pgvector/pgvector`, `timescale/timescaledb`), running.
-
-The data page says the app has no database? Then the live release keeps no SQLite file on a volume and runs no Postgres. Check that the database file sits in a mounted folder, such as `/data`, and deploy again. The agent runs as root; after a change it gives the database files back to their owner, so an app that runs as another user keeps working.
-
-With a bucket set up, every change you make here gets a snapshot first, so one restore undoes it: see [A snapshot before every change](/docs/guides/backups#a-snapshot-before-every-change).
+- SQLite on a volume, such as `/data/app.db` in the compose file moin writes. WAL mode is best: your app turns it on with `PRAGMA journal_mode=WAL`.
+- Postgres from the official image or one built on it (`postgres`, `postgis/postgis`, `pgvector/pgvector`, `timescale/timescaledb`), running. moin shows the tables of the `public` schema.
+- The data page says the app has no database? The live deploy keeps no SQLite file on a volume and runs no Postgres: put the file in a mounted folder, such as `/data`, and deploy again.

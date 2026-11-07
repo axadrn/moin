@@ -1,16 +1,15 @@
 ---
 title: "Deploy"
-description: "Deploy, redeploy and roll back apps"
-order: 3
+description: "Deploy, redeploy, restart, roll back and remove apps"
+group: "Apps"
+order: 1
 ---
 
-A deploy puts a new version of your app live on its server. moin numbers them per app: v1, v2, v3.
-
-Commands that work on an app take its name as the last word, like `moin redeploy <app-name>`. Leave it out and moin uses the app of the folder you are in: the `app` in [x-moin](/docs/guides/config), or else the folder's name.
+A deploy puts a new version of your app live on its server, numbered per app: v1, v2, v3. If it fails, the last good deploy keeps running.
 
 ## Deploy from a repo
 
-Sends the code in your current folder to the server, which builds and starts it.
+Sends the code in your folder to the server, which builds and starts it. The first deploy creates the app, named after the folder.
 
 ```surfaces
 CLI: moin deploy
@@ -19,48 +18,29 @@ API: POST /api/v1/apps/{app}/uploads
 API: POST /api/v1/apps/{app}/deploys
 ```
 
-The web and MCP cannot reach the files on your computer. They deploy from [GitHub](/docs/guides/github) or an [image](/docs/guides/ci) instead. In the API, upload first, then start the deploy.
-
 ```bash
 moin deploy                                                  # the app of this folder
 moin deploy <app-name>                                       # a named app
 moin deploy --server <server-name> --dir ./site <app-name>   # a new app on one of several servers, from another folder
 ```
 
-moin packs the files git knows, including changes you have not committed and new files that are not ignored. Outside a git repo it packs everything but `.git`. The archive goes straight into [your bucket](/docs/guides/bucket). The agent downloads it from there, deletes it, and builds and starts it with Docker Compose on the app's server. moin never stores your code.
-
-What the repo brings decides how moin builds it:
-
-| The repo has | moin does |
-| --- | --- |
-| `compose.yml` | uses it |
-| only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
-| a Go module | also writes the Dockerfile: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
-| none of these | builds it with [Railpack](#no-dockerfile): Node, Bun, Python, Ruby, PHP and more |
-
-Your app must listen on the port moin gives it in `PORT`, or on the port in your compose file or Dockerfile. [Config in the repo](/docs/guides/config) changes the port, the health check and more.
+No Dockerfile needed: moin uses your `compose.yml` or `Dockerfile`, or builds Node, Bun, Python, Ruby, PHP, Go and more by itself. Your app listens on the port in `PORT` (8080 unless your compose file or Dockerfile says otherwise). [How moin works](/docs/concepts/how-moin-works#how-moin-builds-a-repo) has the details; [Config in the repo](/docs/guides/config) changes the port, the health check and more.
 
 ### No Dockerfile
 
-No Dockerfile? No problem. moin reads your repo and builds it with [Railpack](https://railpack.com), the open source builder Railway made: Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more.
-
-- **It finds the language and the version**: from `package.json`, `requirements.txt`, `pyproject.toml`, `Gemfile`, `composer.json` and the like.
-- **It finds the start command**: the `start` script, a `Procfile`, `main.py`. Set your own with the env var `RAILPACK_START_CMD`.
-- **Your app listens on `PORT`**: moin sets it to 8080 and sends traffic there, like Railway.
-- **Your env vars reach the build**, as secrets that never land in the image or in a log. A build that needs `NEXT_PUBLIC_API_URL` gets it.
-- **Data goes to `/data`**, like any app moin builds: `DATA_DIR=/data` is set.
-
-The deploy says what it found:
+Without a `Dockerfile` or `compose.yml`, moin builds the repo with [Railpack](https://railpack.com). The deploy says what it found:
 
 ```text
 → Railpack: Node 24.22.1, start: npm run start
 ```
 
-The app page, `moin apps <app-name>`, the TUI, the API and `get_app` show it too. If Railpack cannot tell how to build or start the repo, the deploy fails with its reason; add a `Dockerfile` or a `compose.yml` and deploy again. The agent downloads Railpack once, checked against its published checksum, and the build runs on your server with Docker's own BuildKit.
+Set your own start command with the env var `RAILPACK_START_CMD`. `DATA_DIR=/data` is set. If Railpack cannot tell how to build or start the repo, the deploy fails with its reason: add a `Dockerfile` or a `compose.yml`.
+
+## What a deploy does
+
+It downloads the code, builds it on your server, starts it, checks it stays up and calls the health path; a failed start brings the last good deploy back. Step by step: [What a deploy does](/docs/concepts/how-moin-works#what-a-deploy-does).
 
 ## See your apps
-
-Lists every app with its server and its live deploy.
 
 ```surfaces
 Web: **Apps**
@@ -72,7 +52,7 @@ MCP: list_apps
 
 ## Create an app
 
-Makes an empty app on a [server](/docs/guides/servers), ready for its first deploy. The first `moin deploy` in a repo does this by itself.
+An empty app on a [server](/docs/guides/servers), ready for its first deploy. `moin deploy` does this by itself.
 
 ```surfaces
 Web: **Apps**, **Add app**
@@ -82,148 +62,93 @@ API: POST /api/v1/apps
 MCP: create_app
 ```
 
-## What a deploy does
-
-1. Downloads the code from your bucket, or the commit from GitHub, checks it and keeps it with the release.
-2. Reads the compose file with `docker compose config`, together with the [x-moin block](/docs/guides/config).
-3. Tags the built images per deploy, sets the env vars and `restart: unless-stopped`.
-4. Builds, starts with `docker compose up --wait` and checks that the main service still runs 5 seconds later.
-5. Calls the health path, if x-moin sets one, until it answers below 500.
-6. Reports the SQLite databases it finds on the app's volumes and the Postgres services in its compose file, for the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups).
-
-If the start fails, the previous release starts again and the deploy is marked **failed**. Its log ends with the last lines of the service that stopped.
-
-The server keeps the releases of the last 5 builds (of code or of an image) with their images, and every restart, start, domain change and rollback since the oldest of them. Roll back can go to any of those.
-
-## Your data survives every deploy
-
-A volume is a folder on the server that your app's container can see, such as `./data` on the server shown as `/data` in the container. A folder your app mounts but the repo does not bring, like `./data`, moves to `/var/lib/moin/apps/<app>/volumes/` and stays there across deploys. Named volumes are kept as they are. Files the repo brings, like a config file, belong to the release.
-
-Your app keeps its database in a folder other than `/data`? Mount that folder in `compose.yml`, for example `./data:/app/data`. moin keeps it and backs up the SQLite files in it.
-
 ## Follow a deploy
 
-Shows the log of a deploy while it runs, step by step.
-
 ```surfaces
-Web: the app page, **Deploy log**
+Web: the app, **Deploys**, the deploy log
 CLI: moin deploy
 TUI: opens by itself when a deploy starts
 API: GET /api/v1/apps/{app}/deploys/{number}/events
 MCP: get_deploy
 ```
 
-`moin deploy` prints the log as it goes. An agent over MCP calls `get_deploy` again until the deploy is done. The web page follows every new deploy by itself, also one started from the CLI.
+The web follows every new deploy by itself, also one started from the CLI. An agent calls `get_deploy` again until the deploy is done.
 
 ## See past deploys
 
-Lists the deploys of an app, newest first, with their status.
+Every deploy keeps its log, a failed one too. A failed log ends with the last lines of the service that stopped: start there.
 
 ```surfaces
-Web: the app page, **Deploys**
+Web: the app, **Deploys**, click a deploy
 CLI: moin deploys <app-name>
-TUI: on the app, `d`
-API: GET /api/v1/apps/{app}
-MCP: get_app
-```
-
-## Read the log of one deploy
-
-Shows the full log of an earlier deploy. Every deploy keeps its log, a failed one too, so you can read later what went wrong. A failed deploy's log ends with the last lines of the service that stopped: start there.
-
-```surfaces
-Web: the app page, click the deploy under **Deploys**
 CLI: moin deploys v3
 TUI: on the app, `d`, pick the deploy, then `enter`
+API: GET /api/v1/apps/{app}
 API: GET /api/v1/apps/{app}/deploys/{number}
+MCP: get_app
 MCP: get_deploy
 ```
 
 ## Redeploy
 
-Builds the newest code again from the copy the server kept, with the env vars as they are now. Nothing is uploaded.
+Builds the newest code again from the copy the server kept, with the env vars as they are now. Nothing is uploaded. An image deploy pulls and runs the newest image again.
 
 ```surfaces
-Web: the app page, **Redeploy**
+Web: the app, **Redeploy**
 CLI: moin redeploy <app-name>
 TUI: on the app, `R`, then `y`
 API: POST /api/v1/apps/{app}/redeploy
 MCP: redeploy_app
 ```
 
-After changing env vars, a restart is enough and faster. An app deployed from an image pulls and runs the newest image again instead.
-
 ## Restart
 
-Starts the live release again with the [env vars](/docs/guides/env), [domains and password](/docs/guides/domains) as they are now. Nothing is built. Saving a setting never restarts an app; the changes wait, and the app page shows how many ("2 changes waiting"). Restart applies them all at once.
-
-If the app's images are gone from the server, for example after `docker image prune`, the restart builds them again from the source the release kept. If that source is gone too, it says so: deploy again.
+Starts the live deploy again with the [env vars](/docs/guides/env), [domains and password](/docs/guides/domains) as they are now, without a build. Saving a setting never restarts an app: the changes wait until a restart applies them all. The app page and `moin apps <app>` say "2 changes waiting"; the API has them as `changes_waiting`.
 
 ```surfaces
-Web: the app page, **Restart**
+Web: the app, **Restart**
 CLI: moin restart <app-name>
 TUI: on the app, `T`, then `y`
 API: POST /api/v1/apps/{app}/restart
 MCP: restart_app
 ```
 
-## Stop
+If the images are gone from the server, after `docker image prune` for example, the restart builds them again from the source the deploy kept. If that is gone too, it says so: deploy again.
 
-Takes the app offline. It stays off, also after the server reboots. Its data and settings stay.
+## Stop and start
+
+Stop takes the app offline. It stays off, also after a reboot; its data and settings stay. Start runs it again, like a restart; a deploy starts it too.
 
 ```surfaces
-Web: the app page, **Stop**
+Web: the app, **Stop** or **Start**
 CLI: moin stop <app-name>
-TUI: on the app, `S`, then `y`
-API: POST /api/v1/apps/{app}/stop
-MCP: stop_app
-```
-
-`moin stop` asks first; `--yes` skips the question. Changes to the domains or the password of a stopped app wait until it starts.
-
-## Start
-
-Runs a stopped app again, like a restart. A deploy starts it too. An app that runs already stays as it is: moin says it is already running.
-
-```surfaces
-Web: the app page, **Start**
 CLI: moin start <app-name>
-TUI: on the app, `S`
+TUI: on the app, `S` (stop asks `y`)
+API: POST /api/v1/apps/{app}/stop
 API: POST /api/v1/apps/{app}/start
+MCP: stop_app
 MCP: start_app
 ```
 
+`moin stop` asks first; `--yes` skips it. Changes to the domains or the password of a stopped app wait until it starts. Starting an app that runs says it is already running.
+
 ## Roll back
 
-Starts an earlier successful deploy again, with the env vars it had. Use it when a new version is broken.
+Starts an earlier successful deploy again, with the env vars it had.
 
 ```surfaces
-Web: the app page, **Roll back** on a deploy
+Web: the app, **Deploys**, **Roll back** on a deploy
 CLI: moin rollback v3
 TUI: on the app, `d`, pick the deploy, `r`, then `y`; `P` rolls back to the one before the live one
 API: POST /api/v1/apps/{app}/rollback
 MCP: rollback_app
 ```
 
-A rollback is a new deploy, for example v4 with the note *rollback to v3*. Without a number (`moin rollback`), it picks the successful deploy before the live one. In the TUI, pick a deploy with `↑` `↓` on the deploys tab before `r`; `P` takes the one before the live one. In the API, send the deploy as `{"number": 3}`. The web, the CLI and the TUI ask first; in a script, add `--yes`.
-
-## Remove an app
-
-Stops the app and removes its containers and images. Its volumes and data stay on the server, and its backups stay in your bucket until you delete them: see [How long things stay](/docs/guides/bucket#how-long-things-stay).
-
-```surfaces
-Web: the app page, **Remove app**
-CLI: moin apps rm <app-name>
-TUI: opens the web: `w`, then `p`
-API: DELETE /api/v1/apps/{app}
-MCP: remove_app
-```
-
-You cannot undo it, so moin asks you to type the app's name first. `moin apps rm <app-name> --yes` skips that in scripts. An agent passes the name as `confirm`.
+A rollback is a new deploy, such as v4 with the note *rollback to v3*. `moin rollback` without a number takes the successful deploy before the live one. The API takes `{"number": 3}`. The web, the CLI and the TUI ask first; `--yes` skips it. The server keeps the last 5 builds to roll back to.
 
 ## Pin your apps
 
-Pin the apps you look at most: the overview shows them right under what needs you.
+Pinned apps show on the overview right under what needs you. A pin is for the whole workspace.
 
 ```surfaces
 Web: the star next to the app's name
@@ -233,13 +158,25 @@ API: PUT /api/v1/apps/{app}/pin {"pinned": true}
 MCP: pin_app
 ```
 
-A pin is for the whole workspace. Everything else sorts itself the same way everywhere: what needs you first, then what deploys, then pinned apps, then the rest by name. The overview shows your pinned apps and the ones deployed last; **All apps** lists every one.
+Everywhere, apps sort the same way: what needs you, then what deploys, then pinned apps, then the rest by name. The overview shows pinned apps and the ones deployed last; **All apps** lists every one.
+
+## Remove an app
+
+Stops the app and removes its containers and images. Its volumes and data stay on the server, its backups in your bucket until you delete them: [How long things stay](/docs/concepts/backups#how-long-things-stay).
+
+```surfaces
+Web: the app, **Remove app**
+CLI: moin apps rm <app-name>
+TUI: opens the web: `w`, then `p`
+API: DELETE /api/v1/apps/{app}
+MCP: remove_app
+```
+
+You type the app's name to confirm; `--yes` skips it in scripts, and an agent passes the name as `confirm`.
 
 ## Push to deploy with GitHub Actions
 
-This workflow deploys every push to `main`. The [GitHub](/docs/guides/github) guide shows a way without CI, and [Build in CI](/docs/guides/ci) builds the image in CI.
-
-It needs a [bucket](/docs/guides/bucket) and an API token with **Read and write** access. [Create the token](/docs/guides/account#create-an-api-token) and save it in your GitHub repo under **Settings**, **Secrets and variables**, **Actions**, as `MOIN_TOKEN`.
+Deploys every push to `main`. It needs a [bucket](/docs/guides/bucket) and an API token with **Read and write** access, saved in the repo under **Settings**, **Secrets and variables**, **Actions** as `MOIN_TOKEN` ([create the token](/docs/guides/account#create-an-api-token)). Without CI, [GitHub](/docs/guides/github) deploys every push by itself; [Build in CI](/docs/guides/ci) builds the image in CI.
 
 ```yaml
 name: deploy
@@ -258,3 +195,11 @@ jobs:
           MOIN_URL: https://moin.example.com
           MOIN_TOKEN: ${{ secrets.MOIN_TOKEN }}
 ```
+
+## Good to know
+
+- Commands on an app take its name as the last word. Without it, moin uses the app of your folder: `app` in [x-moin](/docs/guides/config), or the folder's name.
+- The web and MCP cannot reach files on your computer: they deploy from [GitHub](/docs/guides/github) or an [image](/docs/guides/ci). In the API, upload first, then start the deploy.
+- moin never stores your code: the archive passes through your bucket and is deleted once the server has it.
+- Your data survives every deploy: mounted folders like `./data` move to `/var/lib/moin/apps/<app>/volumes/` and stay. [Your data survives every deploy](/docs/concepts/how-moin-works#your-data-survives-every-deploy).
+- The Railpack result shows on the app page, in `moin apps <app-name>`, the TUI, the API and `get_app`.
