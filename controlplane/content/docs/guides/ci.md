@@ -5,7 +5,7 @@ group: "Apps"
 order: 5
 ---
 
-Build the image in CI, push it to a registry, and moin deploys it: the server only pulls and starts it. Good for heavy builds, build caches and many servers. Deploy the repo once with `moin deploy` first: an image deploy keeps that compose file and swaps only the image of the main service.
+CI is a computer elsewhere, such as GitHub Actions, that builds your app for you: it builds an image and pushes it to a registry, and moin deploys it. The server only downloads and starts it. Good for heavy builds, build caches and many servers. Deploy the repo once with `moin deploy` first: an image deploy keeps that compose file and swaps only the image of the main service.
 
 ## 1. Save a registry login
 

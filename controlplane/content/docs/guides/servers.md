@@ -5,7 +5,7 @@ group: "Servers and data"
 order: 1
 ---
 
-A server is any Linux machine with the moin agent on it, at any provider, amd64 or arm64, with systemd: Ubuntu and Debian are the easy choice. The agent only dials out, so the server needs no open port for moin.
+A server is your computer on the internet, and the agent is the little helper on it that does the work. The agent only calls out, so the server needs no open door for moin. Any Linux machine at any provider works, amd64 or arm64, with systemd: Ubuntu and Debian are the easy choice.
 
 ## Add a server
 
@@ -126,17 +126,19 @@ moin agent uninstall --apps   # the apps and their data go too, for good
 | proxy, tunnel, firewall | stay | removed |
 | `/etc/moin/rules`, Docker | stay | stay |
 
-## On the server
+## Good to know
+
+- **Disk space**: after every deploy and once a day the agent removes images no kept deploy or container uses, images without a name, and build cache older than a week. What a rollback needs, your volumes and anything moin did not put there stay. Its log says what it freed. Over 90% full anyway, moin [alerts](/docs/guides/alerts).
+- **A new address**: agents and the CLI that still use an old address of the control plane move to the new one by themselves, once it answers.
+- Next: close every port with the [Cloudflare Tunnel and the firewall](/docs/guides/security).
+
+## Under the hood
+
+The agent is the `moin-agent` service. On the server:
 
 ```bash
 systemctl status moin-agent     # does the agent run?
 journalctl -u moin-agent -f     # its log
 ```
 
-The agent keeps its state in `/var/lib/moin`: its token in `agent.json` and every app under `apps/<app>`.
-
-## Good to know
-
-- **Disk space**: after every deploy and once a day the agent removes images no kept deploy or container uses, images without a name, and build cache older than a week. What a rollback needs, your volumes and anything moin did not put there stay. Its log says what it freed. Over 90% full anyway, moin [alerts](/docs/guides/alerts).
-- **A new address**: agents and the CLI that still use an old address of the control plane move to the new one by themselves, once it answers.
-- Next: close every port with the [Cloudflare Tunnel and the firewall](/docs/guides/security).
+It keeps its state in `/var/lib/moin`: its token in `agent.json` and every app under `apps/<app>`.

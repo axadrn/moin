@@ -5,7 +5,7 @@ group: "Apps"
 order: 1
 ---
 
-A deploy puts a new version of your app live on its server, numbered per app: v1, v2, v3. If it fails, the last good deploy keeps running.
+A deploy puts a new version of your app live: v1, then v2, then v3. If it fails, the last good deploy keeps running.
 
 ## Deploy from a repo
 

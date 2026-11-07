@@ -5,7 +5,7 @@ group: "Team"
 order: 2
 ---
 
-Every change in a workspace, who made it, to the second, and how it came in. Your secrets and your data never.
+The activity is moin's notebook of who did what, and when: every change in a workspace, who made it, to the second, and how it came in. Your secrets and your data never go in.
 
 ```surfaces
 Web: **Settings**, **Activity**, or `g` then `y`

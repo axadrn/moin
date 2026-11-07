@@ -36,23 +36,11 @@ Below that: apps live, servers online, backups checked in the last 24 hours, the
 
 ## Jump anywhere
 
-`⌘K`, `Ctrl+K`, `/` or the search in the bar opens the search: every page, app, server and bucket. Type a few letters, then `enter`. It also runs **Deploy**, **Restart** and **Roll back** of an app, each asking first, like the buttons on the app.
+`⌘K`, `ctrl+k`, `/` or the search in the bar opens the palette: every page, app and server, and actions such as **Deploy** and **Restart**. Type a few letters, then `enter`; `?` shows every key. [Palette and keys](/docs/reference/palette).
 
 ## The bar and Settings
 
 The bar on every page holds the wordmark (back to the Overview), the search and your picture. Your picture opens **Settings**, a page: the workspace's **Team**, **GitHub**, **Alerts**, **Bucket**, **Activity** and **Billing**, your workspaces, and under **You** your **Account** with the tabs **Profile**, **Security** and **Tokens**.
-
-## Keyboard shortcuts
-
-`?` shows every key, anywhere unless you are typing.
-
-| Key | Does |
-| --- | --- |
-| `⌘K` · `Ctrl+K` · `/` | search, or run anything |
-| `g` then `o` · `s` · `b` · `y` · `t` · `l` · `,` | Overview, Servers, Bucket, Activity, Team, Alerts, Settings |
-| the key on a tab | opens that section of the page, such as `d` for an app's Deploys |
-| `?` | the list of keys |
-| `esc` | close, or leave a field |
 
 ## Good to know
 

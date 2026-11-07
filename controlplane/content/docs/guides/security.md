@@ -5,7 +5,7 @@ group: "Servers and data"
 order: 2
 ---
 
-A server moin runs can have no open port at all. Three switches per server each close a door, and a file on the server decides what moin may do there. The agent only dials out, so moin itself needs no open port.
+Your server has doors to the internet, called ports; moin can close all of them, so nobody from outside gets in. Three switches per server each close a door, and a file on the server decides what moin may do there. The agent only calls out, so moin itself needs no open door.
 
 | Switch | What it closes | Needs |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Each switch works alone; `--tunnel off`, `--ssh open` and `--firewall off` turn 
 
 ## Keys
 
-The tunnel needs a Cloudflare API token, SSH on Tailscale a Tailscale auth key. They belong to the workspace, work for all its servers and are stored encrypted. A new key replaces the old one; an empty field keeps it.
+Two switches need a key, which you give once for every server: the tunnel a Cloudflare API token, SSH on Tailscale a Tailscale auth key. They belong to the workspace, work for all its servers and are stored encrypted. A new key replaces the old one; an empty field keeps it.
 
 ```surfaces
 Web: **Servers**, **Security** on the server, **Keys for every server**
@@ -45,12 +45,11 @@ MCP: set_integrations
 
 - **Cloudflare token**: in Cloudflare, **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit** for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS**, without it you do that in Cloudflare. moin checks the token before it stores it.
 - **Tailscale key**: in the Tailscale admin console, **Settings**, **Keys**. Make it reusable.
-- On the server the agent hands the Cloudflare token to cloudflared through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows in `ps`.
 - Turn the tunnels off before you remove the Cloudflare token: without it moin cannot delete a tunnel. Removing a key changes no server at once; without the Tailscale key, the next security change of a server opens SSH again on every network.
 
 ## Cloudflare Tunnel
 
-`cloudflared` runs next to Traefik, the server's proxy, and keeps a connection open to Cloudflare. With your token moin creates a tunnel for the server, routes every domain of its apps through it (anything else gets a 404), points each domain's DNS at the tunnel in the zone that holds it, and turns on **Always Use HTTPS**: Cloudflare serves HTTPS, so the server needs no certificate. A domain you add later gets the same.
+Visitors reach your app through Cloudflare, so the server keeps ports 80 and 443 closed. With your token moin creates a tunnel for the server, routes every domain of its apps through it (anything else gets a 404), points each domain's DNS at the tunnel in the zone that holds it, and turns on **Always Use HTTPS**: Cloudflare serves HTTPS, so the server needs no certificate. A domain you add later gets the same.
 
 ```bash
 moin servers secure web-1 --tunnel on
@@ -62,7 +61,7 @@ moin servers secure web-1 --tunnel on
 
 ## SSH only on Tailscale
 
-SSH answers only on your tailnet, so nobody else on the internet can even try to log in.
+SSH is the door you use to log in to your server yourself. With this switch it opens only on your tailnet, your own private network, so nobody else on the internet can even try.
 
 ```bash
 moin servers secure web-1 --ssh tailscale
@@ -72,11 +71,13 @@ The agent installs Tailscale if it is missing and adds the server to your tailne
 
 ## Firewall
 
+The firewall shuts every door the other switches do not need.
+
 ```bash
 moin servers secure web-1 --firewall on
 ```
 
-It lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and 41641/udp for Tailscale. It drops everything else. The rules live in one nftables table, `moin`, changed in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table; with the tunnel on, no container port is published.
+It lets in answers to connections the server made itself, ping, and what the other switches leave open: SSH unless it is on Tailscale, ports 80 and 443 unless the tunnel carries the traffic, and 41641/udp for Tailscale. It drops everything else.
 
 ## See what is open
 
@@ -98,7 +99,7 @@ With all three switches on, nothing is open to the internet: the agent dials out
 
 ## Rules
 
-`/etc/moin/rules` on the server says what moin may do there. The agent checks every request against it and refuses what it does not allow. Nobody can change it through moin: not us, not your team, not someone who breaks into moin. It takes root on the server.
+A file on your server says what moin may do there, and only you, as root on the server, can change it: `/etc/moin/rules`. The agent checks every request against it and refuses what it does not allow. Nobody can change it through moin: not us, not your team, not someone who breaks into moin.
 
 ```
 # /etc/moin/rules
@@ -138,3 +139,9 @@ MCP: list_servers
 ```
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
+
+## Under the hood
+
+- The tunnel is `cloudflared`, running next to Traefik, the server's proxy. It keeps a connection open to Cloudflare, and visitors come in through it.
+- The agent hands the Cloudflare token to `cloudflared` through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows in `ps`.
+- The firewall rules live in one nftables table, `moin`, changed in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table; with the tunnel on, no container port is published.

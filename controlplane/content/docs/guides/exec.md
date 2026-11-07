@@ -5,7 +5,7 @@ group: "Every day"
 order: 3
 ---
 
-Runs one command in a container of your app, with its output as it comes and the exit code at the end. For migrations, the first admin user or a look at a file. No SSH, no key on your laptop.
+Run a command inside your app, as if you typed it on the server, and see what it prints: one command in a container of your app, its output as it comes and the exit code at the end. For migrations, the first admin user or a look at a file. No SSH, no key on your laptop.
 
 ## Run a command
 

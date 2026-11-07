@@ -5,7 +5,7 @@ group: "Every day"
 order: 5
 ---
 
-Every server and every app has its CPU, memory, disk and network, live and over the last 30 days. Nothing to install or set up: no Prometheus, no Grafana. A self-hosted control plane does the same.
+Metrics show how hard your servers and apps work: CPU, memory, disk and network, live and over the last 30 days. Nothing to install or set up: no Prometheus, no Grafana. A self-hosted control plane does the same.
 
 ```surfaces
 Web: **Servers**, the server, **Metrics**; the app, **Metrics**

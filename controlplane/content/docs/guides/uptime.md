@@ -5,7 +5,7 @@ group: "Every day"
 order: 6
 ---
 
-From the first deploy on, the control plane visits every domain of every app once a minute, like a visitor: the status, the response time and the HTTPS certificate. Nothing to set up.
+Uptime tells you whether your app is open: from the first deploy on, moin visits every domain of every app once a minute, like a visitor, and checks the status, the response time and the HTTPS certificate. Nothing to set up.
 
 ```surfaces
 Web: the app, **Domains**, a domain under **Uptime**

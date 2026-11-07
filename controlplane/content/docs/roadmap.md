@@ -2,7 +2,7 @@
 title: "Roadmap"
 description: "What moin does today, what comes next and what comes later"
 group: "Reference"
-order: 6
+order: 7
 ---
 
 moin is in beta: it runs real sites today and keeps growing. No dates: "next" is soon after launch, "later" after that. Follow an item on its GitHub issue, or say what you need there.
