@@ -8,9 +8,3 @@ templ NavbarPricingDesktop() {
 		@navLink("/#pricing", "Pricing")
 	}
 }
-
-templ NavbarPricingMobile() {
-	if ctxkeys.RenderConfig(ctx).Billing {
-		@MobileLink("/#pricing", "Pricing")
-	}
-}

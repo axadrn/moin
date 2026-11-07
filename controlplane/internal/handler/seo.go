@@ -66,9 +66,6 @@ func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, "\n\n## Documentation\n\n")
 	for _, page := range h.docsService.FlatDocsList() {
 		path := "/docs/" + page.Slug + ".md"
-		if page.Slug == "introduction" {
-			path = "/docs.md"
-		}
 		description := strings.TrimSpace(page.Description)
 		if description == "" {
 			description = "Product documentation"

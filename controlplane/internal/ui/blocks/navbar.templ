@@ -2,17 +2,12 @@ package blocks
 
 import (
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/githubstars"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/separator"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/sheet"
 	"github.com/axadrn/moin/controlplane/internal/ui/icons"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 // GitHubURL is the open source repository of moin.
@@ -33,118 +28,72 @@ templ Wordmark(class ...string) {
 // BetaBadge says moin is in beta, next to the wordmark, centered on it with
 // items-center: Wordmark trims its box to its lowercase letters.
 templ BetaBadge(class string) {
-	@badge.Badge(badge.Props{Class: utils.CN("h-auto leading-normal rounded-full bg-secondary px-2 py-0.5 font-sans text-[11px] font-semibold text-muted-foreground", class)}) {
-		Beta
-	}
+	<span class={ "rounded-full bg-muted px-2 py-0.5 font-sans text-xs font-medium text-muted-foreground", class }>Beta</span>
 }
 
 templ navLink(href, label string) {
-	<a href={ templ.SafeURL(href) } class="rounded-full px-3.5 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">{ label }</a>
+	<a href={ templ.SafeURL(href) } class="flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">{ label }</a>
 }
 
 // starsShowAt is how many GitHub stars it takes before the navbar shows
 // the count.
 const starsShowAt = 1000
 
+// Navbar is the floating pill of the public pages: the wordmark, the
+// places, and the one way in. On a phone it keeps the wordmark, Docs and
+// the way in; the footer has the rest. No menu: links change pages.
 templ Navbar() {
 	{{ user := ctxkeys.User(ctx) }}
 	<header class="sticky top-0 z-50 px-3 pt-3 sm:px-6">
-		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-3 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-5 sm:h-16 sm:gap-4 sm:pl-7" aria-label="Main">
-			<div class="flex items-center gap-6">
-				<a href="/" class="flex items-center gap-2 text-[21px] leading-none" aria-label={ brand.Name + " home, beta" }>
+		<nav class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 rounded-full bg-card/85 pr-1.5 pl-5 shadow-sm ring-1 ring-foreground/5 backdrop-blur-xl sm:h-16 sm:pr-2.5 sm:pl-6" aria-label="Main">
+			<div class="flex min-w-0 items-center gap-4">
+				<a href="/" class="flex items-center gap-2 text-xl leading-none outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home, beta" }>
 					@Wordmark()
 					@BetaBadge("max-[359px]:hidden")
 				</a>
-				<div class="hidden items-center gap-0.5 lg:flex">
-					@NavbarPricingDesktop()
+				<div class="hidden items-center lg:flex">
+					@navLink("/apps", "Apps")
 					@NavbarDocsDesktop()
+					@NavbarPricingDesktop()
 					@navLink("/changelog", "Changelog")
-					// Apps stands apart: the catalog is a place of its own.
-					@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "mx-2 h-4 data-vertical:self-auto"})
-					<a href="/apps" class="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14px] font-medium text-foreground transition-colors hover:bg-secondary">
-						Apps
-					</a>
 				</div>
 			</div>
-			<div class="flex items-center gap-1">
+			<div class="flex shrink-0 items-center gap-1">
+				<span class="lg:hidden">
+					@NavbarDocsMobile()
+				</span>
 				// The star count shows from starsShowAt on: a small one says
 				// "nobody uses this", like the live numbers of the home page.
 				{{ stars := githubstars.Count() }}
 				if stars < starsShowAt {
 					{{ stars = 0 }}
 				}
-				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-10 items-center justify-center gap-1.5 rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:inline-flex", templ.KV("w-10", stars == 0), templ.KV("px-3.5", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
+				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-11 items-center justify-center gap-1.5 rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 lg:inline-flex", templ.KV("w-11", stars == 0), templ.KV("px-4", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
 					@icons.Github(icons.Props{Class: "size-[18px]"})
 					if stars > 0 {
-						<span class="text-[13px] font-semibold tabular-nums">{ githubstars.Short(stars) }</span>
+						<span class="text-sm font-medium tabular-nums">{ githubstars.Short(stars) }</span>
 					}
 				</a>
-				<div class="hidden lg:block">
-					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
-				</div>
-				// On a phone the bar holds only the logo and the menu: the menu
-				// and the hero carry the way in.
+				<span class="hidden lg:contents">
+					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-11 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"})
+				</span>
+				// One way in: /auth signs in and signs up alike. On a phone it
+				// is gray, so the page keeps its one primary button.
+				{{ href, label := "/auth", "Deploy now" }}
 				if user != nil {
-					@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 gap-1.5 max-sm:hidden"}) {
-						Dashboard
-						@icon.ArrowRight(icon.Props{Class: "size-3.5"})
-					}
-				} else {
-					// One way in: /auth signs in and signs up alike.
-					@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "ml-1 max-sm:hidden"}) {
-						Deploy now
-					}
+					{{ href, label = "/app", "Overview" }}
 				}
-				@sheet.Sheet(sheet.Props{ID: "mobile-nav"}) {
-					@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIconLg, Class: "text-foreground hover:bg-secondary lg:hidden", Attributes: utils.MergeAttributes(sheet.Trigger(ctx), templ.Attributes{"aria-label": "Open menu"})}) {
-						@icon.Menu(icon.Props{Class: "size-5"})
+				<span class="max-sm:hidden">
+					@kit.Button(kit.Primary, href, nil) {
+						{ label }
 					}
-					@sheet.Content(sheet.ContentProps{Side: sheet.SideRight, Class: "w-full gap-0 sm:max-w-sm"}) {
-						@MobileNav()
+				</span>
+				<span class="sm:hidden">
+					@kit.Button(kit.Secondary, href, nil) {
+						{ label }
 					}
-				}
+				</span>
 			</div>
 		</nav>
 	</header>
-}
-
-templ MobileLink(href, label string) {
-	<a href={ templ.SafeURL(href) } class="flex items-center justify-between border-b py-4 text-lg font-medium tracking-tight text-foreground" { sheet.CloseFor("mobile-nav")... }>
-		{ label }
-		@icon.ArrowRight(icon.Props{Class: "size-4 text-muted-foreground"})
-	</a>
-}
-
-templ MobileNav() {
-	{{ user := ctxkeys.User(ctx) }}
-	<div class="flex h-full flex-col">
-		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[22px] leading-none">
-			<span class="flex items-center gap-2">
-				@Wordmark()
-				@BetaBadge("")
-			</span>
-		</div>
-		<div class="flex-1 overflow-y-auto px-6 pt-1">
-			@MobileLink("/apps", "Apps")
-			@NavbarPricingMobile()
-			@NavbarDocsMobile()
-			@MobileLink("/changelog", "Changelog")
-			@MobileLink(GitHubURL, "GitHub")
-		</div>
-		<div class="space-y-2.5 border-t p-6">
-			if user != nil {
-				@button.Button(button.Props{Href: "/app", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
-					Dashboard
-				}
-			} else {
-				@button.Button(button.Props{Href: "/auth", Variant: button.VariantDefault, Size: button.SizeLg, Class: "flex w-full"}) {
-					Deploy now
-				}
-			}
-			<div class="flex items-center justify-between pt-3">
-				<span class="text-sm text-muted-foreground">Theme</span>
-				@ThemeSwitcher()
-			</div>
-		</div>
-	</div>
 }

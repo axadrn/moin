@@ -2,23 +2,27 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// Changelog is every release, newest first, in the release notes format:
-// In short, then New, Changed, Fixed, Removed and Upgrade.
+// Changelog is every version of moin, newest first, in the release notes
+// format: In short, then New, Changed, Fixed, Removed and Upgrade.
 templ Changelog(html string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Changelog",
-		Description: "What shipped in moin, newest first.",
+		Description: "What changed in moin, newest first.",
 		Path:        "/changelog",
 	}) {
-		<main class="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
-			<header class="mb-10 border-b pb-8">
-				<h1 class="font-display text-[clamp(2.1rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.03em]">What shipped.</h1>
-				<p class="mt-4 text-muted-foreground">Every release of moin, newest first. Follow it with <a class="underline underline-offset-4 hover:text-foreground" href="/changelog.xml">RSS</a>, in your reader or a Slack channel.</p>
-			</header>
-			<article class="min-w-0">
+		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{}, "Changelog") {
+				<span class="sm:ml-auto">
+					@kit.Button(kit.Secondary, "/changelog.xml", nil) {
+						RSS
+					}
+				</span>
+			}
+			<article class="max-w-2xl min-w-0 text-base">
 				@blocks.Typeset(html)
 			</article>
 		</main>

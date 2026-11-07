@@ -13,67 +13,64 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 )
 
-func TestDocsReturnsFullPagesAndHTMXFragments(t *testing.T) {
-	handler := newDocsTestHandler(t)
-
-	full := serveDocs(t, handler, false, "/docs")
-	if full.Code != http.StatusOK || !strings.Contains(strings.ToLower(full.Body.String()), "<!doctype html>") {
-		t.Fatalf("full response status = %d, body does not contain a document", full.Code)
+func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
+	response := serveDocs(t, newDocsTestHandler(t), "/docs")
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
+		t.Fatalf("status = %d, body is no page", response.Code)
 	}
-	if vary := full.Header().Values("Vary"); !containsHeaderValue(vary, "HX-Request") {
-		t.Fatalf("full response Vary = %q", vary)
-	}
-	body := full.Body.String()
-	for _, want := range []string{
-		`hx-sync="#docs-content-wrapper:replace"`,
-		`hx-status:4xx="swap:none push:false"`,
-		`hx-status:5xx="swap:none push:false"`,
-		`moin:docs:navigated`,
-	} {
+	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-search"`} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("full response does not contain %q", want)
+			t.Errorf("docs home misses %q", want)
 		}
 	}
-
-	fragment := serveDocs(t, handler, true, "/docs")
-	if fragment.Code != http.StatusOK || strings.Contains(strings.ToLower(fragment.Body.String()), "<!doctype html>") {
-		t.Fatalf("HTMX response status = %d, body is not a fragment", fragment.Code)
+	// Start comes before Apps, whatever the folders say.
+	if strings.Index(body, ">Start</h2>") > strings.Index(body, ">Apps</h2>") {
+		t.Error("topics are out of order")
 	}
-	if !strings.Contains(fragment.Body.String(), `id="docs-content"`) || !strings.Contains(fragment.Body.String(), "hx-swap-oob") {
-		t.Fatal("HTMX response is missing docs content or out-of-band updates")
-	}
-	if vary := fragment.Header().Values("Vary"); !containsHeaderValue(vary, "HX-Request") {
-		t.Fatalf("HTMX response Vary = %q", vary)
+	if strings.Contains(body, "hx-get") {
+		t.Error("docs links load whole pages, never with htmx")
 	}
 }
 
-func TestDocsHTMXErrorStaysOutOfTheSwapTarget(t *testing.T) {
-	handler := newDocsTestHandler(t)
-	response := serveDocs(t, handler, true, "/docs/missing")
+func TestDocsPageEndsWithTheNextPage(t *testing.T) {
+	body := serveDocs(t, newDocsTestHandler(t), "/docs/getting-started").Body.String()
+	for _, want := range []string{"First step", `href="/docs/guides/domains"`, "Next: </span>Domains", `href="/docs"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page misses %q", want)
+		}
+	}
+}
 
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+func TestDocsRedirectsWhatIsNoPage(t *testing.T) {
+	handler := newDocsTestHandler(t)
+	for path, target := range map[string]string{
+		"/docs/introduction":    "/docs/getting-started",
+		"/docs/introduction.md": "/docs/getting-started.md",
+		"/docs/guides":          "/docs",
+	} {
+		response := serveDocs(t, handler, path)
+		if location := response.Header().Get("Location"); location != target {
+			t.Errorf("%s goes to %q, want %q", path, location, target)
+		}
 	}
-	if strings.Contains(strings.ToLower(response.Body.String()), "<!doctype html>") {
-		t.Fatal("HTMX error response contains a full page")
-	}
-	if vary := response.Header().Values("Vary"); !containsHeaderValue(vary, "HX-Request") {
-		t.Fatalf("error response Vary = %q", vary)
+	if code := serveDocs(t, handler, "/docs/missing").Code; code != http.StatusNotFound {
+		t.Errorf("missing page answers %d", code)
 	}
 }
 
 func TestDocsServesMarkdownSource(t *testing.T) {
 	handler := newDocsTestHandler(t)
-	response := serveDocs(t, handler, false, "/docs.md")
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	page := serveDocs(t, handler, "/docs/getting-started.md")
+	if page.Code != http.StatusOK || page.Header().Get("Content-Type") != "text/markdown; charset=utf-8" {
+		t.Fatalf("status = %d, Content-Type = %q", page.Code, page.Header().Get("Content-Type"))
 	}
-	if contentType := response.Header().Get("Content-Type"); contentType != "text/markdown; charset=utf-8" {
-		t.Fatalf("Content-Type = %q", contentType)
+	if !strings.Contains(page.Body.String(), "## First step") {
+		t.Fatalf("markdown response = %q", page.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "## First step") {
-		t.Fatalf("markdown response = %q", response.Body.String())
+	index := serveDocs(t, handler, "/docs.md").Body.String()
+	if !strings.Contains(index, "## Start") || !strings.Contains(index, "- [Domains](/docs/guides/domains.md): Your own domains") {
+		t.Fatalf("index = %q", index)
 	}
 }
 
@@ -81,22 +78,24 @@ func newDocsTestHandler(t *testing.T) *DocsHandler {
 	t.Helper()
 	contentPath := t.TempDir()
 	docsPath := filepath.Join(contentPath, "docs")
-	if err := os.MkdirAll(docsPath, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(docsPath, "guides"), 0o755); err != nil {
 		t.Fatalf("create docs directory: %v", err)
 	}
-	page := "---\ntitle: Introduction\ndescription: Start here\norder: 1\n---\n\n## First step\n\nHello.\n"
-	if err := os.WriteFile(filepath.Join(docsPath, "introduction.md"), []byte(page), 0o644); err != nil {
-		t.Fatalf("write docs page: %v", err)
+	pages := map[string]string{
+		"getting-started.md": "---\ntitle: Get started\ndescription: Start here\ngroup: Start\norder: 1\n---\n\n## First step\n\nHello.\n",
+		"guides/domains.md":  "---\ntitle: Domains\ndescription: Your own domains\ngroup: Apps\norder: 1\n---\n\nDomains.\n",
+	}
+	for name, page := range pages {
+		if err := os.WriteFile(filepath.Join(docsPath, name), []byte(page), 0o644); err != nil {
+			t.Fatalf("write docs page: %v", err)
+		}
 	}
 	return NewDocsHandler(service.NewDocsService(contentPath, ""))
 }
 
-func serveDocs(t *testing.T, handler *DocsHandler, action bool, path string) *httptest.ResponseRecorder {
+func serveDocs(t *testing.T, handler *DocsHandler, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodGet, path, nil)
-	if action {
-		request.Header.Set("HX-Request", "true")
-	}
 	ctx := ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{
 		AppURL:       "https://example.com",
 		SupportEmail: "support@example.com",
@@ -108,15 +107,4 @@ func serveDocs(t *testing.T, handler *DocsHandler, action bool, path string) *ht
 
 	handler.ShowDocs(recorder, request)
 	return recorder
-}
-
-func containsHeaderValue(values []string, want string) bool {
-	for _, value := range values {
-		for _, part := range strings.Split(value, ",") {
-			if strings.TrimSpace(part) == want {
-				return true
-			}
-		}
-	}
-	return false
 }
