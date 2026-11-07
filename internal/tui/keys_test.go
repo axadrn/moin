@@ -187,19 +187,19 @@ func TestAppKeysDoNotShadowTabKeys(t *testing.T) {
 	}
 }
 
-func TestFuzzyFindsSubsequencesBestFirst(t *testing.T) {
-	if _, _, ok := fuzzy("shp", "shop"); !ok {
+func TestMatchFindsSubsequencesBestFirst(t *testing.T) {
+	if _, _, ok := match("shp", "shop"); !ok {
 		t.Error("shp matches shop")
 	}
-	if _, _, ok := fuzzy("pohs", "shop"); ok {
+	if _, _, ok := match("pohs", "shop"); ok {
 		t.Error("pohs does not match shop")
 	}
-	exact, _, _ := fuzzy("shop", "shop")
-	loose, _, _ := fuzzy("shop", "s h o p x")
+	exact, _, _ := match("shop", "shop")
+	loose, _, _ := match("shop", "s h o p x")
 	if exact <= loose {
 		t.Errorf("a whole match scores above a scattered one: %d <= %d", exact, loose)
 	}
-	_, pos, _ := fuzzy("sl", "shop logs")
+	_, pos, _ := match("sl", "shop logs")
 	if len(pos) != 2 || pos[0] != 0 || pos[1] != 5 {
 		t.Errorf("positions of sl in shop logs: %v", pos)
 	}
