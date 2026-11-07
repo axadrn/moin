@@ -36,7 +36,7 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.authService.EndSession(r); err != nil {
 		slog.Error("failed to revoke session during logout", "error", err)
 		if isAction(r) {
-			toastFailed(w, r, "Not signed out", "Something went wrong. Please try again.")
+			answerFailed(w, r, "Not signed out", "Something went wrong. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Sign out failed", "Please try again."))
@@ -259,7 +259,7 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 	workspace, err := h.authService.CompleteOnboarding(user.ID, form.Name, workspaceName, !hasPendingInvitation)
 	if err != nil {
 		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Not saved", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Not saved", "Something went wrong. Please try again.")
 		return
 	}
 	clearGitHubNameCookie(w, r)
@@ -310,7 +310,7 @@ func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
 	_, err = h.authService.StartSession(w, r, user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
 		return
 	}
 

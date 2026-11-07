@@ -3,7 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/axadrn/moin/controlplane/internal/api"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/toast"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 	"log/slog"
 	"net/http"
@@ -15,18 +15,19 @@ func renderMiddlewareError(w http.ResponseWriter, r *http.Request, status int, t
 		return
 	}
 	if r.Header.Get("HX-Request") == "true" {
-		// A toast, and the page stays as it was (DESIGN.md, Feedback).
+		// A line under what sent it, and the page stays as it was (DESIGN.md,
+		// Feedback).
 		w.Header().Set("HX-Reswap", "none")
-		if _, err := fmt.Fprint(w, `<div hx-swap-oob="beforeend:#toast-container">`); err != nil {
-			slog.Error("render middleware error toast wrapper failed", "error", err)
+		if _, err := fmt.Fprint(w, `<div hx-swap-oob="beforeend:#feedback">`); err != nil {
+			slog.Error("render middleware error feedback wrapper failed", "error", err)
 			return
 		}
-		if err := toast.Toast(toast.Props{Title: title, Description: description, Type: toast.TypeError}).Render(r.Context(), w); err != nil {
-			slog.Error("render middleware error toast failed", "error", err)
+		if err := kit.Feedback("failed", title, description).Render(r.Context(), w); err != nil {
+			slog.Error("render middleware error feedback failed", "error", err)
 			return
 		}
 		if _, err := fmt.Fprint(w, `</div>`); err != nil {
-			slog.Error("render middleware error toast wrapper failed", "error", err)
+			slog.Error("render middleware error feedback wrapper failed", "error", err)
 		}
 		return
 	}

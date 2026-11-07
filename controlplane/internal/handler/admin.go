@@ -68,7 +68,7 @@ func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request
 		h.handleError(w, r, err)
 		return
 	}
-	toastDone(w, r, "Sessions revoked", "The user has been signed out everywhere.")
+	answerDone(w, r, "Sessions revoked", "The user has been signed out everywhere.")
 	render(w, r, pages.AdminDashboardContent(dashboard))
 }
 
@@ -97,9 +97,9 @@ func (h *AdminHandler) ForeverFree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if on {
-		toastDone(w, r, "Free forever", "Their first workspace has everything, without paying.")
+		answerDone(w, r, "Free forever", "Their first workspace has everything, without paying.")
 	} else {
-		toastDone(w, r, "Free forever ended", "The rest of their trial, then they pay to make changes.")
+		answerDone(w, r, "Free forever ended", "The rest of their trial, then they pay to make changes.")
 	}
 	render(w, r, pages.AdminDashboardContent(dashboard))
 }
@@ -144,7 +144,7 @@ func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err e
 		slog.Error("admin action failed", "error", err)
 	}
 	if isAction(r) {
-		toastFailed(w, r, title, description)
+		answerFailed(w, r, title, description)
 		return
 	}
 	w.WriteHeader(status)

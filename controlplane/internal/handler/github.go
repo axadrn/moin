@@ -150,13 +150,13 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 		deploy, err := h.apps.DeployRef(r.Context(), actor(r), app.Name, "")
 		h.renderRepo(w, r)
 		if err != nil {
-			toastWarning(w, r, app.Repo+" linked, deploy not started", errorMessage(err))
+			answerNote(w, r, app.Repo+" linked, deploy not started", errorMessage(err))
 			return
 		}
-		toastDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
+		answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 	default:
 		h.renderRepo(w, r)
-		toastDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
+		answerDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
 	}
 }
 
@@ -171,7 +171,7 @@ func (h *AppsHandler) SetAutoDeploy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		app = stored
-		toastError(w, r, "Deploy on push not changed", errorMessage(err))
+		answerError(w, r, "Deploy on push not changed", errorMessage(err))
 	}
 	render(w, r, pages.AutoDeployForm(*app))
 }
@@ -184,7 +184,7 @@ func (h *AppsHandler) UnlinkRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderRepo(w, r)
-	toastDone(w, r, "Repo unlinked", "moin no longer deploys its pushes. The app keeps running.")
+	answerDone(w, r, "Repo unlinked", "moin no longer deploys its pushes. The app keeps running.")
 }
 
 // DeployRef deploys a branch, tag or commit from GitHub; the page follows
@@ -196,7 +196,7 @@ func (h *AppsHandler) DeployRef(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderRepo(w, r)
-	toastDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+shortSHA(deploy.CommitSHA)+" from GitHub.")
+	answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 }
 
 func shortSHA(sha string) string {
@@ -261,7 +261,7 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.renderSecurity(w, r)
-	toastDone(w, r, "Security applied", "The agent changes "+server.Name+" now.")
+	answerDone(w, r, "Security applied", "The agent changes "+server.Name+" now.")
 }
 
 // flipped is the switch's new value when the form flipped it, else now.
@@ -307,7 +307,7 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderSecurity(w, r)
-	toastDone(w, r, done, "")
+	answerDone(w, r, done, "")
 }
 
 // RenameServer gives the server a new name and answers its page with it.
@@ -324,7 +324,7 @@ func (h *AppsHandler) RenameServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderSecurity(w, r)
-	toastDone(w, r, server.Name+" renamed", "It is "+renamed.Name+" now. Its apps stay on it.")
+	answerDone(w, r, server.Name+" renamed", "It is "+renamed.Name+" now. Its apps stay on it.")
 }
 
 func (h *AppsHandler) renderSecurity(w http.ResponseWriter, r *http.Request) {

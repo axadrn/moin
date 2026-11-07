@@ -20,7 +20,7 @@ func (h *AccountHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if email == user.Email {
-		toastDone(w, r, "Nothing changed", "This is your email already.")
+		answerDone(w, r, "Nothing changed", "This is your email already.")
 		return
 	}
 	err := h.authService.RequestEmailChange(user.ID, email)
@@ -34,11 +34,11 @@ func (h *AccountHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Warn("email change request failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Email not changed", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Email not changed", "Something went wrong. Please try again.")
 		return
 	}
 	slog.Info("email change requested", "user_id", user.ID)
-	toastDone(w, r, "Confirm your new email", "We sent a link to "+email+". The change applies once you open it.")
+	answerDone(w, r, "Confirm your new email", "We sent a link to "+email+". The change applies once you open it.")
 }
 
 // passwordFields checks the fields of the password forms in their order and
@@ -88,7 +88,7 @@ func (h *AccountHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 	if err != nil {
 		slog.Warn("password update failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Password not changed", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Password not changed", "Something went wrong. Please try again.")
 		return
 	}
 	slog.Info("password updated", "user_id", user.ID)
@@ -104,7 +104,7 @@ func (h *AccountHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	err := h.authService.SetPassword(user.ID, r.FormValue("new_password"))
 	if err != nil {
 		slog.Warn("set password failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Password not set", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Password not set", "Something went wrong. Please try again.")
 		return
 	}
 	slog.Info("password set", "user_id", user.ID)
@@ -117,7 +117,7 @@ func (h *AccountHandler) RemovePassword(w http.ResponseWriter, r *http.Request) 
 	err := h.authService.RemovePassword(user.ID)
 	if err != nil {
 		slog.Warn("remove password failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Password not removed", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Password not removed", "Something went wrong. Please try again.")
 		return
 	}
 	slog.Info("password removed", "user_id", user.ID)
@@ -141,10 +141,10 @@ func (h *AccountHandler) renderPasswordForm(w http.ResponseWriter, r *http.Reque
 func (h *AccountHandler) passwordDone(w http.ResponseWriter, r *http.Request, userID, title string) {
 	if err := h.revokeOtherAccess(r, userID); err != nil {
 		slog.Error("failed to revoke other sessions after password change", "error", err, "user_id", userID)
-		toastWarning(w, r, title, "Other sessions could not be signed out. Use Sign out everywhere under Sessions.")
+		answerNote(w, r, title, "Other sessions could not be signed out. Use Sign out everywhere under Sessions.")
 		return
 	}
-	toastDone(w, r, title, "Your other sessions are signed out.")
+	answerDone(w, r, title, "Your other sessions are signed out.")
 }
 
 func (h *AccountHandler) revokeOtherAccess(r *http.Request, userID string) error {
@@ -161,7 +161,7 @@ func (h *AccountHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	confirmation := strings.TrimSpace(r.FormValue("delete_confirmation"))
 
 	if confirmation != "DELETE" {
-		toastFailed(w, r, "Account not deleted", "Type DELETE to confirm.")
+		answerFailed(w, r, "Account not deleted", "Type DELETE to confirm.")
 		return
 	}
 

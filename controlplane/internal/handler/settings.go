@@ -67,7 +67,7 @@ func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) 
 	if err := h.authService.RevokeSession(user.ID, sessionID); err != nil {
 		if errors.Is(err, repository.ErrSessionNotFound) {
 			if isAction(r) {
-				toastFailed(w, r, "Session not found", "That session has already ended.")
+				answerFailed(w, r, "Session not found", "That session has already ended.")
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 				render(w, r, pages.ErrorPage(http.StatusNotFound, "Session not found", "That session has already ended."))
@@ -76,7 +76,7 @@ func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) 
 		}
 		slog.Error("failed to revoke session", "error", err, "user_id", user.ID, "session_id", sessionID)
 		if isAction(r) {
-			toastFailed(w, r, "Session not revoked", "Something went wrong. Please try again.")
+			answerFailed(w, r, "Session not revoked", "Something went wrong. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Session could not be revoked", "Please try again."))
@@ -97,10 +97,10 @@ func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) 
 	sessions, err := h.authService.Sessions(user.ID)
 	if err != nil {
 		slog.Error("failed to list sessions", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Sessions not refreshed", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Sessions not refreshed", "Something went wrong. Please try again.")
 		return
 	}
-	toastDone(w, r, "Session revoked", "The session has been signed out.")
+	answerDone(w, r, "Session revoked", "The session has been signed out.")
 	currentSessionID := ""
 	if session != nil {
 		currentSessionID = session.ID
@@ -113,7 +113,7 @@ func (h *SettingsHandler) RevokeAllSessions(w http.ResponseWriter, r *http.Reque
 	if err := h.authService.RevokeAllSessions(user.ID); err != nil {
 		slog.Error("failed to revoke all sessions", "error", err, "user_id", user.ID)
 		if isAction(r) {
-			toastFailed(w, r, "Sessions not revoked", "Something went wrong. Please try again.")
+			answerFailed(w, r, "Sessions not revoked", "Something went wrong. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Sessions could not be revoked", "Please try again."))

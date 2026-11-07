@@ -30,7 +30,7 @@ func (h *AlertsHandler) Page(w http.ResponseWriter, r *http.Request) {
 // Add stores a destination. A webhook's signing secret shows this once.
 func (h *AlertsHandler) Add(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		toastFailed(w, r, "Destination not added", "The form could not be read.")
+		answerFailed(w, r, "Destination not added", "The form could not be read.")
 		return
 	}
 	destination, signingSecret, err := h.alerts.AddDestination(ctxkeys.WorkspaceMember(r.Context()), service.RequestSource(r.Context()), service.AlertDestinationInput{
@@ -42,7 +42,7 @@ func (h *AlertsHandler) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.render(w, r, pages.AlertsView{Created: &destination, SigningSecret: signingSecret})
-	toastDone(w, r, destination.Name+" added", "Send it a test to see that it works.")
+	answerDone(w, r, destination.Name+" added", "Send it a test to see that it works.")
 }
 
 // Remove deletes a destination.
@@ -53,7 +53,7 @@ func (h *AlertsHandler) Remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.render(w, r, pages.AlertsView{})
-	toastDone(w, r, name+" removed", "Its alerts stop.")
+	answerDone(w, r, name+" removed", "Its alerts stop.")
 }
 
 // Test sends a test alert. The list shows the result either way.
@@ -63,12 +63,12 @@ func (h *AlertsHandler) Test(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.As(err, &sendErr):
 		h.render(w, r, pages.AlertsView{})
-		toastError(w, r, "Test not taken", destination.Name+": "+sendErr.Message)
+		answerError(w, r, "Test not taken", destination.Name+": "+sendErr.Message)
 	case err != nil:
 		failed(w, r, "Test not sent", err, nil)
 	default:
 		h.render(w, r, pages.AlertsView{})
-		toastDone(w, r, "Test sent", destination.Name+" took it. Look for it there.")
+		answerDone(w, r, "Test sent", destination.Name+" took it. Look for it there.")
 	}
 }
 

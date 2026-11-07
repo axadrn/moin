@@ -207,7 +207,7 @@ func TestEmailAlertsSwitch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if switchOn(t, body, "email-alerts") != on || user.EmailAlerts != on || strings.Contains(body, "toast") {
+		if switchOn(t, body, "email-alerts") != on || user.EmailAlerts != on || strings.Contains(body, "data-feedback") {
 			t.Fatalf("on %v: stored %v, answer %s", on, user.EmailAlerts, body)
 		}
 	}

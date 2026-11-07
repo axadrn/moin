@@ -28,7 +28,7 @@ func (h *UpdateHandler) Notice(w http.ResponseWriter, r *http.Request) {
 func (h *UpdateHandler) Start(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	if _, err := h.updates.Start(actor(r), user); err != nil {
-		toastFailed(w, r, "Update not started", errorMessage(err))
+		answerFailed(w, r, "Update not started", errorMessage(err))
 	}
 	render(w, r, pages.UpdateNotice(h.updates.Info(user)))
 }

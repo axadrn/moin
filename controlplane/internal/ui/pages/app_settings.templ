@@ -11,7 +11,6 @@ import (
 	field "github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/toast"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/controlplane/internal/ui/utils"
@@ -24,16 +23,11 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 	{{ user := ctxkeys.User(ctx) }}
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings" }}
 	@layouts.App("Settings") {
-		if passwordRemoved {
-			@toast.Toast(toast.Props{
-				Title:       "Password removed",
-				Description: "The password was removed. Set a new one if you like.",
-				Type:        toast.TypeInfo,
-				Timeout:     8000,
-			})
-		}
 		@panelPage() {
 			@pageHeader("Settings", "Your profile, how you sign in, and the tokens your scripts and servers use.")
+			if passwordRemoved {
+				<p class="text-sm text-muted-foreground">Password removed. Set a new one if you like.</p>
+			}
 			@tabNav("Settings") {
 				@tabLink(settingsPath, "Profile", activeTab == "profile", nil)
 				@tabLink(settingsPath+"?tab=security", "Security", activeTab == "security", nil)

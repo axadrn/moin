@@ -74,7 +74,7 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 	docsTree, err := h.docsService.DocsTree()
 	if err != nil {
 		if isAction(r) {
-			toastFailed(w, r, "Documentation unavailable", "The documentation could not be loaded. Please try again.")
+			answerFailed(w, r, "Documentation unavailable", "The documentation could not be loaded. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Documentation unavailable", "The documentation could not be loaded. Please try again."))

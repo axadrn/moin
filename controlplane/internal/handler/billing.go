@@ -42,7 +42,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	member := ctxkeys.WorkspaceMember(r.Context())
 	if !member.Can(model.WorkspacePermissionManageBilling) {
 		if isAction(r) {
-			toastFailed(w, r, "Action not allowed", "Only workspace owners can start checkout.")
+			answerFailed(w, r, "Action not allowed", "Only workspace owners can start checkout.")
 		} else {
 			w.WriteHeader(http.StatusForbidden)
 			render(w, r, pages.ErrorPage(http.StatusForbidden, "Action not allowed", "Only workspace owners can start checkout."))
@@ -54,7 +54,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	plan, exists := access.PlanByID(planID)
 	if !exists || !plan.Purchasable {
 		if isAction(r) {
-			toastFailed(w, r, "Invalid plan", "Choose an available paid plan.")
+			answerFailed(w, r, "Invalid plan", "Choose an available paid plan.")
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			render(w, r, pages.ErrorPage(http.StatusBadRequest, "Invalid plan", "Choose an available paid plan."))
@@ -68,7 +68,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	}
 	if interval != model.SubscriptionIntervalMonthly && interval != model.SubscriptionIntervalYearly {
 		if isAction(r) {
-			toastFailed(w, r, "Invalid billing interval", "Choose monthly or yearly billing.")
+			answerFailed(w, r, "Invalid billing interval", "Choose monthly or yearly billing.")
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			render(w, r, pages.ErrorPage(http.StatusBadRequest, "Invalid billing interval", "Choose monthly or yearly billing."))
@@ -80,7 +80,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		if errors.Is(err, repository.ErrCheckoutPending) || errors.Is(err, repository.ErrCheckoutSelection) || errors.Is(err, repository.ErrSubscriptionAlreadyPaid) {
 			if isAction(r) {
-				toastFailed(w, r, "Checkout already active", "Finish the existing checkout or manage the current subscription first.")
+				answerFailed(w, r, "Checkout already active", "Finish the existing checkout or manage the current subscription first.")
 			} else {
 				w.WriteHeader(http.StatusConflict)
 				render(w, r, pages.ErrorPage(http.StatusConflict, "Checkout already active", "Finish the existing checkout or manage the current subscription first."))
@@ -89,7 +89,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		}
 		slog.Error("failed to create checkout", "error", err, "workspace_id", workspace.ID, "plan_id", planID, "provider", h.paymentService.Name())
 		if isAction(r) {
-			toastFailed(w, r, "Checkout not started", "Checkout could not be started. Please try again.")
+			answerFailed(w, r, "Checkout not started", "Checkout could not be started. Please try again.")
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Checkout unavailable", "Checkout could not be started. Please try again."))

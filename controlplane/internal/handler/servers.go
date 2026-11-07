@@ -75,7 +75,7 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	render(w, r, pages.ServerAddForm())
 	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
-	toastDone(w, r, server.Name+" added", "Run the install command on the server.")
+	answerDone(w, r, server.Name+" added", "Run the install command on the server.")
 }
 
 // NewInstall answers a new install command for a server in the same panel
@@ -87,7 +87,7 @@ func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, pages.ServerAdded(pages.AddedServer{Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
-	toastDone(w, r, "New install command for "+server.Name, "Run it on the server within the hour. The old one stops working.")
+	answerDone(w, r, "New install command for "+server.Name, "Run it on the server within the hour. The old one stops working.")
 }
 
 // Delete removes a server from its page and goes back to the list.
@@ -99,7 +99,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"))
 	if errors.Is(err, repository.ErrServerHasApps) {
-		toastFailed(w, r, "Server not removed", "It is online: remove its apps first, so nothing keeps running unseen.")
+		answerFailed(w, r, "Server not removed", "It is online: remove its apps first, so nothing keeps running unseen.")
 		return
 	}
 	if err != nil && !errors.Is(err, repository.ErrServerNotFound) {
@@ -112,7 +112,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		location += "?removed=" + url.QueryEscape(name)
 	}
 	if len(apps) > 0 {
-		toastDone(w, r, "Removed "+name+" and its apps", strings.Join(apps, ", ")+". They stay on the server if it comes back; remove them there with "+build.Name+" agent uninstall --apps.")
+		answerDone(w, r, "Removed "+name+" and its apps", strings.Join(apps, ", ")+". They stay on the server if it comes back; remove them there with "+build.Name+" agent uninstall --apps.")
 	}
 	redirect(w, r, location, http.StatusSeeOther)
 }
@@ -125,7 +125,7 @@ func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Agent not updated", err, nil)
 		return
 	}
-	toastDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
+	answerDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
 }
 
 // AgentUpdates turns automatic agent updates on or off and answers the
@@ -138,7 +138,7 @@ func (h *ServersHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		toastError(w, r, "Setting not saved", errorMessage(err))
+		answerError(w, r, "Setting not saved", errorMessage(err))
 	}
 	render(w, r, pages.AgentUpdatesForm(on))
 }

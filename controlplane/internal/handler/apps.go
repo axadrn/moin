@@ -73,7 +73,7 @@ func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("HX-Retarget", "#pin-form")
 	w.Header().Set("HX-Reswap", "outerHTML")
-	toastError(w, r, "Pin not changed", errorMessage(err))
+	answerError(w, r, "Pin not changed", errorMessage(err))
 	render(w, r, pages.PinButton(*stored))
 }
 
@@ -89,7 +89,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "App not added", err, map[string]string{"name": "app-name"})
 		return
 	}
-	toastDone(w, r, app.Name+" added", "Link its repo, or run moin deploy "+app.Name+" in its folder.")
+	answerDone(w, r, app.Name+" added", "Link its repo, or run moin deploy "+app.Name+" in its folder.")
 	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
 }
 
@@ -166,7 +166,7 @@ func (h *AppsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, "Rollback started", fmt.Sprintf("v%d releases v%d again.", deploy.Number, number))
+	answerDone(w, r, "Rollback started", fmt.Sprintf("v%d releases v%d again.", deploy.Number, number))
 }
 
 // Redeploy builds the newest source again. The page follows the new deploy.
@@ -177,7 +177,7 @@ func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, "Redeploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
+	answerDone(w, r, "Redeploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
 }
 
 // Restart starts the live release again with the env and routing as they
@@ -189,7 +189,7 @@ func (h *AppsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, "Restart started", fmt.Sprintf("v%d starts the live release again.", deploy.Number))
+	answerDone(w, r, "Restart started", fmt.Sprintf("v%d starts the live release again.", deploy.Number))
 }
 
 // Start runs a stopped app again. The page follows the new deploy.
@@ -198,7 +198,7 @@ func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, service.ErrRunning) {
 		// Started elsewhere: the page shows it running.
 		h.Detail(w, r)
-		toastDone(w, r, r.PathValue("app")+" is already running", "Nothing changed.")
+		answerDone(w, r, r.PathValue("app")+" is already running", "Nothing changed.")
 		return
 	}
 	if err != nil {
@@ -206,7 +206,7 @@ func (h *AppsHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, r.PathValue("app")+" starting", fmt.Sprintf("v%d runs it again.", deploy.Number))
+	answerDone(w, r, r.PathValue("app")+" starting", fmt.Sprintf("v%d runs it again.", deploy.Number))
 }
 
 // Stop stops the app's containers. Its data stays.
@@ -217,7 +217,7 @@ func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, r.PathValue("app")+" stopped", "Its data and settings stay. Start runs it again.")
+	answerDone(w, r, r.PathValue("app")+" stopped", "Its data and settings stay. Start runs it again.")
 }
 
 // DeployImage deploys an image built elsewhere. The page follows the new deploy.
@@ -228,7 +228,7 @@ func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Detail(w, r)
-	toastDone(w, r, "Image deploy started", fmt.Sprintf("v%d pulls %s.", deploy.Number, deploy.Image))
+	answerDone(w, r, "Image deploy started", fmt.Sprintf("v%d pulls %s.", deploy.Number, deploy.Image))
 }
 
 // RotateHook shows a new deploy hook URL once.
@@ -245,10 +245,10 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 	}
 	render(w, r, pages.AppHook(before.Name, url, true))
 	if before.DeployHookHash == nil {
-		toastDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
+		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
 		return
 	}
-	toastDone(w, r, "Deploy hook created", "The old URL stopped working.")
+	answerDone(w, r, "Deploy hook created", "The old URL stopped working.")
 }
 
 // RemoveHook turns the deploy hook off; its URL stops working.
@@ -260,7 +260,7 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, pages.AppHook(name, "", false))
-	toastDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+name+".")
+	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+name+".")
 }
 
 // registryFields are the fields of the registry form, by API field name.
@@ -275,7 +275,7 @@ func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderRegistries(w, r)
-	toastDone(w, r, "Login for "+host+" saved", "Your servers pull private images from it now.")
+	answerDone(w, r, "Login for "+host+" saved", "Your servers pull private images from it now.")
 }
 
 // DeleteRegistry removes a registry login.
@@ -286,7 +286,7 @@ func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderRegistries(w, r)
-	toastDone(w, r, "Login for "+r.PathValue("host")+" removed", "")
+	answerDone(w, r, "Login for "+r.PathValue("host")+" removed", "")
 }
 
 func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +348,7 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 		change := dotenv.Diff(current, next)
 		if change.None() {
 			h.renderEnv(w, r, false)
-			toastDone(w, r, "Nothing changed", "The text has the env vars there are.")
+			answerDone(w, r, "Nothing changed", "The text has the env vars there are.")
 			return
 		}
 		render(w, r, pages.AppEnvReview(name, text, change))
@@ -360,7 +360,7 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderEnv(w, r, false)
-	toastDone(w, r, "Env vars replaced", "It "+change.String()+". The next deploy or restart hands them to the app.")
+	answerDone(w, r, "Env vars replaced", "It "+change.String()+". The next deploy or restart hands them to the app.")
 }
 
 // SetEnv sets one env var from the add form.
@@ -376,7 +376,7 @@ func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderEnv(w, r, false)
-	toastDone(w, r, key+" saved", "The next deploy or restart hands it to the app.")
+	answerDone(w, r, key+" saved", "The next deploy or restart hands it to the app.")
 }
 
 // UnsetEnv removes one env var.
@@ -388,7 +388,7 @@ func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderEnv(w, r, false)
-	toastDone(w, r, key+" removed", "The next deploy or restart drops it.")
+	answerDone(w, r, key+" removed", "The next deploy or restart drops it.")
 }
 
 func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show bool) {
@@ -530,10 +530,10 @@ func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request)
 	case err != nil && changed:
 		// Saved, but the deploy that applies it did not start.
 		h.renderRouting(w, r)
-		toastWarning(w, r, done, "Not applied yet: "+errorMessage(err))
+		answerNote(w, r, done, "Not applied yet: "+errorMessage(err))
 	case err != nil:
 		h.renderRouting(w, r)
-		toastError(w, r, "Password not changed", errorMessage(err))
+		answerError(w, r, "Password not changed", errorMessage(err))
 	default:
 		h.routingChanged(w, r, done, deploy, changed)
 	}
@@ -572,16 +572,16 @@ func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
 }
 
 // routingChanged answers a saved change of the domains or the password: the
-// panel as it is now and a toast with what applies it.
+// panel as it is now and a line with what applies it.
 func (h *AppsHandler) routingChanged(w http.ResponseWriter, r *http.Request, done string, deploy *model.Deploy, changed bool) {
 	h.renderRouting(w, r)
 	switch {
 	case !changed:
-		toastDone(w, r, "Nothing changed", "It was like this already.")
+		answerDone(w, r, "Nothing changed", "It was like this already.")
 	case deploy == nil:
-		toastDone(w, r, done, "The app takes it with its next deploy or start.")
+		answerDone(w, r, done, "The app takes it with its next deploy or start.")
 	default:
-		toastDone(w, r, done, "Deploy v"+strconv.Itoa(deploy.Number)+" applies it now.")
+		answerDone(w, r, done, "Deploy v"+strconv.Itoa(deploy.Number)+" applies it now.")
 	}
 }
 
