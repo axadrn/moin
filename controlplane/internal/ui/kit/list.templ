@@ -26,11 +26,9 @@ templ Section(title string, action templ.Component) {
 //   - holds a control (a switch, a select, a field): RowControl, or
 //     RowForm when the row is the form.
 //
-// A lit row lights edge to edge, square like a tapped row in iOS; the
-// first and the last row take the card's round corners. The lines next to
-// a lit row give way, except between two lit rows, so they stay apart.
+// A lit row and the lines next to it give way, so the light fills the gap.
 templ List() {
-	<div class="flex flex-col rounded-4xl bg-card" role="list">
+	<div class="flex flex-col rounded-4xl bg-card p-1.5" role="list">
 		{ children... }
 	</div>
 }
@@ -137,7 +135,7 @@ templ RowFact(name, note string) {
 // down while it is open. Children are rows.
 templ RowMore(label string) {
 	<details class={ "group/more relative " + rowLine + " has-[>summary:hover]:before:opacity-0 has-[>summary:focus-visible]:before:opacity-0 [&:has(>summary:hover)+*]:before:opacity-0 [&:has(>summary:hover)>div>:first-child]:before:opacity-0" }>
-		<summary class="relative isolate after:absolute after:inset-0 after:-z-10 flex min-h-16 cursor-pointer list-none items-center gap-3 px-6.5 py-3 font-medium outline-none hover:after:bg-foreground/4 focus-visible:after:bg-foreground/4 active:after:bg-foreground/7 [&::-webkit-details-marker]:hidden">
+		<summary class="relative isolate after:absolute after:inset-x-0 after:inset-y-0.75 after:-z-10 after:rounded-3xl flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-3xl px-5 py-3 font-medium outline-none hover:after:bg-foreground/4 focus-visible:after:bg-foreground/4 active:after:bg-foreground/7 [&::-webkit-details-marker]:hidden">
 			<span class="min-w-0 flex-1 truncate">{ label }</span>
 			<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground transition-transform group-open/more:rotate-90"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 		</summary>
@@ -154,20 +152,20 @@ templ chevron() {
 // rowLine is the thin line over every row but the first. Like iOS it starts
 // where the text starts: after a leading icon or avatar (data-lead, 36 px
 // and a 12 px gap) when the row has one.
-const rowLine = "before:absolute before:left-6.5 before:right-6.5 before:top-0 before:h-px before:bg-border first:before:hidden has-[>[data-lead]]:before:left-[4.625rem]"
+const rowLine = "before:absolute before:left-5 before:right-5 before:top-0 before:h-px before:bg-border first:before:hidden has-[>[data-lead]]:before:left-[4.25rem]"
 
-// rowGlow is where a lit row shows its light: a layer behind its content,
-// edge to edge and square; the first and the last row round it like the
-// card.
-const rowGlow = "isolate after:absolute after:inset-0 after:-z-10 first:after:rounded-t-4xl last:after:rounded-b-4xl"
+// rowGlow is where a lit row shows its light: a round layer behind its
+// content, 3 px in from the top and the bottom, so two lit rows (the open
+// one and the hovered one) never touch: there is always room between them.
+const rowGlow = "isolate after:absolute after:inset-x-0 after:inset-y-0.75 after:-z-10 after:rounded-3xl"
 
-const rowClass = "relative flex min-h-16 w-full items-center gap-3 px-6.5 py-3 text-left " + rowGlow + " " + rowLine
+const rowClass = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left " + rowGlow + " " + rowLine
 
 // rowLit is what a row that does something adds: it lights up under the
 // mouse, on the keys and as the one open (aria-current), and the lines
-// around it give way, but the line between two lit rows stays. A row that only tells stays still (DESIGN.md,
+// around it give way. A row that only tells stays still (DESIGN.md,
 // Pages).
-const rowLit = " outline-none hover:after:bg-foreground/4 hover:before:opacity-0 focus-visible:after:bg-foreground/4 focus-visible:before:opacity-0 active:after:bg-foreground/7 [&[aria-current]]:after:bg-foreground/4 [&[aria-current]]:before:opacity-0 [&:hover+*]:before:opacity-0 [&:focus-visible+*]:before:opacity-0 [&[aria-current]+*]:before:opacity-0 [:is(:hover,:focus-visible,[aria-current])+&:is(:hover,:focus-visible,[aria-current])]:before:opacity-100"
+const rowLit = " outline-none hover:after:bg-foreground/4 hover:before:opacity-0 focus-visible:after:bg-foreground/4 focus-visible:before:opacity-0 active:after:bg-foreground/7 [&[aria-current]]:after:bg-foreground/4 [&[aria-current]]:before:opacity-0 [&:hover+*]:before:opacity-0 [&:focus-visible+*]:before:opacity-0 [&[aria-current]+*]:before:opacity-0"
 
 // pickLit lights a RowPick while it is picked or has the keys, the same
 // light as under the mouse, never a ring.

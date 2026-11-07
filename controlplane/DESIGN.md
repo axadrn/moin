@@ -172,10 +172,10 @@ Rules every page follows:
   | only tells | `kit.Row("")`, `kit.RowFact` | still: no light, the lines stay |
   | holds a control | `kit.RowControl`, `kit.RowForm`, with `kit.RowLabel` | still: the switch, select or field is what you press |
 
-  A lit row lights edge to edge and square, like a tapped row in iOS; the
-  first and the last row take the card's round corners. The line between
-  two lit rows stays, so they never run together. Lines start where the
-  text starts, after a leading icon or avatar (`data-lead`).
+  Two lit rows never touch: the light is round and sits 3 px inside the
+  row, so the open row and the one under the mouse keep room between them.
+  Lines start where the text starts, after a leading icon or avatar
+  (`data-lead`).
   `/dev/kit` shows each kind.
 - **Icons only in the catalog.** A catalog app shows its logo
   (`kit.AppIcon`) where you browse and pick; your own apps go by their
