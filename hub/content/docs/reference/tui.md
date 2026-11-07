@@ -102,9 +102,9 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 | Domains | `x` | removes the picked one, after `y` |
 | Domains | `c` | makes the picked domain the canonical one |
 | Domains | `p` | password protection: `user:password`, or removes it after `y` |
-| Uptime | `p` | pauses or resumes the check of the picked domain |
-| Uptime | `c` | sets the path it checks, empty for the default |
-| Uptime | `r` | checks again |
+| Uptime | `p` | pauses or resumes uptime of the picked domain |
+| Uptime | `c` | sets the path it visits, empty for the default |
+| Uptime | `r` | visits again |
 | Metrics | `[` `]` | the range: 1h, 24h, 7d, 30d |
 
 ## Deploy, run, servers, activity

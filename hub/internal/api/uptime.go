@@ -22,7 +22,7 @@ type Uptime struct {
 // UptimeDomain is the uptime of one domain.
 type UptimeDomain struct {
 	Domain string `json:"domain"`
-	// Path is where the check goes; custom_path says it was set, not the
+	// Path is where the visit goes; custom_path says it was set, not the
 	// health path or /.
 	Path       string `json:"path"`
 	CustomPath bool   `json:"custom_path"`
@@ -30,12 +30,12 @@ type UptimeDomain struct {
 	// State is up, down, pending or paused, since when it began.
 	State         string     `json:"state"`
 	Since         *time.Time `json:"since"`
-	CheckedAt     *time.Time `json:"checked_at"`
+	VisitedAt     *time.Time `json:"visited_at"`
 	StatusCode    int        `json:"status_code"`
 	ResponseMS    int        `json:"response_ms"`
 	Error         string     `json:"error"`
 	CertExpiresAt *time.Time `json:"cert_expires_at"`
-	// Uptime in percent; null without a check in that time.
+	// Uptime in percent; null without a visit in that time.
 	Uptime24h *float64 `json:"uptime_24h"`
 	Uptime7d  *float64 `json:"uptime_7d"`
 	Uptime30d *float64 `json:"uptime_30d"`
@@ -50,10 +50,10 @@ type Outage struct {
 	Reason    string     `json:"reason"`
 }
 
-// UptimeCheckRequest is the body of PUT /api/v1/apps/{app}/uptime/{domain}.
+// UptimeRequest is the body of PUT /api/v1/apps/{app}/uptime/{domain}.
 // A missing field keeps its setting; an empty path goes back to the health
 // path or /.
-type UptimeCheckRequest struct {
+type UptimeRequest struct {
 	Path   *string `json:"path"`
 	Paused *bool   `json:"paused"`
 }
@@ -71,7 +71,7 @@ func NewUptime(app string, uptime service.AppUptime) Uptime {
 func NewUptimeDomain(domain service.UptimeDomain) UptimeDomain {
 	answer := UptimeDomain{
 		Domain: domain.Domain, Path: domain.Path, CustomPath: domain.CustomPath, Paused: domain.Paused,
-		State: domain.State, Since: domain.Since, CheckedAt: domain.CheckedAt, StatusCode: domain.StatusCode,
+		State: domain.State, Since: domain.Since, VisitedAt: domain.VisitedAt, StatusCode: domain.StatusCode,
 		ResponseMS: domain.ResponseMS, Error: domain.Error, CertExpiresAt: domain.CertExpiresAt,
 		Uptime24h: domain.Uptime24h, Uptime7d: domain.Uptime7d, Uptime30d: domain.Uptime30d, AverageMS: domain.AverageMS,
 		Outages: []Outage{},
@@ -93,13 +93,13 @@ func (h *AppsHandler) Uptime(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewUptime(app.Name, uptime))
 }
 
-// SetUptimeCheck changes the path of a domain's check or pauses it.
-func (h *AppsHandler) SetUptimeCheck(w http.ResponseWriter, r *http.Request) {
-	var request UptimeCheckRequest
+// SetUptime changes the path of a domain's visit or pauses it.
+func (h *AppsHandler) SetUptime(w http.ResponseWriter, r *http.Request) {
+	var request UptimeRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	_, domain, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), r.PathValue("domain"), request.Path, request.Paused)
+	_, domain, err := h.apps.SetUptime(actor(r), r.PathValue("app"), r.PathValue("domain"), request.Path, request.Paused)
 	if err != nil {
 		ServiceError(w, err)
 		return

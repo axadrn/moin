@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS uptime_hours (
     app_id TEXT NOT NULL,
     domain TEXT NOT NULL,
     hour TIMESTAMP NOT NULL,
-    checks INTEGER NOT NULL DEFAULT 0,
+    visits INTEGER NOT NULL DEFAULT 0,
     up INTEGER NOT NULL DEFAULT 0,
     response_ms INTEGER NOT NULL DEFAULT 0,
     max_ms INTEGER NOT NULL DEFAULT 0,
@@ -96,6 +96,16 @@ func OpenHistory(connection string) (*sqlx.DB, error) {
 func CreateHistory(database *sqlx.DB) error {
 	if _, err := database.Exec(historySchema); err != nil {
 		return fmt.Errorf("create history tables: %w", err)
+	}
+	// Up to v1.0.0-beta.25 uptime counted checks, not visits.
+	var old int
+	if err := database.Get(&old, `SELECT COUNT(*) FROM pragma_table_info('uptime_hours') WHERE name = 'checks'`); err != nil {
+		return fmt.Errorf("read the history tables: %w", err)
+	}
+	if old > 0 {
+		if _, err := database.Exec(`ALTER TABLE uptime_hours RENAME COLUMN checks TO visits`); err != nil {
+			return fmt.Errorf("rename uptime checks to visits: %w", err)
+		}
 	}
 	return nil
 }

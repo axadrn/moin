@@ -15,7 +15,7 @@ import (
 	"github.com/axadrn/moin/internal/style"
 )
 
-// uptime shows the uptime of an app, or changes the check of one domain:
+// uptime shows the uptime of an app, or changes uptime of one domain:
 // uptime path, pause and resume.
 func uptime(ctx context.Context, args []string, stdout io.Writer) error {
 	command := "show"
@@ -72,41 +72,41 @@ func uptime(ctx context.Context, args []string, stdout io.Writer) error {
 		value := command == "pause"
 		paused = &value
 	}
-	answer, err := api.SetUptimeCheck(ctx, name, domain, path, paused)
+	answer, err := api.SetUptime(ctx, name, domain, path, paused)
 	if err != nil {
 		return err
 	}
 	switch command {
 	case "path":
-		done(stdout, "The check of %s goes to %s now.", answer.Domain, answer.Path)
+		done(stdout, "Uptime of %s goes to %s now.", answer.Domain, answer.Path)
 	case "pause":
-		done(stdout, "Paused the check of %s. Resume it with `%s uptime resume %s`.", answer.Domain, build.Name, answer.Domain)
+		done(stdout, "Paused uptime of %s. Resume it with `%s uptime resume %s`.", answer.Domain, build.Name, answer.Domain)
 	default:
-		done(stdout, "Checking %s every minute again.", answer.Domain)
+		done(stdout, "Visiting %s every minute again.", answer.Domain)
 	}
 	return nil
 }
 
 func printUptime(w io.Writer, answer client.Uptime, now time.Time) {
 	if len(answer.Domains) == 0 {
-		fmt.Fprintf(w, "%s has no domains to check. Add one: %s\n", answer.App, command(w, build.Name+" domains add blog.de"))
+		fmt.Fprintf(w, "%s has no domains to visit. Add one: %s\n", answer.App, command(w, build.Name+" domains add blog.de"))
 		return
 	}
 	rows := [][]string{}
 	var outages [][]string
 	for _, domain := range answer.Domains {
-		check := "-"
-		if domain.CheckedAt != nil {
-			check = strconv.Itoa(domain.StatusCode) + " in " + strconv.Itoa(domain.ResponseMS) + " ms"
+		visit := "-"
+		if domain.VisitedAt != nil {
+			visit = strconv.Itoa(domain.StatusCode) + " in " + strconv.Itoa(domain.ResponseMS) + " ms"
 			if domain.Error != "" {
-				check = domain.Error
+				visit = domain.Error
 			}
 		}
 		cert := "-"
 		if domain.CertExpiresAt != nil {
 			cert = strconv.Itoa(int(domain.CertExpiresAt.Sub(now).Hours()/24)) + " days"
 		}
-		rows = append(rows, []string{domain.Domain, uptimeState(domain.State), client.Percent(domain.Uptime24h), client.Percent(domain.Uptime7d), client.Percent(domain.Uptime30d), check, cert, domain.Path})
+		rows = append(rows, []string{domain.Domain, uptimeState(domain.State), client.Percent(domain.Uptime24h), client.Percent(domain.Uptime7d), client.Percent(domain.Uptime30d), visit, cert, domain.Path})
 		for _, outage := range domain.Outages {
 			lasted := "ongoing, " + human.Duration(now.Sub(outage.StartedAt))
 			if outage.EndedAt != nil {
@@ -115,7 +115,7 @@ func printUptime(w io.Writer, answer client.Uptime, now time.Time) {
 			outages = append(outages, []string{domain.Domain, outage.StartedAt.UTC().Format("2006-01-02 15:04 UTC"), lasted, outage.Reason})
 		}
 	}
-	table(w, []string{"DOMAIN", "STATE", "24H", "7D", "30D", "NEWEST CHECK", "CERT", "PATH"}, rows)
+	table(w, []string{"DOMAIN", "STATE", "24H", "7D", "30D", "LAST VISIT", "CERT", "PATH"}, rows)
 	if !answer.ServerOnline && answer.Server != "" {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server "+answer.Server+" is offline: its daemon does not answer.")

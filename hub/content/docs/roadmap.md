@@ -18,7 +18,7 @@ On every surface: web, CLI, terminal UI, API and MCP.
 - **Run a command** in an app's container, without SSH. [Run a command](/docs/guides/exec)
 - **Catalog**: 47 apps such as Umami, n8n, Open WebUI and Vaultwarden in one click, updates with a backup first. [Catalog](/docs/guides/catalog)
 - **Overview and ⌘K**: one page says whether everything is OK, `moin status` too. [Overview](/docs/guides/overview)
-- **Uptime checks** of every domain once a minute, nothing to set up. [Uptime](/docs/guides/uptime)
+- **Uptime** of every domain once a minute, nothing to set up. [Uptime](/docs/guides/uptime)
 - **Alerts** by mail, Slack, Discord, Telegram and webhooks. [Alerts](/docs/guides/alerts)
 - **Metrics**: CPU, memory, disk and network of every server and app, up to 30 days back. [Metrics](/docs/guides/metrics)
 - **More than one bucket**, one per app if you like. [Bucket](/docs/guides/bucket#more-than-one-bucket)

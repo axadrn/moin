@@ -22,7 +22,7 @@ type UptimeView struct {
 
 // AppUptime is the uptime page, one step under the app's domains: per
 // domain its state, the uptime over 24 hours, 7 and 30 days, the newest
-// check, the last outages and the settings of its check.
+// visit, the last outages and the settings of its uptime.
 templ AppUptime(view UptimeView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	@layouts.App(view.App.Name + " uptime") {
@@ -33,7 +33,7 @@ templ AppUptime(view UptimeView) {
 				if len(view.Uptime.Domains) == 0 {
 					@kit.Card("", nil) {
 						@kit.Quiet() {
-							No domain to check yet.
+							No domain to visit yet.
 						}
 						@kit.Command("moin domains add " + view.App.Name + ".example.com")
 					}
@@ -65,7 +65,7 @@ templ AppUptimeBody(view UptimeView) {
 }
 
 // uptimeServerOffline is the line that says the app's server is offline,
-// so its checks say little.
+// so its uptimes say little.
 templ uptimeServerOffline(view UptimeView) {
 	if !view.Uptime.ServerOnline && view.App.ServerName != "" {
 		<p class="px-1" data-server-offline>
@@ -76,7 +76,7 @@ templ uptimeServerOffline(view UptimeView) {
 	}
 }
 
-// uptimeDomain is one domain: its numbers and outages, then its check.
+// uptimeDomain is one domain: its numbers and outages, then its uptime.
 templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 	<div data-uptime-domain={ domain.Domain }>
 		@kit.Section(domain.Domain, uptimeState(domain)) {
@@ -85,7 +85,7 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 					@uptimeFact("Last 24 hours", orNone(percent(domain.Uptime24h)), averageNote(domain))
 					@uptimeFact("Last 7 days", orNone(percent(domain.Uptime7d)), "")
 					@uptimeFact("Last 30 days", orNone(percent(domain.Uptime30d)), "")
-					@uptimeFact("Newest check", orNone(lastCheck(domain)), lastCheckNote(domain, view.Now))
+					@uptimeFact("Last visit", orNone(lastVisit(domain)), lastVisitNote(domain, view.Now))
 					@uptimeFact("Certificate", certText(domain, view.Now), certNote(domain))
 					if domain.Since != nil {
 						@uptimeFact(sinceLabel(domain), sinceText(domain, view.Now), sinceNote(domain))
@@ -121,7 +121,7 @@ templ uptimeFact(label, value, note string) {
 	}
 }
 
-// uptimeState is the state of a domain's check as a status.
+// uptimeState is the state of a domain's visit as a status.
 templ uptimeState(domain service.UptimeDomain) {
 	switch domain.State {
 		case model.UptimeUp:
@@ -143,9 +143,9 @@ templ uptimeState(domain service.UptimeDomain) {
 	}
 }
 
-// uptimeSettings is the path of the check and the switch that pauses it.
+// uptimeSettings is the path of the visit and the switch that pauses it.
 templ uptimeSettings(app model.App, domain service.UptimeDomain) {
-	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/check" }}
+	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/path" }}
 	{{ id := "uptime-" + domain.Domain }}
 	@kit.List() {
 		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
@@ -154,7 +154,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 			<div class="min-w-0 flex-1 pb-2">
 				@kit.Field("Path", id+"-path", "") {
 					@kit.Inline() {
-						@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"})
+						@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellvisit": "false"})
 						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
 							Save
 						}
@@ -166,14 +166,14 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	}
 }
 
-// UptimeSwitchForm is the switch that pauses the check of a domain, a row
+// UptimeSwitchForm is the switch that pauses uptime of a domain, a row
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
+	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}) {
 		@kit.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
-		@kit.RowLabel(id+"-on", "Check every minute", "")
+		@kit.RowLabel(id+"-on", "Visit every minute", "")
 		@kit.Switch(templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused})
 	}
 }
@@ -183,7 +183,7 @@ func uptimeNote(domain service.UptimeDomain) string {
 	if value := percent(domain.Uptime30d); value != "" {
 		return value + " over 30 days"
 	}
-	return "No check yet"
+	return "No visit yet"
 }
 
 func orNone(value string) string {
@@ -227,9 +227,9 @@ func averageNote(domain service.UptimeDomain) string {
 	return fmt.Sprintf("%d ms on average", domain.AverageMS)
 }
 
-func lastCheck(domain service.UptimeDomain) string {
+func lastVisit(domain service.UptimeDomain) string {
 	switch {
-	case domain.CheckedAt == nil:
+	case domain.VisitedAt == nil:
 		return ""
 	case domain.StatusCode == 0:
 		return "Failed"
@@ -237,13 +237,13 @@ func lastCheck(domain service.UptimeDomain) string {
 	return fmt.Sprintf("HTTP %d", domain.StatusCode)
 }
 
-func lastCheckNote(domain service.UptimeDomain, now time.Time) string {
-	if domain.CheckedAt == nil {
+func lastVisitNote(domain service.UptimeDomain, now time.Time) string {
+	if domain.VisitedAt == nil {
 		return ""
 	}
-	note := fmt.Sprintf("%d ms, %s", domain.ResponseMS, human.Ago(*domain.CheckedAt, now))
+	note := fmt.Sprintf("%d ms, %s", domain.ResponseMS, human.Ago(*domain.VisitedAt, now))
 	if domain.Error != "" {
-		note = domain.Error + ", " + human.Ago(*domain.CheckedAt, now)
+		note = domain.Error + ", " + human.Ago(*domain.VisitedAt, now)
 	}
 	return note
 }

@@ -73,7 +73,7 @@ func (m model) withApp(name string, t tab) model {
 	m.app.domains = []client.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}, {Domain: "www.shop.example.com", Points: false, Advice: "add an A record to 203.0.113.7"}}
 	m.app.instant = &client.Instant{URL: "https://shop-acme.moin.app"}
 	m.app.uptime = &client.Uptime{App: name, State: "up", Server: "web-1", ServerOnline: true, Domains: []client.UptimeDomain{
-		{Domain: "shop.example.com", Path: "/", State: "up", CheckedAt: ago2(time.Minute), StatusCode: 200, ResponseMS: 41, Uptime24h: pct(100), Uptime7d: pct(99.98), Uptime30d: pct(99.9),
+		{Domain: "shop.example.com", Path: "/", State: "up", VisitedAt: ago2(time.Minute), StatusCode: 200, ResponseMS: 41, Uptime24h: pct(100), Uptime7d: pct(99.98), Uptime30d: pct(99.9),
 			Outages: []client.Outage{{StartedAt: now.Add(-50 * time.Hour), EndedAt: ago2(50*time.Hour - 3*time.Minute), Reason: "502 Bad Gateway"}}},
 	}}
 	m.app.metrics = &client.AppMetrics{App: name, Server: "web-1", ServerOnline: true, Now: &client.AppMetricsNow{At: now, CPU: 3.2, MemoryUsed: 180 << 20, MemoryLimit: 512 << 20, NetRx: 2048, NetTx: 9000, Containers: 2},

@@ -93,10 +93,10 @@ type Config struct {
 	// to TelemetryURL every five minutes. The hosted one never sends.
 	Telemetry    bool
 	TelemetryURL string
-	// UptimeChecks has the hub check every domain of every live
+	// Uptime has the hub visit every domain of every live
 	// app once a minute. On by default in production, so development and
 	// tests never call real domains.
-	UptimeChecks bool
+	Uptime bool
 	// UpdateCheck has a self-hosted hub ask GitHub once a day for
 	// the newest release, so admins see when an update is out. The hosted
 	// one never asks: the Deploy workflow updates it.
@@ -212,7 +212,7 @@ func Load() (*Config, error) {
 	// Without a bucket there is nowhere to back up to: a self-hosted hub
 	// starts without one and says so.
 	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction() && cfg.S3Bucket != "")
-	cfg.UptimeChecks = r.boolean("UPTIME_CHECKS", cfg.IsProduction())
+	cfg.Uptime = r.boolean("UPTIME", cfg.IsProduction())
 	cfg.SameServer = r.boolean("SAME_SERVER", false)
 	cfg.APIURL = r.string("API_URL", cfg.AppURL)
 	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")

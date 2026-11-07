@@ -28,7 +28,7 @@ The most urgent first:
 - **A server offline**: its daemon stopped answering. A server whose daemon never connected is not on the list.
 - **A failed deploy**: the newest deploy of an app failed, with the version that still runs.
 - **Backups that stopped**, and **a daily check that failed** ([Backups](/docs/guides/backups)).
-- **A domain down**, from the [uptime](/docs/guides/uptime) checks.
+- **A domain down**, says [uptime](/docs/guides/uptime).
 - **A disk over 90%** on a server ([Metrics](/docs/guides/metrics)).
 - **A daemon behind** the hub; it updates by itself or with `moin servers update` ([Servers](/docs/guides/servers)).
 

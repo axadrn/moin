@@ -280,7 +280,7 @@ templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follo
 }
 
 // appDomainsSection answers "where is it reached?": the instant address
-// and the domains in one place, with the password and the uptime checks.
+// and the domains in one place, with the password and uptime.
 templ appDomainsSection(view AppPageView) {
 	if view.Domains != nil {
 		@AppDomains(*view.Domains)

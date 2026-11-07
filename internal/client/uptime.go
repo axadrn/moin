@@ -26,7 +26,7 @@ type UptimeDomain struct {
 	Paused        bool       `json:"paused"`
 	State         string     `json:"state"`
 	Since         *time.Time `json:"since"`
-	CheckedAt     *time.Time `json:"checked_at"`
+	VisitedAt     *time.Time `json:"visited_at"`
 	StatusCode    int        `json:"status_code"`
 	ResponseMS    int        `json:"response_ms"`
 	Error         string     `json:"error"`
@@ -52,9 +52,9 @@ func (c *Client) Uptime(ctx context.Context, app string) (Uptime, error) {
 	return uptime, err
 }
 
-// SetUptimeCheck changes the path of a domain's check, nil keeps it and ""
+// SetUptime changes the path of a domain's visit, nil keeps it and ""
 // goes back to the health path or /, and pauses or resumes it, nil keeps it.
-func (c *Client) SetUptimeCheck(ctx context.Context, app, domain string, path *string, paused *bool) (UptimeDomain, error) {
+func (c *Client) SetUptime(ctx context.Context, app, domain string, path *string, paused *bool) (UptimeDomain, error) {
 	body := map[string]any{}
 	if path != nil {
 		body["path"] = *path
@@ -67,7 +67,7 @@ func (c *Client) SetUptimeCheck(ctx context.Context, app, domain string, path *s
 	return answer, err
 }
 
-// Percent is an uptime for people: "99.95%", or "-" without a check.
+// Percent is an uptime for people: "99.95%", or "-" without a visit.
 func Percent(value *float64) string {
 	switch {
 	case value == nil:

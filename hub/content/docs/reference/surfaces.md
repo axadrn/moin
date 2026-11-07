@@ -33,7 +33,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Add, remove, canonical domain | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Password protection | ✓ | ✓ `protect` | ✓ `p` | ✓ | ✓ |
 | Uptime and outages | ✓ | ✓ `uptime` | ✓ | ✓ | ✓ |
-| Uptime check path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Uptime path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
 | App metrics, 1h to 30d | ✓ | ✓ `metrics` | ✓ | ✓ | ✓ |
 | Backups, the daily check and the moments to go back to | ✓ | ✓ `backups` | ✓ | ✓ | ✓ |
 | How often, how long, Every change | ✓ | ✓ `backups --every --keep --every-change` | Setup: it opens the web. | ✓ | ✓ `set_backups` |

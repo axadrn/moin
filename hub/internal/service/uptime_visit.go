@@ -23,7 +23,7 @@ import (
 	"github.com/axadrn/moin/internal/build"
 )
 
-// newUptimeClient is one client for every check: a shared transport that
+// newUptimeClient is one client for every visit: a shared transport that
 // keeps a bounded number of connections open, no redirects followed (a
 // redirect is an answer), and on the hosted hub only public
 // addresses.
@@ -47,7 +47,7 @@ func newUptimeClient(publicOnly bool) *http.Client {
 	}
 }
 
-// RunUptime checks every domain once a minute until ctx ends, then writes
+// RunUptimes every domain once a minute until ctx ends, then writes
 // the counts it still holds. Wiring starts it once, in a goroutine.
 func (s *AppService) RunUptime(ctx context.Context) {
 	u := s.uptime
@@ -72,7 +72,7 @@ func (s *AppService) RunUptime(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	var plan [60][]uptimeKey
-	// next is the second of the minute to start the checks of; it starts
+	// next is the second of the minute to start the visits of; it starts
 	// at the current one, so the first minute is no burst either.
 	next := -1
 	flushed := s.now()
@@ -134,9 +134,9 @@ func (s *AppService) runUptimeJob(ctx context.Context, job uptimeJob, jobs chan<
 	s.finishUptime(job, result)
 }
 
-// CheckUptime checks every domain once, now, with the retry, and writes
+// VisitUptime visits every domain once, now, with the retry, and writes
 // the counts. Tests call it; RunUptime spreads the same over the minute.
-func (s *AppService) CheckUptime(ctx context.Context) {
+func (s *AppService) VisitUptime(ctx context.Context) {
 	u := s.uptime
 	if u.client == nil {
 		u.client = newUptimeClient(s.publicBucketsOnly)
@@ -175,12 +175,12 @@ func (s *AppService) CheckUptime(ctx context.Context) {
 }
 
 // planUptime brings the domains in memory in line with the live apps and
-// returns them by the second of the minute they are checked at. It also
+// returns them by the second of the minute they are visited at. It also
 // watches the servers and prunes old counts once an hour.
 func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 	var plan [60][]uptimeKey
 	u := s.uptime
-	u.load(s.apps.UptimeChecks)
+	u.load(s.apps.DomainUptimes)
 	s.watchServers(now)
 	s.pruneUptime(now)
 	targets, err := s.apps.UptimeTargets()
@@ -190,7 +190,7 @@ func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 	}
 	live := map[string]bool{}
 	seen := map[uptimeKey]bool{}
-	var gone, reset []model.UptimeCheck
+	var gone, reset []model.DomainUptime
 	u.mu.Lock()
 	for _, target := range targets {
 		live[target.AppID] = true
@@ -200,12 +200,12 @@ func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 			seen[key] = true
 			state := u.states[key]
 			if state == nil {
-				state = &uptimeState{check: model.UptimeCheck{AppID: target.AppID, Domain: domain}, offset: uptimeOffset(key)}
+				state = &uptimeState{stored: model.DomainUptime{AppID: target.AppID, Domain: domain}, offset: uptimeOffset(key)}
 				u.states[key] = state
 			}
 			state.workspaceID, state.appName = target.WorkspaceID, target.Name
-			state.path = cmp.Or(state.check.Path, health)
-			if !state.check.Paused {
+			state.path = cmp.Or(state.stored.Path, health)
+			if !state.stored.Paused {
 				plan[state.offset] = append(plan[state.offset], key)
 			}
 		}
@@ -216,21 +216,21 @@ func (s *AppService) planUptime(now time.Time) [60][]uptimeKey {
 		}
 		switch {
 		case live[key.app]:
-			// A live app no longer has the domain: its check goes.
-			gone = append(gone, state.check)
+			// A live app no longer has the domain: its uptime goes.
+			gone = append(gone, state.stored)
 			delete(u.states, key)
-		case state.check.State != "":
-			// A stopped or removed app is not checked; its check starts
+		case state.stored.State != "":
+			// A stopped or removed app is not visited; its uptime starts
 			// over when it is live again.
-			state.check.State, state.check.Since, state.last = "", nil, nil
-			reset = append(reset, state.check)
+			state.stored.State, state.stored.Since, state.last = "", nil, nil
+			reset = append(reset, state.stored)
 		}
-		if !live[key.app] && state.check.Path == "" && !state.check.Paused && !state.inflight {
+		if !live[key.app] && state.stored.Path == "" && !state.stored.Paused && !state.inflight {
 			delete(u.states, key)
 		}
 	}
 	u.mu.Unlock()
-	s.storePlannedChecks(gone, reset, now)
+	s.storePlannedUptime(gone, reset, now)
 	return plan
 }
 
@@ -248,20 +248,20 @@ func (s *AppService) pruneUptime(now time.Time) {
 	u.pruned = now
 }
 
-// storePlannedChecks writes what planUptime changed: the checks of domains
+// storePlannedUptime writes what planUptime changed: the visits of domains
 // an app no longer has are deleted, the ones of apps no longer live start
 // over. Both end an open outage.
-func (s *AppService) storePlannedChecks(gone, reset []model.UptimeCheck, now time.Time) {
-	for _, check := range gone {
-		_ = s.apps.EndUptimeOutage(check.AppID, check.Domain, now)
-		if err := s.apps.DeleteUptimeCheck(check.AppID, check.Domain); err != nil {
-			slog.Error("delete uptime check failed", "error", err)
+func (s *AppService) storePlannedUptime(gone, reset []model.DomainUptime, now time.Time) {
+	for _, stored := range gone {
+		_ = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, now)
+		if err := s.apps.DeleteDomainUptime(stored.AppID, stored.Domain); err != nil {
+			slog.Error("delete uptime failed", "error", err)
 		}
 	}
-	for _, check := range reset {
-		_ = s.apps.EndUptimeOutage(check.AppID, check.Domain, now)
-		if err := s.apps.SaveUptimeState(check); err != nil {
-			slog.Error("store uptime check failed", "error", err)
+	for _, stored := range reset {
+		_ = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, now)
+		if err := s.apps.SaveUptimeState(stored); err != nil {
+			slog.Error("store uptime failed", "error", err)
 		}
 	}
 }
@@ -275,7 +275,7 @@ func uptimeDomains(domainsJSON, detectedJSON string) (domains []string, health s
 		if len(detected.Domains) > 0 {
 			domains = detected.Domains
 		}
-		// The domains of the other services are checked too, in the order
+		// The domains of the other services are visited too, in the order
 		// of their services.
 		for _, service := range slices.Sorted(maps.Keys(detected.ServiceDomains)) {
 			domains = append(domains, detected.ServiceDomains[service]...)
@@ -290,13 +290,13 @@ func uptimeDomains(domainsJSON, detectedJSON string) (domains []string, health s
 // visit GETs a domain like a visitor: any answer below 500 is up, a 5xx, a
 // timeout, a refused connection or a bad certificate is down. It reads at
 // most a few KB of the body.
-func (u *uptimeChecker) visit(ctx context.Context, domain, path string) uptimeResult {
+func (u *uptimeRunner) visit(ctx context.Context, domain, path string) uptimeResult {
 	result := uptimeResult{at: time.Now()}
 	ctx, cancel := context.WithTimeout(ctx, uptimeTimeout)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.url(domain, path), nil)
 	if err != nil {
-		result.failure = "cannot check " + domain + path
+		result.failure = "cannot visit " + domain + path
 		return result
 	}
 	request.Header.Set("User-Agent", build.Name+"-uptime/"+build.Version)

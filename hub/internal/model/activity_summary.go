@@ -122,16 +122,16 @@ var appSummaries = map[string]summarize{
 		return "found " + d["domain"] + " of " + target + " up again after " + d["duration"]
 	},
 	"uptime.paused": func(target string, d map[string]string) string {
-		return "paused the uptime check of " + d["domain"] + " of " + target
+		return "paused uptime of " + d["domain"] + " of " + target
 	},
 	"uptime.resumed": func(target string, d map[string]string) string {
-		return "resumed the uptime check of " + d["domain"] + " of " + target
+		return "resumed uptime of " + d["domain"] + " of " + target
 	},
 	"uptime.path_set": func(target string, d map[string]string) string {
 		if d["path"] == "" {
-			return "set the uptime check of " + d["domain"] + " of " + target + " back to the health path or /"
+			return "set the uptime path of " + d["domain"] + " of " + target + " back to the health path or /"
 		}
-		return "set the uptime check of " + d["domain"] + " of " + target + " to " + d["path"]
+		return "set the uptime path of " + d["domain"] + " of " + target + " to " + d["path"]
 	},
 }
 

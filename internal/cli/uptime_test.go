@@ -8,7 +8,7 @@ import (
 func TestUptime(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"GET /api/v1/apps/shop/uptime": `{"app":"shop","state":"down","server":"web-1","server_online":false,"domains":[
-			{"domain":"shop.de","path":"/health","state":"up","checked_at":"2026-11-03T12:00:00Z","status_code":200,"response_ms":84,"uptime_24h":100,"uptime_7d":99.5,"uptime_30d":null,"outages":[]},
+			{"domain":"shop.de","path":"/health","state":"up","visited_at":"2026-11-03T12:00:00Z","status_code":200,"response_ms":84,"uptime_24h":100,"uptime_7d":99.5,"uptime_30d":null,"outages":[]},
 			{"domain":"www.shop.de","path":"/","state":"down","error":"HTTP 502","outages":[{"started_at":"2026-11-03T10:00:00Z","ended_at":"2026-11-03T10:30:00Z","reason":"HTTP 502"}]}]}`,
 		"PUT /api/v1/apps/shop/uptime/shop.de": `{"domain":"shop.de","path":"/","paused":true,"state":"paused","outages":[]}`,
 	}}

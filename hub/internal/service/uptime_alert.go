@@ -10,15 +10,15 @@ import (
 // recordUptimeChange stores the outage of a domain that went down or came
 // back and writes it to the activity: uptime.down with the reason,
 // uptime.up with how long it was down.
-func (s *AppService) recordUptimeChange(workspaceID, appName string, before, check model.UptimeCheck, failure string) {
+func (s *AppService) recordUptimeChange(workspaceID, appName string, before, stored model.DomainUptime, failure string) {
 	actor := System(workspaceID)
 	switch {
-	case check.State == model.UptimeDown:
-		_ = s.apps.StartUptimeOutage(check.AppID, check.Domain, *check.Since, failure)
-		s.servers.record(actor, "uptime.down", "app", appName, map[string]string{"domain": check.Domain, "reason": failure})
+	case stored.State == model.UptimeDown:
+		_ = s.apps.StartUptimeOutage(stored.AppID, stored.Domain, *stored.Since, failure)
+		s.servers.record(actor, "uptime.down", "app", appName, map[string]string{"domain": stored.Domain, "reason": failure})
 	case before.State == model.UptimeDown:
-		_ = s.apps.EndUptimeOutage(check.AppID, check.Domain, *check.Since)
-		s.servers.record(actor, "uptime.up", "app", appName, map[string]string{"domain": check.Domain, "duration": check.Since.Sub(*before.Since).Round(time.Second).String()})
+		_ = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, *stored.Since)
+		s.servers.record(actor, "uptime.up", "app", appName, map[string]string{"domain": stored.Domain, "duration": stored.Since.Sub(*before.Since).Round(time.Second).String()})
 	}
 }
 

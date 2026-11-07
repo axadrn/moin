@@ -479,7 +479,7 @@ func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
-// uptimeTabKey pauses a check, sets its path and checks again.
+// uptimeTabKey pauses uptime of a domain, sets its path and visits again.
 func (m model) uptimeTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 	var doms []client.UptimeDomain
 	if m.app.uptime != nil {

@@ -90,9 +90,9 @@ Domains
 
 Uptime
   uptime             Uptime of every domain, 24 hours, 7 and 30 days, and the last outages: uptime [app]
-  uptime path        Where the check of a domain goes: uptime path blog.de /health, or default
-  uptime pause       Pause the check of a domain: uptime pause blog.de
-  uptime resume      Check it every minute again: uptime resume blog.de
+  uptime path        The path uptime visits on a domain: uptime path blog.de /health, or default
+  uptime pause       Pause uptime of a domain: uptime pause blog.de
+  uptime resume      Visit it every minute again: uptime resume blog.de
 
 Metrics
   metrics            CPU, memory and network of an app now, with a sparkline: metrics [app] [--range 1h|24h|7d|30d]

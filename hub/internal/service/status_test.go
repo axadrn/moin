@@ -52,7 +52,7 @@ func TestStatusIssues(t *testing.T) {
 	if err := servers.servers.SetDiskFull(server.ID, true, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.apps.SaveUptimeCheck(model.UptimeCheck{AppID: app.ID, Domain: "shop.example.com", State: model.UptimeDown, Since: &now}); err != nil {
+	if err := apps.apps.SaveDomainUptime(model.DomainUptime{AppID: app.ID, Domain: "shop.example.com", State: model.UptimeDown, Since: &now}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := status.Status(owner.WorkspaceID)

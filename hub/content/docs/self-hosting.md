@@ -127,7 +127,7 @@ The files are in the repo, in `hub/deploy/`:
 | `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | email through Cloudflare Email Sending |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | the bucket of the hub |
 | `BACKUP_DATABASE` | backup of the hub's database; on by default in production once `S3_BUCKET` is set, `false` turns it off |
-| `UPTIME_CHECKS` | the [uptime checks](/docs/guides/uptime); on in production, off in development |
+| `UPTIME` | [uptime](/docs/guides/uptime); on in production, off in development |
 | `TUNNEL_TOKEN`, `TRUSTED_PROXY_CIDRS` | a Cloudflare Tunnel in front of the hub |
 | `SAME_SERVER` | `true` when the hub runs on the same server as its apps, as the one-server install sets it |
 | `OLD_URLS` | old domains the hub still answers on, see [A new domain](#a-new-domain) |
@@ -208,7 +208,7 @@ Like Every change of your apps' SQLite files, the hub's SQLite database goes to 
 
 | File | What is in it | Backup |
 | --- | --- | --- |
-| `app.db` (the name in `DB_CONNECTION`) | users, apps, deploys, settings, the state of each uptime check and every outage | every change, within a second |
+| `app.db` (the name in `DB_CONNECTION`) | users, apps, deploys, settings, the uptime state of each domain and every outage | every change, within a second |
 | `history.db` | [metrics](/docs/guides/metrics) and [uptime](/docs/guides/uptime) per hour | none: it grows back, losing it costs old charts |
 
 A hub that starts without a database restores the newest one from the bucket by itself; an empty bucket means a fresh start. So to move or rebuild: prepare a new server with `setup.sh`, put your settings in `/etc/moin-hub/` again and run `update.sh`. With a tunnel nothing else changes.

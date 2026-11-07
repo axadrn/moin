@@ -181,7 +181,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/apps/{app}/restores", m.InWorkspace(h.Apps.StartRestore), TokenWrite},
 		{"GET /api/v1/apps/{app}/restores/{restore}", m.InWorkspace(h.Apps.Restore), TokenRead},
 		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), TokenRead},
-		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptimeCheck), TokenWrite},
+		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptime), TokenWrite},
 		{"GET /api/v1/alert-destinations", m.InWorkspace(h.Alerts.List), TokenRead},
 		{"POST /api/v1/alert-destinations", m.InWorkspace(h.Alerts.Create), TokenWrite},
 		{"DELETE /api/v1/alert-destinations/{destination}", m.InWorkspace(h.Alerts.Delete), TokenWrite},

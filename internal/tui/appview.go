@@ -489,7 +489,7 @@ func (m model) uptimeTab(u ui, w, h int) string {
 		return u.panel("Uptime", "", loading(u), w, h, true)
 	}
 	if len(up.Domains) == 0 {
-		return u.panel("Uptime", "", []string{"", u.muted("No domains to check. Add one under o.")}, w, h, true)
+		return u.panel("Uptime", "", []string{"", u.muted("No domains to visit. Add one under o.")}, w, h, true)
 	}
 	now := m.now()
 	iw := inner(w)
@@ -497,7 +497,7 @@ func (m model) uptimeTab(u ui, w, h int) string {
 	for _, d := range up.Domains {
 		dw = max(dw, min(wid(d.Domain)+1, iw/3))
 	}
-	body := []string{u.row([]cell{u.head("domain", dw, false), u.head("state", 12, false), u.head("24h", 7, true), u.head("7d", 7, true), u.head("30d", 7, true), u.head("", 1, false), u.head("check", 0, false)}, iw, false)}
+	body := []string{u.row([]cell{u.head("domain", dw, false), u.head("state", 12, false), u.head("24h", 7, true), u.head("7d", 7, true), u.head("30d", 7, true), u.head("", 1, false), u.head("last visit", 0, false)}, iw, false)}
 	at := m.at("uptime", len(up.Domains))
 	var outages []string
 	for i, d := range up.Domains {
@@ -505,16 +505,16 @@ func (m model) uptimeTab(u ui, w, h int) string {
 		if d.Paused {
 			state = "paused"
 		}
-		check := "-"
-		if d.CheckedAt != nil {
-			check = fmt.Sprintf("%d in %d ms", d.StatusCode, d.ResponseMS)
+		visit := "-"
+		if d.VisitedAt != nil {
+			visit = fmt.Sprintf("%d in %d ms", d.StatusCode, d.ResponseMS)
 			if d.Error != "" {
-				check = d.Error
+				visit = d.Error
 			}
 		}
-		check += " · " + d.Path
+		visit += " · " + d.Path
 		pc := func(v *float64) cell { return cell{u.text(client.Percent(v)), 7, true} }
-		body = append(body, u.row([]cell{{u.strong(d.Domain), dw, false}, {u.chip(state, state), 12, false}, pc(d.Uptime24h), pc(d.Uptime7d), pc(d.Uptime30d), {"", 1, false}, {u.muted(check), 0, false}}, iw, i == at))
+		body = append(body, u.row([]cell{{u.strong(d.Domain), dw, false}, {u.chip(state, state), 12, false}, pc(d.Uptime24h), pc(d.Uptime7d), pc(d.Uptime30d), {"", 1, false}, {u.muted(visit), 0, false}}, iw, i == at))
 		for _, o := range d.Outages {
 			lasted := u.bad("ongoing " + human.Duration(now.Sub(o.StartedAt)))
 			if o.EndedAt != nil {
@@ -523,7 +523,7 @@ func (m model) uptimeTab(u ui, w, h int) string {
 			outages = append(outages, u.faint(o.StartedAt.Local().Format("Jan 2 15:04"))+"  "+padR(u.text(d.Domain), dw)+" "+lasted+"  "+u.faint(o.Reason))
 		}
 	}
-	note := u.faint("checked every minute, like a visitor")
+	note := u.faint("visited every minute, like a visitor")
 	if !up.ServerOnline && up.Server != "" {
 		note = u.bad(up.Server + " is offline")
 	}

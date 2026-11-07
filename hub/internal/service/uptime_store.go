@@ -18,7 +18,7 @@ func (s *AppService) finishUptime(job uptimeJob, result uptimeResult) {
 	u := s.uptime
 	u.mu.Lock()
 	state := u.states[job.key]
-	if state == nil || state.check.Paused {
+	if state == nil || state.stored.Paused {
 		if state != nil {
 			state.inflight = false
 		}
@@ -28,30 +28,30 @@ func (s *AppService) finishUptime(job uptimeJob, result uptimeResult) {
 	state.inflight = false
 	state.last = &result
 	u.count(job.key, job.started.UTC().Truncate(time.Hour), result)
-	before := state.check
+	before := state.stored
 	switch {
-	case result.up && state.check.State != model.UptimeUp:
+	case result.up && state.stored.State != model.UptimeUp:
 		at := job.started.UTC()
-		state.check.State, state.check.Since = model.UptimeUp, &at
-	case !result.up && state.check.State != model.UptimeDown:
+		state.stored.State, state.stored.Since = model.UptimeUp, &at
+	case !result.up && state.stored.State != model.UptimeDown:
 		at := job.started.UTC()
-		state.check.State, state.check.Since = model.UptimeDown, &at
+		state.stored.State, state.stored.Since = model.UptimeDown, &at
 	}
-	check, workspaceID, appName := state.check, state.workspaceID, state.appName
+	stored, workspaceID, appName := state.stored, state.workspaceID, state.appName
 	u.mu.Unlock()
-	if check.State == before.State {
+	if stored.State == before.State {
 		return
 	}
-	err := s.apps.SaveUptimeState(check)
+	err := s.apps.SaveUptimeState(stored)
 	if err != nil {
 		slog.Error("store uptime state failed", "error", err)
 	}
-	s.recordUptimeChange(workspaceID, appName, before, check, result.failure)
+	s.recordUptimeChange(workspaceID, appName, before, stored, result.failure)
 }
 
 // count adds a result to the counts of its domain and hour. The caller
 // holds u.mu.
-func (u *uptimeChecker) count(key uptimeKey, hour time.Time, result uptimeResult) {
+func (u *uptimeRunner) count(key uptimeKey, hour time.Time, result uptimeResult) {
 	if u.hours[key] == nil {
 		u.hours[key] = map[time.Time]*model.UptimeCounts{}
 	}
@@ -83,7 +83,7 @@ func (s *AppService) flushUptime() {
 // UptimeDomain is the uptime of one domain of an app.
 type UptimeDomain struct {
 	Domain string
-	// Path is where the check goes; CustomPath says it was set, not the
+	// Path is where the visit goes; CustomPath says it was set, not the
 	// health path or /.
 	Path       string
 	CustomPath bool
@@ -91,15 +91,15 @@ type UptimeDomain struct {
 	// State is up, down, pending or paused, Since when it began.
 	State string
 	Since *time.Time
-	// The newest check, nil before the first since the hub
+	// The last visit, nil before the first since the hub
 	// started.
-	CheckedAt     *time.Time
+	VisitedAt     *time.Time
 	StatusCode    int
 	ResponseMS    int
 	Error         string
 	CertExpiresAt *time.Time
 	// Uptime in percent over the last 24 hours, 7 and 30 days; nil
-	// without a check in that time.
+	// without a visit in that time.
 	Uptime24h, Uptime7d, Uptime30d *float64
 	// AverageMS is the mean response time of the last 24 hours.
 	AverageMS int
@@ -174,20 +174,20 @@ func (s *AppService) appUptimeDomains(app *model.App) ([]string, string) {
 // counts from the database and memory.
 func (s *AppService) uptimeDomain(app *model.App, domain, health string, now time.Time) (UptimeDomain, error) {
 	u := s.uptime
-	u.load(s.apps.UptimeChecks)
+	u.load(s.apps.DomainUptimes)
 	key := uptimeKey{app.ID, domain}
 	view := UptimeDomain{Domain: domain, Path: health, State: model.UptimePending}
 	pending := map[time.Time]model.UptimeCounts{}
 	u.mu.Lock()
 	if state := u.states[key]; state != nil {
-		view.Paused, view.CustomPath = state.check.Paused, state.check.Path != ""
-		view.Path = cmp.Or(state.check.Path, health)
-		if state.check.State != "" {
-			view.State, view.Since = state.check.State, state.check.Since
+		view.Paused, view.CustomPath = state.stored.Paused, state.stored.Path != ""
+		view.Path = cmp.Or(state.stored.Path, health)
+		if state.stored.State != "" {
+			view.State, view.Since = state.stored.State, state.stored.Since
 		}
 		if last := state.last; last != nil {
 			at := last.at.UTC()
-			view.CheckedAt, view.StatusCode, view.ResponseMS, view.Error, view.CertExpiresAt = &at, last.statusCode, last.responseMS, last.failure, last.certExpiry
+			view.VisitedAt, view.StatusCode, view.ResponseMS, view.Error, view.CertExpiresAt = &at, last.statusCode, last.responseMS, last.failure, last.certExpiry
 		}
 	}
 	for hour, counts := range u.hours[key] {
@@ -230,21 +230,21 @@ func (s *AppService) uptimePercents(view *UptimeDomain, appID, domain string, pe
 				counts.Merge(more)
 			}
 		}
-		if counts.Checks > 0 {
-			percent := math.Round(float64(counts.Up)/float64(counts.Checks)*100000) / 1000
+		if counts.Visits > 0 {
+			percent := math.Round(float64(counts.Up)/float64(counts.Visits)*100000) / 1000
 			*window.into = &percent
 			if window.span == 24*time.Hour {
-				view.AverageMS = counts.ResponseMS / counts.Checks
+				view.AverageMS = counts.ResponseMS / counts.Visits
 			}
 		}
 	}
 	return nil
 }
 
-// SetUptimeCheck changes where the check of a domain goes, nil path keeps
+// SetUptime changes where uptime of a domain goes, nil path keeps
 // it and "" goes back to the health path or /, and pauses or resumes it,
-// nil keeps it. A paused check starts over when it resumes.
-func (s *AppService) SetUptimeCheck(actor Actor, idOrName, domain string, path *string, paused *bool) (*model.App, UptimeDomain, error) {
+// nil keeps it. A paused visit starts over when it resumes.
+func (s *AppService) SetUptime(actor Actor, idOrName, domain string, path *string, paused *bool) (*model.App, UptimeDomain, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, UptimeDomain{}, err
@@ -262,49 +262,49 @@ func (s *AppService) SetUptimeCheck(actor Actor, idOrName, domain string, path *
 		path = &clean
 	}
 	u := s.uptime
-	u.load(s.apps.UptimeChecks)
+	u.load(s.apps.DomainUptimes)
 	now := s.now().UTC()
 	key := uptimeKey{app.ID, domain}
 	u.mu.Lock()
 	state := u.states[key]
 	if state == nil {
-		state = &uptimeState{check: model.UptimeCheck{AppID: app.ID, Domain: domain}, offset: uptimeOffset(key)}
+		state = &uptimeState{stored: model.DomainUptime{AppID: app.ID, Domain: domain}, offset: uptimeOffset(key)}
 		u.states[key] = state
 	}
-	before := state.check
+	before := state.stored
 	if path != nil {
-		state.check.Path = *path
+		state.stored.Path = *path
 		state.path = cmp.Or(*path, health)
 	}
 	if paused != nil {
-		state.check.Paused = *paused
+		state.stored.Paused = *paused
 		if *paused {
-			state.check.State, state.check.Since, state.last = "", nil, nil
+			state.stored.State, state.stored.Since, state.last = "", nil, nil
 		}
 	}
-	check := state.check
+	stored := state.stored
 	u.mu.Unlock()
-	if check != before {
-		err = s.apps.SaveUptimeCheck(check)
+	if stored != before {
+		err = s.apps.SaveDomainUptime(stored)
 		if err != nil {
-			// What is not stored does not count: the page and the checks
+			// What is not stored does not count: the page and the visits
 			// keep what the database has.
 			u.mu.Lock()
-			state.check.Path, state.check.Paused = before.Path, before.Paused
+			state.stored.Path, state.stored.Paused = before.Path, before.Paused
 			state.path = cmp.Or(before.Path, health)
 			u.mu.Unlock()
 			return nil, UptimeDomain{}, err
 		}
 	}
-	if before.State == model.UptimeDown && check.State == "" {
+	if before.State == model.UptimeDown && stored.State == "" {
 		_ = s.apps.EndUptimeOutage(app.ID, domain, now)
 	}
-	if check.Path != before.Path {
-		s.servers.record(actor, "uptime.path_set", "app", app.Name, map[string]string{"domain": domain, "path": check.Path, "from": before.Path})
+	if stored.Path != before.Path {
+		s.servers.record(actor, "uptime.path_set", "app", app.Name, map[string]string{"domain": domain, "path": stored.Path, "from": before.Path})
 	}
-	if check.Paused != before.Paused {
+	if stored.Paused != before.Paused {
 		action := "uptime.resumed"
-		if check.Paused {
+		if stored.Paused {
 			action = "uptime.paused"
 		}
 		s.servers.record(actor, action, "app", app.Name, map[string]string{"domain": domain})
@@ -313,7 +313,7 @@ func (s *AppService) SetUptimeCheck(actor Actor, idOrName, domain string, path *
 	return app, view, err
 }
 
-// DownDomain is a domain of an app that the checks find down.
+// DownDomain is a domain of an app that the visits find down.
 type DownDomain struct {
 	App    string
 	Domain string
@@ -321,10 +321,10 @@ type DownDomain struct {
 }
 
 // DownDomains lists the domains of apps that are down now, unpaused, from
-// the checker's state; the overview shows them.
+// uptime's state; the overview shows them.
 func (s *AppService) DownDomains(apps []model.App) []DownDomain {
 	u := s.uptime
-	u.load(s.apps.UptimeChecks)
+	u.load(s.apps.DomainUptimes)
 	names := make(map[string]string, len(apps))
 	for _, app := range apps {
 		names[app.ID] = app.Name
@@ -334,10 +334,10 @@ func (s *AppService) DownDomains(apps []model.App) []DownDomain {
 	defer u.mu.Unlock()
 	for key, state := range u.states {
 		name, ok := names[key.app]
-		if !ok || state.check.Paused || state.check.State != model.UptimeDown {
+		if !ok || state.stored.Paused || state.stored.State != model.UptimeDown {
 			continue
 		}
-		down = append(down, DownDomain{App: name, Domain: key.domain, Since: state.check.Since})
+		down = append(down, DownDomain{App: name, Domain: key.domain, Since: state.stored.Since})
 	}
 	sort.Slice(down, func(i, j int) bool { return down[i].Domain < down[j].Domain })
 	return down

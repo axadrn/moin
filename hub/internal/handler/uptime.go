@@ -17,47 +17,47 @@ func (h *AppsHandler) Uptime(w http.ResponseWriter, r *http.Request) {
 	h.renderUptime(w, r)
 }
 
-// UptimeCheck saves the path of a domain's check.
-func (h *AppsHandler) UptimeCheck(w http.ResponseWriter, r *http.Request) {
+// UptimePath saves the path uptime visits on a domain.
+func (h *AppsHandler) UptimePath(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
 	path := r.FormValue("path")
-	_, _, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), domain, &path, nil)
+	_, _, err := h.apps.SetUptime(actor(r), r.PathValue("app"), domain, &path, nil)
 	if err != nil {
-		failed(w, r, "Check of "+domain+" not saved", err, nil)
+		failed(w, r, "Uptime of "+domain+" not saved", err, nil)
 		return
 	}
 	h.renderUptime(w, r)
-	answerDone(w, r, "Path of "+domain+" saved", "The next check goes there.")
+	answerDone(w, r, "Path of "+domain+" saved", "The next visit goes there.")
 }
 
-// UptimeOn is the switch that pauses or resumes the check of a domain: it
+// UptimeOn is the switch that pauses or resumes uptime of a domain: it
 // saves only that and answers the switch as stored, so a failed save flips
 // it back.
 func (h *AppsHandler) UptimeOn(w http.ResponseWriter, r *http.Request) {
 	domain := r.FormValue("domain")
 	paused := r.FormValue("on") != "1"
-	app, view, err := h.apps.SetUptimeCheck(actor(r), r.PathValue("app"), domain, nil, &paused)
+	app, view, err := h.apps.SetUptime(actor(r), r.PathValue("app"), domain, nil, &paused)
 	if err != nil {
 		var found bool
 		app, view, found = h.uptimeDomain(r, domain)
 		if !found {
-			failed(w, r, "Check of "+domain+" not saved", err, nil)
+			failed(w, r, "Uptime of "+domain+" not saved", err, nil)
 			return
 		}
-		answerError(w, r, "Check of "+domain+" not saved", errorMessage(err))
+		answerError(w, r, "Uptime of "+domain+" not saved", errorMessage(err))
 	}
 	render(w, r, pages.UptimeSwitchForm(*app, view))
 }
 
-// uptimeDomain is the check of one domain of the app as stored.
+// uptimeDomain is the uptime of one domain of the app as stored.
 func (h *AppsHandler) uptimeDomain(r *http.Request, domain string) (*model.App, service.UptimeDomain, bool) {
 	app, uptime, err := h.apps.Uptime(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
 		return nil, service.UptimeDomain{}, false
 	}
-	for _, check := range uptime.Domains {
-		if check.Domain == domain {
-			return app, check, true
+	for _, view := range uptime.Domains {
+		if view.Domain == domain {
+			return app, view, true
 		}
 	}
 	return nil, service.UptimeDomain{}, false

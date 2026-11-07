@@ -242,7 +242,7 @@ func TestUptimeSwitch(t *testing.T) {
 	if got := activity(t, s, "uptime.paused") + activity(t, s, "uptime.resumed"); got != 3 {
 		t.Fatalf("uptime switch recorded %d times, want 3", got)
 	}
-	if body := s.post(pattern, path, url.Values{"domain": {"other.example.com"}, "on": {"1"}}, s.handler.UptimeOn); !strings.Contains(body, "Check of other.example.com not saved") {
+	if body := s.post(pattern, path, url.Values{"domain": {"other.example.com"}, "on": {"1"}}, s.handler.UptimeOn); !strings.Contains(body, "Uptime of other.example.com not saved") {
 		t.Fatalf("another domain: %s", body)
 	}
 }

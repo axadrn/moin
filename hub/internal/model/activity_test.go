@@ -19,7 +19,7 @@ func TestSummaryOfUptime(t *testing.T) {
 	for _, c := range []struct{ action, target, metadata, want string }{
 		{"uptime.down", "blog", `{"domain":"blog.de","reason":"HTTP 502"}`, "found blog.de of blog down: HTTP 502"},
 		{"uptime.up", "blog", `{"domain":"blog.de","duration":"4m0s"}`, "found blog.de of blog up again after 4m0s"},
-		{"uptime.path_set", "blog", `{"domain":"blog.de","path":""}`, "set the uptime check of blog.de of blog back to the health path or /"},
+		{"uptime.path_set", "blog", `{"domain":"blog.de","path":""}`, "set the uptime path of blog.de of blog back to the health path or /"},
 		{"server.down", "web-1", `{"since":"2026-11-03 14:02 UTC"}`, "lost web-1: its daemon has not answered since 2026-11-03 14:02 UTC"},
 		{"server.up", "web-1", `{"duration":"12m0s"}`, "has web-1 back after 12m0s"},
 	} {

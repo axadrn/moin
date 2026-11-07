@@ -91,9 +91,9 @@ func run(cfg *config.Config) error {
 			slog.Error("failed to close app", "error", closeErr)
 		}
 	}()
-	// The uptime checks stop before the database closes: this defer runs
+	// Uptime stops before the database closes: this defer runs
 	// first.
-	if cfg.UptimeChecks {
+	if cfg.Uptime {
 		uptime, stopUptime := context.WithCancel(context.Background())
 		stopped := make(chan struct{})
 		go func() {

@@ -322,7 +322,7 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/backups/download", workspace(apps.BackupDownload))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/schedule", workspace(apps.BackupSchedule))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/uptime", workspace(apps.Uptime))
-	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/uptime/check", workspace(apps.UptimeCheck))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/uptime/path", workspace(apps.UptimePath))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/uptime/on", workspace(apps.UptimeOn))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/metrics", workspace(apps.AppMetrics))
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/{id}/metrics", workspace(apps.ServerMetrics))

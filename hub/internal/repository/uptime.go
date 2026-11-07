@@ -6,8 +6,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// The uptime checks of domains and the outages of domains and servers. The
-// checker keeps the newest results in memory and writes here only when
+// Uptime of domains and the outages of domains and servers. The
+// uptime keeps the newest results in memory and writes here only when
 // something changes, and its counts in batches.
 
 // UptimeTargets are the apps with a live deploy that are not stopped.
@@ -23,37 +23,37 @@ func (r *Apps) UptimeTargets() ([]model.UptimeTarget, error) {
 	return targets, err
 }
 
-// UptimeChecks returns the stored checks of every app.
-func (r *Apps) UptimeChecks() ([]model.UptimeCheck, error) {
-	checks := []model.UptimeCheck{}
-	err := r.db.Select(&checks, `SELECT * FROM uptime_checks ORDER BY app_id, domain`)
-	return checks, err
+// DomainUptimes returns the stored uptime of every domain.
+func (r *Apps) DomainUptimes() ([]model.DomainUptime, error) {
+	stored := []model.DomainUptime{}
+	err := r.db.Select(&stored, `SELECT * FROM domain_uptime ORDER BY app_id, domain`)
+	return stored, err
 }
 
-func (r *Apps) SaveUptimeCheck(check model.UptimeCheck) error {
+func (r *Apps) SaveDomainUptime(stored model.DomainUptime) error {
 	_, err := r.db.Exec(`
-		INSERT INTO uptime_checks (app_id, domain, path, paused, state, since)
+		INSERT INTO domain_uptime (app_id, domain, path, paused, state, since)
 		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
 		ON CONFLICT (app_id, domain) DO UPDATE SET path = excluded.path, paused = excluded.paused,
 			state = excluded.state, since = excluded.since
-	`, check.AppID, check.Domain, check.Path, check.Paused, check.State, check.Since)
+	`, stored.AppID, stored.Domain, stored.Path, stored.Paused, stored.State, stored.Since)
 	return err
 }
 
-// SaveUptimeState stores what the checks found, the state and since,
-// and leaves the path and the pause as the user set them: a check that
+// SaveUptimeState stores what the visits found, the state and since,
+// and leaves the path and the pause as the user set them: a visit that
 // finishes after a change must not undo it.
-func (r *Apps) SaveUptimeState(check model.UptimeCheck) error {
+func (r *Apps) SaveUptimeState(stored model.DomainUptime) error {
 	_, err := r.db.Exec(`
-		INSERT INTO uptime_checks (app_id, domain, path, paused, state, since)
+		INSERT INTO domain_uptime (app_id, domain, path, paused, state, since)
 		SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM apps WHERE id = $1)
 		ON CONFLICT (app_id, domain) DO UPDATE SET state = excluded.state, since = excluded.since
-	`, check.AppID, check.Domain, check.Path, check.Paused, check.State, check.Since)
+	`, stored.AppID, stored.Domain, stored.Path, stored.Paused, stored.State, stored.Since)
 	return err
 }
 
-func (r *Apps) DeleteUptimeCheck(appID, domain string) error {
-	_, err := r.db.Exec(`DELETE FROM uptime_checks WHERE app_id = $1 AND domain = $2`, appID, domain)
+func (r *Apps) DeleteDomainUptime(appID, domain string) error {
+	_, err := r.db.Exec(`DELETE FROM domain_uptime WHERE app_id = $1 AND domain = $2`, appID, domain)
 	return err
 }
 
@@ -83,9 +83,9 @@ func (r *Apps) AddUptimeHours(hours []model.UptimeHour) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	statement, err := tx.Preparex(tx.Rebind(`
-		INSERT INTO uptime_hours (app_id, domain, hour, checks, up, response_ms, max_ms)
+		INSERT INTO uptime_hours (app_id, domain, hour, visits, up, response_ms, max_ms)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (app_id, domain, hour) DO UPDATE SET checks = uptime_hours.checks + excluded.checks,
+		ON CONFLICT (app_id, domain, hour) DO UPDATE SET visits = uptime_hours.visits + excluded.visits,
 			up = uptime_hours.up + excluded.up, response_ms = uptime_hours.response_ms + excluded.response_ms,
 			max_ms = MAX(uptime_hours.max_ms, excluded.max_ms)`))
 	if err != nil {
@@ -96,7 +96,7 @@ func (r *Apps) AddUptimeHours(hours []model.UptimeHour) error {
 		if !exists[hour.AppID] {
 			continue
 		}
-		_, err = statement.Exec(hour.AppID, hour.Domain, hour.Hour.UTC(), hour.Checks, hour.Up, hour.ResponseMS, hour.MaxMS)
+		_, err = statement.Exec(hour.AppID, hour.Domain, hour.Hour.UTC(), hour.Visits, hour.Up, hour.ResponseMS, hour.MaxMS)
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (r *Apps) AddUptimeHours(hours []model.UptimeHour) error {
 func (r *Apps) UptimeCounts(appID, domain string, since time.Time) (model.UptimeCounts, error) {
 	var counts model.UptimeCounts
 	err := r.history.Get(&counts, `
-		SELECT COALESCE(SUM(checks), 0) AS checks, COALESCE(SUM(up), 0) AS up,
+		SELECT COALESCE(SUM(visits), 0) AS visits, COALESCE(SUM(up), 0) AS up,
 			COALESCE(SUM(response_ms), 0) AS response_ms, COALESCE(MAX(max_ms), 0) AS max_ms
 		FROM uptime_hours WHERE app_id = $1 AND domain = $2 AND hour >= $3
 	`, appID, domain, since.UTC())

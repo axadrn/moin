@@ -206,7 +206,7 @@ func (m model) viewKeys() []kb {
 		case tDomains:
 			ks = append(ks, kb{"a", "add"}, kb{"x", "remove"}, kb{"c", "canonical"}, kb{"p", "password"})
 		case tUptime:
-			ks = append(ks, kb{"p", "pause"}, kb{"c", "path"}, kb{"r", "check"})
+			ks = append(ks, kb{"p", "pause"}, kb{"c", "path"}, kb{"r", "visit"})
 		case tMetrics:
 			ks = append(ks, kb{"[ ]", "range"})
 		}

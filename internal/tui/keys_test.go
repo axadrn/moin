@@ -372,7 +372,7 @@ func TestChangesShowAtOnce(t *testing.T) {
 
 	m = press(fixture(120, 40).withApp("shop", tUptime), "p")
 	if !m.app.uptime.Domains[0].Paused {
-		t.Fatal("p pauses the check at once")
+		t.Fatal("p pauses uptime at once")
 	}
 	m, _ = update(m, undoMsg{errors.New("not allowed")})
 	if !m.noticeErr || !strings.Contains(m.notice, "not allowed") {

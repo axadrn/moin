@@ -79,7 +79,7 @@ type AppService struct {
 	// proxyOnFirstConnect sends a server its config the first time its
 	// daemon connects, which starts the proxy; see ProxyOnFirstConnect.
 	proxyOnFirstConnect bool
-	uptime              *uptimeChecker
+	uptime              *uptimeRunner
 	metrics             *metricsStore
 
 	mu          sync.Mutex
@@ -109,7 +109,7 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 		cloudflare:  NewCloudflare(""),
 		now:         time.Now,
 		live:        map[string]*liveDeploy{},
-		uptime:      newUptimeChecker(),
+		uptime:      newUptimeRunner(),
 		metrics:     newMetricsStore(),
 		subscribers: map[string]map[chan struct{}]struct{}{},
 	}

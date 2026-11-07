@@ -150,7 +150,7 @@ API: PUT /api/v1/apps/{app}/domains with "service": "api"
 MCP: set_domains with service
 ```
 
-Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only. The password, the redirect and [uptime checks](/docs/guides/uptime) work per domain the same way.
+Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only. The password, the redirect and [uptime](/docs/guides/uptime) work per domain the same way.
 
 ## In the repo
 

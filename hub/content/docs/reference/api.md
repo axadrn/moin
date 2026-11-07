@@ -143,8 +143,8 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice` |
 | `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and password (`?show=true` with a write token); picks the provider or `off`, and `open` |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | puts a password in front of the app; takes it away |
-| `GET /api/v1/apps/{app}/uptime` | read | uptime per domain: state, 24 hours, 7 and 30 days, the newest check, the last outages |
-| `PUT /api/v1/apps/{app}/uptime/{domain}` | write | the path of a domain's check, `{"path": "/health"}`, or `{"paused": true}` |
+| `GET /api/v1/apps/{app}/uptime` | read | uptime per domain: state, 24 hours, 7 and 30 days, the last visit, the last outages |
+| `PUT /api/v1/apps/{app}/uptime/{domain}` | write | the path uptime visits on a domain, `{"path": "/health"}`, or `{"paused": true}` |
 
 ## Env vars
 

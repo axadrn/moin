@@ -69,7 +69,7 @@ tags:
   - name: Backups
     description: The backup of every SQLite and Postgres database, in your own S3-compatible bucket only, never through the hub. moin writes down every change and keeps it 7 days; a restore goes back to any minute and can be undone for 7 days; every day moin checks that going back works; a full copy downloads with a short-lived link into your bucket.
   - name: Uptime
-    description: The hub checks every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
+    description: The hub visits every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: Alerts
     description: Where the alerts of a workspace go besides email, when a site goes down or comes back, a server goes offline or comes back, or a deploy fails. Slack and Discord incoming webhooks, a Telegram bot, or a webhook of your own, signed with HMAC-SHA256. Every member sees them; owners and admins add, test and remove them.
   - name: Metrics
@@ -2696,7 +2696,7 @@ paths:
       tags: [Uptime]
       operationId: getAppUptime
       summary: Get uptime
-      description: The state of the app as a whole and, per domain, where the check goes, its state, the newest check with the HTTP status, response time and certificate expiry, uptime over 24 hours, 7 and 30 days, the average response time and the last outages.
+      description: The state of the app as a whole and, per domain, the path uptime visits, its state, the last visit with the HTTP status, response time and certificate expiry, uptime over 24 hours, 7 and 30 days, the average response time and the last outages.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2729,15 +2729,15 @@ paths:
           type: string
     put:
       tags: [Uptime]
-      operationId: setUptimeCheck
-      summary: Set an uptime check
-      description: Changes the path the check of a domain goes to, or pauses and resumes it. A missing field keeps its setting; an empty path goes back to the app's health path, or /. A paused check starts over when it resumes.
+      operationId: setUptime
+      summary: Set uptime
+      description: Changes the path uptime visits on a domain, or pauses and resumes it. A missing field keeps its setting; an empty path goes back to the app's health path, or /. A paused domain starts over when it resumes.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UptimeCheckRequest'
+              $ref: '#/components/schemas/UptimeRequest'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -6297,7 +6297,7 @@ components:
         state:
           type: string
           enum: [up, down, pending, paused, stopped, no_domains]
-          description: down when a domain is down, pending before the first check, paused when every check is.
+          description: down when a domain is down, pending before the first visit, paused when every domain is.
         server:
           type: string
         server_online:
@@ -6308,13 +6308,13 @@ components:
             $ref: '#/components/schemas/UptimeDomain'
     UptimeDomain:
       type: object
-      required: [domain, path, custom_path, paused, state, since, checked_at, status_code, response_ms, error, cert_expires_at, uptime_24h, uptime_7d, uptime_30d, average_ms, outages]
+      required: [domain, path, custom_path, paused, state, since, visited_at, status_code, response_ms, error, cert_expires_at, uptime_24h, uptime_7d, uptime_30d, average_ms, outages]
       properties:
         domain:
           type: string
         path:
           type: string
-          description: Where the check goes. The app's health path from `x-moin.health`, or /, unless set.
+          description: Where uptime visits. The app's health path from `x-moin.health`, or /, unless set.
         custom_path:
           type: boolean
         paused:
@@ -6326,18 +6326,18 @@ components:
           type: string
           format: date-time
           nullable: true
-        checked_at:
+        visited_at:
           type: string
           format: date-time
           nullable: true
-          description: The newest check since the hub started.
+          description: The last visit since the hub started.
         status_code:
           type: integer
         response_ms:
           type: integer
         error:
           type: string
-          description: Why the newest check failed, such as `HTTP 502` or `no answer within 10s`.
+          description: Why the last visit failed, such as `HTTP 502` or `no answer within 10s`.
         cert_expires_at:
           type: string
           format: date-time
@@ -6345,7 +6345,7 @@ components:
         uptime_24h:
           type: number
           nullable: true
-          description: Percent of the checks that found it up; null without a check in that time.
+          description: Percent of the visits that found it up; null without a visit in that time.
         uptime_7d:
           type: number
           nullable: true
@@ -6371,7 +6371,7 @@ components:
                 nullable: true
               reason:
                 type: string
-    UptimeCheckRequest:
+    UptimeRequest:
       type: object
       properties:
         path:

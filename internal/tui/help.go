@@ -56,7 +56,7 @@ func (m model) helpGroups() []keyGroup {
 		case tDomains:
 			here = []kb{{"↑↓", "pick a domain"}, {"a", "add one"}, {"x", "remove it"}, {"c", "make it canonical"}, {"p", "password"}}
 		case tUptime:
-			here = []kb{{"↑↓", "pick a domain"}, {"p", "pause, resume"}, {"c", "the path it checks"}, {"r", "check again"}}
+			here = []kb{{"↑↓", "pick a domain"}, {"p", "pause, resume"}, {"c", "the path it visits"}, {"r", "visit again"}}
 		case tMetrics:
 			here = []kb{{"[  ]", "range: 1h to 30d"}}
 		}

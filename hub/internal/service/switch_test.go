@@ -63,15 +63,15 @@ func TestUptimeStateKeepsThePause(t *testing.T) {
 		t.Fatal(err)
 	}
 	app, _ := apps.Get(owner.WorkspaceID, "blog")
-	stale := model.UptimeCheck{AppID: app.ID, Domain: "blog.de", State: model.UptimeUp}
+	stale := model.DomainUptime{AppID: app.ID, Domain: "blog.de", State: model.UptimeUp}
 	paused := true
-	if _, _, err := apps.SetUptimeCheck(owner, "blog", "blog.de", nil, &paused); err != nil {
+	if _, _, err := apps.SetUptime(owner, "blog", "blog.de", nil, &paused); err != nil {
 		t.Fatal(err)
 	}
 	if err := apps.apps.SaveUptimeState(stale); err != nil {
 		t.Fatal(err)
 	}
-	checks, err := apps.apps.UptimeChecks()
+	checks, err := apps.apps.DomainUptimes()
 	if err != nil {
 		t.Fatal(err)
 	}

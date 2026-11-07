@@ -59,7 +59,7 @@ The CLI prints the next `--cursor` at the end. In the API and MCP, send `next_cu
 - **Where from**: the IP address and browser or program. Only admins and owners see them.
 - **What**: the action and what it touched, with the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, exit codes and error messages.
 
-It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, buckets and the bucket of each app, backups and how often and how long they run, restores, daily checks, downloads, SQL writes, row edits, servers and their security, daemon updates, uptime checks and outages, servers that went offline, alert destinations, their tests and failures, API tokens, plan changes and every change of the team.
+It covers deploys and how they ended, redeploys, restarts, starts, stops, rollbacks, env vars, domains, passwords in front of apps, deploy hooks, GitHub links, registry logins, buckets and the bucket of each app, backups and how often and how long they run, restores, daily checks, downloads, SQL writes, row edits, servers and their security, daemon updates, uptime and outages, servers that went offline, alert destinations, their tests and failures, API tokens, plan changes and every change of the team.
 
 ## What it never records
 

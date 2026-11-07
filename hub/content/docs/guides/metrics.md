@@ -39,7 +39,7 @@ Every deploy that went live is a dot on the app's charts, with its number. The C
 
 ## Good to know
 
-- Requests, errors and response times per app are not measured yet. [Uptime](/docs/guides/uptime) checks every domain once a minute, with its response time.
+- Requests, errors and response times per app are not measured yet. [Uptime](/docs/guides/uptime) visits every domain once a minute, with its response time.
 - Numbers only: never a request, a log line or anything from your data.
 - Samples of the last hour stay in the hub's memory, finished minutes go to `history.db` once a minute, and add up into hours. Minutes stay 24 hours, hours 30 days. After a restart the last hour comes back from the minutes.
 - `history.db` has no backup: losing it costs old charts, never data. See [what is kept where](/docs/self-hosting#database-backup).

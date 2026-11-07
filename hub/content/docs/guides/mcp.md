@@ -88,8 +88,8 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
 | `set_app_bucket` | moves an app's uploads and backups to a bucket; the copies start again there | write |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
-| `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
-| `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |
+| `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the last visit and the last outages | read |
+| `set_uptime` | the path uptime visits on a domain, or pauses and resumes it | write |
 | `get_metrics` | CPU, memory, disk and network of an app or a server, now and over 1h, 24h, 7d or 30d; for an app the deploys that went live, for a server its apps by memory | read |
 | `set_domains` | domains and the canonical one, or with `service` the domains of another service | write |
 | `get_instant` | the instant address, or why the app has none; `show` returns its password with a token that may write | read |

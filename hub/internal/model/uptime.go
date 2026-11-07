@@ -6,20 +6,20 @@ import "time"
 const (
 	UptimeUp   = "up"
 	UptimeDown = "down"
-	// UptimePending is a domain that has not been checked yet.
+	// UptimePending is a domain that has not been visited yet.
 	UptimePending = "pending"
-	// UptimePaused is a domain whose check is paused, or of a stopped app.
+	// UptimePaused is a domain whose visit is paused, or of a stopped app.
 	UptimePaused = "paused"
 	// UptimeStopped is an app its owner stopped.
 	UptimeStopped = "stopped"
-	// UptimeNoDomains is an app without domains: nothing to check.
+	// UptimeNoDomains is an app without domains: nothing to visit.
 	UptimeNoDomains = "no_domains"
 )
 
-// UptimeCheck is what the hub keeps of the check of one domain:
+// DomainUptime is what the hub keeps of the uptime of one domain:
 // its settings and its state. Path is empty for the default: the app's
-// health path, or /. State is "" until the first check, then up or down.
-type UptimeCheck struct {
+// health path, or /. State is "" until the first visit, then up or down.
+type DomainUptime struct {
 	AppID  string     `db:"app_id"`
 	Domain string     `db:"domain"`
 	Path   string     `db:"path"`
@@ -36,17 +36,17 @@ type UptimeOutage struct {
 	Reason    string     `db:"reason"`
 }
 
-// UptimeCounts add up the checks of a domain over a while.
+// UptimeCounts add up the visits of a domain over a while.
 type UptimeCounts struct {
-	Checks     int `db:"checks"`
+	Visits     int `db:"visits"`
 	Up         int `db:"up"`
 	ResponseMS int `db:"response_ms"`
 	MaxMS      int `db:"max_ms"`
 }
 
-// Add counts one more check.
+// Add counts one more visit.
 func (c *UptimeCounts) Add(up bool, responseMS int) {
-	c.Checks++
+	c.Visits++
 	if up {
 		c.Up++
 	}
@@ -56,7 +56,7 @@ func (c *UptimeCounts) Add(up bool, responseMS int) {
 
 // Merge adds other to c.
 func (c *UptimeCounts) Merge(other UptimeCounts) {
-	c.Checks += other.Checks
+	c.Visits += other.Visits
 	c.Up += other.Up
 	c.ResponseMS += other.ResponseMS
 	c.MaxMS = max(c.MaxMS, other.MaxMS)
@@ -70,7 +70,7 @@ type UptimeHour struct {
 	UptimeCounts
 }
 
-// UptimeTarget is a live app the checker visits: its domains and what its
+// UptimeTarget is a live app uptime visits: its domains and what its
 // live deploy detected, as JSON.
 type UptimeTarget struct {
 	AppID       string `db:"id"`
@@ -80,7 +80,7 @@ type UptimeTarget struct {
 	Detected    string `db:"detected"`
 }
 
-// ServerSeen is a server the checker watches: when its daemon was last
+// ServerSeen is a server uptime watches: when its daemon was last
 // seen, and since when it counts as down, nil while it does not.
 type ServerSeen struct {
 	ID          string     `db:"id"`

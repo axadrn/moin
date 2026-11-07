@@ -422,10 +422,10 @@ func (m model) protect(app, user, password string) tea.Cmd {
 func (m model) setUptime(app, domain string, path *string, paused *bool) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		if _, err := api.SetUptimeCheck(ctx, app, domain, path, paused); err != nil {
+		if _, err := api.SetUptime(ctx, app, domain, path, paused); err != nil {
 			return undoMsg{err}
 		}
-		return reloadMsg{notice: "Saved the check of " + domain}
+		return reloadMsg{notice: "Saved uptime of " + domain}
 	}
 }
 
