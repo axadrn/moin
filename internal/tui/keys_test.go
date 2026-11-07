@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/find"
 )
 
 func quits(cmd tea.Cmd) bool {
@@ -188,19 +189,19 @@ func TestAppKeysDoNotShadowTabKeys(t *testing.T) {
 }
 
 func TestMatchFindsSubsequencesBestFirst(t *testing.T) {
-	if _, _, ok := match("shp", "shop"); !ok {
+	if _, ok := find.Name("shp", "shop"); !ok {
 		t.Error("shp matches shop")
 	}
-	if _, _, ok := match("pohs", "shop"); ok {
+	if _, ok := find.Name("pohs", "shop"); ok {
 		t.Error("pohs does not match shop")
 	}
-	exact, _, _ := match("shop", "shop")
-	loose, _, _ := match("shop", "s h o p x")
-	if exact <= loose {
-		t.Errorf("a whole match scores above a scattered one: %d <= %d", exact, loose)
+	exact, _ := find.Name("shop", "shop")
+	loose, _ := find.Name("shop", "s h o p x")
+	if exact.Score <= loose.Score {
+		t.Errorf("a whole match scores above a scattered one: %d <= %d", exact.Score, loose.Score)
 	}
-	_, pos, _ := match("sl", "shop logs")
-	if len(pos) != 2 || pos[0] != 0 || pos[1] != 5 {
+	sl, _ := find.Name("sl", "shop logs")
+	if pos := sl.Positions; len(pos) != 2 || pos[0] != 0 || pos[1] != 5 {
 		t.Errorf("positions of sl in shop logs: %v", pos)
 	}
 }
@@ -572,16 +573,16 @@ func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
 		t.Fatalf("logs blog finds blog logs, got %v", titles(hs))
 	}
-	if _, pos, _ := match("lo bl", "blog logs"); fmt.Sprint(pos) != "[5 6 0 1]" {
-		t.Errorf("the highlight follows each word: %v", pos)
+	if found, _ := find.Name("lo bl", "blog logs"); fmt.Sprint(found.Positions) != "[5 6 0 1]" {
+		t.Errorf("the highlight follows each word: %v", found.Positions)
 	}
-	if _, _, ok := match("logs zz", "blog logs"); ok {
+	if _, ok := find.Name("logs zz", "blog logs"); ok {
 		t.Error("every word has to match")
 	}
-	inOrder, _, _ := match("blog lo", "blog logs")
-	anyOrder, _, _ := match("lo blog", "blog logs")
-	if inOrder <= anyOrder {
-		t.Errorf("the order as typed scores best: %d <= %d", inOrder, anyOrder)
+	inOrder, _ := find.Name("blog lo", "blog logs")
+	anyOrder, _ := find.Name("lo blog", "blog logs")
+	if inOrder.Score <= anyOrder.Score {
+		t.Errorf("the order as typed scores best: %d <= %d", inOrder.Score, anyOrder.Score)
 	}
 	m = press(m, "enter", "esc", "ctrl+k")
 	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {

@@ -23,13 +23,14 @@ import (
 // workspace, and the update of an installed app.
 type CatalogHandler struct {
 	catalog    *service.CatalogService
+	apps       *service.AppService
 	servers    *service.ServerService
 	workspaces *service.WorkspaceService
 	appURL     string
 }
 
-func NewCatalogHandler(catalog *service.CatalogService, servers *service.ServerService, workspaces *service.WorkspaceService, appURL string) *CatalogHandler {
-	return &CatalogHandler{catalog: catalog, servers: servers, workspaces: workspaces, appURL: appURL}
+func NewCatalogHandler(catalog *service.CatalogService, apps *service.AppService, servers *service.ServerService, workspaces *service.WorkspaceService, appURL string) *CatalogHandler {
+	return &CatalogHandler{catalog: catalog, apps: apps, servers: servers, workspaces: workspaces, appURL: appURL}
 }
 
 // view is the catalog: the apps of the category in the query, in the
@@ -175,7 +176,7 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 // app of your own.
 func (h *CatalogHandler) UpdatePanel(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	app, err := h.catalog.App(workspace.ID, r.PathValue("app"))
+	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
 	if err != nil || app == nil {
 		return
 	}

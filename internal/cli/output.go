@@ -223,7 +223,7 @@ func (p *progress) draw() {
 	frame := style.Spinner[p.frame%len(style.Spinner)]
 	elapsed := ""
 	if since := time.Since(p.started); since >= time.Second {
-		elapsed = " · " + duration(since)
+		elapsed = " · " + style.Duration(since)
 	}
 	// One row only: a wrapped spinner line would not clear.
 	width := 80
@@ -255,10 +255,8 @@ func (p *progress) end() {
 }
 
 func (p *progress) elapsed() string {
-	return duration(time.Since(p.started))
+	return style.Duration(time.Since(p.started))
 }
-
-func duration(d time.Duration) string { return style.Duration(d) }
 
 // clip cuts text to width cells and ends it with … when it was longer.
 func clip(text string, width int) string {

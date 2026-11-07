@@ -107,9 +107,9 @@ func printUptime(w io.Writer, answer client.Uptime, now time.Time) {
 		}
 		rows = append(rows, []string{domain.Domain, uptimeState(domain.State), client.Percent(domain.Uptime24h), client.Percent(domain.Uptime7d), client.Percent(domain.Uptime30d), check, cert, domain.Path})
 		for _, outage := range domain.Outages {
-			lasted := "ongoing, " + duration(now.Sub(outage.StartedAt))
+			lasted := "ongoing, " + style.Duration(now.Sub(outage.StartedAt))
 			if outage.EndedAt != nil {
-				lasted = duration(outage.EndedAt.Sub(outage.StartedAt))
+				lasted = style.Duration(outage.EndedAt.Sub(outage.StartedAt))
 			}
 			outages = append(outages, []string{domain.Domain, outage.StartedAt.UTC().Format("2006-01-02 15:04 UTC"), lasted, outage.Reason})
 		}

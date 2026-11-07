@@ -95,11 +95,7 @@ func New(cfg *config.Config) (*App, error) {
 	members := repository.NewWorkspaceMemberRepository(database)
 	invitations := repository.NewWorkspaceInvitationRepository(database)
 	workspaceAuditEvents := repository.NewWorkspaceAuditRepository(database)
-	mailProvider, err := mailer.NewProvider(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("initialize mail provider: %w", err)
-	}
-	email := service.NewEmailService(mailProvider, cfg.AppURL, brand.Name)
+	email := service.NewEmailService(mailer.NewProvider(cfg), cfg.AppURL, brand.Name)
 	// A self-hosted control plane may start without a bucket; files such as
 	// avatars wait for one.
 	var fileStorage storage.Storage = storage.None{}
@@ -122,10 +118,7 @@ func New(cfg *config.Config) (*App, error) {
 	)
 	var paymentProvider payment.Provider
 	if cfg.Billing {
-		paymentProvider, err = payment.NewProvider(cfg, subscriptionService)
-		if err != nil {
-			return nil, fmt.Errorf("initialize payment provider: %w", err)
-		}
+		paymentProvider = payment.NewStripeProvider(cfg, subscriptionService)
 	} else {
 		access.Product = access.SelfHosted
 	}
