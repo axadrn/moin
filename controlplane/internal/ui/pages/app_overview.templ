@@ -95,6 +95,7 @@ templ appRows(apps []model.App, servers []model.Server) {
 	@kit.List() {
 		for _, app := range apps {
 			@kit.Row(basePath + "/apps/" + app.Name) {
+				@kit.AppIcon(app.Name, appLogo(app), false)
 				@kit.RowText(app.Name, appNote(app, serverOnline(servers, app.ServerID)))
 				@appState(app)
 			}

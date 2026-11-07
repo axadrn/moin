@@ -215,6 +215,12 @@ templ appHomeSection(view AppPageView) {
 		@kit.Row(appPath + "/metrics") {
 			@kit.RowText("Metrics", "")
 		}
+		if app.Catalog != "" {
+			// Its page in the catalog: what it is, its links, newer versions.
+			@kit.Row(ctxkeys.AppBasePath(ctx) + "/catalog/" + app.Catalog) {
+				@kit.RowText("In the catalog", app.Catalog)
+			}
+		}
 	}
 }
 

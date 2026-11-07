@@ -12,7 +12,7 @@ import (
 // as a title (44 px); else it fits a row.
 templ AppIcon(name, logo string, head bool) {
 	if logo != "" {
-		<span class={ appIconClass(head), "bg-white p-[14%] ring-1 ring-black/5 dark:ring-white/15" } aria-hidden="true">
+		<span class={ appIconClass(head), "bg-white p-1.5 ring-1 ring-black/5 dark:ring-white/15" } aria-hidden="true">
 			<img src={ logo } alt="" class="size-full object-contain" loading="lazy" decoding="async"/>
 		</span>
 	} else {
