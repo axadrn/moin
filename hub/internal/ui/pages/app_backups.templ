@@ -1,0 +1,453 @@
+package pages
+
+import (
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/protocol"
+)
+
+// BackupsView is the backups of an app: its bucket, the buckets of the
+// workspace to pick from, Older the ones the app left, and what the daemon
+// reports about its databases with the moments to go back to.
+type BackupsView struct {
+	App       model.App
+	Bucket    *service.Bucket
+	Buckets   []service.Bucket
+	Older     []service.Bucket
+	Databases []service.DatabaseBackups
+	// Restore is the newest restore of the open database of the last day.
+	Restore *service.Restore
+	// Error says why the server could not report its backups.
+	Error string
+	Now   time.Time
+}
+
+// backupOf is what the daemon reports about one database.
+func (view BackupsView) backupOf(database string) (service.DatabaseBackups, bool) {
+	for _, backup := range view.Databases {
+		if backup.Database == database {
+			return backup, true
+		}
+	}
+	return service.DatabaseBackups{}, false
+}
+
+// othersOf are the other databases of a Postgres service, which moin
+// backs up too: postgres-db/<name>.
+func (view BackupsView) othersOf(database string) []service.DatabaseBackups {
+	others := []service.DatabaseBackups{}
+	for _, backup := range view.Databases {
+		if strings.HasPrefix(backup.Database, database+"/") {
+			others = append(others, backup)
+		}
+	}
+	return others
+}
+
+// BackupSettings is where the backups of all the app's databases go: the
+// bucket. Without a bucket, the way to add one.
+templ BackupSettings(view BackupsView) {
+	<div id="data-backups">
+		@kit.Section("Backups", nil) {
+			@kit.List() {
+				if view.Bucket == nil {
+					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
+					}
+				} else {
+					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+						<span class="shrink-0 font-medium">Bucket</span>
+						<span class="min-w-0 flex-1 truncate text-right text-sm text-muted-foreground" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
+					}
+					@kit.RowFact("Folder", "") {
+						<span class="font-mono" data-bucket-folder>{ view.Bucket.AppFolder(&view.App) }</span>
+					}
+					if len(view.Older) > 0 {
+						@kit.RowFact("Left", "") {
+							<span data-bucket-older>{ olderNames(view.Older) }</span>
+						}
+					}
+					if len(view.Buckets) > 1 {
+						@bucketDisclosure("Use another bucket") {
+							@AppBucketForm(view)
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// AppBucketForm picks the bucket of the app. It asks first: the copies
+// start again in the other bucket.
+templ AppBucketForm(view BackupsView) {
+	<form
+		id="app-bucket-form"
+		class="flex flex-col gap-3 sm:flex-row sm:items-center"
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/bucket" }
+		hx-target="#data-backups"
+		hx-select="#data-backups"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
+		data-confirm-action="Move"
+	>
+		@kit.CSRF()
+		@kit.Select(kit.SelectProps{ID: "app-bucket", Name: "bucket", Label: "Bucket", Options: appBucketOptions(view.Buckets), Value: appBucketValue(view.App)})
+		@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			Move
+		}
+	</form>
+}
+
+// appBucketDefault is the select's value for "the workspace's default".
+// Bucket names never start with a dash, so it is no bucket's name.
+const appBucketDefault = "-default"
+
+func appBucketValue(app model.App) string {
+	if app.BucketName == "" {
+		return appBucketDefault
+	}
+	return app.BucketName
+}
+
+// appBucketOptions are the choices: the default, whichever it is, then
+// each bucket by name.
+func appBucketOptions(buckets []service.Bucket) []kit.Option {
+	options := []kit.Option{}
+	for _, bucket := range buckets {
+		if bucket.Default {
+			options = append(options, kit.Option{Value: appBucketDefault, Label: "The default (" + bucket.Name + ")"})
+		}
+	}
+	for _, bucket := range buckets {
+		options = append(options, kit.Option{Value: bucket.Name, Label: bucket.Name})
+	}
+	return options
+}
+
+// DatabaseBackups is the backup of one database: one row how it stands,
+// how often and how long, Every change for SQLite, Download a copy, then
+// the moments to go back to with Restore. A restore shows it runs in the
+// first row while it does.
+templ DatabaseBackups(view BackupsView, database string) {
+	{{ backup, known := view.backupOf(database) }}
+	<div id="db-backups" class="group/backups flex flex-col gap-6" data-database-backup={ database }>
+		if view.Bucket == nil {
+			@kit.Section("Backups", nil) {
+				@kit.List() {
+					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
+					}
+				}
+			}
+		} else if view.Error != "" {
+			@kit.Section("Backups", nil) {
+				@dataError(view.Error)
+			}
+		} else {
+			@kit.Section("Backups", nil) {
+				@kit.List() {
+					@backupState(backup, known, database, view.Now)
+					@backupRestore(view, database)
+					@backupSchedule(view, backup, database)
+					@backupDownload(view, backup, database)
+				}
+			}
+			@backupGoBack(view, backup, database, database, "Go back to")
+			for _, other := range view.othersOf(database) {
+				@kit.Section(databaseName(other.Database), nil) {
+					@kit.List() {
+						@backupState(other, true, other.Database, view.Now)
+						@backupDownload(view, other, other.Database)
+					}
+				}
+				@backupGoBack(view, other, other.Database, database, "Go back to · "+databaseName(other.Database))
+			}
+		}
+	</div>
+	@backupScript.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			// Restore works once a moment is picked.
+			document.addEventListener("change", (event) => {
+				const form = event.target.closest?.("[data-restore]");
+				if (!form || event.target.name !== "moment") return;
+				const button = form.querySelector("[data-restore-button]");
+				if (button) button.disabled = false;
+			});
+		</script>
+	}
+}
+
+var backupScript = templ.NewOnceHandle()
+
+// backupGoBack is the list of moments of one database to go back to,
+// with Restore; page is the database the page is about.
+templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, page, title string) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	@kit.Section(title, nil) {
+		<form
+			class="flex flex-col gap-2"
+			hx-post={ appPath + "/backups/restore" }
+			hx-target="#db-backups"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+			hx-confirm={ "Restore " + databaseName(database) + " to the moment you picked? It replaces the data there now. moin keeps the data of now beside it, so you can undo this; the app stops for a moment." }
+			data-confirm-name={ view.App.Name }
+			data-confirm-action="Restore"
+			data-restore
+		>
+			@kit.CSRF()
+			<input type="hidden" name="database" value={ database }/>
+			<input type="hidden" name="page" value={ page }/>
+			@kit.List() {
+				if len(backup.Moments) == 0 {
+					@kit.Row("") {
+						<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
+					}
+				}
+				for _, moment := range backup.Moments {
+					@momentPick(moment, view.Now)
+				}
+			}
+			if len(backup.Moments) > 0 {
+				<div class="flex justify-end">
+					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
+						Restore
+					}
+				</div>
+			}
+		</form>
+	}
+}
+
+
+// backupState is the first row of a database's backup: backed up and when
+// it was last checked, or why it does not work in one sentence with the
+// details under it. While a restore runs, it says so.
+templ backupState(backup service.DatabaseBackups, known bool, database string, now time.Time) {
+	@kit.RowControl(templ.Attributes{"data-backup-state": true}) {
+		<div class="hidden min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:flex" role="status">
+			@kit.Dot(kit.StateRunning)
+			<span class="truncate font-medium">Restoring { databaseName(database) }</span>
+		</div>
+		<div class="flex min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:hidden">
+			switch  {
+				case !known:
+					@kit.Dot(kit.StateRunning)
+					@kit.RowText("Starting", "")
+				case backup.Problem != "":
+					@kit.Dot(kit.StateFailed)
+					<div class="min-w-0 flex-1">
+						<div class="font-medium text-failed" data-backup-problem>{ backup.Problem }</div>
+						<details class="group/details text-sm text-muted-foreground">
+							<summary class="cursor-pointer list-none py-1 outline-none hover:text-foreground focus-visible:text-foreground [&::-webkit-details-marker]:hidden">Show details</summary>
+							<p class="font-mono text-xs break-words" data-backup-error>{ backup.Error }</p>
+						</details>
+					</div>
+				case backup.CopiedAt != nil:
+					@kit.Dot(kit.StateLive)
+					<span class="min-w-0 flex-1 truncate font-medium" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Last copy " + human.Ago(*backup.CopiedAt, now) + " · " + checkedText(backup, now) }</span>
+				default:
+					@kit.Dot(kit.StateRunning)
+					@kit.RowText("Starting", "")
+			}
+		</div>
+	}
+}
+
+func checkedText(backup service.DatabaseBackups, now time.Time) string {
+	if backup.CheckedAt == nil {
+		return "not checked yet"
+	}
+	return "checked " + human.Ago(*backup.CheckedAt, now)
+}
+
+func checkedStamp(backup service.DatabaseBackups) string {
+	if backup.CheckedAt == nil {
+		return ""
+	}
+	return "Restored the newest copy into a throwaway database and read it " + stamp(*backup.CheckedAt)
+}
+
+// momentPick is one moment to pick for a restore: what it is and when.
+templ momentPick(moment service.Moment, now time.Time) {
+	@kit.RowPick(templ.Attributes{"name": "moment", "value": moment.ID, "data-moment": moment.ID}) {
+		<span class="min-w-0 flex-1 font-medium break-words">{ moment.Label }</span>
+		<span class="shrink-0 text-sm text-muted-foreground tabular-nums" title={ stamp(moment.At) }>{ momentTime(moment.At, now) }</span>
+	}
+}
+
+// momentTime is when a moment was, in UTC: the time today, else the day.
+func momentTime(at, now time.Time) string {
+	at, now = at.UTC(), now.UTC()
+	if at.YearDay() == now.YearDay() && at.Year() == now.Year() {
+		return at.Format("15:04 UTC")
+	}
+	return at.Format("Jan 2, 15:04 UTC")
+}
+
+// backupRestore is how the newest restore stands: running, which follows
+// the app's changes until it ends, then failed with why, or done for an
+// hour.
+templ backupRestore(view BackupsView, database string) {
+	{{ restore := view.Restore }}
+	if restore != nil && restore.Active() {
+		@kit.RowControl(templ.Attributes{"hx-get": databaseURL(ctx, view.App.Name, database), "hx-trigger": "apps from:body", "hx-select": "#db-backups", "hx-target": "#db-backups", "hx-swap": "outerHTML", "data-restore-running": true}) {
+			@kit.Dot(kit.StateRunning)
+			<div class="min-w-0 flex-1">
+				<div class="truncate font-medium">Restoring { databaseName(database) } to { lowerFirst(restore.To) }</div>
+				if restore.State == service.RestoreUnknown {
+					<div class="text-sm text-muted-foreground" data-restore-unknown>The server is offline; moin asks it how the restore went when it is back.</div>
+				}
+			</div>
+		}
+	} else if restore != nil && restore.State == service.RestoreFailed {
+		@kit.RowControl(templ.Attributes{"data-restore-failed": true}) {
+			@kit.Dot(kit.StateFailed)
+			<div class="min-w-0 flex-1">
+				if strings.HasPrefix(restore.Error, service.RestoreNoWord) {
+					<div class="font-medium text-failed">Unknown how the restore to { lowerFirst(restore.To) } ended: check the app</div>
+				} else {
+					<div class="font-medium text-failed">The restore to { lowerFirst(restore.To) } failed</div>
+				}
+				<details class="text-sm text-muted-foreground">
+					<summary class="cursor-pointer list-none py-1 outline-none hover:text-foreground focus-visible:text-foreground [&::-webkit-details-marker]:hidden">Show details</summary>
+					<p class="font-mono text-xs break-words">{ restore.Error }</p>
+				</details>
+			</div>
+		}
+	} else if restore != nil && restore.FinishedAt != nil && view.Now.Sub(*restore.FinishedAt) < time.Hour {
+		@kit.RowControl(templ.Attributes{"data-restore-done": true}) {
+			<span class="min-w-0 flex-1 truncate text-muted-foreground">Restored to { lowerFirst(restore.To) } { human.Ago(*restore.FinishedAt, view.Now) }</span>
+		}
+	}
+}
+
+// lowerFirst starts a label in the middle of a sentence: "1 hour ago",
+// "before v12".
+func lowerFirst(label string) string {
+	if label == "" {
+		return label
+	}
+	return strings.ToLower(label[:1]) + label[1:]
+}
+
+// backupSchedule are the rows of how often moin copies the app's
+// databases and how long it keeps each copy, and for SQLite the switch of
+// Every change. Each saves itself; they hold for every database of the
+// app.
+templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database string) {
+	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/backups/schedule" }}
+	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML"} }}
+	@kit.RowForm(form) {
+		@kit.CSRF()
+		@scheduleFields(view.App, database, "every")
+		@kit.RowLabel("backup-every", "How often", "")
+		<div class="w-44 shrink-0">
+			@kit.Select(kit.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
+		</div>
+	}
+	@kit.RowForm(form) {
+		@kit.CSRF()
+		@scheduleFields(view.App, database, "keep")
+		@kit.RowLabel("backup-keep", "Keep", "")
+		<div class="w-44 shrink-0">
+			@kit.Select(kit.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
+		</div>
+	}
+	if backup.Kind != "postgres" {
+		@kit.RowForm(everyChangeForm(form, view.App.BackupEveryChange)) {
+			@kit.CSRF()
+			@scheduleFields(view.App, database, "every_change")
+			<input type="hidden" name="every_change_switch" value="1"/>
+			@kit.RowLabel("backup-every-change", "Every change", "")
+			@kit.Switch(templ.Attributes{"id": "backup-every-change", "name": "every_change", "value": "1", "checked": view.App.BackupEveryChange, "data-every-change": true})
+		}
+	}
+}
+
+// scheduleFields are the settings a row does not change, so each row
+// sends all three.
+templ scheduleFields(app model.App, database, except string) {
+	<input type="hidden" name="database" value={ database }/>
+	if except != "every" {
+		<input type="hidden" name="every" value={ strconv.Itoa(app.BackupEvery) }/>
+	}
+	if except != "keep" {
+		<input type="hidden" name="keep" value={ strconv.Itoa(app.BackupKeep) }/>
+	}
+	if except != "every_change" && app.BackupEveryChange {
+		<input type="hidden" name="every_change" value="1"/>
+	}
+}
+
+// everyChangeForm is the form of the Every change switch: turning it off
+// removes what it wrote down, so it asks first (tier 2).
+func everyChangeForm(form templ.Attributes, on bool) templ.Attributes {
+	if !on {
+		return form
+	}
+	asked := templ.Attributes{"hx-confirm": "Turn Every change off? What it wrote down goes; the copies stay.", "data-confirm-action": "Turn off"}
+	for name, value := range form {
+		asked[name] = value
+	}
+	return asked
+}
+
+func everyOptions() []kit.Option {
+	options := []kit.Option{}
+	for _, every := range protocol.Everies {
+		options = append(options, kit.Option{Value: strconv.Itoa(every), Label: upperFirst(service.EveryText(every))})
+	}
+	return options
+}
+
+func keepOptions() []kit.Option {
+	options := []kit.Option{}
+	for _, keep := range protocol.Keeps {
+		options = append(options, kit.Option{Value: strconv.Itoa(keep), Label: service.KeepText(keep)})
+	}
+	return options
+}
+
+func upperFirst(text string) string {
+	if text == "" {
+		return text
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+// backupDownload is the row that downloads the newest copy, straight from
+// the user's own bucket through a link that lasts 15 minutes.
+templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
+	if len(backup.Copies) > 0 {
+		@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+view.App.Name+"/backups/download?database="+url.QueryEscape(database), templ.Attributes{"id": "db-download", "data-download": true}) {
+			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
+			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
+		}
+	}
+}
+
+func olderNames(buckets []service.Bucket) string {
+	names := make([]string, 0, len(buckets))
+	for _, bucket := range buckets {
+		names = append(names, bucket.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+func orAWS(endpoint string) string {
+	if endpoint == "" {
+		return "AWS S3"
+	}
+	return endpoint
+}

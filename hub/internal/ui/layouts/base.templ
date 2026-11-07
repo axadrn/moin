@@ -1,0 +1,164 @@
+package layouts
+
+import "github.com/axadrn/moin/hub/internal/ui/kit"
+
+import "github.com/axadrn/moin/hub/internal/brand"
+import "github.com/axadrn/moin/hub/internal/ctxkeys"
+
+type SEOProps struct {
+	Title        string
+	Description  string
+	Path         string
+	NoIndex      bool
+	MarkdownPath string
+	// Public pages (home, docs, changelog, catalog, legal) carry the page
+	// counter; the app, the admin and sign-in never do.
+	Public bool
+}
+
+templ Base(props ...SEOProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="csrf-token" content={ ctxkeys.CSRFToken(ctx) }/>
+			if len(props) > 0 {
+				@seo(props[0])
+			} else {
+				<title>{ brand.Name }</title>
+			}
+			<link rel="icon" href="/favicon.ico" sizes="32x32"/>
+			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png"/>
+			// The text font loads with the stylesheet, not after it, so the
+			// first paint is already in Geist.
+			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
+			<link rel="preload" href="/assets/fonts/satoshi/satoshi-black.woff2" as="font" type="font/woff2" crossorigin/>
+			<link href={ kit.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
+			// Scripts in swapped content get the page's nonce, so the CSP lets
+			// them run.
+			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
+			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
+			// Server-sent events swap HTML as it streams (hx-sse:connect).
+			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/moin.js") }></script>
+			// A link starts loading when the pointer rests on it, so the page
+			// is there on the click (Chrome and Edge; others ignore it). Only
+			// pages: never sign in or out, GitHub or the API.
+			<script type="speculationrules" nonce={ templ.GetNonce(ctx) }>
+				{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/auth/*"}},{"not":{"href_matches":"/api/*"}},{"not":{"href_matches":"/*/github/*"}},{"not":{"href_matches":"/*\\?*"}}]},"eagerness":"moderate"}]}
+			</script>
+			// Site-wide enhancements
+			@themeScript()
+			if len(props) > 0 && props[0].Public {
+				@Analytics()
+			}
+		</head>
+		<body
+			class="style-nova min-h-screen"
+			hx-headers:inherited={ `{"X-CSRF-Token":"` + ctxkeys.CSRFToken(ctx) + `"}` }
+		>
+			{{ session := ctxkeys.Session(ctx) }}
+			if session.IsImpersonating() {
+				<div class="sticky top-0 z-50 flex items-center justify-center gap-3 border-b border-amber-500/30 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+					<span>You are viewing the application as another user.</span>
+					<form
+						action="/admin/impersonation/stop"
+						method="POST"
+						hx-post="/admin/impersonation/stop"
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@kit.CSRF()
+						<button type="submit" class="font-medium underline-offset-4 hover:underline">Return to Admin</button>
+					</form>
+				</div>
+			}
+			{ children... }
+			<div id="feedback" hidden></div>
+			@kit.ConfirmDialog()
+		</body>
+	</html>
+}
+
+templ seo(props SEOProps) {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	{{ baseURL := cfg.AppURL }}
+	{{ appName := brand.Name }}
+	{{ appTagline := brand.Tagline }}
+	{{ fullTitle := props.Title + " · " + appName }}
+	@templ.Fragment("seo-title") {
+		<title id="page-title" hx-swap-oob="true">{ fullTitle }</title>
+	}
+	<meta name="description" content={ props.Description }/>
+	// Author
+	<meta name="author" content={ appName }/>
+	// Robots Tags
+	if props.NoIndex || cfg.RobotsNoIndex {
+		<meta name="robots" content="noindex, nofollow"/>
+	} else {
+		<meta name="robots" content="index, follow"/>
+	}
+	// Canonical URL
+	<link rel="canonical" href={ baseURL + props.Path }/>
+	<link rel="describedby" href="/llms.txt"/>
+	if props.MarkdownPath != "" {
+		@templ.Fragment("seo-markdown") {
+			<link id="seo-markdown" rel="alternate" type="text/markdown" href={ props.MarkdownPath } hx-swap-oob="outerHTML"/>
+		}
+	}
+	// OpenGraph Tags
+	<meta property="og:title" content={ fullTitle }/>
+	<meta property="og:description" content={ props.Description }/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:url" content={ baseURL + props.Path }/>
+	<meta property="og:site_name" content={ appName }/>
+	// OpenGraph Image
+	<meta property="og:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
+	<meta property="og:image:width" content="1200"/>
+	<meta property="og:image:height" content="630"/>
+	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
+	// Twitter Card
+	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:title" content={ fullTitle }/>
+	<meta name="twitter:description" content={ props.Description }/>
+	<meta name="twitter:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
+	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
+	// Theme Color
+	<meta name="theme-color" content="#000000"/>
+}
+
+templ themeScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(function() {
+			window.themeUtils = window.themeUtils || {};
+			const media = window.matchMedia('(prefers-color-scheme: dark)');
+			window.themeUtils.getThemePreference = function() {
+				return localStorage.getItem('theme') || 'system';
+			};
+			window.themeUtils.applyTheme = function() {
+				const preference = window.themeUtils.getThemePreference();
+				const isDark = preference === 'system' ? media.matches : preference === 'dark';
+				document.documentElement.classList.toggle('dark', isDark);
+				document.dispatchEvent(new CustomEvent('theme-changed'));
+			};
+			window.themeUtils.cycleTheme = function() {
+				const current = window.themeUtils.getThemePreference();
+				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
+				localStorage.setItem('theme', next);
+				window.themeUtils.applyTheme();
+			};
+			window.themeUtils.applyTheme();
+			media.addEventListener('change', function() {
+				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
+			});
+			document.addEventListener('click', function(event) {
+				const switcher = event.target.closest('[data-theme-switcher]');
+				if (!switcher) return;
+				event.preventDefault();
+				window.themeUtils.cycleTheme();
+			});
+		})();
+	</script>
+}

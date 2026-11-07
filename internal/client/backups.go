@@ -138,7 +138,7 @@ func (c *Client) EditBucket(ctx context.Context, name string, input BucketInput)
 }
 
 // RemoveBucket forgets a bucket nothing uses; what is in it stays. confirm
-// is the bucket's name, typed out; the control plane checks it.
+// is the bucket's name, typed out; the hub checks it.
 func (c *Client) RemoveBucket(ctx context.Context, name, confirm string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/buckets/"+url.PathEscape(name)+"?confirm="+url.QueryEscape(confirm), nil, nil)
 }
@@ -170,8 +170,8 @@ func (c *Client) SetBackupSchedule(ctx context.Context, app string, schedule Bac
 // label, or to a time: that minute with Every change, else the newest
 // copy at or before it.
 // It waits until the daemon is done: a restore runs on its own on the
-// control plane, as a big database takes a while.
-// confirm is the app's name as the user typed it; the control plane
+// hub, as a big database takes a while.
+// confirm is the app's name as the user typed it; the hub
 // refuses a restore without it.
 func (c *Client) Restore(ctx context.Context, app, database, moment string, at *time.Time, confirm string) error {
 	body := map[string]any{"database": database, "confirm": confirm}
@@ -186,7 +186,7 @@ func (c *Client) Restore(ctx context.Context, app, database, moment string, at *
 		return err
 	}
 	// It runs, or its server went offline during it (unknown) and tells
-	// how it ended when it is back. A control plane that restarts or a
+	// how it ended when it is back. A hub that restarts or a
 	// network that drops for a while is no failure: it asks again. A
 	// server that stays offline ends the wait after unknownWait.
 	failures := 0
@@ -212,7 +212,7 @@ func (c *Client) Restore(ctx context.Context, app, database, moment string, at *
 		if err != nil {
 			failures++
 			if failures > restoreRetries {
-				return fmt.Errorf("the control plane does not answer how the restore %s stands: %w; moin backups %s shows it once it does", restore.ID, err, app)
+				return fmt.Errorf("the hub does not answer how the restore %s stands: %w; moin backups %s shows it once it does", restore.ID, err, app)
 			}
 			continue
 		}
@@ -233,11 +233,11 @@ func (c *Client) Restore(ctx context.Context, app, database, moment string, at *
 var unknownWait = 10 * time.Minute
 
 // restoreRetries is how often in a row Restore asks again when the
-// control plane does not answer.
+// hub does not answer.
 var restoreRetries = 300
 
 // transient says an error may go away when asked again: no answer, or
-// an answer of a control plane that restarts.
+// an answer of a hub that restarts.
 func transient(err error) bool {
 	var apiErr *Error
 	if errors.As(err, &apiErr) {
@@ -267,7 +267,7 @@ func (c *Client) Download(ctx context.Context, app, database, moment string) (Do
 }
 
 // FetchCopy writes the copy a download link points to, in the user's own
-// bucket, to out. It goes straight to the bucket, not to the control plane.
+// bucket, to out. It goes straight to the bucket, not to the hub.
 func (c *Client) FetchCopy(ctx context.Context, link string, out io.Writer) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {

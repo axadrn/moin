@@ -1,0 +1,84 @@
+package layouts
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+)
+
+// Footer is the site footer: the wordmark and the promise, then Product,
+// Docs, Open source and Company, then a line with the company and the
+// maker. The maker's other open source projects sit in the Open source
+// column next to moin, as one family.
+templ Footer() {
+	<footer class="bg-card">
+		<div class={ kit.Page, "pt-14 pb-10 sm:pt-20" }>
+			<div class="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4 lg:grid-cols-[1.6fr_repeat(4,1fr)]">
+				<div class="col-span-2 sm:col-span-4 lg:col-span-1">
+					<a href="/" class="inline-block text-2xl leading-none" aria-label={ brand.Name + " home" }>
+						@kit.Wordmark()
+					</a>
+					<p class="mt-5 text-sm text-muted-foreground">
+						Deploy anything.
+						<br/>
+						Lose nothing.
+					</p>
+					<a href={ templ.SafeURL("mailto:" + brand.SupportEmail) } class="mt-4 inline-block text-sm text-foreground underline-offset-4 hover:underline">{ brand.SupportEmail }</a>
+				</div>
+				@footerColumn("Product") {
+					@footerLink("/catalog", "Catalog")
+					if ctxkeys.RenderConfig(ctx).Billing {
+						@footerLink("/#pricing", "Pricing")
+					}
+					@footerLink("/changelog", "Changelog")
+					@footerLink("/docs/roadmap", "Roadmap")
+				}
+				@footerColumn("Docs") {
+					@footerLink("/docs/getting-started", "Get started")
+					@footerLink("/docs/self-hosting", "Self-hosting")
+					@footerLink("/docs/reference/cli", "CLI")
+					@footerLink("/docs/reference/api", "API")
+				}
+				@footerColumn("Open source") {
+					@footerOut(GitHubURL, brand.Name+" on GitHub")
+					@footerOut("https://shadcn-templ.com/?ref=moin-footer", "shadcn-templ")
+					@footerOut("https://goilerplate.com/?ref=moin-footer", "goilerplate")
+				}
+				@footerColumn("Company") {
+					@footerLink("/docs/why-moin", "Why "+brand.Name)
+					@footerLink("/legal/terms", "Terms")
+					@footerLink("/legal/privacy", "Privacy")
+				}
+			</div>
+			<div class="mt-12 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+				<span>© { strconv.Itoa(time.Now().Year()) } { brand.Company }</span>
+				<span class="flex items-center justify-between gap-4">
+					<span>Made by <a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="text-foreground underline-offset-4 hover:underline">Axel Adrian</a></span>
+					// The theme lives here only: the navbar keeps the places and
+					// the one way in.
+					@kit.ThemeSwitcher()
+				</span>
+			</div>
+		</div>
+	</footer>
+}
+
+templ footerColumn(title string) {
+	<nav aria-label={ title }>
+		<p class="text-sm font-medium text-foreground">{ title }</p>
+		<ul class="mt-2 flex flex-col text-sm text-muted-foreground">
+			{ children... }
+		</ul>
+	</nav>
+}
+
+templ footerLink(href, label string) {
+	<li><a href={ templ.SafeURL(href) } class="flex min-h-11 items-center hover:text-foreground">{ label }</a></li>
+}
+
+templ footerOut(href, label string) {
+	<li><a href={ templ.SafeURL(href) } target="_blank" rel="noopener" class="flex min-h-11 items-center hover:text-foreground">{ label }</a></li>
+}

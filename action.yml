@@ -5,7 +5,7 @@ branding:
   color: gray-dark
 inputs:
   url:
-    description: The control plane URL.
+    description: The hub URL.
     required: true
   token:
     description: A personal API token with write access. Store it as a secret.

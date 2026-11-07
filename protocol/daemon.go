@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// DownloadPath is where the control plane serves the binaries, as
+// DownloadPath is where the hub serves the binaries, as
 // <name>-<os>-<arch>: the install script and daemon updates take them from
 // there.
 const DownloadPath = "/download/"
 
-// DaemonURL is the address of the control plane a daemon should dial.
+// DaemonURL is the address of the hub a daemon should dial.
 type DaemonURL struct {
 	URL string `json:"url"`
 }
 
-// DaemonUpdate is the binary the daemon should run: the control plane's
+// DaemonUpdate is the binary the daemon should run: the hub's
 // version and the SHA-256 of the binary it serves for the daemon's OS and
-// CPU. The daemon downloads it from its own control plane URL.
+// CPU. The daemon downloads it from its own hub URL.
 type DaemonUpdate struct {
 	Version string `json:"version"`
 	SHA256  string `json:"sha256"`

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Version is the control plane's version and, on a self-hosted one, the
+// Version is the hub's version and, on a self-hosted one, the
 // newest release and the update under way.
 type Version struct {
 	Version         string     `json:"version"`
@@ -21,7 +21,7 @@ type Version struct {
 	Update          *Update    `json:"update"`
 }
 
-// Update is an update of the control plane: requested, updating, done,
+// Update is an update of the hub: requested, updating, done,
 // rolled_back or failed.
 type Update struct {
 	State   string    `json:"state"`
@@ -36,16 +36,16 @@ func (u *Update) Running() bool {
 	return u != nil && (u.State == "requested" || u.State == "updating")
 }
 
-// Version returns the control plane's version and the newest release.
+// Version returns the hub's version and the newest release.
 func (c *Client) Version(ctx context.Context) (Version, error) {
 	var response Version
 	err := c.do(ctx, http.MethodGet, "/api/v1/version", nil, &response)
 	return response, err
 }
 
-// UpdateControlPlane has the updater next to a self-hosted control plane
+// UpdateHub has the updater next to a self-hosted hub
 // install the newest release.
-func (c *Client) UpdateControlPlane(ctx context.Context) (Version, error) {
+func (c *Client) UpdateHub(ctx context.Context) (Version, error) {
 	var response Version
 	err := c.do(ctx, http.MethodPost, "/api/v1/version/update", nil, &response)
 	return response, err
@@ -56,7 +56,7 @@ type daemonUpdates struct {
 }
 
 // DaemonUpdates reports whether the daemons of the workspace update to the
-// control plane's version by themselves.
+// hub's version by themselves.
 func (c *Client) DaemonUpdates(ctx context.Context) (bool, error) {
 	var response daemonUpdates
 	err := c.do(ctx, http.MethodGet, "/api/v1/daemon-updates", nil, &response)

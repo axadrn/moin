@@ -618,7 +618,7 @@ func (m model) confirmDaemonUpdate(sv client.Server) (tea.Model, tea.Cmd) {
 		m.say(sv.Name + " is offline; its daemon updates when it dials in again")
 		return m, nil
 	}
-	detail := "It installs the control plane's version and dials in again in a few seconds. Apps keep running."
+	detail := "It installs the hub's version and dials in again in a few seconds. Apps keep running."
 	if m.ws.version != "" {
 		detail = "From " + sv.DaemonVersion + " to " + m.ws.version + ". " + detail
 	}

@@ -41,7 +41,7 @@ func (r *runner) backupConfig(message protocol.Message, rules *protocol.Rules) {
 	for _, bucket := range append([]*protocol.Bucket{config.Bucket}, slices.Collect(maps.Values(config.AppBuckets))...) {
 		err := checkBucket(rules, r.rulesFile, bucket)
 		if err == nil && bucket != nil && bucket.Workspace == "" {
-			err = errors.New("start backups: a bucket has no workspace folder, update the control plane")
+			err = errors.New("start backups: a bucket has no workspace folder, update the hub")
 		}
 		if err != nil {
 			r.fail(message, err)

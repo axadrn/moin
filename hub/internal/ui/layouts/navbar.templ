@@ -1,0 +1,87 @@
+package layouts
+
+import (
+	"fmt"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/githubstars"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+)
+
+// GitHubURL is the open source repository of moin.
+const GitHubURL = "https://github.com/" + githubstars.Repo
+
+
+templ navLink(href, label string) {
+	<a href={ templ.SafeURL(href) } class="flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">{ label }</a>
+}
+
+// starsShowAt is how many GitHub stars it takes before the navbar shows
+// the count.
+const starsShowAt = 1000
+
+// Navbar is the floating pill of the public pages: the wordmark, the
+// places, and the one way in. On a phone it keeps the wordmark, Docs and
+// the way in; the footer has the rest. No menu: links change pages.
+templ Navbar() {
+	{{ user := ctxkeys.User(ctx) }}
+	<header class="sticky top-0 z-50 px-3 pt-3 sm:px-6">
+		<nav class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 rounded-full bg-card/85 pr-1.5 pl-5 shadow-sm ring-1 ring-foreground/5 backdrop-blur-xl sm:h-16 sm:pr-2.5 sm:pl-6" aria-label="Main">
+			<div class="flex min-w-0 items-center gap-4">
+				<a href="/" class="flex items-center gap-2 text-xl leading-none outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home, beta" }>
+					@kit.Wordmark()
+					@kit.BetaBadge("max-sm:hidden")
+				</a>
+				<div class="hidden items-center lg:flex">
+					@navLink("/catalog", "Catalog")
+					@navLink("/docs", "Docs")
+					// A self-hosted hub has no prices to show.
+					if ctxkeys.RenderConfig(ctx).Billing {
+						@navLink("/#pricing", "Pricing")
+					}
+					@navLink("/changelog", "Changelog")
+				</div>
+			</div>
+			<div class="flex shrink-0 items-center gap-1">
+				// The one search of the site, where the app keeps its search:
+				// top right, on every public page. Without JavaScript it is
+				// the page /search.
+				<a href="/search" data-site-search-open aria-label="Search" aria-keyshortcuts="Meta+K /" class="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
+					@kit.IconSearch("size-5")
+				</a>
+				<span class="lg:hidden">
+					@navLink("/docs", "Docs")
+				</span>
+				// The star count shows from starsShowAt on: a small one says
+				// "nobody uses this", like the live numbers of the home page.
+				{{ stars := githubstars.Count() }}
+				if stars < starsShowAt {
+					{{ stars = 0 }}
+				}
+				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-11 items-center justify-center gap-1.5 rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 lg:inline-flex", templ.KV("w-11", stars == 0), templ.KV("px-4", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
+					@kit.IconGitHub("size-[18px]")
+					if stars > 0 {
+						<span class="text-sm font-medium tabular-nums">{ githubstars.Short(stars) }</span>
+					}
+				</a>
+				// One way in: /auth signs in and signs up alike. On a phone it
+				// is gray, so the page keeps its one primary button.
+				{{ href, label := "/auth", "Deploy now" }}
+				if user != nil {
+					{{ href, label = "/app", "Overview" }}
+				}
+				<span class="max-sm:hidden">
+					@kit.Button(kit.Primary, href, nil) {
+						{ label }
+					}
+				</span>
+				<span class="sm:hidden">
+					@kit.Button(kit.Secondary, href, nil) {
+						{ label }
+					}
+				</span>
+			</div>
+		</nav>
+	</header>
+}

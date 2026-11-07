@@ -107,7 +107,7 @@ func explain(err error) string {
 		if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil {
 			host = parsed.Scheme + "://" + parsed.Host
 		}
-		return fmt.Sprintf("Cannot reach the control plane at %s. Check the connection, or log in to another with `%s login --url <url>`", host, build.Name)
+		return fmt.Sprintf("Cannot reach the hub at %s. Check the connection, or log in to another with `%s login --url <url>`", host, build.Name)
 	}
 	return sentence(err.Error())
 }

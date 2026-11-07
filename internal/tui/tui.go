@@ -1,9 +1,9 @@
 // Package tui is what `moin` opens without a command: full-screen views of
-// the daily work, live from the control plane. It starts on the overview;
+// the daily work, live from the hub. It starts on the overview;
 // `space`, `ctrl+k` or `/` opens the palette, `esc` goes back.
 //
 // tui.go holds the state and the message loop, keys.go the keys, load.go
-// the calls to the control plane, received.go what they answered,
+// the calls to the hub, received.go what they answered,
 // palette.go the palette, and the view files draw it.
 package tui
 
@@ -20,7 +20,7 @@ import (
 
 // Options start the TUI.
 type Options struct {
-	// Config is where the control plane is and the token, as `moin login`
+	// Config is where the hub is and the token, as `moin login`
 	// saved it. Without a token the TUI signs in first.
 	Config client.Config
 	// Dir is the directory the TUI started in, which `D` deploys.
@@ -159,7 +159,7 @@ type model struct {
 	api   *client.Client
 	url   string
 	dir   string
-	hub   chan tea.Msg
+	inbox chan tea.Msg
 	login func(ctx context.Context, show func(userCode, verificationURL string)) error
 
 	w, h  int
@@ -168,15 +168,15 @@ type model struct {
 	now   func() time.Time
 
 	auth    *auth  // the sign-in view; nil once signed in
-	cacheID string // names the cache of this control plane and login
+	cacheID string // names the cache of this hub and login
 
 	ws        workspace
 	apps      []client.App
 	servers   []client.Server
 	loaded    bool // the first app list came
 	cached    bool // what shows came from the cache of the last run
-	live      bool // the status came from the control plane, not the cache
-	wsLive    bool // the workspace came from the control plane
+	live      bool // the status came from the hub, not the cache
+	wsLive    bool // the workspace came from the hub
 	status    *client.Status
 	events    []client.Event
 	eventsEnd string
@@ -217,7 +217,7 @@ var ranges = []string{"1h", "24h", "7d", "30d"}
 func newModel(ctx context.Context, opts Options) model {
 	return model{
 		ctx: ctx, url: opts.Config.URL, dir: opts.Dir, login: opts.Login,
-		hub: make(chan tea.Msg, 256), w: 100, h: 30, pal: dark, now: time.Now,
+		inbox: make(chan tea.Msg, 256), w: 100, h: 30, pal: dark, now: time.Now,
 		cur: screen{v: vOverview}, sel: map[string]int{}, seen: map[string]appData{}, cpu: map[string][]float64{}, usage: map[string]*client.ServerMetricsNow{},
 		auth: &auth{},
 	}
@@ -233,7 +233,7 @@ func (m model) connect(api *client.Client, key string) model {
 
 type (
 	tickMsg      time.Time
-	hubMsg       struct{ msg tea.Msg }
+	inboxMsg     struct{ msg tea.Msg }
 	serversMsg   []client.Server
 	appsMsg      []client.App
 	offlineMsg   struct{ err error }
@@ -294,7 +294,7 @@ type (
 	}
 	noticeMsg string
 	errMsg    struct{ err error }
-	// undoMsg is a change the view showed at once that the control plane
+	// undoMsg is a change the view showed at once that the hub
 	// refused: it says why and loads the truth again.
 	undoMsg struct{ err error }
 	// optimisticMsg shows a change at once, then sends it; the remove of
@@ -318,14 +318,14 @@ func tick() tea.Cmd {
 
 // listen waits for the next message the background streams sent.
 func (m model) listen() tea.Cmd {
-	hub := m.hub
-	return func() tea.Msg { return hubMsg{<-hub} }
+	inbox := m.inbox
+	return func() tea.Msg { return inboxMsg{<-inbox} }
 }
 
 // send hands a message from a goroutine to the loop.
 func (m model) send(msg tea.Msg) {
 	select {
-	case m.hub <- msg:
+	case m.inbox <- msg:
 	case <-m.ctx.Done():
 	}
 }
@@ -342,7 +342,7 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case hubMsg:
+	case inboxMsg:
 		next, cmd := m.Update(msg.msg)
 		return next, tea.Batch(cmd, next.(model).listen())
 	case tea.WindowSizeMsg:
@@ -432,12 +432,12 @@ func (m *model) fail(err error) {
 	m.notice, m.noticeErr, m.noticeAt = reason(err), true, m.frame
 }
 
-// reason is an error as a sentence; a control plane that does not answer
+// reason is an error as a sentence; a hub that does not answer
 // says so instead of the dial error.
 func reason(err error) string {
 	var op *net.OpError
 	if errors.As(err, &op) {
-		return "The control plane does not answer. This loads again when it is back."
+		return "The hub does not answer. This loads again when it is back."
 	}
 	return err.Error()
 }

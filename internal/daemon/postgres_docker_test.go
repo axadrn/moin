@@ -140,7 +140,7 @@ CREATE VIEW names AS SELECT name FROM users;`, nil, false)
 		t.Errorf("EXPLAIN: %+v %v", result, err)
 	}
 
-	// Edits by primary key, the SQL the control plane builds: values,
+	// Edits by primary key, the SQL the hub builds: values,
 	// keys too, are psql variables, never SQL.
 	if _, err := target.psql(ctx, `CREATE TABLE codes (code text PRIMARY KEY, label text);`, nil, false); err != nil {
 		t.Fatal(err)

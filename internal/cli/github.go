@@ -76,7 +76,7 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 		return nil
 	}
 	if !answer.Enabled {
-		return errors.New("this control plane has no GitHub App")
+		return errors.New("this hub has no GitHub App")
 	}
 	for _, installation := range answer.Installations {
 		done(stdout, "Installed on %s", installation.Account)

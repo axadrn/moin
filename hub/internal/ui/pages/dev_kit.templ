@@ -1,0 +1,364 @@
+package pages
+
+import (
+	"math"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// DevKit is the gallery: every part of the kit in every state, on one
+// page, for development only (/app/{workspace}/dev/kit with APP_ENV=
+// development). Check a part here once, in light and dark, at phone and
+// desktop width, instead of on every page (DESIGN.md, Geometry).
+templ DevKit() {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	@layouts.App("Kit") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Settings", Href: base + "/settings"}, "Kit") {
+				<div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+					@kit.Button(kit.Secondary, "", nil) {
+						Secondary
+					}
+					@kit.Button(kit.Primary, "", nil) {
+						Primary
+					}
+				</div>
+			}
+			@kit.Section("Buttons", nil) {
+				@kit.Card("", nil) {
+					<div class="flex flex-wrap items-center gap-2">
+						@kit.Button(kit.Primary, "", nil) {
+							Deploy
+						}
+						@kit.Button(kit.Secondary, "", nil) {
+							Restart
+						}
+						@kit.Button(kit.Danger, "", nil) {
+							Remove
+						}
+						@kit.Button(kit.Secondary, "", templ.Attributes{"disabled": true}) {
+							Disabled
+						}
+						@kit.Button(kit.Primary, "", templ.Attributes{"data-done": true}) {
+							Saved
+						}
+						@kit.Button(kit.Secondary, "", templ.Attributes{"data-done": true}) {
+							Saved
+						}
+						@kit.IconButton("Switch the theme", templ.Attributes{"type": "button", "data-theme-switcher": true}) {
+							@kit.IconTheme("")
+						}
+					</div>
+				}
+			}
+			@kit.Section("Fields", nil) {
+				@kit.Card("Domain", nil) {
+					@kit.Field("Domain", "kit-domain", "") {
+						@kit.Inline() {
+							@kit.Input(templ.Attributes{"id": "kit-domain", "placeholder": "shop.example.com"})
+							@kit.Button(kit.Primary, "", nil) {
+								Add
+							}
+						}
+					}
+					@kit.Field("Wrong", "kit-wrong", "Not a domain.") {
+						@kit.Input(templ.Attributes{"id": "kit-wrong", "value": "shop", "aria-invalid": "true"})
+					}
+					@kit.Field("Branch", "kit-branch", "") {
+						@kit.Select(kit.SelectProps{ID: "kit-branch", Name: "branch", Label: "Branch", Options: []kit.Option{{Value: "main", Label: "main"}, {Value: "next", Label: "next"}}, Value: "main"})
+					}
+					@kit.Choice("kit-mode", "Mode", []kit.Option{{Value: "fields", Label: "Fields"}, {Value: "text", Label: "Text"}}, "fields")
+					@kit.TextArea(templ.Attributes{"rows": "3", "placeholder": "KEY=value"})
+				}
+			}
+			@kit.Section("Tabs", nil) {
+				@kit.Segmented("kit-tabs", "Sections", []kit.Segment{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#", Key: "d"}, {Label: "Domains", Href: "#", Key: "o"}, {Label: "Logs", Href: "#", Key: "l"}})
+			}
+			@kit.Section("Rows that open", nil) {
+				@kit.List() {
+					@kit.Row("#") {
+						@kit.RowText("A row that opens a page", "")
+					}
+					@kit.Row("#") {
+						@kit.RowText("With a second line", "Only when there is something to say")
+						<span class="text-sm text-muted-foreground">value</span>
+					}
+					@kit.RowExternal("https://example.com") {
+						@kit.RowText("Another site", "In a new tab")
+					}
+					@kit.RowMore("2 more") {
+						@kit.Row("") {
+							@kit.RowText("Opened in place", "")
+						}
+						@kit.Row("#") {
+							@kit.RowText("A row in it that opens", "")
+						}
+					}
+				}
+			}
+			@kit.Section("Rows that do", nil) {
+				@kit.List() {
+					@kit.RowButton(false, nil) {
+						<span class="font-medium">Back up now</span>
+					}
+					@kit.RowButton(true, nil) {
+						<span class="font-medium">Remove</span>
+					}
+				}
+			}
+			@kit.Section("Rows that are picked", nil) {
+				<form>
+					@kit.List() {
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "a"}) {
+							@kit.RowText("Nov 7, 09:00 UTC", "Hourly · 2.1 MB")
+						}
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "b", "checked": true}) {
+							@kit.RowText("Nov 7, 08:00 UTC", "Hourly · 2.0 MB")
+						}
+						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "c"}) {
+							@kit.RowText("Nov 6, 23:12 UTC", "By hand · 1.9 MB")
+						}
+					}
+				</form>
+			}
+			@kit.Section("Rows that tell", nil) {
+				@kit.List() {
+					@kit.RowFact("Version", "") {
+						v1.0.0
+					}
+					@kit.RowFact("Last 24 hours", "182 ms on average") {
+						99.98%
+					}
+					@kit.Row("") {
+						@kit.RowText("A row with its own parts", "Still, its lines stay")
+					}
+				}
+			}
+			@kit.Section("Rows that hold a control", nil) {
+				@kit.List() {
+					@kit.RowControl(nil) {
+						@kit.RowLabel("kit-switch", "A switch", "")
+						@kit.Switch(templ.Attributes{"id": "kit-switch", "checked": true})
+					}
+					@kit.RowControl(nil) {
+						@kit.RowLabel("kit-switch-off", "Off, and one that cannot change", "")
+						@kit.Switch(templ.Attributes{"id": "kit-switch-off"})
+						@kit.Switch(templ.Attributes{"disabled": true, "aria-label": "Cannot change"})
+					}
+					@kit.RowForm(nil) {
+						@kit.RowLabel("kit-provider", "Provider", "")
+						<div class="w-36 shrink-0">
+							@kit.Select(kit.SelectProps{ID: "kit-provider", Name: "provider", Label: "Provider", Options: []kit.Option{{Value: "nip.io", Label: "nip.io"}, {Value: "sslip.io", Label: "sslip.io"}}, Value: "nip.io"})
+						</div>
+					}
+					@kit.RowForm(nil) {
+						<div class="min-w-0 flex-1">
+							@kit.Field("Add a domain", "kit-row-domain", "") {
+								@kit.Inline() {
+									@kit.Input(templ.Attributes{"id": "kit-row-domain", "placeholder": "shop.example.com"})
+									@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button"}) {
+										Add
+									}
+								}
+							}
+						</div>
+					}
+				}
+			}
+			@kit.Section("Status", nil) {
+				@kit.Card("", nil) {
+					<div class="flex flex-wrap items-center gap-4">
+						@kit.Chip(kit.StateLive) {
+							Online
+						}
+						@kit.Chip(kit.StateRunning) {
+							Deploying v13
+						}
+						@kit.Chip(kit.StateWaiting) {
+							Waiting
+						}
+						@kit.Chip(kit.StateFailed) {
+							v13 failed
+						}
+						@kit.Chip(kit.StateIdle) {
+							New
+						}
+					</div>
+					<div class="flex flex-wrap items-center gap-4">
+						@kit.Status(kit.StateLive, nil) {
+							live
+						}
+						@kit.Status(kit.StateRunning, nil) {
+							deploying
+						}
+						@kit.Status(kit.StateWaiting, nil) {
+							waiting
+						}
+						@kit.Status(kit.StateDone, nil) {
+							succeeded
+						}
+						@kit.Status(kit.StateFailed, nil) {
+							failed
+						}
+						@kit.Status(kit.StateIdle, nil) {
+							not deployed yet
+						}
+					</div>
+					<div class="flex flex-wrap items-center gap-4">
+						@kit.Dot(kit.StateLive)
+						@kit.Dot(kit.StateRunning)
+						@kit.Dot(kit.StateWaiting)
+						@kit.Dot(kit.StateDone)
+						@kit.Dot(kit.StateFailed)
+						@kit.Dot(kit.StateIdle)
+					</div>
+				}
+			}
+			@kit.Section("Icons", nil) {
+				@kit.Card("", nil) {
+					<div class="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-8">
+						@devKitIcon("Activity", kit.IconActivity)
+						@devKitIcon("App", kit.IconApp)
+						@devKitIcon("Apps", kit.IconApps)
+						@devKitIcon("Bell", kit.IconBell)
+						@devKitIcon("Book", kit.IconBook)
+						@devKitIcon("Bucket", kit.IconBucket)
+						@devKitIcon("Catalog", kit.IconCatalog)
+						@devKitIcon("Check", kit.IconCheck)
+						@devKitIcon("Copy", kit.IconCopy)
+						@devKitIcon("Card", kit.IconCard)
+						@devKitIcon("Database", kit.IconDatabase)
+						@devKitIcon("Deploy", kit.IconDeploy)
+						@devKitIcon("Disk", kit.IconDisk)
+						@devKitIcon("External", kit.IconExternal)
+						@devKitIcon("Failed", kit.IconFailed)
+						@devKitIcon("Gauge", kit.IconGauge)
+						@devKitIcon("Globe", kit.IconGlobe)
+						@devKitIcon("Key", kit.IconKey)
+						@devKitIcon("Logs", kit.IconLogs)
+						@devKitIcon("Package", kit.IconPackage)
+						@devKitIcon("Play", kit.IconPlay)
+						@devKitIcon("Plus", kit.IconPlus)
+						@devKitIcon("Restart", kit.IconRestart)
+						@devKitIcon("Search", kit.IconSearch)
+						@devKitIcon("Server", kit.IconServer)
+						@devKitIcon("ServerOff", kit.IconServerOff)
+						@devKitIcon("Settings", kit.IconSettings)
+						@devKitIcon("Shield", kit.IconShield)
+						@devKitIcon("ShieldOff", kit.IconShieldOff)
+						@devKitIcon("Stop", kit.IconStop)
+						@devKitIcon("Theme", kit.IconTheme)
+						@devKitIcon("Trash", kit.IconTrash)
+						@devKitIcon("Undo", kit.IconUndo)
+						@devKitIcon("User", kit.IconUser)
+						@devKitIcon("Users", kit.IconUsers)
+						@devKitIcon("X", kit.IconX)
+						@devKitIcon("GitHub", kit.IconGitHub)
+						@devKitIcon("Google", kit.IconGoogle)
+					</div>
+				}
+			}
+			@kit.Section("Charts", nil) {
+				@kit.Grid() {
+					@kit.Card("CPU", nil) {
+						@kit.Chart(devKitChart(false))
+					}
+					@kit.Card("Network", nil) {
+						@kit.Chart(devKitChart(true))
+					}
+				}
+			}
+			@kit.Section("Dialog", nil) {
+				@kit.List() {
+					@kit.RowButton(false, kit.OpenDialog("kit-dialog")) {
+						<span class="font-medium">Open the dialog</span>
+					}
+					@kit.RowButton(true, templ.Attributes{"hx-confirm": "Stop shop? It goes offline until you start it.", "hx-post": "/dev/null"}) {
+						<span class="font-medium">Stop</span>
+					}
+				}
+				@kit.Dialog("kit-dialog", "Stop shop?", "It goes offline until you start it.") {
+					@kit.DialogButtons() {
+						@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+							Cancel
+						}
+						@kit.Button(kit.Danger, "", kit.CloseDialog()) {
+							Stop
+						}
+					}
+				}
+			}
+			@kit.Grid() {
+				@kit.Card("A card", nil) {
+					@kit.Quiet() {
+						A fact, never a sentence about the UI.
+					}
+				}
+				@kit.Card("With an action", devKitAction()) {
+					@kit.Command("moin deploy shop")
+				}
+			}
+			@kit.Section("Feedback", nil) {
+				@kit.Card("", nil) {
+					<div class="relative flex flex-wrap items-center gap-2 pb-14">
+						@kit.Button(kit.Primary, "", nil) {
+							Deploy
+						}
+						<p data-said="failed" style="top: 52px; left: 0">Deploy not started. The server is offline.</p>
+					</div>
+				}
+			}
+		}
+	}
+}
+
+// devKitIcon is one icon of the gallery with its name.
+templ devKitIcon(name string, icon func(string) templ.Component) {
+	<div class="flex flex-col items-center gap-2">
+		@icon("")
+		<span class="text-xs text-muted-foreground">{ name }</span>
+	</div>
+}
+
+templ devKitAction() {
+	@kit.Button(kit.Secondary, "", nil) {
+		Edit
+	}
+}
+
+// devKitChart is a made-up day of CPU, or of network in and out, with a
+// pause and a deploy, to see a chart in every state.
+func devKitChart(network bool) kit.ChartProps {
+	start := time.Date(2026, 11, 3, 9, 0, 0, 0, time.UTC)
+	var times []time.Time
+	in, out := []float64{}, []float64{}
+	for i := 0; i < 96; i++ {
+		if i >= 40 && i < 48 {
+			continue
+		}
+		times = append(times, start.Add(time.Duration(i)*5*time.Minute))
+		wave := 30 + 18*math.Sin(float64(i)/7) + 8*math.Sin(float64(i)/2.3)
+		in = append(in, wave)
+		out = append(out, wave/3+4*math.Cos(float64(i)/3))
+	}
+	p := kit.ChartProps{
+		Times: times,
+		Gap:   15 * time.Minute,
+		Value: percentText,
+		Time:  func(at time.Time) string { return at.Format("Jan 2, 15:04 UTC") },
+		Tick:  func(at time.Time) string { return at.Format("15:04") },
+		Marks: map[int]string{60: "v12 went live"},
+		Lines: []kit.ChartLine{{Label: "CPU", Values: in}},
+		Top:   100,
+	}
+	if network {
+		p.Lines = []kit.ChartLine{{Label: "In", Values: in}, {Label: "Out", Values: out}}
+		p.Value = func(v float64) string { return rateText(v * 1024) }
+		p.Top = 0
+		p.Marks = nil
+	}
+	return p
+}

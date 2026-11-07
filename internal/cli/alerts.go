@@ -93,8 +93,8 @@ func showAlerts(ctx context.Context, api *client.Client, stdout io.Writer) error
 	return nil
 }
 
-// allAlertEvents are the events a destination can get, as the control
-// plane lists them.
+// allAlertEvents are the events a destination can get, as the hub
+// lists them.
 var allAlertEvents = []string{
 	"uptime.down", "uptime.up", "server.down", "server.up", "deploy.failed",
 	"backup.failed", "backup.recovered", "check.failed", "check.recovered", "disk.full", "disk.ok",

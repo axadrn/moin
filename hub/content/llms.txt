@@ -1,0 +1,31 @@
+# moin
+
+> Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule, checked every day. moin deploys any Docker Compose app to your servers, copies its SQLite or Postgres database into your own bucket on the schedule you pick (with SQLite every change too), checks every day that the newest copy restores and lets you edit the data live. It installs 47 open-source apps in one click, gives every app an HTTPS address before it has a domain, and checks every domain every minute. It works from the web, the moin CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under AGPL-3.0.
+
+Every docs page is also available as Markdown: add .md to its URL.
+
+## Docs
+
+- [Docs](/docs): Every page under its topic
+- [Get started](/docs/getting-started): From a fresh server to a live app
+- [Why moin](/docs/why-moin): A small stack, a daemon that only dials out, backups whose restores are checked
+- [How moin works](/docs/concepts/how-moin-works): The pieces, the words and what a deploy does
+- [Self-hosting](/docs/self-hosting): Run your own moin hub, free
+- [Deploy](/docs/guides/deploy): Deploy, redeploy and roll back apps
+- [Backups](/docs/guides/backups): Every change of every SQLite and Postgres database in your own bucket
+- [Catalog](/docs/guides/catalog): Open-source apps in one click
+- [Domains](/docs/guides/domains): Instant address, your own domains, per service
+- [Run a command](/docs/guides/exec): A command in an app's container, without SSH
+- [AI agents (MCP)](/docs/guides/mcp): Let Claude and other AI agents run moin
+- [CLI](/docs/reference/cli): Every moin command
+- [API](/docs/reference/api): The JSON API under /api/v1
+- [FAQ](/docs/faq): Common questions
+- [Roadmap](/docs/roadmap): Now, next and later
+- [Changelog](/changelog): What shipped, newest first, also as RSS at /changelog.xml
+
+## Public pages
+
+- [Home](/): What moin does, pricing and questions
+- [Sign in](/auth): Account access
+- [Privacy](/legal/privacy): Privacy policy
+- [Terms](/legal/terms): Terms of service

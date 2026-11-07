@@ -1,0 +1,120 @@
+package layouts
+
+import (
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+)
+
+// Crumb is one step of the path in the top bar. The last one has no link.
+type Crumb struct {
+	Label string
+	Href  string
+}
+
+// AppProps is the shell of a hub page.
+type AppProps struct {
+	Title  string
+	Crumbs []Crumb
+}
+
+// App is the hub shell with the page title as the only crumb.
+templ App(title string) {
+	@AppShell(AppProps{Title: title}) {
+		{ children... }
+	}
+}
+
+// AppShell is the hub: the bar on top, the page under it. No
+// sidebar: the search in the bar goes everywhere (DESIGN.md, Navigation).
+// Every link loads a whole page; the browser keeps the old one on screen
+// until the new one is painted and fades between them (globals.css).
+templ AppShell(p AppProps) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@Base(SEOProps{
+		Title:       p.Title,
+		Description: "The moin hub",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@AppBar()
+		// A new release of a self-hosted hub, for its admins.
+		if ctxkeys.Workspace(ctx) != nil && !ctxkeys.RenderConfig(ctx).Billing {
+			<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
+		}
+		<div id="main">
+			<div class={ kit.Page, "pt-4 empty:hidden" }>
+				@AppTrialCard()
+			</div>
+			{ children... }
+		</div>
+		@AppShortcuts()
+		@appShellScript()
+	}
+}
+
+// appShellScript adds what every page of the panel shares: copy buttons
+// (copying with [data-copy] lives in moin.js, for every page), the go-to keys (g then h, s, b, y, t, l or ,) and n to
+// focus the page's main field ([data-hotkey-focus]). / is the search (moin.js).
+templ appShellScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			if (window.moinShell) return;
+			window.moinShell = true;
+			// The changelog dot: a version the member has not opened the
+			// changelog for yet shows a dot on the account menu and its
+			// Changelog item; opening it clears both, in this browser.
+			const seenKey = "moin-changelog-seen";
+			const markChangelog = () => {
+				const item = document.querySelector("[data-changelog]");
+				if (!item) return;
+				let seen = "";
+				try { seen = localStorage.getItem(seenKey) || ""; } catch {}
+				const fresh = item.dataset.changelog !== seen;
+				document.querySelectorAll("[data-changelog-dot]").forEach((dot) => { dot.hidden = !fresh; });
+			};
+			document.addEventListener("click", (event) => {
+				const item = event.target.closest("[data-changelog]");
+				if (!item) return;
+				try { localStorage.setItem(seenKey, item.dataset.changelog); } catch {}
+				markChangelog();
+			});
+			markChangelog();
+			const places = { h: "/overview", o: "/overview", a: "/apps", s: "/servers", b: "/bucket", y: "/activity", t: "/workspace", l: "/alerts", ",": "/settings" };
+			let leader = 0;
+			document.addEventListener("keydown", (event) => {
+				if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+				const target = event.target;
+				if (target.closest && target.closest("input, textarea, select, [contenteditable], [role=combobox], [role=listbox]")) {
+					if (event.key === "Escape") target.blur();
+					return;
+				}
+				if (event.key === "g") {
+					leader = Date.now();
+					return;
+				}
+				if (leader && Date.now() - leader < 1200 && places[event.key]) {
+					leader = 0;
+					event.preventDefault();
+					const base = document.querySelector("[data-app-base]");
+					if (!base) return;
+					location.assign(base.dataset.appBase + places[event.key]);
+					return;
+				}
+				leader = 0;
+				// A section key of the page (data-key on its tab) opens it.
+				const section = document.querySelector(`[data-key="${CSS.escape(event.key)}"]`);
+				if (section) {
+					event.preventDefault();
+					section.click();
+					return;
+				}
+				if (event.key === "n") {
+					const field = document.querySelector("[data-hotkey-focus]");
+					if (field) {
+						event.preventDefault();
+						field.focus();
+					}
+				}
+			});
+		})();
+	</script>
+}

@@ -1,0 +1,20 @@
+package kit
+
+import "github.com/axadrn/moin/hub/internal/brand"
+
+// Wordmark is "moin." in Satoshi Black, the full stop Satoshi's own round
+// one, like the dot on the i. Its box is trimmed to the
+// lowercase letters, from the baseline to the x-height (text-box), so a
+// label centered next to it sits on the middle of the letters the eye sees,
+// not on the empty room the font keeps above them.
+templ Wordmark(class ...string) {
+	<span class={ "inline-flex items-baseline font-wordmark text-foreground [text-box:trim-both_ex_alphabetic]", class }>
+		{ brand.Name }<span aria-hidden="true">.</span>
+	</span>
+}
+
+// BetaBadge says moin is in beta, next to the wordmark, centered on it with
+// items-center: Wordmark trims its box to its lowercase letters.
+templ BetaBadge(class string) {
+	<span class={ "rounded-full bg-muted px-2 py-0.5 font-sans text-xs font-medium text-muted-foreground", class }>Beta</span>
+}

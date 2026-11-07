@@ -9,7 +9,7 @@ import (
 // build or an image, a daemon keeps per app. Releases without a build, like
 // restarts, domain changes and rollbacks, are small: the daemon keeps them as
 // long as they are newer than the oldest build it keeps. It always keeps the
-// current release. The control plane offers rollbacks by the same rule.
+// current release. The hub offers rollbacks by the same rule.
 const KeepReleases = 5
 
 // Release is one release of an app, for KeptReleases. Build is true when it

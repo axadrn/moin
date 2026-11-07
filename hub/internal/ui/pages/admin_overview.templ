@@ -1,0 +1,224 @@
+package pages
+
+import (
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// AdminOverview is Admin, for whoever runs moin: the numbers at a glance,
+// the way to the operator activity and the old domain, and the users, each
+// a row that opens its own page with what an operator can do to it.
+templ AdminOverview(data *model.AdminOverview) {
+	@layouts.Admin("Admin") {
+		@panelPage() {
+			@kit.Header(kit.Back{}, "Admin")
+			@adminNumbers([]adminNumber{
+				{"Users", data.Metrics.Users},
+				{"Verified", data.Metrics.VerifiedUsers},
+				{"Workspaces", data.Metrics.Workspaces},
+				{"Paid", data.Metrics.PaidWorkspaces},
+				{"Sessions", data.Metrics.ActiveSessions},
+			})
+			if n := data.Network; n != nil {
+				@kit.Section("Network", nil) {
+					@adminNumbers([]adminNumber{
+						{"Deploys", n.Deploys},
+						{"Apps", n.Apps},
+						{"Servers", n.Servers},
+						{"Hosted", n.HostedWorkspaces},
+						{"Self-hosted", n.SelfHosted},
+					})
+				}
+			}
+			@kit.List() {
+				@kit.Row("/admin/activity") {
+					@kit.RowText("Activity", "")
+				}
+				@kit.Row("/admin/old-domain") {
+					@kit.RowText("Old domain", "")
+				}
+			}
+			@adminUsers(data.Users)
+		}
+	}
+}
+
+// adminUsers is the search and one page of users, newest first.
+templ adminUsers(users model.AdminUserPage) {
+	@kit.Section("Users", adminCount(plural(users.TotalUsers, "user", "users"))) {
+		<form method="GET" action="/admin" role="search">
+			@kit.Inline() {
+				<label for="admin-search" class="sr-only">Name or email</label>
+				@kit.Input(templ.Attributes{"id": "admin-search", "name": "q", "type": "search", "value": users.Query, "placeholder": "Name or email", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					Search
+				}
+			}
+		</form>
+		@kit.List() {
+			for _, user := range users.Users {
+				@kit.Row("/admin/users/" + user.ID) {
+					@kit.RowText(adminUserName(user), adminUserNote(user))
+					if value := adminUserValue(user); value != "" {
+						<span class="shrink-0 text-sm whitespace-nowrap text-muted-foreground">{ value }</span>
+					}
+				}
+			}
+			if len(users.Users) == 0 {
+				@kit.Row("") {
+					@kit.RowText(adminNoUsers(users.Query), "")
+				}
+			}
+		}
+		if users.TotalPages > 1 {
+			<div class="flex items-center justify-between gap-3 pt-2">
+				<span class="px-1 text-sm text-muted-foreground tabular-nums">{ fmt.Sprintf("Page %d of %d", users.Page, users.TotalPages) }</span>
+				<div class="flex gap-2">
+					if users.Page > 1 {
+						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page-1), nil) {
+							Newer
+						}
+					}
+					if users.TotalPages > users.Page {
+						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page+1), nil) {
+							Older
+						}
+					}
+				</div>
+			</div>
+		}
+	}
+}
+
+// AdminActivity is what operators did, newest first.
+templ AdminActivity(events []model.AdminActivityEvent) {
+	@layouts.Admin("Activity · Admin") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, "Activity")
+			@kit.List() {
+				for _, event := range events {
+					@kit.Row(adminEventHref(event)) {
+						@kit.RowText(model.AdminActivityActionLabel(event.Action), adminEventNote(event))
+						<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="shrink-0 text-sm whitespace-nowrap text-muted-foreground tabular-nums">
+							{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
+						</time>
+					}
+				}
+				if len(events) == 0 {
+					@kit.Row("") {
+						@kit.RowText("No operator activity yet", "")
+					}
+				}
+			}
+			@kit.Quiet() {
+				<span class="px-1">{ fmt.Sprintf("Kept %d days, in UTC.", int(model.AdminActivityRetention.Hours()/24)) }</span>
+			}
+		}
+	}
+}
+
+// adminNumber is one count of adminNumbers.
+type adminNumber struct {
+	Label string
+	Value int
+}
+
+// adminNumbers are counts side by side on one card: the word, the number
+// under it. Three in a row on a phone, all in one row from sm.
+templ adminNumbers(numbers []adminNumber) {
+	<dl class="grid grid-cols-3 gap-x-4 gap-y-5 rounded-4xl bg-card p-6 sm:grid-cols-5">
+		for _, number := range numbers {
+			<div class="flex min-w-0 flex-col gap-1">
+				<dt class="truncate text-sm text-muted-foreground">{ number.Label }</dt>
+				<dd class="text-2xl font-semibold tracking-tight tabular-nums">{ strconv.Itoa(number.Value) }</dd>
+			</div>
+		}
+	</dl>
+}
+
+// adminCount is the quiet count at the end of a section title.
+templ adminCount(text string) {
+	<span class="text-sm text-muted-foreground tabular-nums">{ text }</span>
+}
+
+func adminPageURL(query string, page int) string {
+	values := url.Values{}
+	if query != "" {
+		values.Set("q", query)
+	}
+	values.Set("page", strconv.Itoa(page))
+	return "/admin?" + values.Encode()
+}
+
+// adminUserName is the name of a user, or the email when it has none.
+func adminUserName(user model.AdminUser) string {
+	if user.Name != "" {
+		return user.Name
+	}
+	return user.Email
+}
+
+// adminUserNote is the line under the name: the email, when the name is
+// not already it.
+func adminUserNote(user model.AdminUser) string {
+	if user.Name == "" {
+		return ""
+	}
+	return user.Email
+}
+
+// adminUserValue is the one fact at the end of a user's row: an operator,
+// an email not confirmed yet, or the plan.
+func adminUserValue(user model.AdminUser) string {
+	switch {
+	case user.IsAdmin:
+		return "Operator"
+	case user.EmailVerifiedAt == nil:
+		return "Unverified"
+	case user.Plan != "":
+		return adminPlanLabel(user)
+	}
+	return ""
+}
+
+func adminNoUsers(query string) string {
+	if query == "" {
+		return "No users yet"
+	}
+	return "No user matches “" + query + "”"
+}
+
+// adminEventNote is who did it and to what.
+func adminEventNote(event model.AdminActivityEvent) string {
+	actor := event.ActorEmail
+	if actor == "" {
+		actor = "System"
+	}
+	return actor + " · " + event.TargetType + " " + event.TargetID
+}
+
+// adminEventHref is the page of what an event touched: a user has one.
+func adminEventHref(event model.AdminActivityEvent) string {
+	if event.TargetType == "user" && event.TargetID != "" {
+		return "/admin/users/" + event.TargetID
+	}
+	return ""
+}
+
+// adminPlanLabel is the plan of a user: "Trial until Dec 2, 2026", "Free
+// forever", "Paying".
+func adminPlanLabel(user model.AdminUser) string {
+	if user.Plan == model.AdminPlanTrial && user.TrialEndsAt != nil {
+		return "Trial until " + user.TrialEndsAt.Format("Jan 2, 2006")
+	}
+	if user.Plan == "" {
+		return ""
+	}
+	return strings.ToUpper(user.Plan[:1]) + user.Plan[1:]
+}

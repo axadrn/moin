@@ -51,7 +51,7 @@ const (
 
 var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
-// apps runs the deploys, logs and removals the control plane asks for.
+// apps runs the deploys, logs and removals the hub asks for.
 type apps struct {
 	dir  string
 	send func(protocol.MessageType, string, any)
@@ -90,7 +90,7 @@ func (a *apps) releaseDir(app string, number int) string {
 	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
 }
 
-// appID is the app's ID in the control plane, which every deploy brings,
+// appID is the app's ID in the hub, which every deploy brings,
 // or "" before the first deploy that brought one.
 func (a *apps) appID(app string) string {
 	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "app-id"))
@@ -101,7 +101,7 @@ func (a *apps) appID(app string) string {
 	return id
 }
 
-// keepIDs stores the IDs the control plane sends for apps that have none
+// keepIDs stores the IDs the hub sends for apps that have none
 // yet, the ones deployed before deploys brought it. A stored ID stays. It
 // reports whether it stored one.
 func (a *apps) keepIDs(ids map[string]string) (kept bool) {
@@ -375,7 +375,7 @@ func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, com
 	previous := a.current(start.App)
 	if previous > 0 {
 		// A copy of each database just before the new release touches the
-		// data: the control plane names it "Before v12".
+		// data: the hub names it "Before v12".
 		if before := a.backups.copyBefore(ctx, start.App, ""); before != nil {
 			logf("copied the data before v%d", start.Number)
 			a.mu.Lock()

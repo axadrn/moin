@@ -1,0 +1,329 @@
+package pages
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/catalog"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// The catalog is one page in two frames: on the site (/catalog) and in a
+// workspace (<workspace>/catalog). Both have the same search, category,
+// order and rows, and the page of one app the same head, links and
+// versions; only the way back and the one action differ.
+
+// ---------------------------------------------------------------- public
+
+// Catalog is the public catalog: open source apps to run on your own
+// server.
+templ Catalog(view CatalogView) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host open source apps on your own server",
+		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server in one click. Every version, updates with a backup first.",
+		Path:        "/catalog",
+	}) {
+		<main class={ kit.Page, "flex flex-col gap-6 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{}, "Catalog")
+			@catalogBody(view)
+		</main>
+	}
+}
+
+// CatalogApp is the public page of one catalog app: what it is, the way
+// to deploy it, its links and its versions.
+templ CatalogApp(view CatalogEntryView, appURL string) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host " + view.Entry.Name + " on your own server",
+		Description: view.Entry.Name + ": " + view.Entry.Pitch + " Install it on your own server in one click, with its database backed up to your bucket.",
+		Path:        "/catalog/" + view.Entry.Slug,
+	}) {
+		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))
+		<main class={ kit.Page, "flex flex-col gap-6 pt-10 pb-20 sm:pt-14" }>
+			@catalogHead(kit.Back{Label: "Catalog", Href: "/catalog"}, view.Entry)
+			if note := view.Entry.DatabaseNote(); note != "" {
+				@kit.Quiet() {
+					<span data-catalog-database-note>{ note }</span>
+				}
+			}
+			<div>
+				@kit.Button(kit.Primary, "/catalog/"+view.Entry.Slug+"/install", templ.Attributes{"data-catalog-install": true}) {
+					Deploy with { brand.Name }
+				}
+			</div>
+			@catalogFacts(view)
+		</main>
+	}
+}
+
+// ---------------------------------------------------------------- app
+
+// CatalogInApp is the catalog inside a workspace; its rows open the
+// install page.
+templ CatalogInApp(view CatalogView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@layouts.App("Catalog") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "New app", Href: basePath + "/apps/new"}, "Catalog")
+			@catalogBody(view)
+		}
+	}
+}
+
+// CatalogInstall is the page of a catalog app in a workspace: its head,
+// the install form, its links and its versions.
+templ CatalogInstall(view CatalogInstallView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ entry := view.App.Entry }}
+	@layouts.App("Install " + entry.Name) {
+		@panelPage() {
+			@catalogHead(kit.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry)
+			if len(view.Servers) == 0 {
+				@kit.List() {
+					@kit.Row(basePath + "/servers") {
+						@kit.RowText("Connect a server first", "Apps run on your servers")
+					}
+				}
+			} else {
+				@kit.Card("", nil) {
+					<form
+						id="catalog-install-form"
+						class="flex flex-col gap-4"
+						hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@kit.CSRF()
+						if note := entry.DatabaseNote(); note != "" {
+							<p class="px-1 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
+						}
+						<div class="grid items-start gap-4 sm:grid-cols-2">
+							@kit.Field("Version", "catalog-version", "") {
+								@kit.Select(kit.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
+							}
+							@kit.Field("Server", "catalog-server", "") {
+								@kit.Select(kit.SelectProps{ID: "catalog-server", Name: "server", Label: "Server", Options: serverOptions(view.Servers)})
+							}
+							@kit.Field("App name", "catalog-name", "Lowercase letters, digits and dashes") {
+								@kit.Input(templ.Attributes{"id": "catalog-name", "name": "name", "type": "text", "value": entry.Slug, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
+							}
+							@kit.Field(ifElse(entry.NeedsURL(), "Domain", "Domain, optional"), "catalog-domain", ifElse(entry.NeedsURL(), entry.Name+" links to it. Point its DNS to the server first", "Point its DNS to the server")) {
+								@kit.Input(templ.Attributes{"id": "catalog-domain", "name": "domain", "type": "text", "placeholder": entry.Slug + ".example.com", "autocomplete": "off", "spellcheck": "false"})
+							}
+						</div>
+						<div class="flex justify-end">
+							@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-catalog-submit": true}) {
+								Install
+							}
+						</div>
+					</form>
+				}
+			}
+			@catalogFacts(view.App)
+		}
+	}
+}
+
+// ---------------------------------------------------------------- parts
+
+// catalogBody is the catalog itself: the category and the order, then
+// the apps. A choice asks the server (htmx), which answers the list and
+// keeps the address bar in step; without JavaScript the form loads the
+// page. No search of its own: the magnifier of the navbar finds apps.
+templ catalogBody(view CatalogView) {
+	<form
+		id="catalog-form"
+		method="get"
+		action={ templ.SafeURL(view.Base) }
+		class="grid grid-cols-2 gap-2 sm:max-w-sm"
+		hx-get={ view.Base }
+		hx-trigger="change, submit"
+		hx-target="#catalog-results"
+		hx-swap="outerHTML"
+		hx-sync="this:replace"
+	>
+		@kit.Select(kit.SelectProps{ID: "catalog-category", Name: "category", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
+		@kit.Select(kit.SelectProps{ID: "catalog-sort", Name: "sort", Label: "Order", Options: []kit.Option{{Value: SortUpdated, Label: "Updated"}, {Value: SortName, Label: "Name"}}, Value: view.Sort})
+	</form>
+	@CatalogResults(view)
+}
+
+// CatalogResults is the list of apps of the category, also the answer to
+// a choice of the category or the order. Each icon sits in a
+// box of its size: its padding is a share of what holds it, and without
+// the box that is the whole row.
+templ CatalogResults(view CatalogView) {
+	<div id="catalog-results" class="flex flex-col gap-2" data-catalog-results>
+		if len(view.Apps) > 0 {
+			@kit.Section(appCount(len(view.Apps)), nil) {
+				@kit.List() {
+					for _, app := range view.Apps {
+						@kit.Row(view.Base + "/" + app.Entry.Slug) {
+							<span data-lead class="flex size-9 shrink-0">
+								@kit.AppIcon(app.Entry.Name, catalogLogo(app.Entry), false)
+							</span>
+							@kit.RowText(app.Entry.Name, app.Entry.Pitch)
+						}
+					}
+				}
+			}
+			<p class="px-1 text-sm text-muted-foreground">
+				Missing one? <a href="/docs/guides/catalog#add-an-app" class="text-foreground underline-offset-4 hover:underline">Ask for it</a>
+			</p>
+		}
+
+	</div>
+}
+
+func appCount(n int) string {
+	if n == 1 {
+		return "1 app"
+	}
+	return strconv.Itoa(n) + " apps"
+}
+
+// catalogHead is the head of a catalog app's page: its icon before its
+// name, and its one sentence under it.
+templ catalogHead(back kit.Back, entry catalog.Entry) {
+	<div class="flex flex-col gap-2">
+		@kit.HeaderIcon(back, kit.AppIcon(entry.Name, catalogLogo(entry), true), entry.Name)
+		@kit.Quiet() {
+			{ entry.Pitch }
+		}
+	</div>
+}
+
+// catalogFacts are what a catalog app's page tells under its action: its
+// links, its first sign-in, and its versions.
+templ catalogFacts(view CatalogEntryView) {
+	{{ entry := view.Entry }}
+	@kit.Section("Links", nil) {
+		@kit.List() {
+			if entry.Website != "" {
+				@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
+			}
+			if entry.Source != "" {
+				@catalogLink("Source", entry.License, "https://"+entry.Source, false)
+			}
+			if entry.Image != "" {
+				@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+			}
+		}
+	}
+	if entry.Login != "" {
+		@kit.Section("First sign-in", nil) {
+			@kit.List() {
+				@kit.Row("") {
+					<p class="min-w-0 flex-1 text-sm" data-catalog-login>{ entry.Login }</p>
+				}
+			}
+		}
+	}
+	@catalogVersions(view.Versions)
+}
+
+// catalogLink is a row that opens another site in a new tab: what it is,
+// its value, and ↗.
+templ catalogLink(label, value, href string, mono bool) {
+	@kit.RowExternal(href) {
+		<span class="shrink-0 font-medium" data-catalog-link={ label }>{ label }</span>
+		<span class={ "min-w-0 flex-1 truncate text-right text-sm text-muted-foreground", templ.KV("font-mono", mono) }>{ value }</span>
+	}
+}
+
+// catalogVersions lists the newest releases with when they came out. It
+// only tells: any of them can be installed, an older one too.
+templ catalogVersions(versions []catalog.Version) {
+	{{ now := time.Now() }}
+	@kit.Section("Versions", nil) {
+		<div class="flex flex-col gap-2" data-catalog-versions>
+			@kit.List() {
+				if len(versions) == 0 {
+					@kit.Row("") {
+						@kit.RowText("Not known yet", "The registry has not answered. Try again in a minute.")
+					}
+				}
+				for _, version := range shownVersions(versions, 8) {
+					@kit.Row("") {
+						<span class="min-w-0 flex-1 truncate font-mono text-sm">{ version.Tag }</span>
+						<span class="shrink-0 text-sm text-muted-foreground">{ released(version, now) }</span>
+					}
+				}
+			}
+			if more := len(versions) - 8; more > 0 {
+				<p class="px-1 text-sm text-muted-foreground">{ strconv.Itoa(more) } older</p>
+			}
+		</div>
+	}
+}
+
+// CatalogUpdate is the panel of an app from the catalog: the version it
+// runs, the newest, and the way to another one.
+templ CatalogUpdate(view CatalogUpdateView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div id="catalog-update" class="grid" data-catalog-update>
+		@kit.Card("", nil) {
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+				<div class="flex min-w-0 flex-1 items-center gap-4">
+					<div class="min-w-0">
+						<p class="truncate font-medium">{ view.Entry.Name }</p>
+						<p class="text-sm text-muted-foreground">
+							{ catalogUpdateLine(view) }
+							if note := view.Entry.DatabaseNote(); note != "" {
+								<span data-catalog-database-note>{ note }</span>
+							}
+						</p>
+					</div>
+				</div>
+				<form
+					class="flex gap-2"
+					hx-post={ basePath + "/apps/" + view.App.Name + "/update" }
+					hx-swap="none"
+					hx-disable="find button[type='submit']"
+					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
+				>
+					@kit.CSRF()
+					<div class="min-w-0 flex-1 sm:w-36 sm:flex-none">
+						@kit.Select(kit.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Value: view.Latest.Tag, Disabled: len(view.Versions) == 0})
+					</div>
+					@kit.Button(catalogUpdateKind(view.Newer), "", templ.Attributes{"type": "submit", "data-catalog-update-submit": true}) {
+						if view.Newer {
+							Update
+						} else {
+							Deploy
+						}
+					}
+				</form>
+			</div>
+		}
+	</div>
+}
+
+// catalogUpdateLine says which version runs, and the newer one if there is.
+func catalogUpdateLine(view CatalogUpdateView) string {
+	switch {
+	case view.Version == "":
+		return ""
+	case view.Newer:
+		return view.Latest.Tag + " is out. You run " + view.Version + "."
+	}
+	return view.Version + ", the newest."
+}
+
+// catalogUpdateKind makes Update the primary button: it is the thing to do.
+func catalogUpdateKind(newer bool) kit.Kind {
+	if newer {
+		return kit.Primary
+	}
+	return kit.Secondary
+}
+
+func firstVersion(versions []catalog.Version) string {
+	if len(versions) == 0 {
+		return ""
+	}
+	return versions[0].Tag
+}

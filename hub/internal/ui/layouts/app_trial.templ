@@ -1,0 +1,57 @@
+package layouts
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/access"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+)
+
+// trialDaysLeft rounds up: a trial that ends in five hours has one day left.
+func trialDaysLeft(ends *time.Time, now time.Time) int {
+	if ends == nil {
+		return 0
+	}
+	return max(1, int(ends.Sub(now).Hours()/24+0.999))
+}
+
+// AppTrialCard is one quiet line over the page while the trial runs or
+// after it ended, with Subscribe for whoever may pay.
+templ AppTrialCard() {
+	{{ subscription := ctxkeys.Subscription(ctx) }}
+	{{ member := ctxkeys.WorkspaceMember(ctx) }}
+	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
+		{{ current := subscription.Access() }}
+		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-4xl bg-card px-6 py-4" data-trial={ string(current.State) }>
+				<p class="min-w-64 flex-1 text-sm">
+					if current.State == access.StateTrial {
+						{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
+						<span class="font-medium" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
+						<span class="text-muted-foreground">After it, moin turns read-only. Your apps keep running.</span>
+					} else {
+						<span class="font-medium">Your trial has ended.</span>
+						<span class="text-muted-foreground">Your apps keep running, and you can stop and start them.</span>
+					}
+				</p>
+				if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
+					@kit.Button(kit.Primary, ctxkeys.AppBasePath(ctx)+"/billing", nil) {
+						Subscribe
+					}
+				} else {
+					<p class="text-sm text-muted-foreground">An owner can subscribe.</p>
+				}
+			</div>
+		}
+	}
+}
+
+func trialLine(days int) string {
+	if days == 1 {
+		return "Last day of your trial."
+	}
+	return strconv.Itoa(days) + " days left in your trial."
+}

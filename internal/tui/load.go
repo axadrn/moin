@@ -1,8 +1,8 @@
 package tui
 
-// Every call to the control plane, each as a command that answers with a
+// Every call to the hub, each as a command that answers with a
 // message. Long ones (live lists, deploy logs, commands) send what comes in
-// through the hub.
+// through the inbox.
 
 import (
 	"bytes"
@@ -80,7 +80,7 @@ func (m model) loadEvents(cursor string) tea.Cmd {
 	return func() tea.Msg {
 		page, err := api.Activity(ctx, client.ActivityQuery{Cursor: cursor, Limit: 50})
 		if err != nil && cursor == "" {
-			return nil // the header says when the control plane is away
+			return nil // the header says when the hub is away
 		}
 		if err != nil {
 			return errMsg{err}

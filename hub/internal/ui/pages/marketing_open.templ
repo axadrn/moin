@@ -1,0 +1,56 @@
+package pages
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// HomeOpen is what the changelog says about how moin ships: how many
+// versions since the first, and the newest one. Read from the changelog on
+// every visit, so it is always true.
+type HomeOpen struct {
+	Releases int
+	Since    time.Time
+	Latest   service.Release
+}
+
+// NewHomeOpen counts the versions, newest first as the changelog lists them.
+func NewHomeOpen(releases []service.Release) HomeOpen {
+	if len(releases) == 0 {
+		return HomeOpen{}
+	}
+	return HomeOpen{Releases: len(releases), Since: releases[len(releases)-1].Date, Latest: releases[0]}
+}
+
+// HomeOpenSection is the trust a young product can show without logos: the
+// code is open, and it ships often, counted from the real changelog.
+templ HomeOpenSection(open HomeOpen) {
+	if open.Releases > 0 {
+		<section id="open" class={ homeSection }>
+			<h2 class={ homeStatement }>Built in the open.</h2>
+			@kit.List() {
+				@kit.Row(layouts.GitHubURL) {
+					@kit.RowText("Open source", "AGPL-3.0, every line on GitHub")
+				}
+				@kit.Row("/changelog") {
+					@kit.RowText(homeVersions(open.Releases), "Since "+open.Since.Format("January 2, 2006"))
+				}
+				@kit.Row("/changelog") {
+					@kit.RowText(open.Latest.Version, homeInShort(open.Latest.InShort))
+					<span class="shrink-0 text-sm text-muted-foreground max-sm:hidden">{ open.Latest.Date.Format("January 2") }</span>
+				}
+			}
+		</section>
+	}
+}
+
+func homeVersions(n int) string {
+	if n == 1 {
+		return "1 version"
+	}
+	return strconv.Itoa(n) + " versions"
+}

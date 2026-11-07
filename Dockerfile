@@ -1,4 +1,4 @@
-# The control plane image. Build from the repo root:
+# The hub image. Build from the repo root:
 #   docker build --build-arg VERSION=v0.1.0 .
 # The build runs on the builder's own CPU and cross-compiles for the
 # target, so the arm64 box is built at full speed, not emulated.
@@ -26,7 +26,7 @@ RUN arch="$(dpkg --print-architecture)" && \
     echo "${tailwind_sha256}  /usr/local/bin/tailwindcss" | sha256sum --check - && \
     chmod +x /usr/local/bin/tailwindcss
 
-WORKDIR /app/controlplane
+WORKDIR /app/hub
 
 # Compile Tailwind CSS.
 RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
@@ -35,7 +35,7 @@ RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 RUN go tool templ generate
 
 # The moin binary that install.sh, cli.sh, CI and daemon updates download
-# from /download, built from the same commit as the control plane, with
+# from /download, built from the same commit as the hub, with
 # SHA256SUMS for checking a download by hand. It is the same in both boxes,
 # so it comes before anything of the target and is built once.
 ARG VERSION=dev
@@ -67,10 +67,10 @@ ENV APP_ENV=production
 ENV GO_ENV=production
 
 # Copy the binary, CSS output, and content directory
-COPY --from=build /app/controlplane/main .
-COPY --from=build /app/controlplane/assets/css/output.css ./assets/css/output.css
-COPY --from=build /app/controlplane/content ./content
-COPY --from=build /app/controlplane/downloads ./downloads
+COPY --from=build /app/hub/main .
+COPY --from=build /app/hub/assets/css/output.css ./assets/css/output.css
+COPY --from=build /app/hub/content ./content
+COPY --from=build /app/hub/downloads ./downloads
 
 # Expose the port
 EXPOSE 8090

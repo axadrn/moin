@@ -1,0 +1,11 @@
+package kit
+
+import "github.com/axadrn/moin/hub/internal/ctxkeys"
+
+// CSRF is the hidden token every form that changes something sends. The
+// middleware compares it with the token in an HttpOnly cookie (double
+// submit cookie): another site can make the browser send the cookie, but
+// cannot read it, so it cannot fill this field.
+templ CSRF() {
+	<input type="hidden" name="csrf_token" value={ ctxkeys.CSRFToken(ctx) }/>
+}

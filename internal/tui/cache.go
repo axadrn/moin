@@ -30,7 +30,7 @@ type saved struct {
 	SavedAt time.Time
 }
 
-// cacheKey names the file of one control plane and one login, so another
+// cacheKey names the file of one hub and one login, so another
 // login or workspace starts empty.
 func cacheKey(url, token string) string {
 	if token == "" {

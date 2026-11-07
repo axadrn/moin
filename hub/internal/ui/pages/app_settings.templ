@@ -1,0 +1,266 @@
+package pages
+
+import (
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
+)
+
+// Settings is your account, one tab at a time: Profile (picture, name,
+// email, alerts), Security (password, sessions, and the account itself at
+// the end) and Tokens. tokenSections are the parts of the tokens tab.
+templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, tokenSections ...templ.Component) {
+	{{ user := ctxkeys.User(ctx) }}
+	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
+	@layouts.App("Account · Settings") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, "Account")
+			@kit.Segmented("account-tabs", "Account", []kit.Segment{
+				{Label: "Profile", Href: settingsPath, Active: activeTab == "profile"},
+				{Label: "Security", Href: settingsPath + "?tab=security", Active: activeTab == "security"},
+				{Label: "Tokens", Href: settingsPath + "?tab=tokens", Active: activeTab == "tokens"},
+			})
+			switch activeTab {
+				case "security":
+					if passwordRemoved {
+						@kit.Quiet() {
+							Password removed.
+						}
+					}
+					@settingsPasswordCard()
+					@SettingsSessionsSection(sessions, currentSessionID)
+					@settingsAccountDanger()
+				case "tokens":
+					for _, section := range tokenSections {
+						@section
+					}
+				default:
+					@SettingsAvatarSection(user)
+					@settingsNameCard(user)
+					@settingsEmailCard(user)
+					@kit.List() {
+						@EmailAlertsForm(user.EmailAlerts)
+					}
+			}
+		}
+	}
+}
+
+// settingsNameCard is the name your team sees.
+templ settingsNameCard(user *model.User) {
+	@kit.Card("Name", nil) {
+		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/profile/name" } hx-swap="none" hx-disable="find button[type='submit']">
+			@kit.CSRF()
+			<label for="name" class="sr-only">Name</label>
+			@kit.Inline() {
+				@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": user.Name, "placeholder": "Your name", "autocomplete": "name", "maxlength": "100"})
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					Save
+				}
+			}
+		</form>
+	}
+}
+
+// settingsEmailCard changes the address; the change applies once the link
+// sent there is opened.
+templ settingsEmailCard(user *model.User) {
+	@kit.Card("Email", nil) {
+		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/account/email" } hx-swap="none" hx-disable="find button[type='submit']">
+			@kit.CSRF()
+			<label for="email" class="sr-only">Email</label>
+			@kit.Inline() {
+				@kit.Input(templ.Attributes{"id": "email", "name": "email", "type": "email", "value": user.Email, "placeholder": "you@example.com", "autocomplete": "email"})
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					Save
+				}
+			}
+		</form>
+	}
+}
+
+// EmailAlertsForm is the switch for the user's email alerts, a row of a
+// kit.List.
+templ EmailAlertsForm(on bool) {
+	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts", "email-alerts", "Email me alerts", "Downtime and failed deploys", on)
+}
+
+// SettingsPasswordSection is what a change of the password answers: the
+// password card and the list at the end, which has Remove password only
+// while there is one. Both swap in by their ids.
+templ SettingsPasswordSection() {
+	@templ.Fragment("settings-password-form") {
+		@settingsPasswordCard()
+		@settingsAccountDanger()
+	}
+}
+
+// settingsPasswordCard changes the password, or sets a first one.
+templ settingsPasswordCard() {
+	{{ user := ctxkeys.User(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div id="password-form" hx-swap-oob="true">
+		@kit.Card("Password", nil) {
+			if user.HasPassword() {
+				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password" } hx-swap="none" hx-disable="find button[type='submit']">
+					@kit.CSRF()
+					<div class="grid items-start gap-4 md:grid-cols-3">
+						@formField("Current password", "current_password", "", "") {
+							@kit.Input(templ.Attributes{"id": "current_password", "aria-describedby": "current_password-hint", "name": "current_password", "type": "password", "autocomplete": "current-password"})
+						}
+						@formField("New password", "new_password", "At least 12 characters.", "") {
+							@kit.Input(templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"})
+						}
+						@formField("Repeat it", "confirm_password", "", "") {
+							@kit.Input(templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"})
+						}
+					</div>
+					<div class="flex justify-end">
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+							Change password
+						}
+					</div>
+				</form>
+			} else {
+				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password/set" } hx-swap="none" hx-disable="find button[type='submit']">
+					@kit.CSRF()
+					<div class="grid items-start gap-4 md:grid-cols-2">
+						@formField("New password", "new_password", "At least 12 characters.", "") {
+							@kit.Input(templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"})
+						}
+						@formField("Repeat it", "confirm_password", "", "") {
+							@kit.Input(templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"})
+						}
+					</div>
+					<div class="flex justify-end">
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+							Set password
+						}
+					</div>
+				</form>
+			}
+		}
+	</div>
+}
+
+// SettingsSessionsSection lists the browsers signed in to the account, each
+// with its button to end it, and ends them all at the end.
+templ SettingsSessionsSection(sessions []model.Session, currentSessionID string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<div id="settings-sessions" hx-swap-oob="true">
+		@kit.Section("Sessions", nil) {
+			@kit.List() {
+				for _, session := range sessions {
+					@kit.Row("") {
+						@kit.RowText(session.DisplayName(), sessionNote(session, currentSessionID, now))
+						@kit.Button(kit.Secondary, "", templ.Attributes{
+							"type":       "button",
+							"hx-delete":  basePath + "/settings/sessions/" + session.ID,
+							"hx-swap":    "none",
+							"hx-disable": "this",
+						}) {
+							if session.ID == currentSessionID {
+								Sign out
+							} else {
+								Revoke
+							}
+						}
+					}
+				}
+				@kit.RowButton(true, templ.Attributes{
+					"hx-delete":  basePath + "/settings/sessions",
+					"hx-swap":    "none",
+					"hx-disable": "this",
+					"hx-confirm": "Sign out everywhere? Every session ends, this one too.",
+				}) {
+					<span class="font-medium">Sign out everywhere</span>
+				}
+			}
+		}
+	</div>
+}
+
+// sessionNote is the second line of a session: this browser, or when it
+// was last active.
+func sessionNote(session model.Session, currentSessionID string, now time.Time) string {
+	if session.ID == currentSessionID {
+		return "This browser"
+	}
+	return "Active " + human.Ago(session.LastSeenAt, now)
+}
+
+// settingsAccountDanger is the end of the security tab: remove the
+// password, and delete the account behind its typed-DELETE dialog.
+templ settingsAccountDanger() {
+	{{ user := ctxkeys.User(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div id="account-danger" hx-swap-oob="true">
+		@kit.List() {
+			if user.HasPassword() {
+				@kit.RowButton(true, templ.Attributes{
+					"hx-delete":  basePath + "/account/password",
+					"hx-swap":    "none",
+					"hx-disable": "this",
+					"hx-confirm": "Remove your password? You then sign in with email links.",
+				}) {
+					<span class="font-medium">Remove password</span>
+				}
+			}
+			@kit.RowButton(true, kit.OpenDialog("delete-account-dialog")) {
+				<span class="font-medium">Delete account</span>
+			}
+		}
+		@deleteAccountDialog()
+	</div>
+}
+
+// deleteAccountDialog is the one question of its own (DESIGN.md, Asking
+// first): the server checks the typed DELETE.
+templ deleteAccountDialog() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@kit.Dialog("delete-account-dialog", "Delete your account?", "Your account, picture, sessions and API tokens are deleted. This cannot be undone.") {
+		<form
+			id="delete-account-form"
+			class="flex flex-col gap-5"
+			hx-delete={ basePath + "/account" }
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@kit.CSRF()
+			@formField("Type DELETE to confirm", "delete-confirmation", "", "") {
+				@kit.Input(templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "data-delete-confirmation": true})
+			}
+			@kit.DialogButtons() {
+				@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+					Cancel
+				}
+				@kit.Button(kit.Danger, "", templ.Attributes{"type": "submit", "disabled": true, "data-delete-submit": true}) {
+					Delete my account
+				}
+			}
+		</form>
+	}
+	@deleteAccountOnce.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			// The button works only once DELETE is typed; the form starts
+			// over when the dialog closes.
+			document.addEventListener("input", (event) => {
+				if (!event.target.matches("[data-delete-confirmation]")) return;
+				event.target.form.querySelector("[data-delete-submit]").disabled = event.target.value.trim() !== "DELETE";
+			});
+			document.addEventListener("close", (event) => {
+				const form = event.target instanceof Element && event.target.querySelector("#delete-account-form");
+				if (!form) return;
+				form.reset();
+				form.querySelector("[data-delete-submit]").disabled = true;
+			}, true);
+		</script>
+	}
+}
+
+var deleteAccountOnce = templ.NewOnceHandle()

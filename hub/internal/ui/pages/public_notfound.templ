@@ -1,0 +1,12 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+templ NotFound() {
+	@layouts.Base() {
+		@StatusScreen("Page not found", "The address does not exist or has moved.", "404 not found: "+ctxkeys.URLPath(ctx))
+	}
+}

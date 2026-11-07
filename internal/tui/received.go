@@ -5,7 +5,7 @@ import (
 	"github.com/axadrn/moin/internal/client"
 )
 
-// received takes what the control plane answered: what a load brought,
+// received takes what the hub answered: what a load brought,
 // how a change went, and the lines of a running deploy.
 func (m model) received(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {

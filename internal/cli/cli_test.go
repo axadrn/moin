@@ -161,7 +161,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	if code != 0 || strings.Contains(stdout, "uninstall") || !strings.Contains(stdout, "never connected") {
 		t.Errorf("never connected: code %d, stdout %q", code, stdout)
 	}
-	// The control plane checks what --confirm says: the CLI sends it as given.
+	// The hub checks what --confirm says: the CLI sends it as given.
 	for _, args := range [][]string{
 		{"servers", "rm", "web-1", "--confirm", "web-2"},
 		{"apps", "rm", "shop", "--confirm", "shop"},
@@ -453,7 +453,7 @@ func TestLoginRefusesPlainHTTP(t *testing.T) {
 }
 
 // TestBadNamesStayLocal: a made-up branch name is refused before the CLI
-// calls the control plane.
+// calls the hub.
 func TestBadNamesStayLocal(t *testing.T) {
 	for _, args := range [][]string{
 		{"deploy", "--ref", "main..x", "shop"},

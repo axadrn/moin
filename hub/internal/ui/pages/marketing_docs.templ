@@ -1,0 +1,112 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// DocsHome is /docs, like a support site, in the one column of a docs
+// page: every page under its topic, as grouped rows. No sidebar and no
+// search of its own: the magnifier of the navbar searches the docs.
+templ DocsHome(groups []model.DocGroup) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        "Docs",
+		Description:  "Get started, every guide and the reference of moin.",
+		Path:         "/docs",
+		MarkdownPath: "/docs.md",
+	}) {
+		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+			@kit.Header(kit.Back{}, "Docs")
+			for _, group := range groups {
+				@kit.Section(group.Title, nil) {
+					@kit.List() {
+						for _, page := range group.Pages {
+							@kit.Row(docsPageURL(page)) {
+								@kit.RowText(page.Title, "")
+							}
+						}
+					}
+				}
+			}
+		</main>
+	}
+}
+
+// Docs is one page: one column in the middle, short enough to read, with
+// the way back, the title, the text and a row to the next page all on its
+// left edge. The search is in the navbar.
+templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        page.Title + " · Docs",
+		Description:  page.Description,
+		Path:         ctxkeys.URLPath(ctx),
+		MarkdownPath: docsMarkdownURL(page),
+	}) {
+		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title)
+			<article class="min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
+				@kit.Typeset(page.HTMLContent)
+			</article>
+			<div class="flex flex-col gap-3">
+				if next != nil {
+					@kit.List() {
+						@kit.Row(docsPageURL(next)) {
+							<div class="min-w-0 flex-1 truncate font-medium"><span class="text-muted-foreground">Next: </span>{ next.Title }</div>
+						}
+					}
+				}
+				<p class="px-1 text-xs text-muted-foreground">
+					<a href={ templ.SafeURL(docsMarkdownURL(page)) } class="underline-offset-4 hover:text-foreground hover:underline">This page as Markdown</a>
+				</p>
+			</div>
+		</main>
+		@docsSurfaces()
+		@kit.HighlightScripts()
+	}
+}
+
+func docsPageURL(page *model.DocPage) string {
+	if page == nil || page.Slug == "" {
+		return "/docs"
+	}
+	return "/docs/" + page.Slug
+}
+
+func docsMarkdownURL(page *model.DocPage) string {
+	return docsPageURL(page) + ".md"
+}
+
+// docsSurfacesOnce keeps the script of the surfaces blocks once on a page.
+var docsSurfacesOnce = templ.NewOnceHandle()
+
+// docsSurfaces makes the surfaces blocks (a choice of Web, CLI, TUI, API
+// and MCP) share one choice: picking a surface picks it on every block of
+// the page, and the browser keeps it for the next pages. The block that
+// was clicked stays where it is on the screen while the blocks above it
+// change height. Without the script each block still works on its own.
+templ docsSurfaces() {
+	@docsSurfacesOnce.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			(() => {
+				const key = "moin-docs-surface";
+				const show = (value, picked) => {
+					if (!/^[a-z]+$/.test(value || "")) return;
+					const top = picked?.getBoundingClientRect().top;
+					document.querySelectorAll(`[data-surfaces] input[type=radio][value="${value}"]`).forEach((radio) => { radio.checked = true; });
+					if (picked) window.scrollBy(0, picked.getBoundingClientRect().top - top);
+				};
+				document.addEventListener("change", (event) => {
+					const block = event.target.closest?.("[data-surfaces]");
+					if (!block || event.target.type !== "radio") return;
+					try { localStorage.setItem(key, event.target.value); } catch {}
+					show(event.target.value, block);
+				});
+				let value = null;
+				try { value = localStorage.getItem(key); } catch {}
+				show(value, null);
+			})();
+		</script>
+	}
+}

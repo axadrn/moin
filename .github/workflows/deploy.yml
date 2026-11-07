@@ -3,11 +3,11 @@ name: Deploy
 # One way to ship, for a release tag and by hand (Actions, Deploy, Run
 # workflow):
 #   1. test: the same checks as CI.
-#   2. box: build the control plane image, ghcr.io/axadrn/moin, which
-#      the hosted control plane and every self-hoster runs.
+#   2. box: build the hub image, ghcr.io/axadrn/moin, which
+#      the hosted hub and every self-hoster runs.
 #   3. release: for a tag, the GitHub release with its notes from
-#      controlplane/content/changelog.md.
-#   4. deploy: through Tailscale, the hosted control plane gets the deploy
+#      hub/content/changelog.md.
+#   4. deploy: through Tailscale, the hosted hub gets the deploy
 #      files of this commit and runs update.sh with the new box.
 # A push to main runs nothing. Forks only build: the deploy runs in
 # axadrn/moin alone, with the repository variables DEPLOY_HOST and
@@ -80,9 +80,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' controlplane/content/changelog.md | sed '1,3d' > notes.md
+          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' hub/content/changelog.md | sed '1,3d' > notes.md
           if [ ! -s notes.md ]; then
-            echo "controlplane/content/changelog.md has no section $TAG" >&2
+            echo "hub/content/changelog.md has no section $TAG" >&2
             exit 1
           fi
           gh release view "$TAG" >/dev/null 2>&1 && gh release edit "$TAG" --notes-file notes.md || gh release create "$TAG" --title "$TAG" --notes-file notes.md --latest
@@ -115,7 +115,7 @@ jobs:
         run: |
           tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
           for file in compose.yml compose.same-server.yml update.sh updater.sh setup.sh; do
-            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "controlplane/deploy/$file"
+            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "hub/deploy/$file"
           done
           tailscale ssh "root@$HOST" "cd /opt/moin && MOIN_IMAGE='$IMAGE' sh update.sh"
       - name: Wait until it answers
@@ -124,5 +124,5 @@ jobs:
             tailscale ssh "root@$HOST" "curl --fail --silent --output /dev/null http://127.0.0.1:8090/healthz" && exit 0
             sleep 5
           done
-          echo "the control plane on $HOST does not answer" >&2
+          echo "the hub on $HOST does not answer" >&2
           exit 1

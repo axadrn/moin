@@ -13,14 +13,14 @@ func TestVersionSaysANewerReleaseIsOut(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	for _, want := range []string{"control plane v0.2.0", "moin v0.3.0 is out. One-click updates.", "releases/tag/v0.3.0", "moin update"} {
+	for _, want := range []string{"hub v0.2.0", "moin v0.3.0 is out. One-click updates.", "releases/tag/v0.3.0", "moin update"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout %q misses %q", stdout, want)
 		}
 	}
 }
 
-func TestUpdateOnTheHostedControlPlane(t *testing.T) {
+func TestUpdateOnTheHostedHub(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"GET /api/v1/version": `{"version":"v0.3.0","self_hosted":false,"update":null}`,
 	}}

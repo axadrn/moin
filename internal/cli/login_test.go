@@ -11,7 +11,7 @@ import (
 	"github.com/axadrn/moin/internal/client"
 )
 
-// loginServer is a control plane that approves a browser login on the
+// loginServer is a hub that approves a browser login on the
 // second poll and knows the token it gave out.
 type loginServer struct {
 	mu    sync.Mutex

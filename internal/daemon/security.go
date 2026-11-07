@@ -17,7 +17,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// How a server is reached and locked down. The control plane decides, the
+// How a server is reached and locked down. The hub decides, the
 // daemon applies it and keeps it in server.json, so the proxy starts in the
 // right mode before the first session.
 //
@@ -285,7 +285,7 @@ func applyFirewall(ctx context.Context, rules string) error {
 
 // resetNetwork takes down the firewall and the tunnel an earlier server
 // entry set up, when the daemon registers again. The new entry starts with
-// both off; the control plane sends its config on connect when it has more.
+// both off; the hub sends its config on connect when it has more.
 func resetNetwork(ctx context.Context, dir string) {
 	if err := removeFirewall(ctx); err != nil {
 		slog.Warn("remove the firewall of the earlier server entry", "error", err)

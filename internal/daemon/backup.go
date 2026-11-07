@@ -27,7 +27,7 @@ import (
 // A backup is a copy of a database in the user's own bucket, taken here
 // on the server on the app's schedule and kept as long as the app says;
 // every day moin checks that the newest one restores. Data goes from the
-// server to the bucket, never through the control plane. One engine per
+// server to the bucket, never through the hub. One engine per
 // kind of database, with the same verbs:
 //
 //	database ── Copy ───▶ bucket <database>/copies/<id>
@@ -85,7 +85,7 @@ type backups struct {
 }
 
 // state is what the daemon knows of one database: its newest copy, why
-// the last one failed, the newest daily check, what the control plane
+// the last one failed, the newest daily check, what the hub
 // heard last, and whether a restore works on it.
 type state struct {
 	copied             time.Time
@@ -501,7 +501,7 @@ func (b *backups) markFile(id string) string {
 // changes and ends with a result either way.
 func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) error {
 	if !restoreID.MatchString(request.ID) {
-		return errors.New("a restore needs an ID: update the control plane")
+		return errors.New("a restore needs an ID: update the hub")
 	}
 	database, err := b.one(request.App, request.Database)
 	if err != nil {

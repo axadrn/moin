@@ -10,7 +10,7 @@ type Hello struct {
 	OS              string `json:"os"`
 	Arch            string `json:"arch"`
 	// Addresses are the server's own public IPv4 and IPv6 addresses, as far
-	// as it knows them. Older daemons send none; the control plane then knows
+	// as it knows them. Older daemons send none; the hub then knows
 	// only the address the daemon connected from.
 	Addresses []string `json:"addresses,omitempty"`
 	// Rules are the server's own rules for moin, from /etc/moin/rules. Nil
@@ -19,7 +19,7 @@ type Hello struct {
 }
 
 // Rules are what the owner of a server allows moin to do there, written in
-// /etc/moin/rules on the server. The control plane cannot change them; the
+// /etc/moin/rules on the server. The hub cannot change them; the
 // daemon refuses every request they do not allow.
 type Rules struct {
 	// DataOff refuses tables, SQL and row edits.

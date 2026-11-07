@@ -251,7 +251,7 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
 	if *ref != "" {
-		// The control plane downloads the commit from GitHub; nothing is
+		// The hub downloads the commit from GitHub; nothing is
 		// uploaded.
 		step(stdout, "Deploying %s from GitHub", *ref)
 		started, err := api.DeployRef(ctx, name, *ref)

@@ -192,7 +192,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if at != nil {
 		what = at.Format("2006-01-02 15:04") + " UTC"
 	}
-	// The control plane checks the name typed out too.
+	// The hub checks the name typed out too.
 	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s keeps the data of now beside it, so you can undo this.", name, what, build.Name), name)
 	if err != nil {
 		return err

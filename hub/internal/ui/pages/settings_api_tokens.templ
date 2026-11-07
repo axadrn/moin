@@ -1,0 +1,116 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+)
+
+// SettingsAPITokensSection is the API tokens of the tokens tab: a new
+// token once it is made, the list, and the form for another. Requests
+// replace its parts by id.
+templ SettingsAPITokensSection(view APITokensView) {
+	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true"></div>
+	@kit.Section("API tokens", nil) {
+		@APITokenList(view)
+	}
+	@APITokenCreate(view)
+}
+
+// APITokenCreate is the card that makes a token. A successful create
+// replaces it, which empties the form.
+templ APITokenCreate(view APITokensView) {
+	<div id="api-token-create" hx-swap-oob="true">
+		@kit.Card("New token", nil) {
+			@APITokenCreateForm(view, false)
+		}
+	</div>
+}
+
+// APITokenCreateForm is the create form. With oob it replaces the form on
+// the page, to show what is wrong with it.
+templ APITokenCreateForm(view APITokensView, oob bool) {
+	{{ form := view.Form }}
+	<form
+		id="api-token-form"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="flex flex-col gap-4"
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/settings/api-tokens" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+	>
+		@kit.CSRF()
+		<div class="grid items-start gap-4 md:grid-cols-2">
+			@formField("Name", "api-token-name", "", form.Errors["name"]) {
+				@kit.Input(templ.Attributes{"id": "api-token-name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Like ci or Claude", "required": true, "maxlength": "64", "autocomplete": "off", "aria-invalid": ariaInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"})
+			}
+			@formField("Expires", "api-token-expiry", "", form.Errors["expiry"]) {
+				@kit.Select(kit.SelectProps{ID: "api-token-expiry", Name: "expiry", Label: "Expires", Options: apiTokenExpiryOptions, Value: form.Expiry})
+			}
+			if len(view.Workspaces) > 0 {
+				@formField("Workspace", "api-token-workspace", "", form.Errors["workspace_id"]) {
+					@kit.Select(kit.SelectProps{ID: "api-token-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: form.WorkspaceID})
+				}
+			}
+			@formField("Access", "access-"+form.Access, "", form.Errors["access"]) {
+				@kit.Choice("access", "Access", apiTokenAccessOptions, form.Access)
+			}
+		</div>
+		<div class="flex justify-end">
+			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				Create token
+			}
+		</div>
+	</form>
+}
+
+// APITokenList lists the tokens, each with Revoke.
+templ APITokenList(view APITokensView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	<div id="api-token-list" hx-swap-oob="true">
+		@kit.List() {
+			if len(view.Tokens) == 0 {
+				@kit.Row("") {
+					<p class="text-sm text-muted-foreground">No tokens yet.</p>
+				}
+			}
+			for _, token := range view.Tokens {
+				@kit.RowControl(templ.Attributes{"data-api-token-row": token.ID}) {
+					<div class="min-w-0 flex-1">
+						<div class="flex min-w-0 items-center gap-2">
+							<span class="truncate font-medium">{ token.Name }</span>
+							if token.IsExpired(view.Now) {
+								<span class="shrink-0 text-sm text-failed">expired</span>
+							}
+						</div>
+						<div class="text-sm text-muted-foreground">{ apiTokenNote(token, view) }</div>
+					</div>
+					@kit.Button(kit.Secondary, "", templ.Attributes{
+						"type":       "button",
+						"aria-label": "Revoke " + token.Name,
+						"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
+					}) {
+						Revoke
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// APITokenReveal shows a new token once, at the top of the tab, until the
+// page is left.
+templ APITokenReveal(raw string) {
+	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true">
+		@kit.Card("Copy your new token", nil) {
+			@kit.Command(raw)
+			@kit.Quiet() {
+				It shows only this once.
+			}
+		}
+	</div>
+}

@@ -1,5 +1,5 @@
 // Package daemon is `moin daemon`: the process on a server that dials out to the
-// control plane and holds one WebSocket session to it.
+// hub and holds one WebSocket session to it.
 package daemon
 
 import (
@@ -37,7 +37,7 @@ const (
 )
 
 // ErrNotRegistered means the daemon has no state yet and needs `moin daemon register`.
-var ErrNotRegistered = errors.New("daemon is not registered: run `" + build.Name + " daemon register --url <control plane> --token <install token>`")
+var ErrNotRegistered = errors.New("daemon is not registered: run `" + build.Name + " daemon register --url <hub> --token <install token>`")
 
 // State is what the daemon keeps between restarts.
 type State struct {
@@ -197,7 +197,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	}
 }
 
-var errRejected = errors.New("the control plane rejected the daemon token: register this server again")
+var errRejected = errors.New("the hub rejected the daemon token: register this server again")
 
 // runner is one daemon process. conn is the current session, nil between
 // sessions.
@@ -306,7 +306,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 		r.send(protocol.TypeDeployDone, "", done)
 	}
 
-	// Reading also answers the control plane's pings.
+	// Reading also answers the hub's pings.
 	for {
 		var message protocol.Message
 		err = wsjson.Read(ctx, conn, &message)
@@ -317,7 +317,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 	}
 }
 
-// handle runs one request from the control plane.
+// handle runs one request from the hub.
 func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	// A rules file with a mistake refuses everything until it is fixed.
 	rules, err := LoadRules(r.rulesFile)
@@ -400,14 +400,14 @@ func answer[T any](r *runner, message protocol.Message, kind protocol.MessageTyp
 	r.send(kind, message.RequestID, result)
 }
 
-// url is the control plane's address.
+// url is the hub's address.
 func (r *runner) url() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.state.URL
 }
 
-// daemonURL moves to the control plane's new address (DaemonURL). It has no
+// daemonURL moves to the hub's new address (DaemonURL). It has no
 // answer.
 func (r *runner) daemonURL(ctx context.Context, message protocol.Message) {
 	var moved protocol.DaemonURL
@@ -421,8 +421,8 @@ func (r *runner) daemonURL(ctx context.Context, message protocol.Message) {
 // moveCheck is how long the new address has to answer.
 const moveCheck = 10 * time.Second
 
-// move dials the control plane at a new address from now on, when the
-// control plane says the one this daemon dialed is old. It only moves when
+// move dials the hub at a new address from now on, when the
+// hub says the one this daemon dialed is old. It only moves when
 // the new address answers, never from https to http, and keeps it in the
 // state, so it survives a restart. The session ends, and the next one
 // dials the new address.
@@ -436,7 +436,7 @@ func (r *runner) move(ctx context.Context, to string) {
 	}
 	parsed, err := url.Parse(to)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && (parsed.Scheme != "http" || strings.HasPrefix(state.URL, "https://"))) {
-		slog.Warn("not moving to the control plane's new address: it is not a valid https address", "url", to)
+		slog.Warn("not moving to the hub's new address: it is not a valid https address", "url", to)
 		return
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, moveCheck)
@@ -447,17 +447,17 @@ func (r *runner) move(ctx context.Context, to string) {
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		slog.Warn("not moving to the control plane's new address yet: it does not answer", "url", to, "error", err)
+		slog.Warn("not moving to the hub's new address yet: it does not answer", "url", to, "error", err)
 		return
 	}
 	response.Body.Close()
 	if response.StatusCode/100 != 2 {
-		slog.Warn("not moving to the control plane's new address yet: it does not answer", "url", to, "status", response.Status)
+		slog.Warn("not moving to the hub's new address yet: it does not answer", "url", to, "status", response.Status)
 		return
 	}
 	state.URL = to
 	if err := saveState(r.dir, state); err != nil {
-		slog.Error("keep the control plane's new address", "error", err)
+		slog.Error("keep the hub's new address", "error", err)
 		return
 	}
 	r.mu.Lock()
@@ -465,7 +465,7 @@ func (r *runner) move(ctx context.Context, to string) {
 	conn := r.conn
 	r.mu.Unlock()
 	r.updater.setURL(to)
-	slog.Info("the control plane has a new address: moving", "url", to)
+	slog.Info("the hub has a new address: moving", "url", to)
 	if conn != nil {
 		conn.Close(websocket.StatusNormalClosure, "moving to "+to)
 	}
@@ -482,7 +482,7 @@ func websocketURL(raw string) (string, error) {
 	case "http":
 		parsed.Scheme = "ws"
 	default:
-		return "", fmt.Errorf("control plane URL must start with http:// or https://, got %q", raw)
+		return "", fmt.Errorf("hub URL must start with http:// or https://, got %q", raw)
 	}
 	return parsed.String(), nil
 }

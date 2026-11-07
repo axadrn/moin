@@ -1,0 +1,94 @@
+package layouts
+
+import "github.com/axadrn/moin/hub/internal/ui/kit"
+
+// SiteSearch is the one search of the public site, in the middle of the
+// screen like the app's palette: the magnifier of the navbar, ⌘K, ctrl+k
+// or / open it on every public page. It finds the docs and the catalog;
+// the server answers (/search, pages.SiteSearchOptions). The arrows or
+// ctrl+j / ctrl+k pick, Enter opens, Escape or a click outside closes.
+templ SiteSearch() {
+	<dialog id="site-search" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search">
+		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl">
+			<form method="get" action="/search" role="search" class="relative shrink-0">
+				<label for="site-search-input" class="sr-only">Search the docs and the catalog</label>
+				@kit.IconSearch("pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground")
+				<input
+					id="site-search-input"
+					name="q"
+					type="search"
+					autocomplete="off"
+					spellcheck="false"
+					placeholder="Search the docs and the catalog"
+					role="combobox"
+					aria-expanded="true"
+					aria-controls="site-search-results"
+					aria-autocomplete="list"
+					hx-get="/search"
+					hx-trigger="input changed delay:80ms, open"
+					hx-target="#site-search-results"
+					hx-swap="innerHTML"
+					hx-sync="this:replace"
+					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+				/>
+			</form>
+			<div id="site-search-results" role="listbox" aria-label="Answers" class="flex flex-col gap-0.5 overflow-y-auto border-t border-border p-1.5"></div>
+		</div>
+	</dialog>
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const dialog = () => document.getElementById("site-search");
+			const field = () => document.getElementById("site-search-input");
+			const options = () => [...dialog().querySelectorAll("[role=option]")];
+			const typing = (target) => target instanceof Element && target.closest("input, textarea, select, [contenteditable]");
+			const pick = (option) => {
+				for (const each of options()) each.setAttribute("aria-selected", String(each === option));
+				option?.scrollIntoView({ block: "nearest" });
+			};
+			const open = () => {
+				if (dialog().open) return;
+				dialog().showModal();
+				field().select();
+				// The answers for what is typed, or the first steps.
+				htmx.trigger(field(), "open");
+			};
+			document.addEventListener("click", (event) => {
+				if (event.target.closest("[data-site-search-open]")) {
+					event.preventDefault();
+					open();
+				} else if (event.target === dialog()) dialog().close();
+				else if (event.target.closest("#site-search [role=option]")) dialog().close();
+			});
+			document.addEventListener("mouseover", (event) => {
+				const option = event.target.closest("#site-search [role=option]");
+				if (option && option.getAttribute("aria-selected") !== "true") pick(option);
+			});
+			document.addEventListener("keydown", (event) => {
+				const ctrl = event.ctrlKey && !event.metaKey;
+				if (!dialog().open) {
+					if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
+						event.preventDefault();
+						open();
+					}
+					return;
+				}
+				if (event.target !== field()) return;
+				const down = event.key === "ArrowDown" || (ctrl && (event.key === "j" || event.key === "n"));
+				const up = event.key === "ArrowUp" || (ctrl && (event.key === "k" || event.key === "p"));
+				const list = options();
+				const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
+				// Escape closes at once; a search field would only empty itself.
+				if ((event.key === "k" && event.metaKey) || event.key === "Escape") {
+					event.preventDefault();
+					dialog().close();
+				} else if (down || up) {
+					event.preventDefault();
+					pick(list[(at + (down ? 1 : -1) + list.length) % list.length]);
+				} else if (event.key === "Enter") {
+					event.preventDefault();
+					(list[at] || list[0])?.click();
+				}
+			});
+		})();
+	</script>
+}

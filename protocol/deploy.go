@@ -17,7 +17,7 @@ import (
 type DeployStart struct {
 	DeployID string `json:"deploy_id"`
 	App      string `json:"app"`
-	// AppID is the app's ID in the control plane. Its backups live under
+	// AppID is the app's ID in the hub. Its backups live under
 	// it, so an app removed and created again with the same name starts
 	// with an empty backup folder.
 	AppID     string `json:"app_id,omitempty"`
@@ -26,7 +26,7 @@ type DeployStart struct {
 	// SourceAuthorization is sent with the download, such as a GitHub
 	// token; SourceStripTop drops the one folder GitHub wraps a repo in.
 	// SourceDeleteURL deletes the source from the user's bucket once it is
-	// downloaded. The control plane never holds the source itself.
+	// downloaded. The hub never holds the source itself.
 	SourceAuthorization string `json:"source_authorization,omitempty"`
 	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
 	SourceDeleteURL     string `json:"source_delete_url,omitempty"`
@@ -96,6 +96,6 @@ type DeployDone struct {
 	Detected Detected `json:"detected"`
 	// Before is when the daemon took the copies just before the new
 	// release started over an older one, which is their ID in
-	// CopyIDLayout: the control plane names them "Before v12".
+	// CopyIDLayout: the hub names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
 }

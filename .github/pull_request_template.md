@@ -4,4 +4,4 @@ Closes #
 
 
 
-- [ ] The docs in `controlplane/content/docs` say what changed.
+- [ ] The docs in `hub/content/docs` say what changed.

@@ -1,0 +1,53 @@
+package pages
+
+import (
+	"context"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/config"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// Auth is the way in: GitHub first where it is set up, else a link by
+// email, and a password for those who set one.
+templ Auth(errorMsg string) {
+	{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
+	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
+		if ctxkeys.RenderConfig(ctx).Billing {
+			@authLine() {
+				30 days free. No card.
+			}
+		}
+		@authStack() {
+			if github {
+				@kit.Button(kit.Primary, "/auth/github", nil) {
+					@kit.IconGitHub("size-4")
+					Continue with GitHub
+				}
+				@authOr()
+			}
+			@AuthMagicLinkForm(errorMsg)
+			if config.GoogleOAuthEnabled {
+				@kit.Button(kit.Secondary, "/auth/google", nil) {
+					@kit.IconGoogle("size-4")
+					Continue with Google
+				}
+			}
+			@authLink("/auth/password") {
+				Sign in with a password
+			}
+		}
+		@authTerms()
+	}
+}
+
+// authTitle invites people in: start free on the hosted hub,
+// sign in on a self-hosted one.
+func authTitle(ctx context.Context) string {
+	if ctxkeys.RenderConfig(ctx).Billing {
+		return "Start free"
+	}
+	return "Sign in"
+}

@@ -75,8 +75,8 @@ func TestScheduleDefaults(t *testing.T) {
 	}
 }
 
-// Every copy of a database has its place in the bucket, which the control
-// plane finds the same way for a download.
+// Every copy of a database has its place in the bucket, which the hub
+// finds the same way for a download.
 func TestCopyKey(t *testing.T) {
 	a := newApps(t.TempDir(), nil)
 	os.MkdirAll(a.appDir("shop"), 0o700)

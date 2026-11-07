@@ -1,0 +1,64 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// AuthMagicLinkSent says where the link went, and sends it again.
+templ AuthMagicLinkSent(email string) {
+	@authScreen(layouts.SEOProps{Title: "Check your email", Description: "Sign-in link sent to your email"}, "Check your email") {
+		@authLine() {
+			We sent a link to <span class="font-medium text-foreground">{ email }</span>.
+		}
+		@authStack() {
+			@AuthMagicLinkResend(email, false)
+			@authLink("/auth") {
+				Use another email
+			}
+		}
+	}
+}
+
+// AuthMagicLinkResend sends the link once more; sent says it went.
+templ AuthMagicLinkResend(email string, sent bool) {
+	<div id="magic-link-resend" class="flex flex-col gap-3">
+		<form
+			id="magic-link-resend-form"
+			class="flex flex-col"
+			hx-post="/auth/magic-link?resend=true"
+			hx-target="#magic-link-resend"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+		>
+			@kit.CSRF()
+			<input type="hidden" name="email" value={ email }/>
+			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+				if sent {
+					Send again
+				} else {
+					Send a new link
+				}
+			}
+		</form>
+		if sent {
+			<p role="status" class="text-center text-sm text-muted-foreground">A new link is on its way.</p>
+		}
+	</div>
+}
+
+// AuthPrivate is what a new address sees while sign-up is closed: only
+// admins and invited people get in.
+templ AuthPrivate() {
+	@authScreen(layouts.SEOProps{Title: "This " + brand.Name + " is private", Description: "Ask its admin for an invitation"}, "This "+brand.Name+" is private") {
+		@authLine() {
+			Ask its admin for an invitation.
+		}
+		<div class="flex flex-col" data-private>
+			@authLink("/auth") {
+				Use another email
+			}
+		</div>
+	}
+}

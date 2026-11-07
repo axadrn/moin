@@ -1,0 +1,29 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// Changelog is every version of moin, newest first, in the release notes
+// format: In short, then New, Changed, Fixed, Removed and Upgrade.
+templ Changelog(html string) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Changelog",
+		Description: "What changed in moin, newest first.",
+		Path:        "/changelog",
+	}) {
+		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{}, "Changelog") {
+				<span class="sm:ml-auto">
+					@kit.Button(kit.Secondary, "/changelog.xml", nil) {
+						RSS
+					}
+				</span>
+			}
+			<article class="max-w-2xl min-w-0 text-base">
+				@kit.Typeset(html)
+			</article>
+		</main>
+	}
+}

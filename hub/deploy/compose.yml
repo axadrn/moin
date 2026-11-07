@@ -1,0 +1,41 @@
+# The moin hub. update.sh starts it with the settings in
+# /etc/moin-hub/env; its SQLite database lives in
+# /var/lib/moin-hub. stable is the newest release; a deploy of
+# moin.run between releases does not reach it.
+services:
+  hub:
+    image: ${MOIN_IMAGE:-ghcr.io/axadrn/moin:stable}
+    restart: unless-stopped
+    env_file: /etc/moin-hub/env
+    volumes:
+      - /var/lib/moin-hub:/app/data
+      # Files the settings point to, such as the GitHub App key.
+      - /etc/moin-hub:/run/moin-hub:ro
+    # Only this machine reaches the port: a proxy in front of it, or the
+    # tunnel below, serves it to the internet.
+    ports:
+      - "127.0.0.1:8090:8090"
+
+  # "Update now" in moin: the updater runs update.sh with the version the
+  # hub asks for in its data directory, and starts the old one
+  # again if the new one does not answer. Only it has access to Docker, not
+  # the hub. update.sh turns it on when updater.sh is next to it.
+  updater:
+    image: docker:28-cli
+    restart: unless-stopped
+    entrypoint: ["sh", "/deploy/updater.sh"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/deploy:ro
+      - /etc/moin-hub:/etc/moin-hub
+      - /var/lib/moin-hub:/var/lib/moin-hub
+    profiles: [updater]
+
+  # With TUNNEL_TOKEN in the settings, a Cloudflare Tunnel carries all
+  # traffic and no web port is open. update.sh turns it on.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file: /etc/moin-hub/env
+    profiles: [tunnel]

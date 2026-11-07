@@ -26,7 +26,7 @@ type DeviceLogin struct {
 var pollUnit = time.Second
 
 // LoginInBrowser logs this computer in through the browser, the device
-// flow of RFC 8628: it starts a login on the control plane at baseURL, calls
+// flow of RFC 8628: it starts a login on the hub at baseURL, calls
 // show with the code and the page to open, and polls until the user
 // approved or denied it there, or it expired. surface is "cli" or "tui". The
 // config it returns has the new device token; the caller saves it with

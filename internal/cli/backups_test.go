@@ -35,7 +35,7 @@ func TestBackupsList(t *testing.T) {
 }
 
 // TestBackupSchedule: --every, --keep and --every-change change only
-// what they name; a wrong value never reaches the control plane.
+// what they name; a wrong value never reaches the hub.
 func TestBackupSchedule(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"every_change":true,"databases":[]}`,
@@ -57,7 +57,7 @@ func TestBackupSchedule(t *testing.T) {
 }
 
 // TestRestoreNeedsAMoment: without --to, and without the app's name
-// typed out, nothing reaches the control plane; --yes is not enough.
+// typed out, nothing reaches the hub; --yes is not enough.
 func TestRestoreNeedsAMoment(t *testing.T) {
 	api := &fakeAPI{}
 	code, _, stderr := runCLI(t, api, "restore", "shop", "--confirm", "shop")
@@ -116,8 +116,8 @@ func TestBackupDownload(t *testing.T) {
 	}
 }
 
-// TestRestoreWaitsForTheDaemon: a restore runs on its own on the control
-// plane; the CLI follows it until it is done, and says why it failed.
+// TestRestoreWaitsForTheDaemon: a restore runs on its own on the hub;
+// the CLI follows it until it is done, and says why it failed.
 func TestRestoreWaitsForTheDaemon(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"POST /api/v1/apps/shop/restores":   `{"id":"r1","state":"running","to":"1 hour ago"}`,

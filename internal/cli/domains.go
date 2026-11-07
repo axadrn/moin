@@ -381,7 +381,7 @@ func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 }
 
 // reportChange says when a saved change applies: saving never restarts an
-// app. An older control plane that still restarts on its own is followed.
+// app. An older hub that still restarts on its own is followed.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
 	switch {
 	case change.Unchanged:

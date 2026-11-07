@@ -1,6 +1,6 @@
 // Package dotenv reads and writes the env vars of an app as one .env text,
 // KEY=value per line, and says what replacing them with such a text changes.
-// The CLI, the TUI and the control plane share it, so a text means the same
+// The CLI, the TUI and the hub share it, so a text means the same
 // everywhere.
 package dotenv
 

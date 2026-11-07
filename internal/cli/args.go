@@ -197,7 +197,7 @@ func isTerminal(r io.Reader) bool {
 }
 
 // typeName asks before something big that cannot be undone and returns
-// the name typed out, which the control plane checks again. given, from
+// the name typed out, which the hub checks again. given, from
 // --confirm, answers it for scripts; without a terminal and without it,
 // it refuses, so a script never removes something by accident.
 func typeName(stdin io.Reader, stdout io.Writer, given, question, name string) (string, error) {

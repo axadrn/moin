@@ -17,7 +17,7 @@ type ExecResult struct {
 
 // Exec runs a command in a container of an app and hands what it writes to
 // output as it comes. argv is the command as words; line, used when argv
-// is empty, is one line the control plane splits like a shell quotes it.
+// is empty, is one line the hub splits like a shell quotes it.
 func (c *Client) Exec(ctx context.Context, app, service string, argv []string, line string, timeout int, output func(string)) (ExecResult, error) {
 	body := map[string]any{"service": service, "command": argv, "line": line, "timeout": timeout}
 	var result ExecResult

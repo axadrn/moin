@@ -28,10 +28,10 @@ const (
 	versionTimeout = 10 * time.Second
 )
 
-// updater swaps the daemon's binary for the control plane's and restarts the
+// updater swaps the daemon's binary for the hub's and restarts the
 // daemon through systemd.
 type updater struct {
-	// url is the control plane the daemon is registered with; the binary
+	// url is the hub the daemon is registered with; the binary
 	// only ever comes from there.
 	mu  sync.Mutex
 	url string
@@ -55,7 +55,7 @@ func newUpdater(url string) *updater {
 	return u
 }
 
-// daemonUpdate installs the binary of the control plane (DaemonUpdate) and
+// daemonUpdate installs the binary of the hub (DaemonUpdate) and
 // restarts, unless the server has rules or a deploy runs.
 func (r *runner) daemonUpdate(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
 	var update protocol.DaemonUpdate
@@ -89,7 +89,7 @@ func (r *runner) daemonUpdate(ctx context.Context, message protocol.Message, rul
 }
 
 // install downloads the binary, checks its SHA-256 and that it runs as the
-// version the control plane named, and moves it over the running one in
+// version the hub named, and moves it over the running one in
 // one rename. Nothing changes when a step fails.
 func (u *updater) install(ctx context.Context, update protocol.DaemonUpdate) error {
 	if u.systemd == "" {
@@ -100,7 +100,7 @@ func (u *updater) install(ctx context.Context, update protocol.DaemonUpdate) err
 	}
 	want := strings.ToLower(strings.TrimSpace(update.SHA256))
 	if len(want) != sha256.Size*2 {
-		return errors.New("the control plane sent no SHA-256 for the new binary")
+		return errors.New("the hub sent no SHA-256 for the new binary")
 	}
 	ctx, cancel := context.WithTimeout(ctx, downloadLimit)
 	defer cancel()
@@ -156,7 +156,7 @@ func (u *updater) install(ctx context.Context, update protocol.DaemonUpdate) err
 	return os.Rename(temp, u.executable)
 }
 
-// setURL changes the control plane the binary comes from.
+// setURL changes the hub the binary comes from.
 func (u *updater) setURL(url string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()

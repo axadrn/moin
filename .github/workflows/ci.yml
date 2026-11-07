@@ -40,11 +40,11 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Generate templ files
-        working-directory: controlplane
+        working-directory: hub
         run: go tool templ generate
 
       - name: Build Tailwind CSS
-        working-directory: controlplane
+        working-directory: hub
         run: tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 
       - name: Check module declarations

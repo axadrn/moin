@@ -1,6 +1,6 @@
-// Package protocol is the contract between the moin daemon and the control
-// plane. The daemon dials out: it registers once over HTTP, then holds one
-// WebSocket session. The daemon and the control plane both import this package,
+// Package protocol is the contract between the moin daemon and the hub.
+// The daemon dials out: it registers once over HTTP, then holds one
+// WebSocket session. The daemon and the hub both import this package,
 // so a change here is a change on both sides.
 package protocol
 
@@ -16,7 +16,7 @@ import (
 const Version = 3
 
 // Needs is the protocol version a daemon must speak for a request: the
-// control plane answers "update the daemon" to an older one instead of
+// hub answers "update the daemon" to an older one instead of
 // sending it.
 func Needs(messageType MessageType) int {
 	switch messageType {
@@ -75,7 +75,7 @@ const (
 
 	// TypeBackupConfig tells the daemon where backups go and how often
 	// (BackupConfig). The
-	// control plane sends it after hello and whenever it changes. The daemon
+	// hub sends it after hello and whenever it changes. The daemon
 	// answers with TypeOK.
 	TypeBackupConfig MessageType = "backup.config"
 	// TypeBackupList says how the backups of an app stand (BackupRequest).
@@ -97,25 +97,25 @@ const (
 	TypeBackupStatus MessageType = "backup.status"
 
 	// TypeServerConfig sets how the server is reached and locked down
-	// (ServerConfig). The control plane sends it after hello and whenever
+	// (ServerConfig). The hub sends it after hello and whenever
 	// it changes. The daemon answers with TypeServerConfigResult.
 	TypeServerConfig       MessageType = "server.config"
 	TypeServerConfigResult MessageType = "server.config.result"
 
 	// TypeDaemonUpdate has the daemon replace its binary with the one the
-	// control plane serves under DownloadPath, check it against SHA256 and
+	// hub serves under DownloadPath, check it against SHA256 and
 	// restart (DaemonUpdate). The daemon answers with TypeOK before it
 	// restarts, or with TypeError and changes nothing.
 	TypeDaemonUpdate MessageType = "daemon.update"
 
-	// TypeDaemonURL tells the daemon the control plane's address when it
+	// TypeDaemonURL tells the daemon the hub's address when it
 	// dialed an old one (DaemonURL). The daemon checks that the address
 	// answers, keeps it and dials it from then on. It has no request ID and
 	// no answer: a daemon that does not know it ignores it.
 	TypeDaemonURL MessageType = "daemon.url"
 
 	// TypeMetrics is a sample of the server and its apps (Metrics), sent by
-	// the daemon every MetricsEvery without a request. A control plane that
+	// the daemon every MetricsEvery without a request. A hub that
 	// does not know it drops it; a daemon that does not send it shows no
 	// metrics.
 	TypeMetrics MessageType = "metrics"

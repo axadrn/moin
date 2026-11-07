@@ -19,8 +19,8 @@ func ago2(d time.Duration) *time.Time { t := now.Add(-d); return &t }
 
 func pct(v float64) *float64 { return &v }
 
-// fixture is a signed-in model with a small workspace, without a control
-// plane: commands are never run.
+// fixture is a signed-in model with a small workspace, without a hub:
+// commands are never run.
 func fixture(w, h int) model {
 	m := newModel(context.Background(), Options{Config: client.Config{URL: "https://moin.example", Token: "pat_test"}, Dir: "/src/shop"})
 	m.auth = nil

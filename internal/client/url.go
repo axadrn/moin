@@ -14,7 +14,7 @@ var tailnet = netip.MustParsePrefix("100.64.0.0/10")
 // tailnet6 is Tailscale's IPv6 range, which MagicDNS answers next to it.
 var tailnet6 = netip.MustParsePrefix("fd7a:115c:a1e0::/48")
 
-// CheckURL refuses a control plane URL the token would cross the internet
+// CheckURL refuses a hub URL the token would cross the internet
 // in plain text to. http is fine on this machine and on a tailnet, which
 // Tailscale already encrypts; everywhere else it must be https.
 func CheckURL(raw string) error {

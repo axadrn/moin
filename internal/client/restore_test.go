@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// TestRestoreWaitsThroughOutages: a control plane that restarts (502) or a
+// TestRestoreWaitsThroughOutages: a hub that restarts (502) or a
 // server that went offline during the restore (unknown) is no failure:
 // the client asks again until the restore ended. A not found is.
 func TestRestoreWaitsThroughOutages(t *testing.T) {

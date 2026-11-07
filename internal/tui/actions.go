@@ -150,8 +150,8 @@ type moment struct {
 	client.Moment
 }
 
-// moments are the moments of every database, in the order the control
-// plane lists them: the quick ones first, then the newest.
+// moments are the moments of every database, in the order the hub
+// lists them: the quick ones first, then the newest.
 func (m model) moments() []moment {
 	if m.app.backups == nil {
 		return nil

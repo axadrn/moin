@@ -1,4 +1,4 @@
-// Package client talks to the control plane API for the CLI and the TUI.
+// Package client talks to the hub API for the CLI and the TUI.
 package client
 
 import (
@@ -24,7 +24,7 @@ import (
 	"github.com/axadrn/moin/internal/human"
 )
 
-// DefaultURL is the hosted control plane.
+// DefaultURL is the hosted hub.
 const DefaultURL = "https://moin.run"
 
 // ErrNotLoggedIn means there is no token in the environment or config file.
@@ -200,7 +200,7 @@ type Account struct {
 	EmailAlerts bool `json:"email_alerts"`
 }
 
-// Client calls the control plane with a personal API token.
+// Client calls the hub with a personal API token.
 type Client struct {
 	url          string
 	token        string
@@ -273,7 +273,7 @@ func (c *Client) RenameServer(ctx context.Context, idOrName, name string) (Serve
 	return response, err
 }
 
-// UpdateDaemon has the daemon of a server download the control plane's moin
+// UpdateDaemon has the daemon of a server download the hub's moin
 // binary, swap it in and restart. It returns the server once the new daemon
 // is back.
 func (c *Client) UpdateDaemon(ctx context.Context, idOrName string) (Server, error) {
@@ -282,15 +282,15 @@ func (c *Client) UpdateDaemon(ctx context.Context, idOrName string) (Server, err
 	return response, err
 }
 
-// Meta is what the control plane says about itself.
+// Meta is what the hub says about itself.
 type Meta struct {
 	Name string `json:"name"`
-	// Version is the version of the control plane and of the moin binary
+	// Version is the version of the hub and of the moin binary
 	// it serves; "dev" for a build without one.
 	Version string `json:"version"`
 }
 
-// Meta returns the control plane's name and version.
+// Meta returns the hub's name and version.
 func (c *Client) Meta(ctx context.Context) (Meta, error) {
 	var response Meta
 	err := c.do(ctx, http.MethodGet, "/api/v1/meta", nil, &response)
@@ -298,7 +298,7 @@ func (c *Client) Meta(ctx context.Context) (Meta, error) {
 }
 
 // Outdated reports whether the server's daemon runs another version than
-// the control plane. Development builds never count.
+// the hub. Development builds never count.
 func (s Server) Outdated(version string) bool {
 	return version != "" && version != "dev" && s.DaemonVersion != "" && s.DaemonVersion != version
 }
@@ -313,7 +313,7 @@ type RemovedServer struct {
 
 // RemoveServer deletes a server by ID or name. Its daemon is disconnected
 // and stays installed. An offline server goes with its apps. confirm is the
-// server's name, typed out; the control plane checks it.
+// server's name, typed out; the hub checks it.
 func (c *Client) RemoveServer(ctx context.Context, idOrName, confirm string) (RemovedServer, error) {
 	var removed struct {
 		UninstallCommand *string  `json:"uninstall_command"`
@@ -323,7 +323,7 @@ func (c *Client) RemoveServer(ctx context.Context, idOrName, confirm string) (Re
 	if err != nil {
 		return RemovedServer{}, err
 	}
-	// A control plane from before uninstall_command answers none.
+	// A hub from before uninstall_command answers none.
 	if removed.UninstallCommand == nil {
 		return RemovedServer{UninstallCommand: protocol.UninstallCommand(build.Name), Apps: removed.Apps}, nil
 	}
@@ -443,11 +443,11 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 	return json.NewDecoder(response.Body).Decode(target)
 }
 
-// MovedHeader names the control plane's address in an answer to a request
+// MovedHeader names the hub's address in an answer to a request
 // that came on an old one.
-const MovedHeader = "X-Control-Plane-URL"
+const MovedHeader = "X-Hub-URL"
 
-// follow moves the saved config to the control plane's new address when an
+// follow moves the saved config to the hub's new address when an
 // answer names one: the next command dials it. A URL from the environment
 // is the user's and stays.
 func (c *Client) follow(response *http.Response) {
@@ -516,12 +516,12 @@ func (c *Client) responseError(response *http.Response) error {
 	return &Error{Status: response.StatusCode, Message: fmt.Sprintf("%s %s: %s", response.Request.Method, response.Request.URL.Path, response.Status)}
 }
 
-// rejected says what to do about a token the control plane does not take.
+// rejected says what to do about a token the hub does not take.
 func (c *Client) rejected() string {
 	if c.tokenFromEnv {
-		return "The control plane rejected the token in " + TokenVariable + ": it is wrong, expired or revoked. Set " + TokenVariable + " to a valid token, or unset it to use the one from `" + build.Name + " login`"
+		return "The hub rejected the token in " + TokenVariable + ": it is wrong, expired or revoked. Set " + TokenVariable + " to a valid token, or unset it to use the one from `" + build.Name + " login`"
 	}
-	return "The control plane rejected your token: it is wrong, expired or revoked. Run `" + build.Name + " login` for a new one"
+	return "The hub rejected your token: it is wrong, expired or revoked. Run `" + build.Name + " login` for a new one"
 }
 
 // Status is "online", "offline" or "waiting" for a server whose daemon never connected.

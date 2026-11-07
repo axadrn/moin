@@ -358,7 +358,7 @@ func TestChangesShowAtOnce(t *testing.T) {
 	m := press(fixture(120, 40).withApp("shop", tEnv), "a", "K", "=", "v")
 	m, _ = update(m, keyMsg("enter"))
 	if m.app.env["K"] != "v" {
-		t.Fatal("a new env var shows before the control plane answers")
+		t.Fatal("a new env var shows before the hub answers")
 	}
 	m = press(m, "x")
 	m, cmd := update(m, keyMsg("y"))
@@ -387,7 +387,7 @@ func TestStartedDeployOpensItsLog(t *testing.T) {
 		t.Fatalf("a started deploy opens its log, got %+v", m.cur)
 	}
 	id := m.out.id
-	m, _ = update(m, hubMsg{lineMsg{id, "building"}})
+	m, _ = update(m, inboxMsg{lineMsg{id, "building"}})
 	m, _ = update(m, lineMsg{id - 1, "stale"})
 	if len(m.out.lines) != 1 || m.out.lines[0] != "building" {
 		t.Fatalf("lines of the open deploy come in, others drop: %v", m.out.lines)
@@ -450,7 +450,7 @@ func TestTheCacheShowsTheLastStateAtStart(t *testing.T) {
 		t.Fatalf("the next start shows the last state: %d apps, %d servers, %q", len(next.apps), len(next.servers), next.ws.name)
 	}
 	if !next.cached || next.loaded || next.live {
-		t.Fatal("the last state is marked as cached until the control plane answers")
+		t.Fatal("the last state is marked as cached until the hub answers")
 	}
 	frame := checkFrame(t, "cached", next)
 	if !strings.Contains(frame, "last seen") || !strings.Contains(frame, "Checking everything") || !strings.Contains(frame, "shop") {
@@ -481,7 +481,7 @@ func TestWebPagesOpenTheBrowser(t *testing.T) {
 	m.ws.selfHosted = true
 	for _, p := range m.webPages() {
 		if p.name == "Billing" {
-			t.Error("a self-hosted control plane has no billing")
+			t.Error("a self-hosted hub has no billing")
 		}
 	}
 	press(fixture(120, 40).withApp("shop", tDeploys), "W")
@@ -506,7 +506,7 @@ func TestLoginShowsTheCodeThenConnects(t *testing.T) {
 		t.Fatal("without a token the TUI signs in first")
 	}
 	m.startLogin()
-	msg := <-m.hub
+	msg := <-m.inbox
 	if !called {
 		t.Fatal("the login function runs")
 	}

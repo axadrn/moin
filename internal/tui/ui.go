@@ -2,7 +2,7 @@ package tui
 
 // The look: one palette for dark and one for light terminals, and the few
 // shapes every view is drawn with. Colour carries status only, like the web
-// app (controlplane/DESIGN.md): green live, amber running, red failed.
+// app (hub/DESIGN.md): green live, amber running, red failed.
 
 import (
 	"fmt"

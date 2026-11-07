@@ -72,7 +72,7 @@ type Backups struct {
 	App       string           `json:"app"`
 	Databases []DatabaseBackup `json:"databases"`
 	// Restores are the restores of the app that run now, and how the
-	// last ones ended, by the ID the control plane gave them. A daemon
+	// last ones ended, by the ID the hub gave them. A daemon
 	// that reports restores sends a list, empty or not.
 	Restores []RestoreState `json:"restores"`
 }

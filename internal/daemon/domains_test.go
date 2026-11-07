@@ -7,7 +7,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestRouteServices: domains per service from the control plane and from
+// TestRouteServices: domains per service from the hub and from
 // the map form of x-moin, x-moin winning per service; the main service's
 // entry of the map is its domains; a domain on two services fails.
 func TestRouteServices(t *testing.T) {
@@ -26,13 +26,13 @@ func TestRouteServices(t *testing.T) {
 	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.com"}, Services: map[string][]string{"api": {"x.com"}}}); err == nil {
 		t.Error("a domain on two services passed")
 	}
-	// The control plane's settings are not changed by route.
+	// The hub's settings are not changed by route.
 	if domains.Services["api"][0] != "API.shop.com" {
 		t.Errorf("route changed the domains it was given: %v", domains.Services)
 	}
 }
 
-// TestRouteInstant: the control plane's provider, x-moin picking another or
+// TestRouteInstant: the hub's provider, x-moin picking another or
 // off, an unknown provider failing, and nothing without a public IPv4.
 func TestRouteInstant(t *testing.T) {
 	for _, test := range []struct {

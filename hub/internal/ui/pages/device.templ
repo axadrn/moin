@@ -1,0 +1,122 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// DeviceView is the page where `moin login` is approved in the browser.
+// Without a pending login it asks for the code.
+type DeviceView struct {
+	// Code is the code as the terminal shows it, ABCD-EFGH.
+	Code string
+	// CodeError says why the code was not taken.
+	CodeError string
+	// Login is the pending login of Code, nil until a valid code is in.
+	Login *model.DeviceLogin
+	// Workspaces are the user's workspaces the computer can be let into.
+	Workspaces  []APITokenWorkspace
+	WorkspaceID string
+	// WorkspaceError says why the workspace was not taken.
+	WorkspaceError string
+}
+
+// deviceName is how the page names the computer: "moin CLI on <computer name>".
+func deviceName(login *model.DeviceLogin) string {
+	if login == nil || login.Hostname == "" {
+		return brand.Name + " CLI"
+	}
+	return brand.Name + " CLI on " + login.Hostname
+}
+
+// workspaceOptions are the workspaces to pick from.
+func (v DeviceView) workspaceOptions() []kit.Option {
+	options := make([]kit.Option, 0, len(v.Workspaces))
+	for _, workspace := range v.Workspaces {
+		options = append(options, kit.Option{Value: workspace.ID, Label: workspace.Name})
+	}
+	return options
+}
+
+// Device asks for the code of `moin login`, or, with a pending login,
+// whether to let the computer in.
+templ Device(view DeviceView) {
+	if view.Login == nil {
+		@authScreen(deviceSEO, "Log in the CLI") {
+			<form id="device-code-form" action="/device" method="GET" class="flex flex-col gap-4">
+				@formField("Code", "code", "Enter the code your terminal shows.", view.CodeError) {
+					@kit.Input(templ.Attributes{"id": "code", "name": "code", "type": "text", "value": view.Code, "placeholder": "ABCD-EFGH", "aria-invalid": ariaInvalid(view.CodeError), "aria-describedby": "code-hint", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "maxlength": "16", "autofocus": true, "required": true})
+				}
+				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+					Continue
+				}
+			</form>
+		}
+	} else {
+		@authScreen(deviceSEO, "Log in "+deviceName(view.Login)+"?") {
+			<form id="device-approve-form" action="/device/approve" method="POST" class="flex flex-col gap-4">
+				@kit.CSRF()
+				<input type="hidden" name="code" value={ view.Code }/>
+				<div class="flex flex-col items-center gap-2 rounded-4xl bg-card px-6 py-5">
+					<p class="font-mono text-2xl font-semibold tracking-tight" data-device-code>{ view.Code }</p>
+					<p class="text-center text-sm text-muted-foreground">Approve only if your terminal shows this code.</p>
+				</div>
+				@kit.List() {
+					@factRow("You", ctxkeys.User(ctx).Email)
+					if len(view.Workspaces) == 1 {
+						@factRow("Workspace", view.Workspaces[0].Name)
+					}
+					@factRow("Access", "Read and write")
+				}
+				if len(view.Workspaces) > 1 {
+					@formField("Workspace", "device-workspace", "", view.WorkspaceError) {
+						@kit.Select(kit.SelectProps{ID: "device-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: view.WorkspaceID})
+					}
+				} else {
+					<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
+					if view.WorkspaceError != "" {
+						<p class="px-1 text-sm text-failed" role="alert">{ view.WorkspaceError }</p>
+					}
+				}
+				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+					Approve
+				}
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "formaction": "/device/deny"}) {
+					Deny
+				}
+			</form>
+		}
+	}
+}
+
+// DeviceDone says what became of the login: approved or denied.
+templ DeviceDone(login *model.DeviceLogin, approved bool) {
+	if approved {
+		@authScreen(deviceSEO, "Logged in") {
+			@authLine() {
+				{ deviceName(login) } is logged in. Go back to your terminal.
+			}
+			<div class="flex flex-col">
+				@authLink("/app") {
+					{ "Open " + brand.Name }
+				}
+			</div>
+		}
+	} else {
+		@authScreen(deviceSEO, "Login denied") {
+			@authLine() {
+				Nothing got access.
+			}
+			<div class="flex flex-col">
+				@authLink("/app") {
+					{ "Open " + brand.Name }
+				}
+			</div>
+		}
+	}
+}
+
+var deviceSEO = layouts.SEOProps{Title: "Log in the CLI", Description: "Approve a login of the " + brand.Name + " CLI"}

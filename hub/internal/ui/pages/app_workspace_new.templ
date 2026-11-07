@@ -1,0 +1,40 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// NewWorkspace names a new workspace: another team or project, with its
+// own servers, apps and plan.
+templ NewWorkspace(errorMsg string) {
+	@authScreen(layouts.SEOProps{Title: "New workspace", Description: "Create a workspace"}, "New workspace") {
+		@authStack() {
+			@NewWorkspaceForm(errorMsg)
+			@authLink("/app") {
+				Cancel
+			}
+		}
+	}
+}
+
+templ NewWorkspaceForm(errorMsg string) {
+	<form
+		id="new-workspace-form"
+		action="/workspaces/new"
+		method="POST"
+		class="flex flex-col gap-4"
+		hx-post="/workspaces/new"
+		hx-target="#new-workspace-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@kit.CSRF()
+		@formField("Name", "workspace-name", "Like your company or a project.", errorMsg) {
+			@kit.Input(templ.Attributes{"id": "workspace-name", "name": "name", "type": "text", "placeholder": "Acme", "aria-invalid": ariaInvalid(errorMsg), "aria-describedby": "workspace-name-hint", "autocomplete": "off", "autofocus": true, "required": true})
+		}
+		@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			Create workspace
+		}
+	</form>
+}

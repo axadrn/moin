@@ -3,10 +3,10 @@
 **/.env
 go.work
 go.work.sum
-controlplane/tmp
-controlplane/data
-controlplane/downloads
-controlplane/node_modules
-controlplane/assets/css/output.css
+hub/tmp
+hub/data
+hub/downloads
+hub/node_modules
+hub/assets/css/output.css
 /moin
 /dist

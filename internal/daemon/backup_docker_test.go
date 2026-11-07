@@ -140,7 +140,7 @@ func (test *backupTest) putBroken() {
 }
 
 // checks runs the daily check and says how it ended, and that the
-// control plane heard of it.
+// hub heard of it.
 func (test *backupTest) check() string {
 	test.t.Helper()
 	time.Sleep(100 * time.Millisecond) // the report of the last restore

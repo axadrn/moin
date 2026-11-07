@@ -31,7 +31,7 @@ type (
 )
 
 // startLogin runs the sign-in in the background. The code comes through
-// the hub, the end as signedInMsg.
+// the inbox, the end as signedInMsg.
 func (m model) startLogin() tea.Cmd {
 	if m.login == nil {
 		return nil
@@ -122,7 +122,7 @@ func (m model) authView(u ui, w, h int) []string {
 		body = []string{
 			u.strong("Sign in to " + build.Name + "."),
 			"",
-			u.warn(spin) + " " + u.muted("Asking the control plane for a code …"),
+			u.warn(spin) + " " + u.muted("Asking the hub for a code …"),
 			"",
 			u.keys(kb{"esc", "quit"}),
 		}

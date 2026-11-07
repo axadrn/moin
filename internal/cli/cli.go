@@ -51,7 +51,7 @@ Servers
   servers rm         Remove a server: servers rm web-1 [--confirm web-1]
   servers rename     Rename a server: servers rename web-1 shop-1
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
-  servers update     Update the daemon to the control plane's version now: servers update [web-1]
+  servers update     Update the daemon to the hub's version now: servers update [web-1]
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
   servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for moin, from /etc/moin/rules on it
@@ -150,8 +150,8 @@ Daemon
   daemon uninstall   Remove the daemon from this server; the apps keep running: daemon uninstall [--apps] [--yes]
   daemon             Run the daemon on this server
 
-  version            Show the version of moin and the control plane, and a newer release
-  update             Update a self-hosted control plane to the newest release [--yes]
+  version            Show the version of moin and the hub, and a newer release
+  update             Update a self-hosted hub to the newest release [--yes]
   update <app>       Update an app from the catalog; restore can go back to before it: update umami [--version 3.4.1]
   help               Show this help
 
@@ -161,7 +161,7 @@ Flags may come before or after the arguments. Commands that remove or
 replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
 
-Docs: https://moin.run/docs, or /docs on your own control plane.
+Docs: https://moin.run/docs, or /docs on your own hub.
 `
 
 // printUsage writes the help: section names bold, descriptions muted on a
@@ -373,8 +373,8 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	flags := newFlags("login", "login [--url <control plane>] [--web] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
-	baseURL := flags.String("url", config.URL, "control plane URL")
+	flags := newFlags("login", "login [--url <hub>] [--web] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
+	baseURL := flags.String("url", config.URL, "hub URL")
 	token := flags.String("token", "", "personal API token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
 	web := flags.Bool("web", false, "log in through the browser even without a terminal")
 	if err := flags.parse(args); err != nil {
@@ -525,7 +525,7 @@ func addServer(ctx context.Context, config client.Config, args []string, stdout 
 	if err != nil {
 		return err
 	}
-	// Without a name the control plane picks one like brave-otter.
+	// Without a name the hub picks one like brave-otter.
 	created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
 	var apiErr *client.Error
 	if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
@@ -644,7 +644,7 @@ func removeServer(ctx context.Context, config client.Config, args []string, stdi
 }
 
 // updateDaemons updates the daemon of one server, or of every online server
-// whose daemon is not the control plane's version.
+// whose daemon is not the hub's version.
 func updateDaemons(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("servers update", "servers update [server]")
 	if err := flags.parse(args); err != nil {
@@ -680,7 +680,7 @@ func updateDaemons(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("no server %q", flags.Arg(0))
 	}
 	if len(targets) == 0 {
-		done(stdout, "Every online daemon runs %s, like the control plane.", dash(meta.Version))
+		done(stdout, "Every online daemon runs %s, like the hub.", dash(meta.Version))
 		return nil
 	}
 	failed := false
@@ -701,8 +701,8 @@ func updateDaemons(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// PrintServers writes the server table. A daemon that is not the control
-// plane's version gets a note to update it.
+// PrintServers writes the server table. A daemon that is not the hub's
+// version gets a note to update it.
 func PrintServers(stdout io.Writer, list []client.Server, version string) {
 	if len(list) == 0 {
 		fmt.Fprintln(stdout, "No servers yet.")
@@ -723,7 +723,7 @@ func PrintServers(stdout io.Writer, list []client.Server, version string) {
 	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "DAEMON", "LAST SEEN", "ACCESS", "RULES"}, rows)
 	if outdated > 0 {
 		fmt.Fprintln(stdout)
-		hint(stdout, fmt.Sprintf("The control plane runs %s. Update the daemons with", version), build.Name+" servers update")
+		hint(stdout, fmt.Sprintf("The hub runs %s. Update the daemons with", version), build.Name+" servers update")
 	}
 }
 
@@ -737,8 +737,8 @@ func dash(value string) string {
 func daemonCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	dir := daemon.StateDir()
 	if len(args) > 0 && args[0] == "register" {
-		flags := newFlags("daemon register", "daemon register --url <control plane> --token <install token>")
-		baseURL := flags.String("url", client.DefaultURL, "control plane URL")
+		flags := newFlags("daemon register", "daemon register --url <hub> --token <install token>")
+		baseURL := flags.String("url", client.DefaultURL, "hub URL")
 		token := flags.String("token", "", "install token")
 		err := flags.parse(args[1:])
 		if err != nil {
@@ -757,7 +757,7 @@ func daemonCommand(ctx context.Context, args []string, stdin io.Reader, stdout i
 	if len(args) > 0 && args[0] == "uninstall" {
 		return uninstallDaemon(ctx, dir, args[1:], stdin, stdout)
 	}
-	flags := newFlags("daemon", "daemon, daemon register --url <control plane> --token <install token>, or daemon uninstall [--apps]")
+	flags := newFlags("daemon", "daemon, daemon register --url <hub> --token <install token>, or daemon uninstall [--apps]")
 	if err := flags.parse(args); err != nil {
 		return err
 	}

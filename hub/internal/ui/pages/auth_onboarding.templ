@@ -1,0 +1,95 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// OnboardingForm is the first sign-in page: the person's name and, unless
+// they joined through an invitation, the name of their first workspace.
+// Field names the field Error is about.
+type OnboardingForm struct {
+	Name         string
+	Workspace    string
+	AskWorkspace bool
+	Field        string
+	Error        string
+}
+
+func (f OnboardingForm) errorFor(field string) string {
+	if f.Field == field {
+		return f.Error
+	}
+	return ""
+}
+
+func onboardingTitle(form OnboardingForm) string {
+	if form.AskWorkspace {
+		return "Welcome to " + brand.Name
+	}
+	return "What's your name?"
+}
+
+// AuthOnboarding is the first page after the first sign-in: two names,
+// one button.
+templ AuthOnboarding(form OnboardingForm) {
+	@authScreen(layouts.SEOProps{Title: "Welcome", Description: "Tell us your name"}, onboardingTitle(form)) {
+		@authStack() {
+			@AuthOnboardingForm(form)
+			<form
+				action="/auth/logout"
+				method="POST"
+				class="flex flex-col"
+				hx-post="/auth/logout"
+				hx-swap="none"
+				hx-disable="find button[type='submit']"
+			>
+				@kit.CSRF()
+				<button type="submit" class="mx-auto flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
+					Not you? Sign out
+				</button>
+			</form>
+		}
+	}
+}
+
+templ AuthOnboardingForm(form OnboardingForm) {
+	{{ user := ctxkeys.User(ctx) }}
+	{{ nameError := form.errorFor("name") }}
+	{{ workspaceError := form.errorFor("workspace") }}
+	<form
+		id="onboarding-form"
+		action="/auth/onboarding"
+		method="POST"
+		class="flex flex-col gap-4"
+		hx-post="/auth/onboarding"
+		hx-target="#onboarding-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@kit.CSRF()
+		@formField("Your name", "name", onboardingEmail(user), nameError) {
+			@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Ada Lovelace", "aria-invalid": ariaInvalid(nameError), "aria-describedby": "name-hint", "autocomplete": "name", "autofocus": true, "required": true, "maxlength": "100"})
+		}
+		if form.AskWorkspace {
+			@formField("Name your workspace", "workspace", "Your apps and servers live here.", workspaceError) {
+				@kit.Input(templ.Attributes{"id": "workspace", "name": "workspace", "type": "text", "value": form.Workspace, "placeholder": "Acme", "aria-invalid": ariaInvalid(workspaceError), "aria-describedby": "workspace-hint", "autocomplete": "organization", "required": true, "minlength": "2", "maxlength": "80"})
+			}
+		}
+		@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			Continue
+		}
+	</form>
+}
+
+// onboardingEmail is the hint under the name: the address you signed in
+// with, so you see it is you.
+func onboardingEmail(user *model.User) string {
+	if user == nil {
+		return ""
+	}
+	return "Signed in as " + user.Email
+}
