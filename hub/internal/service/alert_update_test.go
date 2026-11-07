@@ -22,7 +22,7 @@ func TestUpdateAlertReachesEveryDestination(t *testing.T) {
 	f.add(t, model.AlertTelegram, "telegram", telegramToken, "-1001234")
 	f.add(t, model.AlertWebhook, "hook", f.url+"/hook", "")
 	f.add(t, model.AlertWebhook, "deploys-only", f.url+"/deploys", "", "deploy.failed")
-	page := "https://moin.example.com/app/owner-workspace/apps/shop"
+	page := "https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop"
 	f.alerts.Send(owner.WorkspaceID, "update.available", "shop", map[string]string{"catalog": "Umami", "version": "3.5.0", "current": "3.4.1"}, time.Now())
 
 	line := "Umami 3.5.0 is out for shop (you run 3.4.1). Update in one click; moin backs up first."

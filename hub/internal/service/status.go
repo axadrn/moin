@@ -36,7 +36,9 @@ type StatusIssue struct {
 
 // StatusUpdate is a catalog app with a newer release than it runs.
 type StatusUpdate struct {
+	// App is the app's name, Link how a link names it.
 	App     string
+	Link    string
 	Name    string
 	Version string
 	Latest  string
@@ -85,14 +87,14 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 	}
 	status.Servers = len(servers)
 	for _, server := range servers {
-		path := "/servers/" + server.ID + "/security"
+		path := "/servers/" + server.Link() + "/security"
 		if server.Online {
 			status.ServersOnline++
 		} else if server.LastSeenAt != nil {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueServerDown, Target: server.Name, Detail: "offline: its apps may be down", Path: path, Since: server.LastSeenAt})
 		}
 		if full, err := s.servers.servers.DiskFull(server.ID); err == nil && full {
-			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDiskFull, Target: server.Name, Detail: "disk over 90% full", Path: "/servers/" + server.ID + "/metrics"})
+			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDiskFull, Target: server.Name, Detail: "disk over 90% full", Path: "/servers/" + server.Link() + "/metrics"})
 		}
 		if server.Online && server.Rules == "" && DaemonBehind(s.release, server.DaemonVersion) {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDaemonBehind, Target: server.Name, Detail: "daemon " + server.DaemonVersion + ", update pending", Path: "/servers"})
@@ -101,7 +103,7 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 	status.Apps = len(apps)
 	day := s.now().Add(-24 * time.Hour)
 	for _, app := range apps {
-		path := "/apps/" + app.Name
+		path := "/apps/" + app.Link()
 		if app.LiveNumber > 0 && !app.Stopped {
 			status.AppsLive++
 		}
@@ -129,12 +131,12 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 		}
 		if s.catalog != nil && app.Catalog != "" {
 			if info, ok := s.catalog.Info(workspaceID, &app); ok && info.Newer {
-				status.Updates = append(status.Updates, StatusUpdate{App: app.Name, Name: info.Entry.Name, Version: info.Version, Latest: info.Latest.Tag})
+				status.Updates = append(status.Updates, StatusUpdate{App: app.Name, Link: app.Link(), Name: info.Entry.Name, Version: info.Version, Latest: info.Latest.Tag})
 			}
 		}
 	}
 	for _, down := range s.apps.DownDomains(apps) {
-		status.Issues = append(status.Issues, StatusIssue{Kind: IssueDomainDown, Target: down.Domain, Detail: "down, seen from outside", Path: "/apps/" + down.App + "/uptime", Since: down.Since})
+		status.Issues = append(status.Issues, StatusIssue{Kind: IssueDomainDown, Target: down.Domain, Detail: "down, seen from outside", Path: "/apps/" + down.Link + "/uptime", Since: down.Since})
 	}
 	sort.SliceStable(status.Issues, func(i, j int) bool {
 		return issueOrder[status.Issues[i].Kind] < issueOrder[status.Issues[j].Kind]

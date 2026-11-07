@@ -178,7 +178,7 @@ func selectedDeploy(deploys []api.Deploy, selected int) *api.Deploy {
 	return nil
 }
 
-// deployHref is the page of a deploy's log; the newest one's is the
+// deployHref is the page of a deploy's log of the app a link names; the newest one's is the
 // Deploys section itself, which follows the next deploy.
 func deployHref(basePath, app string, deploys []api.Deploy, number int) string {
 	if len(deploys) > 0 && deploys[0].Number == number {

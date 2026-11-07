@@ -92,7 +92,7 @@ templ AppBucketForm(view BackupsView) {
 	<form
 		id="app-bucket-form"
 		class="flex flex-col gap-3 sm:flex-row sm:items-center"
-		hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/bucket" }
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/bucket" }
 		hx-target="#data-backups"
 		hx-select="#data-backups"
 		hx-swap="outerHTML"
@@ -192,7 +192,7 @@ var backupScript = templ.NewOnceHandle()
 // backupGoBack is the list of moments of one database to go back to,
 // with Restore; page is the database the page is about.
 templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, page, title string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	@kit.Section(title, nil) {
 		<form
 			class="flex flex-col gap-2"
@@ -346,7 +346,7 @@ func lowerFirst(label string) string {
 // Every change. Each saves itself; they hold for every database of the
 // app.
 templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database string) {
-	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/backups/schedule" }}
+	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/schedule" }}
 	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML"} }}
 	@kit.RowForm(form) {
 		@kit.CSRF()
@@ -430,7 +430,7 @@ func upperFirst(text string) string {
 // the user's own bucket through a link that lasts 15 minutes.
 templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
 	if len(backup.Copies) > 0 {
-		@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+view.App.Name+"/backups/download?database="+url.QueryEscape(database), templ.Attributes{"id": "db-download", "data-download": true}) {
+		@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+view.App.Link()+"/backups/download?database="+url.QueryEscape(database), templ.Attributes{"id": "db-download", "data-download": true}) {
 			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
 			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
 		}

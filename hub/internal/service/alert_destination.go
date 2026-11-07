@@ -195,7 +195,7 @@ func (s *AlertService) TestDestination(ctx context.Context, member *model.Worksp
 		Symbol:  "🔔",
 		Heading: "Test alert from " + s.email.appName,
 		Lines:   []string{"Alerts of " + workspace.Name + " come here: " + strings.Join(labels, ", ") + "."},
-		URL:     s.email.appURL + "/app/" + workspace.Slug + "/alerts",
+		URL:     s.email.appURL + workspace.Path() + "/alerts",
 	}
 	message.Payload = alertPayload{Event: "test", Workspace: workspace.Slug, URL: message.URL}
 	sendErr := s.deliver(ctx, *destination, message)

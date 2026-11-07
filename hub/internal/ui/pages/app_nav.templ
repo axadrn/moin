@@ -51,7 +51,7 @@ func appSectionLabel(id string) string {
 // both from sm. On a phone a section other than App is a page of its
 // own: "‹ shop" and the section's name, like a list that drills down.
 templ appHeader(app model.App, section string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	if section != "app" {
 		<div class="sm:hidden">
 			@kit.Header(kit.Back{Label: app.Name, Href: appPath}, appSectionLabel(section))
@@ -72,7 +72,7 @@ templ appHeader(app model.App, section string) {
 // the Settings row says it). Two equal halves on a phone, next to the
 // name from sm.
 templ appActions(app model.App) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	<div id="app-actions" hx-swap-oob="true" class="flex w-full flex-col gap-2 empty:hidden sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
 		if app.ChangesWaiting > 0 && !app.Stopped && app.LiveNumber > 0 {
 			<span class="hidden text-sm text-muted-foreground sm:inline" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
@@ -150,8 +150,8 @@ func changesWaiting(n int) string {
 
 // appTabs are the sections of an app as a segmented control, each a link
 // to its page. Only from sm: a phone gets the list on the App section.
-templ appTabs(appName, active string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
+templ appTabs(appName, appLink, active string) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink }}
 	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
 	for _, s := range appSections {
 		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
@@ -163,12 +163,12 @@ templ appTabs(appName, active string) {
 
 // appSection is the tabs, then what the open section shows. A part that
 // reloads on the app's events keeps the head live on every section.
-templ appSection(appName, section string) {
+templ appSection(appName, appLink, section string) {
 	<div id="app-section" class="flex flex-col gap-6">
-		@appTabs(appName, section)
+		@appTabs(appName, appLink, section)
 		if section != "deploys" {
 			// The Deploys section reloads through its list (appDeploys).
-			<div hidden hx-get={ ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/detail?in=" + section } hx-trigger="apps from:body" hx-swap="none"></div>
+			<div hidden hx-get={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/detail?in=" + section } hx-trigger="apps from:body" hx-swap="none"></div>
 		}
 		{ children... }
 	</div>
@@ -177,7 +177,7 @@ templ appSection(appName, section string) {
 // PinSwitch pins an app above the others that run fine, in every list: a
 // switch in the app's settings that saves itself (DESIGN.md, Feedback).
 templ PinSwitch(app model.App) {
-	@kit.RowForm(templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin", "hx-trigger": "change", "hx-swap": "none"}) {
+	@kit.RowForm(templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/pin", "hx-trigger": "change", "hx-swap": "none"}) {
 		@kit.CSRF()
 		@kit.RowLabel("pin-on", "Pin to the top", "")
 		@kit.Switch(templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})

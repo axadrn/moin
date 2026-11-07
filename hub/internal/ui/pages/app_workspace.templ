@@ -25,7 +25,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	{{ viewer := ctxkeys.WorkspaceMember(ctx) }}
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ seatLimit := subscription.Access().Limit(access.LimitMembers) }}
-	{{ basePath := "/app/" + workspace.Slug }}
+	{{ basePath := workspace.Path() }}
 	@panelPage(templ.Attributes{"id": "workspace-content", "hx-swap-oob": "true"}) {
 		@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Team")
 		if viewer.Can(model.WorkspacePermissionManageMembers) {

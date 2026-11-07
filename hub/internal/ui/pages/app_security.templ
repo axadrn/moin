@@ -24,7 +24,7 @@ type SecurityView struct {
 templ ServerSecurity(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ server := view.Server }}
-	{{ securityPath := basePath + "/servers/" + server.ID + "/security" }}
+	{{ securityPath := basePath + "/servers/" + server.Link() + "/security" }}
 	@layouts.App(server.Name + " security") {
 		@panelPage(templ.Attributes{"data-server-security": server.Name}) {
 			@serverHead(server, "security")
@@ -34,7 +34,7 @@ templ ServerSecurity(view SecurityView) {
 				@serverRules(server)
 				@kit.Card("Name", nil) {
 					<form
-						hx-post={ basePath + "/servers/" + server.ID + "/name" }
+						hx-post={ basePath + "/servers/" + server.Link() + "/name" }
 						hx-target="#main"
 						hx-select="#main"
 						hx-swap="outerHTML"
@@ -53,11 +53,11 @@ templ ServerSecurity(view SecurityView) {
 				}
 				@kit.List() {
 					if server.Online && daemonOutdated(server) {
-						@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.ID + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}) {
+						@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}) {
 							@kit.RowText("Update daemon", server.DaemonVersion+" → "+build.Version)
 						}
 					}
-					@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.ID + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}) {
+					@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}) {
 						@kit.RowText("New install command", "The old one stops working")
 					}
 				}
@@ -72,7 +72,7 @@ templ ServerSecurity(view SecurityView) {
 						@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
 					}
 					@kit.RowButton(true, templ.Attributes{
-						"hx-delete":          basePath + "/servers/" + server.ID,
+						"hx-delete":          basePath + "/servers/" + server.Link(),
 						"hx-swap":            "none",
 						"hx-disable":         "this",
 						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
@@ -84,7 +84,7 @@ templ ServerSecurity(view SecurityView) {
 					}
 				}
 			</div>
-			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link())
 			@securityScript()
 		}
 	}

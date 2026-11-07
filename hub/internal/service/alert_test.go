@@ -76,7 +76,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 			if mail.Subject != event.subject {
 				t.Errorf("%s subject = %q, want %q", event.action, mail.Subject, event.subject)
 			}
-			if !strings.Contains(mail.Text, event.body) || !strings.Contains(mail.Text, "Turn it off: https://moin.example.com/app/owner-workspace/settings") {
+			if !strings.Contains(mail.Text, event.body) || !strings.Contains(mail.Text, "Turn it off: https://moin.example.com/app/owner-workspace-workspaceowner/settings") {
 				t.Errorf("%s text = %q", event.action, mail.Text)
 			}
 		}
@@ -85,7 +85,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 		}
 	}
 	last := mails.Messages()[len(mails.Messages())-1]
-	if !strings.Contains(last.Text, "Open in moin: https://moin.example.com/app/owner-workspace/apps/shop") || !strings.Contains(last.Text, "The app has no live version yet.") {
+	if !strings.Contains(last.Text, "Open in moin: https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop") || !strings.Contains(last.Text, "The app has no live version yet.") {
 		t.Errorf("deploy.failed text = %q", last.Text)
 	}
 }

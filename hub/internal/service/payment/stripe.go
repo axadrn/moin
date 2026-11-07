@@ -38,7 +38,7 @@ func (s *StripeProvider) Name() string {
 	return model.ProviderStripe
 }
 
-func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceSlug, planID, interval, customerEmail, customerName string) (string, error) {
+func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceLink, planID, interval, customerEmail, customerName string) (string, error) {
 	sub, err := s.subscriptionService.Subscription(workspaceID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get subscription: %w", err)
@@ -57,8 +57,8 @@ func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceSlug, planID, i
 		return checkoutURL, nil
 	}
 
-	successURL := fmt.Sprintf("%s/app/%s/billing?session_id={CHECKOUT_SESSION_ID}", s.cfg.AppURL, workspaceSlug)
-	cancelURL := fmt.Sprintf("%s/app/%s/billing", s.cfg.AppURL, workspaceSlug)
+	successURL := fmt.Sprintf("%s/app/%s/billing?session_id={CHECKOUT_SESSION_ID}", s.cfg.AppURL, workspaceLink)
+	cancelURL := fmt.Sprintf("%s/app/%s/billing", s.cfg.AppURL, workspaceLink)
 
 	params := &stripe.CheckoutSessionParams{
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
@@ -109,7 +109,7 @@ func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceSlug, planID, i
 	return sess.URL, nil
 }
 
-func (s *StripeProvider) BillingManagementURL(workspaceID, workspaceSlug string) (string, error) {
+func (s *StripeProvider) BillingManagementURL(workspaceID, workspaceLink string) (string, error) {
 	sub, err := s.subscriptionService.Subscription(workspaceID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get subscription: %w", err)
@@ -119,7 +119,7 @@ func (s *StripeProvider) BillingManagementURL(workspaceID, workspaceSlug string)
 		return "", fmt.Errorf("no customer portal available for free subscriptions")
 	}
 
-	returnURL := fmt.Sprintf("%s/app/%s/billing", s.cfg.AppURL, workspaceSlug)
+	returnURL := fmt.Sprintf("%s/app/%s/billing", s.cfg.AppURL, workspaceLink)
 
 	params := &stripe.BillingPortalSessionParams{
 		Customer:  stripe.String(*sub.ProviderCustomerID),

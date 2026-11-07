@@ -24,7 +24,7 @@ type DomainsView struct {
 // and the password in front of it. A domain says whether it points at the
 // server once it was added or checked; opening the page waits on no DNS.
 templ AppDomains(view DomainsView) {
-	{{ domainsPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/domains" }}
+	{{ domainsPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/domains" }}
 	<div id="app-domains" class="flex flex-col gap-6">
 		@kit.Section("Domains", nil) {
 			@kit.List() {

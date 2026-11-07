@@ -10,13 +10,14 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // AppMetricsPage is the metrics of an app, a page under it ("‹ shop"):
 // CPU, memory and network of its containers now and over a range, with its
 // deploys marked.
 templ AppMetricsPage(view AppMetricsView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	@layouts.App(view.App.Name + " metrics") {
 		@panelPage(templ.Attributes{"data-app-metrics": view.App.Name}) {
 			@kit.Header(kit.Back{Label: view.App.Name, Href: appPath}, "Metrics")
@@ -94,7 +95,7 @@ func rangeTitle(r service.MetricsRange) string {
 // disk, network and load now and over a range, and its apps by memory.
 templ ServerMetricsPage(view ServerMetricsView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ path := basePath + "/servers/" + view.Server.ID + "/metrics" }}
+	{{ path := basePath + "/servers/" + view.Server.Link() + "/metrics" }}
 	@layouts.App(view.Server.Name + " metrics") {
 		@panelPage(templ.Attributes{"data-server-metrics": view.Server.Name}) {
 			@serverHead(view.Server, "metrics")
@@ -232,7 +233,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 					}
 				}
 				for _, app := range apps {
-					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
+					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+link.To(app.Name, app.ID)+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
 						if now := app.Now; now != nil {
 							@kit.RowText(app.Name, "CPU "+percentText(now.CPU)+" · network "+rateText(now.NetRx+now.NetTx))
 							<span class="shrink-0 font-medium tabular-nums">{ human.Size(float64(now.MemoryUsed)) }</span>

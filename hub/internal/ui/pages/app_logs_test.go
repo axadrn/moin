@@ -14,7 +14,7 @@ func TestAppLogsComeWithThePage(t *testing.T) {
 	render := func(logs *AppLogsView) string {
 		var html strings.Builder
 		view := AppPageView{App: app, Section: "logs", Logs: logs}
-		if err := AppPage(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/logs"), &html); err != nil {
+		if err := AppPage(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/logs"), &html); err != nil {
 			t.Fatal(err)
 		}
 		return html.String()
@@ -26,7 +26,7 @@ func TestAppLogsComeWithThePage(t *testing.T) {
 	if page := render(&AppLogsView{Message: "The server is offline."}); !strings.Contains(page, "The server is offline.") {
 		t.Error("no reason why the logs are missing")
 	}
-	if page := render(nil); !strings.Contains(page, `hx-get="/app/tiny-rocket-co/apps/shop/logs/lines"`) || !strings.Contains(page, "Reading the logs") {
+	if page := render(nil); !strings.Contains(page, `hx-get="/app/tiny-rocket-co-workspace1/apps/shop/logs/lines"`) || !strings.Contains(page, "Reading the logs") {
 		t.Error("without the logs the section does not load them")
 	}
 }
@@ -36,13 +36,13 @@ func TestAppLogsComeWithThePage(t *testing.T) {
 func TestAppRepoLoadsOnlyTheRepos(t *testing.T) {
 	render := func(view RepoView) string {
 		var html strings.Builder
-		if err := AppRepo(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/deploys"), &html); err != nil {
+		if err := AppRepo(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/deploys"), &html); err != nil {
 			t.Fatal(err)
 		}
 		return html.String()
 	}
 	app := model.App{Name: "shop"}
-	if page := render(RepoView{App: app, Enabled: true}); !strings.Contains(page, "data-connect-github") || !strings.Contains(page, "next=/app/tiny-rocket-co/apps/shop/deploys") || strings.Contains(page, `hx-trigger="load"`) {
+	if page := render(RepoView{App: app, Enabled: true}); !strings.Contains(page, "data-connect-github") || !strings.Contains(page, "next=/app/tiny-rocket-co-workspace1/apps/shop/deploys") || strings.Contains(page, `hx-trigger="load"`) {
 		t.Errorf("not connected: no Connect GitHub that comes back: %s", page)
 	}
 	if page := render(RepoView{App: app, Enabled: true, Connected: true, Loading: true}); !strings.Contains(page, "data-link-repo") || !strings.Contains(page, `hx-trigger="load"`) {

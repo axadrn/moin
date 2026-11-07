@@ -106,6 +106,7 @@ type ServerMetrics struct {
 // AppMetricsNow is an app on a server and its newest sample, nil without
 // one.
 type AppMetricsNow struct {
+	ID   string
 	Name string
 	Now  *MetricsNow
 }
@@ -406,7 +407,7 @@ func (s *AppService) ServerMetrics(workspaceID, idOrName, rangeName string) (*mo
 	}
 	for _, app := range apps {
 		if app.ServerID == server.ID {
-			metrics.Apps = append(metrics.Apps, AppMetricsNow{Name: app.Name, Now: s.metricsNow(metricsKey{server: server.ID, app: app.Folder}, now)})
+			metrics.Apps = append(metrics.Apps, AppMetricsNow{ID: app.ID, Name: app.Name, Now: s.metricsNow(metricsKey{server: server.ID, app: app.Folder}, now)})
 		}
 	}
 	slices.SortStableFunc(metrics.Apps, func(a, b AppMetricsNow) int {

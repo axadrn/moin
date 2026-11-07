@@ -8,7 +8,7 @@ import (
 // The add form comes with the next free name filled in.
 func TestServerAddFormSuggestsTheName(t *testing.T) {
 	var html strings.Builder
-	if err := ServerAddForm("web-2").Render(projectPageContext("/app/tiny-rocket-co/servers"), &html); err != nil {
+	if err := ServerAddForm("web-2").Render(projectPageContext("/app/tiny-rocket-co-workspace1/servers"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html.String(), `value="web-2"`) {

@@ -48,7 +48,7 @@ templ appExec(app model.App, deploys []api.Deploy) {
 				<form
 					class="flex flex-col gap-4"
 					data-exec-form
-					data-exec-url={ "/api/v1/apps/" + app.Name + "/exec?workspace=" + ctxkeys.Workspace(ctx).Slug }
+					data-exec-url={ "/api/v1/apps/" + app.Link() + "/exec?workspace=" + ctxkeys.Workspace(ctx).Link() }
 				>
 					<div class="flex flex-col gap-2 sm:flex-row">
 						if len(services) > 1 {

@@ -72,11 +72,11 @@ func TestStatusIssues(t *testing.T) {
 		order = append(order, issue.Kind)
 	}
 	for kind, path := range map[string]string{
-		IssueDeployFailed: "/apps/shop",
-		IssueBackupFailed: "/apps/shop/data?db=postgres-db",
-		IssueCheckFailed:  "/apps/shop/data?db=data-app.db",
-		IssueDomainDown:   "/apps/shop/uptime",
-		IssueDiskFull:     "/servers/" + server.ID + "/metrics",
+		IssueDeployFailed: "/apps/" + app.Link(),
+		IssueBackupFailed: "/apps/" + app.Link() + "/data?db=postgres-db",
+		IssueCheckFailed:  "/apps/" + app.Link() + "/data?db=data-app.db",
+		IssueDomainDown:   "/apps/" + app.Link() + "/uptime",
+		IssueDiskFull:     "/servers/" + server.Link() + "/metrics",
 		IssueDaemonBehind: "/servers",
 	} {
 		issue, ok := kinds[kind]

@@ -30,7 +30,7 @@ type RepoView struct {
 // AppRepo is the GitHub card: connect GitHub, link a repo and branch,
 // deploy a ref, deploy on push.
 templ AppRepo(view RepoView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	<div
 		id="app-repo"
 		class="grid"
@@ -65,7 +65,7 @@ templ AppRepo(view RepoView) {
 // repoAction is the one button in the head of the card: Connect GitHub,
 // which comes back to the app, or Unlink once a repo is linked.
 templ repoAction(view RepoView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	if view.Enabled && !view.Connected {
 		@kit.Button(kit.Primary, ctxkeys.AppBasePath(ctx)+"/github/install?next="+appPath+"/deploys", templ.Attributes{"data-connect-github": true}) {
 			@kit.IconGitHub("size-4")
@@ -88,7 +88,7 @@ templ repoAction(view RepoView) {
 // repoLink links the app to a repo and a branch and deploys it: choose the
 // repo, then one of its branches, keep or drop deploy on push, Deploy.
 templ repoLink(view RepoView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	if len(view.Repos) == 0 && !view.Loading {
 		@kit.Quiet() {
 			moin can read no repo yet.
@@ -142,7 +142,7 @@ templ repoBranchField(branches []string, loading bool) {
 // repoAccess links to where on GitHub each connected account picks the
 // repos moin may read.
 templ repoAccess(view RepoView) {
-	{{ install := ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/deploys" }}
+	{{ install := ctxkeys.AppBasePath(ctx) + "/github/install?next=" + ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/deploys" }}
 	for _, installation := range view.Installations {
 		if installation.SettingsURL != "" {
 			@kit.Button(kit.Secondary, installation.SettingsURL, templ.Attributes{"target": "_blank", "rel": "noopener", "data-github-settings": installation.Account}) {
@@ -158,7 +158,7 @@ templ repoAccess(view RepoView) {
 
 // repoLinked is a linked repo: deploy a ref, deploy on push.
 templ repoLinked(view RepoView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="w-fit max-w-full truncate px-1 font-mono text-sm hover:underline hover:underline-offset-4" data-linked-repo>
 		{ view.App.Repo }<span class="text-muted-foreground">{ "@" + view.App.Branch }</span>
 	</a>
@@ -179,7 +179,7 @@ templ repoLinked(view RepoView) {
 // AutoDeployForm is the switch for deploy on push. It saves only that, so
 // it never waits for GitHub, and answers itself as stored.
 templ AutoDeployForm(app model.App) {
-	<form id="auto-deploy-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/repo/auto-deploy" } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+	<form id="auto-deploy-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/repo/auto-deploy" } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
 		@kit.CSRF()
 		<label class="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-1">
 			<span class="text-sm font-medium">Deploy every push to { app.Branch }</span>

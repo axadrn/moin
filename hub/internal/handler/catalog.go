@@ -130,7 +130,7 @@ func (h *CatalogHandler) Start(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, "/workspaces/new", http.StatusSeeOther)
 		return
 	}
-	redirect(w, r, fmt.Sprintf("/app/%s/catalog/%s", members[0].Slug, r.PathValue("slug")), http.StatusSeeOther)
+	redirect(w, r, members[0].Path()+"/catalog/"+r.PathValue("slug"), http.StatusSeeOther)
 }
 
 // InApp is the catalog inside a workspace.
@@ -169,7 +169,7 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Not installed", err, map[string]string{"name": "catalog-name", "domain": "catalog-domain", "version": "catalog-version"})
 		return
 	}
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), http.StatusSeeOther)
 }
 
 // UpdatePanel is the catalog panel of an installed app; nothing for an
@@ -207,5 +207,5 @@ func (h *CatalogHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answerDone(w, r, "Update started", fmt.Sprintf("v%d deploys %s after a backup.", deploy.Number, r.FormValue("version")))
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), http.StatusSeeOther)
 }

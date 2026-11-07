@@ -13,7 +13,7 @@ import (
 templ Billing() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ workspace := ctxkeys.Workspace(ctx) }}
-	{{ basePath := "/app/" + workspace.Slug }}
+	{{ basePath := workspace.Path() }}
 	@layouts.App("Billing") {
 		@panelPage() {
 			@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Billing")

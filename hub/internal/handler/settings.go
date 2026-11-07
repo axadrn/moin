@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -130,7 +129,7 @@ func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) 
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
 	}
-	location := fmt.Sprintf("/app/%s/settings/account?tab=security", ctxkeys.Workspace(r.Context()).Slug)
+	location := ctxkeys.AppBasePath(r.Context()) + "/settings/account?tab=security"
 	if !isAction(r) {
 		redirect(w, r, location, http.StatusSeeOther)
 		return

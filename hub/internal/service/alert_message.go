@@ -40,14 +40,21 @@ type alertPayload struct {
 type alertEvent struct {
 	workspaceID string
 	target      string
-	details     map[string]string
-	at          time.Time
-	base        string
+	// app is how a link names the app the target names, or the target.
+	app     string
+	details map[string]string
+	at      time.Time
+	base    string
 }
 
 // message is what an alert says, the same in every mail and destination.
 func (s *AlertService) message(workspace *model.Workspace, action, target string, details map[string]string, at time.Time) alertMessage {
-	event := alertEvent{workspaceID: workspace.ID, target: target, details: details, at: at, base: s.email.appURL + "/app/" + workspace.Slug}
+	event := alertEvent{workspaceID: workspace.ID, target: target, app: target, details: details, at: at, base: s.email.appURL + workspace.Path()}
+	if s.apps != nil {
+		if app, err := s.apps.ByIDOrNameForWorkspace(target, workspace.ID); err == nil {
+			event.app = app.Link()
+		}
+	}
 	var message alertMessage
 	switch action {
 	case "uptime.down":
@@ -90,7 +97,7 @@ func (s *AlertService) uptimeDownMessage(e alertEvent) alertMessage {
 			"Since: " + e.at.UTC().Format("2006-01-02 15:04 UTC"),
 			"Reason: " + orDash(e.details["reason"]),
 		},
-		URL: e.base + "/apps/" + e.target + "/uptime",
+		URL: e.base + "/apps/" + e.app + "/uptime",
 		Payload: alertPayload{
 			App: e.target, Server: s.serverOf(e.workspaceID, e.target), Domain: domain,
 			Reason: e.details["reason"], Since: e.at.UTC().Format(time.RFC3339),
@@ -106,7 +113,7 @@ func (s *AlertService) uptimeUpMessage(e alertEvent) alertMessage {
 			"App: " + e.target,
 			"It was down for " + spokenDuration(e.details["duration"]) + ".",
 		},
-		URL: e.base + "/apps/" + e.target + "/uptime",
+		URL: e.base + "/apps/" + e.app + "/uptime",
 		Payload: alertPayload{
 			App: e.target, Server: s.serverOf(e.workspaceID, e.target), Domain: domain,
 			Duration: e.details["duration"],
@@ -144,7 +151,7 @@ func (s *AlertService) deployFailedMessage(e alertEvent) alertMessage {
 			"Error: " + orDash(reason),
 			s.stillLive(e.workspaceID, e.target),
 		},
-		URL:     e.base + "/apps/" + e.target,
+		URL:     e.base + "/apps/" + e.app,
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
 	}
 }
@@ -158,7 +165,7 @@ func (s *AlertService) backupFailedMessage(e alertEvent) alertMessage {
 			"Error: " + orDash(reason),
 			"New copies do not reach your bucket until this is fixed. The copies there stay. See: moin backups " + e.target,
 		},
-		URL:     e.base + "/apps/" + e.target + "/data",
+		URL:     e.base + "/apps/" + e.app + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
 	}
 }
@@ -167,7 +174,7 @@ func (s *AlertService) backupRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Backups of " + e.target + " work again",
 		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Its copies reach your bucket again."},
-		URL:     e.base + "/apps/" + e.target + "/data",
+		URL:     e.base + "/apps/" + e.app + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}
 }
@@ -181,7 +188,7 @@ func (s *AlertService) checkFailedMessage(e alertEvent) alertMessage {
 			"Error: " + orDash(reason),
 			"The daily check could not restore the newest copy. Download it and look: moin backup download " + e.target,
 		},
-		URL:     e.base + "/apps/" + e.target + "/data",
+		URL:     e.base + "/apps/" + e.app + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
 	}
 }
@@ -190,7 +197,7 @@ func (s *AlertService) checkRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Daily check of " + e.target + " passes again",
 		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". The newest copy restores again."},
-		URL:     e.base + "/apps/" + e.target + "/data",
+		URL:     e.base + "/apps/" + e.app + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}
 }
@@ -226,7 +233,7 @@ func (s *AlertService) updateAvailableMessage(e alertEvent) alertMessage {
 			newVersion + " is out for " + e.target + " (you run " + e.details["current"] + "). Update in one click; moin backs up first.",
 			"Or run: moin update " + e.target,
 		},
-		URL: e.base + "/apps/" + e.target,
+		URL: e.base + "/apps/" + e.app,
 		Payload: alertPayload{
 			App: e.target, Server: s.serverOf(e.workspaceID, e.target),
 			Reason: newVersion + ", runs " + e.details["current"],

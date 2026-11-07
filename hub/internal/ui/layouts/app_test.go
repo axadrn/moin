@@ -15,7 +15,7 @@ import (
 // search that opens the palette, and your picture, which opens Settings.
 func TestAppLayoutHasTheBarAndNoSidebar(t *testing.T) {
 	page := renderAppLayout(t, model.WorkspaceRoleOwner, 2)
-	for _, hook := range []string{`id="app-bar"`, `id="bar-avatar"`, `href="/app/first-workspace/settings"`, "data-open-palette", `id="palette"`, `id="search"`, `id="search-results"`, "data-app-base=", `id="app-shortcuts"`} {
+	for _, hook := range []string{`id="app-bar"`, `id="bar-avatar"`, `href="/app/first-workspace-workspace1/settings"`, "data-open-palette", `id="palette"`, `id="search"`, `id="search-results"`, "data-app-base=", `id="app-shortcuts"`} {
 		if !strings.Contains(page, hook) {
 			t.Fatalf("the bar lost %s", hook)
 		}

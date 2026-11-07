@@ -24,7 +24,7 @@ type UptimeView struct {
 // domain its state, the uptime over 24 hours, 7 and 30 days, the newest
 // visit, the last outages and the settings of its uptime.
 templ AppUptime(view UptimeView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	@layouts.App(view.App.Name + " uptime") {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
 			@kit.Header(kit.Back{Label: "Domains", Href: appPath + "/domains"}, "Uptime")
@@ -54,7 +54,7 @@ templ AppUptimeBody(view UptimeView) {
 			@uptimeServerOffline(view)
 			@kit.List() {
 				for _, domain := range view.Uptime.Domains {
-					@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/uptime") {
+					@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/uptime") {
 						@kit.RowText(domain.Domain, uptimeNote(domain))
 						@uptimeState(domain)
 					}
@@ -145,7 +145,7 @@ templ uptimeState(domain service.UptimeDomain) {
 
 // uptimeSettings is the path of the visit and the switch that pauses it.
 templ uptimeSettings(app model.App, domain service.UptimeDomain) {
-	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/path" }}
+	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/path" }}
 	{{ id := "uptime-" + domain.Domain }}
 	@kit.List() {
 		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
@@ -170,7 +170,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}) {
+	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}) {
 		@kit.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
 		@kit.RowLabel(id+"-on", "Visit every minute", "")

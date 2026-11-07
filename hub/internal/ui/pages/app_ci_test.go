@@ -10,7 +10,7 @@ import (
 func TestNewHookAsksOnlyToReplace(t *testing.T) {
 	for _, on := range []bool{false, true} {
 		var html strings.Builder
-		if err := AppHook("shop", "", on).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		if err := AppHook("shop", "shop-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b", "", on).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
 			t.Fatal(err)
 		}
 		page := html.String()

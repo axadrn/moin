@@ -315,7 +315,9 @@ func (s *AppService) SetUptime(actor Actor, idOrName, domain string, path *strin
 
 // DownDomain is a domain of an app that the visits find down.
 type DownDomain struct {
+	// App is the app's name, Link how a link names it.
 	App    string
+	Link   string
 	Domain string
 	Since  *time.Time
 }
@@ -325,19 +327,19 @@ type DownDomain struct {
 func (s *AppService) DownDomains(apps []model.App) []DownDomain {
 	u := s.uptime
 	u.load(s.apps.DomainUptimes)
-	names := make(map[string]string, len(apps))
+	names := make(map[string]model.App, len(apps))
 	for _, app := range apps {
-		names[app.ID] = app.Name
+		names[app.ID] = app
 	}
 	var down []DownDomain
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	for key, state := range u.states {
-		name, ok := names[key.app]
+		app, ok := names[key.app]
 		if !ok || state.stored.Paused || state.stored.State != model.UptimeDown {
 			continue
 		}
-		down = append(down, DownDomain{App: name, Domain: key.domain, Since: state.stored.Since})
+		down = append(down, DownDomain{App: app.Name, Link: app.Link(), Domain: key.domain, Since: state.stored.Since})
 	}
 	sort.Slice(down, func(i, j int) bool { return down[i].Domain < down[j].Domain })
 	return down

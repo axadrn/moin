@@ -8,8 +8,8 @@ import (
 
 // envModes is the switch between one row per env var and one .env text. It
 // swaps the env part only; the address stays.
-templ envModes(appName string, text bool) {
-	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
+templ envModes(appLink string, text bool) {
+	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div class="shrink-0">
 		@kit.Segmented("env-modes", "Edit as", []kit.Segment{
 			{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
@@ -20,10 +20,10 @@ templ envModes(appName string, text bool) {
 
 // AppEnvText is every env var of an app as one .env text to edit. Saving
 // shows what changes first; problem is why the text was refused.
-templ AppEnvText(appName, text, problem string) {
-	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
+templ AppEnvText(appLink, text, problem string) {
+	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env">
-		@kit.Section("Environment", envModes(appName, true)) {
+		@kit.Section("Environment", envModes(appLink, true)) {
 			@kit.Card("", nil) {
 				<form class="flex flex-col gap-4" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-env-text>
 					@kit.CSRF()
@@ -58,10 +58,10 @@ func envTextAttributes(problem string) templ.Attributes {
 
 // AppEnvReview says which keys the text adds, changes and removes, and
 // asks before it replaces the env vars. The values never show here.
-templ AppEnvReview(appName, text string, change dotenv.Change) {
-	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
+templ AppEnvReview(appLink, text string, change dotenv.Change) {
+	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env" data-env-review>
-		@kit.Section("Environment", envModes(appName, true)) {
+		@kit.Section("Environment", envModes(appLink, true)) {
 			@kit.Card("This replaces the env vars", nil) {
 				<ul class="flex flex-col gap-1 px-1 font-mono text-sm" role="list">
 					for _, key := range change.Added {

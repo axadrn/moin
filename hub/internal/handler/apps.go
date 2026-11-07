@@ -91,7 +91,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answerDone(w, r, app.Name+" added", "Link its repo, or run moin deploy "+app.Name+" in its folder.")
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), http.StatusSeeOther)
 }
 
 // AppSection answers one section of an app (app, deploys, domains, logs
@@ -266,7 +266,7 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(before.Name, url, true))
+	render(w, r, pages.AppHook(before.Name, before.Link(), url, true))
 	if before.DeployHookHash == nil {
 		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
 		return
@@ -276,14 +276,16 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 
 // RemoveHook turns the deploy hook off; its URL stops working.
 func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("app")
-	_, err := h.apps.RemoveDeployHook(actor(r), name)
+	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	if err == nil {
+		_, err = h.apps.RemoveDeployHook(actor(r), app.ID)
+	}
 	if err != nil {
 		failed(w, r, "Deploy hook not turned off", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(name, "", false))
-	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+name+".")
+	render(w, r, pages.AppHook(app.Name, app.Link(), "", false))
+	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+app.Name+".")
 }
 
 // registryFields are the fields of the registry form, by API field name.
@@ -341,13 +343,16 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 // text=1 they are one .env text to edit.
 func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("text") == "1" {
-		name := r.PathValue("app")
-		env, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+		app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+		var env map[string]string
+		if err == nil {
+			env, err = h.apps.Env(app.WorkspaceID, app.ID)
+		}
 		if err != nil {
 			renderError(w, "load env failed", err)
 			return
 		}
-		render(w, r, pages.AppEnvText(name, dotenv.Format(env), ""))
+		render(w, r, pages.AppEnvText(app.Link(), dotenv.Format(env), ""))
 		return
 	}
 	h.renderEnv(w, r, r.URL.Query().Get("show") == "1")
@@ -356,14 +361,19 @@ func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
 // EnvText takes the env vars as one .env text: first it shows what changes,
 // with confirm=1 it replaces them, with back=1 it goes back to the text.
 func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
-	name, text := r.PathValue("app"), r.FormValue("text")
+	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	if err != nil {
+		renderError(w, "load env failed", err)
+		return
+	}
+	name, link, text := app.ID, app.Link(), r.FormValue("text")
 	next, err := dotenv.Parse(text)
 	if err != nil || r.FormValue("back") == "1" {
 		problem := ""
 		if err != nil {
 			problem = strings.ToUpper(err.Error()[:1]) + err.Error()[1:] + ". Nothing changed."
 		}
-		render(w, r, pages.AppEnvText(name, text, problem))
+		render(w, r, pages.AppEnvText(link, text, problem))
 		return
 	}
 	if r.FormValue("confirm") != "1" {
@@ -378,12 +388,12 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 			answerDone(w, r, "Nothing changed", "The text has the env vars there are.")
 			return
 		}
-		render(w, r, pages.AppEnvReview(name, text, change))
+		render(w, r, pages.AppEnvReview(link, text, change))
 		return
 	}
 	change, err := h.apps.ReplaceEnv(actor(r), name, next)
 	if err != nil {
-		render(w, r, pages.AppEnvText(name, text, errorMessage(err)+" Nothing changed."))
+		render(w, r, pages.AppEnvText(link, text, errorMessage(err)+" Nothing changed."))
 		return
 	}
 	h.renderEnv(w, r, false)
@@ -419,8 +429,11 @@ func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show bool) {
-	name := r.PathValue("app")
-	env, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	var env map[string]string
+	if err == nil {
+		env, err = h.apps.Env(app.WorkspaceID, app.ID)
+	}
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
@@ -429,7 +442,7 @@ func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show boo
 	if show {
 		values = env
 	}
-	render(w, r, pages.AppEnv(name, sortedKeys(env), values))
+	render(w, r, pages.AppEnv(app.Link(), sortedKeys(env), values))
 }
 
 // Delete stops the app on its server and removes it, then goes to the list.

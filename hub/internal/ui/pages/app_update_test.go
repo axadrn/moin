@@ -11,7 +11,7 @@ import (
 func renderNotice(t *testing.T, info model.VersionInfo) string {
 	t.Helper()
 	var html strings.Builder
-	if err := UpdateNotice(info).Render(projectPageContext("/app/tiny-rocket-co/apps"), &html); err != nil {
+	if err := UpdateNotice(info).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps"), &html); err != nil {
 		t.Fatal(err)
 	}
 	return html.String()

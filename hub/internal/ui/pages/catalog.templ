@@ -280,7 +280,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 				</div>
 				<form
 					class="flex gap-2"
-					hx-post={ basePath + "/apps/" + view.App.Name + "/update" }
+					hx-post={ basePath + "/apps/" + view.App.Link() + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
 					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }

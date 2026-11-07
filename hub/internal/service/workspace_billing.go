@@ -37,7 +37,7 @@ func ManageBilling(member *model.WorkspaceMember) error {
 // with start, the CreateCheckoutURL of the payment provider, and returns
 // its URL. interval is monthly, the default, or yearly. A checkout that is
 // open already is a repository error such as ErrCheckoutPending.
-func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *model.Workspace, user *model.User, planID, interval string, source Source, start func(workspaceID, workspaceSlug, planID, interval, customerEmail, customerName string) (string, error)) (string, error) {
+func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *model.Workspace, user *model.User, planID, interval string, source Source, start func(workspaceID, workspaceLink, planID, interval, customerEmail, customerName string) (string, error)) (string, error) {
 	if err := ManageBilling(member); err != nil {
 		return "", err
 	}
@@ -51,7 +51,7 @@ func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *mo
 	if interval != model.SubscriptionIntervalMonthly && interval != model.SubscriptionIntervalYearly {
 		return "", ErrInterval
 	}
-	checkoutURL, err := start(workspace.ID, workspace.Slug, planID, interval, user.Email, workspace.Name)
+	checkoutURL, err := start(workspace.ID, workspace.Link(), planID, interval, user.Email, workspace.Name)
 	if errors.Is(err, repository.ErrCheckoutPending) || errors.Is(err, repository.ErrCheckoutSelection) || errors.Is(err, repository.ErrSubscriptionAlreadyPaid) {
 		return "", err
 	}
@@ -67,14 +67,14 @@ func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *mo
 // BillingManagement returns the URL of the billing management of the
 // payment provider for the member's workspace, made by open, the
 // provider's BillingManagementURL.
-func (s *WorkspaceService) BillingManagement(member *model.WorkspaceMember, workspace *model.Workspace, subscription *model.Subscription, source Source, open func(workspaceID, workspaceSlug string) (string, error)) (string, error) {
+func (s *WorkspaceService) BillingManagement(member *model.WorkspaceMember, workspace *model.Workspace, subscription *model.Subscription, source Source, open func(workspaceID, workspaceLink string) (string, error)) (string, error) {
 	if err := ManageBilling(member); err != nil {
 		return "", err
 	}
 	if subscription == nil || subscription.ProviderCustomerID == nil || *subscription.ProviderCustomerID == "" {
 		return "", ErrNoBillingAccount
 	}
-	managementURL, err := open(workspace.ID, workspace.Slug)
+	managementURL, err := open(workspace.ID, workspace.Link())
 	if err != nil {
 		slog.Error("failed to get billing management URL", "error", err, "workspace_id", workspace.ID)
 		return "", ErrBillingManagementFailed

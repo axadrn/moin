@@ -45,7 +45,7 @@ func TestCreateCheckoutUsesAuthenticatedUserAndDefaultInterval(t *testing.T) {
 	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != provider.checkoutURL {
 		t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
 	}
-	if provider.checkoutRequest.workspaceID != "workspace-1" || provider.checkoutRequest.workspaceSlug != "test-workspace" || provider.checkoutRequest.planID != model.SubscriptionPlanPro {
+	if provider.checkoutRequest.workspaceID != "workspace-1" || provider.checkoutRequest.workspaceSlug != "test-workspace-workspace1" || provider.checkoutRequest.planID != model.SubscriptionPlanPro {
 		t.Fatalf("checkout request = %#v", provider.checkoutRequest)
 	}
 	if provider.checkoutRequest.interval != model.SubscriptionIntervalMonthly {
@@ -204,7 +204,7 @@ func TestBillingManagementRedirectsToProvider(t *testing.T) {
 	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != provider.portalURL {
 		t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
 	}
-	if provider.portalWorkspaceID != "workspace-1" || provider.portalWorkspaceSlug != "test-workspace" {
+	if provider.portalWorkspaceID != "workspace-1" || provider.portalWorkspaceSlug != "test-workspace-workspace1" {
 		t.Fatalf("portal workspace = %q, slug = %q", provider.portalWorkspaceID, provider.portalWorkspaceSlug)
 	}
 }

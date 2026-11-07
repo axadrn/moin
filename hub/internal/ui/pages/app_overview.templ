@@ -64,7 +64,7 @@ templ Overview(view OverviewView) {
 					@kit.Section("Updates", nil) {
 						@kit.List() {
 							for _, update := range view.Status.Updates {
-								@kit.Row(basePath + "/apps/" + update.App) {
+								@kit.Row(basePath + "/apps/" + update.Link) {
 									@kit.RowText(update.App, update.Name+" "+update.Version+" → "+update.Latest)
 								}
 							}
@@ -92,7 +92,7 @@ templ appRows(apps []model.App, servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@kit.List() {
 		for _, app := range apps {
-			@kit.Row(basePath + "/apps/" + app.Name) {
+			@kit.Row(basePath + "/apps/" + app.Link()) {
 				@kit.RowText(app.Name, appNote(app, serverOnline(servers, app.ServerID)))
 				@appState(app)
 			}

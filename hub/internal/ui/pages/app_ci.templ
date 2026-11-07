@@ -8,11 +8,11 @@ import (
 // appCI is the "Deploy from CI" card of the Deploys section: deploy an
 // image built elsewhere, and the deploy hook CI calls; hook says the app
 // has one.
-templ appCI(appName string, hook bool) {
+templ appCI(appName, appLink string, hook bool) {
 	<div class="grid" data-app-ci>
 		@kit.Card("Deploy from CI", nil) {
 			<form
-				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/image" }
+				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
 			>
@@ -26,14 +26,14 @@ templ appCI(appName string, hook bool) {
 					}
 				}
 			</form>
-			@AppHook(appName, "", hook)
+			@AppHook(appName, appLink, "", hook)
 		}
 	</div>
 }
 
 // AppHook is the deploy hook: whether the app has one, the buttons, and a
 // new hook's URL once, with the curl CI runs.
-templ AppHook(appName, url string, on bool) {
+templ AppHook(appName, appLink, url string, on bool) {
 	<div id="app-hook" class="flex flex-col gap-3" data-hook-on?={ on }>
 		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 			<div class="min-w-0 px-1">
@@ -49,7 +49,7 @@ templ AppHook(appName, url string, on bool) {
 			<div class="flex flex-wrap gap-2">
 				if on {
 					@kit.Button(kit.Secondary, "", templ.Attributes{
-						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
 						"hx-target":     "#app-hook",
 						"hx-swap":       "outerHTML",
 						"hx-disable":    "this",
@@ -59,7 +59,7 @@ templ AppHook(appName, url string, on bool) {
 						Turn off
 					}
 				}
-				@newHookButton(appName, on)
+				@newHookButton(appLink, on)
 			</div>
 		</div>
 		if url != "" {
@@ -79,10 +79,10 @@ templ AppHook(appName, url string, on bool) {
 
 // newHookButton makes a new deploy hook URL. It asks first only when it
 // replaces a hook, whose URL then stops working.
-templ newHookButton(appName string, replaces bool) {
+templ newHookButton(appLink string, replaces bool) {
 	{{
 		attributes := templ.Attributes{
-			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/hook",
+			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
 			"hx-target":     "#app-hook",
 			"hx-swap":       "outerHTML",
 			"hx-disable":    "this",

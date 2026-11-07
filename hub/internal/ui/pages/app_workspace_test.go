@@ -34,8 +34,8 @@ func TestWorkspaceContentUsesViewerPermissionsForMemberActions(t *testing.T) {
 			}
 			html := output.String()
 			for _, action := range []string{
-				"/app/acme/workspace/members/listed-member/role",
-				"/app/acme/workspace/members/listed-member/remove",
+				"/app/acme-workspace1/workspace/members/listed-member/role",
+				"/app/acme-workspace1/workspace/members/listed-member/remove",
 			} {
 				if got := strings.Contains(html, action); got != test.wantActions {
 					t.Fatalf("action %q present = %v, want %v", action, got, test.wantActions)

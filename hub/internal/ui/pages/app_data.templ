@@ -66,7 +66,7 @@ templ AppData(view DataView) {
 		if view.Database == "" {
 			// The app's changes come as the event "apps": the head reloads on
 			// it.
-			@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+			@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link())
 		}
 	}
 }
@@ -85,7 +85,7 @@ func dataTitle(view DataView) string {
 // row with how its backup is, then where the backups of the app go.
 templ dataListPage(view DataView) {
 	@appHeader(view.App, "data")
-	@appSection(view.App.Name, "data") {
+	@appSection(view.App.Name, view.App.Link(), "data") {
 		if len(view.Databases) == 0 {
 			@kit.Card("", nil) {
 				@kit.Quiet() {
@@ -137,7 +137,7 @@ func backupStatusOf(statuses []model.BackupStatus, database string) (model.Backu
 // dataDatabasePage is one database: its tables, its backup with the
 // moments to go back to, and the SQL console.
 templ dataDatabasePage(view DataView) {
-	@kit.Header(kit.Back{Label: "Data", Href: dataPath(ctx, view.App.Name)}, databaseName(view.Database))
+	@kit.Header(kit.Back{Label: "Data", Href: dataPath(ctx, view.App.Link())}, databaseName(view.Database))
 	<div class="flex flex-col gap-6">
 		if view.Error != "" {
 			@dataError(view.Error)
@@ -195,6 +195,7 @@ templ dataError(message string) {
 	</p>
 }
 
+// dataPath is the Data section of the app a link names.
 func dataPath(ctx context.Context, app string) string {
 	return ctxkeys.AppBasePath(ctx) + "/apps/" + app + "/data"
 }
@@ -249,7 +250,7 @@ templ dataRows(view DataView) {
 	{{ shown := view.Offset + len(view.Result.Rows) }}
 	@kit.Card(plural(int(table.Rows), "row", "rows"), addRowAction(table)) {
 		if table.Type == "table" {
-			@newRowForm(dataPath(ctx, view.App.Name), view.Database, table)
+			@newRowForm(dataPath(ctx, view.App.Link()), view.Database, table)
 		}
 		if table.Type == "table" && !editable {
 			@kit.Quiet() {
@@ -291,7 +292,7 @@ templ dataRows(view DataView) {
 									{{ value := cellValue(row, index, table.RowID) }}
 									if editable && !isBlob(column) {
 										<td class="py-0 pr-1 first:pl-3">
-											@DataCell(dataPath(ctx, view.App.Name), view.Database, table.Name, ref, column, value, "")
+											@DataCell(dataPath(ctx, view.App.Link()), view.Database, table.Name, ref, column, value, "")
 										</td>
 									} else {
 										<td class={ dataCell, templ.KV("text-right", isNumeric(column)), templ.KV("text-muted-foreground italic", value == nil) }>{ cellText(value) }</td>
@@ -304,7 +305,7 @@ templ dataRows(view DataView) {
 											class="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-failed focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-40 [&_svg]:size-4"
 											aria-label={ "Delete " + strings.ToLower(ref.Label()) }
 											title="Delete"
-											hx-post={ dataPath(ctx, view.App.Name) + "/delete" }
+											hx-post={ dataPath(ctx, view.App.Link()) + "/delete" }
 											hx-vals={ deleteRowVals(view.Database, table.Name, ref) }
 											hx-target="closest tr"
 											hx-swap="outerHTML"
@@ -490,7 +491,7 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 templ dataConsole(view DataView) {
 	@kit.Section("SQL", nil) {
 		@kit.Card("", nil) {
-			<form class="flex flex-col gap-4" hx-post={ dataPath(ctx, view.App.Name) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
+			<form class="flex flex-col gap-4" hx-post={ dataPath(ctx, view.App.Link()) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
 				@kit.CSRF()
 				<input type="hidden" name="db" value={ view.Database }/>
 				<label for="sql" class="sr-only">SQL</label>

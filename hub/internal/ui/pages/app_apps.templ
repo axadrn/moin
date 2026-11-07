@@ -156,7 +156,7 @@ templ AppPage(view AppPageView) {
 	@layouts.App(app.Name) {
 		@panelPage(templ.Attributes{"data-app-page": app.Name}) {
 			@appHeader(app, view.Section)
-			@appSection(app.Name, view.Section) {
+			@appSection(app.Name, app.Link(), view.Section) {
 				switch view.Section {
 					case "deploys":
 						@appDeploysSection(app, view.Deploys, view.Selected, view.Selected == 0, view.Repo)
@@ -173,7 +173,7 @@ templ AppPage(view AppPageView) {
 		}
 		// The app's changes come as the event "apps"; parts that show them
 		// reload on it (hx-trigger "apps from:body").
-		@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+		@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link())
 	}
 }
 
@@ -182,7 +182,7 @@ templ AppPage(view AppPageView) {
 // first, each with what it holds, like a Settings page that drills down.
 templ appHomeSection(view AppPageView) {
 	{{ app := view.App }}
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	if view.Catalog != nil {
 		@CatalogUpdate(*view.Catalog)
 	}
@@ -276,7 +276,7 @@ templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follo
 	} else {
 		@AppRepo(RepoView{App: app, Enabled: true, Connected: true, Loading: app.Repo == ""})
 	}
-	@appCI(app.Name, app.DeployHookHash != nil)
+	@appCI(app.Name, app.Link(), app.DeployHookHash != nil)
 }
 
 // appDomainsSection answers "where is it reached?": the instant address
@@ -294,7 +294,7 @@ templ appDomainsSection(view AppPageView) {
 // command to run in it. The logs come with the page; only when the daemon is
 // slow to answer they load into a box that keeps their place.
 templ appLogsSection(app model.App, deploys []api.Deploy, logs *AppLogsView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	@kit.Card("Last 200 lines", loadLogsButton(appPath)) {
 		<div class="-mx-6">
 			if logs != nil {
@@ -323,8 +323,8 @@ const appLogsBox = "flex max-h-[30rem] flex-col-reverse justify-end-safe overflo
 // appSettingsSection answers "how is it set up?": its env, the pin, and at
 // the end what stops or removes it.
 templ appSettingsSection(app model.App, envKeys []string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	@AppEnv(app.Name, envKeys, nil)
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
+	@AppEnv(app.Link(), envKeys, nil)
 	@kit.List() {
 		@PinSwitch(app)
 	}
@@ -427,7 +427,7 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 	<section
 		id="app-detail"
 		hx-swap-oob="true"
-		hx-get={ detailHref(basePath, app.Name, selected, follow, deploys) }
+		hx-get={ detailHref(basePath, app.Link(), selected, follow, deploys) }
 		hx-trigger="apps from:body"
 		hx-swap="none"
 		data-latest-number={ strconv.Itoa(app.LatestNumber) }
@@ -462,7 +462,7 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected int) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
-	@kit.RowAttrs(deployHref(basePath, app.Name, deploys, deploy.Number), deployRowAttributes(deploy.Number, deploy.Number == selectedNumber(deploys, selected))) {
+	@kit.RowAttrs(deployHref(basePath, app.Link(), deploys, deploy.Number), deployRowAttributes(deploy.Number, deploy.Number == selectedNumber(deploys, selected))) {
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span class="flex min-w-0 items-center gap-3">
 				<span class="font-semibold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
@@ -584,10 +584,10 @@ func parseLogLine(line string) logLine {
 // AppEnv is the env vars of an app, one row each, and the row that sets
 // one. values holds the shown values; keys without one show as dots. Saving
 // never restarts the app: the head then says what waits for Restart.
-templ AppEnv(appName string, keys []string, values map[string]string) {
-	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
+templ AppEnv(appLink string, keys []string, values map[string]string) {
+	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env">
-		@kit.Section("Environment", envModes(appName, false)) {
+		@kit.Section("Environment", envModes(appLink, false)) {
 			@kit.List() {
 				if len(keys) == 0 {
 					@kit.Row("") {

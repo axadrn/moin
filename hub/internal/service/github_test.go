@@ -239,7 +239,7 @@ func TestGitHubDeploys(t *testing.T) {
 	fake.waitStatus(t, "pending")
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	success := fake.waitStatus(t, "success")
-	if success["context"] != "moin/deploy" || !strings.HasSuffix(success["target_url"], "/app/owner-workspace/apps/blog") {
+	if success["context"] != "moin/deploy" || !strings.HasSuffix(success["target_url"], "/apps/"+app.Link()) {
 		t.Fatalf("success status = %v", success)
 	}
 

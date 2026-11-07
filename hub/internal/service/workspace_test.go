@@ -157,6 +157,30 @@ func TestWorkspaceServiceRoleBoundaries(t *testing.T) {
 	if err := workspaces.UpdateName(adminMembership, owner.Workspace, "Admin renamed workspace", Source{}); err != nil {
 		t.Fatalf("admin UpdateName() error = %v", err)
 	}
+	// The slug, the name in its links, follows.
+	if renamed, _, err := workspaces.BySlugForUser("admin-renamed-workspace", owner.User.ID); err != nil || renamed.ID != owner.Workspace.ID || renamed.Name != "Admin renamed workspace" {
+		t.Fatalf("workspace by its new slug = %+v, %v", renamed, err)
+	}
+	// A link with its old name finds it by its ID.
+	globex, err := workspaces.Create(owner.User.ID, "Globex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	globexMember, err := workspaces.members.ByWorkspaceAndUser(globex.ID, owner.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workspaces.UpdateName(globexMember, globex, "Initech", Source{}); err != nil || globex.Slug != "initech" {
+		t.Fatalf("rename = %v, slug %q", err, globex.Slug)
+	}
+	for _, ref := range []string{"globex-" + strings.ReplaceAll(globex.ID, "-", ""), "initech", globex.ID} {
+		if found, _, err := workspaces.BySlugForUser(ref, owner.User.ID); err != nil || found.ID != globex.ID {
+			t.Fatalf("workspace by %q = %+v, %v", ref, found, err)
+		}
+	}
+	if _, _, err := workspaces.BySlugForUser("globex", owner.User.ID); err == nil {
+		t.Fatal("the old slug alone still finds the workspace")
+	}
 	if err := workspaces.UpdateName(memberMembership, owner.Workspace, "Member renamed workspace", Source{}); !errors.Is(err, ErrWorkspacePermission) {
 		t.Fatalf("member UpdateName() error = %v, want ErrWorkspacePermission", err)
 	}

@@ -2,11 +2,11 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -57,7 +57,7 @@ func (h *WorkspaceInvitationHandler) Accept(w http.ResponseWriter, r *http.Reque
 		invitation, _ := h.workspaces.WorkspaceInvitation(token)
 		if errors.Is(err, repository.ErrAlreadyMember) && invitation != nil {
 			h.clearPendingCookie(w)
-			redirect(w, r, fmt.Sprintf("/app/%s/overview", invitation.WorkspaceSlug), http.StatusSeeOther)
+			redirect(w, r, model.Workspace{ID: invitation.WorkspaceID, Slug: invitation.WorkspaceSlug}.Path()+"/overview", http.StatusSeeOther)
 			return
 		}
 		if invitationCookieShouldClear(err) {
@@ -67,7 +67,7 @@ func (h *WorkspaceInvitationHandler) Accept(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	h.clearPendingCookie(w)
-	redirect(w, r, fmt.Sprintf("/app/%s/overview", workspace.Slug), http.StatusSeeOther)
+	redirect(w, r, workspace.Path()+"/overview", http.StatusSeeOther)
 }
 
 func (h *WorkspaceInvitationHandler) setPendingCookie(w http.ResponseWriter, token string) {

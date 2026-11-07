@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"github.com/axadrn/moin/protocol"
 	"log/slog"
 	"regexp"
@@ -418,7 +417,7 @@ func (s *AppService) reportStatus(app *model.App, deploy *model.Deploy, state, d
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	target := fmt.Sprintf("%s/app/%s/apps/%s", s.servers.appURL, app.WorkspaceSlug, app.Name)
+	target := s.servers.appURL + model.Workspace{ID: app.WorkspaceID, Slug: app.WorkspaceSlug}.Path() + "/apps/" + app.Link()
 	err := s.github.SetStatus(ctx, app.InstallationID, app.Repo, deploy.CommitSHA, state, target, description)
 	if err != nil {
 		slog.Warn("github commit status failed", "app_id", app.ID, "sha", deploy.CommitSHA, "error", err)

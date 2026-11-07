@@ -81,10 +81,10 @@ const (
 func SearchItems(in SearchInput) []SearchItem {
 	items := []SearchItem{}
 	for _, app := range in.Apps {
-		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: kit.IconApp, Href: in.Base + "/apps/" + app.Name})
+		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: kit.IconApp, Href: in.Base + "/apps/" + app.Link()})
 	}
 	for _, server := range in.Servers {
-		path := in.Base + "/servers/" + server.ID
+		path := in.Base + "/servers/" + server.Link()
 		items = append(items,
 			SearchItem{Group: groupServers, Title: server.Name, Where: "Servers", Icon: kit.IconServer, Href: path + "/security"},
 			SearchItem{Group: groupPages, Title: "Security", Where: server.Name, Icon: kit.IconShield, Href: path + "/security"},
@@ -92,7 +92,7 @@ func SearchItems(in SearchInput) []SearchItem {
 		)
 	}
 	for _, app := range in.Apps {
-		path := in.Base + "/apps/" + app.Name
+		path := in.Base + "/apps/" + app.Link()
 		for _, section := range appSections[1:] {
 			items = append(items, SearchItem{Group: groupPages, Title: section.Label, Where: app.Name, Key: strings.ToUpper(section.Key), Icon: sectionIcon(section.ID), Href: path + section.Path})
 		}
@@ -141,7 +141,7 @@ func SearchItems(in SearchInput) []SearchItem {
 // Switches and values are not here: the palette cannot show what they are
 // now, so they stay on their pages.
 func paletteActions(in SearchInput, app model.App) []SearchItem {
-	path := in.Base + "/apps/" + app.Name
+	path := in.Base + "/apps/" + app.Link()
 	var items []SearchItem
 	for _, domain := range appDomains(app) {
 		items = append(items, SearchItem{Group: groupActions, Title: "Open " + domain, Where: app.Name, Icon: kit.IconExternal, Href: "https://" + domain, External: true})

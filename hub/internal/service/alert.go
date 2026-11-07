@@ -78,7 +78,7 @@ func (s *AlertService) mail(workspace *model.Workspace, action string, message a
 		Intro:       message.Lines,
 		ActionURL:   message.URL,
 		ActionLabel: "Open in " + s.email.appName,
-		Outro:       []string{fmt.Sprintf("You get this because you are an owner or admin of %s. Turn it off: %s/app/%s/settings", workspace.Name, s.email.appURL, workspace.Slug)},
+		Outro:       []string{fmt.Sprintf("You get this because you are an owner or admin of %s. Turn it off: %s%s/settings", workspace.Name, s.email.appURL, workspace.Path())},
 	}
 	for _, to := range emails {
 		if err := s.email.send("alert_"+strings.ReplaceAll(action, ".", "_"), to, content); err != nil {

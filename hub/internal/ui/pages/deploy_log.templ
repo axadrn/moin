@@ -17,7 +17,7 @@ import (
 // script. Follow is true when it shows the newest deploy and moves on to
 // the next one that starts; then AppDetail sends it again, out of band.
 templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	<div id="deploy-log-panel" class="flex min-w-0 *:flex-1" data-following?={ follow } hx-swap-oob?={ oob }>
 		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(app, deploy), Body: panelBodyFlush}) {
 			<div class="flex max-h-[32rem] flex-1 flex-col-reverse overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:min-h-72" tabindex="0" aria-label="Deploy log">
@@ -47,7 +47,7 @@ templ deployLogActions(app model.App, deploy *api.Deploy) {
 		@copyButton("", "#deploy-log", "Copy the log")
 		if canRollBack(app, *deploy) {
 			@kit.Button(kit.Secondary, "", templ.Attributes{
-				"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/rollback",
+				"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/rollback",
 				"hx-vals":       fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
 				"hx-swap":       "none",
 				"hx-disable":    "this",

@@ -31,8 +31,11 @@ func To(name, uuid string) string {
 			dash = true
 		}
 	}
-	if out.Len() == 0 {
+	switch {
+	case out.Len() == 0:
 		return ID(uuid)
+	case uuid == "":
+		return out.String()
 	}
 	return out.String() + "-" + ID(uuid)
 }

@@ -24,17 +24,17 @@ func TestAlertsPage(t *testing.T) {
 		SigningSecret: "f00dfeed",
 	}
 	var html strings.Builder
-	if err := Alerts(view).Render(projectPageContext("/app/tiny-rocket-co/alerts"), &html); err != nil {
+	if err := Alerts(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/alerts"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-alert-destination="ci"`, `data-alert-destination="team"`, "hooks.slack.com/…WXYZ", "Deploy failed", "every alert", "data-alert-failing", "HTTP 404: no_service", "f00dfeed", "data-alert-form", `hx-post="/app/tiny-rocket-co/alerts/destinations/team/test"`, "Send test"} {
+	for _, want := range []string{`data-alert-destination="ci"`, `data-alert-destination="team"`, "hooks.slack.com/…WXYZ", "Deploy failed", "every alert", "data-alert-failing", "HTTP 404: no_service", "f00dfeed", "data-alert-form", `hx-post="/app/tiny-rocket-co-workspace1/alerts/destinations/team/test"`, "Send test"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}
 	}
 
-	member := ctxkeys.WithWorkspaceMember(projectPageContext("/app/tiny-rocket-co/alerts"), &model.WorkspaceMember{WorkspaceID: "workspace-1", UserID: "user-1", Role: model.WorkspaceRoleMember})
+	member := ctxkeys.WithWorkspaceMember(projectPageContext("/app/tiny-rocket-co-workspace1/alerts"), &model.WorkspaceMember{WorkspaceID: "workspace-1", UserID: "user-1", Role: model.WorkspaceRoleMember})
 	html.Reset()
 	if err := Alerts(AlertsView{Destinations: view.Destinations}).Render(member, &html); err != nil {
 		t.Fatal(err)

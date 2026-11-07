@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // AddedServer is the one-time install command of a server just added.
@@ -48,7 +49,7 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 					@DaemonUpdatesForm(autoUpdate)
 				}
 			}
-			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link())
 		}
 	}
 }
@@ -83,7 +84,7 @@ templ ServerAdded(added AddedServer) {
 	<div
 		id="server-added"
 		hx-swap-oob="true"
-		hx-get={ ctxkeys.AppBasePath(ctx) + "/servers/" + added.ID + "/install" }
+		hx-get={ ctxkeys.AppBasePath(ctx) + "/servers/" + link.To(added.Name, added.ID) + "/install" }
 		hx-trigger="servers from:body"
 		hx-swap="outerHTML"
 		data-server-added={ added.Name }
@@ -153,7 +154,7 @@ templ ServerList(servers []model.Server) {
 				}
 			}
 			for _, server := range servers {
-				@kit.Row(basePath + "/servers/" + server.ID + "/security") {
+				@kit.Row(basePath + "/servers/" + server.Link() + "/security") {
 					@kit.RowText(server.Name, serverNote(server, now))
 					@serverState(server)
 				}
@@ -216,7 +217,7 @@ templ serverStatus(server model.Server) {
 // serverHead is the head of a server's pages: the way back to Servers, its
 // name and status, and its two pages.
 templ serverHead(server model.Server, active string) {
-	{{ serverPath := ctxkeys.AppBasePath(ctx) + "/servers/" + server.ID }}
+	{{ serverPath := ctxkeys.AppBasePath(ctx) + "/servers/" + server.Link() }}
 	@kit.Header(kit.Back{Label: "Servers", Href: ctxkeys.AppBasePath(ctx) + "/servers"}, server.Name) {
 		@serverStatus(server)
 	}

@@ -2,6 +2,8 @@ package ctxkeys
 
 import "context"
 
+// AppBasePath is the address of the request's workspace in the web,
+// /app/<slug>-<id>: links count only its ID.
 func AppBasePath(ctx context.Context) string {
-	return "/app/" + Workspace(ctx).Slug
+	return Workspace(ctx).Path()
 }

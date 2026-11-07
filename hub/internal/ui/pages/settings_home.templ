@@ -68,7 +68,7 @@ templ SettingsHome(view SettingsHomeView) {
 								<svg aria-label="Open now" viewBox="0 0 16 16" class="size-4 shrink-0"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 							}
 						} else {
-							@kit.Row("/app/" + item.Slug + "/settings") {
+							@kit.Row(item.Path() + "/settings") {
 								@workspaceRowText(item)
 							}
 						}

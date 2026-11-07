@@ -17,6 +17,10 @@ func TestTo(t *testing.T) {
 			t.Errorf("To(%q) = %q, want %q", name, got, want)
 		}
 	}
+	// Without an ID, as in a test, the name alone.
+	if got := To("my-app", ""); got != "my-app" {
+		t.Errorf("To without an ID = %q", got)
+	}
 }
 
 func TestParse(t *testing.T) {
