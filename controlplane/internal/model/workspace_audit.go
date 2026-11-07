@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // WorkspaceAuditEvent is one change in the activity of a workspace.
@@ -106,7 +108,7 @@ func (e WorkspaceAuditEvent) Actor() string {
 	case e.Via == "hook":
 		return "A deploy hook"
 	default:
-		return "moin"
+		return build.Name
 	}
 }
 
@@ -130,7 +132,7 @@ func (e WorkspaceAuditEvent) ViaLabel() string {
 	case "github":
 		label = "GitHub"
 	case "system":
-		label = "moin"
+		label = build.Name
 	}
 	if e.TokenName != "" {
 		if label == "" {
