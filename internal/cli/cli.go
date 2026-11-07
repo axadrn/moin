@@ -461,142 +461,182 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
-	// Help works without a login.
-	api, apiErr := client.New(config)
 	command := "ls"
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		command, args = args[0], args[1:]
 	}
 	switch command {
 	case "ls", "list":
-		flags := newFlags("servers", "servers")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		list, err := api.Servers(ctx)
-		if err != nil {
-			return err
-		}
-		meta, _ := api.Meta(ctx)
-		PrintServers(stdout, list, meta.Version)
-		return nil
+		return listServers(ctx, config, args, stdout)
 	case "add":
-		flags := newFlags("servers add", "servers add [name]")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		// Without a name the control plane picks one like brave-otter.
-		created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
-		var apiErr *client.Error
-		if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
-			return fmt.Errorf("adding servers needs the moin plan: an owner subscribes under Billing at %s/app", config.URL)
-		}
-		if err != nil {
-			return err
-		}
-		done(stdout, "Added %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
-		// The command stays on one line, so it copies in one piece.
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
-		fmt.Fprintln(stdout)
-		hint(stdout, "It shows online in", build.Name+" servers")
-		return nil
+		return addServer(ctx, config, args, stdout)
 	case "secure":
 		return secure(ctx, args, stdin, stdout)
 	case "rules":
-		flags := newFlags("servers rules", "servers rules <server>")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 1 {
-			return flags.wrong()
-		}
-		return printRules(ctx, api, flags.Arg(0), stdout)
+		return serverRules(ctx, config, args, stdout)
 	case "update":
 		return updateAgents(ctx, args, stdout)
 	case "auto-update":
 		return agentUpdates(ctx, args, stdout)
 	case "install-command":
-		flags := newFlags("servers install-command", "servers install-command <server>")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 1 {
-			return flags.wrong()
-		}
-		created, err := api.NewInstallCommand(ctx, flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		done(stdout, "New install command for %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
-		fmt.Fprintln(stdout)
-		hint(stdout, "It shows once: moin stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
-		return nil
+		return newInstallCommand(ctx, config, args, stdout)
 	case "rename":
-		flags := newFlags("servers rename", "servers rename <server> <new name>")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 2 {
-			return flags.wrong()
-		}
-		renamed, err := api.RenameServer(ctx, flags.Arg(0), flags.Arg(1))
-		if err != nil {
-			return err
-		}
-		done(stdout, "Renamed %s to %s", flags.Arg(0), style.Bold.Render(renamed.Name))
-		return nil
+		return renameServer(ctx, config, args, stdout)
 	case "rm", "remove":
-		flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 1 {
-			return flags.wrong()
-		}
-		name := flags.Arg(0)
-		err := confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
-		if err != nil {
-			return err
-		}
-		removed, err := api.RemoveServer(ctx, name)
-		if err != nil {
-			return err
-		}
-		uninstall := removed.UninstallCommand
-		if len(removed.Apps) > 0 {
-			done(stdout, "It was offline, so its apps went with it: %s", strings.Join(removed.Apps, ", "))
-			fmt.Fprintln(stdout, "  "+style.Muted.Render("They stay on the server if it comes back. Remove them there with "+protocol.UninstallCommand(build.Name)+" --apps."))
-		}
-		if uninstall == "" {
-			done(stdout, "Removed %s. Its agent never connected, so nothing is installed there", style.Bold.Render(name))
-			return nil
-		}
-		done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
-		hint(stdout, "The agent is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
-		return nil
+		return removeServer(ctx, config, args, stdin, stdout)
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "servers "+command, build.Name)
+}
+
+// Each servers command reads its flags before it needs a login, so its help
+// works without one.
+
+// listServers is `servers ls`: the server table.
+func listServers(ctx context.Context, config client.Config, args []string, stdout io.Writer) error {
+	flags := newFlags("servers", "servers")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	list, err := api.Servers(ctx)
+	if err != nil {
+		return err
+	}
+	meta, _ := api.Meta(ctx)
+	PrintServers(stdout, list, meta.Version)
+	return nil
+}
+
+// addServer is `servers add`: it prints the install command of the new
+// server.
+func addServer(ctx context.Context, config client.Config, args []string, stdout io.Writer) error {
+	flags := newFlags("servers add", "servers add [name]")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	// Without a name the control plane picks one like brave-otter.
+	created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
+	var apiErr *client.Error
+	if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {
+		return fmt.Errorf("adding servers needs the moin plan: an owner subscribes under Billing at %s/app", config.URL)
+	}
+	if err != nil {
+		return err
+	}
+	done(stdout, "Added %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
+	// The command stays on one line, so it copies in one piece.
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
+	fmt.Fprintln(stdout)
+	hint(stdout, "It shows online in", build.Name+" servers")
+	return nil
+}
+
+// serverRules is `servers rules`: what the owner of a server allows moin.
+func serverRules(ctx context.Context, config client.Config, args []string, stdout io.Writer) error {
+	flags := newFlags("servers rules", "servers rules <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return flags.wrong()
+	}
+	return printRules(ctx, api, flags.Arg(0), stdout)
+}
+
+// newInstallCommand is `servers install-command`: a new one-time install
+// command for a server.
+func newInstallCommand(ctx context.Context, config client.Config, args []string, stdout io.Writer) error {
+	flags := newFlags("servers install-command", "servers install-command <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return flags.wrong()
+	}
+	created, err := api.NewInstallCommand(ctx, flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	done(stdout, "New install command for %s. Run this on the server as root (or put sudo before sh) within the next hour:", style.Bold.Render(created.Server.Name))
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
+	fmt.Fprintln(stdout)
+	hint(stdout, "It shows once: moin stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
+	return nil
+}
+
+// renameServer is `servers rename`.
+func renameServer(ctx context.Context, config client.Config, args []string, stdout io.Writer) error {
+	flags := newFlags("servers rename", "servers rename <server> <new name>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 2 {
+		return flags.wrong()
+	}
+	renamed, err := api.RenameServer(ctx, flags.Arg(0), flags.Arg(1))
+	if err != nil {
+		return err
+	}
+	done(stdout, "Renamed %s to %s", flags.Arg(0), style.Bold.Render(renamed.Name))
+	return nil
+}
+
+// removeServer is `servers rm`: it asks for the name, removes the server
+// and says how to remove the agent on it.
+func removeServer(ctx context.Context, config client.Config, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := client.New(config)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return flags.wrong()
+	}
+	name := flags.Arg(0)
+	err = confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
+	if err != nil {
+		return err
+	}
+	removed, err := api.RemoveServer(ctx, name)
+	if err != nil {
+		return err
+	}
+	uninstall := removed.UninstallCommand
+	if len(removed.Apps) > 0 {
+		done(stdout, "It was offline, so its apps went with it: %s", strings.Join(removed.Apps, ", "))
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("They stay on the server if it comes back. Remove them there with "+protocol.UninstallCommand(build.Name)+" --apps."))
+	}
+	if uninstall == "" {
+		done(stdout, "Removed %s. Its agent never connected, so nothing is installed there", style.Bold.Render(name))
+		return nil
+	}
+	done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
+	hint(stdout, "The agent is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
+	return nil
 }
 
 // updateAgents updates the agent of one server, or of every online server
