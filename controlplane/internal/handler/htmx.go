@@ -4,12 +4,24 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/a-h/templ"
 )
 
 func isAction(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
+}
+
+// confirmation is the name typed into the confirm dialog, for the service
+// to check before what is big and cannot be undone. kit.ConfirmDialog sends
+// it as X-Moin-Confirm, URI-encoded, since a header carries no UTF-8.
+func confirmation(r *http.Request) string {
+	typed, err := url.PathUnescape(r.Header.Get("X-Moin-Confirm"))
+	if err != nil {
+		return ""
+	}
+	return typed
 }
 
 func render(w http.ResponseWriter, r *http.Request, component templ.Component) {

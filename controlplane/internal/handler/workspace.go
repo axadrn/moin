@@ -154,7 +154,7 @@ func (h *WorkspaceHandler) Leave(w http.ResponseWriter, r *http.Request) {
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	workspace := ctxkeys.Workspace(r.Context())
-	if err := h.workspaces.Delete(ctxkeys.WorkspaceMember(r.Context()), workspace); err != nil {
+	if err := h.workspaces.Delete(ctxkeys.WorkspaceMember(r.Context()), workspace, confirmation(r)); err != nil {
 		h.handleError(w, r, "Workspace not deleted", err)
 		return
 	}
@@ -266,6 +266,9 @@ func (h *WorkspaceHandler) handleError(w http.ResponseWriter, r *http.Request, t
 		status = http.StatusUnprocessableEntity
 		description = "Enter a valid email address."
 		field = "invite-email"
+	case errors.Is(err, service.ErrConfirmMismatch):
+		status = http.StatusUnprocessableEntity
+		description = errorMessage(err)
 	case errors.Is(err, service.ErrActiveSubscription):
 		status = http.StatusUnprocessableEntity
 		description = "Finish or wait for checkout to expire. Cancel paid subscriptions and wait for access to end before deleting this workspace."

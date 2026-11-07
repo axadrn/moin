@@ -217,7 +217,7 @@ func bucketsDefault(ctx context.Context, args []string, stdout io.Writer) error 
 // bucketsRm removes a bucket from moin after asking for its name; what is
 // in it stays.
 func bucketsRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("buckets rm", "buckets rm <name> [--yes]").withYes()
+	flags := newFlags("buckets rm", "buckets rm <name> [--confirm <name>]").withConfirm()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -229,11 +229,11 @@ func bucketsRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 		return flags.wrong()
 	}
 	name := flags.Arg(0)
-	err = confirmName(stdin, stdout, flags.yes(), "Remove the bucket "+name+" from "+build.Name+"? What is in it stays.", name)
+	typed, err := typeName(stdin, stdout, flags.confirmed(), "Remove the bucket "+name+" from "+build.Name+"? What is in it stays.", name)
 	if err != nil {
 		return err
 	}
-	err = api.RemoveBucket(ctx, name)
+	err = api.RemoveBucket(ctx, name, typed)
 	if err != nil {
 		return err
 	}

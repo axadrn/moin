@@ -155,10 +155,7 @@ func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveApp
 	if err != nil {
 		return Done{}, err
 	}
-	if err := confirmed(input.Confirm, app.Name); err != nil {
-		return Done{}, err
-	}
-	err = t.services.Apps.Delete(ctx, caller.actor(), app.ID)
+	err = t.services.Apps.Delete(ctx, caller.actor(), app.ID, input.Confirm)
 	if err != nil {
 		return Done{}, err
 	}

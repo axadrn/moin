@@ -435,9 +435,13 @@ func (s *WorkspaceService) Leave(workspaceID, userID string, source Source) erro
 	return s.members.Delete(workspaceID, userID, member.ID, event)
 }
 
-func (s *WorkspaceService) Delete(actor *model.WorkspaceMember, workspace *model.Workspace) error {
+// Delete deletes the workspace for good. confirm is its name, typed out.
+func (s *WorkspaceService) Delete(actor *model.WorkspaceMember, workspace *model.Workspace, confirm string) error {
 	if actor == nil || workspace == nil || actor.WorkspaceID != workspace.ID || !actor.Can(model.WorkspacePermissionDeleteWorkspace) {
 		return ErrWorkspacePermission
+	}
+	if err := confirmed(confirm, workspace.Name); err != nil {
+		return err
 	}
 	now := time.Now()
 	metadata, err := json.Marshal(map[string]string{"workspace_name": workspace.Name})

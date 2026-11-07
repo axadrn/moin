@@ -173,9 +173,10 @@ func (h *ServersHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewServer(*server))
 }
 
-// Delete removes a server by ID or name and disconnects its agent.
+// Delete removes a server by ID or name and disconnects its agent;
+// ?confirm= is its name, typed out.
 func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"), r.URL.Query().Get("confirm"))
 	if err != nil {
 		ServiceError(w, err)
 		return

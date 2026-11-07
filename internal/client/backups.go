@@ -130,9 +130,10 @@ func (c *Client) EditBucket(ctx context.Context, name string, input BucketInput)
 	return bucket, err
 }
 
-// RemoveBucket forgets a bucket nothing uses; what is in it stays.
-func (c *Client) RemoveBucket(ctx context.Context, name string) error {
-	return c.do(ctx, http.MethodDelete, "/api/v1/buckets/"+url.PathEscape(name), nil, nil)
+// RemoveBucket forgets a bucket nothing uses; what is in it stays. confirm
+// is the bucket's name, typed out; the control plane checks it.
+func (c *Client) RemoveBucket(ctx context.Context, name, confirm string) error {
+	return c.do(ctx, http.MethodDelete, "/api/v1/buckets/"+url.PathEscape(name)+"?confirm="+url.QueryEscape(confirm), nil, nil)
 }
 
 // SetAppBucket moves an app's uploads and new backups to a bucket; empty

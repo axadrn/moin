@@ -312,13 +312,14 @@ type RemovedServer struct {
 }
 
 // RemoveServer deletes a server by ID or name. Its agent is disconnected
-// and stays installed. An offline server goes with its apps.
-func (c *Client) RemoveServer(ctx context.Context, idOrName string) (RemovedServer, error) {
+// and stays installed. An offline server goes with its apps. confirm is the
+// server's name, typed out; the control plane checks it.
+func (c *Client) RemoveServer(ctx context.Context, idOrName, confirm string) (RemovedServer, error) {
 	var removed struct {
 		UninstallCommand *string  `json:"uninstall_command"`
 		Apps             []string `json:"apps"`
 	}
-	err := c.do(ctx, http.MethodDelete, "/api/v1/servers/"+url.PathEscape(idOrName), nil, &removed)
+	err := c.do(ctx, http.MethodDelete, "/api/v1/servers/"+url.PathEscape(idOrName)+"?confirm="+url.QueryEscape(confirm), nil, &removed)
 	if err != nil {
 		return RemovedServer{}, err
 	}

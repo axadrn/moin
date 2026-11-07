@@ -112,7 +112,7 @@ A server with rules in `/etc/moin/rules` never updates from moin: update it on t
 
 ## Remove a server
 
-Disconnects the agent and makes its token stop working. It cannot be undone, so moin asks you to type the server's name: in the web dialog (with a copy button) and in the CLI; `--yes` skips it in scripts, an agent passes the name as `confirm`.
+Disconnects the agent and makes its token stop working. It cannot be undone, so moin asks you to type the server's name: in the web dialog (with a copy button) and in the CLI. The control plane checks it: a script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an agent as `confirm`.
 
 ```surfaces
 Web: **Servers**, open the server, **Remove server**

@@ -3,6 +3,7 @@ package api_test
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"testing"
 	"time"
@@ -313,14 +314,18 @@ func TestWorkspaceDeleteMatrix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("set provider subscription: %v", err)
 	}
-	paid := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path(""), bearer: seeded.owner})
+	paid := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), bearer: seeded.owner})
 	expectError(t, paid, http.StatusConflict, "active_subscription")
 	_, err = environment.database.Exec(`UPDATE subscriptions SET provider_subscription_id = NULL, plan_id = $1 WHERE workspace_id = $2`, model.SubscriptionPlanFree, seeded.workspace.ID)
 	if err != nil {
 		t.Fatalf("clear provider subscription: %v", err)
 	}
 
-	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path(""), bearer: seeded.owner})
+	for _, query := range []string{"", "?confirm=", "?confirm=" + url.QueryEscape(seeded.workspace.Name+"x")} {
+		unconfirmed := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + query, bearer: seeded.owner})
+		expectError(t, unconfirmed, http.StatusUnprocessableEntity, "confirm_mismatch")
+	}
+	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), bearer: seeded.owner})
 	expectStatus(t, deleted, http.StatusNoContent)
 	for _, role := range []string{model.WorkspaceRoleOwner, model.WorkspaceRoleAdmin, model.WorkspaceRoleMember} {
 		gone := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.token(role)})

@@ -124,10 +124,10 @@ func TestBuckets(t *testing.T) {
 
 	// In use: client-a by blog, the default by shop and blog's older backups.
 	var inUse *BucketInUseError
-	if err := apps.RemoveBucket(owner, "client-a"); !errors.As(err, &inUse) || len(inUse.Apps) != 1 || inUse.Apps[0] != "blog" {
+	if err := apps.RemoveBucket(owner, "client-a", "client-a"); !errors.As(err, &inUse) || len(inUse.Apps) != 1 || inUse.Apps[0] != "blog" {
 		t.Fatalf("remove client-a: err = %v", err)
 	}
-	if err := apps.RemoveBucket(owner, "default"); !errors.As(err, &inUse) || len(inUse.Apps) != 1 || inUse.Apps[0] != "shop" || len(inUse.Older) != 1 || inUse.Older[0] != "blog" {
+	if err := apps.RemoveBucket(owner, "default", "default"); !errors.As(err, &inUse) || len(inUse.Apps) != 1 || inUse.Apps[0] != "shop" || len(inUse.Older) != 1 || inUse.Older[0] != "blog" {
 		t.Fatalf("remove default: err = %v", err)
 	}
 
@@ -136,7 +136,15 @@ func TestBuckets(t *testing.T) {
 	if _, err := apps.AddBucket(ctx, owner, input); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.RemoveBucket(owner, "spare"); err != nil {
+	for _, confirm := range []string{"", "Spare", "default"} {
+		if err := apps.RemoveBucket(owner, "spare", confirm); !errors.Is(err, ErrConfirmMismatch) {
+			t.Fatalf("remove with confirm %q: err = %v", confirm, err)
+		}
+	}
+	if _, err := apps.Bucket(owner.WorkspaceID, "spare"); err != nil {
+		t.Fatalf("a refused confirm removed the bucket: %v", err)
+	}
+	if err := apps.RemoveBucket(owner, "spare", "spare"); err != nil {
 		t.Fatalf("remove an unused bucket: %v", err)
 	}
 	if _, err := apps.Bucket(owner.WorkspaceID, "spare"); !errors.Is(err, repository.ErrBucketNotFound) {
@@ -185,7 +193,7 @@ func TestFirstBucketIsTheDefault(t *testing.T) {
 		t.Fatalf("first bucket = %+v, %v", bucket, err)
 	}
 	// Without apps the last bucket may go.
-	if err := apps.RemoveBucket(other, "first"); err != nil {
+	if err := apps.RemoveBucket(other, "first", "first"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := apps.DefaultBucket(other.WorkspaceID); !errors.Is(err, ErrNoBackups) {

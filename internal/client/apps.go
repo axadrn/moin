@@ -109,8 +109,9 @@ func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
 }
 
 // RemoveApp stops an app and removes it. Its data stays on the server.
-func (c *Client) RemoveApp(ctx context.Context, app string) error {
-	return c.do(ctx, http.MethodDelete, appPath(app), nil, nil)
+// confirm is the app's name, typed out; the control plane checks it.
+func (c *Client) RemoveApp(ctx context.Context, app, confirm string) error {
+	return c.do(ctx, http.MethodDelete, appPath(app)+"?confirm="+url.QueryEscape(confirm), nil, nil)
 }
 
 // Deploy uploads a gzipped source tarball and starts a deploy.

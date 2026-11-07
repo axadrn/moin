@@ -62,14 +62,22 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		t.Fatalf("payer: %+v", user)
 	}
 
-	if err := admin.SetForeverFree(target.User, session, payer.User.ID, true); !errors.Is(err, ErrAdminPermission) {
+	if err := admin.SetForeverFree(target.User, session, payer.User.ID, true, payer.User.Email); !errors.Is(err, ErrAdminPermission) {
 		t.Fatalf("a non-admin: err = %v", err)
 	}
-	if err := admin.SetForeverFree(operator.User, session, payer.User.ID, true); !errors.Is(err, ErrPaying) {
+	if err := admin.SetForeverFree(operator.User, session, payer.User.ID, true, payer.User.Email); !errors.Is(err, ErrPaying) {
 		t.Fatalf("a paying workspace: err = %v", err)
 	}
 
-	if err := admin.SetForeverFree(operator.User, session, target.User.ID, true); err != nil {
+	for _, confirm := range []string{"", "payer@example.com"} {
+		if err := admin.SetForeverFree(operator.User, session, target.User.ID, true, confirm); !errors.Is(err, ErrConfirmMismatch) {
+			t.Fatalf("confirm %q: err = %v", confirm, err)
+		}
+	}
+	if user := plans()["target@example.com"]; user.Plan != model.AdminPlanTrial {
+		t.Fatalf("a refused confirm changed the plan: %+v", user)
+	}
+	if err := admin.SetForeverFree(operator.User, session, target.User.ID, true, " "+target.User.Email+" "); err != nil {
 		t.Fatal(err)
 	}
 	if user := plans()["target@example.com"]; user.Plan != model.AdminPlanFreeForever {
@@ -77,7 +85,7 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 	}
 
 	// Ended during the trial: the rest of the trial.
-	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false); err != nil {
+	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false, target.User.Email); err != nil {
 		t.Fatal(err)
 	}
 	after, err := subscriptions.ByWorkspaceID(target.Workspace.ID)

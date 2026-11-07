@@ -90,7 +90,7 @@ func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request
 func (h *AdminHandler) ForeverFree(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("userID")
 	on := r.FormValue("forever_free") == "true"
-	err := h.admin.SetForeverFree(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID, on)
+	err := h.admin.SetForeverFree(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID, on, confirmation(r))
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -150,6 +150,10 @@ func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err e
 		status = http.StatusConflict
 		title = "Action not allowed"
 		description = err.Error()
+	case errors.Is(err, service.ErrConfirmMismatch):
+		status = http.StatusUnprocessableEntity
+		title = "Nothing changed"
+		description = errorMessage(err)
 	default:
 		slog.Error("admin action failed", "error", err)
 	}

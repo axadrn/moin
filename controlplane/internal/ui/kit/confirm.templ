@@ -7,7 +7,8 @@ package kit
 // label of the clicked button, or data-confirm-action. With
 // data-confirm-name on the element or one around it, the button works only
 // once that name is typed, for what is big and cannot be undone; the name
-// has a copy button.
+// has a copy button. The typed name goes along as X-Moin-Confirm,
+// URI-encoded, and the service checks it again.
 templ ConfirmDialog() {
 	@Dialog("confirm-dialog", "", "") {
 		<div class="flex flex-col gap-3" data-confirm-typed hidden>
@@ -31,7 +32,7 @@ templ ConfirmDialog() {
 }
 
 // confirmScript opens the dialog for htmx:confirm and lets the request go
-// once it closed with the button, or drops it.
+// once it closed with the button, with the typed name, or drops it.
 templ confirmScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {
@@ -62,7 +63,7 @@ templ confirmScript() {
 				const field = part("input");
 				field.value = "";
 				accept.disabled = name !== "";
-				pending = { name, accepted: false, issue: issueRequest, drop: dropRequest };
+				pending = { name, accepted: false, ctx, issue: issueRequest, drop: dropRequest };
 				popup().showModal();
 				if (name) field.focus();
 				else accept.focus();
@@ -73,6 +74,7 @@ templ confirmScript() {
 			const accept = () => {
 				if (!pending || part("accept").disabled) return;
 				pending.accepted = true;
+				if (pending.name) pending.ctx.request.headers["X-Moin-Confirm"] = encodeURIComponent(part("input").value.trim());
 				popup().close();
 			};
 			document.addEventListener("click", (event) => {

@@ -114,7 +114,7 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id")); err == nil {
 		name = server.Name
 	}
-	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"))
+	uninstall, apps, err := h.servers.Delete(actor(r), r.PathValue("id"), confirmation(r))
 	if errors.Is(err, repository.ErrServerHasApps) {
 		answerFailed(w, r, "Server not removed", "It is online: remove its apps first, so nothing keeps running unseen.")
 		return

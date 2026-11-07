@@ -133,10 +133,7 @@ func (t moinTools) removeBucket(_ context.Context, caller Caller, input RemoveBu
 	if err != nil {
 		return Done{}, err
 	}
-	if err := confirmed(input.Confirm, bucket.Name); err != nil {
-		return Done{}, err
-	}
-	err = t.services.Apps.RemoveBucket(caller.actor(), bucket.Name)
+	err = t.services.Apps.RemoveBucket(caller.actor(), bucket.Name, input.Confirm)
 	if err != nil {
 		return Done{}, err
 	}

@@ -121,9 +121,9 @@ func (h *AppsHandler) EditBucket(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewBucket(*bucket))
 }
 
-// DeleteBucket removes a bucket nothing uses.
+// DeleteBucket removes a bucket nothing uses; ?confirm= is its name.
 func (h *AppsHandler) DeleteBucket(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveBucket(actor(r), r.PathValue("name"))
+	err := h.apps.RemoveBucket(actor(r), r.PathValue("name"), r.URL.Query().Get("confirm"))
 	if err != nil {
 		ServiceError(w, err)
 		return

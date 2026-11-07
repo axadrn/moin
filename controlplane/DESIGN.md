@@ -230,15 +230,22 @@ Messages read like the CLI: short and concrete, never "Success", "Error" or
 ## Asking first
 
 Three tiers, the same on every surface. The API never asks: the caller
-decides.
+decides, and for tier 1 sends the name.
 
 1. **Big and cannot be undone** (delete the workspace or the account,
    remove an app, a server or the bucket, restore over live data): the
    name must be typed out. Web: the confirm dialog shows the name with a
    copy button and the button works only once it matches. CLI: "Type
-   blog to confirm:", `--yes` skips it for scripts. TUI: type the name,
+   blog to confirm:", scripts pass `--confirm blog`. TUI: type the name,
    then `enter`; paste works. MCP: destructive, and the tool takes
    `confirm`, the name. Deleting the account asks for DELETE.
+   Tier 1 is checked by the service, never only in the browser or a
+   client: the method takes `confirm` and refuses with
+   `ErrConfirmMismatch` (`confirm_mismatch`, 422) unless it is the name,
+   spaces around it trimmed (`internal/service/confirm.go`). The web
+   dialog sends what was typed as `X-Moin-Confirm`, URI-encoded; the API
+   takes `?confirm=`; the CLI asks or takes `--confirm <name>`, as `--yes`
+   is not enough; MCP takes `confirm`.
 2. **Reversible or small** (stop an app, roll back, revoke a token or an
    invitation, remove a domain, an env var, a registry login, a key, a
    member or the password, unlink a repo, a new or no deploy hook, change
@@ -256,8 +263,8 @@ only the account keeps its dialog, as the server checks the DELETE. The
 confirm dialog, the palette and the list of `kit.Select` are the only
 overlays: no menus, popovers or
 sheets. CLI:
-`confirm` and `confirmName` in `internal/cli/args.go`; TUI: `confirmFirst`
-and `confirmName`; MCP: `confirmed`.
+`confirm` and `typeName` in `internal/cli/args.go`; TUI: `confirmFirst`
+and `confirmName`; service: `confirmed`.
 
 ## Status
 

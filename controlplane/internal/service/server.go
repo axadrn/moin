@@ -213,10 +213,14 @@ func (s *ServerService) List(workspaceID string) ([]model.Server, error) {
 // Delete removes a server by ID or name and disconnects its agent. The agent
 // token stops working. It returns the command that removes the agent on the
 // machine, empty when no agent ever connected, so none is installed there,
-// and the apps that went with an offline server.
-func (s *ServerService) Delete(actor Actor, idOrName string) (uninstall string, apps []string, err error) {
+// and the apps that went with an offline server. confirm is the server's
+// name, typed out.
+func (s *ServerService) Delete(actor Actor, idOrName, confirm string) (uninstall string, apps []string, err error) {
 	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
+		return "", nil, err
+	}
+	if err := confirmed(confirm, server.Name); err != nil {
 		return "", nil, err
 	}
 	// An online server keeps its apps until they are removed there, so

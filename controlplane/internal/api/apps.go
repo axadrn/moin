@@ -272,8 +272,9 @@ func (h *AppsHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete stops the app on its server and removes it. Its data stays there.
+// ?confirm= is its name, typed out.
 func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.Delete(r.Context(), actor(r), r.PathValue("app"))
+	err := h.apps.Delete(r.Context(), actor(r), r.PathValue("app"), r.URL.Query().Get("confirm"))
 	if err != nil {
 		ServiceError(w, err)
 		return

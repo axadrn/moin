@@ -48,7 +48,7 @@ Account
 Servers
   servers            List servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
-  servers rm         Remove a server: servers rm web-1 [--yes]
+  servers rm         Remove a server: servers rm web-1 [--confirm web-1]
   servers rename     Rename a server: servers rename web-1 shop-1
   servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
   servers update     Update the agent to the control plane's version now: servers update [web-1]
@@ -61,7 +61,7 @@ Servers
 Apps
   apps               List apps; one app with its domains and deploys: apps <app>
   apps add           Add an app: apps add --server <server> <name>
-  apps rm            Remove an app; its data stays on the server: apps rm <app> [--yes]
+  apps rm            Remove an app; its data stays on the server: apps rm <app> [--confirm <app>]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
 
 Deploys
@@ -134,7 +134,7 @@ Buckets
   buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default], secret key on stdin
   buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
   buckets default    Make one the default for apps without their own: buckets default <name>
-  buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--yes]
+  buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--confirm <name>]
   buckets use        Move an app's uploads and backups: buckets use <bucket> [app], or --default
 
 Env
@@ -605,7 +605,7 @@ func renameServer(ctx context.Context, config client.Config, args []string, stdo
 // removeServer is `servers rm`: it asks for the name, removes the server
 // and says how to remove the agent on it.
 func removeServer(ctx context.Context, config client.Config, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("servers rm", "servers rm <server> [--yes]").withYes()
+	flags := newFlags("servers rm", "servers rm <server> [--confirm <server>]").withConfirm()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -617,11 +617,11 @@ func removeServer(ctx context.Context, config client.Config, args []string, stdi
 		return flags.wrong()
 	}
 	name := flags.Arg(0)
-	err = confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
+	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
 	if err != nil {
 		return err
 	}
-	removed, err := api.RemoveServer(ctx, name)
+	removed, err := api.RemoveServer(ctx, name, typed)
 	if err != nil {
 		return err
 	}

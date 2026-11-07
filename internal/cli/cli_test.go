@@ -143,18 +143,36 @@ func TestOwnUsageNotGoFlags(t *testing.T) {
 func TestDestructiveCommandsAsk(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"moin agent uninstall"}`}}
 	code, _, stderr := runCLI(t, api, "servers", "rm", "web-1")
-	if code != 1 || !strings.Contains(stderr, "--yes") || api.seen("DELETE") {
-		t.Errorf("without --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	if code != 1 || !strings.Contains(stderr, "--confirm web-1") || api.seen("DELETE") {
+		t.Errorf("without --confirm: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
-	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--yes")
-	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1") || !strings.Contains(stdout, "moin agent uninstall") {
-		t.Errorf("with --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	// --yes is not enough for what cannot be undone.
+	code, _, stderr = runCLI(t, api, "servers", "rm", "web-1", "--yes")
+	if code != 1 || !strings.Contains(stderr, "--confirm") || api.seen("DELETE") {
+		t.Errorf("with --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--confirm", "web-1")
+	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1 confirm=web-1") || !strings.Contains(stdout, "moin agent uninstall") {
+		t.Errorf("with --confirm: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
 	// A server whose agent never connected has nothing to uninstall.
 	api = &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":""}`}}
-	code, stdout, _ = runCLI(t, api, "servers", "rm", "web-1", "--yes")
+	code, stdout, _ = runCLI(t, api, "servers", "rm", "web-1", "--confirm", "web-1")
 	if code != 0 || strings.Contains(stdout, "uninstall") || !strings.Contains(stdout, "never connected") {
 		t.Errorf("never connected: code %d, stdout %q", code, stdout)
+	}
+	// The control plane checks what --confirm says: the CLI sends it as given.
+	for _, args := range [][]string{
+		{"servers", "rm", "web-1", "--confirm", "web-2"},
+		{"apps", "rm", "shop", "--confirm", "shop"},
+		{"buckets", "rm", "client-a", "--confirm", "client-a"},
+	} {
+		api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":""}`}}
+		runCLI(t, api, args...)
+		want := map[string]string{"servers": "DELETE /api/v1/servers/web-1", "apps": "DELETE /api/v1/apps/shop", "buckets": "DELETE /api/v1/buckets/client-a"}[args[0]] + " confirm=" + args[4]
+		if !api.seen(want) {
+			t.Errorf("%v: requests %v, want %s", args, api.requests, want)
+		}
 	}
 	for _, args := range [][]string{
 		{"apps", "rm", "shop"},
@@ -170,7 +188,8 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 	} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.de"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
 		code, _, stderr := runCLI(t, api, args...)
-		if code != 1 || !strings.Contains(stderr, "--yes") {
+		// The big ones want the name, the others --yes.
+		if code != 1 || (!strings.Contains(stderr, "--yes") && !strings.Contains(stderr, "--confirm "+args[2])) {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
 		}
 		for _, request := range api.requests {
@@ -279,7 +298,7 @@ func TestHelpRunsNothing(t *testing.T) {
 
 func TestHelpListsOnlyItsFlags(t *testing.T) {
 	code, stdout, _ := runCLI(t, &fakeAPI{}, "buckets", "rm", "--help")
-	if code != 0 || !strings.Contains(stdout, "--yes") || strings.Contains(stdout, "--endpoint") || strings.Contains(stdout, "--app") {
+	if code != 0 || !strings.Contains(stdout, "--confirm") || strings.Contains(stdout, "--endpoint") || strings.Contains(stdout, "--app") {
 		t.Errorf("buckets rm help: code %d, stdout %q", code, stdout)
 	}
 	code, stdout, _ = runCLI(t, &fakeAPI{}, "buckets", "add", "--help")

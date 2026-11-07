@@ -31,7 +31,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 - No login tool and no browser login: the token is all an agent needs.
 - A read-only token calls the read tools; changes need read and write.
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
-- Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it.
+- Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.
 - Tools take the app as `app` and the server as `server`; the older `name` still works for both, for now.
 
 ## Tools

@@ -99,7 +99,7 @@ API: DELETE /api/v1/buckets/{name}
 MCP: remove_bucket
 ```
 
-moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that apps moved away from, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name; `--yes` skips it in scripts.
+moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that apps moved away from, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name, and the control plane checks it: a script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an agent as `confirm`.
 
 ## Good to know
 

@@ -99,7 +99,7 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		return nil
 	case "rm":
-		flags := newFlags("apps rm", "apps rm <app> [--yes]").withApp().withYes()
+		flags := newFlags("apps rm", "apps rm <app> [--confirm <app>]").withApp().withConfirm()
 		if err := flags.parse(args); err != nil {
 			return err
 		}
@@ -113,11 +113,11 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		if err != nil {
 			return err
 		}
-		err = confirmName(stdin, stdout, flags.yes(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name), name)
+		typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name), name)
 		if err != nil {
 			return err
 		}
-		err = api.RemoveApp(ctx, name)
+		err = api.RemoveApp(ctx, name, typed)
 		if err != nil {
 			return err
 		}

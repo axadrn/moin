@@ -434,7 +434,7 @@ func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show boo
 
 // Delete stops the app on its server and removes it, then goes to the list.
 func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.Delete(r.Context(), actor(r), r.PathValue("app"))
+	err := h.apps.Delete(r.Context(), actor(r), r.PathValue("app"), confirmation(r))
 	if err != nil {
 		failed(w, r, "App not removed", err, nil)
 		return

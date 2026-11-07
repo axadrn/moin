@@ -424,12 +424,12 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	if renamed.Server.Name != "box-3" {
 		t.Fatalf("rename_server = %#v", renamed)
 	}
-	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box"}), "validation_failed")
+	toolError(t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box"}), "confirm_mismatch")
 	// box-3 never connected: no agent to uninstall there.
 	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-3", "confirm": "box-3"})); removed.UninstallCommand != "" || !strings.Contains(removed.Message, "never connected") {
 		t.Fatalf("removed a server that never connected = %+v", removed)
 	}
-	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "validation_failed")
+	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "confirm_mismatch")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
 	output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "1", "GONE": "1"}}))
 	replaced := output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "2", "NEW": "1"}}))

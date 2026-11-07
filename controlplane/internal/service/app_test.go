@@ -298,7 +298,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	agent.sent = nil
 	agent.mu.Unlock()
 	go answer(protocol.TypeAppRemove, protocol.TypeError, protocol.Error{Message: "docker is not running"})
-	err = apps.Delete(context.Background(), owner, "blog")
+	err = apps.Delete(context.Background(), owner, "blog", "blog")
 	var agentErr *AgentError
 	if !errors.As(err, &agentErr) || agentErr.Message != "docker is not running" {
 		t.Fatalf("delete with an agent error: err = %v", err)
@@ -307,7 +307,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 		t.Fatalf("a failed delete removed the app: %v", err)
 	}
 	// It is online: its apps go first, so nothing runs on unseen.
-	if _, _, err := servers.Delete(owner, server.ID); !errors.Is(err, repository.ErrServerHasApps) {
+	if _, _, err := servers.Delete(owner, server.ID, server.Name); !errors.Is(err, repository.ErrServerHasApps) {
 		t.Fatalf("delete an online server with apps: err = %v", err)
 	}
 
@@ -315,7 +315,7 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 	agent.sent = nil
 	agent.mu.Unlock()
 	go answer(protocol.TypeAppRemove, protocol.TypeOK, nil)
-	err = apps.Delete(context.Background(), owner, "blog")
+	err = apps.Delete(context.Background(), owner, "blog", "blog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,11 +330,22 @@ func TestDeleteOnAServerThatNeverConnected(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.Delete(context.Background(), owner, "blog"); err != nil {
+	for _, confirm := range []string{"", "shop"} {
+		if err := apps.Delete(context.Background(), owner, "blog", confirm); !errors.Is(err, ErrConfirmMismatch) {
+			t.Fatalf("delete with confirm %q: err = %v", confirm, err)
+		}
+		if _, _, err := servers.Delete(owner, server.ID, confirm); !errors.Is(err, ErrConfirmMismatch) {
+			t.Fatalf("delete the server with confirm %q: err = %v", confirm, err)
+		}
+	}
+	if _, err := apps.Get(owner.WorkspaceID, "blog"); err != nil {
+		t.Fatalf("a refused confirm removed the app: %v", err)
+	}
+	if err := apps.Delete(context.Background(), owner, "blog", "blog"); err != nil {
 		t.Fatalf("delete on a server that never connected: %v", err)
 	}
 	// No agent ever connected, so none is left to uninstall.
-	if uninstall, gone, err := servers.Delete(owner, server.ID); err != nil || uninstall != "" || len(gone) != 0 {
+	if uninstall, gone, err := servers.Delete(owner, server.ID, server.Name); err != nil || uninstall != "" || len(gone) != 0 {
 		t.Fatalf("delete the empty server = %q, %v, %v", uninstall, gone, err)
 	}
 }
@@ -351,7 +362,7 @@ func TestDeleteAnOfflineServerTakesItsApps(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	_, gone, err := servers.Delete(owner, server.ID)
+	_, gone, err := servers.Delete(owner, server.ID, server.Name)
 	if err != nil || strings.Join(gone, ",") != "blog,shop" {
 		t.Fatalf("delete the offline server = %v, %v", gone, err)
 	}

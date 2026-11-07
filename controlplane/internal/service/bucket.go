@@ -304,10 +304,13 @@ func (s *AppService) MakeDefaultBucket(ctx context.Context, actor Actor, name st
 
 // RemoveBucket forgets a bucket. One that apps use, or that keeps older
 // backups of an app, stays: BucketInUseError says which. What is in the
-// bucket stays either way.
-func (s *AppService) RemoveBucket(actor Actor, name string) error {
+// bucket stays either way. confirm is the bucket's name, typed out.
+func (s *AppService) RemoveBucket(actor Actor, name, confirm string) error {
 	bucket, err := s.apps.Bucket(actor.WorkspaceID, name)
 	if err != nil {
+		return err
+	}
+	if err := confirmed(confirm, bucket.Name); err != nil {
 		return err
 	}
 	apps, older, err := s.apps.BucketApps(actor.WorkspaceID, bucket.ID)

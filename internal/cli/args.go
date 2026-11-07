@@ -20,9 +20,10 @@ import (
 // line.
 type flagSet struct {
 	*flag.FlagSet
-	usage   string
-	appFlag *string
-	yesFlag *bool
+	usage       string
+	appFlag     *string
+	yesFlag     *bool
+	confirmFlag *string
 }
 
 // newFlags makes the flags of a command. usage is the command line without
@@ -42,6 +43,13 @@ func (f *flagSet) withApp() *flagSet {
 // withYes adds --yes, which skips the question before a destructive step.
 func (f *flagSet) withYes() *flagSet {
 	f.yesFlag = f.Bool("yes", false, "do it without asking")
+	return f
+}
+
+// withConfirm adds --confirm, the name typed out, for what is big and
+// cannot be undone: scripts pass it, as --yes is not enough there.
+func (f *flagSet) withConfirm() *flagSet {
+	f.confirmFlag = f.String("confirm", "", "the name, typed out, to do it without asking")
 	return f
 }
 
@@ -84,6 +92,14 @@ func (f *flagSet) wrong() error {
 
 // yes reports whether --yes was given.
 func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
+
+// confirmed is what --confirm gave, empty without it.
+func (f *flagSet) confirmed() string {
+	if f.confirmFlag == nil {
+		return ""
+	}
+	return *f.confirmFlag
+}
 
 // app picks the app the command works on: --app, then the argument, then
 // x-moin.app in compose.yml, then the directory name. A not found error
@@ -180,9 +196,23 @@ func isTerminal(r io.Reader) bool {
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 
-// confirm asks before a destructive step. --yes skips the question; without
-// a terminal and without --yes it refuses, so a script never removes
-// something by accident.
+// typeName asks before something big that cannot be undone and returns
+// the name typed out, which the control plane checks again. given, from
+// --confirm, answers it for scripts; without a terminal and without it,
+// it refuses, so a script never removes something by accident.
+func typeName(stdin io.Reader, stdout io.Writer, given, question, name string) (string, error) {
+	if given != "" {
+		return given, nil
+	}
+	if !isTerminal(stdin) {
+		return "", fmt.Errorf("%s Answer it on a terminal, or add --confirm %s", question, name)
+	}
+	if err := askName(stdin, stdout, question, name); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
 // confirmName asks before something big that cannot be undone: the answer
 // must be name, typed out. --yes skips it for scripts.
 func confirmName(stdin io.Reader, stdout io.Writer, yes bool, question, name string) error {
@@ -192,6 +222,11 @@ func confirmName(stdin io.Reader, stdout io.Writer, yes bool, question, name str
 	if !isTerminal(stdin) {
 		return fmt.Errorf("%s Answer it on a terminal, or add --yes", question)
 	}
+	return askName(stdin, stdout, question, name)
+}
+
+// askName asks on the terminal for name, typed out.
+func askName(stdin io.Reader, stdout io.Writer, question, name string) error {
 	fmt.Fprintln(stdout, style.Warning.Render("?")+" "+question)
 	fmt.Fprint(stdout, "  Type "+style.Bold.Render(name)+" to confirm: ")
 	answer, err := readLine(stdin)
@@ -205,6 +240,9 @@ func confirmName(stdin io.Reader, stdout io.Writer, yes bool, question, name str
 	return errReported
 }
 
+// confirm asks before a destructive step. --yes skips the question; without
+// a terminal and without --yes it refuses, so a script never removes
+// something by accident.
 func confirm(stdin io.Reader, stdout io.Writer, yes bool, question string) error {
 	if yes {
 		return nil

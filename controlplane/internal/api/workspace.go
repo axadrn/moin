@@ -342,11 +342,11 @@ func (h *WorkspaceHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// Delete deletes the workspace.
+// Delete deletes the workspace; ?confirm= is its name, typed out.
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	workspace := ctxkeys.Workspace(r.Context())
-	err := h.workspaces.Delete(ctxkeys.WorkspaceMember(r.Context()), workspace)
+	err := h.workspaces.Delete(ctxkeys.WorkspaceMember(r.Context()), workspace, r.URL.Query().Get("confirm"))
 	if err != nil {
 		ServiceError(w, err)
 		return

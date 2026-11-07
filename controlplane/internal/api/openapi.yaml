@@ -1066,11 +1066,13 @@ paths:
       tags: [Servers]
       operationId: deleteServer
       summary: Remove a server
-      description: Disconnects its agent. The agent token stops working. The agent stays installed on the server until you run `uninstall_command` there; it is empty when no agent ever connected.
+      description: Disconnects its agent. The agent token stops working. The agent stays installed on the server until you run `uninstall_command` there; it is empty when no agent ever connected. `confirm` is the server's name.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
+      parameters:
+        - $ref: '#/components/parameters/Confirm'
       responses:
         '200':
           description: The server is removed.
@@ -1089,6 +1091,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_has_apps`. The server is online and has apps: remove them first. An offline server goes with its apps.'
+        '422':
+          $ref: '#/components/responses/ConfirmMismatch'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -1439,11 +1443,13 @@ paths:
       tags: [Apps]
       operationId: deleteApp
       summary: Remove an app
-      description: The agent stops the app and removes its containers and images. Volumes and data stay on the server.
+      description: The agent stops the app and removes its containers and images. Volumes and data stay on the server. `confirm` is the app's name.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
+      parameters:
+        - $ref: '#/components/parameters/Confirm'
       responses:
         '204':
           description: The app is removed.
@@ -1457,6 +1463,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`.'
+        '422':
+          $ref: '#/components/responses/ConfirmMismatch'
         '424':
           $ref: '#/components/responses/AgentError'
         '500':
@@ -2985,11 +2993,13 @@ paths:
       tags: [Backups]
       operationId: deleteBucket
       summary: Remove a bucket
-      description: Forgets a bucket. A bucket that apps use, or that keeps older backups of an app, is refused. What is in the bucket stays.
+      description: Forgets a bucket. A bucket that apps use, or that keeps older backups of an app, is refused. What is in the bucket stays. `confirm` is the bucket's name.
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
+      parameters:
+        - $ref: '#/components/parameters/Confirm'
       responses:
         '204':
           description: The bucket is forgotten.
@@ -3003,6 +3013,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`bucket_in_use` when apps use it or it keeps older backups; the message names the apps.'
+        '422':
+          $ref: '#/components/responses/ConfirmMismatch'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3768,6 +3780,9 @@ paths:
       tags: [Workspaces]
       operationId: deleteWorkspace
       summary: Delete a workspace
+      description: Deletes the workspace for good. `confirm` is its name.
+      parameters:
+        - $ref: '#/components/parameters/Confirm'
       responses:
         '204':
           description: The workspace is deleted.
@@ -3780,6 +3795,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`active_subscription`. End paid access first.'
+        '422':
+          $ref: '#/components/responses/ConfirmMismatch'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4419,6 +4436,13 @@ components:
       description: 'A personal API token from `POST /api/v1/account/tokens`, sent as `Authorization: Bearer pat_...`. The role in the security entry of an operation is the scope it needs.'
 
   parameters:
+    Confirm:
+      name: confirm
+      in: query
+      required: true
+      description: 'The name of what goes, typed out, for what is big and cannot be undone: ask the user first. Spaces around it do not count.'
+      schema:
+        type: string
     AlertDestination:
       name: destination
       in: path
@@ -4654,6 +4678,12 @@ components:
             $ref: '#/components/schemas/Error'
     UnsupportedMediaType:
       description: '`unsupported_media_type`. Send the body as `application/json`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ConfirmMismatch:
+      description: '`confirm_mismatch`. `confirm` is missing or not the name: "Type the name to confirm."'
       content:
         application/json:
           schema:

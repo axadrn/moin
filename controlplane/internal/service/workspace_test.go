@@ -200,7 +200,7 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 		t.Fatalf("activate paid subscription: %v", err)
 	}
 
-	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); !errors.Is(err, ErrActiveSubscription) {
+	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name); !errors.Is(err, ErrActiveSubscription) {
 		t.Fatalf("Delete() active subscription error = %v, want ErrActiveSubscription", err)
 	}
 	if _, err := repository.NewWorkspaces(database).ByID(owner.Workspace.ID); err != nil {
@@ -213,14 +213,19 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 	if err := subscriptions.Update(owner.Subscription); err != nil {
 		t.Fatalf("expire paid subscription: %v", err)
 	}
-	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); !errors.Is(err, ErrActiveSubscription) {
+	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name); !errors.Is(err, ErrActiveSubscription) {
 		t.Fatalf("Delete() expired local access with provider subscription error = %v, want ErrActiveSubscription", err)
 	}
 	owner.Subscription.ProviderSubscriptionID = nil
 	if err := subscriptions.Update(owner.Subscription); err != nil {
 		t.Fatalf("clear provider subscription: %v", err)
 	}
-	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); err != nil {
+	for _, confirm := range []string{"", owner.Workspace.Name + "x"} {
+		if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, confirm); !errors.Is(err, ErrConfirmMismatch) {
+			t.Fatalf("Delete() with confirm %q error = %v, want ErrConfirmMismatch", confirm, err)
+		}
+	}
+	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name); err != nil {
 		t.Fatalf("Delete() after provider subscription ended error = %v", err)
 	}
 	if _, err := repository.NewWorkspaces(database).ByID(owner.Workspace.ID); !errors.Is(err, repository.ErrWorkspaceNotFound) {
@@ -243,13 +248,13 @@ func TestPendingCheckoutBlocksWorkspaceDeletion(t *testing.T) {
 	if _, _, _, err := subscriptions.BeginCheckout(owner.Workspace.ID, model.ProviderStripe, model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly, pendingUntil.Add(-time.Minute), pendingUntil); err != nil {
 		t.Fatalf("BeginCheckout() error = %v", err)
 	}
-	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); !errors.Is(err, ErrActiveSubscription) {
+	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name); !errors.Is(err, ErrActiveSubscription) {
 		t.Fatalf("Delete() pending checkout error = %v, want ErrActiveSubscription", err)
 	}
 	if _, err := database.Exec(`UPDATE subscriptions SET checkout_pending_until = $1 WHERE workspace_id = $2`, time.Now().Add(-time.Minute), owner.Workspace.ID); err != nil {
 		t.Fatalf("expire checkout marker: %v", err)
 	}
-	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); err != nil {
+	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name); err != nil {
 		t.Fatalf("Delete() after checkout failure error = %v", err)
 	}
 }
@@ -280,7 +285,7 @@ func TestConcurrentPaidWebhookAndDeletionKeepWorkspaceRecoverable(t *testing.T) 
 	go func() {
 		defer wait.Done()
 		<-start
-		results <- workspaces.Delete(owner.WorkspaceMember, owner.Workspace)
+		results <- workspaces.Delete(owner.WorkspaceMember, owner.Workspace, owner.Workspace.Name)
 	}()
 	close(start)
 	wait.Wait()

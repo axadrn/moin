@@ -122,7 +122,7 @@ API: POST /api/v1/workspaces
 
 **Leave workspace** takes you out; servers and apps stay for the others. The last owner cannot leave: [change a role](#change-a-role) first.
 
-**Delete workspace** removes it with its team, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner can, after typing its name; it cannot be undone. A paid plan must be cancelled and run out first.
+**Delete workspace** removes it with its team, invitations, activity, servers and apps from moin. Your apps keep running on your servers, and your bucket keeps its backups. Only an owner can, after typing its name, which the control plane checks (the API takes it as `?confirm=<name>`); it cannot be undone. A paid plan must be cancelled and run out first.
 
 ```surfaces
 Web: **Settings**, **Team**, **Leave workspace**

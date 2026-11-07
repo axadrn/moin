@@ -15,6 +15,7 @@ The CLI, the terminal UI and your own scripts use this API; its OpenAPI 3.1 docu
 | Token column | **read**: a read token is enough. **write**: needs a token with read and write. **session**: a signed-in browser only, never a token. **none**: needs no login |
 | Session | sign-in and two-step flows are under `/api/v1/auth`; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
 | Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback` |
+| Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
 | Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place |
 
 Session-only endpoints keep a leaked token from making new tokens, changing roles, removing people or deleting a workspace. [Where things work](/docs/reference/surfaces) shows the same per feature.
@@ -66,7 +67,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/workspaces` | session | makes a workspace |
 | `GET /api/v1/workspaces/{slug}` | read | the team: who is in it, their roles, open invitations |
 | `PATCH /api/v1/workspaces/{slug}/name` | write | renames the workspace (admin) |
-| `DELETE /api/v1/workspaces/{slug}` | session | deletes the workspace (owner) |
+| `DELETE /api/v1/workspaces/{slug}?confirm=<name>` | session | deletes the workspace (owner) |
 | `POST /api/v1/workspaces/{slug}/invitations` | write | invites someone by email (admin) |
 | `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /invitations/{id}` | write | sends an invitation again; revokes it (admin) |
 | `PATCH /api/v1/workspaces/{slug}/members/{id}/role` | session | changes a role (admin; only an owner makes or changes an owner) |
@@ -88,7 +89,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/servers` | write | adds a server and answers its install command once; its token connects one agent within an hour. An empty name gets a generated one |
 | `POST /api/v1/servers/{id}/install` | write | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | write | renames a server: `{"name": "…"}` |
-| `DELETE /api/v1/servers/{id}` | write | removes a server; answers the `uninstall_command` that removes its agent (empty when no agent ever connected) and the `apps` that went with an offline server |
+| `DELETE /api/v1/servers/{id}?confirm=<name>` | write | removes a server; answers the `uninstall_command` that removes its agent (empty when no agent ever connected) and the `apps` that went with an offline server |
 | `POST /api/v1/servers/{id}/update` | write | updates the agent to the control plane's version |
 | `GET` · `PUT /api/v1/agent-updates` | read · write | whether agents update by themselves, `{"auto": true}`; on by default |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | read | CPU, memory, disk, network and load now and over `1h`, `24h`, `7d` or `30d`, and its apps now, the most memory first |
@@ -100,7 +101,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one |
-| `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}` | read · write | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
+| `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}?confirm=<app>` | read · write | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
 | `GET /api/v1/apps/events` | read | the app list as server-sent events |
 | `PUT /api/v1/apps/{app}/pin` | write | `{"pinned": true}` keeps the app above the others that run fine; `false` unpins it |
 | `POST /api/v1/apps/{app}/restart` | write | starts the live deploy again with the current settings |
@@ -172,7 +173,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/apps/{app}/backups/downloads` | write | starts a full copy of a database in the app's own bucket, `202` with its `id` |
 | `GET /api/v1/apps/{app}/backups/downloads/{download}` | write | how the copy stands; `link`, valid 15 minutes, once `state` is `ready` |
 | `GET /api/v1/buckets` · `POST /api/v1/buckets` | read · write | the workspace's buckets, the default first, with the apps that use each; adds one |
-| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it, `409` `bucket_in_use` while apps use it or left it |
+| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it with `?confirm=<name>`, `409` `bucket_in_use` while apps use it or left it |
 | `PUT /api/v1/apps/{app}/bucket` | write | the app's bucket, `{"bucket": "client-a"}`, or `""` for the default; the history starts again there |
 
 ## Alerts

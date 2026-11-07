@@ -196,7 +196,7 @@ API: DELETE /api/v1/apps/{app}
 MCP: remove_app
 ```
 
-You type the app's name to confirm; `--yes` skips it in scripts, and an agent passes the name as `confirm`.
+You type the app's name to confirm, and the control plane checks it: a script passes it as `--confirm <app>`, the API as `?confirm=<app>`, an agent as `confirm`.
 
 ## Push to deploy with GitHub Actions
 

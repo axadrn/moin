@@ -101,11 +101,11 @@ func TestBucketRoutes(t *testing.T) {
 		t.Fatalf("list items = %v", items)
 	}
 
-	status, answer = send("DELETE", "/api/v1/buckets/client-a", "")
+	status, answer = send("DELETE", "/api/v1/buckets/client-a?confirm=client-a", "")
 	if status != http.StatusConflict || code(answer) != "bucket_in_use" || !strings.Contains(answer["error"].(map[string]any)["message"].(string), "blog") {
 		t.Fatalf("remove client-a in use: %d %v", status, answer)
 	}
-	if status, answer := send("DELETE", "/api/v1/buckets/main", ""); status != http.StatusConflict || code(answer) != "bucket_in_use" {
+	if status, answer := send("DELETE", "/api/v1/buckets/main?confirm=main", ""); status != http.StatusConflict || code(answer) != "bucket_in_use" {
 		t.Fatalf("remove the default with older backups: %d %v", status, answer)
 	}
 	if status, answer := send("POST", "/api/v1/apps/blog/restores", `{"moment":""}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {

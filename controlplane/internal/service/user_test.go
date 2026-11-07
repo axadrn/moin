@@ -191,7 +191,7 @@ func TestRefusedAccountDeletionKeepsFiles(t *testing.T) {
 		t.Fatalf("file rows after refused deletion = %d, error = %v", len(remaining), err)
 	}
 
-	err = workspaces.Delete(fixture.WorkspaceMember, fixture.Workspace)
+	err = workspaces.Delete(fixture.WorkspaceMember, fixture.Workspace, fixture.Workspace.Name)
 	if err != nil {
 		t.Fatalf("delete workspace: %v", err)
 	}

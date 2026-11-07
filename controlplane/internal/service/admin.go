@@ -235,15 +235,20 @@ func (s *AdminService) describePlan(user *model.AdminUser, now time.Time) error 
 
 // SetForeverFree makes the first workspace a user created free forever, or
 // puts it back: the rest of its trial, or the free plan once that is over.
-// A paying workspace is not made free forever.
-func (s *AdminService) SetForeverFree(actor *model.User, actorSession *model.Session, targetUserID string, on bool) error {
+// A paying workspace is not made free forever. confirm is the user's email
+// address, typed out.
+func (s *AdminService) SetForeverFree(actor *model.User, actorSession *model.Session, targetUserID string, on bool, confirm string) error {
 	if !s.IsAdmin(actor, actorSession) {
 		return ErrAdminPermission
 	}
 	if s.subscriptions == nil {
 		return ErrNoWorkspace
 	}
-	if _, err := s.users.ByID(targetUserID); err != nil {
+	target, err := s.users.ByID(targetUserID)
+	if err != nil {
+		return err
+	}
+	if err := confirmed(confirm, target.Email); err != nil {
 		return err
 	}
 	workspace, err := s.repository.FirstWorkspace(targetUserID)

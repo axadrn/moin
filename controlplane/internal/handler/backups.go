@@ -120,7 +120,7 @@ func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 
 // RemoveBucket forgets a bucket nothing uses.
 func (h *AppsHandler) RemoveBucket(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveBucket(actor(r), r.PathValue("name"))
+	err := h.apps.RemoveBucket(actor(r), r.PathValue("name"), confirmation(r))
 	if err != nil {
 		failed(w, r, "Bucket not removed", err, nil)
 		return

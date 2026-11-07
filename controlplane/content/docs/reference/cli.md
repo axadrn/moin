@@ -54,7 +54,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin servers add [name]` | adds a server and prints its install command; without a name it gets one like `brave-otter` |
 | `moin servers install-command <name>` | a new one-time install command, to install or move the agent; the old one stops working |
 | `moin servers rename <name> <new name>` | renames a server; its apps stay on it |
-| `moin servers rm <name> [--yes]` | asks you to type its name, removes the server and prints the command that removes its agent there |
+| `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its agent there |
 | `moin servers update [name]` | updates the agent to the control plane's version now; without a name, every online server whose agent differs. See [Agent updates](#agent-updates) |
 | `moin servers auto-update [on\|off]` | shows or sets whether agents update by themselves; on by default |
 | `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off] [--yes]` | how the server is reached; prints what the agent set up. See [Security](/docs/guides/security) |
@@ -76,7 +76,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin apps` | lists apps |
 | `moin apps <app>` | one app: its state, server, domains, password, repo and deploys, and "N changes waiting" with the restart that applies them |
 | `moin apps add --server <server> <name>` | adds an app |
-| `moin apps rm <app> [--yes]` | asks you to type its name and removes the app; its data stays on the server |
+| `moin apps rm <app> [--confirm <app>]` | asks you to type its name and removes the app; its data stays on the server |
 | `moin apps pin [app]` · `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
 
 ## Deploys
@@ -183,7 +183,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin buckets add <name> --endpoint … --bucket … --access-key … [--region auto] [--path <folder>] [--default]` | adds a bucket; the secret key comes on stdin; the first one is the default |
 | `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
 | `moin buckets default <name>` | makes a bucket the default for apps without one of their own |
-| `moin buckets rm <name> [--yes]` | removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
+| `moin buckets rm <name> [--confirm <name>]` | asks you to type its name and removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
 | `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; the history starts again there |
 
 | Flag | Takes |
@@ -219,7 +219,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app shop` is `
 | Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, adding and setting things | nothing |
 
-`--yes` skips the question, the typed name too. Without a terminal, as in CI, these commands refuse unless `--yes` is there, so a script never removes something by accident.
+`--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm shop`, and the control plane checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
 
 ## Agent updates
 

@@ -186,10 +186,7 @@ func (t moinTools) removeServer(_ context.Context, caller Caller, input RemoveSe
 	if err != nil {
 		return RemovedServer{}, err
 	}
-	if err := confirmed(input.Confirm, server.Name); err != nil {
-		return RemovedServer{}, err
-	}
-	command, apps, err := t.services.Servers.Delete(caller.actor(), server.ID)
+	command, apps, err := t.services.Servers.Delete(caller.actor(), server.ID, input.Confirm)
 	if err != nil {
 		return RemovedServer{}, err
 	}
