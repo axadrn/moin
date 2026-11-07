@@ -105,7 +105,7 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 
 - `task dev` runs templ, the application, and Tailwind watchers.
 - `task dev` selects available app and templ proxy ports automatically. Pass `APP_PORT`, `DEV_PORT`, or `OPEN_BROWSER=true` to override its development defaults.
-- `go run github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ@v2.0.0 add <component>` adds a UI component and rebuilds the minified `assets/js/shadcn-templ-*.js` and `internal/ui/components/scripts_bundle.go`; commit both.
+- No foreign UI library, not even for icons or charts: every part comes from our own kit (`internal/ui/kit`, gallery at `/app/<workspace>/dev/kit` in development). Icons are templ components in `kit/icons.templ`, drawn on one 24 grid with `currentColor`; only brand marks keep their official shapes.
 - `go test ./...` runs the test suite.
 - `go test -race ./...` checks concurrency behavior.
 - `go vet ./...` and `go build ./...` run static and build checks.
@@ -120,7 +120,7 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/mcp` serves the MCP tools for agents.
 - `internal/service` owns business rules.
 - `internal/repository` owns raw SQL.
-- `internal/ui` contains templ layouts, pages, blocks, and components.
+- `internal/ui` has three flat folders, each answering one question. `kit/`: what pages are built from (rows, buttons, fields, dialog, icons, chart, wordmark); it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A part goes to `kit/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. No fourth folder without a good reason, no subfolders.
 - `internal/db/migrations` contains the Goose schema.
 - `internal/service/payment` contains the selected billing adapter.
 - `internal/access` contains signup policy, plans, features, limits, quotas, and lifecycle rules.
