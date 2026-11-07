@@ -1,194 +1,106 @@
 package agent
 
 import (
-	"syscall"
-
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/axadrn/moin/internal/human"
 	"io"
 	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/benbjohnson/litestream"
 
 	"github.com/axadrn/moin/protocol"
 )
 
-// A backup is the history of a database: moin writes down every change
-// into the user's bucket and keeps it 7 days. Every day it checks that
-// going back works. Two engines do it, one per kind of database, with the
-// same four verbs:
+// A backup is a copy of a database in the user's own bucket, taken here
+// on the server on the app's schedule and kept as long as the app says;
+// every day moin checks that the newest one restores. Data goes from the
+// server to the bucket, never through the control plane. One engine per
+// kind of database, with the same verbs:
 //
-//	          Record                       Check (daily)
-//	database ────────▶ bucket: every change ────────▶ throwaway copy, verified
-//	   ▲                 for 7 days
-//	   └──────────────── GoBack to a moment: built beside, one switch
+//	database ── Copy ───▶ bucket <database>/copies/<id>
+//	copy ────── Check ──▶ a throwaway database, read through
+//	copy ────── Restore ▶ built beside the live one, one switch,
+//	                      the live one kept as the undo
 //
-//	database ── Download ──▶ bucket downloads/ ──▶ a short-lived link
-//
-// backup_sqlite.go does it with Litestream, backup_postgres.go with WAL-G.
-// Everything goes to the app's bucket, the user's own, never through the
-// control plane:
-//
-//	<path>/<workspace>/<app>/<app ID>/<database>/litestream/ or walg/   the history
-//	<path>/<workspace>/<app>/<app ID>/<database>/before-restore/        SQLite: the copy before each restore
-//	<path>/<workspace>/<app>/<app ID>/<database>/timelines.json         Postgres: the timeline it ran on, since when
-//	<path>/<workspace>/<app>/<app ID>/downloads/                        copies to download
-//
-// The workspace ID keeps workspaces that share a bucket apart, the app ID
-// an app from an earlier one of the same name.
+// backup_sqlite.go copies with VACUUM INTO and records every change with
+// Litestream, backup_postgres.go copies with pg_dump.
 type engine interface {
-	// Record keeps writing down every change of the database into the
-	// bucket. It runs every minute and says what keeps it from working.
-	Record(ctx context.Context) error
-	// GoBack puts the database back to a moment, or undoes an earlier
-	// restore. It builds the restored state beside the live one and
-	// switches in one step; the state before stays as the undo.
-	GoBack(ctx context.Context, to moment, run *restoreRun) error
-	// Check restores the newest state of the history into a throwaway
-	// copy and verifies it; errNothingYet while the history is empty.
-	Check(ctx context.Context) error
-	// Download writes a full copy of the database into a local file.
-	// cleanup removes it.
-	Download(ctx context.Context) (file string, cleanup func(), err error)
-	// Window is how far back the history reaches; it only reads.
-	Window(ctx context.Context) (window, error)
+	// Copy writes a full copy of the live database to w.
+	Copy(ctx context.Context, w io.Writer) error
+	// Restore builds the database beside the live one, stops the app,
+	// renames the live one aside as the undo id and the built one in,
+	// and starts the app.
+	Restore(ctx context.Context, from source, id string) error
+	// Recover is the crash rule of the restore that leaves the undo id:
+	// the live database missing and the undo there, the undo goes back.
+	// switched says the restore had switched.
+	Recover(ctx context.Context, id string) (switched bool, err error)
+	// Check restores a copy into a throwaway database and reads it all.
+	Check(ctx context.Context, copy io.Reader) error
+	// Undos are the states before restores, newest first; Drop removes one.
+	Undos(ctx context.Context) ([]protocol.Copy, error)
+	Drop(ctx context.Context, id string) error
 }
 
-// moment is where GoBack goes: a time, or Copy, the state an earlier
-// restore left behind, which undoes it.
-type moment struct {
-	At   time.Time
-	Copy string
+// source is what a restore goes back to: a copy from the bucket, a
+// minute (SQLite with Every change) or the undo of an earlier restore.
+type source struct {
+	copy io.Reader
+	at   time.Time
+	undo string
 }
 
-// window is the history of a database: since its oldest moment, with
-// newest the newest change in the bucket. note says what it lacks, copies
-// are the states before the restores of the last 7 days.
-type window struct {
-	since, newest time.Time
-	note          string
-	copies        []protocol.Copy
-	// gaps are spans inside it with no way back (Postgres, after a
-	// switch).
-	gaps []gap
-}
+const day = 24 * time.Hour
 
-// errNothingYet is a history with nothing in it yet: a check has nothing
-// to restore, neither passed nor failed.
-var errNothingYet = errors.New("nothing in the bucket yet")
-
-const (
-	keepHistory  = 7 * 24 * time.Hour
-	checkEvery   = 24 * time.Hour
-	firstCheck   = 2 * time.Minute
-	checkTimeout = 2 * time.Hour
-	recordEvery  = time.Minute
-	copyTimeout  = 30 * time.Minute
-	keepUploads  = 24 * time.Hour
-	sweepEvery   = time.Hour
-)
-
-// copyFolderPrefix starts the folder a full copy of a SQLite file goes to
-// next to it. An agent before version 2 used oldCopyFolderPrefix.
-const (
-	copyFolderPrefix    = "." + ourName + "-copy-"
-	oldCopyFolderPrefix = "." + ourName + "-snapshot-"
-)
-
-// backups records every database of the running apps and answers the
-// backup requests of the control plane.
+// backups runs the schedule of every database on the server.
 type backups struct {
 	apps *apps
 	send func(protocol.MessageType, string, any)
 
-	mu sync.Mutex
-	// defaultBucket is the workspace's default bucket, appBuckets the bucket of
-	// each app that uses another one.
-	defaultBucket *protocol.Bucket
-	appBuckets    map[string]*protocol.Bucket
-	// store and watched are Litestream's, see backup_sqlite.go.
-	store   *litestream.Store
+	mu        sync.Mutex
+	bucket    *protocol.Bucket
+	buckets   map[string]*protocol.Bucket
+	schedules map[string]protocol.Schedule
+	states    map[string]*state
+	// stores and watched are Litestream's, see backup_sqlite.go.
+	stores  map[int]*litestream.Store
 	watched map[string]watched
-	// checked is the newest daily check of each database.
-	checked map[string]check
-	// failures are the backups that do not work, and reported what the
-	// agent last told the control plane about each database; see
-	// backup_health.go.
-	failures map[string]failure
-	reported map[string]string
-	// walg is WAL-G's, see backup_postgres.go and walg.go.
-	walg walg
-	// recording keeps two rounds of Record apart.
-	recording sync.Mutex
-	// restoring are the databases a restore works on, by key: Record
-	// leaves them alone until it is done. clearFirst are the SQLite files
-	// whose old history in the bucket must go before Record follows them
-	// again.
-	restoring  map[string]bool
-	clearFirst map[string]bool
-	// registering hands SQLite files to Litestream one at a time.
-	registering sync.Mutex
-	// busy keeps Record and a restore of one Postgres apart, by key: a
-	// Record that runs when the restore starts ends first.
-	busy map[string]*sync.Mutex
-	// journal keeps the files of the restore journal whole; see
-	// backup_journal.go.
-	journal sync.Mutex
-	// keepHook replaces the copy before a restore in tests, crashHook ends
-	// a restore at a step as a killed agent would.
-	keepHook  func() (string, error)
-	crashHook func(step string) bool
-	// stateErr says a state file is damaged; see loadState.
-	stateErr string
+	// copying takes one copy at a time, ticking one round.
+	copying, ticking sync.Mutex
+	// crash ends a restore at a step as a killed agent would, in tests.
+	crash func(step string) bool
 }
 
-// check is the newest daily check of a database.
-type check struct {
-	at  time.Time
-	err string
+// state is what the agent knows of one database: its newest copy, why
+// the last one failed, the newest daily check, what the control plane
+// heard last, and whether a restore works on it.
+type state struct {
+	copied             time.Time
+	failed             string
+	checkedAt          time.Time
+	checkErr, reported string
+	restoring          bool
 }
+
+var errCrash = errors.New("the agent stopped here")
 
 func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups {
-	b := &backups{apps: a, send: send, watched: map[string]watched{}, checked: map[string]check{}}
-	// A restore that swapped a file before the agent stopped still has
-	// the history from before to clear.
-	b.clearFirst = b.loadSet(clearFirstFile)
-	// A history that lost its place stays lost after a restart.
-	b.loadBreaks()
-	return b
+	return &backups{apps: a, send: send, states: map[string]*state{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
 }
 
-// lockBusy holds the busy lock of a database.
-func (b *backups) lockBusy(k string) func() {
-	b.mu.Lock()
-	if b.busy == nil {
-		b.busy = map[string]*sync.Mutex{}
-	}
-	lock := b.busy[k]
-	if lock == nil {
-		lock = &sync.Mutex{}
-		b.busy[k] = lock
-	}
-	b.mu.Unlock()
-	lock.Lock()
-	return lock.Unlock
-}
-
-// engine is the engine of a database.
 func (b *backups) engine(app string, database protocol.Database) engine {
 	if database.Postgres() {
 		return &postgresEngine{b: b, app: app, database: database}
@@ -196,133 +108,335 @@ func (b *backups) engine(app string, database protocol.Database) engine {
 	return &sqliteEngine{b: b, app: app, database: database}
 }
 
-// key names a database in the agent's state: its file, or for Postgres
-// the app and service.
-func key(app string, database protocol.Database) string {
+// state is the state of a database, by its file or its app and service.
+// The caller holds the lock.
+func (b *backups) state(app string, database protocol.Database) *state {
+	k := database.HostPath
 	if database.Postgres() {
-		return "postgres:" + app + "/" + database.Service
+		k = app + "/" + database.Service
 	}
-	return database.HostPath
+	if b.states[k] == nil {
+		b.states[k] = &state{}
+	}
+	return b.states[k]
 }
 
-// backupConfig answers backup.config (BackupConfig): every bucket must be
-// one the rules allow.
-func (r *runner) backupConfig(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
-	var config protocol.BackupConfig
-	if err := message.Decode(&config); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if err := checkBucket(rules, r.rulesFile, config.Bucket); err != nil {
-		r.fail(message, err)
-		return
-	}
-	for _, bucket := range config.AppBuckets {
-		if err := checkBucket(rules, r.rulesFile, bucket); err != nil {
-			r.fail(message, err)
-			return
-		}
-	}
-	kept := r.apps.keepIDs(config.Apps)
-	if err := r.backups.configure(ctx, config.Bucket, config.AppBuckets); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if kept {
-		r.backups.reconcile()
-	}
-	r.send(protocol.TypeOK, message.RequestID, nil)
-}
+func newCopyID() string { return time.Now().UTC().Format(protocol.CopyIDLayout) }
 
-// configure sets the default bucket and the buckets of single apps, and
-// records every database into its app's bucket. A nil bucket stops it.
-func (b *backups) configure(ctx context.Context, bucket *protocol.Bucket, appBuckets map[string]*protocol.Bucket) error {
-	for _, other := range appBuckets {
-		if other == nil || other.Workspace == "" {
-			return errors.New("start backups: a bucket has no workspace folder, update the control plane")
-		}
-	}
+// configure sets the buckets and schedules; a nil bucket stops backups.
+func (b *backups) configure(bucket *protocol.Bucket, buckets map[string]*protocol.Bucket, schedules map[string]protocol.Schedule) {
 	b.mu.Lock()
-	if b.defaultBucket != nil && bucket != nil && *b.defaultBucket == *bucket {
-		// The same default: only apps that changed buckets start again.
-		changed := !sameBuckets(b.appBuckets, appBuckets)
-		b.appBuckets = appBuckets
-		b.mu.Unlock()
-		if changed {
-			b.reconcile()
-		}
-		return nil
-	}
-	b.closeStoreLocked()
-	b.defaultBucket, b.appBuckets = bucket, appBuckets
-	if bucket == nil {
-		b.mu.Unlock()
-		return nil
-	}
-	if bucket.Workspace == "" {
-		b.defaultBucket = nil
-		b.mu.Unlock()
-		return errors.New("start backups: the bucket has no workspace folder, update the control plane")
-	}
-	err := b.openStoreLocked(ctx)
+	b.bucket, b.buckets, b.schedules = bucket, buckets, schedules
 	b.mu.Unlock()
-	if err != nil {
-		return fmt.Errorf("start backups: %w", err)
+	if bucket == nil {
+		b.forget(nil)
 	}
-	b.reconcile()
+}
+
+func (b *backups) on() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.bucket != nil
+}
+
+func (b *backups) schedule(app string) protocol.Schedule {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if s, ok := b.schedules[app]; ok && s.Every > 0 && s.Keep > 0 {
+		return s
+	}
+	return protocol.DefaultSchedule
+}
+
+// where is the bucket of a database and its folder in it:
+// <path>/<workspace>/<app>/<app ID>/<database>.
+func (b *backups) where(app string, database protocol.Database) (*protocol.Bucket, string, error) {
+	b.mu.Lock()
+	bucket := b.buckets[app]
+	if bucket == nil {
+		bucket = b.bucket
+	}
+	b.mu.Unlock()
+	if bucket == nil {
+		return nil, "", errors.New("backups are not set up: add a bucket under Data")
+	}
+	id := b.apps.appID(app)
+	if id == "" {
+		return nil, "", fmt.Errorf("deploy %s once more to start its backups", app)
+	}
+	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
+}
+
+// copy streams a copy of a database into the bucket as id.
+func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) error {
+	bucket, folder, err := b.where(app, database)
+	if err != nil {
+		return err
+	}
+	b.copying.Lock()
+	defer b.copying.Unlock()
+	reader, writer := io.Pipe()
+	go func() { writer.CloseWithError(b.engine(app, database).Copy(ctx, writer)) }()
+	_, err = manager.NewUploader(s3Client(bucket)).Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres())), Body: reader})
+	reader.CloseWithError(errors.New("the upload ended"))
+	if err != nil {
+		return fmt.Errorf("copy %s: %w", database.Path, err)
+	}
+	at, _ := time.Parse(protocol.CopyIDLayout, id)
+	b.mu.Lock()
+	if s := b.state(app, database); at.After(s.copied) {
+		s.copied = at
+	}
+	b.mu.Unlock()
 	return nil
 }
 
-// reconcile records the SQLite databases of the running releases at once
-// and stops the gone ones: deploys, restores and removals call it. Postgres
-// follows within a minute in recordAll: its companion takes a while.
-func (b *backups) reconcile() { b.recordSome(context.Background(), false) }
-
-// recordAll has every engine record its databases, and notes what fails.
-func (b *backups) recordAll(ctx context.Context) { b.recordSome(ctx, true) }
-
-func (b *backups) recordSome(ctx context.Context, postgres bool) {
-	if postgres {
-		b.recording.Lock()
-		defer b.recording.Unlock()
+// copies are the copies of a database in the bucket, newest first.
+func (b *backups) copies(ctx context.Context, app string, database protocol.Database) ([]protocol.Copy, error) {
+	bucket, folder, err := b.where(app, database)
+	if err != nil {
+		return nil, err
 	}
-	running := b.running()
-	if _, err := b.ready(); err != nil {
-		running = map[string][]protocol.Database{}
-	}
-	for app, databases := range running {
-		for _, database := range databases {
-			if database.Postgres() && !postgres {
-				continue
+	copies := []protocol.Copy{}
+	pages := s3.NewListObjectsV2Paginator(s3Client(bucket), &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(folder + "/copies/")})
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, object := range page.Contents {
+			id := strings.TrimSuffix(path.Base(aws.ToString(object.Key)), path.Base(protocol.CopyFile("", database.Postgres())))
+			if at, err := time.Parse(protocol.CopyIDLayout, id); err == nil {
+				copies = append(copies, protocol.Copy{ID: id, At: at, Size: aws.ToInt64(object.Size)})
 			}
-			err := b.engine(app, database).Record(ctx)
-			if err != nil && database.Postgres() {
-				slog.Warn("backup: record", "app", app, "database", database.Path, "error", err)
-			}
-			b.fail(key(app, database), err)
 		}
 	}
-	b.forgetSQLite(running)
-	if postgres {
-		b.forgetPostgres(ctx, running)
-	}
+	slices.SortFunc(copies, func(x, y protocol.Copy) int { return y.At.Compare(x.At) })
+	return copies, nil
 }
 
-// recordLoop runs Record every minute.
-func (b *backups) recordLoop(ctx context.Context) {
-	ticker := time.NewTicker(recordEvery)
+// object reads or deletes the copy id of a database in the bucket.
+func (b *backups) object(ctx context.Context, app string, database protocol.Database, id string, remove bool) (io.ReadCloser, error) {
+	bucket, folder, err := b.where(app, database)
+	if err != nil {
+		return nil, err
+	}
+	name := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+	if remove {
+		_, err := s3Client(bucket).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: name})
+		return nil, err
+	}
+	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: name})
+	if err != nil {
+		return nil, fmt.Errorf("the copy %s of %s: %w", id, database.Path, err)
+	}
+	return object.Body, nil
+}
+
+// prune deletes the copies and undos older than the app keeps them, but
+// never the newest copy.
+func (b *backups) prune(ctx context.Context, app string, database protocol.Database, copies []protocol.Copy) error {
+	before := time.Now().Add(-time.Duration(b.schedule(app).Keep) * day)
+	var err error
+	for index, copy := range copies {
+		if index > 0 && copy.At.Before(before) {
+			_, deleteErr := b.object(ctx, app, database, copy.ID, true)
+			err = errors.Join(err, deleteErr)
+		}
+	}
+	e := b.engine(app, database)
+	undos, undosErr := e.Undos(ctx)
+	for _, undo := range undos {
+		if undo.At.Before(before) {
+			err = errors.Join(err, e.Drop(ctx, undo.ID))
+		}
+	}
+	return errors.Join(err, undosErr)
+}
+
+// loop runs tick every minute, the daily checks, and the sweep of the
+// uploads every hour.
+func (b *backups) loop(ctx context.Context) {
+	ticker, checks := time.NewTicker(time.Minute), time.NewTimer(10*time.Minute)
 	defer ticker.Stop()
-	for {
+	for round := 0; ; round++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			b.tick(ctx)
+			if round%60 == 0 {
+				b.sweepUploads(ctx)
+			}
+		case <-checks.C:
+			b.checkAll(ctx)
+			checks.Reset(day)
 		}
-		b.recordAll(ctx)
 	}
 }
 
-// running are the databases of every app's running release.
+// tick takes the copies that are due and deletes the old ones, has
+// Litestream follow SQLite files with Every change, and reports what
+// changed.
+func (b *backups) tick(ctx context.Context) {
+	if !b.on() || !b.ticking.TryLock() {
+		return
+	}
+	defer b.ticking.Unlock()
+	running := b.running()
+	for app, databases := range running {
+		schedule := b.schedule(app)
+		for _, database := range databases {
+			b.mu.Lock()
+			s := *b.state(app, database)
+			b.mu.Unlock()
+			if s.restoring {
+				continue
+			}
+			var err error
+			if !database.Postgres() {
+				err = b.record(ctx, app, database, schedule)
+			}
+			if due := time.Duration(schedule.Every) * time.Minute; time.Since(s.copied) >= due {
+				err = errors.Join(err, b.copyDue(ctx, app, database, due))
+			}
+			b.mu.Lock()
+			b.state(app, database).failed = ""
+			if err != nil {
+				b.state(app, database).failed = err.Error()
+			}
+			b.mu.Unlock()
+		}
+	}
+	b.forget(running)
+	b.report(ctx, running, false)
+}
+
+// copyDue takes a copy when the newest in the bucket is older than due,
+// and deletes the old ones.
+func (b *backups) copyDue(ctx context.Context, app string, database protocol.Database, due time.Duration) error {
+	copies, err := b.copies(ctx, app, database)
+	if err != nil {
+		return err
+	}
+	if len(copies) > 0 && time.Since(copies[0].At) < due {
+		b.mu.Lock()
+		b.state(app, database).copied = copies[0].At
+		b.mu.Unlock()
+		return nil
+	}
+	id := newCopyID()
+	if err := b.copy(ctx, app, database, id); err != nil {
+		return err
+	}
+	at, _ := time.Parse(protocol.CopyIDLayout, id)
+	return b.prune(ctx, app, database, append([]protocol.Copy{{ID: id, At: at}}, copies...))
+}
+
+// report sends how the databases of each app stand, when that changed or
+// always.
+func (b *backups) report(ctx context.Context, running map[string][]protocol.Database, always bool) {
+	for app, databases := range running {
+		changed := always
+		statuses := []protocol.DatabaseBackup{}
+		for _, database := range databases {
+			status := b.status(ctx, app, database, false)
+			b.mu.Lock()
+			s := b.state(app, database)
+			changed = changed || s.reported != status.Error
+			s.reported = status.Error
+			b.mu.Unlock()
+			statuses = append(statuses, status)
+		}
+		if changed && b.send != nil {
+			b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: statuses, Restores: b.restoreStates(app)})
+		}
+	}
+}
+
+// status is how one database is backed up; full also reads the copies,
+// the undos and how far Every change reaches.
+func (b *backups) status(ctx context.Context, app string, database protocol.Database, full bool) protocol.DatabaseBackup {
+	status := protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind}
+	b.mu.Lock()
+	s := *b.state(app, database)
+	b.mu.Unlock()
+	if !s.copied.IsZero() {
+		status.CopiedAt = &s.copied
+	}
+	if !s.checkedAt.IsZero() {
+		status.CheckedAt, status.CheckError = &s.checkedAt, s.checkErr
+	}
+	status.Error = s.failed
+	if full {
+		copies, err := b.copies(ctx, app, database)
+		if err != nil && status.Error == "" {
+			status.Error = err.Error()
+		}
+		if status.Copies = copies; len(copies) > 0 {
+			status.CopiedAt = &copies[0].At
+		}
+		status.Undos, _ = b.engine(app, database).Undos(ctx)
+		if !database.Postgres() && b.schedule(app).EveryChange {
+			status.Since, status.Until = b.reach(ctx, app, database)
+		}
+	}
+	return status
+}
+
+// checkAll restores the newest copy of every database into a throwaway
+// one and reads it.
+func (b *backups) checkAll(ctx context.Context) {
+	running := b.running()
+	for app, databases := range running {
+		for _, database := range databases {
+			copies, err := b.copies(ctx, app, database)
+			if err != nil || len(copies) == 0 {
+				continue
+			}
+			body, err := b.object(ctx, app, database, copies[0].ID, false)
+			if err == nil {
+				err = b.engine(app, database).Check(ctx, body)
+				body.Close()
+			}
+			b.mu.Lock()
+			s := b.state(app, database)
+			s.checkedAt, s.checkErr = time.Now().UTC(), ""
+			if err != nil {
+				s.checkErr = "the daily check failed: " + err.Error()
+				slog.Error("backup: the daily check failed", "app", app, "database", database.Path, "error", err)
+			}
+			b.mu.Unlock()
+		}
+	}
+	b.report(ctx, running, true)
+}
+
+// copyBefore copies the app's databases, or the one named, just before a
+// deploy or an edit, and returns the ID of the copies; nil without
+// backups or when none worked.
+func (b *backups) copyBefore(ctx context.Context, app, only string) *time.Time {
+	if b == nil || !b.on() {
+		return nil
+	}
+	id, took := newCopyID(), false
+	for _, database := range b.apps.runningDatabases(app) {
+		if only == "" || database.Path == only {
+			err := b.copy(ctx, app, database, id)
+			if err != nil {
+				slog.Warn("backup: the copy before a change failed", "app", app, "database", database.Path, "error", err)
+			}
+			took = took || err == nil
+		}
+	}
+	at, _ := time.Parse(protocol.CopyIDLayout, id)
+	if !took {
+		return nil
+	}
+	return &at
+}
+
+// running are the databases of every app's live deploy.
 func (b *backups) running() map[string][]protocol.Database {
 	found := map[string][]protocol.Database{}
 	entries, _ := os.ReadDir(b.apps.dir)
@@ -334,733 +448,191 @@ func (b *backups) running() map[string][]protocol.Database {
 	return found
 }
 
-// runningDatabases are the databases of an app's running release.
-func (a *apps) runningDatabases(app string) []protocol.Database {
-	current := a.current(app)
-	if current == 0 {
-		return nil
-	}
-	var detected protocol.Detected
-	body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, current), "detected.json"))
-	_ = json.Unmarshal(body, &detected)
-	return detected.Databases
-}
-
-// databaseKey is a database's folder in the bucket: its path in the
-// container without slashes, like data-app.db.
-func databaseKey(database string) string {
-	return strings.ReplaceAll(strings.Trim(database, "/"), "/", "-")
-}
-
-// prefix is a database's folder in the bucket:
-// <path>/<workspace>/<app>/<app ID>/<database>. An app deployed before
-// deploys brought the app ID has none until its next deploy. The caller
-// holds the lock.
-func (b *backups) prefix(app, database string) (string, error) {
-	folder, err := b.appFolder(app)
-	if err != nil {
-		return "", err
-	}
-	return folder + "/" + databaseKey(database), nil
-}
-
-// appFolder is an app's folder in its bucket: <path>/<workspace>/<app>/<app ID>.
-// The caller holds the lock.
-func (b *backups) appFolder(app string) (string, error) {
-	bucket := b.bucketFor(app)
-	if bucket == nil {
-		return "", errors.New("backups are not set up")
-	}
-	id := b.apps.appID(app)
-	if id == "" {
-		return "", fmt.Errorf("deploy %s once more to start its backups", app)
-	}
-	return strings.Trim(path.Join(bucket.Path, bucket.Workspace, app, id), "/"), nil
-}
-
-// bucketFor is the bucket of an app: its own, or the default. The caller
-// holds the lock.
-func (b *backups) bucketFor(app string) *protocol.Bucket {
-	if bucket := b.appBuckets[app]; bucket != nil {
-		return bucket
-	}
-	return b.defaultBucket
-}
-
-// sameBuckets reports whether two sets of app buckets are the same.
-func sameBuckets(one, other map[string]*protocol.Bucket) bool {
-	if len(one) != len(other) {
-		return false
-	}
-	for app, bucket := range one {
-		if theirs := other[app]; theirs == nil || bucket == nil || *theirs != *bucket {
-			return false
-		}
-	}
-	return true
-}
-
-// bucketOf is the bucket and the folder of a database, for one call.
-func (b *backups) bucketOf(app string, database protocol.Database) (*protocol.Bucket, string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.bucketOfLocked(app, database)
-}
-
-// bucketOfLocked is bucketOf for a caller that holds the lock.
-func (b *backups) bucketOfLocked(app string, database protocol.Database) (*protocol.Bucket, string, error) {
-	bucket := b.bucketFor(app)
-	if bucket == nil {
-		return nil, "", errors.New("backups are not set up")
-	}
-	prefix, err := b.prefix(app, database.Path)
-	if err != nil {
-		return nil, "", err
-	}
-	copied := *bucket
-	return &copied, prefix, nil
-}
-
-func s3Client(bucket *protocol.Bucket) *s3.Client {
-	region := bucket.Region
-	if region == "" {
-		region = "auto"
-	}
-	return s3.New(s3.Options{
-		Region:       region,
-		Credentials:  credentials.NewStaticCredentialsProvider(bucket.AccessKey, bucket.SecretKey, ""),
-		BaseEndpoint: aws.String(endpointOrAWS(bucket)),
-		UsePathStyle: bucket.Endpoint != "",
-	})
-}
-
-func endpointOrAWS(bucket *protocol.Bucket) string {
-	if bucket.Endpoint != "" {
-		return bucket.Endpoint
-	}
-	region := bucket.Region
-	if region == "" {
-		region = "us-east-1"
-	}
-	return "https://s3." + region + ".amazonaws.com"
-}
-
-// ready returns the bucket, or an error people can act on.
-func (b *backups) ready() (*protocol.Bucket, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.defaultBucket == nil {
-		return nil, errors.New("backups are not set up: add a bucket under Data")
-	}
-	bucket := *b.defaultBucket
-	return &bucket, nil
-}
-
-// databases returns the app's running databases, or the one named.
-func (b *backups) databases(app, database string) ([]protocol.Database, error) {
-	if !protocol.ValidAppName(app) {
-		return nil, errors.New("invalid app name")
-	}
+// one is the database a request names, or the app's only one.
+func (b *backups) one(app, name string) (protocol.Database, error) {
 	all := b.apps.runningDatabases(app)
-	if database == "" {
-		if len(all) == 0 {
-			return nil, fmt.Errorf("no database in %s: no SQLite file on a volume, no Postgres service", app)
-		}
-		return all, nil
-	}
-	for _, found := range all {
-		if found.Path == database {
-			return []protocol.Database{found}, nil
+	for _, database := range all {
+		if database.Path == name || name == "" && len(all) == 1 {
+			return database, nil
 		}
 	}
-	return nil, fmt.Errorf("no database %s in %s", database, app)
-}
-
-// one is the database a restore or a download works on: the one named, or
-// the app's only one.
-func (b *backups) one(app, database string) (protocol.Database, error) {
-	databases, err := b.databases(app, database)
-	if err != nil {
-		return protocol.Database{}, err
-	}
-	if len(databases) > 1 {
+	if name == "" && len(all) > 1 {
 		return protocol.Database{}, errors.New("the app has several databases: name the one")
 	}
-	return databases[0], nil
+	return protocol.Database{}, fmt.Errorf("no database %s in %s", name, app)
 }
 
-// backupRestores answers backup.restores (BackupRequest): the restores of
-// the app from the agent's state folder, whatever else stands.
-func (r *runner) backupRestores(message protocol.Message) {
-	var request protocol.BackupRequest
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeBackupsResult, message.RequestID, protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: r.backups.restoreStates(request.App)})
-}
-
-// backupList answers backup.list (BackupRequest).
-func (r *runner) backupList(ctx context.Context, message protocol.Message) {
-	var request protocol.BackupRequest
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	result, err := r.backups.list(ctx, request)
-	if err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeBackupsResult, message.RequestID, result)
-}
-
-// list reports the backups of an app: the history of each database, its
-// copies before restores and its newest daily check.
-func (b *backups) list(ctx context.Context, request protocol.BackupRequest) (protocol.Backups, error) {
+// list answers backup.list.
+func (b *backups) list(ctx context.Context, request protocol.BackupRequest) protocol.Backups {
 	result := protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: b.restoreStates(request.App)}
-	if _, err := b.ready(); err != nil {
-		return result, err
-	}
-	databases, err := b.databases(request.App, request.Database)
-	if err != nil {
-		return result, err
-	}
-	for _, database := range databases {
-		result.Databases = append(result.Databases, b.status(ctx, request.App, database, true))
-	}
-	return result, nil
-}
-
-// status is how one database is backed up. withCopies also lists the
-// copies before restores, which reads the bucket once more.
-func (b *backups) status(ctx context.Context, app string, database protocol.Database, withCopies bool) protocol.DatabaseBackup {
-	backup := protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind}
-	backup.Error = b.problem(app, database, time.Now())
-	window, err := b.engine(app, database).Window(ctx)
-	if err != nil && backup.Error == "" {
-		backup.Error = err.Error()
-	}
-	if !window.since.IsZero() {
-		backup.Since, backup.ReplicatedAt = &window.since, &window.newest
-	}
-	backup.Note = window.note
-	if withCopies {
-		backup.Copies = window.copies
-	}
-	b.mu.Lock()
-	if b.stateErr != "" && backup.Error == "" {
-		backup.Error = b.stateErr
-	}
-	b.mu.Unlock()
-	b.mu.Lock()
-	last := b.checked[key(app, database)]
-	b.mu.Unlock()
-	if !last.at.IsZero() {
-		at := last.at
-		backup.CheckedAt = &at
-		backup.CheckError = last.err
-		if last.err != "" && backup.Error == "" {
-			backup.Error = last.err
+	for _, database := range b.apps.runningDatabases(request.App) {
+		if request.Database == "" || request.Database == database.Path {
+			result.Databases = append(result.Databases, b.status(ctx, request.App, database, true))
 		}
 	}
-	return backup
+	return result
 }
 
-// backupRestore answers backup.restore (BackupRestore).
-func (r *runner) backupRestore(ctx context.Context, message protocol.Message) {
-	var request protocol.BackupRestore
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	// An update waits for it, as for a deploy.
-	if !r.beginWork() {
-		r.fail(message, errUpdating)
-		return
-	}
-	defer r.endWork()
-	if err := r.backups.restore(ctx, request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeOK, message.RequestID, nil)
+// restoreMark is a restore in restores/<id>.json in the agent's folder,
+// written whole before anything changes, so a start after a crash knows
+// it ran. Undo names the state before, which it leaves.
+type restoreMark struct {
+	ID         string     `json:"id"`
+	App        string     `json:"app"`
+	Database   string     `json:"database"`
+	Undo       string     `json:"undo"`
+	State      string     `json:"state"`
+	Error      string     `json:"error,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
-// restore puts one database back to a moment, or to the state before an
-// earlier restore, which undoes that one. It is written down as running
-// the moment it arrives, so the control plane hears of it even when the
-// session ends right then, and it ends with a result either way.
+var restoreID = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
+func (b *backups) markFile(id string) string {
+	return filepath.Join(filepath.Dir(b.apps.dir), "restores", id+".json")
+}
+
+// restore puts a database back. It is written down before anything
+// changes and ends with a result either way.
 func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) error {
-	if request.ID == "" {
-		request.ID = newID()
+	if !restoreID.MatchString(request.ID) {
+		return errors.New("a restore needs an ID: update the control plane")
 	}
-	run := &restoreRun{b: b, mark: restoreMark{ID: request.ID, App: request.App, Database: request.Database, StartedAt: time.Now().UTC()}, crash: b.crashHook}
-	if err := run.save(); err != nil {
+	database, err := b.one(request.App, request.Database)
+	if err != nil {
+		return err
+	}
+	mark := restoreMark{ID: request.ID, App: request.App, Database: database.Path, Undo: newCopyID(), State: protocol.RestoreRunning}
+	if err := writeState(b.markFile(mark.ID), mark); err != nil {
 		return fmt.Errorf("write the restore down: %w", err)
 	}
-	err := b.runRestore(ctx, request, run)
+	defer b.apps.lock(request.App)()
+	b.mu.Lock()
+	b.state(request.App, database).restoring = true
+	b.mu.Unlock()
+	var from source
+	switch {
+	case protocol.ValidCopyID(request.Copy):
+		var body io.ReadCloser
+		if body, err = b.object(ctx, request.App, database, request.Copy, false); err == nil {
+			defer body.Close()
+			from.copy = body
+		}
+	case protocol.ValidCopyID(request.Undo):
+		from.undo = request.Undo
+	case request.At != nil && !database.Postgres():
+		from.at = request.At.UTC()
+	default:
+		err = errors.New("pick a copy, a minute or an undo to go back to")
+	}
+	if err == nil {
+		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo)
+	}
+	b.mu.Lock()
+	b.state(request.App, database).restoring = false
+	b.mu.Unlock()
 	if errors.Is(err, errCrash) {
 		return err
 	}
-	result := restoreResult{ID: request.ID, App: request.App, Database: run.mark.Database, State: protocol.RestoreDone, FinishedAt: time.Now().UTC()}
-	if err != nil && run.mark.Copy != "" {
-		err = fmt.Errorf("%w. The copy from before is undo-%s: going back to it puts the data back as it was", err, run.mark.Copy)
-	}
+	b.finish(mark, err)
+	go b.report(context.WithoutCancel(ctx), map[string][]protocol.Database{request.App: {database}}, true)
+	return err
+}
+
+// finish writes down how a restore ended.
+func (b *backups) finish(mark restoreMark, err error) {
+	now := time.Now().UTC()
+	mark.State, mark.FinishedAt = protocol.RestoreDone, &now
 	if err != nil {
-		result.State, result.Error = protocol.RestoreFailed, err.Error()
+		mark.State, mark.Error = protocol.RestoreFailed, err.Error()
 	}
-	b.saveResult(result)
-	b.dropMark(request.ID)
-	// The control plane may have lost the session meanwhile: it learns
-	// how the restore ended here, or from the next list.
-	go func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-		defer cancel()
-		backups := protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: b.restoreStates(request.App)}
-		if database, err := b.one(request.App, run.mark.Database); err == nil {
-			backups.Databases = append(backups.Databases, b.status(ctx, request.App, database, false))
+	if err := writeState(b.markFile(mark.ID), mark); err != nil {
+		slog.Error("backup: write down how a restore ended", "id", mark.ID, "error", err)
+	}
+	slog.Info("backup: restore", "app", mark.App, "database", mark.Database, "state", mark.State, "error", mark.Error)
+}
+
+// marks are the restores written down; one week of them.
+func (b *backups) marks() []restoreMark {
+	files, _ := filepath.Glob(b.markFile("*"))
+	marks := []restoreMark{}
+	for _, file := range files {
+		var mark restoreMark
+		if body, err := os.ReadFile(file); err != nil || json.Unmarshal(body, &mark) != nil {
+			continue
 		}
-		if b.send != nil {
-			b.send(protocol.TypeBackupStatus, "", backups)
+		if mark.FinishedAt != nil && time.Since(*mark.FinishedAt) > 7*day {
+			os.Remove(file)
+			continue
 		}
-	}()
-	if err != nil {
-		return err
+		marks = append(marks, mark)
 	}
-	slog.Info("backup: restored", "app", request.App, "database", run.mark.Database, "at", request.At, "copy", request.Copy)
-	return nil
+	return marks
 }
 
-// runRestore checks the restore and has the engine run it.
-func (b *backups) runRestore(ctx context.Context, request protocol.BackupRestore, run *restoreRun) error {
-	if _, err := b.ready(); err != nil {
-		return err
-	}
-	database, err := b.one(request.App, request.Database)
-	if err != nil {
-		return err
-	}
-	run.mark.Database, run.mark.Postgres, run.mark.Service = database.Path, database.Postgres(), database.Service
-	if err := run.save(); err != nil {
-		return err
-	}
-	to := moment{}
-	switch {
-	case request.Copy != "":
-		if !protocol.ValidCopyID(request.Copy) {
-			return errors.New("this is not a copy before a restore: pick one from the list")
-		}
-		to.Copy = request.Copy
-	case request.At != nil:
-		to.At = request.At.UTC()
-		if to.At.After(time.Now().Add(time.Minute)) {
-			return errors.New("that moment is still to come: pick one from the list")
-		}
-	default:
-		return errors.New("pick a moment to go back to")
-	}
-	defer b.apps.lock(request.App)()
-	k := key(request.App, database)
-	b.mu.Lock()
-	if b.restoring == nil {
-		b.restoring = map[string]bool{}
-	}
-	b.restoring[k] = true
-	b.mu.Unlock()
-	defer func() {
-		b.mu.Lock()
-		delete(b.restoring, k)
-		b.mu.Unlock()
-		b.reconcile()
-	}()
-	if database.Postgres() {
-		defer b.lockBusy(k)()
-	}
-	e := b.engine(request.App, database)
-	run.keepCopy = func() (string, error) {
-		if b.keepHook != nil {
-			return b.keepHook()
-		}
-		return b.keepCopy(context.WithoutCancel(ctx), request.App, database, e)
-	}
-	return e.GoBack(ctx, to, run)
-}
-
-// copyExt is the file ending of a database's full copies.
-func copyExt(database protocol.Database) string {
-	if database.Postgres() {
-		return ".dump"
-	}
-	return ".db.gz"
-}
-
-// keepCopy takes the one full copy of a database before a restore and
-// puts it in its before-restore folder.
-func (b *backups) keepCopy(ctx context.Context, app string, database protocol.Database, e engine) (string, error) {
-	bucket, prefix, err := b.bucketOf(app, database)
-	if err != nil {
-		return "", err
-	}
-	id := time.Now().UTC().Format(protocol.CopyIDLayout)
-	_, err = b.upload(ctx, bucket, prefix+"/before-restore/"+id+copyExt(database), e)
-	if err != nil {
-		return "", fmt.Errorf("the copy before the restore: %w", err)
-	}
-	slog.Info("backup: copy before the restore", "app", app, "database", database.Path, "id", id)
-	return id, nil
-}
-
-// backupDownload answers backup.download (BackupRequest).
-func (r *runner) backupDownload(ctx context.Context, message protocol.Message) {
-	var request protocol.BackupRequest
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	file, err := r.backups.download(ctx, request)
-	if err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeBackupFile, message.RequestID, file)
-}
-
-// download puts a full copy of one database in the app's downloads/
-// folder, for a short-lived link the control plane signs.
-func (b *backups) download(ctx context.Context, request protocol.BackupRequest) (protocol.BackupFile, error) {
-	if _, err := b.ready(); err != nil {
-		return protocol.BackupFile{}, err
-	}
-	database, err := b.one(request.App, request.Database)
-	if err != nil {
-		return protocol.BackupFile{}, err
-	}
-	b.mu.Lock()
-	bucket := b.bucketFor(request.App)
-	folder, err := b.appFolder(request.App)
-	b.mu.Unlock()
-	if err != nil {
-		return protocol.BackupFile{}, err
-	}
-	key := folder + "/downloads/" + request.App + "-" + databaseKey(database.Path) + "-" + time.Now().UTC().Format(protocol.CopyIDLayout) + copyExt(database)
-	size, err := b.upload(ctx, bucket, key, b.engine(request.App, database))
-	if err != nil {
-		return protocol.BackupFile{}, fmt.Errorf("copy %s: %w", database.Path, err)
-	}
-	slog.Info("backup: copy to download", "app", request.App, "database", database.Path, "size", size)
-	return protocol.BackupFile{Database: database.Path, Key: key, Size: size}, nil
-}
-
-// upload has the engine write a full copy and puts it at key.
-func (b *backups) upload(ctx context.Context, bucket *protocol.Bucket, key string, e engine) (int64, error) {
-	ctx, cancel := context.WithTimeout(ctx, copyTimeout)
-	defer cancel()
-	file, cleanup, err := e.Download(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer cleanup()
-	in, err := os.Open(file)
-	if err != nil {
-		return 0, err
-	}
-	defer in.Close()
-	info, err := in.Stat()
-	if err != nil {
-		return 0, err
-	}
-	_, err = s3Client(bucket).PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key), Body: in, ContentLength: aws.Int64(info.Size())})
-	if err != nil {
-		return 0, fmt.Errorf("upload: %w", err)
-	}
-	return info.Size(), nil
-}
-
-// copies lists the copies before restores of a database, newest first,
-// those of the last 7 days.
-func (b *backups) copies(ctx context.Context, app string, database protocol.Database) ([]protocol.Copy, error) {
-	bucket, prefix, err := b.bucketOf(app, database)
-	if err != nil {
-		return nil, err
-	}
-	folder := prefix + "/before-restore/"
-	copies := []protocol.Copy{}
-	pages := s3.NewListObjectsV2Paginator(s3Client(bucket), &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(folder)})
-	for pages.HasMorePages() {
-		page, err := pages.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, object := range page.Contents {
-			id := strings.TrimSuffix(strings.TrimPrefix(aws.ToString(object.Key), folder), copyExt(database))
-			at, err := time.Parse(protocol.CopyIDLayout, id)
-			if err != nil || time.Since(at) > keepHistory {
-				continue
-			}
-			copies = append(copies, protocol.Copy{ID: id, At: at, Size: aws.ToInt64(object.Size)})
+func (b *backups) restoreStates(app string) []protocol.RestoreState {
+	states := []protocol.RestoreState{}
+	for _, mark := range b.marks() {
+		if mark.App == app {
+			states = append(states, protocol.RestoreState{ID: mark.ID, Database: mark.Database, State: mark.State, Error: mark.Error, FinishedAt: mark.FinishedAt})
 		}
 	}
-	slices.SortFunc(copies, func(x, y protocol.Copy) int { return y.At.Compare(x.At) })
-	return copies, nil
+	return states
 }
 
-// fetchCopy downloads a copy before a restore into a file in the app's
-// folder on the server.
-func (b *backups) fetchCopy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
-	bucket, prefix, err := b.bucketOf(app, database)
-	if err != nil {
-		return "", err
-	}
-	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(prefix + "/before-restore/" + id + copyExt(database))})
-	var missing *types.NoSuchKey
-	if errors.As(err, &missing) {
-		return "", fmt.Errorf("there is no copy from %s of %s: it is older than 7 days, or of another database", id, database.Path)
-	}
-	if err != nil {
-		return "", fmt.Errorf("the copy before the restore: %w", err)
-	}
-	defer object.Body.Close()
-	file, err := os.CreateTemp(b.apps.appDir(app), tempName("copy-*")+copyExt(database))
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(file, object.Body)
-	if closeErr := file.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		os.Remove(file.Name())
-		return "", err
-	}
-	return file.Name(), nil
-}
-
-// checks runs the daily check of every database, then reports to the
-// control plane. While a database has nothing in the bucket yet, it tries
-// again soon.
-func (b *backups) checks(ctx context.Context) {
-	timer := time.NewTimer(firstCheck)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
+// recover ends the restores a stopped agent left running: the crash rule
+// puts a whole database in place, the app starts, the result is written
+// down. The agent runs it when it starts.
+func (b *backups) recover(ctx context.Context) {
+	for _, mark := range b.marks() {
+		if mark.State != protocol.RestoreRunning {
+			continue
 		}
-		if b.checkAll(ctx) {
-			timer.Reset(firstCheck)
-		} else {
-			timer.Reset(checkEvery)
-		}
-	}
-}
-
-// checkAll checks every database. waiting reports a database with nothing
-// in the bucket yet: it has no check, neither passed nor failed.
-func (b *backups) checkAll(ctx context.Context) (waiting bool) {
-	if _, err := b.ready(); err != nil {
-		return false
-	}
-	reports := map[string][]protocol.DatabaseBackup{}
-	for app, databases := range b.running() {
-		for _, database := range databases {
-			checkCtx, cancel := context.WithTimeout(ctx, checkTimeout)
-			err := b.engine(app, database).Check(checkCtx)
-			cancel()
-			k := key(app, database)
-			b.mu.Lock()
-			if errors.Is(err, errNothingYet) {
-				waiting = true
-				delete(b.checked, k)
-			} else {
-				result := check{at: time.Now().UTC()}
-				if err != nil {
-					result.err = "the daily check failed: " + err.Error()
-					slog.Error("backup: the daily check failed", "app", app, "database", database.Path, "error", err)
-				}
-				b.checked[k] = result
-			}
-			b.mu.Unlock()
-			if !database.Postgres() {
-				matchOwner(database.HostPath)
-			}
-			reports[app] = append(reports[app], b.status(ctx, app, database, false))
-		}
-	}
-	for app, databases := range reports {
-		b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: databases})
-	}
-	return waiting
-}
-
-// sweepLoop deletes, once an hour, what moin keeps only for a while: what
-// moin deploy left in the bucket and the copies to download after a day,
-// the copies before restores after 7 days.
-func (b *backups) sweepLoop(ctx context.Context) {
-	ticker := time.NewTicker(sweepEvery)
-	defer ticker.Stop()
-	for {
-		b.sweepOnce(ctx, time.Now())
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-// sweepOnce sweeps the workspace's folder, also the apps that are gone, in
-// the default bucket and in every bucket of an app.
-func (b *backups) sweepOnce(ctx context.Context, now time.Time) {
-	b.sweepVolumes(ctx, now)
-	b.mu.Lock()
-	if b.defaultBucket == nil {
-		b.mu.Unlock()
-		return
-	}
-	buckets := []protocol.Bucket{*b.defaultBucket}
-	for _, bucket := range b.appBuckets {
-		if !slices.ContainsFunc(buckets, func(known protocol.Bucket) bool {
-			return known.Endpoint == bucket.Endpoint && known.Bucket == bucket.Bucket && known.Path == bucket.Path
-		}) {
-			buckets = append(buckets, *bucket)
-		}
-	}
-	b.mu.Unlock()
-	for _, bucket := range buckets {
-		sweepIn(ctx, &bucket, now)
-	}
-}
-
-// sweepIn sweeps one bucket: <app>/<app ID>/uploads/ and downloads/ after
-// a day, <app>/<app ID>/<database>/before-restore/ after 7 days. Nothing
-// else is touched.
-func sweepIn(ctx context.Context, bucket *protocol.Bucket, now time.Time) {
-	client, name := s3Client(bucket), bucket.Bucket
-	root := strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace)+"/", "/")
-	folders := func(prefix string) []string {
-		var found []string
-		pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(name), Prefix: aws.String(prefix), Delimiter: aws.String("/")})
-		for pages.HasMorePages() {
-			page, err := pages.NextPage(ctx)
-			if err != nil {
-				slog.Warn("backup: sweep", "prefix", prefix, "error", err)
-				return found
-			}
-			for _, folder := range page.CommonPrefixes {
-				found = append(found, aws.ToString(folder.Prefix))
-			}
-		}
-		return found
-	}
-	sweep := func(prefix string, before time.Time) {
-		pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(name), Prefix: aws.String(prefix)})
-		for pages.HasMorePages() {
-			page, err := pages.NextPage(ctx)
-			if err != nil {
-				slog.Warn("backup: sweep", "prefix", prefix, "error", err)
-				return
-			}
-			for _, object := range page.Contents {
-				if object.LastModified == nil || !object.LastModified.Before(before) {
-					continue
-				}
-				_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(name), Key: object.Key})
-				if err != nil {
-					slog.Warn("backup: sweep", "key", aws.ToString(object.Key), "error", err)
-				} else {
-					slog.Info("backup: swept", "key", aws.ToString(object.Key))
-				}
-			}
-		}
-	}
-	for _, app := range folders(root) {
-		for _, id := range folders(app) {
-			sweep(id+"uploads/", now.Add(-keepUploads))
-			sweep(id+"downloads/", now.Add(-keepUploads))
-			for _, database := range folders(id) {
-				sweep(database+"before-restore/", now.Add(-keepHistory))
-			}
-		}
-	}
-}
-
-// appStop stops the services of an app for a restore, all of them without
-// services, and starts them again, always: also after a failed stop, and
-// with a context a shutting down agent does not cancel.
-type appStop struct {
-	a           *apps
-	ctx         context.Context
-	app         string
-	composeFile string
-	services    []string
-	// recreate starts with up -d, which puts a Postgres on the volume it
-	// was switched to.
-	recreate bool
-}
-
-func (a *apps) stopper(ctx context.Context, app string, services ...string) *appStop {
-	return &appStop{a: a, ctx: context.WithoutCancel(ctx), app: app, composeFile: filepath.Join(a.releaseDir(app, a.current(app)), "compose.json"), services: services}
-}
-
-// stop stops the services. When that fails it starts them again and says
-// nothing changed.
-func (s *appStop) stop() error {
-	ctx, cancel := context.WithTimeout(s.ctx, composeTimeout)
-	defer cancel()
-	err := s.a.compose(ctx, s.app, s.composeFile, func(string, ...any) {}, append([]string{"stop"}, s.services...)...)
-	if err != nil {
-		return s.startAfter(fmt.Errorf("stop the app: %w; nothing changed", err))
-	}
-	return nil
-}
-
-// startAfter starts the services again and adds a failure of that to err.
-func (s *appStop) startAfter(err error) error {
-	ctx, cancel := context.WithTimeout(s.ctx, composeTimeout)
-	defer cancel()
-	args := append([]string{"start"}, s.services...)
-	if s.recreate {
-		args = append([]string{"up", "-d"}, s.services...)
-	}
-	startErr := s.a.compose(ctx, s.app, s.composeFile, func(string, ...any) {}, args...)
-	if startErr != nil {
-		startErr = fmt.Errorf("start the app again: %w", startErr)
+		database, err := b.one(mark.App, mark.Database)
+		switched := false
 		if err == nil {
-			return startErr
+			switched, err = b.engine(mark.App, database).Recover(ctx, mark.Undo)
 		}
-		return fmt.Errorf("%w; %w", err, startErr)
+		start := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
+		switch {
+		case err == nil && !switched:
+			err = errors.New("the agent stopped during the restore; the data is as it was before")
+		case err == nil && start != nil:
+			err = fmt.Errorf("the restored data is in place, but start the app: %w", start)
+		}
+		b.finish(mark, err)
+	}
+}
+
+// writeState writes a file whole: a temp file, synced, renamed over the
+// old one, the folder synced. A crash leaves the old file or the new one.
+func writeState(name string, value any) error {
+	body, _ := json.Marshal(value)
+	temp := name + ".new"
+	err := errors.Join(os.MkdirAll(filepath.Dir(name), 0o700), os.WriteFile(temp, body, 0o600))
+	if err == nil {
+		err = syncFile(temp)
+	}
+	if err == nil {
+		err = os.Rename(temp, name)
+	}
+	if err == nil {
+		err = syncFile(filepath.Dir(name))
 	}
 	return err
 }
 
-// The longest a step of a restore may take once the app stopped: no hung
-// step keeps the app stopped or its lock held for good. They are generous,
-// for databases of many gigabytes on slow disks.
-const (
-	composeTimeout = 10 * time.Minute
-	switchTimeout  = time.Hour
-)
-
-// spareSpace is what a disk keeps free beyond what a restore needs.
-const spareSpace = 512 << 20
-
-// enoughSpace says in one sentence when the disk of dir has less than
-// need free, plus some to spare.
-func enoughSpace(dir string, need int64) error {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(dir, &stat); err != nil {
-		return nil
+// syncFile writes a file, or a folder, to the disk.
+func syncFile(name string) error {
+	file, err := os.Open(name)
+	if err != nil {
+		return err
 	}
-	return spaceFor(need, int64(stat.Bavail)*int64(stat.Bsize))
+	defer file.Close()
+	return file.Sync()
 }
 
-// spaceFor says in one sentence when free is less than need plus some to
-// spare.
-func spaceFor(need, free int64) error {
-	if free >= need+spareSpace {
-		return nil
-	}
-	return fmt.Errorf("the restore needs about %s free on the server's disk and there is %s: free some space first, nothing changed", human.Size(float64(need+spareSpace)), human.Size(float64(free)))
+func exists(name string) bool {
+	_, err := os.Stat(name)
+	return err == nil
 }

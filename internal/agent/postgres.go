@@ -281,7 +281,7 @@ func (a *apps) pgTables(ctx context.Context, app string, database protocol.Datab
 // pgQuery runs one read or one write on a Postgres database. Params take
 // the places of the ? marks outside literals, identifiers and comments; a
 // read is one statement and runs in a READ ONLY transaction.
-func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database protocol.Database) (protocol.DBResult, error) {
+func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database protocol.Database, before *time.Time) (protocol.DBResult, error) {
 	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
 	sql, vars, err := pgBind(request.SQL, request.Params)
 	if err != nil {
@@ -292,8 +292,7 @@ func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database p
 		return result, err
 	}
 	if request.Write {
-		before := time.Now().UTC()
-		result.Before = &before
+		result.Before = before
 		out, err := target.psql(ctx, pgStatementTimeout+"BEGIN;\n"+sql+"\n;\nCOMMIT;\n", vars, true)
 		if err != nil {
 			return result, err

@@ -11,7 +11,7 @@ import (
 
 // Version is the protocol version the agent reports in Hello. Bump it when a
 // message changes in a way an older peer cannot read. Version 2 brought
-// backups as one history to go back in, without snapshots.
+// backups as copies on a schedule, restores and undos.
 const Version = 2
 
 // Needs is the protocol version an agent must speak for a request: the
@@ -19,7 +19,7 @@ const Version = 2
 // sending it.
 func Needs(messageType MessageType) int {
 	switch messageType {
-	case TypeBackupList, TypeBackupRestore, TypeBackupDownload, TypeBackupRestores:
+	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2
 	}
 	return 1
@@ -72,7 +72,8 @@ const (
 	TypeDBQuery       MessageType = "db.query"
 	TypeDBQueryResult MessageType = "db.query.result"
 
-	// TypeBackupConfig tells the agent where backups go (BackupConfig). The
+	// TypeBackupConfig tells the agent where backups go and how often
+	// (BackupConfig). The
 	// control plane sends it after hello and whenever it changes. The agent
 	// answers with TypeOK.
 	TypeBackupConfig MessageType = "backup.config"
@@ -80,22 +81,18 @@ const (
 	// The agent answers with TypeBackupsResult.
 	TypeBackupList    MessageType = "backup.list"
 	TypeBackupsResult MessageType = "backups.result"
-	// TypeBackupRestore puts a database back to a moment, or to the copy
-	// before an earlier restore (BackupRestore). The agent answers with
-	// TypeOK or TypeError.
+	// TypeBackupRestore puts a database back to a copy, a minute or the
+	// state before an earlier restore (BackupRestore). The agent answers
+	// with TypeOK or TypeError.
 	TypeBackupRestore MessageType = "backup.restore"
 	// TypeBackupRestores asks how the restores of an app stand
 	// (BackupRequest), without looking into the bucket: also when the app
 	// has no bucket or is gone. The agent answers with TypeBackupsResult,
 	// whose Restores is the answer and Databases empty.
 	TypeBackupRestores MessageType = "backup.restores"
-	// TypeBackupDownload makes a full copy of one database in the bucket's
-	// downloads/ folder (BackupRequest). The agent answers with
-	// TypeBackupFile or TypeError.
-	TypeBackupDownload MessageType = "backup.download"
-	TypeBackupFile     MessageType = "backup.file"
 	// TypeBackupStatus is how the backups of an app stand (Backups), sent by
-	// the agent after a daily check, or when a backup breaks or works again.
+	// the agent after a daily check or a restore, or when a backup breaks
+	// or works again.
 	TypeBackupStatus MessageType = "backup.status"
 
 	// TypeServerConfig sets how the server is reached and locked down

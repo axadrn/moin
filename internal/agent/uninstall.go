@@ -78,9 +78,8 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 	} else {
 		entries, _ := os.ReadDir(dir)
 		for _, entry := range entries {
-			// The apps keep their data and the proxy its certificates; a
-			// Postgres a restore switched keeps the volume it runs on.
-			if entry.Name() == "apps" || entry.Name() == "traefik" || entry.Name() == pgVolumesFile {
+			// The apps keep their data and the proxy its certificates.
+			if entry.Name() == "apps" || entry.Name() == "traefik" {
 				continue
 			}
 			err = os.RemoveAll(filepath.Join(dir, entry.Name()))

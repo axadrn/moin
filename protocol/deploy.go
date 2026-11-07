@@ -94,8 +94,8 @@ type DeployDone struct {
 	OK       bool     `json:"ok"`
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
-	// Before is the moment, by the server's clock, just before the new
-	// release started over an older one: the control plane remembers it,
-	// so a restore can go back to it.
+	// Before is when the agent took the copies just before the new
+	// release started over an older one, which is their ID in
+	// CopyIDLayout: the control plane names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
 }

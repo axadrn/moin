@@ -1,15 +1,17 @@
 package protocol
 
-import "time"
+import (
+	"path"
+	"strings"
+	"time"
+)
 
 // Bucket is an S3-compatible bucket. Everything of a workspace
 // goes under <Path>/<Workspace>/, each app under <app>/<app ID>/:
 //
-//	<app>/<app ID>/uploads/                      sources of moin deploy, a day
-//	<app>/<app ID>/downloads/                    copies to download, a day
-//	<app>/<app ID>/<database>/litestream/        every change of a SQLite file, 7 days
-//	<app>/<app ID>/<database>/walg/              every change of a Postgres, 7 days
-//	<app>/<app ID>/<database>/before-restore/    the copy before each restore, 7 days
+//	<app>/<app ID>/uploads/                  sources of moin deploy, a day
+//	<app>/<app ID>/<database>/copies/        the copies, as long as the app keeps them
+//	<app>/<app ID>/<database>/litestream/    SQLite with Every change: every change
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
 // sharing one bucket never touch each other's files. Name is the bucket's
@@ -25,18 +27,39 @@ type Bucket struct {
 	Name      string `json:"name,omitempty"`
 }
 
-// BackupConfig is where backups go. Bucket is the workspace's default
-// bucket; without it the agent stops recording. AppBuckets is the bucket
-// of each app, by name, that uses another one than the default. Apps are
-// the IDs of the server's apps by name: an app deployed before deploys
-// brought its ID gets it here, so its backups start without another
-// deploy. The JSON keys storage and app_storage stay as they are: agents
-// of protocol version 1 read them.
+// BackupConfig is where backups go and how often. Bucket is the
+// workspace's default bucket; without it the agent copies nothing.
+// AppBuckets is the bucket of each app, by name, that uses another one
+// than the default. Apps are the IDs of the server's apps by name: an app
+// deployed before deploys brought its ID gets it here. Schedules are the
+// backup settings of each app by name; an app without one gets
+// DefaultSchedule. The JSON keys storage and app_storage stay as they
+// are: agents of protocol version 1 read them.
 type BackupConfig struct {
-	Bucket     *Bucket            `json:"storage,omitempty"`
-	AppBuckets map[string]*Bucket `json:"app_storage,omitempty"`
-	Apps       map[string]string  `json:"apps,omitempty"`
+	Bucket     *Bucket             `json:"storage,omitempty"`
+	AppBuckets map[string]*Bucket  `json:"app_storage,omitempty"`
+	Apps       map[string]string   `json:"apps,omitempty"`
+	Schedules  map[string]Schedule `json:"schedules,omitempty"`
 }
+
+// Schedule is how an app is backed up: a copy every Every minutes, each
+// kept Keep days. EveryChange also records every change of a SQLite file,
+// so a restore can go back to any minute of those days.
+type Schedule struct {
+	Every       int  `json:"every_minutes"`
+	Keep        int  `json:"keep_days"`
+	EveryChange bool `json:"every_change"`
+}
+
+// DefaultSchedule is the schedule of an app nobody set one for.
+var DefaultSchedule = Schedule{Every: 60, Keep: 7, EveryChange: true}
+
+// Everies and Keeps are the choices of a Schedule: every 15 minutes,
+// hourly or daily; kept 1, 3, 7 or 30 days.
+var (
+	Everies = []int{15, 60, 24 * 60}
+	Keeps   = []int{1, 3, 7, 30}
+)
 
 // BackupRequest names an app; Database narrows it to one database.
 type BackupRequest struct {
@@ -48,11 +71,9 @@ type BackupRequest struct {
 type Backups struct {
 	App       string           `json:"app"`
 	Databases []DatabaseBackup `json:"databases"`
-	// Restores are the restores of the app's databases that run now, and
-	// how the last one of each ended, by the ID the control plane gave
-	// it. A restore outlives a session, so the control plane learns here
-	// how one ended that it lost track of. An agent that reports restores
-	// sends a list, empty or not; agents before it send none (null).
+	// Restores are the restores of the app that run now, and how the
+	// last ones ended, by the ID the control plane gave them. An agent
+	// that reports restores sends a list, empty or not.
 	Restores []RestoreState `json:"restores"`
 }
 
@@ -73,32 +94,30 @@ const (
 	RestoreFailed  = "failed"
 )
 
-// DatabaseBackup is how one database is backed up. Since is the oldest
-// moment a restore can go back to, ReplicatedAt the newest change in the
-// bucket. CheckedAt is the newest daily check that passed: it restored
-// the latest state into a throwaway copy and checked it. Copies are the
-// copies moin took before each restore of the last 7 days, newest first:
-// going back to one undoes that restore. The JSON keys verified_at and
-// drill_error stay as they are: agents of protocol version 1 send them.
+// DatabaseBackup is how one database is backed up. Copies are its copies
+// in the bucket, newest first; CopiedAt is the newest. Undos are the
+// states before its restores, kept on the server: going back to one
+// undoes that restore. CheckedAt is the newest daily check: it restored
+// the newest copy into a throwaway database and read it, and CheckError
+// says why it failed. Since and Until are how far Every change reaches,
+// for SQLite with it on. Error says what keeps the backup from working.
+// The JSON keys verified_at, drill_error, since and replicated_at stay as
+// they are: agents of protocol version 1 send them.
 type DatabaseBackup struct {
-	Database     string     `json:"database"`
-	Kind         string     `json:"kind,omitempty"`
-	Since        *time.Time `json:"since,omitempty"`
-	ReplicatedAt *time.Time `json:"replicated_at,omitempty"`
-	CheckedAt    *time.Time `json:"verified_at,omitempty"`
-	Copies       []Copy     `json:"copies,omitempty"`
-	Error        string     `json:"error,omitempty"`
-	// CheckError is why the newest daily check failed. Error holds it too
-	// when nothing else is wrong.
-	CheckError string `json:"drill_error,omitempty"`
-	// Note says what a database lacks, such as backups for a Postgres
-	// image WAL-G does not run in.
-	Note string `json:"note,omitempty"`
+	Database   string     `json:"database"`
+	Kind       string     `json:"kind,omitempty"`
+	CopiedAt   *time.Time `json:"copied_at,omitempty"`
+	Copies     []Copy     `json:"copies,omitempty"`
+	Undos      []Copy     `json:"undos,omitempty"`
+	CheckedAt  *time.Time `json:"verified_at,omitempty"`
+	CheckError string     `json:"drill_error,omitempty"`
+	Since      *time.Time `json:"since,omitempty"`
+	Until      *time.Time `json:"replicated_at,omitempty"`
+	Error      string     `json:"error,omitempty"`
 }
 
-// Copy is the state of a database before a restore, which undoes it: for
-// SQLite the full copy moin took, for Postgres the volume the restore
-// switched away from. Its ID is the time of the restore, in CopyIDLayout.
+// Copy is one copy of a database in the bucket, or one state before a
+// restore on the server. Its ID is when it was taken, in CopyIDLayout.
 // Size is 0 when moin does not know it.
 type Copy struct {
 	ID   string    `json:"id"`
@@ -106,26 +125,33 @@ type Copy struct {
 	Size int64     `json:"size"`
 }
 
-// BackupRestore puts one database back: to the moment At, or to the state
-// Copy before an earlier restore, which undoes that restore. The agent
-// builds the restored state beside the live one and switches in one step;
-// the state before stays, so this restore can be undone too. The app
-// stops for the switch and starts again.
+// BackupRestore puts one database back: to the copy Copy, to the minute
+// At (SQLite with Every change), or to the state Undo before an earlier
+// restore, which undoes that restore. The agent builds the database
+// beside the live one, stops the app, switches in one step and starts it;
+// the live one stays as the undo of this restore.
 type BackupRestore struct {
-	// ID is the control plane's name for the restore, which the agent
-	// reports it under; agents before it ignore it.
-	ID       string     `json:"id,omitempty"`
+	ID       string     `json:"id"`
 	App      string     `json:"app"`
 	Database string     `json:"database,omitempty"`
-	At       *time.Time `json:"at,omitempty"`
 	Copy     string     `json:"copy,omitempty"`
+	At       *time.Time `json:"at,omitempty"`
+	Undo     string     `json:"undo,omitempty"`
 }
 
-// BackupFile is a full copy of a database the agent put in the bucket for
-// a download: a gzipped SQLite file, or a pg_dump in its custom format.
-// Key is where it is in the app's bucket; it goes after a day.
-type BackupFile struct {
-	Database string `json:"database"`
-	Key      string `json:"key"`
-	Size     int64  `json:"size"`
+// DatabaseFolder is the folder of a database in its app's bucket:
+// <path>/<workspace>/<app>/<app ID>/<database>, its path in the container
+// without slashes, like data-app.db or postgres-db.
+func DatabaseFolder(bucket Bucket, app, appID, database string) string {
+	name := strings.ReplaceAll(strings.Trim(database, "/"), "/", "-")
+	return strings.Trim(path.Join(bucket.Path, bucket.Workspace, app, appID, name), "/")
+}
+
+// CopyFile is the copy id in its database's folder: a gzipped SQLite
+// file, or a pg_dump in its custom format.
+func CopyFile(id string, postgres bool) string {
+	if postgres {
+		return "copies/" + id + ".dump"
+	}
+	return "copies/" + id + ".db.gz"
 }

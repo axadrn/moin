@@ -67,7 +67,8 @@ type DBResult struct {
 	Rows      [][]any  `json:"rows"`
 	Truncated bool     `json:"truncated,omitempty"`
 	Changes   int64    `json:"changes,omitempty"`
-	// Before is the moment, by the server's clock, just before a write:
-	// the control plane remembers it, so a restore can go back to it.
+	// Before is when the agent took the copy just before a write, which
+	// is its ID in CopyIDLayout: the control plane names it "Before your
+	// edit".
 	Before *time.Time `json:"before,omitempty"`
 }

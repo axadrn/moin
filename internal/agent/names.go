@@ -15,14 +15,10 @@ const (
 	tunnelName   = ourName + "-cloudflared"
 	// firewallTable is the nftables table of the firewall.
 	firewallTable = ourName
-	walgSlot      = ourName + "_walg"
 
-	labelMode       = ourName + ".mode"
-	labelSetup      = ourName + ".setup"
-	labelToken      = ourName + ".token"
-	labelWalg       = ourName + ".walg"
-	labelWalgTarget = ourName + ".walg.target"
-	labelThrowaway  = ourName + ".throwaway"
+	labelMode  = ourName + ".mode"
+	labelSetup = ourName + ".setup"
+	labelToken = ourName + ".token"
 )
 
 // project is the Compose project of an app.

@@ -373,12 +373,15 @@ func (a *apps) build(ctx context.Context, start protocol.DeployStart, config map
 // does not come up, the release before it starts again.
 func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, composeFile string, detected protocol.Detected, logf func(string, ...any)) error {
 	previous := a.current(start.App)
-	if previous > 0 && len(a.runningDatabases(start.App)) > 0 {
-		// The control plane remembers this moment: a restore can go back
-		// to just before the new release touched the data.
-		a.mu.Lock()
-		a.befores[start.DeployID] = time.Now().UTC()
-		a.mu.Unlock()
+	if previous > 0 {
+		// A copy of each database just before the new release touches the
+		// data: the control plane names it "Before v12".
+		if before := a.backups.copyBefore(ctx, start.App, ""); before != nil {
+			logf("copied the data before v%d", start.Number)
+			a.mu.Lock()
+			a.befores[start.DeployID] = *before
+			a.mu.Unlock()
+		}
 	}
 	logf("starting")
 	// A restart brings nothing new, so compose would leave the containers
@@ -414,13 +417,7 @@ func (a *apps) afterStart(ctx context.Context, app, release, composeFile string,
 		logf("database %s (%s)", database.Path, database.HostPath)
 	}
 	if a.backups != nil {
-		a.backups.reconcile()
-		// A recreated Postgres container needs its WAL-G companion again.
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-			defer cancel()
-			a.backups.recordAll(ctx)
-		}()
+		go a.backups.tick(context.Background())
 	}
 	a.prune(ctx, app)
 	a.cleanup(ctx)
@@ -1161,18 +1158,20 @@ func postgresImage(image string) bool {
 
 // sqliteFiles returns the files under dir, three levels deep, that are
 // SQLite databases: the magic string and a valid page size in the 100 byte
-// header. Full copies being taken do not count.
+// header. What moin leaves next to a database does not count (backupFile).
 func sqliteFiles(dir string) []string {
 	files := []string{}
 	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if entry.IsDir() {
-			// A full copy being taken copies the database there.
-			if strings.HasPrefix(entry.Name(), copyFolderPrefix) || strings.HasPrefix(entry.Name(), oldCopyFolderPrefix) {
+		if backupFile(entry.Name()) {
+			if entry.IsDir() {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if entry.IsDir() {
 			if relative, _ := filepath.Rel(dir, path); strings.Count(relative, string(filepath.Separator)) >= 3 {
 				return filepath.SkipDir
 			}
@@ -1346,12 +1345,7 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
 	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
 	if a.backups != nil {
-		// An app made again under this name starts on its own volumes;
-		// those of its restores go in 7 days.
-		if err := a.backups.retireVolumes(app); err != nil {
-			slog.Error("backup: forget the volumes of the removed app", "app", app, "error", err)
-		}
-		a.backups.reconcile()
+		a.backups.forget(a.backups.running())
 	}
 	return nil
 }
@@ -1386,14 +1380,8 @@ func (a *apps) stop(ctx context.Context, app string) error {
 }
 
 // compose runs docker compose on a release and streams its output as log
-// lines. A Postgres a restore switched to another volume runs on that one,
-// in every release (applyVolumes).
+// lines.
 func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
-	if a.backups != nil {
-		if err := a.backups.applyVolumes(app, composeFile); err != nil {
-			return fmt.Errorf("point the database at its volume since the last restore: %w", err)
-		}
-	}
 	return a.run(ctx, logf, nil, append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)
 }
 
@@ -1550,6 +1538,39 @@ func writeFile(path string, content io.Reader, mode fs.FileMode) error {
 func within(dir, path string) bool {
 	relative, err := filepath.Rel(dir, path)
 	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
+}
+
+// stopServices stops services of an app, all without names, and returns
+// what starts them again, with a context a stopping agent does not cancel.
+func (a *apps) stopServices(ctx context.Context, app string, services ...string) (start func() error, err error) {
+	ctx = context.WithoutCancel(ctx)
+	run := func(args ...string) error {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+		return a.compose(ctx, app, a.composeFile(app), func(string, ...any) {}, append(args, services...)...)
+	}
+	start = func() error { return run("start") }
+	if err := run("stop"); err != nil {
+		return nil, errors.Join(fmt.Errorf("stop the app: %w; nothing changed", err), start())
+	}
+	return start, nil
+}
+
+// composeFile is the compose file of the app's live deploy.
+func (a *apps) composeFile(app string) string {
+	return filepath.Join(a.releaseDir(app, a.current(app)), "compose.json")
+}
+
+// runningDatabases are the databases of an app's live deploy.
+func (a *apps) runningDatabases(app string) []protocol.Database {
+	current := a.current(app)
+	if current == 0 {
+		return nil
+	}
+	var detected protocol.Detected
+	body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, current), "detected.json"))
+	_ = json.Unmarshal(body, &detected)
+	return detected.Databases
 }
 
 func saveJSON(path string, value any) {

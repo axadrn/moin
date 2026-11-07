@@ -262,10 +262,15 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	if strings.TrimSpace(request.SQL) == "" {
 		return protocol.DBResult{}, errors.New("the query is empty")
 	}
+	var before *time.Time
+	if request.Write {
+		// A copy just before the change, so "Before your edit" is exact.
+		before = a.backups.copyBefore(ctx, request.App, database.Path)
+	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	if database.Postgres() {
-		return a.pgQuery(ctx, request, database)
+		return a.pgQuery(ctx, request, database, before)
 	}
 	db, closeDB, err := openDatabase(ctx, database.HostPath, request.Write)
 	if err != nil {
@@ -275,8 +280,7 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
 
 	if request.Write {
-		before := time.Now().UTC()
-		result.Before = &before
+		result.Before = before
 		defer matchOwner(database.HostPath)
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {

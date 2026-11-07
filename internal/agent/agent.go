@@ -160,20 +160,17 @@ func Run(ctx context.Context, dir string, state State) error {
 	agent.security = newSecurity(dir, agent.apps)
 	agent.apps.proxyMode = agent.security.proxyMode
 	agent.updater = newUpdater(state.URL)
-	// A restore the agent stopped in the middle of ends first: the app
-	// runs again, on the data before or the restored data, both whole.
-	agent.backups.recoverRestores(ctx)
+	// A restore the agent stopped in the middle of ends first: the crash
+	// rule puts a whole database in place and the app runs again.
+	agent.backups.recover(ctx)
 	// On a stop, a deploy or a restore that runs gets a moment to end
 	// before backups stop; one that does not is ended by the next start.
 	defer func() {
 		agent.waitIdle(stopWait)
-		agent.backups.configure(context.Background(), nil, nil)
+		agent.backups.configure(nil, nil, nil)
 	}()
-	go agent.backups.recordLoop(ctx)
-	go agent.backups.checks(ctx)
-	go agent.backups.health(ctx)
+	go agent.backups.loop(ctx)
 	go agent.apps.cleanups(ctx)
-	go agent.backups.sweepLoop(ctx)
 	go agent.metrics(ctx)
 	wait := minReconnect
 	for {
@@ -348,15 +345,24 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeServerConfig:
 		r.serverConfig(ctx, message, rules)
 	case protocol.TypeBackupConfig:
-		r.backupConfig(ctx, message, rules)
+		r.backupConfig(message, rules)
 	case protocol.TypeBackupList:
-		r.backupList(ctx, message)
-	case protocol.TypeBackupRestore:
-		r.backupRestore(ctx, message)
+		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
+			return r.backups.list(ctx, request), nil
+		})
 	case protocol.TypeBackupRestores:
-		r.backupRestores(message)
-	case protocol.TypeBackupDownload:
-		r.backupDownload(ctx, message)
+		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
+			return protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: r.backups.restoreStates(request.App)}, nil
+		})
+	case protocol.TypeBackupRestore:
+		// An update waits for a restore, as for a deploy.
+		answer(r, message, protocol.TypeOK, func(request protocol.BackupRestore) (any, error) {
+			if !r.beginWork() {
+				return nil, errUpdating
+			}
+			defer r.endWork()
+			return nil, r.backups.restore(ctx, request)
+		})
 	case protocol.TypeExecStart:
 		r.execStart(ctx, message, rules)
 	case protocol.TypeAgentURL:
@@ -373,6 +379,22 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 // fail answers a request with the error that stopped it.
 func (r *runner) fail(message protocol.Message, err error) {
 	r.send(protocol.TypeError, message.RequestID, protocol.Error{Message: err.Error()})
+}
+
+// answer decodes a request, runs do and sends its result as kind, or the
+// error.
+func answer[T any](r *runner, message protocol.Message, kind protocol.MessageType, do func(T) (any, error)) {
+	var request T
+	err := message.Decode(&request)
+	var result any
+	if err == nil {
+		result, err = do(request)
+	}
+	if err != nil {
+		r.fail(message, err)
+		return
+	}
+	r.send(kind, message.RequestID, result)
 }
 
 // url is the control plane's address.
@@ -466,6 +488,8 @@ func websocketURL(raw string) (string, error) {
 // that run, within systemd's default stop timeout of 90 seconds. A
 // restore changes no data in place, so one cut off is harmless.
 const stopWait = time.Minute
+
+var errUpdating = errors.New("the agent is updating itself: try again in a minute")
 
 // beginWork starts a deploy or a restore, unless the agent is updating
 // itself. endWork ends it.

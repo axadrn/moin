@@ -14,11 +14,11 @@ var appName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 // ValidAppName reports whether name is a valid app name.
 func ValidAppName(name string) bool { return appName.MatchString(name) }
 
-// CopyIDLayout is the ID of a copy before a restore: the time it was
-// taken.
+// CopyIDLayout is the ID of a copy, or of the state before a restore:
+// the time it was taken.
 const CopyIDLayout = "20060102T150405Z"
 
-// ValidCopyID reports whether id is the ID of a copy before a restore.
+// ValidCopyID reports whether id is the ID of a copy.
 // Anything else never reaches the bucket as part of a key.
 func ValidCopyID(id string) bool {
 	if len(id) != len(CopyIDLayout) {

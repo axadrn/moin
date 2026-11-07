@@ -1,810 +1,96 @@
 package agent
 
 import (
-	"compress/gzip"
 	"context"
-	"database/sql"
-	"fmt"
-	"io"
 	"os"
-	"path"
 	"path/filepath"
-	"slices"
-	"strings"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/moin/protocol"
-	"github.com/benbjohnson/litestream"
 )
 
-// testS3 is the S3 endpoint and bucket of the tests that need one, such as
-// SeaweedFS: MOIN_TEST_S3=http://127.0.0.1:19000 MOIN_TEST_S3_BUCKET=moin-dev.
-func testS3(t *testing.T) (endpoint, bucketName string) {
-	t.Helper()
-	endpoint = os.Getenv("MOIN_TEST_S3")
-	if endpoint == "" {
-		t.Skip("set MOIN_TEST_S3 to an S3 endpoint")
-	}
-	bucketName = os.Getenv("MOIN_TEST_S3_BUCKET")
-	if bucketName == "" {
-		bucketName = "moin-dev"
-	}
-	bucket := &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: bucketName, AccessKey: "x", SecretKey: "y"}
-	_, _ = s3Client(bucket).CreateBucket(context.Background(), &s3.CreateBucketInput{Bucket: aws.String(bucketName)})
-	return endpoint, bucketName
-}
-
-// sqliteApp makes an app with one SQLite file, as a deploy leaves it.
-func sqliteApp(t *testing.T, a *apps, app, id string) (string, *sql.DB) {
-	t.Helper()
-	file := filepath.Join(t.TempDir(), "app.db")
-	db, err := sql.Open("sqlite", "file:"+file+"?_pragma=journal_mode(wal)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)`); err != nil {
-		t.Fatal(err)
-	}
-	release := a.releaseDir(app, 1)
-	os.MkdirAll(release, 0o700)
-	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
-	os.WriteFile(filepath.Join(a.appDir(app), "current"), []byte("1"), 0o600)
-	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte(id), 0o600)
-	return file, db
-}
-
-func countNotes(t *testing.T, file string) int {
-	t.Helper()
-	check, err := sql.Open("sqlite", "file:"+file+"?mode=ro")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer check.Close()
-	var n int
-	if err := check.QueryRow(`SELECT count(*) FROM notes`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
-}
-
-// waitRecorded waits until the bucket has a change after after.
-func waitRecorded(t *testing.T, e engine, after time.Time) window {
-	t.Helper()
-	deadline := time.Now().Add(20 * time.Second)
-	for time.Now().Before(deadline) {
-		w, _ := e.Window(context.Background())
-		if !w.newest.IsZero() && w.newest.After(after) {
-			return w
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-	files := ""
-	if sqlite, ok := e.(*sqliteEngine); ok {
-		if client, err := sqlite.client(); err == nil {
-			for level := litestream.SnapshotLevel; level >= 0; level-- {
-				itr, err := client.LTXFiles(context.Background(), level, 0, false)
-				if err != nil {
-					continue
-				}
-				for itr.Next() {
-					info := itr.Item()
-					files += fmt.Sprintf(" L%d:%d-%d@%s", level, info.MinTXID, info.MaxTXID, info.CreatedAt.Format("15:04:05.000"))
-				}
-				itr.Close()
-			}
-		}
-	}
-	t.Fatalf("nothing recorded after %s:%s", after, files)
-	return window{}
-}
-
-// TestBackups records a SQLite file into a real bucket and goes back to a
-// moment in the history, checks it daily, downloads a copy and follows
-// the file when its bucket or app ID changes. The full restore with the
-// app stopping and starting is in sqlite_docker_test.go.
-func TestBackups(t *testing.T) {
-	endpoint, bucketName := testS3(t)
-	ctx := context.Background()
-	dir := t.TempDir()
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
-	reports := make(chan protocol.Backups, 10)
-	b := newBackups(a, func(messageType protocol.MessageType, _ string, data any) {
-		if backups, ok := data.(protocol.Backups); ok && messageType == protocol.TypeBackupStatus {
-			reports <- backups
-		}
-	})
-	a.backups = b
-	app := fmt.Sprintf("backup-%d", time.Now().UnixNano())
-	file, db := sqliteApp(t, a, app, "app-one")
-	if _, err := b.list(ctx, protocol.BackupRequest{App: app}); err == nil {
-		t.Fatal("a list without a bucket worked")
-	}
-	bucket := &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: bucketName, Path: "test", Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	if err := b.configure(ctx, bucket, nil); err != nil {
-		t.Fatal(err)
-	}
-	defer b.configure(ctx, nil, nil)
-	if len(b.watched) != 1 {
-		t.Fatalf("watched = %v", b.watched)
-	}
-	database := a.runningDatabases(app)[0]
-	e := b.engine(app, database).(*sqliteEngine)
-
-	// Two rows, a minute noted, then more rows and a delete.
-	db.Exec(`INSERT INTO notes (body) VALUES ('one'), ('two')`)
-	waitRecorded(t, e, time.Now().Add(-time.Second))
-	time.Sleep(1100 * time.Millisecond)
-	noted := time.Now()
-	time.Sleep(1100 * time.Millisecond)
-	db.Exec(`INSERT INTO notes (body) VALUES ('three'), ('four'); DELETE FROM notes WHERE body = 'one'`)
-	w := waitRecorded(t, e, noted)
-	if w.since.IsZero() || w.since.After(noted) {
-		t.Fatalf("window %+v", w)
-	}
-	back := filepath.Join(dir, "back.db")
-	if err := e.restoreTo(ctx, noted, back); err != nil {
-		t.Fatal(err)
-	}
-	if n := countNotes(t, back); n != 2 {
-		t.Fatalf("at the noted moment %d notes, want 2", n)
-	}
-	// A moment after the newest change is the newest state, once its last
-	// part reached the bucket: the window's newest can be an earlier
-	// part of the same write.
-	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(300 * time.Millisecond) {
-		newest := filepath.Join(dir, "newest.db")
-		removeDatabase(newest)
-		if err := e.restoreTo(ctx, time.Now().Add(time.Minute), newest); err != nil {
-			t.Fatalf("a moment after the newest change: %v", err)
-		}
-		n := countNotes(t, newest)
-		if n == 3 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the newest state has %d notes, want 3", n)
-		}
-	}
-	// The newest change is the write, not a compaction after it.
-	if w, _ := e.Window(ctx); w.newest.After(time.Now()) || w.newest.Before(noted) {
-		t.Fatalf("newest %s", w.newest)
-	}
-	// Before the history it says so, not Litestream's words.
-	err := e.restoreTo(ctx, time.Date(2020, 1, 1, 10, 0, 0, 0, time.UTC), filepath.Join(dir, "early.db"))
-	if err == nil || !strings.Contains(err.Error(), "Jan 1 10:00 UTC is before the oldest moment of the backup of /data/app.db") {
-		t.Fatalf("a moment before the history: %v", err)
-	}
-
-	// The daily check passes and tells the control plane.
-	b.checkAll(ctx)
-	select {
-	case report := <-reports:
-		if report.App != app || report.Databases[0].CheckedAt == nil || report.Databases[0].Error != "" || report.Databases[0].Since == nil {
-			t.Fatalf("check report = %+v", report)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("no check report")
-	}
-
-	// Download a copy: a gzipped SQLite file in downloads/ that opens.
-	copied, err := b.download(ctx, protocol.BackupRequest{App: app})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(copied.Key, "test/ws-one/"+app+"/app-one/downloads/"+app+"-data-app.db-") || !strings.HasSuffix(copied.Key, ".db.gz") || copied.Size == 0 {
-		t.Fatalf("download %+v", copied)
-	}
-	client := s3Client(bucket)
-	object, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucketName), Key: aws.String(copied.Key)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	unzipped, err := gzip.NewReader(object.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	opened := filepath.Join(dir, "downloaded.db")
-	out, _ := os.Create(opened)
-	io.Copy(out, unzipped)
-	out.Close()
-	object.Body.Close()
-	if n := countNotes(t, opened); n != 3 {
-		t.Fatalf("the download has %d notes, want 3", n)
-	}
-
-	// The copy before a restore lists, and a restore to it reads it back.
-	if _, err := b.keepCopy(ctx, app, database, e); err != nil {
-		t.Fatal(err)
-	}
-	copies, err := b.copies(ctx, app, database)
-	if err != nil || len(copies) != 1 || copies[0].Size == 0 {
-		t.Fatalf("copies %+v %v", copies, err)
-	}
-	fetched, err := b.fetchCopy(ctx, app, database, copies[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(fetched)
-	if err := gunzipFile(fetched, filepath.Join(dir, "copy.db")); err != nil || countNotes(t, filepath.Join(dir, "copy.db")) != 3 {
-		t.Fatalf("the copy before the restore: %v", err)
-	}
-	if _, err := b.fetchCopy(ctx, app, database, "20200101T000000Z"); err == nil || !strings.Contains(err.Error(), "there is no copy from 20200101T000000Z") {
-		t.Fatalf("a copy that is not there: %v", err)
-	}
-
-	// A new folder in the bucket starts over and records again.
-	moved := *bucket
-	moved.Path = "test-moved"
-	if err := b.configure(ctx, &moved, nil); err != nil {
-		t.Fatal(err)
-	}
-	db.Exec(`INSERT INTO notes (body) VALUES ('after the move')`)
-	waitRecorded(t, b.engine(app, database), time.Now().Add(-time.Second))
-	if err := b.configure(ctx, bucket, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	// The app moves to a bucket of its own: its changes go there.
-	own := *bucket
-	own.Path, own.Name = "test-own", "own"
-	if err := b.configure(ctx, bucket, map[string]*protocol.Bucket{app: &own}); err != nil {
-		t.Fatal(err)
-	}
-	if b.watched[file].bucket != own {
-		t.Fatalf("the app records to %+v, want its own bucket", b.watched[file].bucket)
-	}
-	db.Exec(`INSERT INTO notes (body) VALUES ('own bucket')`)
-	waitRecorded(t, b.engine(app, database), time.Now().Add(-time.Second))
-	list, _ := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucketName), Prefix: aws.String("test-own/ws-one/" + app + "/app-one/data-app.db/litestream/")})
-	if len(list.Contents) == 0 {
-		t.Fatal("nothing in the app's own bucket")
-	}
-	if err := b.configure(ctx, bucket, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	// The app removed and created again with the same name: the same file
-	// records into a new, empty folder, and the old history stays apart.
-	os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("app-two"), 0o600)
-	b.reconcile()
-	db.Exec(`INSERT INTO notes (body) VALUES ('new app')`)
-	waitRecorded(t, b.engine(app, database), time.Now().Add(-time.Second))
-	list, _ = client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucketName), Prefix: aws.String("test/ws-one/" + app + "/app-two/data-app.db/litestream/")})
-	if len(list.Contents) == 0 {
-		t.Fatal("nothing recorded under the new app ID")
-	}
-	if copies, _ := b.copies(ctx, app, database); len(copies) != 0 {
-		t.Fatalf("the new app sees the copies of the old one: %+v", copies)
-	}
-
-	// Without an app ID, from a deploy before deploys brought one, nothing
-	// is recorded and the status says what to do.
-	os.Remove(filepath.Join(a.appDir(app), "app-id"))
-	b.recordAll(ctx)
-	if len(b.watched) != 0 {
-		t.Fatalf("watched without an app ID = %v", b.watched)
-	}
-	if status := b.status(ctx, app, database, true); !strings.Contains(status.Error, "deploy "+app+" once more") {
-		t.Fatalf("status without an app ID = %+v", status)
-	}
-	// The control plane sends the ID on connect: backups go on, no deploy.
-	if !a.keepIDs(map[string]string{app: "app-two"}) {
-		t.Fatal("the sent app ID was not kept")
-	}
-	b.reconcile()
-	if len(b.watched) != 1 {
-		t.Fatalf("watched with the sent app ID = %v", b.watched)
-	}
-}
-
-// TestKeepIDs: an app without an ID takes the one the control plane sends;
-// a stored ID, an unknown app or a bad ID are left alone.
-func TestKeepIDs(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
-	for _, app := range []string{"old", "new"} {
-		os.MkdirAll(a.appDir(app), 0o700)
-	}
-	os.WriteFile(filepath.Join(a.appDir("new"), "app-id"), []byte("id-new"), 0o600)
-	if !a.keepIDs(map[string]string{"old": "id-old", "new": "id-other", "gone": "id-gone", "../x": "id-x"}) {
-		t.Fatal("nothing kept")
-	}
-	if a.keepIDs(map[string]string{"old": "id-again"}) {
-		t.Fatal("kept over a stored ID")
-	}
-	if a.appID("old") != "id-old" || a.appID("new") != "id-new" || a.appID("gone") != "" {
-		t.Fatalf("ids = %q %q %q", a.appID("old"), a.appID("new"), a.appID("gone"))
-	}
-	if _, err := os.Stat(a.appDir("gone")); err == nil {
-		t.Fatal("an unknown app got a folder")
-	}
-	if a.keepIDs(map[string]string{"old": "../bad"}) {
-		t.Fatal("kept a bad ID")
-	}
-}
-
-// TestBucketLayout: two workspaces share one bucket and folder, each with
-// an app of the same name. Their keys never overlap.
-func TestBucketLayout(t *testing.T) {
-	prefixes := map[string]string{}
-	for _, workspace := range []string{"0b6c1f8e-1111-4c1a-9a7e-5d2b3c4d5e6f", "7a9e2d4c-2222-4b8f-8c3d-1e2f3a4b5c6d"} {
-		for _, folder := range []string{"", "moin"} {
-			a := newApps(t.TempDir(), nil)
-			os.MkdirAll(a.appDir("shop"), 0o700)
-			os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-"+workspace[:8]), 0o600)
-			b := newBackups(a, nil)
-			b.defaultBucket = &protocol.Bucket{Bucket: "shared", Path: folder, Workspace: workspace}
-			prefix, err := b.prefix("shop", "/data/app.db")
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := strings.TrimLeft(folder+"/"+workspace+"/shop/id-"+workspace[:8]+"/data-app.db", "/")
-			if prefix != want {
-				t.Errorf("prefix = %s, want %s", prefix, want)
-			}
-			for other, key := range prefixes {
-				if strings.HasPrefix(prefix+"/", key+"/") || strings.HasPrefix(key+"/", prefix+"/") {
-					t.Errorf("%s overlaps %s (%s)", prefix, key, other)
-				}
-			}
-			prefixes[workspace+folder] = prefix
-		}
-	}
-	err := newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.Bucket{Bucket: "shared"}, nil)
-	if err == nil {
-		t.Error("a bucket without a workspace folder was accepted")
-	}
-	err = newBackups(newApps(t.TempDir(), nil), nil).configure(context.Background(), &protocol.Bucket{Bucket: "shared", Workspace: "ws"}, map[string]*protocol.Bucket{"shop": {Bucket: "own"}})
-	if err == nil {
-		t.Error("an app's bucket without a workspace folder was accepted")
-	}
-}
-
-// TestAppBucket: an app with a bucket of its own backs up there, the
-// others to the default bucket.
-func TestAppBucket(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
-	for _, app := range []string{"shop", "blog"} {
-		os.MkdirAll(a.appDir(app), 0o700)
-		os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte("id-"+app), 0o600)
-	}
-	b := newBackups(a, nil)
-	b.defaultBucket = &protocol.Bucket{Bucket: "shared", Workspace: "ws", Name: "default"}
-	b.appBuckets = map[string]*protocol.Bucket{"shop": {Bucket: "client", Path: "moin", Workspace: "ws", Name: "client"}}
-	if b.bucketFor("shop").Bucket != "client" || b.bucketFor("blog").Bucket != "shared" {
-		t.Fatalf("buckets = %s, %s", b.bucketFor("shop").Bucket, b.bucketFor("blog").Bucket)
-	}
-	prefix, _ := b.prefix("shop", "/data/app.db")
-	if prefix != "moin/ws/shop/id-shop/data-app.db" {
-		t.Errorf("prefix in the app's own bucket = %s", prefix)
-	}
-	if sameBuckets(b.appBuckets, nil) || !sameBuckets(b.appBuckets, map[string]*protocol.Bucket{"shop": {Bucket: "client", Path: "moin", Workspace: "ws", Name: "client"}}) {
-		t.Error("sameBuckets compares wrong")
-	}
-}
-
-// TestSweep: uploads and downloads older than a day go, copies before
-// restores after 7 days; the history, newer files and another
-// workspace's files are never touched. Old snapshots/ stay too.
-func TestSweep(t *testing.T) {
-	endpoint, bucketName := testS3(t)
-	ctx := context.Background()
-	folder := fmt.Sprintf("sweep-%d", time.Now().UnixNano())
-	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.defaultBucket = &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: bucketName, Path: folder, Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	client := s3Client(b.defaultBucket)
-	keys := []string{
-		folder + "/ws-one/shop/app-1/uploads/up_old.tar.gz",
-		folder + "/ws-one/gone/app-2/uploads/up_old.tar.gz",
-		folder + "/ws-one/shop/app-1/downloads/shop-data-app.db-20261031T143638Z.db.gz",
-		folder + "/ws-one/shop/app-1/data-app.db/before-restore/20261031T143638Z.db.gz",
-		folder + "/ws-one/shop/app-1/data-app.db/litestream/0000/x.ltx",
-		folder + "/ws-one/shop/app-1/data-app.db/snapshots/20261031T143638Z-manual.db.gz",
-		folder + "/ws-two/shop/app-3/uploads/up_old.tar.gz",
-	}
-	for _, key := range keys {
-		_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucketName), Key: aws.String(key), Body: strings.NewReader("x")})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	exists := func(key string) bool {
-		_, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucketName), Key: aws.String(key)})
-		return err == nil
-	}
-	b.sweepOnce(ctx, time.Now().Add(time.Hour))
-	for _, key := range keys {
-		if !exists(key) {
-			t.Fatalf("%s went before its time", key)
-		}
-	}
-	b.sweepOnce(ctx, time.Now().Add(25*time.Hour))
-	want := map[string]bool{keys[0]: false, keys[1]: false, keys[2]: false, keys[3]: true, keys[4]: true, keys[5]: true, keys[6]: true}
-	for key, kept := range want {
-		if exists(key) != kept {
-			t.Errorf("after a day %s exists = %v, want %v", key, !kept, kept)
-		}
-	}
-	b.sweepOnce(ctx, time.Now().Add(8*24*time.Hour))
-	want = map[string]bool{keys[3]: false, keys[4]: true, keys[5]: true, keys[6]: true}
-	for key, kept := range want {
-		if exists(key) != kept {
-			t.Errorf("after 8 days %s exists = %v, want %v", key, !kept, kept)
-		}
-	}
-	for _, key := range keys {
-		client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucketName), Key: aws.String(key)})
-	}
-}
-
-// TestCheckBeforeRecording: a check with nothing in the bucket yet is
-// neither passed nor failed, and asks to try again soon.
-func TestCheckBeforeRecording(t *testing.T) {
-	endpoint, bucketName := testS3(t)
-	reports := make(chan protocol.Backups, 1)
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(_ protocol.MessageType, _ string, data any) {
-		if backups, ok := data.(protocol.Backups); ok {
-			reports <- backups
-		}
-	})
-	sqliteApp(t, a, "fresh", "app-1")
-	b.defaultBucket = &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: bucketName, Path: fmt.Sprintf("empty-%d", time.Now().UnixNano()), Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	if !b.checkAll(context.Background()) {
-		t.Error("a check before the first change does not try again soon")
-	}
-	report := <-reports
-	if report.Databases[0].CheckedAt != nil || report.Databases[0].Error != "" {
-		t.Errorf("report = %+v, want no check yet", report.Databases[0])
-	}
-}
-
-// TestBrokenHistoryFailsTheCheck: a history whose files are damaged fails
-// the daily check loudly.
-func TestBrokenHistoryFailsTheCheck(t *testing.T) {
-	endpoint, bucketName := testS3(t)
-	ctx := context.Background()
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	app := fmt.Sprintf("broken-%d", time.Now().UnixNano())
-	_, db := sqliteApp(t, a, app, "app-1")
-	bucket := &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: bucketName, Path: "broken", Workspace: "ws-one", AccessKey: "x", SecretKey: "y"}
-	if err := b.configure(ctx, bucket, nil); err != nil {
-		t.Fatal(err)
-	}
-	defer b.configure(ctx, nil, nil)
-	database := a.runningDatabases(app)[0]
-	db.Exec(`INSERT INTO notes (body) VALUES ('one')`)
-	waitRecorded(t, b.engine(app, database), time.Now().Add(-time.Second))
-	if err := b.engine(app, database).Check(ctx); err != nil {
-		t.Fatalf("the check of a good history: %v", err)
-	}
-	// Every file of the history in the bucket turns to garbage.
-	b.configure(ctx, nil, nil)
-	b.defaultBucket = bucket
-	client := s3Client(bucket)
-	prefix := path.Join("broken/ws-one", app, "app-1/data-app.db/litestream") + "/"
-	pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucketName), Prefix: aws.String(prefix)})
-	broken := 0
-	for pages.HasMorePages() {
-		page, err := pages.NextPage(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, object := range page.Contents {
-			client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucketName), Key: object.Key, Body: strings.NewReader("garbage")})
-			broken++
-		}
-	}
-	if broken == 0 {
-		t.Fatal("no history to break")
-	}
-	b.checkAll(ctx)
-	status := b.status(ctx, app, database, false)
-	if status.CheckedAt == nil || !strings.Contains(status.CheckError, "the daily check failed") || status.Error == "" {
-		t.Fatalf("status of a broken history = %+v", status)
-	}
-}
-
-// TestDeployRefusesBadAppID: the app ID becomes a folder in the bucket, so
-// a deploy with one that could leave it fails before anything happens.
-func TestDeployRefusesBadAppID(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	_, err := a.runDeploy(context.Background(), protocol.DeployStart{App: "shop", AppID: "../other", Number: 1}, func(string, ...any) {})
-	if err == nil {
-		t.Fatal("a deploy with a bad app ID ran")
-	}
-	if a.appID("shop") != "" {
-		t.Error("a bad app ID was stored")
-	}
-}
-
-// TestGzippedCopiesAtOnce: two full copies of one database at the same
-// time, like a download during the copy before a restore, both work and
-// leave nothing behind.
-func TestGzippedCopiesAtOnce(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "app.db")
-	db, err := sql.Open("sqlite", "file:"+file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = db.Exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT); INSERT INTO notes (body) VALUES ('one')`)
-	db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	first, firstCleanup, err := gzippedCopy(ctx, file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, secondCleanup, err := gzippedCopy(ctx, file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatalf("both copies are %s", first)
-	}
-	secondCleanup()
-	if _, err := os.Stat(first); err != nil {
-		t.Fatalf("the second cleanup removed the first copy: %v", err)
-	}
-	firstCleanup()
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 1 {
-		t.Fatalf("left behind: %v", entries)
-	}
-}
-
-// TestRestoreRefuses: a restore without a moment, to a moment to come or
-// to a made-up copy changes nothing and says why.
-func TestRestoreRefuses(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
-	b := newBackups(a, nil)
-	sqliteApp(t, a, "shop", "app-1")
-	b.defaultBucket = &protocol.Bucket{Bucket: "x", Workspace: "ws"}
-	later := time.Now().Add(time.Hour)
-	for _, request := range []protocol.BackupRestore{
-		{App: "shop"},
-		{App: "shop", At: &later},
-		{App: "shop", Copy: "../../other"},
+// What moin leaves next to a database is never a database of the app.
+func TestBackupFile(t *testing.T) {
+	for name, ours := range map[string]bool{
+		"app.db": false, "app.db-wal": false, ".moin-copy-123": true, ".moin-check-9": true,
+		"app.db.before-20261107T140000Z": true, "app.db.restore": true,
 	} {
-		if err := b.restore(context.Background(), request); err == nil {
-			t.Errorf("restore %+v worked", request)
+		if backupFile(name) != ours {
+			t.Errorf("backupFile(%q) = %v", name, !ours)
 		}
 	}
 }
 
-// TestSpaceFor: a restore that would fill the disk refuses in one sentence
-// before it changes anything.
-func TestSpaceFor(t *testing.T) {
-	if err := spaceFor(10<<30, 30<<30); err != nil {
-		t.Fatalf("enough space: %v", err)
-	}
-	err := spaceFor(10<<30, 10<<30)
-	if err == nil || !strings.Contains(err.Error(), "needs about 10 GB free") || !strings.Contains(err.Error(), "there is 10 GB") || !strings.Contains(err.Error(), "nothing changed") {
-		t.Fatalf("not enough space: %v", err)
-	}
-	if err := enoughSpace(t.TempDir(), 1<<60); err == nil {
-		t.Fatal("a disk has room for an exabyte")
-	}
-}
-
-// TestStateFiles: every state file is written whole, and a damaged one is
-// reported, not skipped: no switch is written over it, compose does not
-// start on it, no volume is swept for it.
-func TestStateFiles(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	file := filepath.Join(b.stateDir(), pgVolumesFile)
-	if err := b.changePgVolume("shop/db", func(v *pgVolume) error { v.Current = pgMount{Type: "volume", Source: "v1"}; return nil }); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := b.pgVolume("shop/db"); err != nil || got.Current.Source != "v1" {
-		t.Fatalf("read back %+v %v", got, err)
-	}
-	if leftovers, _ := filepath.Glob(filepath.Join(b.stateDir(), "."+pgVolumesFile+".*")); len(leftovers) != 0 {
-		t.Fatalf("temp files left: %v", leftovers)
-	}
-	os.WriteFile(file, []byte(`{"shop/db": {"curr`), 0o600)
-	if err := b.changePgVolume("shop/db", func(*pgVolume) error { return nil }); err == nil {
-		t.Fatal("a switch was written over a damaged file")
-	}
-	if _, err := b.pgVolume("shop/db"); err == nil {
-		t.Fatal("a damaged file read as empty")
-	}
-	if !strings.Contains(b.stateErr, "damaged") {
-		t.Fatalf("not reported: %q", b.stateErr)
-	}
-	if err := b.applyVolumes("shop", filepath.Join(t.TempDir(), "compose.json")); err == nil {
-		t.Fatal("compose ran on a damaged volume file")
-	}
-	if _, err := b.switched(restoreMark{Postgres: true, App: "shop", Service: "db", Volume: "v1"}); err == nil {
-		t.Fatal("a crashed restore was judged on a damaged file")
-	}
-}
-
-// TestChangePgVolumeAtOnce: changes of one entry at the same time, like a
-// switch, the sweep and Record paying what a switch owes, never undo each
-// other.
-func TestChangePgVolumeAtOnce(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	b.changePgVolume("shop/db", func(v *pgVolume) error {
-		v.Current = pgMount{Type: "volume", Source: "v0"}
-		v.Owed = &pgOwed{Timeline: 2, Fresh: true}
-		for i := range 20 {
-			v.Previous = append(v.Previous, pgPrevious{pgMount: pgMount{Type: "volume", Source: fmt.Sprintf("old-%d", i)}, ID: fmt.Sprintf("old-%d", i)})
+// The crash rule of SQLite: the live file missing and the undo there, the
+// undo goes back; the undo there and the live file too, the restore had
+// switched. A half built restore goes.
+func TestSQLiteCrashRule(t *testing.T) {
+	const id = "20261107T140000Z"
+	for _, test := range []struct {
+		name               string
+		live, aside, built bool
+		switched           bool
+	}{
+		{name: "before the first rename", live: true, built: true},
+		{name: "between the renames", aside: true, built: true},
+		{name: "after the switch", live: true, aside: true, switched: true},
+	} {
+		dir := t.TempDir()
+		live := filepath.Join(dir, "app.db")
+		put := func(file, body string, on bool) {
+			if on {
+				os.WriteFile(file, []byte(body), 0o600)
+			}
 		}
-		return nil
-	})
-	var wg sync.WaitGroup
-	for i := range 20 {
-		wg.Add(3)
-		go func() {
-			defer wg.Done()
-			// A switch adds an undo.
-			b.changePgVolume("shop/db", func(v *pgVolume) error {
-				v.Previous = append(v.Previous, pgPrevious{pgMount: pgMount{Type: "volume", Source: fmt.Sprintf("new-%d", i)}, ID: fmt.Sprintf("new-%d", i)})
-				return nil
-			})
-		}()
-		go func() {
-			defer wg.Done()
-			// The sweep removes an old one.
-			b.changePgVolume("shop/db", func(v *pgVolume) error {
-				v.Previous = slices.DeleteFunc(v.Previous, func(p pgPrevious) bool { return p.ID == fmt.Sprintf("old-%d", i) })
-				return nil
-			})
-		}()
-		go func() {
-			defer wg.Done()
-			b.updateOwed("shop", protocol.Database{Service: "db"}, func(owed *pgOwed) { owed.Timeline = 0 })
-		}()
-	}
-	wg.Wait()
-	got, err := b.pgVolume("shop/db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Previous) != 20 || got.Current.Source != "v0" || got.Owed == nil || got.Owed.Timeline != 0 || !got.Owed.Fresh {
-		t.Fatalf("lost a change: %+v %+v", got, got.Owed)
-	}
-	for _, p := range got.Previous {
-		if !strings.HasPrefix(p.ID, "new-") {
-			t.Fatalf("an old one is left: %+v", got.Previous)
+		put(live, "restored", test.live)
+		put(live+".before-"+id, "before", test.aside)
+		put(live+".restore", "half", test.built)
+		e := &sqliteEngine{b: newBackups(newApps(dir, nil), nil), database: protocol.Database{HostPath: live}}
+		switched, err := e.Recover(context.Background(), id)
+		if err != nil || switched != test.switched {
+			t.Fatalf("%s: switched %v, %v", test.name, switched, err)
+		}
+		body, _ := os.ReadFile(live)
+		if want := map[bool]string{true: "restored", false: "before"}[test.live]; string(body) != want {
+			t.Errorf("%s: the live file is %q, want %q", test.name, body, want)
+		}
+		if exists(live + ".restore") {
+			t.Errorf("%s: the half built restore stayed", test.name)
 		}
 	}
 }
 
-// TestPointVolumes: compose runs the database on the switched volume, and
-// refuses when the service or its mount is gone; the image's own volume
-// gets a mount.
-func TestPointVolumes(t *testing.T) {
-	config := func(services map[string]any) map[string]any {
-		return map[string]any{"services": services, "volumes": map[string]any{"pgdata": map[string]any{"name": "shop_pgdata"}}}
+// An app without settings, or with broken ones, is copied hourly and
+// keeps its copies a week, with every change.
+func TestScheduleDefaults(t *testing.T) {
+	b := newBackups(newApps(t.TempDir(), nil), nil)
+	b.configure(nil, nil, map[string]protocol.Schedule{"shop": {Every: 15, Keep: 3}, "broken": {}})
+	if got := b.schedule("shop"); got != (protocol.Schedule{Every: 15, Keep: 3}) {
+		t.Errorf("shop: %+v", got)
 	}
-	db := func(target string) map[string]any {
-		return map[string]any{"image": "postgres:17", "volumes": []any{map[string]any{"type": "volume", "source": "pgdata", "target": target}}}
-	}
-	switched := map[string]pgVolume{"db": {Target: "/var/lib/postgresql/data", Current: pgMount{Type: "volume", Source: "moin-restore-shop-db-1"}}}
-
-	c := config(map[string]any{"db": db("/var/lib/postgresql/data")})
-	if changed, err := pointVolumes(c, switched); err != nil || !changed {
-		t.Fatalf("switch: %v %v", changed, err)
-	}
-	mount := c["services"].(map[string]any)["db"].(map[string]any)["volumes"].([]any)[0].(map[string]any)
-	top := c["volumes"].(map[string]any)["moin-restore-shop-db-1"].(map[string]any)
-	if mount["source"] != "moin-restore-shop-db-1" || top["external"] != true {
-		t.Fatalf("not switched: %v %v", mount, top)
-	}
-	if changed, _ := pointVolumes(c, switched); changed {
-		t.Fatal("a second run changed it again")
-	}
-	if _, err := pointVolumes(config(map[string]any{"web": map[string]any{}}), switched); err == nil || !strings.Contains(err.Error(), "no service db") {
-		t.Fatalf("a service that is gone: %v", err)
-	}
-	// postgres:18 keeps its data one folder up: the mount moved.
-	if _, err := pointVolumes(config(map[string]any{"db": db("/var/lib/postgresql")}), switched); err == nil || !strings.Contains(err.Error(), "mounts nothing there") {
-		t.Fatalf("a mount that moved: %v", err)
-	}
-	anonymous := map[string]pgVolume{"db": {Target: "/var/lib/postgresql/data", Anonymous: true, Current: pgMount{Type: "volume", Source: "moin-restore-shop-db-1"}}}
-	c = config(map[string]any{"db": map[string]any{"image": "postgres:17"}})
-	if changed, err := pointVolumes(c, anonymous); err != nil || !changed || len(c["services"].(map[string]any)["db"].(map[string]any)["volumes"].([]any)) != 1 {
-		t.Fatalf("the image's own volume: %v %v %v", changed, err, c)
-	}
-}
-
-// TestRetireVolumes: a removed app's switch does not follow an app made
-// again under its name.
-func TestRetireVolumes(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	b.changePgVolume("shop/db", func(v *pgVolume) error {
-		v.Target, v.Current = "/var/lib/postgresql/data", pgMount{Type: "volume", Source: "moin-restore-shop-db-1"}
-		return nil
-	})
-	b.changePgVolume("shopping/db", func(v *pgVolume) error {
-		v.Target, v.Current = "/var/lib/postgresql/data", pgMount{Type: "volume", Source: "moin-restore-shopping-db-1"}
-		return nil
-	})
-	if err := b.retireVolumes("shop"); err != nil {
-		t.Fatal(err)
-	}
-	volumes, _ := b.loadPgVolumes()
-	if _, ok := volumes["shop/db"]; ok || len(volumes) != 2 {
-		t.Fatalf("volumes %v", volumes)
-	}
-	if _, ok := volumes["shopping/db"]; !ok {
-		t.Fatal("another app lost its entry")
-	}
-	compose := filepath.Join(t.TempDir(), "compose.json")
-	saveJSON(compose, map[string]any{"services": map[string]any{"web": map[string]any{}}})
-	if err := b.applyVolumes("shop", compose); err != nil {
-		t.Fatalf("the new app is held to the old one's database: %v", err)
-	}
-}
-
-// TestBreaksLast: a history that lost its place stays lost after the agent
-// restarts, so the window does not reach across the gap.
-func TestBreaksLast(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	k := "postgres:shop/db"
-	state := b.walgState(k)
-	broke := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
-	state.broke, state.why = broke, walgWhyCap
-	b.saveBreak(k)
-	restarted := newBackups(a, func(protocol.MessageType, string, any) {})
-	if got := restarted.walgState(k); !got.broke.Equal(broke) || got.why != walgWhyCap {
-		t.Fatalf("after a restart: %v %q", got.broke, got.why)
-	}
-}
-
-// TestPrepareSwitch: the restored file gets the live one's mode, is on
-// disk, and the logs around both go.
-func TestPrepareSwitch(t *testing.T) {
-	dir := t.TempDir()
-	live, restored := filepath.Join(dir, "app.db"), filepath.Join(dir, "app.db.moin-restore")
-	os.WriteFile(live, []byte("live"), 0o640)
-	os.WriteFile(restored, []byte("restored"), 0o600)
-	for _, extra := range []string{live + "-wal", live + "-shm", restored + "-wal"} {
-		os.WriteFile(extra, nil, 0o600)
-	}
-	if err := prepareSwitch(restored, live); err != nil {
-		t.Fatal(err)
-	}
-	info, _ := os.Stat(restored)
-	if info.Mode().Perm() != 0o640 {
-		t.Fatalf("mode %v", info.Mode())
-	}
-	for _, extra := range []string{live + "-wal", live + "-shm", restored + "-wal"} {
-		if _, err := os.Stat(extra); err == nil {
-			t.Fatalf("%s is left", extra)
+	for _, app := range []string{"broken", "other"} {
+		if got := b.schedule(app); got != protocol.DefaultSchedule {
+			t.Errorf("%s: %+v", app, got)
 		}
 	}
 }
 
-// TestRestoresWithoutBucket: how restores stand needs no bucket and no
-// app (backup.restores), where the full list fails.
-func TestRestoresWithoutBucket(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	b := newBackups(a, func(protocol.MessageType, string, any) {})
-	b.saveMark(restoreMark{ID: "r1", App: "gone", Database: "postgres-db", StartedAt: time.Now()})
-	if _, err := b.list(context.Background(), protocol.BackupRequest{App: "gone"}); err == nil {
-		t.Fatal("a list without a bucket worked")
+// Every copy of a database has its place in the bucket, which the control
+// plane finds the same way for a download.
+func TestCopyKey(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	os.MkdirAll(a.appDir("shop"), 0o700)
+	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
+	b := newBackups(a, nil)
+	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil {
+		t.Fatal("a folder without a bucket")
 	}
-	states := b.restoreStates("gone")
-	if len(states) != 1 || states[0].ID != "r1" || states[0].State != protocol.RestoreRunning {
-		t.Fatalf("states %+v", states)
+	b.configure(&protocol.Bucket{Bucket: "b", Path: "moin", Workspace: "ws"}, nil, nil)
+	_, folder, err := b.where("shop", protocol.Database{Path: "/data/app.db"})
+	if err != nil || folder != "moin/ws/shop/id-1/data-app.db" {
+		t.Fatalf("folder %q %v", folder, err)
 	}
-	if states := b.restoreStates("other"); states == nil || len(states) != 0 {
-		t.Fatalf("an app without restores: %#v", states)
+	if _, _, err := b.where("blog", protocol.Database{Path: "/data/app.db"}); err == nil {
+		t.Fatal("an app without an ID has a folder")
 	}
 }
