@@ -9,7 +9,16 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/protocol"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// registerExecTools registers exec_command.
+func registerExecTools(server *mcpsdk.Server, services Services) {
+	tools := moinTools{services: services}
+	mcpsdk.AddTool(server, newTool("exec_command", "Run a command in a container",
+		"Runs one command in a container of an app, such as rails db:migrate or ls /data, and returns its output (the last 64 KB) and exit code. No shell reads it: wrap pipes and variables in sh -c '...'. Only owners and admins may, and a server can forbid it with exec: off in its rules. Ask the user before a command that changes data. Needs a token with read and write access.",
+		change(true, false)), Write(changes(services, tools.exec)))
+}
 
 // execOutputLimit is how much of a command's output exec_command returns:
 // enough to read, small enough for an agent's context.
