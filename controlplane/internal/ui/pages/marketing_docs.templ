@@ -4,12 +4,12 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// DocsHome is /docs, like a support site: the search on top, then every
+// DocsHome is /docs, like a support site, in the one column of a docs
+// page: the search on top, then every
 // page under its topic, as grouped rows, or what the search finds. No
 // sidebar: a topic is a list, a page is a row.
 templ DocsHome(groups []model.DocGroup, query string, hits []DocHit) {
@@ -19,17 +19,18 @@ templ DocsHome(groups []model.DocGroup, query string, hits []DocHit) {
 		Path:         "/docs",
 		MarkdownPath: "/docs.md",
 	}) {
-		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
 			@kit.Header(kit.Back{}, "Docs")
 			@docsSearchField(query)
 			@DocsResults(groups, query, hits)
 		</main>
-		@docsSearchScript()
+		@docsSearch(groups)
 	}
 }
 
-// Docs is one page: the way back, the title, the text in a column short
-// enough to read, and a row to the next page at the end.
+// Docs is one page: one column in the middle, short enough to read, with
+// the way back, the title, the text and a row to the next page all on its
+// left edge. The search is in the navbar.
 templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 	@layouts.Home(layouts.SEOProps{
 		Title:        page.Title + " · Docs",
@@ -37,16 +38,12 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(page),
 	}) {
-		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
-			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title) {
-				<a href="/docs" data-docs-search-open aria-label="Search the docs" aria-keyshortcuts="Meta+K /" class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:ml-auto">
-					@icon.Search(icon.Props{Class: "size-5"})
-				</a>
-			}
-			<article class="max-w-2xl min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
+		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title)
+			<article class="min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
 				@blocks.Typeset(page.HTMLContent)
 			</article>
-			<div class="flex max-w-2xl flex-col gap-3">
+			<div class="flex flex-col gap-3">
 				if next != nil {
 					@kit.List() {
 						@kit.Row(docsPageURL(next)) {

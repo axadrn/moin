@@ -20,7 +20,7 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 		t.Fatalf("status = %d, body is no page", response.Code)
 	}
-	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-q"`, `hx-get="/docs"`} {
+	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-q"`, `data-docs-search-open`, `id="docs-search"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("docs home misses %q", want)
 		}
@@ -44,17 +44,14 @@ func TestDocsSearchFindsPagesAndSectionsWithATypo(t *testing.T) {
 	if !strings.Contains(body, `value="domians"`) {
 		t.Error("search page loses what was typed")
 	}
-	// A keystroke gets only the list, and the address bar follows.
-	request := httptest.NewRequest(http.MethodGet, "/docs?q=first", nil)
+	// The palette asks /docs/search and gets only its answers.
+	request := httptest.NewRequest(http.MethodGet, "/docs/search?q=first", nil)
 	request.Header.Set("HX-Request", "true")
 	recorder := httptest.NewRecorder()
-	handler.ShowDocs(recorder, request)
+	handler.SearchDocs(recorder, request)
 	fragment := recorder.Body.String()
 	if strings.Contains(strings.ToLower(fragment), "<!doctype html>") || !strings.Contains(fragment, `href="/docs/getting-started#first-step"`) {
 		t.Errorf("search answer = %q", fragment)
-	}
-	if got := recorder.Header().Get("HX-Replace-Url"); got != "/docs?q=first" {
-		t.Errorf("HX-Replace-Url = %q", got)
 	}
 }
 
