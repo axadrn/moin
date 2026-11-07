@@ -57,7 +57,7 @@ MCP: set_integrations
 
 - **Cloudflare token**: in Cloudflare, **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit** for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS**, without it you do that in Cloudflare. moin checks the token before it stores it.
 - **Tailscale key**: in the Tailscale admin console, **Settings**, **Keys**. Make it reusable.
-- Turn the tunnels off before you remove the Cloudflare token: without it moin cannot delete a tunnel. Removing a key changes no server at once; without the Tailscale key, the next security change of a server opens SSH again on every network.
+- Turn the tunnels off before you remove the Cloudflare token: without it moin cannot delete a tunnel, so moin keeps the token while a server has one (`tunnels_on`). Removing a key changes no server at once; without the Tailscale key, the next security change of a server opens SSH again on every network.
 
 ## Cloudflare Tunnel
 

@@ -194,6 +194,11 @@ func TestServerSecurity(t *testing.T) {
 	if !secured.Tunnel || secured.TunnelID != "tun1" || !secured.Firewall || !secured.SSHTailscale {
 		t.Fatalf("server = %+v", secured)
 	}
+	// The token stays while a tunnel needs it to be deleted.
+	none := ""
+	if err := apps.SetIntegrations(ctx, owner, &none, nil); !errors.Is(err, ErrTunnelsOn) {
+		t.Fatalf("remove the token with a tunnel on: err = %v", err)
+	}
 	report := SecurityReport(*secured)
 	if report == nil || report.Proxy != "tunnel" || report.TailscaleIP != "100.64.0.9" {
 		t.Fatalf("report = %+v", report)
@@ -239,5 +244,11 @@ func TestServerSecurity(t *testing.T) {
 	}
 	if !fake.called("DELETE /zones/zone1/dns_records/rec1") || fake.called("DELETE /zones/zone1/dns_records/rec2") {
 		t.Fatalf("turning the tunnel off deletes only the record at the tunnel: %v", fake.calls)
+	}
+	if err := apps.SetIntegrations(ctx, owner, &none, nil); err != nil {
+		t.Fatalf("remove the token with the tunnels off: %v", err)
+	}
+	if integrations, _ := apps.Integrations(owner.WorkspaceID); integrations.Cloudflare {
+		t.Fatalf("the token is still there: %+v", integrations)
 	}
 }

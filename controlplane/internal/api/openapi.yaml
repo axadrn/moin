@@ -3533,6 +3533,9 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.cloudflare_token` or `fields.tailscale_key`.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`tunnels_on`. An empty `cloudflare_token` while a server has a tunnel: turn the tunnels off first, as moin needs the token to delete them.'
         '500':
           $ref: '#/components/responses/Internal'
 

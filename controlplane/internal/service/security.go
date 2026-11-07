@@ -21,6 +21,9 @@ var (
 	ErrNoTailscale     = errors.New("add a Tailscale auth key first")
 	ErrCloudflareToken = errors.New("Cloudflare does not accept this token: it needs Account Cloudflare Tunnel Edit and Zone DNS Edit")
 	ErrTailscaleKey    = errors.New("a Tailscale auth key starts with tskey-")
+	// ErrTunnelsOn keeps the Cloudflare API token while a server has a
+	// tunnel: without it moin cannot delete the tunnel in Cloudflare.
+	ErrTunnelsOn = errors.New("turn the tunnels off first: without the token moin cannot delete them in Cloudflare")
 )
 
 // SetCloudflare turns on tunnels through this Cloudflare API client.
@@ -52,6 +55,11 @@ func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, cloudflar
 	}
 	if cloudflareToken != nil {
 		token := strings.TrimSpace(*cloudflareToken)
+		if token == "" && stored.CloudflareToken != "" {
+			if err := s.noTunnels(actor.WorkspaceID); err != nil {
+				return err
+			}
+		}
 		stored.CloudflareToken, stored.CloudflareAccount = "", ""
 		if token != "" {
 			account, err := s.cloudflare.Account(ctx, token)
@@ -84,6 +92,21 @@ func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, cloudflar
 		s.servers.record(actor, "integration.tailscale", "integration", "tailscale", map[string]string{"on": strconv.FormatBool(stored.TailscaleKey != "")})
 	}
 	s.servers.notify(actor.WorkspaceID)
+	return nil
+}
+
+// noTunnels refuses with ErrTunnelsOn while a server of the workspace has
+// a tunnel in Cloudflare.
+func (s *AppService) noTunnels(workspaceID string) error {
+	servers, err := s.servers.servers.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		return err
+	}
+	for _, server := range servers {
+		if server.TunnelID != "" {
+			return ErrTunnelsOn
+		}
+	}
 	return nil
 }
 

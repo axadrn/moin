@@ -316,6 +316,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBranch, field: "branch", message: "The repo on GitHub has no branch by this name. List them with moin github branches."},
 	{err: service.ErrRefName, field: "ref", message: "This is not a valid branch, tag or commit name. Use git's rules, at most 255 characters."},
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Add a Cloudflare API token first."},
+	{err: service.ErrTunnelsOn, status: http.StatusConflict, code: "tunnels_on", message: "Turn the tunnels off first: without the token moin cannot delete them in Cloudflare."},
 	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Add a Tailscale auth key first."},
 	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it moin turns on Always Use HTTPS."},
 	{err: service.ErrUpdateNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this control plane, in ADMIN_EMAILS, update it."},
