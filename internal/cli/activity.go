@@ -49,7 +49,7 @@ func activity(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	rows := [][]string{}
 	for _, event := range page.Items {
-		rows = append(rows, []string{when(event.CreatedAt), event.Actor, viaName(event.Via, event.Token), event.Summary})
+		rows = append(rows, []string{when(event.CreatedAt), event.Actor, client.ViaLabel(event.Via, event.Token), event.Summary})
 	}
 	table(stdout, []string{"WHEN", "WHO", "VIA", "WHAT"}, rows)
 	if page.Next != "" {
@@ -70,21 +70,6 @@ func activity(ctx context.Context, args []string, stdout io.Writer) error {
 // when is the time of an event to the second, in the local time zone.
 func when(t time.Time) string {
 	return t.Local().Format("2006-01-02 15:04:05 MST")
-}
-
-// viaName names how a change came in, with the API token it came with.
-func viaName(via, token string) string {
-	name := via
-	switch via {
-	case "hook":
-		name = "deploy hook"
-	case "system":
-		name = build.Name
-	}
-	if token != "" {
-		return name + ", token " + token
-	}
-	return name
 }
 
 // team lists the members of the token's workspace, invites one, sends
