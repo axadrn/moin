@@ -2,8 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
@@ -72,8 +76,27 @@ func invalid(w http.ResponseWriter, detail map[string]string) {
 		slog.Error("encode field error failed", "error", err)
 		return
 	}
-	w.Header().Set("HX-Trigger", string(event))
+	w.Header().Set("HX-Trigger", asciiJSON(event))
 	w.Header().Set("HX-Reswap", "none")
+}
+
+// asciiJSON writes every rune beyond ASCII as \uXXXX: a header carries
+// only ASCII safely, so "…" would arrive as "â€¦". JSON.parse in the
+// browser reads the escapes back.
+func asciiJSON(data []byte) string {
+	var b strings.Builder
+	for _, r := range string(data) {
+		switch {
+		case r < utf8.RuneSelf:
+			b.WriteRune(r)
+		case r > 0xFFFF:
+			high, low := utf16.EncodeRune(r)
+			fmt.Fprintf(&b, "\\u%04x\\u%04x", high, low)
+		default:
+			fmt.Fprintf(&b, "\\u%04x", r)
+		}
+	}
+	return b.String()
 }
 
 // errorMessage is the message the API would answer for err.
