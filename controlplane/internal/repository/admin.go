@@ -13,6 +13,9 @@ import (
 type AdminRepository interface {
 	Metrics(now time.Time) (model.AdminMetrics, error)
 	ListUsers(query string, limit, offset int, now time.Time) ([]model.AdminUser, int, error)
+	// User is one user as the list shows it; ErrUserNotFound when there is
+	// none.
+	User(id string, now time.Time) (*model.AdminUser, error)
 	CreateAuditEvent(event *model.AdminAuditEvent) error
 	StopImpersonationSession(sessionID, targetUserID, operatorUserID string, event *model.AdminAuditEvent) error
 	ListAuditEvents(limit int) ([]model.AdminAuditEvent, error)
@@ -68,7 +71,16 @@ func (r *adminRepository) ListUsers(query string, limit, offset int, now time.Ti
 	}
 
 	users := []model.AdminUser{}
-	err := r.db.Select(&users, `
+	err := r.db.Select(&users, adminUserSelect+where+`
+		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
+		ORDER BY u.created_at DESC, u.id
+		LIMIT $3 OFFSET $4
+	`, pattern, now, limit, offset)
+	return users, total, err
+}
+
+// adminUserSelect is a user with its counts; $2 is now.
+const adminUserSelect = `
 		SELECT
 			u.id,
 			u.email,
@@ -80,12 +92,21 @@ func (r *adminRepository) ListUsers(query string, limit, offset int, now time.Ti
 		FROM users u
 		LEFT JOIN workspace_members m ON m.user_id = u.id
 		LEFT JOIN sessions s ON s.user_id = u.id
-		`+where+`
+		`
+
+func (r *adminRepository) User(id string, now time.Time) (*model.AdminUser, error) {
+	var user model.AdminUser
+	err := r.db.Get(&user, adminUserSelect+`
+		WHERE u.id = $1
 		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
-		ORDER BY u.created_at DESC, u.id
-		LIMIT $3 OFFSET $4
-	`, pattern, now, limit, offset)
-	return users, total, err
+	`, id, now)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (r *adminRepository) CreateAuditEvent(event *model.AdminAuditEvent) error {

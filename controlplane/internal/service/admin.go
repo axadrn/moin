@@ -129,6 +129,23 @@ func (s *AdminService) Dashboard(user *model.User, session *model.Session, query
 	}, nil
 }
 
+// User is one user for its admin page: the same facts as the list.
+func (s *AdminService) User(actor *model.User, actorSession *model.Session, userID string) (*model.AdminUser, error) {
+	if !s.IsAdmin(actor, actorSession) {
+		return nil, ErrAdminPermission
+	}
+	now := time.Now()
+	user, err := s.repository.User(userID, now)
+	if err != nil {
+		return nil, err
+	}
+	_, user.IsAdmin = s.adminEmails[strings.ToLower(user.Email)]
+	if err := s.describePlan(user, now); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (s *AdminService) RevokeUserSessions(actor *model.User, actorSession *model.Session, targetUserID string) error {
 	if !s.IsAdmin(actor, actorSession) {
 		return ErrAdminPermission

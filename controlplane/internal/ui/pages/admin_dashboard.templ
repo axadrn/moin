@@ -2,218 +2,149 @@ package pages
 
 import (
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/inputgroup"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/pagination"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/table"
-	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
-	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"net/url"
 	"strconv"
+	"strings"
+
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
+// AdminDashboard is Admin, for whoever runs moin: the numbers at a glance,
+// the way to the operator activity and the old address, and the users, each
+// a row that opens its own page with what an operator can do to it.
 templ AdminDashboard(data *model.AdminDashboard) {
 	@layouts.Admin("Admin") {
-		@AdminDashboardContent(data)
+		@panelPage() {
+			@kit.Header(kit.Back{}, "Admin")
+			@adminNumbers([]adminNumber{
+				{"Users", data.Metrics.Users},
+				{"Verified", data.Metrics.VerifiedUsers},
+				{"Workspaces", data.Metrics.Workspaces},
+				{"Paid", data.Metrics.PaidWorkspaces},
+				{"Sessions", data.Metrics.ActiveSessions},
+			})
+			if n := data.Network; n != nil {
+				@kit.Section("Network", nil) {
+					@adminNumbers([]adminNumber{
+						{"Deploys", n.Deploys},
+						{"Apps", n.Apps},
+						{"Servers", n.Servers},
+						{"Hosted", n.HostedWorkspaces},
+						{"Self-hosted", n.SelfHosted},
+					})
+				}
+			}
+			@kit.List() {
+				@kit.Row("/admin/activity") {
+					@kit.RowText("Activity", "")
+				}
+				@kit.Row("/admin/old-address") {
+					@kit.RowText("Old domain", "")
+				}
+			}
+			@adminUsers(data.Users)
+		}
 	}
 }
 
-templ AdminDashboardContent(data *model.AdminDashboard) {
-	{{ currentUser := ctxkeys.User(ctx) }}
-	<div id="admin-content" class="flex flex-col gap-6" hx-swap-oob="true">
-		@pageHeader("Admin", "Users, workspaces, sessions and operator activity.") {
-			@button.Button(button.Props{Href: "/admin/old-address", Variant: button.VariantSecondary}) {
-				Old address
+// adminUsers is the search and one page of users, newest first.
+templ adminUsers(users model.AdminUserPage) {
+	@kit.Section("Users", adminCount(plural(users.TotalUsers, "user", "users"))) {
+		<form method="GET" action="/admin" role="search">
+			@kit.Inline() {
+				<label for="admin-search" class="sr-only">Name or email</label>
+				@kit.Input(templ.Attributes{"id": "admin-search", "name": "q", "type": "search", "value": users.Query, "placeholder": "Name or email", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					Search
+				}
+			}
+		</form>
+		@kit.List() {
+			for _, user := range users.Users {
+				@kit.Row("/admin/users/" + user.ID) {
+					@kit.RowText(adminUserName(user), adminUserNote(user))
+					if value := adminUserValue(user); value != "" {
+						<span class="shrink-0 text-sm whitespace-nowrap text-muted-foreground">{ value }</span>
+					}
+				}
+			}
+			if len(users.Users) == 0 {
+				@kit.Row("") {
+					@kit.RowText(adminNoUsers(users.Query), "")
+				}
 			}
 		}
-		<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
-			@statCard("Users", strconv.Itoa(data.Metrics.Users), "")
-			@statCard("Verified", strconv.Itoa(data.Metrics.VerifiedUsers), "")
-			@statCard("Workspaces", strconv.Itoa(data.Metrics.Workspaces), "")
-			@statCard("Paid", strconv.Itoa(data.Metrics.PaidWorkspaces), "")
-			@statCard("Sessions", strconv.Itoa(data.Metrics.ActiveSessions), "")
-		</dl>
-		if data.Network != nil {
-			@panel(panelProps{Title: "Network", Description: "This control plane and every self-hosted one, last 15 minutes."}) {
-				<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-5">
-					@statCard("Deploys", strconv.Itoa(data.Network.Deploys), "all time")
-					@statCard("Apps", strconv.Itoa(data.Network.Apps), "")
-					@statCard("Servers", strconv.Itoa(data.Network.Servers), "")
-					@statCard("Hosted workspaces", strconv.Itoa(data.Network.HostedWorkspaces), "")
-					@statCard("Self-hosted", strconv.Itoa(data.Network.SelfHosted), "control planes")
-				</dl>
-			}
-		}
-		@panel(panelProps{Title: "Users", Description: "Search accounts, revoke access, or inspect the product as a user."}) {
-			<div class="flex flex-col gap-6">
-				<form
-					method="GET"
-					action="/admin"
-					class="flex gap-2"
-				>
-					@inputgroup.InputGroup(inputgroup.Props{Class: "max-w-md flex-1"}) {
-						@inputgroup.Addon() {
-							@icon.Search()
-						}
-						@inputgroup.Input(inputgroup.InputProps{Name: "q", Value: data.Users.Query, Placeholder: "Search name or email"})
-					}
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
-						Search
-					}
-				</form>
-				<div class="-mx-6">
-					@table.Table() {
-						@table.Header() {
-							@table.Row() {
-								@table.Head(table.HeadProps{Class: "px-4 first:pl-6"}) {
-									User 
-								}
-								@table.Head(table.HeadProps{Class: "px-4 first:pl-6"}) {
-									Status 
-								}
-								@table.Head(table.HeadProps{Class: "px-4 first:pl-6"}) {
-									Workspaces 
-								}
-								@table.Head(table.HeadProps{Class: "px-4 first:pl-6"}) {
-									Sessions 
-								}
-								@table.Head(table.HeadProps{Class: "px-4 pr-6 text-right"}) {
-									Actions 
-								}
-							}
-						}
-						@table.Body() {
-							for _, user := range data.Users.Users {
-								@table.Row() {
-									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
-										<div class="font-medium">{ user.Name }</div>
-										<div class="text-muted-foreground">{ user.Email }</div>
-									}
-									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
-										<div class="flex flex-wrap gap-1.5">
-											if user.EmailVerifiedAt != nil {
-												@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-													Verified 
-												}
-											} else {
-												@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-													Unverified 
-												}
-											}
-											if user.IsAdmin {
-												@badge.Badge() {
-													Operator 
-												}
-											}
-											if user.Plan != "" {
-												@badge.Badge(badge.Props{Variant: adminPlanVariant(user.Plan)}) {
-													{ adminPlanLabel(user) }
-												}
-											}
-										</div>
-									}
-									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
-										{ strconv.Itoa(user.WorkspaceCount) }
-									}
-									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
-										{ strconv.Itoa(user.ActiveSessionCount) }
-									}
-									@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 last:pr-6"}) {
-										<div class="flex justify-end gap-2">
-											if currentUser.ID != user.ID {
-												<form
-													method="POST"
-													action={ templ.SafeURL("/admin/users/" + user.ID + "/sessions/revoke") }
-													hx-post={ "/admin/users/" + user.ID + "/sessions/revoke" }
-													hx-swap="none"
-													hx-confirm="Revoke every active session for this user?"
-													hx-disable="find button[type='submit']"
-												>
-													@csrf.Token()
-													<input type="hidden" name="q" value={ data.Users.Query }/>
-													<input type="hidden" name="page" value={ strconv.Itoa(data.Users.Page) }/>
-													@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
-														Revoke sessions 
-													}
-												</form>
-											}
-											if user.Plan != "" && user.Plan != model.AdminPlanNoWorkspace && user.Plan != model.AdminPlanPaying {
-												@adminForeverFree(user, data.Users)
-											}
-											if currentUser.ID != user.ID && !user.IsAdmin {
-												<form
-													method="POST"
-													action={ templ.SafeURL("/admin/users/" + user.ID + "/impersonate") }
-													hx-post={ "/admin/users/" + user.ID + "/impersonate" }
-													hx-swap="none"
-													hx-disable="find button[type='submit']"
-												>
-													@csrf.Token()
-													@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-														@icon.Eye(icon.Props{Class: "size-4"})
-														View as user
-													}
-												</form>
-											}
-										</div>
-									}
-								}
-							}
+		if users.TotalPages > 1 {
+			<div class="flex items-center justify-between gap-3 pt-2">
+				<span class="px-1 text-sm text-muted-foreground tabular-nums">{ fmt.Sprintf("Page %d of %d", users.Page, users.TotalPages) }</span>
+				<div class="flex gap-2">
+					if users.Page > 1 {
+						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page-1), nil) {
+							Newer
 						}
 					}
-				</div>
-				<div class="flex items-center justify-between text-sm text-muted-foreground">
-					<span>{ plural(data.Users.TotalUsers, "user", "users") }</span>
-					@pagination.Pagination(pagination.Props{Class: "mx-0 w-auto"}) {
-						@pagination.Content() {
-							@pagination.Item() {
-								@pagination.Previous(pagination.PreviousProps{Href: adminPageURL(data.Users.Query, data.Users.Page-1), Disabled: data.Users.Page <= 1})
-							}
-							@pagination.Item(pagination.ItemProps{Class: "px-2"}) {
-								{ fmt.Sprintf("Page %d of %d", data.Users.Page, data.Users.TotalPages) }
-							}
-							@pagination.Item() {
-								@pagination.Next(pagination.NextProps{Href: adminPageURL(data.Users.Query, data.Users.Page+1), Disabled: data.Users.Page >= data.Users.TotalPages})
-							}
+					if users.TotalPages > users.Page {
+						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page+1), nil) {
+							Older
 						}
 					}
 				</div>
 			</div>
 		}
-		@panel(panelProps{Title: "Operator activity", Description: "Kept 180 days."}) {
-				if len(data.Events) == 0 {
-					@emptyHint("Nothing yet. Security and administrative events show up here.", "")
-				} else {
-					@item.Group(item.GroupProps{Class: "gap-2"}) {
-						for _, event := range data.Events {
-							@item.Item(item.Props{Size: item.SizeSm}) {
-								@item.Content() {
-									@item.Title() {
-										{ model.AdminAuditActionLabel(event.Action) }
-									}
-									@item.Description() {
-										if event.ActorEmail != "" {
-											{ event.ActorEmail }
-										} else {
-											System
-										}
-										<span>· { event.TargetType } { event.TargetID }</span>
-									}
-								}
-								@item.Actions() {
-									<time class="text-sm text-muted-foreground">{ event.CreatedAt.Local().Format("Jan 2, 2006 at 15:04") }</time>
-								}
-							}
-						}
+	}
+}
+
+// AdminActivity is what operators did, newest first.
+templ AdminActivity(events []model.AdminAuditEvent) {
+	@layouts.Admin("Activity · Admin") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, "Activity")
+			@kit.List() {
+				for _, event := range events {
+					@kit.Row(adminEventHref(event)) {
+						@kit.RowText(model.AdminAuditActionLabel(event.Action), adminEventNote(event))
+						<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="shrink-0 text-sm whitespace-nowrap text-muted-foreground tabular-nums">
+							{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
+						</time>
 					}
 				}
+				if len(events) == 0 {
+					@kit.Row("") {
+						@kit.RowText("No operator activity yet", "")
+					}
+				}
+			}
+			@kit.Quiet() {
+				<span class="px-1">{ fmt.Sprintf("Kept %d days, in UTC.", int(model.AdminAuditRetention.Hours()/24)) }</span>
+			}
 		}
-	</div>
+	}
+}
+
+// adminNumber is one count of adminNumbers.
+type adminNumber struct {
+	Label string
+	Value int
+}
+
+// adminNumbers are counts side by side on one card: the word, the number
+// under it. Three in a row on a phone, all in one row from sm.
+templ adminNumbers(numbers []adminNumber) {
+	<dl class="grid grid-cols-3 gap-x-4 gap-y-5 rounded-4xl bg-card p-6 sm:grid-cols-5">
+		for _, number := range numbers {
+			<div class="flex min-w-0 flex-col gap-1">
+				<dt class="truncate text-sm text-muted-foreground">{ number.Label }</dt>
+				<dd class="text-2xl font-semibold tracking-tight tabular-nums">{ strconv.Itoa(number.Value) }</dd>
+			</div>
+		}
+	</dl>
+}
+
+// adminCount is the quiet count at the end of a section title.
+templ adminCount(text string) {
+	<span class="text-sm text-muted-foreground tabular-nums">{ text }</span>
 }
 
 func adminPageURL(query string, page int) string {
@@ -225,52 +156,69 @@ func adminPageURL(query string, page int) string {
 	return "/admin?" + values.Encode()
 }
 
-// adminForeverFree makes the first workspace of a user free forever, or
-// ends it. Both ask first and want the email typed out.
-templ adminForeverFree(user model.AdminUser, users model.AdminUserPage) {
-	{{ on := user.Plan != model.AdminPlanFreeForever }}
-	<form
-		method="POST"
-		action={ templ.SafeURL("/admin/users/" + user.ID + "/forever-free") }
-		hx-post={ "/admin/users/" + user.ID + "/forever-free" }
-		hx-swap="none"
-		hx-disable="find button[type='submit']"
-		if on {
-			hx-confirm={ "Make " + user.Email + " free forever? Their first workspace gets everything, forever, without paying." }
-			data-confirm-action="Make free forever"
-		} else {
-			hx-confirm={ "End free forever for " + user.Email + "? They get the rest of their trial, or read-only once it is over, until they pay." }
-			data-confirm-action="End free forever"
-		}
-		data-confirm-name={ user.Email }
-	>
-		@csrf.Token()
-		<input type="hidden" name="forever_free" value={ strconv.FormatBool(on) }/>
-		<input type="hidden" name="q" value={ users.Query }/>
-		<input type="hidden" name="page" value={ strconv.Itoa(users.Page) }/>
-		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Size: button.SizeSm}) {
-			if on {
-				Make free forever
-			} else {
-				End free forever
-			}
-		}
-	</form>
+// adminUserName is the name of a user, or the email when it has none.
+func adminUserName(user model.AdminUser) string {
+	if user.Name != "" {
+		return user.Name
+	}
+	return user.Email
 }
 
-// adminPlanLabel is the plan of a user: "trial until 2026-12-02", "free
-// forever", "paying".
+// adminUserNote is the line under the name: the email, when the name is
+// not already it.
+func adminUserNote(user model.AdminUser) string {
+	if user.Name == "" {
+		return ""
+	}
+	return user.Email
+}
+
+// adminUserValue is the one fact at the end of a user's row: an operator,
+// an email not confirmed yet, or the plan.
+func adminUserValue(user model.AdminUser) string {
+	switch {
+	case user.IsAdmin:
+		return "Operator"
+	case user.EmailVerifiedAt == nil:
+		return "Unverified"
+	case user.Plan != "":
+		return adminPlanLabel(user)
+	}
+	return ""
+}
+
+func adminNoUsers(query string) string {
+	if query == "" {
+		return "No users yet"
+	}
+	return "No user matches “" + query + "”"
+}
+
+// adminEventNote is who did it and to what.
+func adminEventNote(event model.AdminAuditEvent) string {
+	actor := event.ActorEmail
+	if actor == "" {
+		actor = "System"
+	}
+	return actor + " · " + event.TargetType + " " + event.TargetID
+}
+
+// adminEventHref is the page of what an event touched: a user has one.
+func adminEventHref(event model.AdminAuditEvent) string {
+	if event.TargetType == "user" && event.TargetID != "" {
+		return "/admin/users/" + event.TargetID
+	}
+	return ""
+}
+
+// adminPlanLabel is the plan of a user: "Trial until Dec 2, 2026", "Free
+// forever", "Paying".
 func adminPlanLabel(user model.AdminUser) string {
 	if user.Plan == model.AdminPlanTrial && user.TrialEndsAt != nil {
-		return "trial until " + user.TrialEndsAt.Format("2006-01-02")
+		return "Trial until " + user.TrialEndsAt.Format("Jan 2, 2006")
 	}
-	return user.Plan
-}
-
-func adminPlanVariant(plan string) badge.Variant {
-	switch plan {
-	case model.AdminPlanFreeForever, model.AdminPlanPaying:
-		return badge.VariantSecondary
+	if user.Plan == "" {
+		return ""
 	}
-	return badge.VariantOutline
+	return strings.ToUpper(user.Plan[:1]) + user.Plan[1:]
 }

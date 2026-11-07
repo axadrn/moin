@@ -285,6 +285,8 @@ func SetupRoutes(app *app.App) http.Handler {
 		}
 		mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
 		mux.HandleFunc("GET /admin/old-address", adminRoute(admin.OldAddress))
+		mux.HandleFunc("GET /admin/activity", adminRoute(admin.Activity))
+		mux.HandleFunc("GET /admin/users/{userID}", adminRoute(admin.User))
 		mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 		mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 		mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
