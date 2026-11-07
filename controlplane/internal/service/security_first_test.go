@@ -8,16 +8,16 @@ import (
 )
 
 // TestProxyOnFirstConnect: a server without security settings gets no
-// config when its agent connects, unless the control plane runs on the
+// config when its daemon connects, unless the control plane runs on the
 // same server as its apps: then its first connect starts the proxy, and a
 // later one sends nothing again.
 func TestProxyOnFirstConnect(t *testing.T) {
-	apps, _, server, agent := newAppService(t)
+	apps, _, server, daemon := newAppService(t)
 	configs := func() []protocol.Message {
-		agent.mu.Lock()
-		defer agent.mu.Unlock()
+		daemon.mu.Lock()
+		defer daemon.mu.Unlock()
 		var found []protocol.Message
-		for _, message := range agent.sent {
+		for _, message := range daemon.sent {
 			if message.Type == protocol.TypeServerConfig {
 				found = append(found, message)
 			}

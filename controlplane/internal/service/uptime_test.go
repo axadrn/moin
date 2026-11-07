@@ -98,7 +98,7 @@ func TestUptimeChecksEveryDomainAndRecordsOutages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{
 		Kind: "compose", Domains: []string{"blog.de", "www.blog.de"}, Config: &protocol.Config{Health: "/health"},
 	}})
 
@@ -161,7 +161,7 @@ func TestUptimeCheckSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 
 	path := "/up"
 	if _, _, err := apps.SetUptimeCheck(owner, "blog", "other.de", &path, nil); !errors.Is(err, ErrUptimeDomain) {
@@ -220,7 +220,7 @@ func TestRunUptimeChecksAtTheOffsetAndStops(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	// The clock stands one second before the domain's offset.
 	offset := uptimeOffset(uptimeKey{deploy.AppID, "blog.de"})
 	start := time.Date(2026, 11, 3, 12, 0, (offset+59)%60, 0, time.UTC)

@@ -11,7 +11,7 @@ That is the whole idea. Two settings per app: **how often** (every 15 minutes, h
 
 ## Where the work happens
 
-On your server. Your data goes from your server to your bucket, never through moin. The agent on your server makes each copy and puts it in your bucket. The control plane only keeps your two settings and shows you the list.
+On your server. Your data goes from your server to your bucket, never through moin. The daemon on your server makes each copy and puts it in your bucket. The control plane only keeps your two settings and shows you the list.
 
 ```
 control plane
@@ -62,7 +62,7 @@ nothing waits on the disk
 
 ## Every change (SQLite)
 
-Copies are a few minutes or hours apart. For SQLite, one switch also writes down every change between them: **Every change**, on unless you turn it off. [Litestream](https://litestream.io), a small tool inside the agent, sends each change to your bucket within a second. Then you can go back to any minute, not only to a copy.
+Copies are a few minutes or hours apart. For SQLite, one switch also writes down every change between them: **Every change**, on unless you turn it off. [Litestream](https://litestream.io), a small tool inside the daemon, sends each change to your bucket within a second. Then you can go back to any minute, not only to a copy.
 
 It keeps the changes as long as you keep the copies. Turning it off removes what it wrote down; the copies stay. Postgres goes back to its copies only.
 
@@ -116,7 +116,7 @@ The same for Postgres, with databases instead of files:
 
 The undo stays as long as you keep copies, then moin removes it. Undo = the same switch the other way.
 
-**If the server dies in the middle.** Before it stops the app, moin writes a small note: "restoring". When the agent starts again it reads the note and follows one rule: the live database is missing and the old one is there, so the old one goes back. Then it starts the app and tells you how the restore ended. Your app always runs on a whole database, the one before or the restored one, never half of one.
+**If the server dies in the middle.** Before it stops the app, moin writes a small note: "restoring". When the daemon starts again it reads the note and follows one rule: the live database is missing and the old one is there, so the old one goes back. Then it starts the app and tells you how the restore ended. Your app always runs on a whole database, the one before or the restored one, never half of one.
 
 ## The daily check
 
@@ -154,7 +154,7 @@ Everything of one workspace goes into one folder named after the workspace's ID,
 
 ## How long things stay
 
-The agent deletes what is too old, once a minute after a copy and once an hour for uploads:
+The daemon deletes what is too old, once a minute after a copy and once an hour for uploads:
 
 - **Copies** and **Every change**: as long as the app keeps copies (**Keep**). The newest copy always stays, so a database that stopped changing is never left without one.
 - **The undo of a restore** (`app.db.before-…` next to the file, `shop_before_…` in the same Postgres): as long as the app keeps copies.
@@ -174,7 +174,7 @@ When an app moves to another bucket, its copies start again there. What is in th
 
 ## Under the hood
 
-The agent does it all, with one small set of verbs and one file per kind of database (`backup_sqlite.go`, `backup_postgres.go`); `backup.go` holds the schedule, the cleanup and the restore note:
+The daemon does it all, with one small set of verbs and one file per kind of database (`backup_sqlite.go`, `backup_postgres.go`); `backup.go` holds the schedule, the cleanup and the restore note:
 
 | Verb | SQLite | Postgres |
 | --- | --- | --- |
@@ -183,4 +183,4 @@ The agent does it all, with one small set of verbs and one file per kind of data
 | **Check** | `PRAGMA integrity_check` | read every table of `shop_check` |
 | **Record** | Litestream, with Every change | |
 
-Once a minute the agent looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**.
+Once a minute the daemon looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**.

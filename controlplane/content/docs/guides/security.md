@@ -5,11 +5,11 @@ group: "Servers and data"
 order: 2
 ---
 
-Your server has doors to the internet, called ports; moin can close all of them, so nobody from outside gets in. Three switches per server each close a door, and a file on the server decides what moin may do there. The agent only calls out, so moin itself needs no open door.
+Your server has doors to the internet, called ports; moin can close all of them, so nobody from outside gets in. Three switches per server each close a door, and a file on the server decides what moin may do there. The daemon only calls out, so moin itself needs no open door.
 
 ```text
 outside                    server
-moin ◀──────────────────── agent
+moin ◀──────────────────── daemon
 visitors ─▶ Cloudflare ◀── cloudflared
 you, SSH ─▶ tailnet ◀───── Tailscale
                            firewall:
@@ -67,7 +67,7 @@ Visitors reach your app through Cloudflare, so the server keeps ports 80 and 443
 moin servers secure web-1 --tunnel on
 ```
 
-- If the token cannot reach a domain's zone, **What the agent set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says to turn on **Always Use HTTPS** yourself.
+- If the token cannot reach a domain's zone, **What the daemon set up** says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says to turn on **Always Use HTTPS** yourself.
 - Off deletes the tunnel and the DNS records moin made. Traefik opens 80 and 443 again and gets certificates from Let's Encrypt: point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
 - A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
 
@@ -79,7 +79,7 @@ SSH is the door you use to log in to your server yourself. With this switch it o
 moin servers secure web-1 --ssh tailscale
 ```
 
-The agent installs Tailscale if it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address; until then it stays open and moin says why. With the firewall off it closes too: the agent then drops only SSH from other networks. Before you close SSH, keep a second way in, such as your provider's web console.
+The daemon installs Tailscale if it is missing and adds the server to your tailnet. Port 22 closes only once Tailscale is up and has an address; until then it stays open and moin says why. With the firewall off it closes too: the daemon then drops only SSH from other networks. Before you close SSH, keep a second way in, such as your provider's web console.
 
 ## Firewall
 
@@ -96,7 +96,7 @@ It lets in answers to connections the server made itself, ping, and what the oth
 How traffic comes in, which ports are open to everyone, and the tailnet address.
 
 ```surfaces
-Web: **Servers**, **Security** on the server, **What the agent set up**
+Web: **Servers**, **Security** on the server, **What the daemon set up**
 CLI: moin servers
 TUI: on the server, **Access**
 API: GET /api/v1/servers
@@ -107,11 +107,11 @@ The CLI shows it in the ACCESS column and after every `moin servers secure`; the
 
 ## No open port
 
-With all three switches on, nothing is open to the internet: the agent dials out to moin, `cloudflared` to Cloudflare, Tailscale to its own servers. **What the agent set up** shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
+With all three switches on, nothing is open to the internet: the daemon dials out to moin, `cloudflared` to Cloudflare, Tailscale to its own servers. **What the daemon set up** shows **Open to everyone: 41641/udp**, the Tailscale port, and nothing else.
 
 ## Rules
 
-A file on your server says what moin may do there, and only you, as root on the server, can change it: `/etc/moin/rules`. The agent checks every request against it and refuses what it does not allow. Nobody can change it through moin: not us, not your team, not someone who breaks into moin.
+A file on your server says what moin may do there, and only you, as root on the server, can change it: `/etc/moin/rules`. The daemon checks every request against it and refuses what it does not allow. Nobody can change it through moin: not us, not your team, not someone who breaks into moin.
 
 ```
 # /etc/moin/rules
@@ -135,8 +135,8 @@ network: locked
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file: moin may do everything. A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
-- Rules apply to every request at once. The agent reports them when it connects, so `systemctl restart moin-agent` after a change shows them everywhere.
-- A server with rules never updates its agent from moin ([Updates](/docs/guides/servers#updates)).
+- Rules apply to every request at once. The daemon reports them when it connects, so `systemctl restart moin-daemon` after a change shows them everywhere.
+- A server with rules never updates its daemon from moin ([Updates](/docs/guides/servers#updates)).
 - A refused request says why, on every surface: `refused by the rules of this server (/etc/moin/rules): data: off`.
 - With all of them, a break-in at moin reads nothing and runs nothing of its own on your server: `data` and `logs` keep your users' data from passing through moin, `deploy-from` and `exec` stop code that could copy it.
 
@@ -155,5 +155,5 @@ MCP: list_servers
 ## Under the hood
 
 - The tunnel is `cloudflared`, running next to Traefik, the server's proxy. It keeps a connection open to Cloudflare, and visitors come in through it.
-- The agent hands the Cloudflare token to `cloudflared` through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows in `ps`.
+- The daemon hands the Cloudflare token to `cloudflared` through its environment and the Tailscale key through a file only root can read, deleted right after. Neither shows in `ps`.
 - The firewall rules live in one nftables table, `moin`, changed in one step, so there is never a moment without rules. Docker publishes container ports on its own, past this table; with the tunnel on, no container port is published.

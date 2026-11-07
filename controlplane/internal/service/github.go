@@ -289,7 +289,7 @@ func (g *GitHub) Commit(ctx context.Context, installationID int64, repo, ref str
 	return GitHubCommit{SHA: answer.SHA, Message: message}, nil
 }
 
-// Tarball is where the agent downloads a commit itself, with the
+// Tarball is where the daemon downloads a commit itself, with the
 // authorization to send: the code goes from GitHub to the server and never
 // through moin. The token only reads this one repo and expires within the
 // hour, so a server never holds access to the other repos of the

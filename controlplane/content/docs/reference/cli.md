@@ -50,14 +50,14 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin servers` | lists servers: status, agent version, access, rules |
+| `moin servers` | lists servers: status, daemon version, access, rules |
 | `moin servers add [name]` | adds a server and prints its install command; without a name it gets one like `brave-otter` |
-| `moin servers install-command <name>` | a new one-time install command, to install or move the agent; the old one stops working |
+| `moin servers install-command <name>` | a new one-time install command, to install or move the daemon; the old one stops working |
 | `moin servers rename <name> <new name>` | renames a server; its apps stay on it |
-| `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its agent there |
-| `moin servers update [name]` | updates the agent to the control plane's version now; without a name, every online server whose agent differs. See [Agent updates](#agent-updates) |
-| `moin servers auto-update [on\|off]` | shows or sets whether agents update by themselves; on by default |
-| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off] [--yes]` | how the server is reached; prints what the agent set up. See [Security](/docs/guides/security) |
+| `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its daemon there |
+| `moin servers update [name]` | updates the daemon to the control plane's version now; without a name, every online server whose daemon differs. See [Daemon updates](#daemon-updates) |
+| `moin servers auto-update [on\|off]` | shows or sets whether daemons update by themselves; on by default |
+| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|open] [--firewall on\|off] [--yes]` | how the server is reached; prints what the daemon set up. See [Security](/docs/guides/security) |
 | `moin servers rules <name>` | the server's own rules for moin, from `/etc/moin/rules` on it ([Rules](/docs/guides/security#rules)) |
 | `moin integrations` | whether a Cloudflare token and a Tailscale key are stored, never the keys |
 | `moin integrations cloudflare` · `moin integrations tailscale` | stores the Cloudflare API token or the Tailscale auth key; the key comes on stdin |
@@ -196,15 +196,15 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `--access-key` | the access key ID |
 | `--default` | `add`: make it the workspace's default. `use`: follow the default again |
 
-## Agent
+## Daemon
 
 These run on a server, as root.
 
 | Command | What it does |
 | --- | --- |
-| `moin agent register --url <url> --token <install token>` | connects this server; the install script does it |
-| `moin agent` | runs the agent |
-| `moin agent uninstall [--apps] [--yes]` | removes the agent from this server; the apps keep running. `--apps` removes the apps with their data, the proxy, the tunnel and the firewall too |
+| `moin daemon register --url <url> --token <install token>` | connects this server; the install script does it |
+| `moin daemon` | runs the daemon |
+| `moin daemon uninstall [--apps] [--yes]` | removes the daemon from this server; the apps keep running. `--apps` removes the apps with their data, the proxy, the tunnel and the firewall too |
 
 ## How commands find the app
 
@@ -217,19 +217,19 @@ Flags may come before or after the arguments: `moin rollback v3 --app shop` is `
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type shop to confirm:` |
-| Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm shop`, and the control plane checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
 
-## Agent updates
+## Daemon updates
 
-Agents update themselves to the control plane's version, unless `moin servers auto-update off`. `moin servers` shows each agent's version and marks one that differs.
+Daemons update themselves to the control plane's version, unless `moin servers auto-update off`. `moin servers` shows each daemon's version and marks one that differs.
 
-`moin servers update` has the agent download the `moin` binary the control plane serves, check its SHA-256, swap it in and restart through systemd; it waits until the new agent is back. The agent refuses while a deploy runs, and on a server with rules in `/etc/moin/rules`, since a new binary could allow what they stop. There, and for agents older than the update, update it on the server as root (the refused update prints this command for that server):
+`moin servers update` has the daemon download the `moin` binary the control plane serves, check its SHA-256, swap it in and restart through systemd; it waits until the new daemon is back. The daemon refuses while a deploy runs, and on a server with rules in `/etc/moin/rules`, since a new binary could allow what they stop. There, and for daemons older than the update, update it on the server as root (the refused update prints this command for that server):
 
 ```bash
-curl -fsSL https://moin.example.com/download/moin-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-agent
+curl -fsSL https://moin.example.com/download/moin-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-daemon
 ```
 
 `moin-linux-arm64` on an ARM server. `/download/SHA256SUMS` lists the checksums of every binary.
@@ -247,6 +247,6 @@ curl -fsSL https://moin.example.com/download/moin-linux-amd64 -o /usr/local/bin/
 | Variable | Does |
 | --- | --- |
 | `MOIN_URL`, `MOIN_TOKEN` | override the saved login, for CI |
-| `MOIN_STATE_DIR` | where the agent keeps its state, default `/var/lib/moin` |
-| `MOIN_RULES` | where the agent reads its [rules](/docs/guides/security#rules), default `/etc/moin/rules` |
+| `MOIN_STATE_DIR` | where the daemon keeps its state, default `/var/lib/moin` |
+| `MOIN_RULES` | where the daemon reads its [rules](/docs/guides/security#rules), default `/etc/moin/rules` |
 | `NO_COLOR` | turns colors off on a terminal too |

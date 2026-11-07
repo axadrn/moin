@@ -8,7 +8,7 @@ Every docs page is also available as Markdown: add .md to its URL.
 
 - [Docs](/docs): Every page under its topic
 - [Get started](/docs/getting-started): From a fresh server to a live app
-- [Why moin](/docs/why-moin): A small stack, an agent that only dials out, backups whose restores are checked
+- [Why moin](/docs/why-moin): A small stack, a daemon that only dials out, backups whose restores are checked
 - [How moin works](/docs/concepts/how-moin-works): The pieces, the words and what a deploy does
 - [Self-hosting](/docs/self-hosting): Run all of moin yourself, free
 - [Deploy](/docs/guides/deploy): Deploy, redeploy and roll back apps
@@ -16,7 +16,7 @@ Every docs page is also available as Markdown: add .md to its URL.
 - [Catalog](/docs/guides/catalog): Open-source apps in one click
 - [Domains](/docs/guides/domains): Instant address, your own domains, per service
 - [Run a command](/docs/guides/exec): A command in an app's container, without SSH
-- [AI agents (MCP)](/docs/guides/mcp): Let Claude and other agents run moin
+- [AI agents (MCP)](/docs/guides/mcp): Let Claude and other AI agents run moin
 - [CLI](/docs/reference/cli): Every moin command
 - [API](/docs/reference/api): The JSON API under /api/v1
 - [FAQ](/docs/faq): Common questions

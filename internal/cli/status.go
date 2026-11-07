@@ -50,7 +50,7 @@ func printStatus(w io.Writer, status client.Status) {
 		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+need+":")
 		for _, issue := range status.Issues {
 			mark := style.Danger.Render(style.SymbolFailed)
-			if issue.Kind == "agent.behind" {
+			if issue.Kind == "daemon.behind" {
 				mark = style.Warning.Render(style.SymbolRunning)
 			}
 			fmt.Fprintf(w, "  %s %s %s\n", mark, issue.Target, style.Muted.Render(issue.Detail))

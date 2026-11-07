@@ -35,11 +35,11 @@ type DataView struct {
 	Limit     int
 	// Error says why the server could not answer.
 	Error string
-	// Status is what the agent last said about each database's backup, for
+	// Status is what the daemon last said about each database's backup, for
 	// the list.
 	Status []model.BackupStatus
 	// Backups is the open database's backup: its bucket, the buckets the
-	// app may pick, the ones it left, what the agent reports and the
+	// app may pick, the ones it left, what the daemon reports and the
 	// moments to go back to.
 	Backups BackupsView
 	Now     time.Time

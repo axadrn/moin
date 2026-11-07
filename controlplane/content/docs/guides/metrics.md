@@ -43,8 +43,8 @@ Every deploy that went live is a dot on the app's charts, with its number. The C
 - Numbers only: never a request, a log line or anything from your data.
 - Samples of the last hour stay in the control plane's memory, finished minutes go to `history.db` once a minute, and add up into hours. Minutes stay 24 hours, hours 30 days. After a restart the last hour comes back from the minutes.
 - `history.db` has no backup: losing it costs old charts, never data. See [what is kept where](/docs/self-hosting#database-backup).
-- An agent older than metrics sends none until it has [updated itself](/docs/self-hosting#updates), on its next connect.
+- A daemon older than metrics sends none until it has [updated itself](/docs/self-hosting#updates), on its next connect.
 
 ## How it works
 
-Every 15 seconds the agent reads the server from `/proc` (CPU, memory, the data disk, network, load) and each app's running containers from the Docker API (CPU, memory, network, added up, and their memory limit), and sends a few hundred bytes over the connection it already holds. The control plane writes one row per server or app and minute, never one per sample.
+Every 15 seconds the daemon reads the server from `/proc` (CPU, memory, the data disk, network, load) and each app's running containers from the Docker API (CPU, memory, network, added up, and their memory limit), and sends a few hundred bytes over the connection it already holds. The control plane writes one row per server or app and minute, never one per sample.

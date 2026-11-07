@@ -116,9 +116,9 @@ func TestBackupDownload(t *testing.T) {
 	}
 }
 
-// TestRestoreWaitsForTheAgent: a restore runs on its own on the control
+// TestRestoreWaitsForTheDaemon: a restore runs on its own on the control
 // plane; the CLI follows it until it is done, and says why it failed.
-func TestRestoreWaitsForTheAgent(t *testing.T) {
+func TestRestoreWaitsForTheDaemon(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"POST /api/v1/apps/shop/restores":   `{"id":"r1","state":"running","to":"1 hour ago"}`,
 		"GET /api/v1/apps/shop/restores/r1": `{"id":"r1","state":"failed","to":"1 hour ago","error":"swap the data: disk full. The copy from before is undo-20261107T140200Z"}`,

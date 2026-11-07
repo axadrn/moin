@@ -151,13 +151,13 @@ func (r *Apps) PruneUptime(hoursBefore, outagesBefore time.Time) error {
 	return err
 }
 
-// ServersSeen are the servers whose agent connected once.
+// ServersSeen are the servers whose daemon connected once.
 func (r *Apps) ServersSeen() ([]model.ServerSeen, error) {
 	servers := []model.ServerSeen{}
 	err := r.db.Select(&servers, `
 		SELECT s.id, s.workspace_id, s.name, s.last_seen_at, o.started_at AS down_since
 		FROM servers s LEFT JOIN server_outages o ON o.server_id = s.id AND o.ended_at IS NULL
-		WHERE s.agent_token_hash IS NOT NULL AND s.last_seen_at IS NOT NULL
+		WHERE s.daemon_token_hash IS NOT NULL AND s.last_seen_at IS NOT NULL
 		ORDER BY s.id`)
 	return servers, err
 }

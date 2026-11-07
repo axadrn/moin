@@ -33,8 +33,8 @@ profiles=""
 grep -q '^TUNNEL_TOKEN=.' "$dir/env" && profiles=tunnel
 [ -f updater.sh ] && profiles="${profiles:+$profiles,}updater"
 
-# On the same server as the apps, the agent's proxy serves the control
-# plane on its domain, once the agent has started it. Its network is
+# On the same server as the apps, the daemon's proxy serves the control
+# plane on its domain, once the daemon has started it. Its network is
 # moin-proxy.
 files="-f compose.yml"
 if grep -q '^SAME_SERVER=true' "$dir/env"; then
@@ -44,7 +44,7 @@ if grep -q '^SAME_SERVER=true' "$dir/env"; then
 		export MOIN_PROXY_NETWORK=moin-proxy
 		files="$files -f compose.same-server.yml"
 	else
-		echo "The agent's proxy does not run yet: the control plane answers on 127.0.0.1:8090 only." >&2
+		echo "The daemon's proxy does not run yet: the control plane answers on 127.0.0.1:8090 only." >&2
 	fi
 fi
 

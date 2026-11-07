@@ -70,7 +70,7 @@ func (m model) places() []entry {
 	}
 	return []entry{
 		{"place", "overview", "what runs and what needs you", "", func(m model) (tea.Model, tea.Cmd) { return m.openOverview() }},
-		{"place", "servers", "every server and its agent", onOverview("s"), func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vServers}) }},
+		{"place", "servers", "every server and its daemon", onOverview("s"), func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vServers}) }},
 		{"place", "activity", "who did what", onOverview("a"), func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vActivity}) }},
 		{"place", "web app", "setup that wants a browser", onOverview("w"), func(m model) (tea.Model, tea.Cmd) { return m.open(screen{v: vWeb}) }},
 		{"keys", "all keys", "every key of the place you are in", "?", func(m model) (tea.Model, tea.Cmd) { m.help = true; return m, nil }},
@@ -103,7 +103,7 @@ func (m model) serverEntries(name string) []entry {
 		return nil
 	}
 	return []entry{
-		{"action", "update the agent on " + name, "", "u", func(m model) (tea.Model, tea.Cmd) { return m.confirmAgentUpdate(sv) }},
+		{"action", "update the daemon on " + name, "", "u", func(m model) (tea.Model, tea.Cmd) { return m.confirmDaemonUpdate(sv) }},
 		{"web", "security of " + name, "firewall, ports, the proxy", "W", func(m model) (tea.Model, tea.Cmd) { return m.browse("/servers/" + sv.ID + "/security") }},
 	}
 }

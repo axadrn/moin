@@ -1,7 +1,7 @@
 package protocol
 
 // ExecStart runs Argv in a container of Service of App, as a list: no shell
-// reads it. The agent stops it after Timeout seconds.
+// reads it. The daemon stops it after Timeout seconds.
 type ExecStart struct {
 	App     string   `json:"app"`
 	Service string   `json:"service"`
@@ -17,7 +17,7 @@ type ExecOutput struct {
 
 // ExecDone ends a run: the exit code, or the error that kept the command
 // from running. Truncated says the output passed ExecMaxOutput and the rest
-// was dropped; TimedOut that the agent stopped it.
+// was dropped; TimedOut that the daemon stopped it.
 type ExecDone struct {
 	ExitCode  int    `json:"exit_code"`
 	Truncated bool   `json:"truncated,omitempty"`

@@ -16,7 +16,7 @@ control plane  saved encrypted;
    │
    │ moin restart, start or deploy
    ▼
-agent          sets them on the
+daemon         sets them on the
    │           app's services
    ▼
 your app       reads KEY when it

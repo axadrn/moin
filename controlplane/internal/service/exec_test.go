@@ -11,18 +11,18 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// agentStreams waits for the request of requestType and answers it with
+// daemonStreams waits for the request of requestType and answers it with
 // every message in replies, in order, under the request's ID.
-func agentStreams(servers *ServerService, serverID string, agent *fakeAgent, requestType protocol.MessageType, replies ...protocol.Message) {
+func daemonStreams(servers *ServerService, serverID string, daemon *fakeDaemon, requestType protocol.MessageType, replies ...protocol.Message) {
 	var request protocol.Message
 	for request.RequestID == "" {
-		agent.mu.Lock()
-		for _, sent := range agent.sent {
+		daemon.mu.Lock()
+		for _, sent := range daemon.sent {
 			if sent.Type == requestType {
 				request = sent
 			}
 		}
-		agent.mu.Unlock()
+		daemon.mu.Unlock()
 		time.Sleep(time.Millisecond)
 	}
 	for _, reply := range replies {
@@ -44,7 +44,7 @@ func message(t *testing.T, messageType protocol.MessageType, data any) protocol.
 // activity records the command with the app's secrets masked and the exit
 // code, never the output. A member may not run one.
 func TestExec(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestExec(t *testing.T) {
 		t.Fatalf("no command: %v", err)
 	}
 
-	go agentStreams(servers, server.ID, agent, protocol.TypeExecStart,
+	go daemonStreams(servers, server.ID, daemon, protocol.TypeExecStart,
 		message(t, protocol.TypeExecOutput, protocol.ExecOutput{Data: "ALTER "}),
 		message(t, protocol.TypeExecOutput, protocol.ExecOutput{Data: "ROLE\n"}),
 		message(t, protocol.TypeExecDone, protocol.ExecDone{ExitCode: 3}))
@@ -72,7 +72,7 @@ func TestExec(t *testing.T) {
 		t.Fatalf("result %+v, output %q, err %v", result, output.String(), err)
 	}
 	var start protocol.ExecStart
-	agent.last(t, protocol.TypeExecStart, &start)
+	daemon.last(t, protocol.TypeExecStart, &start)
 	if start.App != "shop" || start.Service != "db" || len(start.Argv) != 3 || start.Timeout != protocol.ExecTimeout {
 		t.Errorf("exec.start = %+v", start)
 	}
@@ -100,20 +100,20 @@ func TestExec(t *testing.T) {
 	}
 }
 
-// TestExecOldAgent: an agent that does not know exec says so, and the
+// TestExecOldDaemon: a daemon that does not know exec says so, and the
 // error reaches the caller.
-func TestExecOldAgent(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+func TestExecOldDaemon(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
 		t.Fatal(err)
 	}
 	ownerMember := &model.WorkspaceMember{WorkspaceID: owner.WorkspaceID, UserID: "owner", Role: model.WorkspaceRoleOwner}
-	go agentStreams(servers, server.ID, agent, protocol.TypeExecStart,
-		message(t, protocol.TypeError, protocol.Error{Message: `this agent does not know "exec.start": update it`}))
+	go daemonStreams(servers, server.ID, daemon, protocol.TypeExecStart,
+		message(t, protocol.TypeError, protocol.Error{Message: `this daemon does not know "exec.start": update it`}))
 	_, err := apps.Exec(context.Background(), ownerMember, Source{}, "shop", ExecInput{Service: "web", Argv: []string{"ls"}}, nil)
-	var agentErr *AgentError
-	if !errors.As(err, &agentErr) || !strings.Contains(agentErr.Message, "update it") {
-		t.Fatalf("old agent: %v", err)
+	var daemonErr *DaemonError
+	if !errors.As(err, &daemonErr) || !strings.Contains(daemonErr.Message, "update it") {
+		t.Fatalf("old daemon: %v", err)
 	}
 }
 

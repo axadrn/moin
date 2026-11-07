@@ -2,7 +2,7 @@ package pages
 
 import "testing"
 
-// A stored key alone joins no tailnet: the agent joins it only for SSH on
+// A stored key alone joins no tailnet: the daemon joins it only for SSH on
 // Tailscale, so the page must not say the join failed.
 func TestTailnetText(t *testing.T) {
 	for _, c := range []struct {

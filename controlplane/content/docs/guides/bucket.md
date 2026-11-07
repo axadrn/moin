@@ -99,7 +99,7 @@ API: DELETE /api/v1/buckets/{name}
 MCP: remove_bucket
 ```
 
-moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that apps moved away from, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name, and the control plane checks it: a script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an agent as `confirm`.
+moin refuses a bucket that apps still use (the default is used by every app without a bucket of its own) or that apps moved away from, and names those apps: move them first. A workspace without apps can remove its last bucket. moin asks you to type the bucket's name, and the control plane checks it: a script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an AI agent as `confirm`.
 
 ## Good to know
 
@@ -107,7 +107,7 @@ moin refuses a bucket that apps still use (the default is used by every app with
 - Two workspaces can share one bucket: each gets its own folder, named after its ID.
 - Making another bucket the default moves every app that follows the default.
 - The `backups-to` [rule](/docs/guides/security#rules) of a server allows one bucket: an app on that server in another bucket is refused there.
-- Backing up an app to its own bucket needs a current agent; older agents back up every app to the default. [Agents update themselves](/docs/guides/servers#updates) unless you turned that off.
+- Backing up an app to its own bucket needs a current daemon; older daemons back up every app to the default. [Daemons update themselves](/docs/guides/servers#updates) unless you turned that off.
 - moin never deletes anything in a bucket you changed or removed, or of an app you removed. [How long things stay](/docs/concepts/backups#how-long-things-stay).
 
 ## Under the hood

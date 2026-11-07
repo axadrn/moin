@@ -144,7 +144,7 @@ type AppPageView struct {
 	// Repo is the GitHub card of the Deploys section, as far as it is known
 	// without asking GitHub.
 	Repo *RepoView
-	// Logs is the container logs of the Logs section; nil when the agent
+	// Logs is the container logs of the Logs section; nil when the daemon
 	// did not answer in time, and the section loads them itself.
 	Logs *AppLogsView
 }
@@ -291,7 +291,7 @@ templ appDomainsSection(view AppPageView) {
 }
 
 // appLogsSection answers "what happens in it?": the container logs, and a
-// command to run in it. The logs come with the page; only when the agent is
+// command to run in it. The logs come with the page; only when the daemon is
 // slow to answer they load into a box that keeps their place.
 templ appLogsSection(app model.App, deploys []api.Deploy, logs *AppLogsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}

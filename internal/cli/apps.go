@@ -406,7 +406,7 @@ func printLive(app client.App, checks []client.DomainCheck, took string, stdout 
 	}
 }
 
-// isResult reports whether a deploy log line is the agent's last word,
+// isResult reports whether a deploy log line is the daemon's last word,
 // "v4 is live" or "deploy failed: …".
 func isResult(line string) bool {
 	if strings.HasPrefix(line, "deploy failed: ") {
@@ -513,7 +513,7 @@ func deploys(ctx context.Context, args []string, stdout io.Writer) error {
 		if len(deploy.Log) == 0 {
 			fmt.Fprintln(stdout, style.Muted.Render("No log lines."))
 		}
-		// The agent's log usually ends with the error already.
+		// The daemon's log usually ends with the error already.
 		logged := len(deploy.Log) > 0 && strings.HasSuffix(deploy.Log[len(deploy.Log)-1], "deploy failed: "+deploy.Error)
 		if deploy.Status == "failed" && deploy.Error != "" && !logged {
 			fmt.Fprintln(stdout, style.Danger.Render(style.SymbolFailed+" "+deploy.Error))
@@ -679,7 +679,7 @@ func hookOff(ctx context.Context, api *client.Client, name string, stdin io.Read
 	return nil
 }
 
-// registry manages the logins agents use to pull private images.
+// registry manages the logins daemons use to pull private images.
 func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := ""
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {

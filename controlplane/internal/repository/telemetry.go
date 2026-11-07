@@ -41,7 +41,7 @@ func (r *Telemetry) Counts() (model.Counts, error) {
 	var counts model.Counts
 	err := r.db.Get(&counts, `
 		SELECT
-			(SELECT COUNT(*) FROM servers WHERE agent_token_hash IS NOT NULL) AS servers,
+			(SELECT COUNT(*) FROM servers WHERE daemon_token_hash IS NOT NULL) AS servers,
 			(SELECT COUNT(DISTINCT app_id) FROM deploys WHERE status = 'succeeded') AS apps,
 			(SELECT COUNT(*) FROM deploys) AS deploys
 	`)
@@ -51,7 +51,7 @@ func (r *Telemetry) Counts() (model.Counts, error) {
 // HostedWorkspaces counts the workspaces with at least one server.
 func (r *Telemetry) HostedWorkspaces() (int, error) {
 	var count int
-	err := r.db.Get(&count, `SELECT COUNT(DISTINCT workspace_id) FROM servers WHERE agent_token_hash IS NOT NULL`)
+	err := r.db.Get(&count, `SELECT COUNT(DISTINCT workspace_id) FROM servers WHERE daemon_token_hash IS NOT NULL`)
 	return count, err
 }
 

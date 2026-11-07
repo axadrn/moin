@@ -34,5 +34,5 @@ services:
 - `database` picks the database the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
 - Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
 - Only a `Dockerfile` or `go.mod`, or neither? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`: it replaces the one moin would write. For a Railpack app, set the start command with the env var `RAILPACK_START_CMD` instead.
-- After every deploy the agent reports what it detected: kind, service, port, databases and this block. The app page, the end of `moin deploy` and `get_app` show it.
+- After every deploy the daemon reports what it detected: kind, service, port, databases and this block. The app page, the end of `moin deploy` and `get_app` show it.
 - Secrets never belong in the repo: use [env vars](/docs/guides/env).

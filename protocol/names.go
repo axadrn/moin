@@ -7,7 +7,7 @@ import (
 )
 
 // appName is the name of an app: 1 to 63 lowercase letters, digits or
-// dashes, starting with a letter or digit. The agent names its directory
+// dashes, starting with a letter or digit. The daemon names its directory
 // and Docker project after it.
 var appName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 

@@ -24,7 +24,7 @@ const (
 	ViaGitHub = "github"
 	ViaHook   = "hook"
 	// ViaSystem is moin itself, such as a deploy that ended or a server whose
-	// agent connected.
+	// daemon connected.
 	ViaSystem = "system"
 )
 

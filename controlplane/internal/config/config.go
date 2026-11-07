@@ -34,7 +34,7 @@ type Config struct {
 	RobotsNoIndex bool
 	// OldURLs are addresses the control plane had before APP_URL, such as
 	// https://old.example.com. It still answers on them: browsers go
-	// on to APP_URL, agents and the CLI move there by themselves, and
+	// on to APP_URL, daemons and the CLI move there by themselves, and
 	// admins see how much still arrives on them.
 	OldURLs []string
 
@@ -102,7 +102,7 @@ type Config struct {
 	// one never asks: the Deploy workflow updates it.
 	UpdateCheck bool
 	// SameServer says the control plane runs on the same server as its
-	// apps, set up by install.sh: a server's agent starts the proxy on its
+	// apps, set up by install.sh: a server's daemon starts the proxy on its
 	// first connect, since the proxy serves the control plane too.
 	SameServer bool
 	// Payment, Stripe

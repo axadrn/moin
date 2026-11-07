@@ -27,7 +27,7 @@ func TestEntries(t *testing.T) {
 		if !strings.Contains(string(entry.Compose), "x-moin:") {
 			t.Errorf("%s: compose.yml has no x-moin block", entry.Slug)
 		}
-		// pgvector/pgvector is Postgres with vectors; the agent backs it up
+		// pgvector/pgvector is Postgres with vectors; the daemon backs it up
 		// like postgres.
 		runsPostgres := strings.Contains(string(entry.Compose), "image: postgres:") || strings.Contains(string(entry.Compose), "image: pgvector/pgvector:")
 		if entry.Database == "postgres" && !runsPostgres {

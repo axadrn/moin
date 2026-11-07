@@ -429,13 +429,13 @@ func (m model) setUptime(app, domain string, path *string, paused *bool) tea.Cmd
 	}
 }
 
-func (m model) updateAgent(server string) tea.Cmd {
+func (m model) updateDaemon(server string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		if _, err := api.UpdateAgent(ctx, server); err != nil {
+		if _, err := api.UpdateDaemon(ctx, server); err != nil {
 			return errMsg{err}
 		}
-		return noticeMsg("The agent on " + server + " updates itself now and dials in again")
+		return noticeMsg("The daemon on " + server + " updates itself now and dials in again")
 	}
 }
 

@@ -104,8 +104,8 @@ templ updateLine(attributes templ.Attributes) {
 	</section>
 }
 
-// AgentUpdatesForm is the switch for automatic agent updates, a row of a
+// DaemonUpdatesForm is the switch for automatic daemon updates, a row of a
 // list that saves itself.
-templ AgentUpdatesForm(on bool) {
-	@switchForm("agent-updates-form", ctxkeys.AppBasePath(ctx)+"/servers/agent-updates", "agent-updates", "Update agents automatically", "To "+build.Version+", one server at a time, never during a deploy", on)
+templ DaemonUpdatesForm(on bool) {
+	@switchForm("daemon-updates-form", ctxkeys.AppBasePath(ctx)+"/servers/daemon-updates", "daemon-updates", "Update daemons automatically", "To "+build.Version+", one server at a time, never during a deploy", on)
 }

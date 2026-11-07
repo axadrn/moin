@@ -94,10 +94,10 @@ func rangeText(name string) string {
 func printAppMetrics(w io.Writer, answer client.AppMetrics) {
 	fmt.Fprintln(w, style.Bold.Render(answer.App)+style.Muted.Render(" on "+answer.Server+", "+rangeText(answer.Range)))
 	if !answer.ServerOnline && answer.Server != "" {
-		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server "+answer.Server+" is offline: its agent sends no metrics.")
+		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server "+answer.Server+" is offline: its daemon sends no metrics.")
 	}
 	if answer.Now == nil && len(answer.Points) == 0 {
-		fmt.Fprintf(w, "No metrics yet. The agent sends them every 15 seconds while the app runs; an older agent sends none: %s\n", command(w, build.Name+" servers update <server>"))
+		fmt.Fprintf(w, "No metrics yet. The daemon sends them every 15 seconds while the app runs; an older daemon sends none: %s\n", command(w, build.Name+" servers update <server>"))
 		return
 	}
 	now := answer.Now
@@ -133,10 +133,10 @@ func printAppMetrics(w io.Writer, answer client.AppMetrics) {
 func printServerMetrics(w io.Writer, answer client.ServerMetrics) {
 	fmt.Fprintln(w, style.Bold.Render(answer.Server)+style.Muted.Render(", "+rangeText(answer.Range)))
 	if !answer.Online {
-		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server is offline: its agent sends no metrics.")
+		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server is offline: its daemon sends no metrics.")
 	}
 	if answer.Now == nil && len(answer.Points) == 0 {
-		fmt.Fprintf(w, "No metrics yet. The agent sends them every 15 seconds; an older agent sends none: %s\n", command(w, build.Name+" servers update "+answer.Server))
+		fmt.Fprintf(w, "No metrics yet. The daemon sends them every 15 seconds; an older daemon sends none: %s\n", command(w, build.Name+" servers update "+answer.Server))
 		return
 	}
 	now := answer.Now

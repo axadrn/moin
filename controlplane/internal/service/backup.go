@@ -31,7 +31,7 @@ import (
 const (
 	backupTimeout = 10 * time.Minute
 	// restoreTimeout is how long the control plane waits for a restore.
-	// The agent runs it to the end in any case.
+	// The daemon runs it to the end in any case.
 	restoreTimeout = 3 * time.Hour
 )
 
@@ -139,7 +139,7 @@ func bucketClient(bucket protocol.Bucket) *s3.Client {
 	})
 }
 
-// backupConfig is what the agent of a server gets: the default bucket in
+// backupConfig is what the daemon of a server gets: the default bucket in
 // plain text, and the bucket of each of its apps that uses another one,
 // or nothing.
 func (s *AppService) backupConfig(workspaceID, serverID string) protocol.BackupConfig {
@@ -176,10 +176,10 @@ func (s *AppService) backupConfig(workspaceID, serverID string) protocol.BackupC
 	return config
 }
 
-// configureAgents sends the backup config to every online server of the
+// configureDaemons sends the backup config to every online server of the
 // user and waits for them, so the next request finds it in place. One
 // that is offline gets it when it connects.
-func (s *AppService) configureAgents(workspaceID string) {
+func (s *AppService) configureDaemons(workspaceID string) {
 	servers, err := s.servers.servers.ListByWorkspaceID(workspaceID)
 	if err != nil {
 		slog.Error("list servers for backups failed", "workspace_id", workspaceID, "error", err)
@@ -188,13 +188,13 @@ func (s *AppService) configureAgents(workspaceID string) {
 	var wait sync.WaitGroup
 	for _, server := range servers {
 		if s.servers.Online(server.ID) {
-			wait.Go(func() { s.configureAgent(server.ID, workspaceID) })
+			wait.Go(func() { s.configureDaemon(server.ID, workspaceID) })
 		}
 	}
 	wait.Wait()
 }
 
-func (s *AppService) configureAgent(serverID, workspaceID string) {
+func (s *AppService) configureDaemon(serverID, workspaceID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	config := s.backupConfig(workspaceID, serverID)
@@ -222,7 +222,7 @@ func (s *AppService) appIDs(serverID, workspaceID string) map[string]string {
 }
 
 // DatabaseBackups is the backup of one database as people see it: what
-// the agent reports, Problem as one short sentence when it does not work,
+// the daemon reports, Problem as one short sentence when it does not work,
 // and the moments a restore can go back to.
 type DatabaseBackups struct {
 	protocol.DatabaseBackup
@@ -388,7 +388,7 @@ func (e *AmbiguousMomentError) Error() string {
 }
 
 // BackupProblem says in one short sentence why a backup does not work,
-// from what the agent and its tools said. "" when it works.
+// from what the daemon and its tools said. "" when it works.
 func BackupProblem(raw string) string {
 	text := strings.ToLower(raw)
 	switch {
@@ -411,12 +411,12 @@ func BackupProblem(raw string) string {
 	case strings.Contains(text, "every change"):
 		return "Every change is not written down."
 	case strings.Contains(text, "too old for this"):
-		return "The agent on the server is too old: update it."
+		return "The daemon on the server is too old: update it."
 	}
 	return "The backup does not work."
 }
 
-// Backups asks the agent how the databases of an app are backed up and
+// Backups asks the daemon how the databases of an app are backed up and
 // adds the moments each can go back to.
 func (s *AppService) Backups(ctx context.Context, workspaceID, idOrName string) (*model.App, []DatabaseBackups, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
@@ -452,9 +452,9 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	return databases, nil
 }
 
-// SetBackupSchedule sets how often the agent copies an app's databases,
+// SetBackupSchedule sets how often the daemon copies an app's databases,
 // how long it keeps each copy and whether it records every change of a
-// SQLite file, and tells the agent.
+// SQLite file, and tells the daemon.
 func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule protocol.Schedule) (*model.App, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
@@ -479,7 +479,7 @@ func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule pr
 		})
 	}
 	if s.servers.Online(app.ServerID) {
-		go s.configureAgent(app.ServerID, app.WorkspaceID)
+		go s.configureDaemon(app.ServerID, app.WorkspaceID)
 	}
 	s.notify(app.WorkspaceID)
 	return app, nil
@@ -529,14 +529,14 @@ type RestoreTarget struct {
 	Confirm string
 }
 
-// Restore is a restore the agent runs. It runs on its own, as a big
+// Restore is a restore the daemon runs. It runs on its own, as a big
 // database takes longer than a request lasts, and across sessions and
 // restarts of the control plane: RestoreOf says how it stands. It is kept
 // in the database a week.
 type Restore = model.BackupRestore
 
 // Restore states. Unknown is a restore whose server went offline during
-// it: the agent tells how it ended when it is back, and until then no
+// it: the daemon tells how it ended when it is back, and until then no
 // other restore of the app starts.
 const (
 	RestoreRunning = model.RestoreRunning
@@ -548,11 +548,11 @@ const (
 // keepRestores is how long a restore's record stays.
 const keepRestores = 7 * 24 * time.Hour
 
-// StartRestore puts a database of an app back to a moment. The agent
+// StartRestore puts a database of an app back to a moment. The daemon
 // builds the restored database beside the live one and switches in one
 // step; the state before stays as long as the app keeps copies: going
 // back to it undoes the restore. It reserves the restore, checks the
-// moment, then the agent runs the restore on its own; RestoreOf follows
+// moment, then the daemon runs the restore on its own; RestoreOf follows
 // it.
 func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName string, target RestoreTarget) (*Restore, error) {
 	if strings.TrimSpace(target.Moment) == "" && target.At == nil {
@@ -596,8 +596,8 @@ func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName str
 		delete(s.waiting, restore.ID)
 		s.mu.Unlock()
 		switch {
-		case errors.Is(err, ErrAgentGone) || errors.Is(err, context.DeadlineExceeded):
-			// The agent goes on with it: it tells how it ended when it is
+		case errors.Is(err, ErrDaemonGone) || errors.Is(err, context.DeadlineExceeded):
+			// The daemon goes on with it: it tells how it ended when it is
 			// back (reconcileRestores).
 			s.endRestore(actor, app, restore.ID, protocol.RestoreState{State: RestoreUnknown, Error: "the server went offline during the restore; moin asks it how it ended when it is back"})
 		case err != nil:
@@ -631,7 +631,7 @@ func (s *AppService) reserveRestore(app *model.App, database string) (*Restore, 
 	return restore, nil
 }
 
-// endRestore stores how a restore stands after the agent said so. A
+// endRestore stores how a restore stands after the daemon said so. A
 // restore that ended stays ended: a late word changes nothing.
 func (s *AppService) endRestore(actor Actor, app *model.App, id string, state protocol.RestoreState) {
 	s.restoreMu.Lock()
@@ -665,7 +665,7 @@ func (s *AppService) endRestore(actor Actor, app *model.App, id string, state pr
 	s.notify(app.WorkspaceID)
 }
 
-// applyRestoreStates takes what an agent says of the restores of an app:
+// applyRestoreStates takes what a daemon says of the restores of an app:
 // those that run, and how the last one of each database ended.
 func (s *AppService) applyRestoreStates(app *model.App, states []protocol.RestoreState) {
 	for _, state := range states {
@@ -676,18 +676,18 @@ func (s *AppService) applyRestoreStates(app *model.App, states []protocol.Restor
 	}
 }
 
-// RestoreNoWord begins the error of a restore whose agent does not report
+// RestoreNoWord begins the error of a restore whose daemon does not report
 // restores: nobody can say how it ended.
 const RestoreNoWord = "Unknown how it ended"
 
-// reconcileRestores asks the agent of a server how the restores stand that
+// reconcileRestores asks the daemon of a server how the restores stand that
 // the control plane lost track of: those whose server went offline during
 // them, and those that ran when the control plane restarted. It runs when
-// the agent connects and every minute while one may still run
+// the daemon connects and every minute while one may still run
 // (RunRestores). It asks with backup.restores, which needs no bucket and
 // lists nothing in it, so an app without a bucket or one that is gone
-// still answers. The agent writes a restore down the moment it arrives,
-// so one it knows nothing of never reached it. An agent that reports no
+// still answers. The daemon writes a restore down the moment it arrives,
+// so one it knows nothing of never reached it. A daemon that reports no
 // restores at all cannot say: the restore ends with that, and the app is
 // to check.
 func (s *AppService) reconcileRestores(serverID string) {
@@ -710,9 +710,9 @@ func (s *AppService) reconcileRestores(serverID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), backupTimeout)
 		var backups protocol.Backups
 		err = s.servers.Request(ctx, serverID, protocol.TypeBackupRestores, protocol.BackupRequest{App: app.Name}, &backups)
-		var agentErr *AgentError
-		if errors.As(err, &agentErr) {
-			// An agent before backup.restores.
+		var daemonErr *DaemonError
+		if errors.As(err, &daemonErr) {
+			// A daemon before backup.restores.
 			backups = protocol.Backups{}
 			err = s.servers.Request(ctx, serverID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Name}, &backups)
 		}
@@ -722,7 +722,7 @@ func (s *AppService) reconcileRestores(serverID string) {
 			continue
 		}
 		if backups.Restores == nil {
-			s.endRestore(System(app.WorkspaceID), app, restore.ID, protocol.RestoreState{State: RestoreFailed, Error: RestoreNoWord + ": the agent on the server does not report restores. Check the app and its data; update the agent so moin can tell next time."})
+			s.endRestore(System(app.WorkspaceID), app, restore.ID, protocol.RestoreState{State: RestoreFailed, Error: RestoreNoWord + ": the daemon on the server does not report restores. Check the app and its data; update the daemon so moin can tell next time."})
 			continue
 		}
 		s.applyRestoreStates(app, backups.Restores)
@@ -737,7 +737,7 @@ func (s *AppService) reconcileRestores(serverID string) {
 // restores how they ended.
 const restoreAskEvery = time.Minute
 
-// RunRestores asks, every minute, the agents of restores that may still
+// RunRestores asks, every minute, the daemons of restores that may still
 // run how they stand: one whose server went offline during it, once the
 // server is back, and one that runs while no request waits for it, as
 // after a restart of the control plane, whose last word may be lost.
@@ -863,7 +863,7 @@ func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target 
 	return request, moment.Label, nil
 }
 
-// remember names the copy the agent took before a change, by its ID, and
+// remember names the copy the daemon took before a change, by its ID, and
 // forgets the names of copies older than the app keeps.
 func (s *AppService) remember(app *model.App, database, kind, detail string, at time.Time) {
 	err := s.apps.AddBackupMoment(model.BackupMoment{AppID: app.ID, Database: database, Kind: kind, Detail: detail, At: at.UTC()}, s.now().Add(-keepDays(app)-24*time.Hour))
@@ -883,7 +883,7 @@ func (s *AppService) markUpdate(deployID, version string) {
 	s.updates[deployID] = version
 }
 
-// rememberDeploy names the copies the agent took before a deploy.
+// rememberDeploy names the copies the daemon took before a deploy.
 func (s *AppService) rememberDeploy(deployID string, done protocol.DeployDone) {
 	s.mu.Lock()
 	version, update := s.updates[deployID]
@@ -977,14 +977,14 @@ func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, databa
 
 // errorText is an error as people read it.
 func errorText(err error) string {
-	var agentErr *AgentError
-	if errors.As(err, &agentErr) {
-		return agentErr.Message
+	var daemonErr *DaemonError
+	if errors.As(err, &daemonErr) {
+		return daemonErr.Message
 	}
 	return err.Error()
 }
 
-// BackupStatus is what the agent last reported about the app's databases.
+// BackupStatus is what the daemon last reported about the app's databases.
 func (s *AppService) BackupStatus(workspaceID, idOrName string) ([]model.BackupStatus, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
@@ -993,7 +993,7 @@ func (s *AppService) BackupStatus(workspaceID, idOrName string) ([]model.BackupS
 	return s.apps.BackupStatus(app.ID)
 }
 
-// receiveBackupStatus stores a status the agent sent on its own.
+// receiveBackupStatus stores a status the daemon sent on its own.
 func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backups) {
 	workspaceID, ok := s.servers.UserOf(serverID)
 	if !ok {
@@ -1011,8 +1011,8 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 // storeBackupStatus stores the backup status of each database. Backups
 // that start failing or work again, a restore check that fails or passes
 // again, and each passed check go into the activity as moin itself; the
-// changes alert. The backups' own error and the check's are apart: an
-// agent from before check_error sends the check's failure as Error alone.
+// changes alert. The backups' own error and the check's are apart: a
+// daemon from before check_error sends the check's failure as Error alone.
 func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups) {
 	appID := app.ID
 	before := map[string]model.BackupStatus{}
@@ -1035,7 +1035,7 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			UpdatedAt:  s.now().UTC(),
 		}
 		if database.CheckedAt == nil {
-			// No check since the agent started: the last one still stands.
+			// No check since the daemon started: the last one still stands.
 			status.CheckError = previous.CheckError
 		}
 		for _, change := range backupChanges(previous, known, status) {
@@ -1057,7 +1057,7 @@ type backupChange struct {
 // backupChanges compares a database's backup status with the one before
 // and says what changed: backups that fail or work again, a restore check
 // that fails or passes again, and a passed check. Only a change counts, so
-// an agent that tells the same failure every minute alerts once.
+// a daemon that tells the same failure every minute alerts once.
 func backupChanges(previous model.BackupStatus, known bool, now model.BackupStatus) []backupChange {
 	changes := []backupChange{}
 	add := func(action string, details map[string]string) {

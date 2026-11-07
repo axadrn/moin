@@ -1,5 +1,5 @@
 // Command moin opens the TUI without arguments, runs a CLI command with them,
-// and runs the agent on a server with `moin agent`.
+// and runs the daemon on a server with `moin daemon`.
 package main
 
 import (

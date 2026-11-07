@@ -22,7 +22,7 @@ func (s *AppService) recordUptimeChange(workspaceID, appName string, before, che
 	}
 }
 
-// watchServers writes a server whose agent is gone for a while to the
+// watchServers writes a server whose daemon is gone for a while to the
 // activity as down, and back up when it connects again.
 func (s *AppService) watchServers(now time.Time) {
 	servers, err := s.apps.ServersSeen()

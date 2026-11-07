@@ -195,7 +195,7 @@ var backupSummaries = map[string]summarize{
 	},
 }
 
-// serverSummaries are about a server and its agent.
+// serverSummaries are about a server and its daemon.
 var serverSummaries = map[string]summarize{
 	"server.added": func(target string, d map[string]string) string {
 		return "added the server " + target
@@ -209,23 +209,23 @@ var serverSummaries = map[string]summarize{
 	"server.renamed": func(target string, d map[string]string) string {
 		return "renamed the server " + d["from"] + " to " + target
 	},
-	"server.agent_updated": func(target string, d map[string]string) string {
-		return "updated the agent of " + target + " from " + d["from"] + " to " + d["to"]
+	"server.daemon_updated": func(target string, d map[string]string) string {
+		return "updated the daemon of " + target + " from " + d["from"] + " to " + d["to"]
 	},
-	"server.agent_update_failed": func(target string, d map[string]string) string {
-		return "could not update the agent of " + target + " from " + d["from"] + " to " + d["to"] + ", so agents of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
+	"server.daemon_update_failed": func(target string, d map[string]string) string {
+		return "could not update the daemon of " + target + " from " + d["from"] + " to " + d["to"] + ", so daemons of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
 	},
 	"server.security_set": func(target string, d map[string]string) string {
 		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
 	},
 	"server.reinstalled": func(target string, d map[string]string) string {
-		return "installed the agent of " + target + " again, and the old agent's token stopped working: " + agentFacts(d)
+		return "installed the daemon of " + target + " again, and the old daemon's token stopped working: " + daemonFacts(d)
 	},
 	"server.installed": func(target string, d map[string]string) string {
-		return "connected " + target + " for the first time: " + agentFacts(d)
+		return "connected " + target + " for the first time: " + daemonFacts(d)
 	},
 	"server.down": func(target string, d map[string]string) string {
-		return "lost " + target + ": its agent has not answered since " + d["since"]
+		return "lost " + target + ": its daemon has not answered since " + d["since"]
 	},
 	"server.up": func(target string, d map[string]string) string {
 		return "has " + target + " back after " + d["duration"]
@@ -296,8 +296,8 @@ var settingsSummaries = map[string]summarize{
 	"integration.tailscale": func(target string, d map[string]string) string {
 		return onOff(d, "turned the Tailscale key %s")
 	},
-	"workspace.agent_updates": func(target string, d map[string]string) string {
-		return onOff(d, "turned automatic agent updates %s")
+	"workspace.daemon_updates": func(target string, d map[string]string) string {
+		return onOff(d, "turned automatic daemon updates %s")
 	},
 	"controlplane.update_started": func(target string, d map[string]string) string {
 		return "started the update of the control plane from " + d["from"] + " to " + d["to"]
@@ -457,8 +457,8 @@ func onOff(d map[string]string, sentence string) string {
 	return strings.Replace(sentence, "%s", "on", 1)
 }
 
-// agentFacts are the host, platform and version an agent reported.
-func agentFacts(d map[string]string) string {
+// daemonFacts are the host, platform and version a daemon reported.
+func daemonFacts(d map[string]string) string {
 	return strings.Join(nonEmpty(d["hostname"], d["os"]+"/"+d["arch"], d["version"]), ", ")
 }
 

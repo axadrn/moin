@@ -2,12 +2,12 @@ package protocol
 
 import "time"
 
-// MetricsEvery is how often the agent samples its server and apps and sends
+// MetricsEvery is how often the daemon samples its server and apps and sends
 // the sample.
 const MetricsEvery = 15 * time.Second
 
 // Metrics is one sample of a server and the apps on it. Rates are per
-// second since the sample before. Server is nil where the agent cannot read
+// second since the sample before. Server is nil where the daemon cannot read
 // the server's numbers, such as outside Linux.
 type Metrics struct {
 	At     time.Time      `json:"at"`

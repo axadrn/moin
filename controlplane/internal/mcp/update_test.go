@@ -11,8 +11,8 @@ import (
 )
 
 // TestUpdateTools: get_version tells of the newest release, only the admin
-// of the control plane updates it, and set_agent_updates turns automatic
-// agent updates off.
+// of the control plane updates it, and set_daemon_updates turns automatic
+// daemon updates off.
 func TestUpdateTools(t *testing.T) {
 	env := newEnvironment(t)
 	if err := env.services.Updates.Check(context.Background()); err != nil {
@@ -29,7 +29,7 @@ func TestUpdateTools(t *testing.T) {
 	bobSession := connectMemory(t, env.server, bob, bobToken)
 
 	version := output[mcp.VersionOutput](t, call(t, bobSession, "get_version", nil))
-	if version.Latest != "v0.3.0" || !version.UpdateAvailable || version.CanUpdate || !version.AutoUpdateAgents || version.Summary != "Updates in one click." {
+	if version.Latest != "v0.3.0" || !version.UpdateAvailable || version.CanUpdate || !version.AutoUpdateDaemons || version.Summary != "Updates in one click." {
 		t.Fatalf("bob's version = %+v", version)
 	}
 	if result := call(t, bobSession, "update_control_plane", nil); !result.IsError || !strings.Contains(text(result), `"forbidden"`) {
@@ -43,11 +43,11 @@ func TestUpdateTools(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	off := output[mcp.AgentUpdatesOutput](t, call(t, adaSession, "set_agent_updates", map[string]any{"auto": false}))
+	off := output[mcp.DaemonUpdatesOutput](t, call(t, adaSession, "set_daemon_updates", map[string]any{"auto": false}))
 	if off.Auto {
-		t.Fatalf("set_agent_updates = %+v", off)
+		t.Fatalf("set_daemon_updates = %+v", off)
 	}
-	if version := output[mcp.VersionOutput](t, call(t, adaSession, "get_version", nil)); version.AutoUpdateAgents {
-		t.Fatal("agents still update by themselves")
+	if version := output[mcp.VersionOutput](t, call(t, adaSession, "get_version", nil)); version.AutoUpdateDaemons {
+		t.Fatal("daemons still update by themselves")
 	}
 }

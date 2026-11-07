@@ -10,12 +10,12 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// sendSamples has the agent send n samples, one every 15 seconds from at,
+// sendSamples has the daemon send n samples, one every 15 seconds from at,
 // with the server's CPU and the app's memory counting up from base.
 func sendSamples(t *testing.T, apps *AppService, servers *ServerService, serverID string, clock *time.Time, n int, base float64) {
 	t.Helper()
 	for i := range n {
-		agentSays(t, servers, serverID, protocol.TypeMetrics, protocol.Metrics{
+		daemonSays(t, servers, serverID, protocol.TypeMetrics, protocol.Metrics{
 			At: *clock,
 			Server: &protocol.ServerMetrics{CPU: base + float64(i), Cores: 2, MemoryUsed: 1 << 30, MemoryTotal: 4 << 30,
 				DiskUsed: 10 << 30, DiskTotal: 40 << 30, NetRx: 1000, NetTx: 500, Load: 0.5},
@@ -40,7 +40,7 @@ func TestMetricsRingMinutesAndHours(t *testing.T) {
 	// Three minutes of samples; one that comes too fast is dropped.
 	sendSamples(t, apps, servers, server.ID, &clock, 12, 10)
 	clock = clock.Add(-10 * time.Second)
-	agentSays(t, servers, server.ID, protocol.TypeMetrics, protocol.Metrics{Server: &protocol.ServerMetrics{CPU: 99}})
+	daemonSays(t, servers, server.ID, protocol.TypeMetrics, protocol.Metrics{Server: &protocol.ServerMetrics{CPU: 99}})
 	clock = clock.Add(10 * time.Second)
 	_, metrics, err := apps.ServerMetrics(owner.WorkspaceID, server.Name, "")
 	if err != nil {

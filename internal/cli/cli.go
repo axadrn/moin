@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/moin/internal/agent"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/internal/tui"
 	"github.com/axadrn/moin/protocol"
@@ -50,9 +50,9 @@ Servers
   servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
   servers rm         Remove a server: servers rm web-1 [--confirm web-1]
   servers rename     Rename a server: servers rename web-1 shop-1
-  servers install-command  A new one-time install command, to install or move the agent: servers install-command web-1
-  servers update     Update the agent to the control plane's version now: servers update [web-1]
-  servers auto-update  Agents update by themselves, on by default: servers auto-update [on|off]
+  servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
+  servers update     Update the daemon to the control plane's version now: servers update [web-1]
+  servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
   servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
   servers rules      The server's own rules for moin, from /etc/moin/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
@@ -145,10 +145,10 @@ Env
   env push           Replace all env vars with a .env, after a yes: env push [file] [--yes]
   run                Run a command with the env vars: run -- go run .
 
-Agent
-  agent register     Connect this server with an install token
-  agent uninstall    Remove the agent from this server; the apps keep running: agent uninstall [--apps] [--yes]
-  agent              Run the agent on this server
+Daemon
+  daemon register    Connect this server with an install token
+  daemon uninstall   Remove the daemon from this server; the apps keep running: daemon uninstall [--apps] [--yes]
+  daemon             Run the daemon on this server
 
   version            Show the version of moin and the control plane, and a newer release
   update             Update a self-hosted control plane to the newest release [--yes]
@@ -320,8 +320,12 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return runWithEnv(ctx, rest, stdin, stdout)
 	case "exec":
 		return execCommand(ctx, rest, stdout)
+	case "daemon":
+		return daemonCommand(ctx, rest, stdin, stdout)
 	case "agent":
-		return agentCommand(ctx, rest, stdin, stdout)
+		// Not a command: the unit of a server from before the daemon runs
+		// it once after the update, to move to the daemon.
+		return daemon.FromAgent(ctx, daemon.StateDir())
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help` for all of them", command, build.Name)
 }
@@ -475,9 +479,9 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	case "rules":
 		return serverRules(ctx, config, args, stdout)
 	case "update":
-		return updateAgents(ctx, args, stdout)
+		return updateDaemons(ctx, args, stdout)
 	case "auto-update":
-		return agentUpdates(ctx, args, stdout)
+		return daemonUpdates(ctx, args, stdout)
 	case "install-command":
 		return newInstallCommand(ctx, config, args, stdout)
 	case "rename":
@@ -577,7 +581,7 @@ func newInstallCommand(ctx context.Context, config client.Config, args []string,
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "  "+style.Accent.Render(created.InstallCommand))
 	fmt.Fprintln(stdout)
-	hint(stdout, "It shows once: moin stores only a fingerprint of it. The old command stops working; an agent that registers with this one takes over. See it in", build.Name+" servers")
+	hint(stdout, "It shows once: moin stores only a fingerprint of it. The old command stops working; a daemon that registers with this one takes over. See it in", build.Name+" servers")
 	return nil
 }
 
@@ -603,7 +607,7 @@ func renameServer(ctx context.Context, config client.Config, args []string, stdo
 }
 
 // removeServer is `servers rm`: it asks for the name, removes the server
-// and says how to remove the agent on it.
+// and says how to remove the daemon on it.
 func removeServer(ctx context.Context, config client.Config, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("servers rm", "servers rm <server> [--confirm <server>]").withConfirm()
 	if err := flags.parse(args); err != nil {
@@ -617,7 +621,7 @@ func removeServer(ctx context.Context, config client.Config, args []string, stdi
 		return flags.wrong()
 	}
 	name := flags.Arg(0)
-	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Remove server %s and disconnect its agent?", name), name)
+	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Remove server %s and disconnect its daemon?", name), name)
 	if err != nil {
 		return err
 	}
@@ -631,17 +635,17 @@ func removeServer(ctx context.Context, config client.Config, args []string, stdi
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("They stay on the server if it comes back. Remove them there with "+protocol.UninstallCommand(build.Name)+" --apps."))
 	}
 	if uninstall == "" {
-		done(stdout, "Removed %s. Its agent never connected, so nothing is installed there", style.Bold.Render(name))
+		done(stdout, "Removed %s. Its daemon never connected, so nothing is installed there", style.Bold.Render(name))
 		return nil
 	}
-	done(stdout, "Removed %s. Its agent is disconnected", style.Bold.Render(name))
-	hint(stdout, "The agent is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
+	done(stdout, "Removed %s. Its daemon is disconnected", style.Bold.Render(name))
+	hint(stdout, "The daemon is still installed there. Remove it on the server as root (or put sudo in front) with", uninstall)
 	return nil
 }
 
-// updateAgents updates the agent of one server, or of every online server
-// whose agent is not the control plane's version.
-func updateAgents(ctx context.Context, args []string, stdout io.Writer) error {
+// updateDaemons updates the daemon of one server, or of every online server
+// whose daemon is not the control plane's version.
+func updateDaemons(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("servers update", "servers update [server]")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -676,20 +680,20 @@ func updateAgents(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("no server %q", flags.Arg(0))
 	}
 	if len(targets) == 0 {
-		done(stdout, "Every online agent runs %s, like the control plane.", dash(meta.Version))
+		done(stdout, "Every online daemon runs %s, like the control plane.", dash(meta.Version))
 		return nil
 	}
 	failed := false
 	for _, server := range targets {
-		progress := newProgress(stdout, fmt.Sprintf("updating the agent of %s from %s to %s", server.Name, dash(server.AgentVersion), dash(meta.Version)))
-		updated, err := api.UpdateAgent(ctx, server.ID)
+		progress := newProgress(stdout, fmt.Sprintf("updating the daemon of %s from %s to %s", server.Name, dash(server.DaemonVersion), dash(meta.Version)))
+		updated, err := api.UpdateDaemon(ctx, server.ID)
 		progress.end()
 		if err != nil {
 			printError(stdout, fmt.Errorf("server %s: %w", server.Name, err))
 			failed = true
 			continue
 		}
-		done(stdout, "%s runs agent %s now", style.Bold.Render(updated.Name), updated.AgentVersion)
+		done(stdout, "%s runs daemon %s now", style.Bold.Render(updated.Name), updated.DaemonVersion)
 	}
 	if failed {
 		return errReported
@@ -697,7 +701,7 @@ func updateAgents(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// PrintServers writes the server table. An agent that is not the control
+// PrintServers writes the server table. A daemon that is not the control
 // plane's version gets a note to update it.
 func PrintServers(stdout io.Writer, list []client.Server, version string) {
 	if len(list) == 0 {
@@ -709,17 +713,17 @@ func PrintServers(stdout io.Writer, list []client.Server, version string) {
 	rows := make([][]string, 0, len(list))
 	outdated := 0
 	for _, server := range list {
-		agentVersion := dash(server.AgentVersion)
+		daemonVersion := dash(server.DaemonVersion)
 		if server.Outdated(version) {
-			agentVersion += " " + style.Warning.Render("update to "+version)
+			daemonVersion += " " + style.Warning.Render("update to "+version)
 			outdated++
 		}
-		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), agentVersion, server.LastSeen(now), server.Access(), server.RulesText()})
+		rows = append(rows, []string{style.Bold.Render(server.Name), badge(stdout, style.Server(server), server.Status()), server.System(), daemonVersion, server.LastSeen(now), server.Access(), server.RulesText()})
 	}
-	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "AGENT", "LAST SEEN", "ACCESS", "RULES"}, rows)
+	table(stdout, []string{"NAME", "STATUS", "SYSTEM", "DAEMON", "LAST SEEN", "ACCESS", "RULES"}, rows)
 	if outdated > 0 {
 		fmt.Fprintln(stdout)
-		hint(stdout, fmt.Sprintf("The control plane runs %s. Update the agents with", version), build.Name+" servers update")
+		hint(stdout, fmt.Sprintf("The control plane runs %s. Update the daemons with", version), build.Name+" servers update")
 	}
 }
 
@@ -730,10 +734,10 @@ func dash(value string) string {
 	return value
 }
 
-func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	dir := agent.StateDir()
+func daemonCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	dir := daemon.StateDir()
 	if len(args) > 0 && args[0] == "register" {
-		flags := newFlags("agent register", "agent register --url <control plane> --token <install token>")
+		flags := newFlags("daemon register", "daemon register --url <control plane> --token <install token>")
 		baseURL := flags.String("url", client.DefaultURL, "control plane URL")
 		token := flags.String("token", "", "install token")
 		err := flags.parse(args[1:])
@@ -743,7 +747,7 @@ func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io
 		if *token == "" || flags.NArg() > 0 {
 			return flags.wrong()
 		}
-		state, err := agent.Register(ctx, dir, *baseURL, *token)
+		state, err := daemon.Register(ctx, dir, *baseURL, *token)
 		if err != nil {
 			return err
 		}
@@ -751,25 +755,25 @@ func agentCommand(ctx context.Context, args []string, stdin io.Reader, stdout io
 		return nil
 	}
 	if len(args) > 0 && args[0] == "uninstall" {
-		return uninstallAgent(ctx, dir, args[1:], stdin, stdout)
+		return uninstallDaemon(ctx, dir, args[1:], stdin, stdout)
 	}
-	flags := newFlags("agent", "agent, agent register --url <control plane> --token <install token>, or agent uninstall [--apps]")
+	flags := newFlags("daemon", "daemon, daemon register --url <control plane> --token <install token>, or daemon uninstall [--apps]")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 0 {
-		return fmt.Errorf("unknown command %q. Run `%s help`", "agent "+flags.Arg(0), build.Name)
+		return fmt.Errorf("unknown command %q. Run `%s help`", "daemon "+flags.Arg(0), build.Name)
 	}
-	state, err := agent.LoadState(dir)
+	state, err := daemon.LoadState(dir)
 	if err != nil {
 		return err
 	}
-	return agent.Run(ctx, dir, state)
+	return daemon.Run(ctx, dir, state)
 }
 
-// uninstallAgent removes the agent from this server and says what stays.
-func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("agent uninstall", "agent uninstall [--apps] [--yes]").withYes()
+// uninstallDaemon removes the daemon from this server and says what stays.
+func uninstallDaemon(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("daemon uninstall", "daemon uninstall [--apps] [--yes]").withYes()
 	withApps := flags.Bool("apps", false, "remove the apps with their data, the proxy, the tunnel and the firewall too")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -777,18 +781,18 @@ func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Rea
 	if flags.NArg() > 0 {
 		return flags.wrong()
 	}
-	question := "Remove the agent from this server? The apps keep running."
+	question := "Remove the daemon from this server? The apps keep running."
 	if *withApps {
-		question = "Remove the agent and every app on this server with its data? This cannot be undone."
+		question = "Remove the daemon and every app on this server with its data? This cannot be undone."
 	}
 	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
 		return err
 	}
-	kept, err := agent.Uninstall(ctx, dir, *withApps, func(format string, args ...any) { step(stdout, format, args...) })
+	kept, err := daemon.Uninstall(ctx, dir, *withApps, func(format string, args ...any) { step(stdout, format, args...) })
 	if err != nil {
 		return err
 	}
-	done(stdout, "The agent is removed from this server")
+	done(stdout, "The daemon is removed from this server")
 	if len(kept) > 0 {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Still here: "+strings.Join(kept, "; ")+"."))
 	}
@@ -798,7 +802,7 @@ func uninstallAgent(ctx context.Context, dir string, args []string, stdin io.Rea
 	return nil
 }
 
-// printRules shows /etc/moin/rules of a server as its agent reported it.
+// printRules shows /etc/moin/rules of a server as its daemon reported it.
 func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout io.Writer) error {
 	list, err := api.Servers(ctx)
 	if err != nil {

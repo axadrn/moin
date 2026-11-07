@@ -46,7 +46,7 @@ API: PUT /api/v1/apps/{app}/backups
 MCP: set_backups
 ```
 
-`--every` takes `15m`, `1h` or `1d`, `--keep` takes `1d`, `3d`, `7d` or `30d`, `--every-change` takes `on` or `off`; set one or all of them. The API and MCP take `every_minutes` (15, 60 or 1440), `keep_days` (1, 3, 7 or 30) and `every_change`. The agent takes the new settings at once; the next copy comes when the newest one is older than **How often**.
+`--every` takes `15m`, `1h` or `1d`, `--keep` takes `1d`, `3d`, `7d` or `30d`, `--every-change` takes `on` or `off`; set one or all of them. The API and MCP take `every_minutes` (15, 60 or 1440), `keep_days` (1, 3, 7 or 30) and `every_change`. The daemon takes the new settings at once; the next copy comes when the newest one is older than **How often**.
 
 ## The copies
 
@@ -159,11 +159,11 @@ moin backs up every database of the service, not only that one. One you made you
 - A restore replaces the live data, so moin asks you to type the app's name first, on the web, in the CLI and in the TUI. The control plane checks the name, not only the screen: scripts pass it with `--confirm <app>` (`--yes` is not enough), the API and MCP take it as `confirm`, and a wrong one answers `confirm_mismatch`.
 - A restore needs room on the server's disk for one more database, the one it builds beside the live one. The old one stays as the undo until the copies of that day go.
 - After a restore of a SQLite file, Every change starts again from the restored file. To go back to before the restore, use **Before the restore at …**.
-- A restore goes on when the server goes offline or the control plane restarts in the middle: it shows as "the server is offline", no other restore of the app starts meanwhile, and moin asks the agent every minute how it ended once the server is back. The CLI and the TUI wait 10 minutes for that, then say what to check. An agent that stops in the middle (a reboot) ends the restore when it starts again: the app runs again, on the database before or the restored one, never on half of one, and the restore says which.
+- A restore goes on when the server goes offline or the control plane restarts in the middle: it shows as "the server is offline", no other restore of the app starts meanwhile, and moin asks the daemon every minute how it ended once the server is back. The CLI and the TUI wait 10 minutes for that, then say what to check. A daemon that stops in the middle (a reboot) ends the restore when it starts again: the app runs again, on the database before or the restored one, never on half of one, and the restore says which.
 - A restore that fails says why. Mostly nothing changed then, and the app runs again; when only the start after the switch failed, it says so: the restored data is in place, and starting the app again is what is left.
 - When an app moves to another bucket, its copies start again there. What is in the old bucket stays.
 - Removing the bucket from moin stops its backups; what is in it stays. See [Remove a bucket](/docs/guides/bucket#remove-a-bucket).
 - Removing an app keeps its copies in your bucket until you delete them.
 - To keep a server's backups in one bucket only, use the `backups-to` [rule](/docs/guides/security#rules).
-- An agent older than this version answers "update the agent": update it under **Servers** or with `moin servers update`.
+- A daemon older than this version answers "update the daemon": update it under **Servers** or with `moin servers update`.
 - Not sure which database to pick for a new app? [SQLite or Postgres?](/docs/guides/sqlite-or-postgres)

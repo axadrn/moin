@@ -71,9 +71,9 @@ func (m model) helpGroups() []keyGroup {
 	case vExec:
 		return []keyGroup{{"Run", []kb{{"enter", "run the line"}, {"@service", "first word picks one"}, {"↑↓", "scroll back"}, {"ctrl+u", "clear the line"}, {"ctrl+w", "delete a word"}, {"esc", "back"}}}}
 	case vServers:
-		return []keyGroup{{"Servers", []kb{{"↑↓", "pick a server"}, {"enter", "open it"}, {"u", "update its agent"}}}}
+		return []keyGroup{{"Servers", []kb{{"↑↓", "pick a server"}, {"enter", "open it"}, {"u", "update its daemon"}}}}
 	case vServer:
-		return []keyGroup{{"Server", []kb{{"[  ]", "range: 1h to 30d"}, {"↑↓", "pick an app"}, {"enter", "open it"}, {"u", "update the agent"}, {"W", "security in the web"}}}}
+		return []keyGroup{{"Server", []kb{{"[  ]", "range: 1h to 30d"}, {"↑↓", "pick an app"}, {"enter", "open it"}, {"u", "update the daemon"}, {"W", "security in the web"}}}}
 	case vActivity:
 		return []keyGroup{{"Activity", []kb{{"↑↓", "move; older ones load"}, {"enter", "open its app or server"}}}}
 	case vWeb:

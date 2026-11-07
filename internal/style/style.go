@@ -58,7 +58,7 @@ const (
 	StatusLive
 	StatusRunning
 	StatusFailed
-	// StatusWaiting is a server whose agent never connected: hollow, in the
+	// StatusWaiting is a server whose daemon never connected: hollow, in the
 	// running color.
 	StatusWaiting
 	// StatusDone is a deploy that succeeded but is no longer live.
@@ -151,11 +151,11 @@ func Deploy(deploy client.Deploy, liveNumber int) string {
 	return Badge(StatusOf(deploy.Status), deploy.Status)
 }
 
-// steps are how the agent's own deploy log lines start (logf in
-// internal/agent/apps.go); every other line is tool output.
+// steps are how the daemon's own deploy log lines start (logf in
+// internal/daemon/apps.go); every other line is tool output.
 var steps = []string{"downloading the source", "pulling ", "detected ", "building", "starting", "rolling back to ", "database ", "health check ", "deploy failed: "}
 
-// LogLine sorts a deploy log line. Steps are what the agent says ("building",
+// LogLine sorts a deploy log line. Steps are what the daemon says ("building",
 // "health check …"); everything else is tool output such as docker build
 // lines. text is the line without the indent docker adds.
 func LogLine(line string) (text string, step bool) {
@@ -181,7 +181,7 @@ func Noise(text string) string {
 	return Dim.Render(text)
 }
 
-// Step renders a step of the agent: the arrow muted, the text plain, a
+// Step renders a step of the daemon: the arrow muted, the text plain, a
 // failure in the failed color.
 func Step(text string) string {
 	if strings.HasPrefix(text, "deploy failed") {

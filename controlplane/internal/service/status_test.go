@@ -77,7 +77,7 @@ func TestStatusIssues(t *testing.T) {
 		IssueCheckFailed:  "/apps/shop/data?db=data-app.db",
 		IssueDomainDown:   "/apps/shop/uptime",
 		IssueDiskFull:     "/servers/" + server.ID + "/metrics",
-		IssueAgentBehind:  "/servers",
+		IssueDaemonBehind: "/servers",
 	} {
 		issue, ok := kinds[kind]
 		if !ok {

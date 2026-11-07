@@ -29,10 +29,10 @@ func fixture(w, h int) model {
 	m.loaded, m.live, m.wsLive = true, true, true
 	m.ws = workspace{slug: "acme", name: "acme", email: "ada@example.com", user: "Ada Lovelace", version: "v1.0.0"}
 	m.servers = []client.Server{
-		{ID: "s1", Name: "web-1", Online: true, OS: "linux", Arch: "arm64", Hostname: "web-1", AgentVersion: "v1.0.0", LastSeenAt: ago2(time.Second),
+		{ID: "s1", Name: "web-1", Online: true, OS: "linux", Arch: "arm64", Hostname: "web-1", DaemonVersion: "v1.0.0", LastSeenAt: ago2(time.Second),
 			Security: &protocol.ServerConfigResult{Proxy: "traefik", Firewall: true, OpenPorts: []string{"80", "443"}}},
-		{ID: "s2", Name: "edge-02", Online: true, OS: "linux", Arch: "amd64", AgentVersion: "v0.9.8", LastSeenAt: ago2(time.Second)},
-		{ID: "s3", Name: "lab", Online: false, OS: "linux", Arch: "amd64", AgentVersion: "v1.0.0", LastSeenAt: ago2(3 * time.Hour)},
+		{ID: "s2", Name: "edge-02", Online: true, OS: "linux", Arch: "amd64", DaemonVersion: "v0.9.8", LastSeenAt: ago2(time.Second)},
+		{ID: "s3", Name: "lab", Online: false, OS: "linux", Arch: "amd64", DaemonVersion: "v1.0.0", LastSeenAt: ago2(3 * time.Hour)},
 	}
 	m.apps = []client.App{
 		{Name: "shop", ServerName: "web-1", LatestNumber: 43, LatestStatus: "succeeded", LiveNumber: 43, Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Repo: "acme/shop", Branch: "main"},
@@ -42,14 +42,14 @@ func fixture(w, h int) model {
 		{Name: "notes", ServerName: "lab", LatestNumber: 0},
 	}
 	m.status = &client.Status{
-		Issues:  []client.StatusIssue{{Kind: "deploy.failed", Target: "api", Detail: "v7 failed its health check"}, {Kind: "agent.behind", Target: "edge-02", Detail: "agent v0.9.8, v1.0.0 is ready"}},
+		Issues:  []client.StatusIssue{{Kind: "deploy.failed", Target: "api", Detail: "v7 failed its health check"}, {Kind: "daemon.behind", Target: "edge-02", Detail: "daemon v0.9.8, v1.0.0 is ready"}},
 		Updates: []client.StatusUpdate{{App: "plausible", Name: "Plausible", Version: "2.1", Latest: "2.2"}},
 		Counts:  client.StatusCounts{Apps: 5, AppsLive: 3, Servers: 3, ServersOnline: 2, Databases: 4, BackupsChecked: 4},
 	}
 	m.events = []client.Event{
 		{Actor: "ada@example.com", Summary: "deployed shop v43", Via: "cli", App: "shop", CreatedAt: now.Add(-2 * time.Minute)},
 		{Actor: "grace@example.com", Summary: "set 2 env vars of blog", Via: "web", App: "blog", CreatedAt: now.Add(-40 * time.Minute)},
-		{Actor: "ada@example.com", Summary: "updated the agent on web-1", Via: "tui", Server: "web-1", CreatedAt: now.Add(-3 * time.Hour)},
+		{Actor: "ada@example.com", Summary: "updated the daemon on web-1", Via: "tui", Server: "web-1", CreatedAt: now.Add(-3 * time.Hour)},
 	}
 	m.usage["web-1"] = &client.ServerMetricsNow{CPU: 12, MemoryUsed: 3 << 30, MemoryTotal: 8 << 30}
 	m.cpu["web-1"] = []float64{5, 8, 12, 30, 22, 9, 12}

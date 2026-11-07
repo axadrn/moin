@@ -208,7 +208,7 @@ toasts.
   turns red and takes the focus, what was typed stays, and the line under
   it says why in one short sentence (`kit.Field`). A field in one row with
   its button has that line too.
-- **If it failed and no field is to blame** (agent offline, not allowed):
+- **If it failed and no field is to blame** (daemon offline, not allowed):
   a red line in the page under the row, form or head that sent it, until
   the next try. Never floating over other content. The page stays as it
   was.
@@ -274,7 +274,7 @@ Every status shows as a colored dot or symbol plus a word, everywhere:
 | --- | --- | --- |
 | live | ● | online, live, the live deploy |
 | running | ◐ (animated where possible) | running, deploying |
-| waiting | ○ in the running color | a server whose agent never connected |
+| waiting | ○ in the running color | a server whose daemon never connected |
 | done | ✓ muted | a deploy that succeeded but is no longer live |
 | failed | ✗ | failed, offline |
 | idle | ○ | new, unknown |

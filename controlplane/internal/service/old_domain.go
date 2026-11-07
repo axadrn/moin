@@ -56,7 +56,7 @@ func (s *OldDomainService) Hosts() []string {
 	return s.hosts
 }
 
-// Count counts one request of kind (web, api, agent, download, webhook)
+// Count counts one request of kind (web, api, daemon, download, webhook)
 // on host.
 func (s *OldDomainService) Count(host, kind string) {
 	if s == nil {

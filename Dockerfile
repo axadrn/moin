@@ -34,7 +34,7 @@ RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 # Generate Go files from .templ files.
 RUN go tool templ generate
 
-# The moin binary that install.sh, cli.sh, CI and agent updates download
+# The moin binary that install.sh, cli.sh, CI and daemon updates download
 # from /download, built from the same commit as the control plane, with
 # SHA256SUMS for checking a download by hand. It is the same in both boxes,
 # so it comes before anything of the target and is built once.
@@ -49,7 +49,7 @@ RUN mkdir -p downloads && \
     (cd downloads && sha256sum moin-* > SHA256SUMS)
 
 # The server, a static binary for the CPU of the box being built. It knows
-# its version, the one agents update to.
+# its version, the one daemons update to.
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -ldflags "-X github.com/axadrn/moin/internal/build.Version=$VERSION" \

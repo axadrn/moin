@@ -11,7 +11,7 @@ moin deploy             # ✓ moin. your app is live
 moin                    # the live terminal UI
 ```
 
-The agent on your server only dials out. Nothing listens for moin.
+The daemon on your server only dials out. Nothing listens for moin.
 
 ## Documentation
 

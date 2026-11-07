@@ -73,7 +73,7 @@ API: PATCH /api/v1/apps/{app}/databases/rows
 MCP: execute_sql
 ```
 
-The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. It names a row by `rowid` on SQLite, or by `key`, every column of the primary key, such as `{"id": "42"}`. Agents see `execute_sql` as destructive, so they ask first.
+The API adds a row with `POST` and deletes one with `DELETE` on the same path, and runs SQL that changes data through `/databases/query`. It names a row by `rowid` on SQLite, or by `key`, every column of the primary key, such as `{"id": "42"}`. AI agents see `execute_sql` as destructive, so they ask first.
 
 ## The schema belongs to your code
 

@@ -128,18 +128,18 @@ func RemoveConfig() error {
 	return err
 }
 
-// Server is a server with an agent, as the API answers it.
+// Server is a server with a daemon, as the API answers it.
 type Server struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	Online       bool       `json:"online"`
-	Hostname     string     `json:"hostname"`
-	OS           string     `json:"os"`
-	Arch         string     `json:"arch"`
-	AgentVersion string     `json:"agent_version"`
-	LastSeenAt   *time.Time `json:"last_seen_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	Online        bool       `json:"online"`
+	Hostname      string     `json:"hostname"`
+	OS            string     `json:"os"`
+	Arch          string     `json:"arch"`
+	DaemonVersion string     `json:"daemon_version"`
+	LastSeenAt    *time.Time `json:"last_seen_at"`
 	// Tunnel, SSHTailscale and Firewall say how the server is reached and
-	// locked down; Security is what its agent set up.
+	// locked down; Security is what its daemon set up.
 	Tunnel       bool                         `json:"tunnel"`
 	SSHTailscale bool                         `json:"ssh_tailscale"`
 	Firewall     bool                         `json:"firewall"`
@@ -183,7 +183,7 @@ func (s Server) Access() string {
 	return strings.Join(parts, ", ")
 }
 
-// NewServer is a server that waits for its agent.
+// NewServer is a server that waits for its daemon.
 type NewServer struct {
 	Server         Server    `json:"server"`
 	InstallToken   string    `json:"install_token"`
@@ -251,7 +251,7 @@ func (c *Client) Servers(ctx context.Context) ([]Server, error) {
 	return response.Items, err
 }
 
-// AddServer creates a server and the install token for its agent.
+// AddServer creates a server and the install token for its daemon.
 func (c *Client) AddServer(ctx context.Context, name string) (NewServer, error) {
 	var response NewServer
 	err := c.do(ctx, http.MethodPost, "/api/v1/servers", map[string]string{"name": name}, &response)
@@ -273,10 +273,10 @@ func (c *Client) RenameServer(ctx context.Context, idOrName, name string) (Serve
 	return response, err
 }
 
-// UpdateAgent has the agent of a server download the control plane's moin
-// binary, swap it in and restart. It returns the server once the new agent
+// UpdateDaemon has the daemon of a server download the control plane's moin
+// binary, swap it in and restart. It returns the server once the new daemon
 // is back.
-func (c *Client) UpdateAgent(ctx context.Context, idOrName string) (Server, error) {
+func (c *Client) UpdateDaemon(ctx context.Context, idOrName string) (Server, error) {
 	var response Server
 	err := c.do(ctx, http.MethodPost, "/api/v1/servers/"+url.PathEscape(idOrName)+"/update", map[string]any{}, &response)
 	return response, err
@@ -297,21 +297,21 @@ func (c *Client) Meta(ctx context.Context) (Meta, error) {
 	return response, err
 }
 
-// Outdated reports whether the server's agent runs another version than
+// Outdated reports whether the server's daemon runs another version than
 // the control plane. Development builds never count.
 func (s Server) Outdated(version string) bool {
-	return version != "" && version != "dev" && s.AgentVersion != "" && s.AgentVersion != version
+	return version != "" && version != "dev" && s.DaemonVersion != "" && s.DaemonVersion != version
 }
 
 // RemovedServer is a server just removed: the command that removes its
-// agent on the machine, empty when no agent ever connected there, and the
+// daemon on the machine, empty when no daemon ever connected there, and the
 // apps that went with it because it was offline.
 type RemovedServer struct {
 	UninstallCommand string
 	Apps             []string
 }
 
-// RemoveServer deletes a server by ID or name. Its agent is disconnected
+// RemoveServer deletes a server by ID or name. Its daemon is disconnected
 // and stays installed. An offline server goes with its apps. confirm is the
 // server's name, typed out; the control plane checks it.
 func (c *Client) RemoveServer(ctx context.Context, idOrName, confirm string) (RemovedServer, error) {
@@ -524,7 +524,7 @@ func (c *Client) rejected() string {
 	return "The control plane rejected your token: it is wrong, expired or revoked. Run `" + build.Name + " login` for a new one"
 }
 
-// Status is "online", "offline" or "waiting" for a server whose agent never connected.
+// Status is "online", "offline" or "waiting" for a server whose daemon never connected.
 func (s Server) Status() string {
 	switch {
 	case s.Online:
@@ -535,7 +535,7 @@ func (s Server) Status() string {
 	return "offline"
 }
 
-// System is "linux/amd64", or a dash before the agent registered.
+// System is "linux/amd64", or a dash before the daemon registered.
 func (s Server) System() string {
 	if s.OS == "" {
 		return "-"

@@ -84,14 +84,14 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET /api/v1/servers` | read | servers, with their `security` (what the agent set up) and `rules` from `/etc/moin/rules` |
+| `GET /api/v1/servers` | read | servers, with their `security` (what the daemon set up) and `rules` from `/etc/moin/rules` |
 | `GET /api/v1/servers/events` | read | the server list as server-sent events |
-| `POST /api/v1/servers` | write | adds a server and answers its install command once; its token connects one agent within an hour. An empty name gets a generated one |
+| `POST /api/v1/servers` | write | adds a server and answers its install command once; its token connects one daemon within an hour. An empty name gets a generated one |
 | `POST /api/v1/servers/{id}/install` | write | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | write | renames a server: `{"name": "…"}` |
-| `DELETE /api/v1/servers/{id}?confirm=<name>` | write | removes a server; answers the `uninstall_command` that removes its agent (empty when no agent ever connected) and the `apps` that went with an offline server |
-| `POST /api/v1/servers/{id}/update` | write | updates the agent to the control plane's version |
-| `GET` · `PUT /api/v1/agent-updates` | read · write | whether agents update by themselves, `{"auto": true}`; on by default |
+| `DELETE /api/v1/servers/{id}?confirm=<name>` | write | removes a server; answers the `uninstall_command` that removes its daemon (empty when no daemon ever connected) and the `apps` that went with an offline server |
+| `POST /api/v1/servers/{id}/update` | write | updates the daemon to the control plane's version |
+| `GET` · `PUT /api/v1/daemon-updates` | read · write | whether daemons update by themselves, `{"auto": true}`; on by default |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | read | CPU, memory, disk, network and load now and over `1h`, `24h`, `7d` or `30d`, and its apps now, the most memory first |
 | `PUT /api/v1/servers/{id}/security` | write | Cloudflare Tunnel, SSH on Tailscale, firewall ([Security](/docs/guides/security)) |
 | `GET` · `PUT /api/v1/integrations` | read · write | the Cloudflare API token and the Tailscale auth key; an empty key removes it |

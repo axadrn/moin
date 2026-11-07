@@ -169,7 +169,7 @@ func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 		t.Fatal("enter on redeploy blog asks before it redeploys")
 	}
 	m = press(fixture(120, 40), "s", "enter", "space")
-	if hs := m.hits(); len(hs) < 2 || hs[0].Item.title != "update the agent on web-1" || hs[0].Item.key != "u" {
+	if hs := m.hits(); len(hs) < 2 || hs[0].Item.title != "update the daemon on web-1" || hs[0].Item.key != "u" {
 		t.Fatalf("on a server its actions come first, got %v", titles(hs))
 	}
 }

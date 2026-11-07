@@ -208,12 +208,12 @@ func TestUpdateStartAndSettle(t *testing.T) {
 	}
 }
 
-// TestAgentBehind: an agent built from a commit, not a release, updates to
+// TestDaemonBehind: a daemon built from a commit, not a release, updates to
 // the release; a development control plane updates nobody.
-func TestAgentBehind(t *testing.T) {
+func TestDaemonBehind(t *testing.T) {
 	for _, test := range []struct {
-		release, agent string
-		behind         bool
+		release, daemon string
+		behind          bool
 	}{
 		{"v1.0.0-beta.6", "v1.0.0-beta.5", true},
 		{"v1.0.0-beta.6", "v1.0.0-beta.6", false},
@@ -224,8 +224,8 @@ func TestAgentBehind(t *testing.T) {
 		{"dev", "b4be272", false},
 		{"b4be272", "v1.0.0", false},
 	} {
-		if got := AgentBehind(test.release, test.agent); got != test.behind {
-			t.Errorf("AgentBehind(%q, %q) = %v, want %v", test.release, test.agent, got, test.behind)
+		if got := DaemonBehind(test.release, test.daemon); got != test.behind {
+			t.Errorf("DaemonBehind(%q, %q) = %v, want %v", test.release, test.daemon, got, test.behind)
 		}
 	}
 }

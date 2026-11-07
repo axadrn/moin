@@ -546,7 +546,7 @@ func (m model) metricsTab(u ui, w, h int) string {
 	}
 	iw := inner(w)
 	if mt.Now == nil {
-		msg := "No numbers yet: the agent sends them every 15 seconds while the app runs."
+		msg := "No numbers yet: the daemon sends them every 15 seconds while the app runs."
 		if !mt.ServerOnline {
 			msg = mt.Server + " is offline."
 		}
@@ -673,7 +673,7 @@ func (m model) outView(u ui, w, h int) string {
 	return strings.Join(out, "\n")
 }
 
-// outLine colours a line of a deploy log: the agent's steps plain, tool
+// outLine colours a line of a deploy log: the daemon's steps plain, tool
 // output dim, errors red.
 func (m model) outLine(u ui, l string) string {
 	if m.cur.v == vExec {

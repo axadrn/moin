@@ -14,7 +14,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | What needs you, what runs | ✓ | ✓ `status` | ✓ overview | ✓ | ✓ |
 | Servers, live | ✓ | ✓ `servers` | ✓ | ✓ | ✓ |
 | Server metrics, 1h to 30d | ✓ | ✓ `metrics --server` | ✓ | ✓ | ✓ |
-| Update an agent | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
+| Update a daemon | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
 | Pin an app | ✓ | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
 | Deploy this directory | Your files are on your computer, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An AI agent has no directory to upload: use the CLI. |
@@ -53,11 +53,11 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | --- | --- | --- | --- | --- | --- |
 | Add a server, install command | ✓ | ✓ `servers add` | Opens the web. | ✓ | ✓ |
 | Rename, remove a server | ✓ | ✓ | Opens the web. | ✓ | ✓ |
-| Tunnel, SSH on Tailscale, firewall | ✓ | ✓ `servers secure` | Shows what the agent set up; `W` changes it in the web. | ✓ | ✓ |
+| Tunnel, SSH on Tailscale, firewall | ✓ | ✓ `servers secure` | Shows what the daemon set up; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
 | Cloudflare token, Tailscale key | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
-| Agent auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
-| Uninstall the agent | Runs on the server. | ✓ `agent uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
+| Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
+| Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |

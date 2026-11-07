@@ -51,19 +51,19 @@ func (c *Client) UpdateControlPlane(ctx context.Context) (Version, error) {
 	return response, err
 }
 
-type agentUpdates struct {
+type daemonUpdates struct {
 	Auto bool `json:"auto"`
 }
 
-// AgentUpdates reports whether the agents of the workspace update to the
+// DaemonUpdates reports whether the daemons of the workspace update to the
 // control plane's version by themselves.
-func (c *Client) AgentUpdates(ctx context.Context) (bool, error) {
-	var response agentUpdates
-	err := c.do(ctx, http.MethodGet, "/api/v1/agent-updates", nil, &response)
+func (c *Client) DaemonUpdates(ctx context.Context) (bool, error) {
+	var response daemonUpdates
+	err := c.do(ctx, http.MethodGet, "/api/v1/daemon-updates", nil, &response)
 	return response.Auto, err
 }
 
-// SetAgentUpdates turns automatic agent updates on or off.
-func (c *Client) SetAgentUpdates(ctx context.Context, on bool) error {
-	return c.do(ctx, http.MethodPut, "/api/v1/agent-updates", agentUpdates{Auto: on}, nil)
+// SetDaemonUpdates turns automatic daemon updates on or off.
+func (c *Client) SetDaemonUpdates(ctx context.Context, on bool) error {
+	return c.do(ctx, http.MethodPut, "/api/v1/daemon-updates", daemonUpdates{Auto: on}, nil)
 }

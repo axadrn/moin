@@ -19,7 +19,7 @@ func TestSEOHandlerDisallowsRobotsWhenNoIndexIsEnabled(t *testing.T) {
 	handler := NewSEOHandler(nil, "https://example.com/", t.TempDir(), true, false)
 	recorder := httptest.NewRecorder()
 	handler.Robots(recorder, httptest.NewRequest("GET", "/robots.txt", nil))
-	if recorder.Body.String() != "User-agent: *\nDisallow: /\n" {
+	if recorder.Body.String() != "User-daemon: *\nDisallow: /\n" {
 		t.Fatalf("robots response = %q", recorder.Body.String())
 	}
 }

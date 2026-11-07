@@ -96,7 +96,7 @@ API: GET /api/v1/apps/{app}/deploys/{number}/events
 MCP: get_deploy
 ```
 
-The web follows every new deploy by itself, also one started from the CLI. An agent calls `get_deploy` again until the deploy is done.
+The web follows every new deploy by itself, also one started from the CLI. An AI agent calls `get_deploy` again until the deploy is done.
 
 ## See past deploys
 
@@ -196,7 +196,7 @@ API: DELETE /api/v1/apps/{app}
 MCP: remove_app
 ```
 
-You type the app's name to confirm, and the control plane checks it: a script passes it as `--confirm <app>`, the API as `?confirm=<app>`, an agent as `confirm`.
+You type the app's name to confirm, and the control plane checks it: a script passes it as `--confirm <app>`, the API as `?confirm=<app>`, an AI agent as `confirm`.
 
 ## Push to deploy with GitHub Actions
 

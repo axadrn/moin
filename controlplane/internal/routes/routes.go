@@ -49,7 +49,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
-	agentRoutes(mux, app, clientIPs)
+	daemonRoutes(mux, app, clientIPs)
 	apiRoutes(mux, app, clientIPs, rateLimiter, authEmailRateLimiter, deviceLimiter, emailChanges, invitationLimiter)
 	mcpRoutes(mux, app, invitationLimiter)
 	mux.HandleFunc("/api/", middleware.APINotFound)
@@ -256,8 +256,8 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/list", workspace(servers.List))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers", workspace(servers.Create))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/servers/{id}", workspace(servers.Delete))
-	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/update", workspace(servers.UpdateAgent))
-	mux.HandleFunc("POST /app/{workspaceSlug}/servers/agent-updates", workspace(servers.AgentUpdates))
+	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/update", workspace(servers.UpdateDaemon))
+	mux.HandleFunc("POST /app/{workspaceSlug}/servers/daemon-updates", workspace(servers.DaemonUpdates))
 	updates := handler.NewUpdateHandler(app.UpdateService)
 	mux.HandleFunc("GET /app/{workspaceSlug}/update", workspace(updates.Notice))
 	mux.HandleFunc("POST /app/{workspaceSlug}/update", workspace(updates.Start))
@@ -359,18 +359,18 @@ func adminRoutes(mux *http.ServeMux, app *app.App) {
 	mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
 }
 
-// agentRoutes are what servers and CI call: the install scripts and
-// binaries, the agent's register and session, deploy hooks and the
+// daemonRoutes are what servers and CI call: the install scripts and
+// binaries, the daemon's register and session, deploy hooks and the
 // webhooks of GitHub and telemetry.
-func agentRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver) {
-	agent := handler.NewAgentHandler(app.ServerService, app.Cfg.AppURL, clientIPs, app.OldDomainService.Hosts())
-	mux.HandleFunc("GET /install.sh", agent.InstallScript)
-	mux.HandleFunc("GET /cli.sh", agent.CLIScript)
+func daemonRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver) {
+	daemon := handler.NewDaemonHandler(app.ServerService, app.Cfg.AppURL, clientIPs, app.OldDomainService.Hosts())
+	mux.HandleFunc("GET /install.sh", daemon.InstallScript)
+	mux.HandleFunc("GET /cli.sh", daemon.CLIScript)
 	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
-	// Agents get their own budget: many servers behind one NAT must not lock
+	// Daemons get their own budget: many servers behind one NAT must not lock
 	// out sign-ins, and install tokens are too long to guess.
 	registerLimiter := middleware.RateLimit(clientIPs, 30, time.Minute)
-	mux.HandleFunc("POST "+protocol.RegisterPath, registerLimiter(agent.Register))
+	mux.HandleFunc("POST "+protocol.RegisterPath, registerLimiter(daemon.Register))
 	// CI calls deploy hooks; the token is the credential, the limit stops guessing.
 	hooks := handler.NewHooksHandler(app.AppService)
 	// The hosted control plane counts what self-hosted ones report.
@@ -379,7 +379,9 @@ func agentRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIP
 	}
 	mux.HandleFunc("POST /webhooks/deploy/{token}", registerLimiter(hooks.Deploy))
 	mux.HandleFunc("POST /webhooks/github", hooks.GitHubWebhook)
-	mux.HandleFunc("GET "+protocol.SessionPath, agent.Session)
+	mux.HandleFunc("GET "+protocol.SessionPath, daemon.Session)
+	// Daemons from before protocol 3 dial the old path until they update.
+	mux.HandleFunc("GET "+protocol.LegacySessionPath, daemon.Session)
 }
 
 // apiRoutes are the JSON API: every route comes from api.Routes.

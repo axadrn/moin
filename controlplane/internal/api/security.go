@@ -55,7 +55,7 @@ func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetSecurity sets how a server is reached and locked down, and answers
-// the server with what its agent set up.
+// the server with what its daemon set up.
 func (h *AppsHandler) SetSecurity(w http.ResponseWriter, r *http.Request) {
 	var request SecurityRequest
 	if !Decode(w, r, &request) {

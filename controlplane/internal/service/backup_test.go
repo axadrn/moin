@@ -13,7 +13,7 @@ import (
 // TestPublicBucketsOnly: the hosted control plane refuses a bucket on its
 // own network, also behind a name; a self-hosted one may use it.
 func TestPublicBucketsOnly(t *testing.T) {
-	// other has no servers, so saving does not wait for an agent.
+	// other has no servers, so saving does not wait for a daemon.
 	apps, _, _, _ := newAppService(t)
 	var calls atomic.Int32
 	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

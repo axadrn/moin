@@ -21,7 +21,7 @@ func registerExecTools(server *mcpsdk.Server, services Services) {
 }
 
 // execOutputLimit is how much of a command's output exec_command returns:
-// enough to read, small enough for an agent's context.
+// enough to read, small enough for a daemon's context.
 const execOutputLimit = 64 * 1024
 
 // ExecInput is the input of exec_command.
@@ -29,7 +29,7 @@ type ExecInput struct {
 	App     string `json:"app" jsonschema:"the app name or ID"`
 	Command string `json:"command" jsonschema:"the command, like rails db:migrate; split into words like a shell quotes them, with no variables, globs or pipes: wrap those in sh -c '...'"`
 	Service string `json:"service,omitempty" jsonschema:"the compose service to run it in, default the app's main service"`
-	Timeout int    `json:"timeout,omitempty" jsonschema:"seconds before the agent stops waiting, default 600, at most 3600"`
+	Timeout int    `json:"timeout,omitempty" jsonschema:"seconds before the daemon stops waiting, default 600, at most 3600"`
 }
 
 // ExecOutput is the output of exec_command.

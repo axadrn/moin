@@ -10,7 +10,7 @@ import (
 
 // TestBootstrap: the first run makes the account, one workspace and the
 // server with an install token; a second run makes nothing twice and gives
-// a new token; once the agent registered, it gives none. The sign-in link
+// a new token; once the daemon registered, it gives none. The sign-in link
 // signs in once.
 func TestBootstrap(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
@@ -44,7 +44,7 @@ func TestBootstrap(t *testing.T) {
 	}
 	third, err := Bootstrap(environment.auth, environment.workspaceService, servers, "admin@example.com", "web-1")
 	if err != nil || third != "" {
-		t.Errorf("after the agent registered: token %q, err %v", third, err)
+		t.Errorf("after the daemon registered: token %q, err %v", third, err)
 	}
 
 	link, err := environment.auth.SignInLink("admin@example.com")

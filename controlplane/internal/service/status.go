@@ -19,10 +19,10 @@ const (
 	IssueCheckFailed  = "check.failed"
 	IssueDomainDown   = "domain.down"
 	IssueDiskFull     = "disk.full"
-	IssueAgentBehind  = "agent.behind"
+	IssueDaemonBehind = "daemon.behind"
 )
 
-var issueOrder = map[string]int{IssueServerDown: 0, IssueDeployFailed: 1, IssueBackupFailed: 2, IssueCheckFailed: 3, IssueDomainDown: 4, IssueDiskFull: 5, IssueAgentBehind: 6}
+var issueOrder = map[string]int{IssueServerDown: 0, IssueDeployFailed: 1, IssueBackupFailed: 2, IssueCheckFailed: 3, IssueDomainDown: 4, IssueDiskFull: 5, IssueDaemonBehind: 6}
 
 // StatusIssue is one thing that needs you: what kind, on what, in words,
 // and where to fix it, as a path under the workspace.
@@ -94,8 +94,8 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 		if full, err := s.servers.servers.DiskFull(server.ID); err == nil && full {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDiskFull, Target: server.Name, Detail: "disk over 90% full", Path: "/servers/" + server.ID + "/metrics"})
 		}
-		if server.Online && server.Rules == "" && AgentBehind(s.release, server.AgentVersion) {
-			status.Issues = append(status.Issues, StatusIssue{Kind: IssueAgentBehind, Target: server.Name, Detail: "agent " + server.AgentVersion + ", update pending", Path: "/servers"})
+		if server.Online && server.Rules == "" && DaemonBehind(s.release, server.DaemonVersion) {
+			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDaemonBehind, Target: server.Name, Detail: "daemon " + server.DaemonVersion + ", update pending", Path: "/servers"})
 		}
 	}
 	status.Apps = len(apps)

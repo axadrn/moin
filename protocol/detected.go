@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Detected is what the agent learned about an app from its repo and its
+// Detected is what the daemon learned about an app from its repo and its
 // running containers. Config holds the x-moin block of compose.yml, if any.
 type Detected struct {
 	// Kind is "compose", "dockerfile", "go" or "railpack": what the repo
@@ -42,10 +42,10 @@ func (d Detected) Built() string {
 	return d.Kind
 }
 
-// Database is a database of an app: a SQLite file the agent found on one
+// Database is a database of an app: a SQLite file the daemon found on one
 // of the app's mounts, or, with Kind "postgres", a compose service that runs
 // Postgres. Path names a SQLite file in the container; for Postgres it is
-// postgres-<service>, and HostPath is empty. Older agents send no Kind.
+// postgres-<service>, and HostPath is empty. Older daemons send no Kind.
 // Name is a database of a Postgres service besides the one POSTGRES_DB
 // names, which backups copy too; its Path is postgres-<service>/<name>.
 type Database struct {
@@ -67,7 +67,7 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 func PostgresKey(service string) string { return "postgres-" + service }
 
 // OldConfigKey is the block of compose.yml under the name the product had
-// before. The agent refuses it with a message to rename it to x-moin.
+// before. The daemon refuses it with a message to rename it to x-moin.
 const OldConfigKey = "x-ops"
 
 // Config is the x-moin block of compose.yml. Every field is optional.

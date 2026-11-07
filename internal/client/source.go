@@ -97,7 +97,7 @@ func sourceFiles(dir string) ([]string, error) {
 }
 
 // LocalConfig is what `moin deploy` reads from the repo before it uploads:
-// the app and server names of the x-moin block. The agent reads the whole
+// the app and server names of the x-moin block. The daemon reads the whole
 // block on the server.
 type LocalConfig struct {
 	App    string

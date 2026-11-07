@@ -87,18 +87,18 @@ func TestBackupProblem(t *testing.T) {
 	}
 }
 
-// backupAgent answers the agent's backup list with one database.
-func backupAgent(t *testing.T, apps *AppService, servers *ServerService, server *model.Server, agent *fakeAgent, backup protocol.DatabaseBackup) {
+// backupDaemon answers the daemon's backup list with one database.
+func backupDaemon(t *testing.T, apps *AppService, servers *ServerService, server *model.Server, daemon *fakeDaemon, backup protocol.DatabaseBackup) {
 	t.Helper()
-	go agentAnswers(servers, server.ID, agent, protocol.TypeBackupList, protocol.TypeBackupsResult, protocol.Backups{App: "shop", Databases: []protocol.DatabaseBackup{backup}})
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupList, protocol.TypeBackupsResult, protocol.Backups{App: "shop", Databases: []protocol.DatabaseBackup{backup}})
 }
 
 // TestRestoreToMoments: a restore resolves the moment, by ID or label, to
 // a copy, an undo or a minute; a time goes to that minute inside Every
 // change, else to the newest copy at or before it; a moment that is not
-// there is refused before the agent gets anything.
+// there is refused before the daemon gets anything.
 func TestRestoreToMoments(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -114,23 +114,23 @@ func TestRestoreToMoments(t *testing.T) {
 
 	restore := func(target RestoreTarget) (protocol.BackupRestore, string, error) {
 		t.Helper()
-		agent.mu.Lock()
-		agent.sent = nil
-		agent.mu.Unlock()
-		backupAgent(t, apps, servers, server, agent, backup)
+		daemon.mu.Lock()
+		daemon.sent = nil
+		daemon.mu.Unlock()
+		backupDaemon(t, apps, servers, server, daemon, backup)
 		var sent protocol.BackupRestore
 		target.Confirm = "shop"
 		started, err := apps.StartRestore(ctx, owner, "shop", target)
 		if err != nil {
 			return sent, "", err
 		}
-		for deadline := time.Now().Add(5 * time.Second); agent.count(protocol.TypeBackupRestore) == 0; time.Sleep(time.Millisecond) {
+		for deadline := time.Now().Add(5 * time.Second); daemon.count(protocol.TypeBackupRestore) == 0; time.Sleep(time.Millisecond) {
 			if time.Now().After(deadline) {
-				t.Fatal("the agent got no restore")
+				t.Fatal("the daemon got no restore")
 			}
 		}
-		agent.last(t, protocol.TypeBackupRestore, &sent)
-		agentAnswers(servers, server.ID, agent, protocol.TypeBackupRestore, protocol.TypeOK, nil)
+		daemon.last(t, protocol.TypeBackupRestore, &sent)
+		daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupRestore, protocol.TypeOK, nil)
 		waitRestore(t, apps, started.ID, RestoreDone)
 		return sent, started.To, nil
 	}
@@ -141,8 +141,8 @@ func TestRestoreToMoments(t *testing.T) {
 			t.Fatalf("confirm %q: %v", typed, err)
 		}
 	}
-	if agent.count(protocol.TypeBackupRestore) != 0 || agent.count(protocol.TypeBackupList) != 0 {
-		t.Fatal("a restore without the name reached the agent")
+	if daemon.count(protocol.TypeBackupRestore) != 0 || daemon.count(protocol.TypeBackupList) != 0 {
+		t.Fatal("a restore without the name reached the daemon")
 	}
 	sent, to, err := restore(RestoreTarget{Moment: "before v7"})
 	if err != nil || sent.Copy != before.Format(protocol.CopyIDLayout) || sent.At != nil || sent.Database != "/data/app.db" || to != "Before v7" {
@@ -174,8 +174,8 @@ func TestRestoreToMoments(t *testing.T) {
 	if _, _, err := restore(RestoreTarget{Moment: "before v99"}); !errors.Is(err, ErrMoment) {
 		t.Fatalf("a moment that is not there: %v", err)
 	}
-	if agent.count(protocol.TypeBackupRestore) != 0 {
-		t.Error("a refused restore reached the agent")
+	if daemon.count(protocol.TypeBackupRestore) != 0 {
+		t.Error("a refused restore reached the daemon")
 	}
 	if _, _, err := restore(RestoreTarget{Database: "/data/other.db", Moment: "1h"}); !errors.Is(err, ErrNoDatabase) {
 		t.Fatalf("another database: %v", err)
@@ -200,10 +200,10 @@ func waitRestore(t *testing.T, apps *AppService, id, state string) *Restore {
 }
 
 // TestRestoreRunsOnItsOwn: a restore answers at once and runs until the
-// agent is done, longer than any request lasts; a second one waits for
+// daemon is done, longer than any request lasts; a second one waits for
 // it, a failure says why, and another workspace never sees it.
 func TestRestoreRunsOnItsOwn(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	since := now.Add(-3 * time.Hour)
 	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now}
 	ctx := context.Background()
-	backupAgent(t, apps, servers, server, agent, backup)
+	backupDaemon(t, apps, servers, server, daemon, backup)
 	restore, err := apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"})
 	if err != nil || restore.State != RestoreRunning || restore.To != "1 hour ago" || restore.Database != "/data/app.db" {
 		t.Fatalf("start: %+v %v", restore, err)
@@ -225,29 +225,29 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	if _, err := apps.RestoreOf(other.WorkspaceID, "shop", restore.ID); err == nil {
 		t.Fatal("another workspace sees the restore")
 	}
-	agentAnswers(servers, server.ID, agent, protocol.TypeBackupRestore, protocol.TypeError, protocol.Error{Message: "swap the data: disk full"})
+	daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupRestore, protocol.TypeError, protocol.Error{Message: "swap the data: disk full"})
 	failed := waitRestore(t, apps, restore.ID, RestoreFailed)
 	if failed.Error != "swap the data: disk full" || failed.FinishedAt == nil {
 		t.Fatalf("failed: %+v", failed)
 	}
 
-	// The agent goes offline in the middle: the restore is unknown, not
-	// failed, and blocks another restore of the app until the agent says
+	// The daemon goes offline in the middle: the restore is unknown, not
+	// failed, and blocks another restore of the app until the daemon says
 	// how it ended.
-	agent.mu.Lock()
-	agent.sent = nil
-	agent.mu.Unlock()
-	backupAgent(t, apps, servers, server, agent, backup)
+	daemon.mu.Lock()
+	daemon.sent = nil
+	daemon.mu.Unlock()
+	backupDaemon(t, apps, servers, server, daemon, backup)
 	restore, err = apps.StartRestore(ctx, owner, "shop", RestoreTarget{Confirm: "shop", Moment: "1h"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for deadline := time.Now().Add(5 * time.Second); agent.count(protocol.TypeBackupRestore) == 0; time.Sleep(time.Millisecond) {
+	for deadline := time.Now().Add(5 * time.Second); daemon.count(protocol.TypeBackupRestore) == 0; time.Sleep(time.Millisecond) {
 		if time.Now().After(deadline) {
-			t.Fatal("the agent got no restore")
+			t.Fatal("the daemon got no restore")
 		}
 	}
-	// The agent that is back answers every list with what it knows of the
+	// The daemon that is back answers every list with what it knows of the
 	// restores.
 	// It does not answer until the control plane restarted.
 	var says sync.Mutex
@@ -274,7 +274,7 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	}
 
 	// The control plane restarts: the restore is still there, and the
-	// agent that is back says it still runs, then that it is done.
+	// daemon that is back says it still runs, then that it is done.
 	restarted := NewAppService(apps.apps, servers, apps.box)
 	if kept, err := restarted.RestoreOf(owner.WorkspaceID, "shop", restore.ID); err != nil || kept.State != RestoreUnknown {
 		t.Fatalf("after a restart: %+v %v", kept, err)
@@ -284,7 +284,7 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	says.Unlock()
 	restarted.reconcileRestores(server.ID)
 	if still, _ := restarted.RestoreOf(owner.WorkspaceID, "shop", restore.ID); still.State != RestoreRunning {
-		t.Fatalf("the agent says it runs: %+v", still)
+		t.Fatalf("the daemon says it runs: %+v", still)
 	}
 	// The word that it ended is lost: the minute loop asks a running
 	// one again too, until it ended.
@@ -297,12 +297,12 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 		t.Fatalf("done: %+v", done)
 	}
 	// A late word changes nothing once it ended.
-	agentSays(t, servers, server.ID, protocol.TypeBackupStatus, protocol.Backups{App: "shop", Restores: []protocol.RestoreState{{ID: restore.ID, State: protocol.RestoreFailed, Error: "late"}}})
+	daemonSays(t, servers, server.ID, protocol.TypeBackupStatus, protocol.Backups{App: "shop", Restores: []protocol.RestoreState{{ID: restore.ID, State: protocol.RestoreFailed, Error: "late"}}})
 	if done, _ := restarted.RestoreOf(owner.WorkspaceID, "shop", restore.ID); done.State != RestoreDone {
 		t.Fatalf("a late word: %+v", done)
 	}
 
-	// The agent writes a restore down the moment it arrives: one it knows
+	// The daemon writes a restore down the moment it arrives: one it knows
 	// nothing of never reached it. The minute loop asks, not only a
 	// connect.
 	unknown := func(id string) {
@@ -317,30 +317,30 @@ func TestRestoreRunsOnItsOwn(t *testing.T) {
 	says.Unlock()
 	restarted.askUnknownRestores()
 	if gone, _ := restarted.RestoreOf(owner.WorkspaceID, "shop", "lost"); gone.State != RestoreFailed || !strings.Contains(gone.Error, "never reached the server") {
-		t.Fatalf("a restore the agent knows nothing of: %+v", gone)
+		t.Fatalf("a restore the daemon knows nothing of: %+v", gone)
 	}
-	// An agent that reports no restores at all cannot say how one ended:
+	// A daemon that reports no restores at all cannot say how one ended:
 	// never "it never started".
-	unknown("old-agent")
+	unknown("old-daemon")
 	says.Lock()
 	knows = protocol.Backups{App: "shop"}
 	says.Unlock()
 	restarted.askUnknownRestores()
-	if gone, _ := restarted.RestoreOf(owner.WorkspaceID, "shop", "old-agent"); gone.State != RestoreFailed || !strings.HasPrefix(gone.Error, RestoreNoWord) || !strings.Contains(gone.Error, "Check the app") {
-		t.Fatalf("a restore of an agent that does not report restores: %+v", gone)
+	if gone, _ := restarted.RestoreOf(owner.WorkspaceID, "shop", "old-daemon"); gone.State != RestoreFailed || !strings.HasPrefix(gone.Error, RestoreNoWord) || !strings.Contains(gone.Error, "Check the app") {
+		t.Fatalf("a restore of a daemon that does not report restores: %+v", gone)
 	}
 }
 
 // TestOneRestoreAtATime: two restores of one app asked at the same moment
 // never both start.
 func TestOneRestoreAtATime(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
 	since := now.Add(-3 * time.Hour)
-	backupAgent(t, apps, servers, server, agent, protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now})
+	backupDaemon(t, apps, servers, server, daemon, protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now})
 	results := make(chan error, 2)
 	for range 2 {
 		go func() {
@@ -394,7 +394,7 @@ func TestUndoLabelsCarryTheDay(t *testing.T) {
 // TestRememberedMoments: a write through moin and a deploy over an older
 // release leave the moment before them, by the server's clock.
 func TestRememberedMoments(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -405,9 +405,9 @@ func TestRememberedMoments(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The first deploy runs over nothing: no moment.
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}}}})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}}}})
 	written := time.Now().UTC().Add(-time.Minute)
-	go agentAnswers(servers, server.ID, agent, protocol.TypeDBQuery, protocol.TypeDBQueryResult, protocol.DBResult{Database: "/data/app.db", Changes: 1, Before: &written})
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeDBQuery, protocol.TypeDBQueryResult, protocol.DBResult{Database: "/data/app.db", Changes: 1, Before: &written})
 	if _, err := apps.Query(ctx, owner, "blog", "", "UPDATE orders SET paid = 1", nil, true, 0); err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -422,16 +422,16 @@ func TestRememberedMoments(t *testing.T) {
 	}
 	apps.markUpdate(deploy.ID, "3.4.1")
 	started := time.Now().UTC().Add(-10 * time.Second)
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Before: &started})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Before: &started})
 	moments, _ = apps.apps.BackupMoments(app.ID, time.Now().Add(-time.Hour))
 	if len(moments) != 2 || moments[0].Kind != model.MomentUpdate || moments[0].Detail != fmt.Sprint(deploy.Number)+" 3.4.1" {
 		t.Fatalf("after an update: %+v", moments)
 	}
 }
 
-// TestOldAgentGetsAnUpdateAnswer: an agent from before backups as one
+// TestOldDaemonGetsAnUpdateAnswer: a daemon from before backups as one
 // history gets no backup request, and people read what to do.
-func TestOldAgentGetsAnUpdateAnswer(t *testing.T) {
+func TestOldDaemonGetsAnUpdateAnswer(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
 		t.Fatal(err)
@@ -446,14 +446,14 @@ func TestOldAgentGetsAnUpdateAnswer(t *testing.T) {
 		return nil
 	})
 	_, _, err := apps.Backups(context.Background(), owner.WorkspaceID, "shop")
-	if !errors.Is(err, ErrAgentOutdated) || !strings.Contains(err.Error(), "update it") {
-		t.Fatalf("backups from an old agent: %v", err)
+	if !errors.Is(err, ErrDaemonOutdated) || !strings.Contains(err.Error(), "update it") {
+		t.Fatalf("backups from an old daemon: %v", err)
 	}
-	if BackupProblem(err.Error()) != "The agent on the server is too old: update it." {
+	if BackupProblem(err.Error()) != "The daemon on the server is too old: update it." {
 		t.Errorf("problem %q", BackupProblem(err.Error()))
 	}
 	if sent != 0 {
-		t.Errorf("an old agent got %d backup requests", sent)
+		t.Errorf("an old daemon got %d backup requests", sent)
 	}
 }
 
@@ -461,7 +461,7 @@ func TestOldAgentGetsAnUpdateAnswer(t *testing.T) {
 // one named, in the app's own bucket; it expires, and an app without a
 // copy says so.
 func TestDownloads(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -470,10 +470,10 @@ func TestDownloads(t *testing.T) {
 	newest, older := time.Date(2026, 11, 7, 14, 2, 0, 0, time.UTC), time.Date(2026, 11, 7, 13, 2, 0, 0, time.UTC)
 	backup := protocol.DatabaseBackup{Database: "/data/app.db", Copies: []protocol.Copy{{ID: "20261107T140200Z", At: newest, Size: 42}, {ID: "20261107T130200Z", At: older, Size: 40}}}
 	answer := func(backup protocol.DatabaseBackup) {
-		agent.mu.Lock()
-		agent.sent = nil
-		agent.mu.Unlock()
-		backupAgent(t, apps, servers, server, agent, backup)
+		daemon.mu.Lock()
+		daemon.sent = nil
+		daemon.mu.Unlock()
+		backupDaemon(t, apps, servers, server, daemon, backup)
 	}
 	answer(backup)
 	download, err := apps.Download(ctx, owner, "shop", "", "")
@@ -498,7 +498,7 @@ func TestDownloads(t *testing.T) {
 }
 
 // TestBackupSchedule: the schedule takes only the choices, goes into the
-// activity with before and after, and reaches the agent.
+// activity with before and after, and reaches the daemon.
 func TestBackupSchedule(t *testing.T) {
 	apps, _, _, _ := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
@@ -523,6 +523,6 @@ func TestBackupSchedule(t *testing.T) {
 	}
 	config := apps.backupConfig(owner.WorkspaceID, app.ServerID)
 	if got := config.Schedules["shop"]; got != (protocol.Schedule{Every: 15, Keep: 30}) {
-		t.Fatalf("to the agent: %+v", got)
+		t.Fatalf("to the daemon: %+v", got)
 	}
 }

@@ -161,9 +161,9 @@ func New(cfg *config.Config) (*App, error) {
 		alertService.AllowOnlyPublicTargets()
 	}
 	serverService.SendAlerts(alertService)
-	// Agents older than the control plane update to its version by
+	// Daemons older than the control plane update to its version by
 	// themselves, unless their workspace turned it off.
-	serverService.UpdateAgentsTo(build.Version)
+	serverService.UpdateDaemonsTo(build.Version)
 	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAppClientID, cfg.GitHubAppClientSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
 	if err != nil {
 		return nil, err

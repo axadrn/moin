@@ -192,27 +192,27 @@ func TestEmailAlertsSwitch(t *testing.T) {
 	}
 }
 
-// The agent updates switch answers itself as stored and records the change.
-func TestAgentUpdatesSwitch(t *testing.T) {
+// The daemon updates switch answers itself as stored and records the change.
+func TestDaemonUpdatesSwitch(t *testing.T) {
 	s := newSwitches(t)
 	handler := NewServersHandler(s.servers, s.users)
-	path := "/app/" + s.ada.Workspace.Slug + "/servers/agent-updates"
+	path := "/app/" + s.ada.Workspace.Slug + "/servers/daemon-updates"
 	for _, on := range []bool{false, true} {
 		form := url.Values{}
 		if on {
 			form.Set("on", "1")
 		}
-		body := s.post("/app/{workspaceSlug}/servers/agent-updates", path, form, handler.AgentUpdates)
-		stored, err := s.servers.AutoUpdateAgents(s.ada.Workspace.ID)
+		body := s.post("/app/{workspaceSlug}/servers/daemon-updates", path, form, handler.DaemonUpdates)
+		stored, err := s.servers.AutoUpdateDaemons(s.ada.Workspace.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if switchOn(t, body, "agent-updates") != on || stored != on {
+		if switchOn(t, body, "daemon-updates") != on || stored != on {
 			t.Fatalf("on %v: stored %v, answer %s", on, stored, body)
 		}
 	}
-	if got := activity(t, s, "workspace.agent_updates"); got != 2 {
-		t.Fatalf("workspace.agent_updates recorded %d times, want 2", got)
+	if got := activity(t, s, "workspace.daemon_updates"); got != 2 {
+		t.Fatalf("workspace.daemon_updates recorded %d times, want 2", got)
 	}
 }
 

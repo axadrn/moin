@@ -25,8 +25,8 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 | App | one app in seven tabs: deploys, logs, backups, env, domains, uptime, metrics |
 | Deploy | the log of one deploy, live while it runs |
 | Run | one command in a container of the app and what it writes |
-| Servers | every server: status, system, agent, apps, access, last seen |
-| Server | CPU, memory and disk over a range, what its agent set up, its rules and its apps |
+| Servers | every server: status, system, daemon, apps, access, last seen |
+| Server | CPU, memory and disk over a range, what its daemon set up, its rules and its apps |
 | Activity | who did what in your workspace, newest first |
 | Web app | the setup pages, to open in the browser |
 
@@ -117,7 +117,7 @@ The terminal UI is moin in your terminal: run `moin` in a repo for the daily wor
 | Run | `enter` | runs the line; a first word `@service` picks the service |
 | Run | `↑` `↓` · `G` | scrolls back; follows the end again |
 | Servers | `enter` | opens the server |
-| Servers, server | `u` | updates the agent to the control plane's version, after `y` |
+| Servers, server | `u` | updates the daemon to the control plane's version, after `y` |
 | Server | `[` `]` | the range: 1h, 24h, 7d, 30d |
 | Server | `enter` | opens the picked app |
 | Server | `W` | its security page in the web app |

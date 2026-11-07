@@ -226,7 +226,7 @@ func (s *AppService) AddBucket(ctx context.Context, actor Actor, input BucketInp
 	if err != nil {
 		return nil, err
 	}
-	s.configureAgents(actor.WorkspaceID)
+	s.configureDaemons(actor.WorkspaceID)
 	s.servers.record(actor, "bucket.added", "bucket", bucket.Name, map[string]string{"bucket": bucket.Bucket, "endpoint": bucket.Endpoint, "path": bucket.Path})
 	if bucket.IsDefault && !first {
 		s.servers.record(actor, "bucket.default", "bucket", bucket.Name, nil)
@@ -278,7 +278,7 @@ func (s *AppService) EditBucket(ctx context.Context, actor Actor, name string, i
 	if err != nil {
 		return nil, err
 	}
-	s.configureAgents(actor.WorkspaceID)
+	s.configureDaemons(actor.WorkspaceID)
 	if moved || bucket.Name != stored.Name {
 		details := map[string]string{"bucket": bucket.Bucket, "endpoint": bucket.Endpoint, "path": bucket.Path}
 		if bucket.Name != stored.Name {
@@ -324,7 +324,7 @@ func (s *AppService) RemoveBucket(actor Actor, name, confirm string) error {
 	if err != nil {
 		return err
 	}
-	s.configureAgents(actor.WorkspaceID)
+	s.configureDaemons(actor.WorkspaceID)
 	s.servers.record(actor, "bucket.removed", "bucket", bucket.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return nil
@@ -362,7 +362,7 @@ func (s *AppService) SetAppBucket(actor Actor, idOrName, name string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	s.configureAgents(actor.WorkspaceID)
+	s.configureDaemons(actor.WorkspaceID)
 	s.servers.record(actor, "app.bucket_set", "app", app.Name, map[string]string{"bucket": name})
 	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
@@ -414,7 +414,7 @@ func (s *AppService) checkBucket(ctx context.Context, actor Actor, bucket protoc
 	return nil
 }
 
-// openBucket is a bucket as the agent needs it, with its secret key.
+// openBucket is a bucket as the daemon needs it, with its secret key.
 func (s *AppService) openBucket(bucket *model.Bucket) (*protocol.Bucket, error) {
 	secretKey, err := s.box.Open(bucket.SecretKey, bucket.WorkspaceID+"/backups")
 	if err != nil {

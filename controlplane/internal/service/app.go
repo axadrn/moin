@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// deployTimeout ends a deploy the agent never reported on.
+	// deployTimeout ends a deploy the daemon never reported on.
 	deployTimeout     = 30 * time.Minute
 	maxDeployLogLines = 5000
 	maxEnvVars        = 200
@@ -66,7 +66,7 @@ var (
 )
 
 // AppService manages apps, their deploys and their env. Deploys run on the
-// agent; their log lines live in memory until the deploy ends.
+// daemon; their log lines live in memory until the deploy ends.
 type AppService struct {
 	apps       *repository.Apps
 	servers    *ServerService
@@ -77,7 +77,7 @@ type AppService struct {
 	// publicBucketsOnly refuses buckets on private or local addresses.
 	publicBucketsOnly bool
 	// proxyOnFirstConnect sends a server its config the first time its
-	// agent connects, which starts the proxy; see ProxyOnFirstConnect.
+	// daemon connects, which starts the proxy; see ProxyOnFirstConnect.
 	proxyOnFirstConnect bool
 	uptime              *uptimeChecker
 	metrics             *metricsStore
@@ -87,7 +87,7 @@ type AppService struct {
 	subscribers map[string]map[chan struct{}]struct{}
 	// updates is the catalog version each running update deploy brings.
 	updates map[string]string
-	// waiting are the restores this control plane waits for the agent's
+	// waiting are the restores this control plane waits for the daemon's
 	// answer to; restoreMu keeps reserving and ending restores apart.
 	waiting   map[string]bool
 	restoreMu sync.Mutex
@@ -113,11 +113,11 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 		metrics:     newMetricsStore(),
 		subscribers: map[string]map[chan struct{}]struct{}{},
 	}
-	servers.OnAgentMessage(service.receive)
-	servers.OnAgentConnect(func(serverID, workspaceID string) {
+	servers.OnDaemonMessage(service.receive)
+	servers.OnDaemonConnect(func(serverID, workspaceID string) {
 		_, err := apps.DefaultBucket(workspaceID)
 		if err == nil {
-			service.configureAgent(serverID, workspaceID)
+			service.configureDaemon(serverID, workspaceID)
 		}
 		service.configureServerOnConnect(serverID, workspaceID)
 		service.reconcileRestores(serverID)
@@ -171,7 +171,7 @@ func (s *AppService) Delete(ctx context.Context, actor Actor, idOrName, confirm 
 	if err != nil {
 		return err
 	}
-	if server.AgentTokenHash != nil {
+	if server.DaemonTokenHash != nil {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
 		err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppRemove, protocol.AppRemove{App: app.Name}, nil)
@@ -303,7 +303,7 @@ func (s *AppService) Registries(workspaceID string) ([]RegistryLogin, error) {
 	return logins, nil
 }
 
-// SetRegistry stores a login agents use to pull the user's images from host.
+// SetRegistry stores a login daemons use to pull the user's images from host.
 func (s *AppService) SetRegistry(actor Actor, host, username, password string) error {
 	host = strings.ToLower(strings.TrimSpace(host))
 	if !registryHostPattern.MatchString(host) {
@@ -598,7 +598,7 @@ type DomainCheck struct {
 	Service string
 }
 
-// liveDetected is what the agent found in the live deploy, nil before the
+// liveDetected is what the daemon found in the live deploy, nil before the
 // first deploy.
 func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 	if app.LiveNumber == 0 {
@@ -638,7 +638,7 @@ func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
 	return set
 }
 
-// ServerAddresses are the IPv4 and IPv6 of a server: the address its agent
+// ServerAddresses are the IPv4 and IPv6 of a server: the address its daemon
 // connects from and the ones it reports.
 func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
 	for _, text := range append([]string{server.Address}, strings.Fields(server.Addresses)...) {
@@ -647,7 +647,7 @@ func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
 			continue
 		}
 		address = address.Unmap()
-		// An agent on the control plane's own machine or network connects
+		// A daemon on the control plane's own machine or network connects
 		// from a loopback or private address, which no domain can point at.
 		if !address.IsGlobalUnicast() || address.IsPrivate() {
 			continue
@@ -691,7 +691,7 @@ func resolvesTo(found []string, ipv4, ipv6 string) bool {
 }
 
 // CheckDomains looks up every domain of an app and compares it with the
-// address its agent connects from.
+// address its daemon connects from.
 func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName string) ([]DomainCheck, error) {
 	return s.domainChecks(ctx, workspaceID, idOrName, func(string) bool { return true })
 }
@@ -858,7 +858,7 @@ func (s *AppService) ready(workspaceID, idOrName string) (*model.App, error) {
 	return app, nil
 }
 
-// start stores the deploy, sends it to the agent and records action in the
+// start stores the deploy, sends it to the daemon and records action in the
 // activity; an empty action records nothing.
 func (s *AppService) start(actor Actor, action string, app *model.App, deploy *model.Deploy, start protocol.DeployStart) (*model.Deploy, error) {
 	env, err := s.Env(app.WorkspaceID, app.ID)
@@ -917,7 +917,7 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	return deploy, nil
 }
 
-// expire fails a running deploy the agent stopped reporting on, and reports
+// expire fails a running deploy the daemon stopped reporting on, and reports
 // whether the deploy is over.
 func (s *AppService) expire(deploy *model.Deploy) bool {
 	if deploy.Status != model.DeployRunning {
@@ -926,12 +926,12 @@ func (s *AppService) expire(deploy *model.Deploy) bool {
 	if s.now().Sub(deploy.CreatedAt) < deployTimeout {
 		return false
 	}
-	s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: "the agent stopped reporting on this deploy"})
+	s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: "the daemon stopped reporting on this deploy"})
 	deploy.Status = model.DeployFailed
 	return true
 }
 
-// receive takes the deploy messages of an agent. A server can only report on
+// receive takes the deploy messages of a daemon. A server can only report on
 // deploys of its own apps.
 func (s *AppService) receive(serverID string, message protocol.Message) {
 	switch message.Type {
@@ -973,7 +973,7 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 		}
 		app, err := s.apps.ByID(deploy.AppID)
 		if err != nil || app.ServerID != serverID {
-			slog.Warn("agent reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
+			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
 		s.rememberDeploy(done.DeployID, done)
@@ -1130,7 +1130,7 @@ func (s *AppService) DeployByNumber(workspaceID, idOrName string, number int) (*
 	return deploy, nil
 }
 
-// Logs asks the agent for the last lines of the app's containers.
+// Logs asks the daemon for the last lines of the app's containers.
 func (s *AppService) Logs(ctx context.Context, workspaceID, idOrName string, tail int) ([]string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
@@ -1266,7 +1266,7 @@ func (s *AppService) notify(workspaceID string) {
 	}
 }
 
-// Detected decodes what the agent reported for a deploy.
+// Detected decodes what the daemon reported for a deploy.
 func Detected(deploy model.Deploy) *protocol.Detected {
 	if deploy.Detected == "" {
 		return nil

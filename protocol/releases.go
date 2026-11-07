@@ -6,8 +6,8 @@ import (
 )
 
 // KeepReleases is how many releases that brought something new, a source
-// build or an image, an agent keeps per app. Releases without a build, like
-// restarts, domain changes and rollbacks, are small: the agent keeps them as
+// build or an image, a daemon keeps per app. Releases without a build, like
+// restarts, domain changes and rollbacks, are small: the daemon keeps them as
 // long as they are newer than the oldest build it keeps. It always keeps the
 // current release. The control plane offers rollbacks by the same rule.
 const KeepReleases = 5
@@ -19,7 +19,7 @@ type Release struct {
 	Build  bool
 }
 
-// KeptReleases returns the numbers of the releases an agent keeps of
+// KeptReleases returns the numbers of the releases a daemon keeps of
 // releases, which may come in any order, with current the running one.
 func KeptReleases(releases []Release, current int) map[int]bool {
 	sorted := slices.Clone(releases)

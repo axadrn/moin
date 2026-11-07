@@ -16,10 +16,10 @@ CI         builds the image and
    │
    │ calls the deploy hook
    ▼
-moin       tells the agent
+moin       tells the daemon
    │
    ▼
-agent      pulls the image from
+daemon     pulls the image from
    │       the registry
    ▼
 live ✓     started and checked
@@ -39,7 +39,7 @@ API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
 
-The CLI reads the token from stdin. It is stored encrypted, and the agent gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
+The CLI reads the token from stdin. It is stored encrypted, and the daemon gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
 
 ## 2. Create a deploy hook
 

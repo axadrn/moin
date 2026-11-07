@@ -5,15 +5,15 @@ group: "Start"
 order: 4
 ---
 
-moin has two halves: the control plane is the place you sign in to, and the agent is the little helper on each of your servers that does the work. Your code and your backups never live with the control plane.
+moin has two halves: the control plane is the place you sign in to, and the daemon is the little helper on each of your servers that does the work. Your code and your backups never live with the control plane.
 
 ## The pieces
 
 | Piece | What it is |
 | --- | --- |
-| **control plane** | The place you sign in to: the moin web app and API. It remembers your servers, apps and settings, and tells the agents what to do. We host it, or you [host it yourself](/docs/self-hosting). |
-| **agent** | The little helper on each server. It calls the control plane and keeps the line open; nothing on your server waits for calls. |
-| **`moin`** | The one program on your computer: `moin` opens the terminal UI, `moin <command>` is the CLI, `moin agent` is the agent. |
+| **control plane** | The place you sign in to: the moin web app and API. It remembers your servers, apps and settings, and tells the daemons what to do. We host it, or you [host it yourself](/docs/self-hosting). |
+| **daemon** | The little helper on each server. It calls the control plane and keeps the line open; nothing on your server waits for calls. |
+| **`moin`** | The one program on your computer: `moin` opens the terminal UI, `moin <command>` is the CLI, `moin daemon` is the daemon. |
 
 The web, the CLI, the terminal UI, the [API](/docs/reference/api) and AI agents through [MCP](/docs/guides/mcp) do the same work. Your account and the roles of your team change only on the web. [Where things work](/docs/reference/surfaces) lists what each one does.
 
@@ -36,8 +36,8 @@ The five that matter most are in [moin in five words](/docs/moin-in-five-words).
 | **control plane** | the place you sign in to; every server reports to it |
 | **workspace** | your own space: your apps, servers, bucket and team live in it. You get one when you sign up; on hosted moin you pay per workspace |
 | **team** | the people in a workspace. Members deploy and fix things, admins also invite people, the owner also pays. [Team](/docs/guides/team#roles) |
-| **server** | your computer on the internet: a Linux machine you rent, for example at Hetzner, with the agent on it |
-| **agent** | the little helper on a server. It only calls out to the control plane; it never lets anyone in |
+| **server** | your computer on the internet: a Linux machine you rent, for example at Hetzner, with the daemon on it |
+| **daemon** | the little helper on a server. It only calls out to the control plane; it never lets anyone in |
 | **app** | the thing you made, such as your shop. It lives on one server |
 | **service** | one part of an app, such as its website or its database: one container of its `compose.yml` |
 | **deploy** | a new version of your app, put live: v1, v2, v3. Also the verb |
@@ -77,7 +77,7 @@ Keep your database in a mounted folder. If your app keeps it somewhere other tha
 
 Builds run on **your** server.
 
-- `moin deploy` packs the files git knows, including uncommitted changes and new files that are not ignored; outside a git repo, everything but `.git`. The archive goes straight into your bucket. The agent downloads it, deletes it from the bucket, and builds it.
+- `moin deploy` packs the files git knows, including uncommitted changes and new files that are not ignored; outside a git repo, everything but `.git`. The archive goes straight into your bucket. The daemon downloads it, deletes it from the bucket, and builds it.
 - A deploy from [GitHub](/docs/guides/github) goes from GitHub straight to your server, with a short-lived token the control plane gets for it. No bucket needed.
 - A deploy from [CI](/docs/guides/ci) builds the image elsewhere; the server only pulls it.
 - Backups go from your server straight to your bucket.
@@ -93,7 +93,7 @@ How `moin deploy` carries your code from your computer:
 2 bucket    keeps it for a moment
      │
      ▼
-3 server    the agent downloads it,
+3 server    the daemon downloads it,
             checks it, deletes it
             from the bucket, builds it
 
@@ -110,7 +110,7 @@ code never passes through moin.
 | a Go module | also writes the Dockerfile: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
 | none of these | builds it with [Railpack](https://railpack.com), the open source builder Railway made |
 
-Railpack finds the language and its version from `package.json`, `requirements.txt`, `pyproject.toml`, `Gemfile`, `composer.json` and the like, and the start command from the `start` script, a `Procfile` or `main.py`. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets that never land in the image or a log. The agent downloads Railpack once, checked against its published checksum, and builds with Docker's own BuildKit.
+Railpack finds the language and its version from `package.json`, `requirements.txt`, `pyproject.toml`, `Gemfile`, `composer.json` and the like, and the start command from the `start` script, a `Procfile` or `main.py`. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets that never land in the image or a log. The daemon downloads Railpack once, checked against its published checksum, and builds with Docker's own BuildKit.
 
 ### What a deploy does
 
@@ -135,11 +135,11 @@ The [data browser](/docs/guides/data) reads the live database on the server; not
 - A read opens the database read-only; on Postgres it runs in a `READ ONLY` transaction and as one statement. A statement that would change data fails, so a typo cannot delete rows. Every change runs in one transaction.
 - moin changes data, never the schema. Tables, columns and indexes change through migrations in your repo, which your app runs when it starts, so the database and the code stay the same. moin names the migration tool and its newest version when it finds a `goose_db_version`, `schema_migrations`, `_prisma_migrations` or `__drizzle_migrations` table.
 - WAL mode (`PRAGMA journal_mode=WAL`) lets your app and moin read and write SQLite at the same time.
-- The agent runs as root; after a change it gives the database files back to their owner.
+- The daemon runs as root; after a change it gives the database files back to their owner.
 
 ### How a command runs
 
-[Run a command](/docs/guides/exec) uses the connection the agent already has: no SSH and no key on your laptop. The agent runs `docker compose exec` in the live deploy, without a shell and without a terminal, and streams what it prints back.
+[Run a command](/docs/guides/exec) uses the connection the daemon already has: no SSH and no key on your laptop. The daemon runs `docker compose exec` in the live deploy, without a shell and without a terminal, and streams what it prints back.
 
 ### The catalog
 

@@ -18,13 +18,13 @@ func (m model) serversView(u ui, w, h int) string {
 	system, wide := iw >= 80, iw >= 108
 	aw := 8
 	for _, s := range m.servers {
-		aw = max(aw, min(wid(s.AgentVersion)+3, 18))
+		aw = max(aw, min(wid(s.DaemonVersion)+3, 18))
 	}
 	cols := []cell{u.head("server", 14, false), u.head("status", 11, false)}
 	if system {
 		cols = append(cols, u.head("system", 13, false))
 	}
-	cols = append(cols, u.head("agent", aw, false), u.head("apps", 4, true))
+	cols = append(cols, u.head("daemon", aw, false), u.head("apps", 4, true))
 	if wide {
 		cols = append(cols, u.head("", 1, false), u.head("access", 24, false))
 	}
@@ -37,15 +37,15 @@ func (m model) serversView(u ui, w, h int) string {
 	for i := start; i < len(m.servers) && i < start+listN; i++ {
 		s := m.servers[i]
 		word := s.Status()
-		agent := u.muted(s.AgentVersion)
+		daemon := u.muted(s.DaemonVersion)
 		if s.Outdated(m.ws.version) {
-			agent = u.warn(s.AgentVersion + " ↑")
+			daemon = u.warn(s.DaemonVersion + " ↑")
 		}
 		cells := []cell{{u.strong(s.Name), 14, false}, {u.chip(word, word), 11, false}}
 		if system {
 			cells = append(cells, cell{u.muted(s.System()), 13, false})
 		}
-		cells = append(cells, cell{agent, aw, false}, cell{u.text(fmt.Sprint(m.appCount(s.Name))), 4, true})
+		cells = append(cells, cell{daemon, aw, false}, cell{u.text(fmt.Sprint(m.appCount(s.Name))), 4, true})
 		if wide {
 			cells = append(cells, cell{"", 1, false}, cell{u.muted(s.Access()), 24, false})
 		}
@@ -59,7 +59,7 @@ func (m model) serversView(u ui, w, h int) string {
 		}
 	}
 	listH := len(body) + chrome
-	list := u.panel("Servers", u.faint(fmt.Sprintf("%d of %d online · agents dial out, nothing listens", online, len(m.servers))), body, w, listH, true)
+	list := u.panel("Servers", u.faint(fmt.Sprintf("%d of %d online · daemons dial out, nothing listens", online, len(m.servers))), body, w, listH, true)
 	if h-listH-1 < chrome+2 {
 		return list
 	}
@@ -77,7 +77,7 @@ func (m model) appCount(server string) int {
 	return n
 }
 
-// serverApps is the panel of the apps on a server, with the agent's state
+// serverApps is the panel of the apps on a server, with the daemon's state
 // at the end.
 func (m model) serverApps(u ui, s client.Server, w, h int, cursor bool) string {
 	iw := inner(w)
@@ -98,9 +98,9 @@ func (m model) serverApps(u ui, s client.Server, w, h int, cursor bool) string {
 	body = append(body, "")
 	switch {
 	case s.Outdated(m.ws.version):
-		body = append(body, u.warn("agent "+m.ws.version+" is ready")+u.faint("  ·  ")+u.keys(kb{"u", "update now"}))
-	case s.AgentVersion != "":
-		body = append(body, u.faint("agent "+s.AgentVersion+" is current"))
+		body = append(body, u.warn("daemon "+m.ws.version+" is ready")+u.faint("  ·  ")+u.keys(kb{"u", "update now"}))
+	case s.DaemonVersion != "":
+		body = append(body, u.faint("daemon "+s.DaemonVersion+" is current"))
 	}
 	return u.panel("Apps on "+s.Name, u.faint(s.Access()), body, w, h, cursor)
 }
@@ -172,7 +172,7 @@ func (m model) serverMetrics(u ui, s client.Server, w, h int) string {
 		return u.panel("Metrics", rl, loading(u), w, h, false)
 	}
 	if mt.Now == nil {
-		msg := "No numbers yet: the agent sends them every 15 seconds."
+		msg := "No numbers yet: the daemon sends them every 15 seconds."
 		if !s.Online {
 			msg = s.Name + " is offline."
 		}

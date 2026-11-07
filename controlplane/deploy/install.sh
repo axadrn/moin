@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs moin on one server: the control plane, and next to it the agent
+# Installs moin on one server: the control plane, and next to it the daemon
 # that runs your apps. Run it as root on a fresh Ubuntu or Debian server:
 #
 #   curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
@@ -86,17 +86,17 @@ until curl -fsS http://127.0.0.1:8090/healthz >/dev/null 2>&1; do
 	sleep 2
 done
 
-# The admin's account, a workspace and this server; then the agent, which
+# The admin's account, a workspace and this server; then the daemon, which
 # reaches the control plane on this machine and starts the proxy.
 token=$(docker compose -f compose.yml exec -T controlplane ./main bootstrap "$(hostname)")
 if [ -n "$token" ]; then
 	curl -fsSL http://127.0.0.1:8090/install.sh | MOIN_URL=http://127.0.0.1:8090 sh -s -- "$token"
 fi
-echo "Waiting for the agent's proxy…"
+echo "Waiting for the daemon's proxy…"
 i=0
 until docker network inspect moin-proxy >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' moin-traefik 2>/dev/null)" = true ]; do
 	i=$((i + 1))
-	[ "$i" -lt 60 ] || { echo "The proxy did not start: journalctl -u moin-agent" >&2; exit 1; }
+	[ "$i" -lt 60 ] || { echo "The proxy did not start: journalctl -u moin-daemon" >&2; exit 1; }
 	sleep 2
 done
 

@@ -118,7 +118,7 @@ func printUptime(w io.Writer, answer client.Uptime, now time.Time) {
 	table(w, []string{"DOMAIN", "STATE", "24H", "7D", "30D", "NEWEST CHECK", "CERT", "PATH"}, rows)
 	if !answer.ServerOnline && answer.Server != "" {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server "+answer.Server+" is offline: its agent does not answer.")
+		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" The server "+answer.Server+" is offline: its daemon does not answer.")
 	}
 	if len(outages) > 0 {
 		slices.SortFunc(outages, func(a, b []string) int { return cmp.Compare(b[1], a[1]) })

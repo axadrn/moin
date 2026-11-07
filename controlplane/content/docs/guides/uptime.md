@@ -26,7 +26,7 @@ Per domain you see its state, the uptime over 24 hours, 7 and 30 days, the newes
 
 ## Down and back up
 
-A domain that goes down or comes back goes into the [activity](/docs/guides/activity) with the reason, such as `HTTP 502` or `no answer within 10s`, and how long it was down. An agent that has not answered for two minutes puts `lost web-1` there, and `has web-1 back` when it connects again. Each one sends an [alert](/docs/guides/alerts).
+A domain that goes down or comes back goes into the [activity](/docs/guides/activity) with the reason, such as `HTTP 502` or `no answer within 10s`, and how long it was down. A daemon that has not answered for two minutes puts `lost web-1` there, and `has web-1 back` when it connects again. Each one sends an [alert](/docs/guides/alerts).
 
 ## Change the path
 

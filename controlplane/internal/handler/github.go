@@ -278,7 +278,7 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.renderSecurity(w, r)
-	answerDone(w, r, "Security applied", "The agent changes "+server.Name+" now.")
+	answerDone(w, r, "Security applied", "The daemon changes "+server.Name+" now.")
 }
 
 // flipped is the switch's new value when the form flipped it, else now.

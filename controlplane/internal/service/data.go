@@ -36,7 +36,7 @@ type Rows struct {
 }
 
 // Databases returns the databases of the app's live deploy, as the
-// agent found them.
+// daemon found them.
 func (s *AppService) Databases(workspaceID, idOrName string) (*model.App, []protocol.Database, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
@@ -56,7 +56,7 @@ func (s *AppService) Databases(workspaceID, idOrName string) (*model.App, []prot
 	return app, detected.Databases, nil
 }
 
-// Tables asks the agent for the tables of one of the app's databases. An
+// Tables asks the daemon for the tables of one of the app's databases. An
 // empty database means the first one.
 func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database string) (protocol.DBTables, error) {
 	app, databases, err := s.Databases(workspaceID, idOrName)
@@ -108,7 +108,7 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	if len(databases) == 0 {
 		return protocol.DBResult{}, ErrNoDatabase
 	}
-	// A write waits for the copy the agent takes just before it.
+	// A write waits for the copy the daemon takes just before it.
 	timeout := dataTimeout
 	if write {
 		timeout = writeTimeout
@@ -136,8 +136,8 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 // readOnlyError turns the answer to a write in a read into ErrReadOnly:
 // SQLite's read-only handle, or Postgres's READ ONLY transaction.
 func readOnlyError(err error) error {
-	var agentErr *AgentError
-	if errors.As(err, &agentErr) && (strings.Contains(agentErr.Message, "readonly database") || strings.Contains(agentErr.Message, "in a read-only transaction")) {
+	var daemonErr *DaemonError
+	if errors.As(err, &daemonErr) && (strings.Contains(daemonErr.Message, "readonly database") || strings.Contains(daemonErr.Message, "in a read-only transaction")) {
 		return ErrReadOnly
 	}
 	return err

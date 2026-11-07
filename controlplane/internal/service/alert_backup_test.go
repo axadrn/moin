@@ -20,9 +20,9 @@ func actions(changes []backupChange) string {
 	return strings.Join(names, ",")
 }
 
-// TestBackupChanges: a failure alerts once, however often the agent tells
+// TestBackupChanges: a failure alerts once, however often the daemon tells
 // it, and once more when it works again; a failed restore check is its own
-// alert; a check that passed is in the activity, not an alert; an agent
+// alert; a check that passed is in the activity, not an alert; a daemon
 // that restarted and has no check yet changes nothing about the last one.
 func TestBackupChanges(t *testing.T) {
 	day1 := time.Date(2026, 11, 4, 3, 0, 0, 0, time.UTC)
@@ -47,9 +47,9 @@ func TestBackupChanges(t *testing.T) {
 		{"works again", broken, true, ok, "backup.recovered", ""},
 		{"restore check fails, backups fine", ok, true, checkBad, "check.failed", "The daily check could not restore the newest copy."},
 		{"restore check still failing", checkBad, true, checkBad, "", ""},
-		{"agent restarted, no check yet", checkBad, true, restarted, "", ""},
+		{"daemon restarted, no check yet", checkBad, true, restarted, "", ""},
 		{"restore check passes again", checkBad, true, checkGood, "check.recovered,backup.checked", ""},
-		{"old agent: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: x"}, "backup.failed,backup.checked", "The daily check could not restore the newest copy."},
+		{"old daemon: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: x"}, "backup.failed,backup.checked", "The daily check could not restore the newest copy."},
 	} {
 		changes := backupChanges(test.previous, test.known, test.now)
 		if got := actions(changes); got != test.want {
@@ -98,7 +98,7 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 	}
 	connect := func(s *ServerService) {
 		s.mu.Lock()
-		s.sessions[server.ID] = &agentSession{workspaceID: owner.WorkspaceID}
+		s.sessions[server.ID] = &daemonSession{workspaceID: owner.WorkspaceID}
 		s.mu.Unlock()
 	}
 	connect(servers)
@@ -184,7 +184,7 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	}
 }
 
-// TestStoreBackupStatusAlertsOnce: the agent telling the same broken
+// TestStoreBackupStatusAlertsOnce: the daemon telling the same broken
 // backup every minute leads to one backup.failed in the activity.
 func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	database := testutil.NewDatabase(t)

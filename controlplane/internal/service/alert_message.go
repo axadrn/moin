@@ -118,7 +118,7 @@ func (s *AlertService) serverDownMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🔴", Heading: "Server " + e.target + " is offline",
 		Lines: []string{
-			"Its agent has not answered since " + orDash(e.details["since"]) + ".",
+			"Its daemon has not answered since " + orDash(e.details["since"]) + ".",
 			s.appsOn(e.workspaceID, e.target),
 		},
 		URL:     e.base + "/servers",

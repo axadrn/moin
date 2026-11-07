@@ -17,9 +17,9 @@ import (
 
 // Version is the version the server reports to MCP clients. Raise it when the
 // tools change.
-const Version = "1.18.0"
+const Version = "1.19.0"
 
-// instructions tell the agent how the tools behave as a whole. Clients pass
+// instructions tell the AI agent how the tools behave as a whole. Clients pass
 // them to the model when they connect.
 const instructions = "Every tool acts for the user who created the personal API token in the Authorization header. " +
 	"Tools that only read need the read scope. Tools that change data need a token with read and write access; " +

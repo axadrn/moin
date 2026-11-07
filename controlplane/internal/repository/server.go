@@ -34,7 +34,7 @@ func (r *Servers) SetDiskFull(id string, full bool, at time.Time) error {
 	return err
 }
 
-// Servers stores the servers of each workspace and what their agents report.
+// Servers stores the servers of each workspace and what their daemons report.
 type Servers struct {
 	db *sqlx.DB
 }
@@ -76,8 +76,8 @@ func (r *Servers) ByInstallTokenHash(hash string) (*model.Server, error) {
 	return r.get(`SELECT * FROM servers WHERE install_token_hash = $1`, hash)
 }
 
-func (r *Servers) ByAgentTokenHash(hash string) (*model.Server, error) {
-	return r.get(`SELECT * FROM servers WHERE agent_token_hash = $1`, hash)
+func (r *Servers) ByDaemonTokenHash(hash string) (*model.Server, error) {
+	return r.get(`SELECT * FROM servers WHERE daemon_token_hash = $1`, hash)
 }
 
 // ListByWorkspaceID returns the servers of a user by name.
@@ -87,22 +87,22 @@ func (r *Servers) ListByWorkspaceID(workspaceID string) ([]model.Server, error) 
 	return servers, err
 }
 
-// Register clears the install token, so it works once, and stores the agent
-// token and what the agent said about its server.
-func (r *Servers) Register(id, agentTokenHash string, hello model.Server) error {
+// Register clears the install token, so it works once, and stores the daemon
+// token and what the daemon said about its server.
+func (r *Servers) Register(id, daemonTokenHash string, hello model.Server) error {
 	_, err := r.db.Exec(`
 		UPDATE servers
-		SET install_token_hash = NULL, install_expires_at = NULL, agent_token_hash = $1,
-			hostname = $2, os = $3, arch = $4, agent_version = $5, rules = $6
+		SET install_token_hash = NULL, install_expires_at = NULL, daemon_token_hash = $1,
+			hostname = $2, os = $3, arch = $4, daemon_version = $5, rules = $6
 		WHERE id = $7
-	`, agentTokenHash, hello.Hostname, hello.OS, hello.Arch, hello.AgentVersion, hello.Rules, id)
+	`, daemonTokenHash, hello.Hostname, hello.OS, hello.Arch, hello.DaemonVersion, hello.Rules, id)
 	return err
 }
 
 func (r *Servers) UpdateHello(id string, hello model.Server) error {
 	_, err := r.db.Exec(`
-		UPDATE servers SET hostname = $1, os = $2, arch = $3, agent_version = $4, last_seen_at = $5, address = $6, rules = $7, addresses = $8 WHERE id = $9
-	`, hello.Hostname, hello.OS, hello.Arch, hello.AgentVersion, hello.LastSeenAt, hello.Address, hello.Rules, hello.Addresses, id)
+		UPDATE servers SET hostname = $1, os = $2, arch = $3, daemon_version = $4, last_seen_at = $5, address = $6, rules = $7, addresses = $8 WHERE id = $9
+	`, hello.Hostname, hello.OS, hello.Arch, hello.DaemonVersion, hello.LastSeenAt, hello.Address, hello.Rules, hello.Addresses, id)
 	return err
 }
 
@@ -223,18 +223,18 @@ func (r *Servers) SetIntegrations(integrations model.Integrations) error {
 	return err
 }
 
-// AutoUpdateAgents reports whether the control plane updates the agents of
+// AutoUpdateDaemons reports whether the control plane updates the daemons of
 // the workspace by itself.
-func (r *Servers) AutoUpdateAgents(workspaceID string) (bool, error) {
+func (r *Servers) AutoUpdateDaemons(workspaceID string) (bool, error) {
 	var on bool
-	err := r.db.Get(&on, `SELECT auto_update_agents FROM workspaces WHERE id = $1`, workspaceID)
+	err := r.db.Get(&on, `SELECT auto_update_daemons FROM workspaces WHERE id = $1`, workspaceID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, ErrWorkspaceNotFound
 	}
 	return on, err
 }
 
-func (r *Servers) SetAutoUpdateAgents(workspaceID string, on bool) error {
-	_, err := r.db.Exec(`UPDATE workspaces SET auto_update_agents = $1 WHERE id = $2`, on, workspaceID)
+func (r *Servers) SetAutoUpdateDaemons(workspaceID string, on bool) error {
+	_, err := r.db.Exec(`UPDATE workspaces SET auto_update_daemons = $1 WHERE id = $2`, on, workspaceID)
 	return err
 }

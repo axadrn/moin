@@ -30,17 +30,17 @@ func TestUpdateOnTheHostedControlPlane(t *testing.T) {
 	}
 }
 
-func TestAgentAutoUpdate(t *testing.T) {
+func TestDaemonAutoUpdate(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/agent-updates": `{"auto":true}`,
-		"PUT /api/v1/agent-updates": `{"auto":false}`,
+		"GET /api/v1/daemon-updates": `{"auto":true}`,
+		"PUT /api/v1/daemon-updates": `{"auto":false}`,
 	}}
 	code, stdout, _ := runCLI(t, api, "servers", "auto-update")
 	if code != 0 || !strings.Contains(stdout, "by themselves: on") {
 		t.Fatalf("code %d, stdout %q", code, stdout)
 	}
 	code, _, _ = runCLI(t, api, "servers", "auto-update", "off")
-	if code != 0 || !api.seen(`PUT /api/v1/agent-updates {"auto":false}`) {
+	if code != 0 || !api.seen(`PUT /api/v1/daemon-updates {"auto":false}`) {
 		t.Fatalf("code %d, requests %v", code, api.requests)
 	}
 }

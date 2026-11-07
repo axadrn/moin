@@ -136,7 +136,7 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		}
 		view.Repo = &repo
 	case "logs":
-		// The page comes with the logs, unless the agent is slow: then the
+		// The page comes with the logs, unless the daemon is slow: then the
 		// section asks for them itself.
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		lines, err := h.apps.Logs(ctx, workspace.ID, app.Name, logLines)

@@ -13,15 +13,15 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// Every agent sends a sample of its server and apps every 15 seconds. The
+// Every daemon sends a sample of its server and apps every 15 seconds. The
 // last hour of samples stays in memory, a ring per server and app. Each
 // minute adds up into an average, and once a minute all finished minutes go
 // to SQLite in one transaction; once an hour they add up into hours. A
 // server with five apps costs six rows a minute, not a row per sample.
 const (
-	// metricsRing holds an hour of samples at the agent's pace.
+	// metricsRing holds an hour of samples at the daemon's pace.
 	metricsRing = int(time.Hour / protocol.MetricsEvery)
-	// metricsMinGap drops samples that come faster, so an agent cannot
+	// metricsMinGap drops samples that come faster, so a daemon cannot
 	// push the hour out of its ring.
 	metricsMinGap = 10 * time.Second
 	// metricsStale is how old the newest sample may be to count as now.
@@ -121,7 +121,7 @@ type AppMetrics struct {
 	Deploys      []model.MetricsDeploy
 }
 
-// metricsKey names a series the way the agent does: its server, and the
+// metricsKey names a series the way the daemon does: its server, and the
 // app's name, "" for the server itself.
 type metricsKey struct{ server, app string }
 
@@ -158,7 +158,7 @@ func newMetricsStore() *metricsStore {
 	return &metricsStore{series: map[metricsKey]*metricsSeries{}}
 }
 
-// receiveMetrics takes a sample of an agent. The control plane's clock
+// receiveMetrics takes a sample of a daemon. The control plane's clock
 // dates it, not the server's.
 func (s *AppService) receiveMetrics(serverID string, sample protocol.Metrics) {
 	if sample.Server != nil {

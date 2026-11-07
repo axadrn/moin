@@ -157,7 +157,7 @@ func badge(w io.Writer, styled, plain string) string {
 	return plain
 }
 
-// progress prints a deploy log as it streams: agent steps with →, tool
+// progress prints a deploy log as it streams: daemon steps with →, tool
 // output indented and dimmed. On a terminal a spinner with the current step
 // and the time so far stays on the last line.
 type progress struct {

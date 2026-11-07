@@ -22,7 +22,7 @@ On every surface: web, CLI, terminal UI, API and MCP.
 - **Alerts** by mail, Slack, Discord, Telegram and webhooks. [Alerts](/docs/guides/alerts)
 - **Metrics**: CPU, memory, disk and network of every server and app, up to 30 days back. [Metrics](/docs/guides/metrics)
 - **More than one bucket**, one per app if you like. [Bucket](/docs/guides/bucket#more-than-one-bucket)
-- **Updates in one click** for a self-hosted moin; agents update themselves. [Self-hosting](/docs/self-hosting#updates)
+- **Updates in one click** for a self-hosted moin; daemons update themselves. [Self-hosting](/docs/self-hosting#updates)
 - **Env vars** as fields or one `.env` text. [Env vars](/docs/guides/env)
 - **Terminal UI** for the daily work. [Terminal UI](/docs/reference/tui)
 - **Security**: Cloudflare Tunnel, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
@@ -41,4 +41,4 @@ Zero trust: even someone in full control of moin can't read your data or command
 - **Bucket keys only on your servers**: moin knows the bucket's name, never its key.
 - **Secrets encrypted end to end**: only your servers can read your env vars.
 - **Signed commands**: your server only obeys changes signed by a key on your own device.
-- **Signed agent updates**: your server checks every new agent before it runs it.
+- **Signed daemon updates**: your server checks every new daemon before it runs it.

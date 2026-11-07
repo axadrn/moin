@@ -33,7 +33,7 @@ func registerDeployTools(server *mcpsdk.Server, services Services) {
 		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes. Needs a token with read and write access.",
 		change(true, true)), Write(member(services, tools.removeDeployHook)))
 	mcpsdk.AddTool(server, newTool("list_registries", "List registry logins",
-		"Lists the registry logins agents use to pull private images, without passwords. Needs the read scope.",
+		"Lists the registry logins daemons use to pull private images, without passwords. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRegistries)))
 	mcpsdk.AddTool(server, newTool("set_registry", "Set a registry login",
 		"Stores the login for a registry host such as ghcr.io, sealed. Image deploys from that host pull with it. Needs a token with read and write access.",

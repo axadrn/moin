@@ -78,9 +78,9 @@ func ServiceError(w http.ResponseWriter, err error) {
 // the same codes. known is false for errors without a mapping; they get 500
 // internal and the caller should log them.
 func ErrorFor(err error) (int, ErrorDetail, bool) {
-	var agentErr *service.AgentError
-	if errors.As(err, &agentErr) {
-		return http.StatusFailedDependency, ErrorDetail{Code: "agent_error", Message: agentErr.Message}, true
+	var daemonErr *service.DaemonError
+	if errors.As(err, &daemonErr) {
+		return http.StatusFailedDependency, ErrorDetail{Code: "daemon_error", Message: daemonErr.Message}, true
 	}
 	var sendErr *service.AlertSendError
 	if errors.As(err, &sendErr) {
@@ -227,8 +227,8 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrServerHasApps, status: http.StatusConflict, code: "server_has_apps", message: "The server is online: remove its apps first, so nothing keeps running unseen."},
 	{err: service.ErrTrialEnded, status: http.StatusPaymentRequired, code: "trial_ended", message: TrialEndedMessage},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to moin under Billing to add servers."},
-	{err: service.ErrNoAgentBinary, status: http.StatusConflict, code: "no_agent_binary", message: "This control plane serves no agent binary for the server's system. Update the agent on the server instead."},
-	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its agent and try again."},
+	{err: service.ErrNoDaemonBinary, status: http.StatusConflict, code: "no_daemon_binary", message: "This control plane serves no daemon binary for the server's system. Update the daemon on the server instead."},
+	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its daemon and try again."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
 	{err: repository.ErrDuplicateApp, field: "name", message: "An app with this name already exists."},
 	{err: service.ErrAppName, field: "name", message: "Use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit."},
@@ -302,8 +302,8 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBackupKeep, field: "keep_days", message: "Keep each copy 1, 3, 7 or 30 days."},
 	{err: service.ErrRestoreNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such restore. moin keeps how a restore ended for a week."},
 	{err: service.ErrRestoreRunning, status: http.StatusConflict, code: "restore_running", message: "A restore of this app runs. Wait until it is done."},
-	{err: service.ErrAgentGone, status: http.StatusConflict, code: "server_offline", message: "The server went offline before it answered. What it did may still finish there."},
-	{err: service.ErrAgentOutdated, status: http.StatusConflict, code: "agent_outdated", message: "The agent on this server is too old for this. Update it with moin servers update."},
+	{err: service.ErrDaemonGone, status: http.StatusConflict, code: "server_offline", message: "The server went offline before it answered. What it did may still finish there."},
+	{err: service.ErrDaemonOutdated, status: http.StatusConflict, code: "daemon_outdated", message: "The daemon on this server is too old for this. Update it with moin servers update."},
 	{err: service.ErrGitHubOff, status: http.StatusConflict, code: "github_off", message: "The GitHub App is not set up on this control plane."},
 	{err: service.ErrGitHubState, status: http.StatusBadRequest, code: "github_state", message: "The GitHub install link expired or belongs to another account. Connect again."},
 	{err: service.ErrGitHubNotYours, status: http.StatusForbidden, code: "github_not_yours", message: "Your GitHub account cannot manage this installation. Install the app from an account you own, then connect again."},

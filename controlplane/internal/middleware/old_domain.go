@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	"github.com/axadrn/moin/protocol"
 )
 
 // OldDomainHeader tells the CLI the control plane's address when a request
@@ -14,7 +16,7 @@ const OldDomainHeader = "X-Control-Plane-URL"
 // OldDomain serves the old domains of the control plane (OLD_URLS) next
 // to APP_URL. It counts every request on them by kind. A browser asking for
 // a page goes on to the same path on APP_URL; everything a machine calls
-// (the API, agents, downloads, install scripts, webhooks) is answered where
+// (the API, daemons, downloads, install scripts, webhooks) is answered where
 // it is, so nothing breaks before it moves, and API answers name the new
 // address in OldDomainHeader.
 func OldDomain(hosts []string, appURL string, count func(host, kind string)) func(http.Handler) http.Handler {
@@ -53,8 +55,8 @@ func requestHost(r *http.Request) string {
 func oldDomainKind(r *http.Request) string {
 	path := r.URL.Path
 	switch {
-	case strings.HasPrefix(path, "/agent/"):
-		return "agent"
+	case strings.HasPrefix(path, "/daemon/") || path == protocol.LegacySessionPath:
+		return "daemon"
 	case strings.HasPrefix(path, "/api/") || path == "/mcp":
 		return "api"
 	case strings.HasPrefix(path, "/download/") || path == "/install.sh" || path == "/cli.sh":

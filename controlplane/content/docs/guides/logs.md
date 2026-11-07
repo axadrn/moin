@@ -25,5 +25,5 @@ Each line starts with the service and a timestamp. `moin logs --tail 500` reads 
 
 ## Good to know
 
-- The agent reads them with `docker compose logs`, so the server must be online.
+- The daemon reads them with `docker compose logs`, so the server must be online.
 - `logs: off` in the [rules](/docs/guides/security#rules) of a server refuses reading logs through moin there.

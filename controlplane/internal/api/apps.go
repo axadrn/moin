@@ -642,7 +642,7 @@ func (h *AppsHandler) registryList(workspaceID string) (RegistryList, error) {
 	return list, nil
 }
 
-// Registries lists the registry logins agents use to pull private images.
+// Registries lists the registry logins daemons use to pull private images.
 func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	list, err := h.registryList(workspace.ID)

@@ -17,7 +17,7 @@ Like a little shop: it has a door, and visitors come in.
 
 A server is your computer on the internet. It is always on, so your app is always open.
 
-The **agent** is the little helper moin puts on it. It only calls out to moin, like a child phoning home; it never opens the door to anyone.
+The **daemon** is the little helper moin puts on it. It only calls out to moin, like a child phoning home; it never opens the door to anyone.
 
 ## Deploy
 
@@ -45,11 +45,11 @@ you
  ▼
 moin (control plane)
  ▲
- │ the agent calls moin,
+ │ the daemon calls moin,
  │ nobody calls in
 ┌┴─────────────┐
 │ server       │
-│   agent      │
+│   daemon     │
 │   app shop ◀─┼── visitors
 └┬─────────────┘
  │ copies
@@ -57,7 +57,7 @@ moin (control plane)
 your bucket
 ```
 
-You deploy. The agent on your server picks it up and starts your app. Copies of its data go into your bucket.
+You deploy. The daemon on your server picks it up and starts your app. Copies of its data go into your bucket.
 
 ## Next
 

@@ -54,7 +54,7 @@ type App struct {
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
-	// BackupEvery is how often the agent copies the app's databases, in
+	// BackupEvery is how often the daemon copies the app's databases, in
 	// minutes; BackupKeep how many days it keeps each copy.
 	// BackupEveryChange also records every change of a SQLite file.
 	BackupEvery       int    `db:"backup_every"`
@@ -145,7 +145,7 @@ type Bucket struct {
 	CreatedAt   time.Time `db:"created_at"`
 }
 
-// BackupStatus is what the agent last reported about one database:
+// BackupStatus is what the daemon last reported about one database:
 // its newest copy, how far Every change reaches (Since, Until) and the
 // newest daily check.
 type BackupStatus struct {
@@ -161,7 +161,7 @@ type BackupStatus struct {
 	CheckError string `db:"check_error"`
 }
 
-// BackupMoment names the copy the agent took just before a deploy, a
+// BackupMoment names the copy the daemon took just before a deploy, a
 // data edit or a catalog update: At is its ID, by the server's clock.
 // Database is empty for every database of the app.
 type BackupMoment struct {
@@ -174,7 +174,7 @@ type BackupMoment struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
-// BackupRestore is a restore the agent of a server runs: running, unknown
+// BackupRestore is a restore the daemon of a server runs: running, unknown
 // while the server is offline during it, then done or failed with Error.
 // To is the moment it goes back to, as people read it.
 type BackupRestore struct {
@@ -212,7 +212,7 @@ const (
 )
 
 // BackupError is why the backups themselves fail, without a failed restore
-// check, which older agents report in Error too.
+// check, which older daemons report in Error too.
 func (s BackupStatus) BackupError() string {
 	if s.Error == s.CheckError {
 		return ""

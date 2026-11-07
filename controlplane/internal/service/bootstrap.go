@@ -8,8 +8,8 @@ const bootstrapWorkspace = "My Workspace"
 
 // Bootstrap readies a control plane that runs on the same server as its
 // apps: the account of email with a workspace, and the server named
-// serverName waiting for its agent. It returns the install token, or ""
-// when the agent of that server has connected already. Run again, it makes
+// serverName waiting for its daemon. It returns the install token, or ""
+// when the daemon of that server has connected already. Run again, it makes
 // nothing twice: the same account, workspace and server, with a new token.
 func Bootstrap(auth *AuthService, workspaces *WorkspaceService, servers *ServerService, email, serverName string) (string, error) {
 	user, err := auth.EnsureUser(email)
@@ -34,7 +34,7 @@ func Bootstrap(auth *AuthService, workspaces *WorkspaceService, servers *ServerS
 		if server.Name != serverName {
 			continue
 		}
-		if server.AgentTokenHash != nil {
+		if server.DaemonTokenHash != nil {
 			return "", nil
 		}
 		_, token, err := servers.NewInstallToken(actor, server.ID)

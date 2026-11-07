@@ -36,9 +36,9 @@ func (b *putBucket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeAgent, *putBucket) {
+func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon, *putBucket) {
 	t.Helper()
-	apps, _, _, agent := newAppService(t)
+	apps, _, _, daemon := newAppService(t)
 	bucket := &putBucket{objects: map[string][]byte{}}
 	server := httptest.NewServer(bucket)
 	t.Cleanup(server.Close)
@@ -56,14 +56,14 @@ func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeAgent, 
 	}
 	store := catalog.NewStore(entries, catalog.Registry{})
 	store.Set("umami", []catalog.Version{{Tag: "3.4.1"}, {Tag: "3.4.0"}, {Tag: "3.3.1"}})
-	return NewCatalogService(store, apps), apps, agent, bucket
+	return NewCatalogService(store, apps), apps, daemon, bucket
 }
 
 // TestCatalogInstall: an install creates the app, gives it VERSION and a
 // fresh secret for every ${NAME} of its compose.yml, puts the compose file
 // into the bucket and starts a deploy from there.
 func TestCatalogInstall(t *testing.T) {
-	catalogs, apps, agent, bucket := newCatalogService(t)
+	catalogs, apps, daemon, bucket := newCatalogService(t)
 	app, deploy, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Domain: "stats.example.com"})
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestCatalogInstall(t *testing.T) {
 		t.Errorf("env = %v", env)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.SourceURL == "" || start.SHA256 == "" || start.Env["VERSION"] != "3.4.1" || start.Domains == nil || len(start.Domains.Domains) != 1 {
 		t.Errorf("deploy start = %+v", start)
 	}
@@ -123,7 +123,7 @@ func TestCatalogInstallRefuses(t *testing.T) {
 // TestCatalogUpdate: an update sets VERSION, keeps the secrets, and an app
 // of your own refuses it.
 func TestCatalogUpdate(t *testing.T) {
-	catalogs, apps, agent, _ := newCatalogService(t)
+	catalogs, apps, daemon, _ := newCatalogService(t)
 	app, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.3.1"})
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestCatalogUpdate(t *testing.T) {
 		t.Errorf("after the update: env %v, deploy %d", after, deploy.Number)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Env["VERSION"] != "3.4.1" {
 		t.Errorf("deploy env = %v", start.Env)
 	}
@@ -156,7 +156,7 @@ func TestCatalogUpdate(t *testing.T) {
 	}
 }
 
-// finishDeploys marks the app's running deploys done, as the agent would.
+// finishDeploys marks the app's running deploys done, as the daemon would.
 func finishDeploys(t *testing.T, apps *AppService, appID string) {
 	t.Helper()
 	_, deploys, err := apps.Deploys(owner.WorkspaceID, appID, 10)

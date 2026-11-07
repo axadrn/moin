@@ -45,10 +45,10 @@ func NewSEOHandler(
 func (h *SEOHandler) Robots(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if h.robotsNoIndex {
-		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+		_, _ = w.Write([]byte("User-daemon: *\nDisallow: /\n"))
 		return
 	}
-	fmt.Fprintf(w, "User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", h.baseURL)
+	fmt.Fprintf(w, "User-daemon: *\nAllow: /\nSitemap: %s/sitemap.xml\n", h.baseURL)
 }
 
 func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {

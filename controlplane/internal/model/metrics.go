@@ -16,7 +16,7 @@ type MetricsRow struct {
 	Load   int64  `db:"load"`
 }
 
-// MetricsApp names an app the way an agent does: by its server and name.
+// MetricsApp names an app the way a daemon does: by its server and name.
 type MetricsApp struct {
 	ID       string `db:"id"`
 	ServerID string `db:"server_id"`

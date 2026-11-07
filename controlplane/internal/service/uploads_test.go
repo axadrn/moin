@@ -37,9 +37,9 @@ func TestUploadKeys(t *testing.T) {
 }
 
 // TestUploadGoesToTheWorkspaceFolder: the signed link, the deploy and the
-// bucket the agent gets all carry the workspace and the app ID.
+// bucket the daemon gets all carry the workspace and the app ID.
 func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
-	apps, _, server, agent := newAppService(t)
+	apps, _, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "blog", server.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
 		t.Errorf("upload path = %s, want %s", link.Path, want)
 	}
 	if bucket := apps.backupConfig(owner.WorkspaceID, server.ID).Bucket; bucket == nil || bucket.Workspace != owner.WorkspaceID {
-		t.Errorf("the agent's bucket = %+v, want the workspace folder", bucket)
+		t.Errorf("the daemon's bucket = %+v, want the workspace folder", bucket)
 	}
 	shown, err := apps.DefaultBucket(owner.WorkspaceID)
 	if err != nil || shown.Folder != owner.WorkspaceID+"/" || shown.AppFolder(app) != owner.WorkspaceID+"/blog/"+app.ID+"/" {
@@ -67,7 +67,7 @@ func TestUploadGoesToTheWorkspaceFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.AppID != app.ID || !strings.Contains(start.SourceURL, "/"+owner.WorkspaceID+"/blog/"+app.ID+"/uploads/") {
 		t.Errorf("deploy.start = %+v", start)
 	}

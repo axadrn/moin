@@ -15,7 +15,7 @@ Point a domain at the server with an A record, then run this as root on a fresh 
 curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/controlplane/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
-In a few minutes it installs Docker and security updates, writes the settings to `/etc/moin-controlplane/env` with a new `SECRETS_KEY`, starts the control plane with your account, a workspace and this server in it, installs the agent and serves the control plane on your domain with a Let's Encrypt certificate. At the end it prints a sign-in link.
+In a few minutes it installs Docker and security updates, writes the settings to `/etc/moin-controlplane/env` with a new `SECRETS_KEY`, starts the control plane with your account, a workspace and this server in it, installs the daemon and serves the control plane on your domain with a Let's Encrypt certificate. At the end it prints a sign-in link.
 
 Then point the CLI at it:
 
@@ -52,19 +52,19 @@ The rest of these docs apply as they are.
 
 ## Two servers
 
-Once it matters, run the control plane on its own small server, not next to your apps. The agent on an app server takes ports 80 and 443, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers: their agents dial out to it.
+Once it matters, run the control plane on its own small server, not next to your apps. The daemon on an app server takes ports 80 and 443, and a control plane apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers: their daemons dial out to it.
 
 ```text
 one server          two servers
 
 ┌───────────────┐   ┌───────────────┐
 │ control plane │   │ control plane │
-│ agent         │   └───────▲───────┘
-│ your apps     │           │ agents
+│ daemon        │   └───────▲───────┘
+│ your apps     │           │ daemons
 └───────────────┘           │ call out
                     ┌───────┴───────┐
                     │ app server    │
-                    │ agent         │
+                    │ daemon        │
                     │ your apps     │
                     └───────────────┘
 ```
@@ -147,7 +147,7 @@ The safest control plane is one the internet cannot reach:
 
 1. Prepare the server with `sh setup.sh --tailscale`.
 2. `tailscale serve --bg 8090` serves it at `https://<server>.<tailnet>.ts.net`. Use that as `APP_URL`, with no tunnel and no open port.
-3. Put each server on the tailnet with `tailscale up` before you install the agent, and your computer too, for the web, the CLI and the TUI.
+3. Put each server on the tailnet with `tailscale up` before you install the daemon, and your computer too, for the web, the CLI and the TUI.
 
 Your apps stay public through their own tunnel or ports 80 and 443. GitHub and CI outside your tailnet cannot reach the control plane, so **Deploy every push** and deploy hooks do not work: deploy from the web, the CLI or a CI runner on your tailnet.
 
@@ -156,7 +156,7 @@ Your apps stay public through their own tunnel or ports 80 and 443. GitHub and C
 1. Turn on the control plane's backup: `S3_*`, `BACKUP_DATABASE=true`, `sh /opt/moin/update.sh`. Use a bucket no other control plane backs up to (folder `controlplane/litestream`).
 2. Wait a few seconds, then on the old server stop the control plane and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running.
 3. On the new server, [run it](#run-it) with the same settings, without `SAME_SERVER`, and above all the same `SECRETS_KEY`. It restores its database from the bucket on its first start. Point the domain at it.
-4. On the old server, run a new install command from `moin servers install-command <server>`: its agent now dials your domain, as the same server.
+4. On the old server, run a new install command from `moin servers install-command <server>`: its daemon now dials your domain, as the same server.
 5. Once all works, on the old server: `rm -r /opt/moin /etc/moin-controlplane /var/lib/moin-controlplane`.
 
 ## Your own GitHub App
@@ -199,7 +199,7 @@ Once a day the control plane asks GitHub for the newest version. When one is out
 - `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
 - **Update now** needs the updater next to the control plane, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A control plane set up before it gets it once with `git pull`, then `sh update.sh`.
 - `UPDATE_CHECK=false` stops the check; then update with `sh update.sh`.
-- The agents update themselves to the version of the control plane, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
+- The daemons update themselves to the version of the control plane, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
 
 ## Database backup
 
@@ -214,7 +214,7 @@ A control plane that starts without a database restores the newest one from the 
 
 ## A new domain
 
-Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, agents and the CLI move by themselves, and webhooks and API calls there keep working. **Admin**, **Old domain** (or `GET /api/v1/admin/old-domain`) shows what still arrives, by day and kind; after 14 quiet days it can go.
+Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, daemons and the CLI move by themselves, and webhooks and API calls there keep working. **Admin**, **Old domain** (or `GET /api/v1/admin/old-domain`) shows what still arrives, by day and kind; after 14 quiet days it can go.
 
 ## What it sends us
 

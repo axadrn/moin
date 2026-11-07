@@ -1,5 +1,5 @@
 // Package dbbackup keeps the control plane's own SQLite database in its
-// bucket with Litestream, the way the agent keeps the databases of apps:
+// bucket with Litestream, the way the daemon keeps the databases of apps:
 // every change within seconds, and the database comes back by itself when
 // a new server starts without one.
 package dbbackup

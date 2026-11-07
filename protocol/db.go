@@ -67,7 +67,7 @@ type DBResult struct {
 	Rows      [][]any  `json:"rows"`
 	Truncated bool     `json:"truncated,omitempty"`
 	Changes   int64    `json:"changes,omitempty"`
-	// Before is when the agent took the copy just before a write, which
+	// Before is when the daemon took the copy just before a write, which
 	// is its ID in CopyIDLayout: the control plane names it "Before your
 	// edit".
 	Before *time.Time `json:"before,omitempty"`

@@ -135,7 +135,7 @@ func (f *fakeGitHub) waitStatus(t *testing.T, state string) map[string]string {
 }
 
 func TestGitHubDeploys(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	fake := &fakeGitHub{}
 	githubServer := fake.serve(t)
 	defer githubServer.Close()
@@ -229,15 +229,15 @@ func TestGitHubDeploys(t *testing.T) {
 		t.Fatalf("deploy = %+v", deploy)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.SourceURL == "" {
-		t.Fatal("the agent got no source")
+		t.Fatal("the daemon got no source")
 	}
 	if !strings.HasSuffix(start.SourceURL, "/repos/axadrn/blog/tarball/abc123") || start.SourceAuthorization != "token ghs_blog_read" || !start.SourceStripTop {
-		t.Fatalf("the agent does not download from GitHub itself: %+v", start)
+		t.Fatalf("the daemon does not download from GitHub itself: %+v", start)
 	}
 	fake.waitStatus(t, "pending")
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	success := fake.waitStatus(t, "success")
 	if success["context"] != "moin/deploy" || !strings.HasSuffix(success["target_url"], "/app/owner-workspace/apps/blog") {
 		t.Fatalf("success status = %v", success)

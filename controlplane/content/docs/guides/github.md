@@ -60,10 +60,10 @@ git push    to the branch the app
 GitHub      tells moin
    │
    ▼
-moin        tells the agent
+moin        tells the daemon
    │
    ▼
-agent       downloads the commit
+daemon      downloads the commit
    │        from GitHub with a
    │        short-lived token and
    │        deploys it

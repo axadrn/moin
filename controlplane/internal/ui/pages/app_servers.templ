@@ -19,14 +19,14 @@ type AddedServer struct {
 }
 
 // RemovedServer is a server just removed and the command that removes its
-// agent on the machine.
+// daemon on the machine.
 type RemovedServer struct {
 	Name    string
 	Command string
 }
 
 // Servers is every server of the workspace, live: the list, adding one,
-// and whether agents update by themselves.
+// and whether daemons update by themselves.
 templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Servers") {
@@ -43,9 +43,9 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 					@ServerAddForm()
 				}
 			}
-			@kit.Section("Agents", nil) {
+			@kit.Section("Daemons", nil) {
 				@kit.List() {
-					@AgentUpdatesForm(autoUpdate)
+					@DaemonUpdatesForm(autoUpdate)
 				}
 			}
 			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
@@ -76,7 +76,7 @@ templ ServerAddForm() {
 }
 
 // ServerAdded shows the install command of the server just added. It stays
-// until the server's agent connects: on every change of the servers it asks
+// until the server's daemon connects: on every change of the servers it asks
 // (ServerInstall), and the answer replaces it with ServerConnected.
 templ ServerAdded(added AddedServer) {
 	<div
@@ -87,7 +87,7 @@ templ ServerAdded(added AddedServer) {
 		hx-swap="outerHTML"
 		data-server-added={ added.Name }
 	>
-		@kit.Card("Install the agent on "+added.Name, nil) {
+		@kit.Card("Install the daemon on "+added.Name, nil) {
 			@kit.Quiet() {
 				Run it on the server as root. It works once, for an hour.
 			}
@@ -95,13 +95,13 @@ templ ServerAdded(added AddedServer) {
 				@kit.Command(added.Command)
 			</div>
 			@kit.Status(kit.StateWaiting, nil) {
-				Waiting for the agent
+				Waiting for the daemon
 			}
 		}
 	</div>
 }
 
-// ServerConnected takes the place of the install command once the agent of
+// ServerConnected takes the place of the install command once the daemon of
 // the server just added has connected.
 templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
@@ -120,13 +120,13 @@ templ ServerGone() {
 	<div id="server-added" class="empty:hidden"></div>
 }
 
-// serverRemoved tells that the agent of a server just removed is still
+// serverRemoved tells that the daemon of a server just removed is still
 // installed, with the command that removes it there.
 templ serverRemoved(removed RemovedServer) {
 	<div data-server-removed={ removed.Name }>
 		@kit.Card(removed.Name+" is removed", nil) {
 			@kit.Quiet() {
-				Run this on the server as root to remove its agent. Its apps keep running; --apps removes them too.
+				Run this on the server as root to remove its daemon. Its apps keep running; --apps removes them too.
 			}
 			@kit.Command(removed.Command)
 		}
@@ -165,11 +165,11 @@ templ ServerList(servers []model.Server) {
 func serverNote(server model.Server, now time.Time) string {
 	switch {
 	case server.LastSeenAt == nil:
-		return "Its agent never connected"
+		return "Its daemon never connected"
 	case !server.Online:
 		return "Last seen " + serverLastSeen(server, now)
-	case agentOutdated(server):
-		return "Its agent updates to " + build.Version + " by itself"
+	case daemonOutdated(server):
+		return "Its daemon updates to " + build.Version + " by itself"
 	}
 	return ""
 }
@@ -225,10 +225,10 @@ templ serverHead(server model.Server, active string) {
 	})
 }
 
-// agentOutdated reports whether the agent runs another version than the
+// daemonOutdated reports whether the daemon runs another version than the
 // control plane. Development builds never count.
-func agentOutdated(server model.Server) bool {
-	return build.Version != "dev" && server.AgentVersion != "" && server.AgentVersion != build.Version
+func daemonOutdated(server model.Server) bool {
+	return build.Version != "dev" && server.DaemonVersion != "" && server.DaemonVersion != build.Version
 }
 
 func serverLastSeen(server model.Server, now time.Time) string {

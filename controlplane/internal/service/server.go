@@ -23,7 +23,7 @@ import (
 
 const (
 	installTokenMarker = "ins_"
-	agentTokenMarker   = "agt_"
+	daemonTokenMarker  = "dmn_"
 	// InstallTokenLifetime is how long an install command works.
 	InstallTokenLifetime = time.Hour
 )
@@ -31,32 +31,32 @@ const (
 var (
 	ErrServerName        = errors.New("server name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
 	ErrInstallTokenValid = errors.New("install token is invalid, used or expired")
-	ErrAgentToken        = errors.New("agent token is invalid")
+	ErrDaemonToken       = errors.New("daemon token is invalid")
 	ErrServerOffline     = errors.New("server is offline")
 )
 
-// AgentError is a request the agent answered with an error.
-type AgentError struct{ Message string }
+// DaemonError is a request the daemon answered with an error.
+type DaemonError struct{ Message string }
 
-func (e *AgentError) Error() string { return "agent: " + e.Message }
+func (e *DaemonError) Error() string { return "daemon: " + e.Message }
 
-// ServerService manages servers and the live sessions of their agents. The
+// ServerService manages servers and the live sessions of their daemons. The
 // sessions live in memory: there is one control plane process.
 type ServerService struct {
 	activity *repository.Activity
 	servers  *repository.Servers
 	appURL   string
 	now      func() time.Time
-	// downloads holds the binaries agents update to.
+	// downloads holds the binaries daemons update to.
 	downloads string
 
 	mu          sync.Mutex
-	sessions    map[string]*agentSession
+	sessions    map[string]*daemonSession
 	subscribers map[string]map[chan struct{}]struct{}
 	onMessage   func(serverID string, message protocol.Message)
 	onConnect   func(serverID, workspaceID string)
 	accessOf    func(workspaceID string) (access.Access, error)
-	// autoVersion is the version agents update to by themselves; "" is
+	// autoVersion is the version daemons update to by themselves; "" is
 	// off. autoRunning and autoHalted are per workspace.
 	autoVersion string
 	autoRunning map[string]bool
@@ -69,9 +69,9 @@ type ServerService struct {
 	diskFull map[string]bool
 }
 
-type agentSession struct {
+type daemonSession struct {
 	workspaceID string
-	// protocol is the protocol version the agent speaks.
+	// protocol is the protocol version the daemon speaks.
 	protocol int
 	kick     func()
 	send     func(protocol.Message) error
@@ -92,14 +92,14 @@ func NewServerService(servers *repository.Servers, activity *repository.Activity
 		appURL:      strings.TrimRight(appURL, "/"),
 		downloads:   DownloadsDir,
 		now:         time.Now,
-		sessions:    map[string]*agentSession{},
+		sessions:    map[string]*daemonSession{},
 		subscribers: map[string]map[chan struct{}]struct{}{},
 		autoRunning: map[string]bool{},
 		autoHalted:  map[string]bool{},
 	}
 }
 
-// Create adds a server that waits for its agent and returns the raw install
+// Create adds a server that waits for its daemon and returns the raw install
 // token, which works once within InstallTokenLifetime.
 func (s *ServerService) Create(actor Actor, name string) (*model.Server, string, error) {
 	name = strings.TrimSpace(name)
@@ -169,9 +169,9 @@ func (s *ServerService) Rename(actor Actor, idOrName, name string) (*model.Serve
 }
 
 // NewInstallToken gives a server a new install token, for a lost install
-// command or to move the agent to another machine. The old token stops
-// working; the agent that registers with the new one takes over and the
-// old agent's token stops working. It returns the raw token, which works
+// command or to move the daemon to another machine. The old token stops
+// working; the daemon that registers with the new one takes over and the
+// old daemon's token stops working. It returns the raw token, which works
 // once within InstallTokenLifetime.
 func (s *ServerService) NewInstallToken(actor Actor, idOrName string) (*model.Server, string, error) {
 	server, err := s.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
@@ -190,7 +190,7 @@ func (s *ServerService) NewInstallToken(actor Actor, idOrName string) (*model.Se
 	return server, raw, nil
 }
 
-// UninstallCommand removes the agent from a server, run on it after the
+// UninstallCommand removes the daemon from a server, run on it after the
 // server is removed here.
 func (s *ServerService) UninstallCommand() string {
 	return protocol.UninstallCommand(build.Name)
@@ -210,9 +210,9 @@ func (s *ServerService) List(workspaceID string) ([]model.Server, error) {
 	return servers, nil
 }
 
-// Delete removes a server by ID or name and disconnects its agent. The agent
-// token stops working. It returns the command that removes the agent on the
-// machine, empty when no agent ever connected, so none is installed there,
+// Delete removes a server by ID or name and disconnects its daemon. The daemon
+// token stops working. It returns the command that removes the daemon on the
+// machine, empty when no daemon ever connected, so none is installed there,
 // and the apps that went with an offline server. confirm is the server's
 // name, typed out.
 func (s *ServerService) Delete(actor Actor, idOrName, confirm string) (uninstall string, apps []string, err error) {
@@ -251,7 +251,7 @@ func (s *ServerService) Delete(actor Actor, idOrName, confirm string) (uninstall
 	return s.UninstallCommand(), apps, nil
 }
 
-// Register trades a raw install token for an agent token. The install token
+// Register trades a raw install token for a daemon token. The install token
 // stops working.
 func (s *ServerService) Register(installToken string, hello protocol.Hello) (*model.Server, string, error) {
 	if !strings.HasPrefix(installToken, installTokenMarker) {
@@ -267,45 +267,45 @@ func (s *ServerService) Register(installToken string, hello protocol.Hello) (*mo
 	if server.InstallExpiresAt == nil || !s.now().Before(*server.InstallExpiresAt) {
 		return nil, "", ErrInstallTokenValid
 	}
-	raw := agentTokenMarker + randomToken()
+	raw := daemonTokenMarker + randomToken()
 	reported := helloServer(hello, nil)
 	err = s.servers.Register(server.ID, hashToken(raw), reported)
 	if err != nil {
 		return nil, "", err
 	}
-	// An agent that registers again, or on another machine, takes over.
+	// A daemon that registers again, or on another machine, takes over.
 	s.mu.Lock()
 	session := s.sessions[server.ID]
 	s.mu.Unlock()
 	if session != nil {
 		session.kick()
 	}
-	slog.Info("agent registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
+	slog.Info("daemon registered", "server_id", server.ID, "workspace_id", server.WorkspaceID)
 	action := "server.installed"
-	if server.AgentTokenHash != nil {
+	if server.DaemonTokenHash != nil {
 		action = "server.reinstalled"
 	}
-	s.record(System(server.WorkspaceID), action, "server", server.Name, map[string]string{"hostname": reported.Hostname, "os": reported.OS, "arch": reported.Arch, "version": reported.AgentVersion})
+	s.record(System(server.WorkspaceID), action, "server", server.Name, map[string]string{"hostname": reported.Hostname, "os": reported.OS, "arch": reported.Arch, "version": reported.DaemonVersion})
 	s.notify(server.WorkspaceID)
 	return server, raw, nil
 }
 
-// Authenticate returns the server of a raw agent token.
-func (s *ServerService) Authenticate(agentToken string) (*model.Server, error) {
-	if !strings.HasPrefix(agentToken, agentTokenMarker) {
-		return nil, ErrAgentToken
+// Authenticate returns the server of a raw daemon token.
+func (s *ServerService) Authenticate(daemonToken string) (*model.Server, error) {
+	if !strings.HasPrefix(daemonToken, daemonTokenMarker) && !strings.HasPrefix(daemonToken, protocol.LegacyTokenMarker) {
+		return nil, ErrDaemonToken
 	}
-	server, err := s.servers.ByAgentTokenHash(hashToken(agentToken))
+	server, err := s.servers.ByDaemonTokenHash(hashToken(daemonToken))
 	if errors.Is(err, repository.ErrServerNotFound) {
-		return nil, ErrAgentToken
+		return nil, ErrDaemonToken
 	}
 	return server, err
 }
 
-// Connect marks the server online and remembers the address the agent
+// Connect marks the server online and remembers the address the daemon
 // connected from, which the DNS check compares domains with. kick ends the session; Connect calls it
 // for an older session of the same server, and Delete calls it too. send
-// writes one message to the agent. The session calls the returned disconnect
+// writes one message to the daemon. The session calls the returned disconnect
 // when it ends.
 func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, address string, kick func(), send func(protocol.Message) error) (disconnect func()) {
 	now := s.now().UTC()
@@ -313,9 +313,9 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	update.Address = clip(address)
 	err := s.servers.UpdateHello(server.ID, update)
 	if err != nil {
-		slog.Error("store agent hello failed", "error", err, "server_id", server.ID)
+		slog.Error("store daemon hello failed", "error", err, "server_id", server.ID)
 	}
-	session := &agentSession{workspaceID: server.WorkspaceID, protocol: hello.ProtocolVersion, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
+	session := &daemonSession{workspaceID: server.WorkspaceID, protocol: hello.ProtocolVersion, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
 	s.mu.Lock()
 	previous := s.sessions[server.ID]
 	s.sessions[server.ID] = session
@@ -353,13 +353,13 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	}
 }
 
-// ErrAgentGone is a request whose agent went offline before it answered.
+// ErrDaemonGone is a request whose daemon went offline before it answered.
 // What it did may still finish on the server.
-var ErrAgentGone = errors.New("the server went offline before it answered; what it did may still finish there")
+var ErrDaemonGone = errors.New("the server went offline before it answered; what it did may still finish there")
 
-// ErrAgentOutdated answers a request the agent of a server is too old
+// ErrDaemonOutdated answers a request the daemon of a server is too old
 // for, instead of sending it.
-var ErrAgentOutdated = errors.New("the agent on this server is too old for this: update it under Servers, or with moin servers update")
+var ErrDaemonOutdated = errors.New("the daemon on this server is too old for this: update it under Servers, or with moin servers update")
 
 // ErrSubscriptionRequired means the account needs the moin plan to add a
 // server.
@@ -435,17 +435,17 @@ func (s *ServerService) UserOf(serverID string) (string, bool) {
 	return session.workspaceID, true
 }
 
-// OnAgentConnect sets who learns that an agent connected, to send it what
+// OnDaemonConnect sets who learns that a daemon connected, to send it what
 // it needs to know. Wiring calls it once.
-func (s *ServerService) OnAgentConnect(handle func(serverID, workspaceID string)) {
+func (s *ServerService) OnDaemonConnect(handle func(serverID, workspaceID string)) {
 	s.mu.Lock()
 	s.onConnect = handle
 	s.mu.Unlock()
 }
 
-// OnAgentMessage sets who gets the agent messages that answer no request,
+// OnDaemonMessage sets who gets the daemon messages that answer no request,
 // such as deploy logs. Wiring calls it once.
-func (s *ServerService) OnAgentMessage(handle func(serverID string, message protocol.Message)) {
+func (s *ServerService) OnDaemonMessage(handle func(serverID string, message protocol.Message)) {
 	s.mu.Lock()
 	s.onMessage = handle
 	s.mu.Unlock()
@@ -458,7 +458,7 @@ func (s *ServerService) Online(serverID string) bool {
 	return s.sessions[serverID] != nil
 }
 
-// Send writes one message to the agent of a server.
+// Send writes one message to the daemon of a server.
 func (s *ServerService) Send(serverID string, messageType protocol.MessageType, data any) error {
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
@@ -473,8 +473,8 @@ func (s *ServerService) Send(serverID string, messageType protocol.MessageType, 
 	return session.send(message)
 }
 
-// Request sends a message to the agent and decodes its answer into result,
-// which may be nil. An error answer returns an *AgentError.
+// Request sends a message to the daemon and decodes its answer into result,
+// which may be nil. An error answer returns a *DaemonError.
 func (s *ServerService) Request(ctx context.Context, serverID string, messageType protocol.MessageType, data, result any) error {
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
@@ -493,7 +493,7 @@ func (s *ServerService) Request(ctx context.Context, serverID string, messageTyp
 		return ErrServerOffline
 	}
 	if old {
-		return ErrAgentOutdated
+		return ErrDaemonOutdated
 	}
 	defer func() {
 		s.mu.Lock()
@@ -506,14 +506,14 @@ func (s *ServerService) Request(ctx context.Context, serverID string, messageTyp
 	}
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("the agent did not answer: %w", ctx.Err())
+		return fmt.Errorf("the daemon did not answer: %w", ctx.Err())
 	case <-session.gone:
-		return ErrAgentGone
+		return ErrDaemonGone
 	case reply := <-answer:
 		if reply.Type == protocol.TypeError {
-			var agentErr protocol.Error
-			_ = reply.Decode(&agentErr)
-			return &AgentError{Message: agentErr.Message}
+			var daemonErr protocol.Error
+			_ = reply.Decode(&daemonErr)
+			return &DaemonError{Message: daemonErr.Message}
 		}
 		if result == nil {
 			return nil
@@ -523,9 +523,9 @@ func (s *ServerService) Request(ctx context.Context, serverID string, messageTyp
 }
 
 // Stream sends a request whose answer comes in pieces: every message the
-// agent sends with the request's ID goes to receive, until receive says
-// done, the context ends or the agent goes. An error answer returns an
-// *AgentError.
+// daemon sends with the request's ID goes to receive, until receive says
+// done, the context ends or the daemon goes. An error answer returns a
+// *DaemonError.
 func (s *ServerService) Stream(ctx context.Context, serverID string, messageType protocol.MessageType, data any, receive func(protocol.Message) (done bool, err error)) error {
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
@@ -553,14 +553,14 @@ func (s *ServerService) Stream(ctx context.Context, serverID string, messageType
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("the agent did not finish: %w", ctx.Err())
+			return fmt.Errorf("the daemon did not finish: %w", ctx.Err())
 		case <-session.gone:
 			return ErrServerOffline
 		case reply := <-pieces:
 			if reply.Type == protocol.TypeError {
-				var agentErr protocol.Error
-				_ = reply.Decode(&agentErr)
-				return &AgentError{Message: agentErr.Message}
+				var daemonErr protocol.Error
+				_ = reply.Decode(&daemonErr)
+				return &DaemonError{Message: daemonErr.Message}
 			}
 			done, err := receive(reply)
 			if err != nil || done {
@@ -570,7 +570,7 @@ func (s *ServerService) Stream(ctx context.Context, serverID string, messageType
 	}
 }
 
-// Receive takes one message the agent of a server sent.
+// Receive takes one message the daemon of a server sent.
 func (s *ServerService) Receive(serverID string, message protocol.Message) {
 	s.mu.Lock()
 	var answer, stream chan protocol.Message
@@ -637,17 +637,17 @@ func (s *ServerService) notify(workspaceID string) {
 
 func helloServer(hello protocol.Hello, seenAt *time.Time) model.Server {
 	return model.Server{
-		Hostname:     clip(hello.Hostname),
-		OS:           clip(hello.OS),
-		Arch:         clip(hello.Arch),
-		AgentVersion: clip(hello.AgentVersion),
-		Rules:        rulesJSON(hello.Rules),
-		Addresses:    reportedAddresses(hello.Addresses),
-		LastSeenAt:   seenAt,
+		Hostname:      clip(hello.Hostname),
+		OS:            clip(hello.OS),
+		Arch:          clip(hello.Arch),
+		DaemonVersion: clip(hello.DaemonVersion),
+		Rules:         rulesJSON(hello.Rules),
+		Addresses:     reportedAddresses(hello.Addresses),
+		LastSeenAt:    seenAt,
 	}
 }
 
-// reportedAddresses keeps the valid IP addresses an agent reports, at most
+// reportedAddresses keeps the valid IP addresses a daemon reports, at most
 // four, space separated.
 func reportedAddresses(addresses []string) string {
 	var clean []string
@@ -661,7 +661,7 @@ func reportedAddresses(addresses []string) string {
 	return strings.Join(clean, " ")
 }
 
-// rulesJSON keeps what an agent reports about its rules short.
+// rulesJSON keeps what a daemon reports about its rules short.
 func rulesJSON(rules *protocol.Rules) string {
 	if rules == nil {
 		return ""
@@ -679,7 +679,7 @@ func rulesJSON(rules *protocol.Rules) string {
 	return string(body)
 }
 
-// ServerRules are the rules the server's agent last reported, nil without.
+// ServerRules are the rules the server's daemon last reported, nil without.
 func ServerRules(server model.Server) *protocol.Rules {
 	if server.Rules == "" {
 		return nil
@@ -691,8 +691,8 @@ func ServerRules(server model.Server) *protocol.Rules {
 	return &rules
 }
 
-// clip keeps what an agent reports short.
-// clip cleans a value an agent reports: at most 128 bytes and no control
+// clip keeps what a daemon reports short.
+// clip cleans a value a daemon reports: at most 128 bytes and no control
 // characters, so it cannot move the cursor or recolor a terminal that
 // shows it in the CLI or the TUI.
 func clip(value string) string {

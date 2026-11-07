@@ -17,7 +17,7 @@ func TestReadLocalConfig(t *testing.T) {
 	if config.App != "blog" || config.Server != "web-1" {
 		t.Fatalf("config = %+v", config)
 	}
-	// The block of the old name counts for nothing: the agent refuses it.
+	// The block of the old name counts for nothing: the daemon refuses it.
 	os.WriteFile(filepath.Join(dir, "compose.yml"), []byte("x-ops:\n  app: old\n"), 0o644)
 	if got := ReadLocalConfig(dir); got.App != "" {
 		t.Fatalf("x-ops read: %+v", got)

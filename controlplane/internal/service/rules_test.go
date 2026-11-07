@@ -8,7 +8,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-func TestServerRulesKeepWhatTheAgentReports(t *testing.T) {
+func TestServerRulesKeepWhatTheDaemonReports(t *testing.T) {
 	if ServerRules(model.Server{Rules: rulesJSON(nil)}) != nil {
 		t.Fatal("a server without rules has rules")
 	}

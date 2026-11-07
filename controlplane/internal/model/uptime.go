@@ -80,7 +80,7 @@ type UptimeTarget struct {
 	Detected    string `db:"detected"`
 }
 
-// ServerSeen is a server the checker watches: when its agent was last
+// ServerSeen is a server the checker watches: when its daemon was last
 // seen, and since when it counts as down, nil while it does not.
 type ServerSeen struct {
 	ID          string     `db:"id"`

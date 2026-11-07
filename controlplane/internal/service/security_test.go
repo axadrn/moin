@@ -98,7 +98,7 @@ func TestCloudflareAccountFromZones(t *testing.T) {
 	}
 }
 
-// SSH kept on the tailnet without the firewall is a leftover too: an agent
+// SSH kept on the tailnet without the firewall is a leftover too: a daemon
 // that comes back after SSH on Tailscale was turned off must open it again.
 func TestLeftOver(t *testing.T) {
 	for _, report := range []protocol.ServerConfigResult{{Proxy: "direct", Firewall: true}, {Proxy: "tunnel"}, {Proxy: "direct", TailscaleIP: "100.64.0.9"}} {
@@ -112,7 +112,7 @@ func TestLeftOver(t *testing.T) {
 }
 
 func TestServerSecurity(t *testing.T) {
-	apps, _, server, agent := newAppService(t)
+	apps, _, server, daemon := newAppService(t)
 	fake := &fakeCloudflare{body: map[string]string{}}
 	cloudflare := fake.serve()
 	defer cloudflare.Close()
@@ -154,7 +154,7 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The agent answers every server config.
+	// The daemon answers every server config.
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -165,15 +165,15 @@ func TestServerSecurity(t *testing.T) {
 				return
 			case <-time.After(5 * time.Millisecond):
 			}
-			agent.mu.Lock()
+			daemon.mu.Lock()
 			pending := []protocol.Message{}
-			for _, message := range agent.sent {
+			for _, message := range daemon.sent {
 				if message.Type == protocol.TypeServerConfig && !answered[message.RequestID] {
 					pending = append(pending, message)
 					answered[message.RequestID] = true
 				}
 			}
-			agent.mu.Unlock()
+			daemon.mu.Unlock()
 			for _, request := range pending {
 				var config protocol.ServerConfig
 				request.Decode(&config)
@@ -204,9 +204,9 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	var config protocol.ServerConfig
-	agent.last(t, protocol.TypeServerConfig, &config)
+	daemon.last(t, protocol.TypeServerConfig, &config)
 	if config.TunnelToken != "tunnel-token-123456" || config.TailscaleKey != "tskey-auth-abc" || !config.SSHOnTailscale || !config.Firewall {
-		t.Fatalf("agent config = %+v", config)
+		t.Fatalf("daemon config = %+v", config)
 	}
 	for _, call := range []string{"POST /accounts/acc1/cfd_tunnel", "PUT /accounts/acc1/cfd_tunnel/tun1/configurations", "POST /zones/zone1/dns_records", "PATCH /zones/zone1/settings/always_use_https"} {
 		if !fake.called(call) {

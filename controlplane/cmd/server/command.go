@@ -13,7 +13,7 @@ import (
 //
 //	bootstrap <server>  the account of the first ADMIN_EMAILS address, a
 //	                    workspace and the server, named like this machine;
-//	                    prints its install token, or nothing when its agent
+//	                    prints its install token, or nothing when its daemon
 //	                    connected already
 //	sign-in-link        prints a sign-in link for the first ADMIN_EMAILS
 //	                    address, for a control plane without email

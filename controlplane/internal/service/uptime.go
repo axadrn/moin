@@ -36,7 +36,7 @@ const (
 	uptimeOutagesKept = 90 * 24 * time.Hour
 	// uptimeOutagesShown is how many outages a domain lists.
 	uptimeOutagesShown = 10
-	// serverDownAfter is how long an agent may be gone before its server
+	// serverDownAfter is how long a daemon may be gone before its server
 	// counts as down: a restart or a short network hiccup is not.
 	serverDownAfter = 2 * time.Minute
 )
@@ -96,7 +96,7 @@ type uptimeChecker struct {
 	// an httptest server.
 	url        func(domain, path string) string
 	retryAfter time.Duration
-	// started is when the checker started: an agent counts as gone only
+	// started is when the checker started: a daemon counts as gone only
 	// from then on, since none could connect while the control plane was
 	// down itself.
 	started time.Time

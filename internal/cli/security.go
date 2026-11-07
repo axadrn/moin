@@ -83,7 +83,7 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 func printSecurity(w io.Writer, server client.Server) {
 	report := server.Security
 	if report == nil {
-		done(w, "%s: %s. Its agent applies it when it connects.", server.Name, server.Access())
+		done(w, "%s: %s. Its daemon applies it when it connects.", server.Name, server.Access())
 		return
 	}
 	done(w, "%s: %s", server.Name, server.Access())

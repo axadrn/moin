@@ -560,7 +560,7 @@ func (m model) serversKey(s string) (tea.Model, tea.Cmd) {
 	case "enter", "l", "right":
 		return m.open(screen{v: vServer, server: sv.Name})
 	case "u":
-		return m.confirmAgentUpdate(sv)
+		return m.confirmDaemonUpdate(sv)
 	}
 	return m, nil
 }
@@ -581,7 +581,7 @@ func (m model) serverKey(s string) (tea.Model, tea.Cmd) {
 	}
 	switch s {
 	case "u":
-		return m.confirmAgentUpdate(sv)
+		return m.confirmDaemonUpdate(sv)
 	case "[", "]":
 		if s == "[" {
 			m.rng = (m.rng + len(ranges) - 1) % len(ranges)
@@ -613,16 +613,16 @@ func (m model) openEvent() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) confirmAgentUpdate(sv client.Server) (tea.Model, tea.Cmd) {
+func (m model) confirmDaemonUpdate(sv client.Server) (tea.Model, tea.Cmd) {
 	if !sv.Online {
-		m.say(sv.Name + " is offline; its agent updates when it dials in again")
+		m.say(sv.Name + " is offline; its daemon updates when it dials in again")
 		return m, nil
 	}
 	detail := "It installs the control plane's version and dials in again in a few seconds. Apps keep running."
 	if m.ws.version != "" {
-		detail = "From " + sv.AgentVersion + " to " + m.ws.version + ". " + detail
+		detail = "From " + sv.DaemonVersion + " to " + m.ws.version + ". " + detail
 	}
-	return m.ask1("Update the agent on "+sv.Name+"?", detail, "update", false, m.updateAgent(sv.Name)), nil
+	return m.ask1("Update the daemon on "+sv.Name+"?", detail, "update", false, m.updateDaemon(sv.Name)), nil
 }
 
 func (m model) confirmRollback(app string, d client.Deploy) (tea.Model, tea.Cmd) {

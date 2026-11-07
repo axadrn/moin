@@ -28,13 +28,13 @@ type Bucket struct {
 }
 
 // BackupConfig is where backups go and how often. Bucket is the
-// workspace's default bucket; without it the agent copies nothing.
+// workspace's default bucket; without it the daemon copies nothing.
 // AppBuckets is the bucket of each app, by name, that uses another one
 // than the default. Apps are the IDs of the server's apps by name: an app
 // deployed before deploys brought its ID gets it here. Schedules are the
 // backup settings of each app by name; an app without one gets
 // DefaultSchedule. The JSON keys storage and app_storage stay as they
-// are: agents of protocol version 1 read them.
+// are: daemons of protocol version 1 read them.
 type BackupConfig struct {
 	Bucket     *Bucket             `json:"storage,omitempty"`
 	AppBuckets map[string]*Bucket  `json:"app_storage,omitempty"`
@@ -72,7 +72,7 @@ type Backups struct {
 	App       string           `json:"app"`
 	Databases []DatabaseBackup `json:"databases"`
 	// Restores are the restores of the app that run now, and how the
-	// last ones ended, by the ID the control plane gave them. An agent
+	// last ones ended, by the ID the control plane gave them. A daemon
 	// that reports restores sends a list, empty or not.
 	Restores []RestoreState `json:"restores"`
 }
@@ -102,7 +102,7 @@ const (
 // says why it failed. Since and Until are how far Every change reaches,
 // for SQLite with it on. Error says what keeps the backup from working.
 // The JSON keys verified_at, drill_error, since and replicated_at stay as
-// they are: agents of protocol version 1 send them.
+// they are: daemons of protocol version 1 send them.
 type DatabaseBackup struct {
 	Database   string     `json:"database"`
 	Kind       string     `json:"kind,omitempty"`
@@ -127,7 +127,7 @@ type Copy struct {
 
 // BackupRestore puts one database back: to the copy Copy, to the minute
 // At (SQLite with Every change), or to the state Undo before an earlier
-// restore, which undoes that restore. The agent builds the database
+// restore, which undoes that restore. The daemon builds the database
 // beside the live one, stops the app, switches in one step and starts it;
 // the live one stays as the undo of this restore.
 type BackupRestore struct {

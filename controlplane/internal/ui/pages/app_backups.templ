@@ -15,7 +15,7 @@ import (
 )
 
 // BackupsView is the backups of an app: its bucket, the buckets of the
-// workspace to pick from, Older the ones the app left, and what the agent
+// workspace to pick from, Older the ones the app left, and what the daemon
 // reports about its databases with the moments to go back to.
 type BackupsView struct {
 	App       model.App
@@ -30,7 +30,7 @@ type BackupsView struct {
 	Now   time.Time
 }
 
-// backupOf is what the agent reports about one database.
+// backupOf is what the daemon reports about one database.
 func (view BackupsView) backupOf(database string) (service.DatabaseBackups, bool) {
 	for _, backup := range view.Databases {
 		if backup.Database == database {

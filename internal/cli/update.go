@@ -142,8 +142,8 @@ func update(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 }
 
-// agentUpdates shows or sets whether the agents update by themselves.
-func agentUpdates(ctx context.Context, args []string, stdout io.Writer) error {
+// daemonUpdates shows or sets whether the daemons update by themselves.
+func daemonUpdates(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("servers auto-update", "servers auto-update [on|off]")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -156,15 +156,15 @@ func agentUpdates(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	if flags.NArg() == 0 {
-		on, err := api.AgentUpdates(ctx)
+		on, err := api.DaemonUpdates(ctx)
 		if err != nil {
 			return err
 		}
 		if on {
-			fmt.Fprintln(stdout, "Agents update to the control plane's version by themselves: on")
+			fmt.Fprintln(stdout, "Daemons update to the control plane's version by themselves: on")
 			hint(stdout, "Turn it off with", build.Name+" servers auto-update off")
 		} else {
-			fmt.Fprintln(stdout, "Agents update to the control plane's version by themselves: off")
+			fmt.Fprintln(stdout, "Daemons update to the control plane's version by themselves: off")
 			hint(stdout, "Update them by hand with", build.Name+" servers update")
 		}
 		return nil
@@ -177,13 +177,13 @@ func agentUpdates(ctx context.Context, args []string, stdout io.Writer) error {
 	default:
 		return flags.wrong()
 	}
-	if err := api.SetAgentUpdates(ctx, on); err != nil {
+	if err := api.SetDaemonUpdates(ctx, on); err != nil {
 		return err
 	}
 	if on {
-		done(stdout, "Agents update by themselves now, one server at a time")
+		done(stdout, "Daemons update by themselves now, one server at a time")
 	} else {
-		done(stdout, "Agents no longer update by themselves. Update them with %s", build.Name+" servers update")
+		done(stdout, "Daemons no longer update by themselves. Update them with %s", build.Name+" servers update")
 	}
 	return nil
 }

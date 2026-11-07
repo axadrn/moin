@@ -32,16 +32,16 @@ func (h *ServersHandler) ServersPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list servers failed", err)
 		return
 	}
-	autoUpdate, err := h.servers.AutoUpdateAgents(workspace.ID)
+	autoUpdate, err := h.servers.AutoUpdateDaemons(workspace.ID)
 	if err != nil {
-		renderError(w, "read agent updates failed", err)
+		renderError(w, "read daemon updates failed", err)
 		return
 	}
 	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers), autoUpdate))
 }
 
 // removed is the server Delete just removed, named in ?removed=, so the
-// list can show the command that removes its agent on the machine.
+// list can show the command that removes its daemon on the machine.
 func (h *ServersHandler) removed(r *http.Request, servers []model.Server) *pages.RemovedServer {
 	name := r.URL.Query().Get("removed")
 	if name == "" || slices.ContainsFunc(servers, func(server model.Server) bool { return server.Name == name }) {
@@ -92,7 +92,7 @@ func (h *ServersHandler) NewInstall(w http.ResponseWriter, r *http.Request) {
 
 // Install answers whether the install command on the page is still needed.
 // It works once: while it is unused the server still holds its token and
-// the page keeps it; once an agent used it, the answer takes its place.
+// the page keeps it; once a daemon used it, the answer takes its place.
 func (h *ServersHandler) Install(w http.ResponseWriter, r *http.Request) {
 	server, err := h.servers.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("id"))
 	switch {
@@ -123,33 +123,33 @@ func (h *ServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Server not removed", err, nil)
 		return
 	}
-	// The list names a server whose agent connected, to show how to remove
-	// the agent there.
+	// The list names a server whose daemon connected, to show how to remove
+	// the daemon there.
 	if uninstall != "" && name != "" {
 		location += "?removed=" + url.QueryEscape(name)
 	}
 	if len(apps) > 0 {
-		answerDone(w, r, "Removed "+name+" and its apps", strings.Join(apps, ", ")+". They stay on the server if it comes back; remove them there with "+build.Name+" agent uninstall --apps.")
+		answerDone(w, r, "Removed "+name+" and its apps", strings.Join(apps, ", ")+". They stay on the server if it comes back; remove them there with "+build.Name+" daemon uninstall --apps.")
 	}
 	redirect(w, r, location, http.StatusSeeOther)
 }
 
-// UpdateAgent has the server's agent update itself and says how it went. The
+// UpdateDaemon has the server's daemon update itself and says how it went. The
 // event stream reloads the list with the new version.
-func (h *ServersHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
-	server, err := h.servers.UpdateAgent(r.Context(), actor(r), r.PathValue("id"))
+func (h *ServersHandler) UpdateDaemon(w http.ResponseWriter, r *http.Request) {
+	server, err := h.servers.UpdateDaemon(r.Context(), actor(r), r.PathValue("id"))
 	if err != nil {
-		failed(w, r, "Agent not updated", err, nil)
+		failed(w, r, "Daemon not updated", err, nil)
 		return
 	}
-	answerDone(w, r, "Agent updated", server.Name+" runs agent "+server.AgentVersion+" now.")
+	answerDone(w, r, "Daemon updated", server.Name+" runs daemon "+server.DaemonVersion+" now.")
 }
 
-// AgentUpdates turns automatic agent updates on or off and answers the
+// DaemonUpdates turns automatic daemon updates on or off and answers the
 // switch as stored, so a failed save flips it back.
-func (h *ServersHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
-	err := h.servers.SetAutoUpdateAgents(actor(r), r.FormValue("on") == "1")
-	on, getErr := h.servers.AutoUpdateAgents(ctxkeys.Workspace(r.Context()).ID)
+func (h *ServersHandler) DaemonUpdates(w http.ResponseWriter, r *http.Request) {
+	err := h.servers.SetAutoUpdateDaemons(actor(r), r.FormValue("on") == "1")
+	on, getErr := h.servers.AutoUpdateDaemons(ctxkeys.Workspace(r.Context()).ID)
 	if getErr != nil {
 		failed(w, r, "Setting not saved", getErr, nil)
 		return
@@ -157,5 +157,5 @@ func (h *ServersHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		answerError(w, r, "Setting not saved", errorMessage(err))
 	}
-	render(w, r, pages.AgentUpdatesForm(on))
+	render(w, r, pages.DaemonUpdatesForm(on))
 }

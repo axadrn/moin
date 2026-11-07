@@ -219,9 +219,9 @@ func (m model) viewKeys() []kb {
 	case vExec:
 		return []kb{{"enter", "run"}, {"@service", "picks one"}, {"↑↓", "scroll"}, {"esc", "back"}}
 	case vServers:
-		return []kb{{"↑↓", "select"}, {"enter", "open"}, {"u", "update agent"}, {"esc", "back"}}
+		return []kb{{"↑↓", "select"}, {"enter", "open"}, {"u", "update daemon"}, {"esc", "back"}}
 	case vServer:
-		return []kb{{"[ ]", "range"}, {"enter", "app"}, {"u", "update agent"}, {"W", "web"}, {"esc", "back"}}
+		return []kb{{"[ ]", "range"}, {"enter", "app"}, {"u", "update daemon"}, {"W", "web"}, {"esc", "back"}}
 	case vActivity:
 		return []kb{{"↑↓", "scroll"}, {"enter", "open"}, {"esc", "back"}}
 	case vWeb:

@@ -14,7 +14,7 @@ you: moin exec shop -- ls /data
 control plane             │
   │                       │
   ▼                       │
-agent, on the line        │
+daemon, on the line       │
 it already has open       │
   │                       │
   ▼                       │
@@ -64,4 +64,4 @@ Everything after `--` is the command, word by word. For pipes and the like, ask 
 exec: off
 ```
 
-A refused command says `refused by the rules of this server (/etc/moin/rules): exec: off`. An agent older than this feature answers `update it`: `moin servers update <server>`.
+A refused command says `refused by the rules of this server (/etc/moin/rules): exec: off`. A daemon older than this feature answers `update it`: `moin servers update <server>`.

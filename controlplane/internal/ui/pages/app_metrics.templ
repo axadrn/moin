@@ -33,7 +33,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 	{{ marks := deployMarks(m.Points, m.Deploys) }}
 	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.ServerOnline && m.Server != "" {
-			<p class="px-1 text-sm text-failed" data-server-offline>{ m.Server } is offline: its agent sends no metrics.</p>
+			<p class="px-1 text-sm text-failed" data-server-offline>{ m.Server } is offline: its daemon sends no metrics.</p>
 		}
 		@serverRangeSelect(path, m.Range.Name)
 		@kit.Section("Now", nil) {
@@ -56,7 +56,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 			if len(times) == 0 {
 				@kit.Card("", nil) {
 					@kit.Quiet() {
-						No metrics yet. The agent sends them every 15 seconds while the app runs.
+						No metrics yet. The daemon sends them every 15 seconds while the app runs.
 					}
 					@kit.Command("moin metrics " + view.App.Name)
 				}
@@ -110,7 +110,7 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 	{{ times := metricsTimes(m.Points) }}
 	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.Online {
-			<p class="px-1 text-sm text-failed" data-server-offline>The server is offline: its agent sends no metrics.</p>
+			<p class="px-1 text-sm text-failed" data-server-offline>The server is offline: its daemon sends no metrics.</p>
 		}
 		@serverRangeSelect(path, m.Range.Name)
 		@kit.Section("Now", nil) {
@@ -134,7 +134,7 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 			if len(times) == 0 {
 				@kit.Card("", nil) {
 					@kit.Quiet() {
-						No metrics yet. The agent sends them every 15 seconds.
+						No metrics yet. The daemon sends them every 15 seconds.
 					}
 					@kit.Command("moin metrics --server " + view.Server.Name)
 				}

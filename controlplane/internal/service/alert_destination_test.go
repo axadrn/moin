@@ -203,7 +203,7 @@ func TestAlertDestinationsGetTheExactMessages(t *testing.T) {
 	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"server.down","workspace":"owner-workspace","app":"","server":"web-1","domain":"","reason":"","since":"2026-11-03T14:00:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace/servers"}` {
 		t.Errorf("webhook server.down = %s", body)
 	}
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Server web-1 is offline</b>\nIts agent has not answered since 2026-11-03 14:00 UTC.\nApps on it: shop.\n<a href=\"https://moin.example.com/app/owner-workspace/servers\">Open in moin</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Server web-1 is offline</b>\nIts daemon has not answered since 2026-11-03 14:00 UTC.\nApps on it: shop.\n<a href=\"https://moin.example.com/app/owner-workspace/servers\">Open in moin</a>" {
 		t.Errorf("telegram server.down = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "deploy.failed", "shop", map[string]string{"number": "4", "error": "build <x> & *y*_z"}, at)

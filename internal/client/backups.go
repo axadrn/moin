@@ -29,7 +29,7 @@ type BackupSchedule struct {
 	EveryChange  bool `json:"every_change"`
 }
 
-// DatabaseBackup is how one database is backed up, as the agent reports
+// DatabaseBackup is how one database is backed up, as the daemon reports
 // it: protocol.DatabaseBackup under the API's own names.
 type DatabaseBackup struct {
 	Database   string          `json:"database"`
@@ -169,7 +169,7 @@ func (c *Client) SetBackupSchedule(ctx context.Context, app string, schedule Bac
 // Restore puts a database back to a moment from Backups, by its ID or
 // label, or to a time: that minute with Every change, else the newest
 // copy at or before it.
-// It waits until the agent is done: a restore runs on its own on the
+// It waits until the daemon is done: a restore runs on its own on the
 // control plane, as a big database takes a while.
 // confirm is the app's name as the user typed it; the control plane
 // refuses a restore without it.
@@ -249,7 +249,7 @@ func transient(err error) bool {
 // restorePoll is how often Restore asks how a restore stands.
 var restorePoll = time.Second
 
-// Restore is a restore the agent runs: running, then done or failed.
+// Restore is a restore the daemon runs: running, then done or failed.
 type Restore struct {
 	ID       string `json:"id"`
 	Database string `json:"database"`

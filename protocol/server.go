@@ -2,16 +2,16 @@ package protocol
 
 import "strings"
 
-// Hello describes the agent and its server.
+// Hello describes the daemon and its server.
 type Hello struct {
 	ProtocolVersion int    `json:"protocol_version"`
-	AgentVersion    string `json:"agent_version"`
+	DaemonVersion   string `json:"daemon_version"`
 	Hostname        string `json:"hostname"`
 	OS              string `json:"os"`
 	Arch            string `json:"arch"`
 	// Addresses are the server's own public IPv4 and IPv6 addresses, as far
-	// as it knows them. Older agents send none; the control plane then knows
-	// only the address the agent connected from.
+	// as it knows them. Older daemons send none; the control plane then knows
+	// only the address the daemon connected from.
 	Addresses []string `json:"addresses,omitempty"`
 	// Rules are the server's own rules for moin, from /etc/moin/rules. Nil
 	// means the server has none and moin may do everything.
@@ -20,7 +20,7 @@ type Hello struct {
 
 // Rules are what the owner of a server allows moin to do there, written in
 // /etc/moin/rules on the server. The control plane cannot change them; the
-// agent refuses every request they do not allow.
+// daemon refuses every request they do not allow.
 type Rules struct {
 	// DataOff refuses tables, SQL and row edits.
 	DataOff bool `json:"data_off,omitempty"`
@@ -71,11 +71,11 @@ type RegisterRequest struct {
 	Hello
 }
 
-// RegisterResponse answers a register call. The agent stores the token and
+// RegisterResponse answers a register call. The daemon stores the token and
 // uses it for every session.
 type RegisterResponse struct {
-	ServerID   string `json:"server_id"`
-	AgentToken string `json:"agent_token"`
+	ServerID    string `json:"server_id"`
+	DaemonToken string `json:"daemon_token"`
 }
 
 // ServerConfig is how a server is reached and locked down.
@@ -92,7 +92,7 @@ type ServerConfig struct {
 	Firewall       bool   `json:"firewall,omitempty"`
 }
 
-// ServerConfigResult is what the agent set up. Problems are the parts it
+// ServerConfigResult is what the daemon set up. Problems are the parts it
 // could not, in words; the rest stands.
 type ServerConfigResult struct {
 	Proxy       string   `json:"proxy"`

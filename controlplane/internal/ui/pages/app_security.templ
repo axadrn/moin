@@ -19,7 +19,7 @@ type SecurityView struct {
 }
 
 // ServerSecurity is the page of one server: how it is reached, what the
-// agent set up, the keys all servers share, its rules, its name, a new
+// daemon set up, the keys all servers share, its rules, its name, a new
 // install command, and removing it at the end.
 templ ServerSecurity(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
@@ -52,16 +52,16 @@ templ ServerSecurity(view SecurityView) {
 					</form>
 				}
 				@kit.List() {
-					if server.Online && agentOutdated(server) {
-						@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.ID + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-agent": server.Name}) {
-							@kit.RowText("Update agent", server.AgentVersion+" → "+build.Version)
+					if server.Online && daemonOutdated(server) {
+						@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.ID + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}) {
+							@kit.RowText("Update daemon", server.DaemonVersion+" → "+build.Version)
 						}
 					}
 					@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.ID + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}) {
 						@kit.RowText("New install command", "The old one stops working")
 					}
 				}
-				// The new command shows here, out of band, until its agent
+				// The new command shows here, out of band, until its daemon
 				// used it.
 				<div id="server-added" class="empty:hidden"></div>
 				@kit.List() {
@@ -75,7 +75,7 @@ templ ServerSecurity(view SecurityView) {
 						"hx-delete":          basePath + "/servers/" + server.ID,
 						"hx-swap":            "none",
 						"hx-disable":         "this",
-						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its agent and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin agent uninstall --apps."),
+						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
 						"data-confirm-name":  server.Name,
 						"data-confirm-action": "Remove server",
 						"data-remove-server": server.Name,
@@ -90,7 +90,7 @@ templ ServerSecurity(view SecurityView) {
 	}
 }
 
-// securityState is the switches and what the agent set up. The page
+// securityState is the switches and what the daemon set up. The page
 // reloads it when the server changes, unless a switch waits for Apply.
 templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
@@ -116,7 +116,7 @@ templ securityState(view SecurityView, securityPath string) {
 			</div>
 		</form>
 		if report != nil {
-			@kit.Section("What the agent set up", nil) {
+			@kit.Section("What the daemon set up", nil) {
 				<div data-security-report>
 					@kit.List() {
 						@securityFact("Traffic", "", proxyText(report.Proxy))
@@ -134,7 +134,7 @@ templ securityState(view SecurityView, securityPath string) {
 	</div>
 }
 
-// securityFact is a row of what the agent set up: the name and a note
+// securityFact is a row of what the daemon set up: the name and a note
 // left, the value right.
 templ securityFact(name, note, value string) {
 	@kit.RowFact(name, note) {
@@ -264,7 +264,7 @@ func portsNote(firewall bool) string {
 }
 
 // tailnetText and tailnetNote say where the server stands on the tailnet.
-// The agent joins it only for SSH on Tailscale.
+// The daemon joins it only for SSH on Tailscale.
 func tailnetText(ip string, key, sshOnTailscale bool) string {
 	switch {
 	case ip != "":
@@ -289,7 +289,7 @@ func tailnetNote(ip string, key, sshOnTailscale bool) string {
 	return "Add a Tailscale auth key below: the server joins your tailnet, then SSH can answer only there."
 }
 
-// serverRules shows /etc/moin/rules of the server as the agent reported it.
+// serverRules shows /etc/moin/rules of the server as the daemon reported it.
 // Only the owner of the server changes them, on the server.
 templ serverRules(server model.Server) {
 	{{ rules := service.ServerRules(server) }}
@@ -308,7 +308,7 @@ templ serverRules(server model.Server) {
 				@kit.Card("", nil) {
 					<pre class="overflow-x-auto font-mono text-sm leading-relaxed" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
 					@kit.Quiet() {
-						From <code class="font-mono">/etc/moin/rules</code> on the server. The agent refuses the rest.
+						From <code class="font-mono">/etc/moin/rules</code> on the server. The daemon refuses the rest.
 					}
 				}
 			}

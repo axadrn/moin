@@ -47,12 +47,12 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_status` | whether everything is OK: what needs you, catalog updates and counts | read |
 | `list_servers` | servers with live status | read |
 | `add_server` | adds a server, returns its install command | write |
-| `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no agent ever connected, and the `apps` that went with an offline server | write, destructive |
+| `remove_server` | removes a server; `confirm` is its name; returns the `uninstall_command` for the server, empty when no daemon ever connected, and the `apps` that went with an offline server | write, destructive |
 | `new_install_command` | a new one-time install command for a server | write, destructive |
 | `rename_server` | renames a server | write |
-| `update_agent` | puts the control plane's agent version on a server | write |
-| `set_agent_updates` | turns automatic agent updates on or off | write |
-| `get_version` | the control plane's version, the newest version of moin and whether agents update by themselves | read |
+| `update_daemon` | puts the control plane's daemon version on a server | write |
+| `set_daemon_updates` | turns automatic daemon updates on or off | write |
+| `get_version` | the control plane's version, the newest version of moin and whether daemons update by themselves | read |
 | `update_control_plane` | updates a self-hosted control plane to the newest version, for its admins | write |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |

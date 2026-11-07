@@ -41,7 +41,7 @@ Run the command it prints on the server, as root, within the hour:
 curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 ```
 
-It installs Docker if it is missing and starts the agent, the little helper that only calls out to moin. `moin servers` shows the server `online`.
+It installs Docker if it is missing and starts the daemon, the little helper that only calls out to moin. `moin servers` shows the server `online`.
 
 ## 3. Add your bucket
 
@@ -92,7 +92,7 @@ No Dockerfile needed: moin builds Node, Bun, Python, Ruby, PHP, Go and more, or 
 
 ## Next
 
-- [Why moin](/docs/why-moin): one binary, an agent that only dials out, restores that are checked.
+- [Why moin](/docs/why-moin): one binary, a daemon that only dials out, restores that are checked.
 - [Palette and keys](/docs/reference/palette): `⌘K` finds everything.
 - [Catalog](/docs/guides/catalog): n8n, Umami, Open WebUI and more in one click.
 - [Backups](/docs/guides/backups) and [Security](/docs/guides/security).

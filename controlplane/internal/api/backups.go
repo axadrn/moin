@@ -33,7 +33,7 @@ type AppBackups struct {
 	Databases []DatabaseBackups `json:"databases"`
 }
 
-// DatabaseBackup is how one database is backed up, as the agent reports
+// DatabaseBackup is how one database is backed up, as the daemon reports
 // it: protocol.DatabaseBackup under the API's own names. since and until
 // are how far Every change reaches.
 type DatabaseBackup struct {
@@ -49,7 +49,7 @@ type DatabaseBackup struct {
 	Error      string          `json:"error,omitempty"`
 }
 
-// DatabaseBackups is the backup of one database: what the agent reports,
+// DatabaseBackups is the backup of one database: what the daemon reports,
 // problem as one short sentence when it does not work, and the moments a
 // restore can go back to, the quick minutes first, then the copies and
 // the undos, newest first.
@@ -156,7 +156,7 @@ func (h *AppsHandler) SetBackupSchedule(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, NewBackupSchedule(app))
 }
 
-// Restore is a restore the agent runs: running, then done or failed with
+// Restore is a restore the daemon runs: running, then done or failed with
 // error. To is the moment it goes back to, as people read it.
 type Restore struct {
 	ID         string     `json:"id"`
@@ -174,7 +174,7 @@ func NewRestore(restore *service.Restore) Restore {
 	return Restore{ID: restore.ID, App: restore.App, Database: restore.Database, To: restore.To, State: restore.State, Error: restore.Error, StartedAt: restore.StartedAt, FinishedAt: restore.FinishedAt}
 }
 
-// StartRestore checks the moment and has the agent put the database back
+// StartRestore checks the moment and has the daemon put the database back
 // to it, on its own: 202 with the restore to follow.
 func (h *AppsHandler) StartRestore(w http.ResponseWriter, r *http.Request) {
 	var request RestoreRequest

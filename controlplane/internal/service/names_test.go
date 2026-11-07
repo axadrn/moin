@@ -8,7 +8,7 @@ import (
 
 // TestBadNamesStopBeforeTheServer: a restore without a moment or a
 // made-up ref name is refused before moin looks anything up, sends it to
-// GitHub or to an agent.
+// GitHub or to a daemon.
 func TestBadNamesStopBeforeTheServer(t *testing.T) {
 	s := &AppService{}
 	ctx := context.Background()

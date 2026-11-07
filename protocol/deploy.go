@@ -8,9 +8,9 @@ import (
 )
 
 // DeployStart is one deploy. Number counts per app. A rollback carries
-// FromNumber and no source: the agent starts that release's images again,
+// FromNumber and no source: the daemon starts that release's images again,
 // with the env it had. Image replaces the build of the main service with an
-// image built elsewhere, such as in CI; without a source the agent takes the
+// image built elsewhere, such as in CI; without a source the daemon takes the
 // compose file of the running release. Without source, image and FromNumber
 // the deploy applies env and domains to the running release, without a
 // build.
@@ -44,7 +44,7 @@ type DeployStart struct {
 // Domains is how visitors reach the main service, as set in web, CLI, TUI
 // or MCP. The x-moin block of compose.yml wins for every field it sets.
 // Protect is an htpasswd line ("user:bcrypt hash") when password protection
-// is on. DeployStart carries it under the JSON key routing, which agents of
+// is on. DeployStart carries it under the JSON key routing, which daemons of
 // protocol version 1 read.
 type Domains struct {
 	Domains   []string `json:"domains,omitempty"`
@@ -88,13 +88,13 @@ type DeployLog struct {
 	Line     string `json:"line"`
 }
 
-// DeployDone reports how a deploy ended and what the agent found.
+// DeployDone reports how a deploy ended and what the daemon found.
 type DeployDone struct {
 	DeployID string   `json:"deploy_id"`
 	OK       bool     `json:"ok"`
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
-	// Before is when the agent took the copies just before the new
+	// Before is when the daemon took the copies just before the new
 	// release started over an older one, which is their ID in
 	// CopyIDLayout: the control plane names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`

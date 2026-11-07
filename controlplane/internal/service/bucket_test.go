@@ -12,9 +12,9 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// answerBackupConfigs answers every backup config the agent gets, so a
+// answerBackupConfigs answers every backup config the daemon gets, so a
 // change waits for no one.
-func answerBackupConfigs(t *testing.T, servers *ServerService, serverID string, agent *fakeAgent) {
+func answerBackupConfigs(t *testing.T, servers *ServerService, serverID string, daemon *fakeDaemon) {
 	t.Helper()
 	done := make(chan struct{})
 	t.Cleanup(func() { close(done) })
@@ -27,14 +27,14 @@ func answerBackupConfigs(t *testing.T, servers *ServerService, serverID string, 
 			case <-time.After(time.Millisecond):
 			}
 			var open []string
-			agent.mu.Lock()
-			for _, sent := range agent.sent {
+			daemon.mu.Lock()
+			for _, sent := range daemon.sent {
 				if sent.Type == protocol.TypeBackupConfig && !answered[sent.RequestID] {
 					answered[sent.RequestID] = true
 					open = append(open, sent.RequestID)
 				}
 			}
-			agent.mu.Unlock()
+			daemon.mu.Unlock()
 			for _, id := range open {
 				message, _ := protocol.NewMessage(protocol.TypeOK, nil)
 				message.RequestID = id
@@ -53,11 +53,11 @@ func fakeBucket(t *testing.T) string {
 }
 
 // TestBuckets: the bucket a workspace had stays its default, an app picks
-// another one, the agent gets both in the old shape plus the app's own,
+// another one, the daemon gets both in the old shape plus the app's own,
 // and a bucket in use is not removed.
 func TestBuckets(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
-	answerBackupConfigs(t, servers, server.ID, agent)
+	apps, servers, server, daemon := newAppService(t)
+	answerBackupConfigs(t, servers, server.ID, daemon)
 	ctx := context.Background()
 	endpoint := fakeBucket(t)
 	blog, err := apps.Create(owner, "blog", server.ID)
@@ -68,7 +68,7 @@ func TestBuckets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The default serves every app; nothing changes for the agent.
+	// The default serves every app; nothing changes for the daemon.
 	current, err := apps.AppBucket(blog)
 	if err != nil || current.Name != "default" || !current.Default {
 		t.Fatalf("blog's bucket = %+v, %v", current, err)
@@ -95,14 +95,14 @@ func TestBuckets(t *testing.T) {
 	}
 
 	// blog moves: uploads and backups go to client-a, shop stays on the
-	// default, and the agent still gets the default as Bucket.
+	// default, and the daemon still gets the default as Bucket.
 	moved, err := apps.SetAppBucket(owner, "blog", "client-a")
 	if err != nil || moved.BucketName != "client-a" {
 		t.Fatalf("move blog = %+v, %v", moved, err)
 	}
 	config = apps.backupConfig(owner.WorkspaceID, server.ID)
 	if config.Bucket == nil || config.Bucket.Bucket != "owner" {
-		t.Fatalf("the default for old agents = %+v", config.Bucket)
+		t.Fatalf("the default for old daemons = %+v", config.Bucket)
 	}
 	if own := config.AppBuckets["blog"]; own == nil || own.Bucket != "client" || own.SecretKey != "secret-a" || own.Workspace != owner.WorkspaceID || own.Name != "client-a" {
 		t.Fatalf("blog's own bucket = %+v", config.AppBuckets)

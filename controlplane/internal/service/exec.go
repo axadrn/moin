@@ -63,7 +63,7 @@ func (s *AppService) execServices(app *model.App) []string {
 	return services
 }
 
-// Exec runs a command in a container of an app through its server's agent,
+// Exec runs a command in a container of an app through its server's daemon,
 // and hands what it writes to output as it comes. Only owners and admins
 // may: a command can read and change everything the app can. The activity
 // records the command, masked, and how it ended; never its output.
@@ -92,7 +92,7 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 		timeout = protocol.ExecTimeout
 	}
 	timeout = min(timeout, protocol.ExecMaxTimeout)
-	// A little longer than the agent's own timeout, so its answer comes first.
+	// A little longer than the daemon's own timeout, so its answer comes first.
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second+30*time.Second)
 	defer cancel()
 	result := ExecResult{Service: service, ExitCode: -1}
@@ -111,7 +111,7 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 				return true, err
 			}
 			if done.Error != "" {
-				return true, &AgentError{Message: done.Error}
+				return true, &DaemonError{Message: done.Error}
 			}
 			result.ExitCode, result.Truncated, result.TimedOut = done.ExitCode, done.Truncated, done.TimedOut
 			return true, nil

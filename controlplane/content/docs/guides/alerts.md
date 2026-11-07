@@ -22,7 +22,7 @@ One alert per event, never one per minute, and one when it is fixed. Each links 
 | Event | When |
 | --- | --- |
 | `uptime.down`, `uptime.up` | a site goes down, with the reason such as `HTTP 502`; back up, with how long it was down ([Uptime](/docs/guides/uptime#down-and-back-up)) |
-| `server.down`, `server.up` | an agent has not answered for two minutes, with the apps on the server; back online |
+| `server.down`, `server.up` | a daemon has not answered for two minutes, with the apps on the server; back online |
 | `deploy.failed` | a deploy fails, with its number, the error and the version that runs now ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
 | `backup.failed`, `backup.recovered` | a copy of a database, or Every change, does not reach the bucket; and when it works again. What is in the bucket stays ([Backups](/docs/guides/backups)) |
 | `check.failed`, `check.recovered` | the daily check could not restore the newest copy; passes again |

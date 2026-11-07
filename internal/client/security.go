@@ -20,7 +20,7 @@ type Security struct {
 }
 
 // SetSecurity applies the settings and returns the server with what its
-// agent set up.
+// daemon set up.
 func (c *Client) SetSecurity(ctx context.Context, server string, security Security) (Server, error) {
 	var answer Server
 	err := c.do(ctx, http.MethodPut, "/api/v1/servers/"+server+"/security", security, &answer)

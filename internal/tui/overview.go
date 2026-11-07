@@ -189,7 +189,7 @@ func (m model) tiles(u ui, c client.StatusCounts, w int) string {
 	case c.AppsLive < c.Apps:
 		appsSub = fmt.Sprintf("%d not live", c.Apps-c.AppsLive)
 	}
-	srvSub := "agents dialed in"
+	srvSub := "daemons dialed in"
 	if off := c.Servers - c.ServersOnline; off > 0 {
 		srvSub = u.bad(fmt.Sprintf("%d offline", off))
 	} else if c.Servers == 0 {
@@ -205,19 +205,19 @@ func (m model) tiles(u ui, c client.StatusCounts, w int) string {
 	updSub := "everything current"
 	updBig := u.strong("0")
 	if upd > 0 {
-		agents, apps := 0, 0
+		daemons, apps := 0, 0
 		for _, i := range m.issues() {
 			switch {
 			case i.word != "update":
-			case i.server != "" || strings.Contains(i.detail, "agent"):
-				agents++
+			case i.server != "" || strings.Contains(i.detail, "daemon"):
+				daemons++
 			default:
 				apps++
 			}
 		}
 		var what []string
-		if agents > 0 {
-			what = append(what, plural(agents, "agent"))
+		if daemons > 0 {
+			what = append(what, plural(daemons, "daemon"))
 		}
 		if apps > 0 {
 			what = append(what, plural(apps, "app"))
@@ -348,9 +348,9 @@ func (m model) serversPanel(u ui, w, h int) string {
 			mem = u.text(client.Share(float64(now.MemoryUsed), float64(now.MemoryTotal)))
 			spark = u.spark(m.cpu[s.Name], sw, u.p.Muted)
 		}
-		agent := u.faint(s.AgentVersion)
+		daemon := u.faint(s.DaemonVersion)
 		if s.Outdated(m.ws.version) {
-			agent = u.warn(s.AgentVersion + " ↑")
+			daemon = u.warn(s.DaemonVersion + " ↑")
 		}
 		cells := []cell{{name, 14, false}}
 		if !s.Online {
@@ -359,7 +359,7 @@ func (m model) serversPanel(u ui, w, h int) string {
 			if iw >= 64 {
 				cells = append(cells, cell{u.faint("cpu ") + padR(spark, sw), sw + 4, false})
 			}
-			cells = append(cells, cell{cpu, 4, true}, cell{u.faint("mem ") + padL(mem, 4), 8, false}, cell{agent, 0, true})
+			cells = append(cells, cell{cpu, 4, true}, cell{u.faint("mem ") + padL(mem, 4), 8, false}, cell{daemon, 0, true})
 		}
 		body = append(body, u.row(cells, iw, focus && i == at))
 	}

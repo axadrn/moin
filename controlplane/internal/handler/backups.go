@@ -169,10 +169,10 @@ func (h *AppsHandler) renderBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 // backupsView is how an app is backed up: its bucket and the buckets to
-// pick from, and with agent what the agent reports and the newest copy to
+// pick from, and with daemon what the daemon reports and the newest copy to
 // download of database. Error in the view says why the server could not
 // report its backups: a state of the page, not of a click.
-func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool, database string) (pages.BackupsView, error) {
+func (h *AppsHandler) backupsView(r *http.Request, app *model.App, daemon bool, database string) (pages.BackupsView, error) {
 	workspace := ctxkeys.Workspace(r.Context())
 	view := pages.BackupsView{App: *app, Now: time.Now()}
 	var err error
@@ -191,7 +191,7 @@ func (h *AppsHandler) backupsView(r *http.Request, app *model.App, agent bool, d
 	if err != nil {
 		return view, err
 	}
-	if agent {
+	if daemon {
 		_, view.Databases, err = h.apps.Backups(r.Context(), workspace.ID, app.ID)
 		if err != nil {
 			view.Error = errorMessage(err)

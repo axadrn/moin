@@ -10,7 +10,7 @@ import (
 )
 
 // VersionHandler answers the version of the control plane, the newest
-// release and the update, and the workspace's automatic agent updates.
+// release and the update, and the workspace's automatic daemon updates.
 type VersionHandler struct {
 	updates *service.UpdateService
 	servers *service.ServerService
@@ -22,7 +22,7 @@ func NewVersionHandler(updates *service.UpdateService, servers *service.ServerSe
 
 // VersionInfo is the answer of GET /api/v1/version.
 type VersionInfo struct {
-	// Version is the control plane's version, the one agents update to.
+	// Version is the control plane's version, the one daemons update to.
 	Version string `json:"version"`
 	// SelfHosted is false on the hosted control plane, which updates with
 	// every release; the fields below stay empty there.
@@ -66,24 +66,24 @@ func (h *VersionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusAccepted, NewVersion(info))
 }
 
-// AgentUpdates is the answer of GET and PUT /api/v1/agent-updates.
-type AgentUpdates struct {
-	// Auto updates every agent older than the control plane by itself.
+// DaemonUpdates is the answer of GET and PUT /api/v1/daemon-updates.
+type DaemonUpdates struct {
+	// Auto updates every daemon older than the control plane by itself.
 	Auto bool `json:"auto"`
 }
 
-// AgentUpdates answers whether the agents update by themselves.
-func (h *VersionHandler) AgentUpdates(w http.ResponseWriter, r *http.Request) {
-	on, err := h.servers.AutoUpdateAgents(ctxkeys.Workspace(r.Context()).ID)
+// DaemonUpdates answers whether the daemons update by themselves.
+func (h *VersionHandler) DaemonUpdates(w http.ResponseWriter, r *http.Request) {
+	on, err := h.servers.AutoUpdateDaemons(ctxkeys.Workspace(r.Context()).ID)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, AgentUpdates{Auto: on})
+	JSON(w, http.StatusOK, DaemonUpdates{Auto: on})
 }
 
-// SetAgentUpdates turns automatic agent updates on or off.
-func (h *VersionHandler) SetAgentUpdates(w http.ResponseWriter, r *http.Request) {
+// SetDaemonUpdates turns automatic daemon updates on or off.
+func (h *VersionHandler) SetDaemonUpdates(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Auto *bool `json:"auto"`
 	}
@@ -94,9 +94,9 @@ func (h *VersionHandler) SetAgentUpdates(w http.ResponseWriter, r *http.Request)
 		ValidationError(w, map[string]string{"auto": "Say true or false."})
 		return
 	}
-	if err := h.servers.SetAutoUpdateAgents(actor(r), *body.Auto); err != nil {
+	if err := h.servers.SetAutoUpdateDaemons(actor(r), *body.Auto); err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, AgentUpdates{Auto: *body.Auto})
+	JSON(w, http.StatusOK, DaemonUpdates{Auto: *body.Auto})
 }

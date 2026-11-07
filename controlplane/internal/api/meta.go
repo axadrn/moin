@@ -19,7 +19,7 @@ func NewMetaHandler(supportEmail string) *MetaHandler {
 type metaResponse struct {
 	Name         string `json:"name"`
 	SupportEmail string `json:"support_email"`
-	// Version is the control plane's version, the one agents update to.
+	// Version is the control plane's version, the one daemons update to.
 	Version string `json:"version"`
 }
 

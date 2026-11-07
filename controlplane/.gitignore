@@ -56,5 +56,5 @@ node_modules/
 package-lock.json
 tailwindcss
 
-# Agent binaries served at /download
+# Daemon binaries served at /download
 /downloads/

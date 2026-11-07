@@ -18,7 +18,7 @@ import (
 
 // TestBucketRoutes: buckets are added, listed and picked per app through
 // the API; a bucket in use answers 409 bucket_in_use naming the app. The
-// workspace has no online server, so no change waits for an agent.
+// workspace has no online server, so no change waits for a daemon.
 func TestBucketRoutes(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})

@@ -7,7 +7,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 )
 
-// The Logs section comes with the logs; only without them (a slow agent)
+// The Logs section comes with the logs; only without them (a slow daemon)
 // it loads them itself.
 func TestAppLogsComeWithThePage(t *testing.T) {
 	app := model.App{Name: "shop", LiveNumber: 3, LatestNumber: 3}

@@ -21,7 +21,7 @@ func TestStatus(t *testing.T) {
 		}
 	}
 	bad := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/status": `{"ok":false,"issues":[{"kind":"server.down","target":"web-1","detail":"offline: its apps may be down","path":"/servers/x/security","since":null},{"kind":"agent.behind","target":"web-2","detail":"agent v1.0.0, update pending","path":"/servers","since":null}],"updates":[],"counts":{"apps":1,"apps_live":0,"servers":2,"servers_online":1,"databases":0,"backups_checked":0}}`,
+		"GET /api/v1/status": `{"ok":false,"issues":[{"kind":"server.down","target":"web-1","detail":"offline: its apps may be down","path":"/servers/x/security","since":null},{"kind":"daemon.behind","target":"web-2","detail":"daemon v1.0.0, update pending","path":"/servers","since":null}],"updates":[],"counts":{"apps":1,"apps_live":0,"servers":2,"servers_online":1,"databases":0,"backups_checked":0}}`,
 	}}
 	code, stdout, _ = runCLI(t, bad, "status")
 	if code != 1 {

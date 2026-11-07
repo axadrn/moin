@@ -9,7 +9,7 @@ import (
 )
 
 // TestVersionOnTheHostedControlPlane: the hosted control plane answers its
-// version and nothing to update, even to an operator, and agents update by
+// version and nothing to update, even to an operator, and daemons update by
 // themselves until the workspace turns it off.
 func TestVersionOnTheHostedControlPlane(t *testing.T) {
 	environment := newAPIEnvironment(t)
@@ -32,16 +32,16 @@ func TestVersionOnTheHostedControlPlane(t *testing.T) {
 		t.Fatalf("POST update = %d %s", update.Code, update.Body)
 	}
 
-	auto := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/agent-updates", bearer: token})
+	auto := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/daemon-updates", bearer: token})
 	if auto.Code != http.StatusOK || auto.Body.String() != "{\"auto\":true}\n" {
-		t.Fatalf("GET agent-updates = %d %s", auto.Code, auto.Body)
+		t.Fatalf("GET daemon-updates = %d %s", auto.Code, auto.Body)
 	}
-	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/agent-updates", body: `{"auto":false}`, bearer: token})
+	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{"auto":false}`, bearer: token})
 	if off.Code != http.StatusOK || off.Body.String() != "{\"auto\":false}\n" {
-		t.Fatalf("PUT agent-updates = %d %s", off.Code, off.Body)
+		t.Fatalf("PUT daemon-updates = %d %s", off.Code, off.Body)
 	}
-	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/agent-updates", body: `{}`, bearer: token})
+	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{}`, bearer: token})
 	if invalid.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("PUT agent-updates {} = %d %s", invalid.Code, invalid.Body)
+		t.Fatalf("PUT daemon-updates {} = %d %s", invalid.Code, invalid.Body)
 	}
 }

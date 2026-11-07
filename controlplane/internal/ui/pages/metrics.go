@@ -73,7 +73,7 @@ func deployMarks(points []service.MetricsPoint, deploys []model.MetricsDeploy) m
 	return marks
 }
 
-// metricsChart is a chart of the range: the lines break where the agent
+// metricsChart is a chart of the range: the lines break where the daemon
 // sent nothing for a while, the axis reads the clock for a day or less
 // and the date for longer.
 func metricsChart(p metricsChartProps, times []time.Time, r service.MetricsRange) kit.ChartProps {

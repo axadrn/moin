@@ -23,8 +23,8 @@ func TestOldDomainReport(t *testing.T) {
 	if err != nil || !empty.Quiet || empty.Total != 0 {
 		t.Fatalf("empty = %+v, %v", empty, err)
 	}
-	s.Count("old.example.com", "agent")
-	s.Count("old.example.com", "agent")
+	s.Count("old.example.com", "daemon")
+	s.Count("old.example.com", "daemon")
 	s.Count("old.example.com", "web")
 	report, err := s.Report()
 	if err != nil {
@@ -34,7 +34,7 @@ func TestOldDomainReport(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	// Counts written once are not counted twice.
-	s.Count("old.example.com", "agent")
+	s.Count("old.example.com", "daemon")
 	report, _ = s.Report()
 	if report.Total != 4 {
 		t.Fatalf("total = %d, want 4", report.Total)

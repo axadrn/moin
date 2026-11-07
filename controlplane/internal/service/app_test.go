@@ -31,13 +31,13 @@ func deployUpload(apps *AppService) (*model.Deploy, error) {
 	return apps.DeployUpload(context.Background(), owner, "blog", testUpload, testSum)
 }
 
-// fakeAgent is an online server whose agent records what it gets.
-type fakeAgent struct {
+// fakeDaemon is an online server whose daemon records what it gets.
+type fakeDaemon struct {
 	mu   sync.Mutex
 	sent []protocol.Message
 }
 
-func (f *fakeAgent) last(t *testing.T, messageType protocol.MessageType, target any) protocol.Message {
+func (f *fakeDaemon) last(t *testing.T, messageType protocol.MessageType, target any) protocol.Message {
 	t.Helper()
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -51,12 +51,12 @@ func (f *fakeAgent) last(t *testing.T, messageType protocol.MessageType, target 
 			return f.sent[index]
 		}
 	}
-	t.Fatalf("the agent got no %s", messageType)
+	t.Fatalf("the daemon got no %s", messageType)
 	return protocol.Message{}
 }
 
-// count is how many messages of a type the agent got.
-func (f *fakeAgent) count(messageType protocol.MessageType) int {
+// count is how many messages of a type the daemon got.
+func (f *fakeDaemon) count(messageType protocol.MessageType) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := 0
@@ -68,7 +68,7 @@ func (f *fakeAgent) count(messageType protocol.MessageType) int {
 	return n
 }
 
-func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *fakeAgent) {
+func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *fakeDaemon) {
 	t.Helper()
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
@@ -92,17 +92,17 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent := &fakeAgent{}
+	daemon := &fakeDaemon{}
 	servers.Connect(server, testHello, "203.0.113.5", func() {}, func(message protocol.Message) error {
-		agent.mu.Lock()
-		agent.sent = append(agent.sent, message)
-		agent.mu.Unlock()
+		daemon.mu.Lock()
+		daemon.sent = append(daemon.sent, message)
+		daemon.mu.Unlock()
 		return nil
 	})
-	return apps, servers, server, agent
+	return apps, servers, server, daemon
 }
 
-func agentSays(t *testing.T, servers *ServerService, serverID string, messageType protocol.MessageType, data any) {
+func daemonSays(t *testing.T, servers *ServerService, serverID string, messageType protocol.MessageType, data any) {
 	t.Helper()
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
@@ -111,18 +111,18 @@ func agentSays(t *testing.T, servers *ServerService, serverID string, messageTyp
 	servers.Receive(serverID, message)
 }
 
-// agentAnswers waits for the request of the given type and answers it: what
-// the agent gets on connect may arrive in between.
-func agentAnswers(servers *ServerService, serverID string, agent *fakeAgent, requestType, messageType protocol.MessageType, data any) {
+// daemonAnswers waits for the request of the given type and answers it: what
+// the daemon gets on connect may arrive in between.
+func daemonAnswers(servers *ServerService, serverID string, daemon *fakeDaemon, requestType, messageType protocol.MessageType, data any) {
 	var request protocol.Message
 	for request.RequestID == "" {
-		agent.mu.Lock()
-		for _, sent := range agent.sent {
+		daemon.mu.Lock()
+		for _, sent := range daemon.sent {
 			if sent.Type == requestType {
 				request = sent
 			}
 		}
-		agent.mu.Unlock()
+		daemon.mu.Unlock()
 		time.Sleep(time.Millisecond)
 	}
 	message, _ := protocol.NewMessage(messageType, data)
@@ -131,7 +131,7 @@ func agentAnswers(servers *ServerService, serverID string, agent *fakeAgent, req
 }
 
 func TestDeployRollbackAndEnv(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "Blog", "web-1")
 	if !errors.Is(err, ErrAppName) {
 		t.Fatalf("upper case name: err = %v, want ErrAppName", err)
@@ -156,13 +156,13 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("removed = %v, %v; want OLD", removed, err)
 	}
 
-	// v1: the agent gets the source URL, its sum and the env.
+	// v1: the daemon gets the source URL, its sum and the env.
 	first, err := deployUpload(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Number != 1 || start.App != "blog" || start.SourceURL == "" || start.SHA256 == "" || start.Env["SECRET"] != "a$b" {
 		t.Fatalf("deploy.start = %+v", start)
 	}
@@ -175,14 +175,14 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stop()
-	agentSays(t, servers, server.ID, protocol.TypeDeployLog, protocol.DeployLog{DeployID: first.ID, Line: "building"})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployLog, protocol.DeployLog{DeployID: first.ID, Line: "building"})
 	<-changes
 	if got := lines(); len(got) != 1 || got[0] != "building" {
 		t.Fatalf("lines = %v", got)
 	}
 	// Another server cannot end this deploy.
-	agentSays(t, servers, "someone-else", protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: false})
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080}})
+	daemonSays(t, servers, "someone-else", protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: false})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080}})
 	if _, open := <-changes; open {
 		t.Fatal("changes stays open after done")
 	}
@@ -199,7 +199,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, Error: "build failed"})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, Error: "build failed"})
 	app, _ = apps.Get(owner.WorkspaceID, app.ID)
 	if app.LatestNumber != 2 || app.LatestStatus != model.DeployFailed || app.LiveNumber != 1 {
 		t.Fatalf("after a failed deploy: %+v", app)
@@ -219,20 +219,20 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true})
 	rollback, err := apps.Rollback(owner, "blog", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	start = protocol.DeployStart{}
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Number != 4 || start.FromNumber != 1 || start.SourceURL != "" || start.Env != nil {
 		t.Fatalf("rollback deploy.start = %+v", start)
 	}
 	if rollback.FromNumber != 1 {
 		t.Fatalf("rollback = %+v", rollback)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
 
 	// A redeploy builds the newest source again, with the env as it is now.
 	_, err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "new"}, nil)
@@ -244,23 +244,23 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	start = protocol.DeployStart{}
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Number != 5 || start.SourceNumber != third.Number || start.SourceURL != "" || start.Env["SECRET"] != "new" || redeploy.SourceKey != third.SourceKey {
 		t.Fatalf("redeploy deploy.start = %+v", start)
 	}
 
 	// The redeploy fails: the next one builds v3 again, not v5.
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, Error: "build failed"})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, Error: "build failed"})
 	redeploy, err = apps.Redeploy(owner, "blog")
 	if err != nil {
 		t.Fatal(err)
 	}
 	start = protocol.DeployStart{}
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Number != 6 || start.SourceNumber != third.Number {
 		t.Fatalf("redeploy after a failed one: deploy.start = %+v", start)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: redeploy.ID, OK: true})
 
 	// Three more builds make v1 the sixth newest build: its release is gone.
 	for range 3 {
@@ -268,7 +268,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	}
 	if _, err := apps.Rollback(owner, "blog", 1); !errors.Is(err, ErrDeployGone) {
 		t.Fatalf("rollback out of the window: err = %v", err)
@@ -278,14 +278,14 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 }
 
-func TestLogsAndDeleteAskTheAgent(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+func TestLogsAndDeleteAskTheDaemon(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "blog", server.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	answer := func(requestType, messageType protocol.MessageType, data any) {
-		agentAnswers(servers, server.ID, agent, requestType, messageType, data)
+		daemonAnswers(servers, server.ID, daemon, requestType, messageType, data)
 	}
 
 	go answer(protocol.TypeLogs, protocol.TypeLogsResult, protocol.LogsResult{Lines: []string{"web-1  | hello"}})
@@ -294,14 +294,14 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 		t.Fatalf("logs = %v, %v", lines, err)
 	}
 
-	agent.mu.Lock()
-	agent.sent = nil
-	agent.mu.Unlock()
+	daemon.mu.Lock()
+	daemon.sent = nil
+	daemon.mu.Unlock()
 	go answer(protocol.TypeAppRemove, protocol.TypeError, protocol.Error{Message: "docker is not running"})
 	err = apps.Delete(context.Background(), owner, "blog", "blog")
-	var agentErr *AgentError
-	if !errors.As(err, &agentErr) || agentErr.Message != "docker is not running" {
-		t.Fatalf("delete with an agent error: err = %v", err)
+	var daemonErr *DaemonError
+	if !errors.As(err, &daemonErr) || daemonErr.Message != "docker is not running" {
+		t.Fatalf("delete with a daemon error: err = %v", err)
 	}
 	if _, err := apps.Get(owner.WorkspaceID, "blog"); err != nil {
 		t.Fatalf("a failed delete removed the app: %v", err)
@@ -311,9 +311,9 @@ func TestLogsAndDeleteAskTheAgent(t *testing.T) {
 		t.Fatalf("delete an online server with apps: err = %v", err)
 	}
 
-	agent.mu.Lock()
-	agent.sent = nil
-	agent.mu.Unlock()
+	daemon.mu.Lock()
+	daemon.sent = nil
+	daemon.mu.Unlock()
 	go answer(protocol.TypeAppRemove, protocol.TypeOK, nil)
 	err = apps.Delete(context.Background(), owner, "blog", "blog")
 	if err != nil {
@@ -344,7 +344,7 @@ func TestDeleteOnAServerThatNeverConnected(t *testing.T) {
 	if err := apps.Delete(context.Background(), owner, "blog", "blog"); err != nil {
 		t.Fatalf("delete on a server that never connected: %v", err)
 	}
-	// No agent ever connected, so none is left to uninstall.
+	// No daemon ever connected, so none is left to uninstall.
 	if uninstall, gone, err := servers.Delete(owner, server.ID, server.Name); err != nil || uninstall != "" || len(gone) != 0 {
 		t.Fatalf("delete the empty server = %q, %v, %v", uninstall, gone, err)
 	}
@@ -387,7 +387,7 @@ func TestDeleteAnOfflineServerTakesItsApps(t *testing.T) {
 }
 
 func TestImageDeploysHooksAndRegistries(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -407,7 +407,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatalf("registries = %+v", logins)
 	}
 
-	// The hook deploys an image and hands the agent the matching login.
+	// The hook deploys an image and hands the daemon the matching login.
 	url, err := apps.RotateDeployHook(owner, "blog")
 	if err != nil || !strings.HasPrefix(url, "https://moin.example.com/webhooks/deploy/dph_") {
 		t.Fatalf("hook url = %q, %v", url, err)
@@ -418,11 +418,11 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Image != "ghcr.io/me/blog:abc" || start.SourceURL != "" || start.Registry == nil || start.Registry.Password != "ghp_secret" || deploy.Image != start.Image {
 		t.Fatalf("deploy.start = %+v", start)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 
 	// A Docker Hub image gets no ghcr.io login; a redeploy pulls the image again.
 	deploy, err = apps.Deploy(owner, "blog", "nginx:1.27")
@@ -430,11 +430,11 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatal(err)
 	}
 	start = protocol.DeployStart{}
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Registry != nil {
 		t.Fatalf("docker hub image got a login: %+v", start.Registry)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	redeploy, err := apps.Redeploy(owner, "blog")
 	if err != nil || redeploy.Image != "nginx:1.27" {
 		t.Fatalf("redeploy = %+v, %v", redeploy, err)
@@ -453,7 +453,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 }
 
 func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -476,11 +476,11 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.de" || start.Domains.Canonical != "blog.de" {
 		t.Fatalf("domains = %+v", start.Domains)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 	waiting := func() int {
 		t.Helper()
 		app, err := apps.Get(owner.WorkspaceID, "blog")
@@ -501,14 +501,14 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
 		t.Fatalf("short password: err = %v", err)
 	}
-	sent := agent.count(protocol.TypeDeployStart)
+	sent := daemon.count(protocol.TypeDeployStart)
 	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
 		t.Fatalf("set protection = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil || !changed {
 		t.Fatalf("set domains = %v, %v", changed, err)
 	}
-	if agent.count(protocol.TypeDeployStart) != sent {
+	if daemon.count(protocol.TypeDeployStart) != sent {
 		t.Fatal("saving started a deploy")
 	}
 	if n := waiting(); n != 2 {
@@ -528,11 +528,11 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	start = protocol.DeployStart{}
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.SourceURL != "" || start.Image != "" || !strings.HasPrefix(start.Domains.Protect, "me:$2a$") || len(start.Domains.Domains) != 1 {
 		t.Fatalf("restart deploy.start = %+v", start)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: restarted.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: restarted.ID, OK: true})
 	if n := waiting(); n != 0 {
 		t.Fatalf("changes waiting after the restart = %d", n)
 	}
@@ -570,7 +570,7 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 		t.Fatal(err)
 	}
 	detected := protocol.Detected{Kind: "compose", Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de", Config: &protocol.Config{Domains: []string{"shop.de", "www.shop.de"}, Canonical: "shop.de"}}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
 	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
 	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.de" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
 		t.Fatalf("checks = %+v, %v", checks, err)
@@ -581,7 +581,7 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 }
 
 func TestServerAddressesAndAdvice(t *testing.T) {
-	// An agent that connects over IPv6 and reports its IPv4 too.
+	// A daemon that connects over IPv6 and reports its IPv4 too.
 	server := model.Server{Address: "2a01:4f8::1", Addresses: "203.0.113.7 2a01:4f8::1"}
 	ipv4, ipv6 := ServerAddresses(server)
 	if ipv4 != "203.0.113.7" || ipv6 != "2a01:4f8::1" {
@@ -593,7 +593,7 @@ func TestServerAddressesAndAdvice(t *testing.T) {
 	if advice := DNSAdvice("", ipv6); advice != "AAAA record to 2a01:4f8::1" {
 		t.Fatalf("advice without IPv4 = %q", advice)
 	}
-	// An agent next to the control plane connects from loopback or a
+	// A daemon next to the control plane connects from loopback or a
 	// private network; only its reported public address counts.
 	for _, address := range []string{"::1", "172.17.0.1"} {
 		ipv4, ipv6 := ServerAddresses(model.Server{Address: address, Addresses: "203.0.113.7"})
@@ -607,7 +607,7 @@ func TestServerAddressesAndAdvice(t *testing.T) {
 }
 
 func TestStopStartAndRestart(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {
 		t.Fatal(err)
@@ -623,41 +623,41 @@ func TestStopStartAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 
 	// A running app does not start again.
-	agent.mu.Lock()
-	agent.sent = nil
-	agent.mu.Unlock()
+	daemon.mu.Lock()
+	daemon.sent = nil
+	daemon.mu.Unlock()
 	if _, err := apps.Start(owner, "blog"); !errors.Is(err, ErrRunning) {
 		t.Fatalf("start a running app: err = %v", err)
 	}
-	agent.mu.Lock()
-	sent := len(agent.sent)
-	agent.mu.Unlock()
+	daemon.mu.Lock()
+	sent := len(daemon.sent)
+	daemon.mu.Unlock()
 	if _, deploys, _ := apps.Deploys(owner.WorkspaceID, "blog", 10); len(deploys) != 1 || sent != 0 {
 		t.Fatalf("start of a running app made %d deploys, sent %d messages", len(deploys), sent)
 	}
 
 	// A failed stop leaves the app as it was.
-	go agentAnswers(servers, server.ID, agent, protocol.TypeAppStop, protocol.TypeError, protocol.Error{Message: "docker is not running"})
-	var agentErr *AgentError
-	if err := apps.Stop(context.Background(), owner, "blog"); !errors.As(err, &agentErr) {
-		t.Fatalf("stop with an agent error: err = %v", err)
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeAppStop, protocol.TypeError, protocol.Error{Message: "docker is not running"})
+	var daemonErr *DaemonError
+	if err := apps.Stop(context.Background(), owner, "blog"); !errors.As(err, &daemonErr) {
+		t.Fatalf("stop with a daemon error: err = %v", err)
 	}
 	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Stopped {
 		t.Fatal("a failed stop marked the app stopped")
 	}
 
-	agent.mu.Lock()
-	agent.sent = nil
-	agent.mu.Unlock()
-	go agentAnswers(servers, server.ID, agent, protocol.TypeAppStop, protocol.TypeOK, nil)
+	daemon.mu.Lock()
+	daemon.sent = nil
+	daemon.mu.Unlock()
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeAppStop, protocol.TypeOK, nil)
 	if err := apps.Stop(context.Background(), owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
 	var stop protocol.AppStop
-	agent.last(t, protocol.TypeAppStop, &stop)
+	daemon.last(t, protocol.TypeAppStop, &stop)
 	if stop.App != "blog" {
 		t.Fatalf("app.stop = %+v", stop)
 	}
@@ -676,14 +676,14 @@ func TestStopStartAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
-	agent.last(t, protocol.TypeDeployStart, &start)
+	daemon.last(t, protocol.TypeDeployStart, &start)
 	if start.SourceURL != "" || start.Image != "" || start.FromNumber != 0 || len(start.Domains.Domains) != 1 {
 		t.Fatalf("start deploy.start = %+v", start)
 	}
 	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Stopped {
 		t.Fatal("a started app is still marked stopped")
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: started.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: started.ID, OK: true})
 
 	restarted, err := apps.Restart(owner, "blog")
 	if err != nil || restarted.Number != started.Number+1 {

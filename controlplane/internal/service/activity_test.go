@@ -13,7 +13,7 @@ import (
 // data in them and checks that none of it lands in the activity: moin keeps
 // names, numbers and settings, never values, passwords, tokens or rows.
 func TestActivityNeverHoldsSecrets(t *testing.T) {
-	apps, servers, server, agent := newAppService(t)
+	apps, servers, server, daemon := newAppService(t)
 	secrets := []string{"env-value-7f3a", "registry-password-9c1d", "protect-password-2b8e", "row-value-ada@private.example", "sql-literal-5e6f"}
 
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
@@ -38,8 +38,8 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}}}})
-	go agentAnswers(servers, server.ID, agent, protocol.TypeDBQuery, protocol.TypeDBQueryResult, protocol.DBResult{Changes: 1})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}}}})
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeDBQuery, protocol.TypeDBQueryResult, protocol.DBResult{Changes: 1})
 	sql := "UPDATE users SET email = '" + secrets[3] + "', note = '" + secrets[4] + "' WHERE id = 1"
 	if _, err := apps.Query(context.Background(), owner, "blog", "", sql, nil, true, 0); err != nil {
 		t.Fatal(err)

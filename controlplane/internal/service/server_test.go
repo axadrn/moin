@@ -22,7 +22,7 @@ func newServerService(t *testing.T) *ServerService {
 	return NewServerService(repository.NewServers(database), repository.NewActivity(database), "https://moin.example.com/")
 }
 
-var testHello = protocol.Hello{ProtocolVersion: protocol.Version, AgentVersion: "v0.1.0", Hostname: "box", OS: "linux", Arch: "arm64"}
+var testHello = protocol.Hello{ProtocolVersion: protocol.Version, DaemonVersion: "v0.1.0", Hostname: "box", OS: "linux", Arch: "arm64"}
 
 func TestInstallTokenWorksOnce(t *testing.T) {
 	servers := newServerService(t)
@@ -37,7 +37,7 @@ func TestInstallTokenWorksOnce(t *testing.T) {
 		t.Fatalf("install command = %q", got)
 	}
 
-	registered, agentToken, err := servers.Register(installToken, testHello)
+	registered, daemonToken, err := servers.Register(installToken, testHello)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestInstallTokenWorksOnce(t *testing.T) {
 		t.Fatalf("second register: err = %v, want ErrInstallTokenValid", err)
 	}
 
-	authenticated, err := servers.Authenticate(agentToken)
+	authenticated, err := servers.Authenticate(daemonToken)
 	if err != nil || authenticated.ID != server.ID {
 		t.Fatalf("authenticate = %v, %v", authenticated, err)
 	}
@@ -57,8 +57,8 @@ func TestInstallTokenWorksOnce(t *testing.T) {
 		t.Fatalf("register did not store the hello: %+v", authenticated)
 	}
 	_, err = servers.Authenticate(installToken)
-	if !errors.Is(err, ErrAgentToken) {
-		t.Fatalf("install token as agent token: err = %v", err)
+	if !errors.Is(err, ErrDaemonToken) {
+		t.Fatalf("install token as daemon token: err = %v", err)
 	}
 }
 
@@ -113,8 +113,8 @@ func TestServerNames(t *testing.T) {
 func TestSessionsMarkServersOnline(t *testing.T) {
 	servers := newServerService(t)
 	server, installToken, _ := servers.Create(owner, "prod")
-	_, agentToken, _ := servers.Register(installToken, testHello)
-	authenticated, _ := servers.Authenticate(agentToken)
+	_, daemonToken, _ := servers.Register(installToken, testHello)
+	authenticated, _ := servers.Authenticate(daemonToken)
 
 	changes, unsubscribe := servers.Subscribe(owner.WorkspaceID)
 	defer unsubscribe()
@@ -153,17 +153,17 @@ func TestSessionsMarkServersOnline(t *testing.T) {
 	if !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another user deleted the server: %v", err)
 	}
-	// The agent connected, so it is installed there.
+	// The daemon connected, so it is installed there.
 	uninstall, _, err := servers.Delete(owner, "prod", "prod")
-	if err != nil || uninstall != "moin agent uninstall" {
+	if err != nil || uninstall != "moin daemon uninstall" {
 		t.Fatalf("delete = %q, %v", uninstall, err)
 	}
 	if kicked != 2 {
 		t.Fatalf("kicked = %d, want delete to end the session", kicked)
 	}
-	_, err = servers.Authenticate(agentToken)
-	if !errors.Is(err, ErrAgentToken) {
-		t.Fatalf("agent token after delete: err = %v", err)
+	_, err = servers.Authenticate(daemonToken)
+	if !errors.Is(err, ErrDaemonToken) {
+		t.Fatalf("daemon token after delete: err = %v", err)
 	}
 }
 
@@ -244,7 +244,7 @@ func TestOldServerNameKeepsWorking(t *testing.T) {
 	}
 }
 
-func TestNewInstallTokenMovesTheAgent(t *testing.T) {
+func TestNewInstallTokenMovesTheDaemon(t *testing.T) {
 	servers := newServerService(t)
 	_, first, err := servers.Create(owner, "prod")
 	if err != nil {
@@ -257,7 +257,7 @@ func TestNewInstallTokenMovesTheAgent(t *testing.T) {
 	if _, _, err := servers.Register(first, testHello); !errors.Is(err, ErrInstallTokenValid) {
 		t.Fatalf("old install token: err = %v", err)
 	}
-	_, oldAgent, err := servers.Register(second, testHello)
+	_, oldDaemon, err := servers.Register(second, testHello)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,22 +265,22 @@ func TestNewInstallTokenMovesTheAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, newAgent, err := servers.Register(third, testHello)
+	_, newDaemon, err := servers.Register(third, testHello)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := servers.Authenticate(oldAgent); !errors.Is(err, ErrAgentToken) {
-		t.Fatalf("old agent token: err = %v", err)
+	if _, err := servers.Authenticate(oldDaemon); !errors.Is(err, ErrDaemonToken) {
+		t.Fatalf("old daemon token: err = %v", err)
 	}
-	if _, err := servers.Authenticate(newAgent); err != nil {
-		t.Fatalf("new agent token: %v", err)
+	if _, err := servers.Authenticate(newDaemon); err != nil {
+		t.Fatalf("new daemon token: %v", err)
 	}
 	if _, _, err := servers.NewInstallToken(other, "prod"); !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another workspace: err = %v", err)
 	}
 }
 
-// TestRegisterCleansHello: what an agent reports is stored without
+// TestRegisterCleansHello: what a daemon reports is stored without
 // control characters, which could move the cursor or recolor a terminal
 // that shows the server in the CLI or the TUI.
 func TestRegisterCleansHello(t *testing.T) {
@@ -291,7 +291,7 @@ func TestRegisterCleansHello(t *testing.T) {
 	}
 	hello := testHello
 	hello.Hostname = "web\x1b]0;owned\x07-1\n"
-	hello.AgentVersion = strings.Repeat("é", 100)
+	hello.DaemonVersion = strings.Repeat("é", 100)
 	if _, _, err := servers.Register(installToken, hello); err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestRegisterCleansHello(t *testing.T) {
 	if server.Hostname != "web]0;owned-1" {
 		t.Fatalf("hostname = %q", server.Hostname)
 	}
-	if len(server.AgentVersion) > 128 || !utf8.ValidString(server.AgentVersion) {
-		t.Fatalf("version = %q", server.AgentVersion)
+	if len(server.DaemonVersion) > 128 || !utf8.ValidString(server.DaemonVersion) {
+		t.Fatalf("version = %q", server.DaemonVersion)
 	}
 }

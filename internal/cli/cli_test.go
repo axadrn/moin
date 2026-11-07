@@ -141,7 +141,7 @@ func TestOwnUsageNotGoFlags(t *testing.T) {
 }
 
 func TestDestructiveCommandsAsk(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"moin agent uninstall"}`}}
+	api := &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":"moin daemon uninstall"}`}}
 	code, _, stderr := runCLI(t, api, "servers", "rm", "web-1")
 	if code != 1 || !strings.Contains(stderr, "--confirm web-1") || api.seen("DELETE") {
 		t.Errorf("without --confirm: code %d, stderr %q, requests %v", code, stderr, api.requests)
@@ -152,10 +152,10 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		t.Errorf("with --yes: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 	code, stdout, stderr := runCLI(t, api, "servers", "rm", "web-1", "--confirm", "web-1")
-	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1 confirm=web-1") || !strings.Contains(stdout, "moin agent uninstall") {
+	if code != 0 || !api.seen("DELETE /api/v1/servers/web-1 confirm=web-1") || !strings.Contains(stdout, "moin daemon uninstall") {
 		t.Errorf("with --confirm: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
-	// A server whose agent never connected has nothing to uninstall.
+	// A server whose daemon never connected has nothing to uninstall.
 	api = &fakeAPI{answers: map[string]string{"DELETE /api/v1/servers/web-1": `{"uninstall_command":""}`}}
 	code, stdout, _ = runCLI(t, api, "servers", "rm", "web-1", "--confirm", "web-1")
 	if code != 0 || strings.Contains(stdout, "uninstall") || !strings.Contains(stdout, "never connected") {

@@ -4,11 +4,11 @@ description: The plain-language rules for using the hosted moin service
 lastUpdated: November 4, 2026
 ---
 
-These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA, the company that runs the hosted moin service. They cover the website, the control plane, its API and MCP server, and the `moin` command line tool and agent when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
+These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA, the company that runs the hosted moin service. They cover the website, the control plane, its API and MCP server, and the `moin` command line tool and daemon when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
 
 ## The service
 
-moin deploys, runs and watches apps on servers you own. You install the moin agent on your server; it dials out to the control plane and runs your deploys with Docker Compose.
+moin deploys, runs and watches apps on servers you own. You install the moin daemon on your server; it dials out to the control plane and runs your deploys with Docker Compose.
 
 moin is open source under the GNU Affero General Public License 3.0. That license covers the code. These terms cover only the hosted service we run. A control plane you host yourself is yours: these terms do not apply to it, and it shows no legal pages.
 
@@ -26,7 +26,7 @@ Your servers, apps, code and data stay yours. moin does not store your code or t
 
 You decide what runs on your servers and you are responsible for it: its content, its security updates, the personal data of its users, and that it is legal where you run it. You also follow the terms of your server provider, your bucket provider and any other service you connect, such as GitHub, Cloudflare or Tailscale.
 
-The agent runs with root rights so it can manage Docker and the proxy. Install it only on servers you control.
+The daemon runs with root rights so it can manage Docker and the proxy. Install it only on servers you control.
 
 ## Acceptable use
 
@@ -68,7 +68,7 @@ moin is in beta and moves fast. That means:
 
 We work hard to keep moin up and correct, but we do not promise uptime, uninterrupted service, a response time for support, or that moin is free of errors.
 
-**MOIN, ITS SOFTWARE, AGENT, COMMAND LINE TOOL AND HOSTED SERVICE ARE PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND. AS FAR AS THE LAW ALLOWS, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND THAT BACKUPS OR RESTORES WILL BE COMPLETE, CORRECT OR AVAILABLE.**
+**MOIN, ITS SOFTWARE, DAEMON, COMMAND LINE TOOL AND HOSTED SERVICE ARE PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND. AS FAR AS THE LAW ALLOWS, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND THAT BACKUPS OR RESTORES WILL BE COMPLETE, CORRECT OR AVAILABLE.**
 
 Your apps run on your servers, not on ours. If the control plane is down, your apps keep running; you just cannot deploy or change them through moin until it is back. moin helps you keep apps running, but it cannot guarantee that a deploy, a rollback or a health check succeeds, or that your server stays reachable.
 
@@ -96,7 +96,7 @@ These limits do not apply where the law does not allow them, such as for intent,
 
 You can delete your account at any time in the settings. Your servers, apps and deploys belong to a workspace, not to your account: deleting the workspace on its Team page removes them from moin. A workspace with a subscription can be deleted once the subscription has ended. If you are the only owner of a workspace, delete it or hand it to someone else before you delete your account.
 
-Once a server is gone from moin, its agent can no longer connect, and your containers keep running until you remove them. What moin set up in your own accounts, such as the GitHub App installation or Cloudflare tunnels and DNS records, stays there until you remove it.
+Once a server is gone from moin, its daemon can no longer connect, and your containers keep running until you remove them. What moin set up in your own accounts, such as the GitHub App installation or Cloudflare tunnels and DNS records, stays there until you remove it.
 
 If we ever end the hosted service, we tell you by email in good time and refund the unused part of any prepaid period.
 

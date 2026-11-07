@@ -129,7 +129,7 @@ type SecurityInput struct {
 	Firewall     bool
 }
 
-// SecurityReport is what the agent set up last.
+// SecurityReport is what the daemon set up last.
 func SecurityReport(server model.Server) *protocol.ServerConfigResult {
 	if server.Security == "" {
 		return nil
@@ -142,7 +142,7 @@ func SecurityReport(server model.Server) *protocol.ServerConfigResult {
 }
 
 // SetServerSecurity creates or removes the server's tunnel, stores the
-// settings and has the agent apply them. It returns what the agent set up;
+// settings and has the daemon apply them. It returns what the daemon set up;
 // an offline server applies them when it connects.
 func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrName string, input SecurityInput) (*model.Server, error) {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
@@ -203,7 +203,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	return s.servers.servers.ByIDOrNameForWorkspace(server.ID, actor.WorkspaceID)
 }
 
-// serverConfig is what the agent of a server gets.
+// serverConfig is what the daemon of a server gets.
 func (s *AppService) serverConfig(server *model.Server) protocol.ServerConfig {
 	config := protocol.ServerConfig{SSHOnTailscale: server.SSHTailscale, Firewall: server.Firewall}
 	if server.Tunnel && server.TunnelToken != "" {
@@ -222,7 +222,7 @@ func (s *AppService) serverConfig(server *model.Server) protocol.ServerConfig {
 	return config
 }
 
-// configureServer sends the server config and stores what the agent set
+// configureServer sends the server config and stores what the daemon set
 // up.
 func (s *AppService) configureServer(ctx context.Context, server *model.Server, problems []string) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -230,7 +230,7 @@ func (s *AppService) configureServer(ctx context.Context, server *model.Server, 
 	var report protocol.ServerConfigResult
 	err := s.servers.Request(ctx, server.ID, protocol.TypeServerConfig, s.serverConfig(server), &report)
 	if err != nil {
-		report = protocol.ServerConfigResult{Problems: []string{"the agent could not apply it: " + err.Error()}}
+		report = protocol.ServerConfigResult{Problems: []string{"the daemon could not apply it: " + err.Error()}}
 	}
 	report.Problems = append(report.Problems, problems...)
 	body, _ := json.Marshal(report)
@@ -240,10 +240,10 @@ func (s *AppService) configureServer(ctx context.Context, server *model.Server, 
 	}
 }
 
-// configureServerOnConnect sends the config to an agent that just
-// connected, when the server has one, or when the agent last reported a
+// configureServerOnConnect sends the config to a daemon that just
+// connected, when the server has one, or when the daemon last reported a
 // firewall, tunnel or SSH on the tailnet the server no longer has, such as
-// one turned off while the agent was offline.
+// one turned off while the daemon was offline.
 func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(serverID, workspaceID)
 	if err != nil {
@@ -258,14 +258,14 @@ func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	s.servers.notify(workspaceID)
 }
 
-// ProxyOnFirstConnect has a server start its proxy as soon as its agent
+// ProxyOnFirstConnect has a server start its proxy as soon as its daemon
 // first connects, not at its first app with a domain: for a control plane
 // on the same server as its apps, which the proxy serves too.
 func (s *AppService) ProxyOnFirstConnect() {
 	s.proxyOnFirstConnect = true
 }
 
-// leftOver says whether the agent last set up a firewall, a tunnel or SSH
+// leftOver says whether the daemon last set up a firewall, a tunnel or SSH
 // on the tailnet. Only SSH on the tailnet reports a tailnet address.
 func leftOver(report *protocol.ServerConfigResult) bool {
 	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.TailscaleIP != "")
