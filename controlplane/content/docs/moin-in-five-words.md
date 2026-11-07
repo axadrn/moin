@@ -27,7 +27,7 @@ Like hanging a new sign in the shop window. If the new sign falls down, the old 
 
 ## Backup
 
-moin writes down every change of your database for 7 days, so you can go back to any moment.
+moin copies your database into your bucket on the schedule you pick, and keeps the copies as long as you say. With SQLite it can also write down every change, so you go back to any minute.
 
 Like a diary of your data: turn back the pages to any day.
 
@@ -52,12 +52,12 @@ moin (control plane)
 │   agent      │
 │   app shop ◀─┼── visitors
 └┬─────────────┘
- │ every change
+ │ copies
  ▼
 your bucket
 ```
 
-You deploy. The agent on your server picks it up and starts your app. Every change of its data goes into your bucket.
+You deploy. The agent on your server picks it up and starts your app. Copies of its data go into your bucket.
 
 ## Next
 

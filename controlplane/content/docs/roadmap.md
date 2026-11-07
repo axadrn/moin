@@ -12,7 +12,7 @@ moin is in beta: it runs real sites today and keeps growing. No dates: "next" is
 On every surface: web, CLI, terminal UI, API and MCP.
 
 - **Deploys** from your repo, a GitHub branch or commit, or an image from CI, with or without a Dockerfile; a failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
-- **Backups** of every SQLite and Postgres change in your own bucket for 7 days: go back to any minute, undo a restore, download a copy, and a check every day that going back works. [Backups](/docs/guides/backups)
+- **Backups** of every SQLite and Postgres database in your own bucket, on the schedule you pick: copies every 15 minutes, hourly or daily, kept 1 to 30 days; for SQLite every change too, to go back to any minute. Undo a restore, download a copy, and a check every day that a copy restores. [Backups](/docs/guides/backups)
 - **Data**: browse, edit and query the live database. [Data](/docs/guides/data)
 - **Domains** with HTTPS and a password, and an [instant address](/docs/guides/domains#instant-address) after the first deploy. [Domains](/docs/guides/domains)
 - **Run a command** in an app's container, without SSH. [Run a command](/docs/guides/exec)
@@ -32,7 +32,7 @@ On every surface: web, CLI, terminal UI, API and MCP.
 ## Next
 
 - **Servers in one click** at Hetzner, DigitalOcean, Vultr and UpCloud, right from moin. [#1](https://github.com/axadrn/moin/issues/1)
-- **MySQL backups**, every change backed up and every restore checked, like Postgres. MongoDB, ClickHouse and the rest run like any service; their backups come when you ask for them.
+- **MySQL backups**, copies on your schedule and a daily check, like Postgres. MongoDB, ClickHouse and the rest run like any service; their backups come when you ask for them.
 
 ## Later
 

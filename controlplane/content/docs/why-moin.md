@@ -80,7 +80,7 @@ In short: with SSH-based tools, whoever runs the tool holds a key that opens a s
 
 ## Backups whose restores are checked
 
-moin writes down every change of your database for 7 days, in your own bucket, so you can go back to any minute; a restore can be undone for 7 days. Every day moin restores the newest state into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
+moin copies your database into your own bucket on the schedule you pick, and keeps the copies as long as you say; with SQLite it can also write down every change, so you go back to any minute. A restore can be undone. Every day moin restores the newest copy into a throwaway database and reads it, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
 
 ## Every way in
 

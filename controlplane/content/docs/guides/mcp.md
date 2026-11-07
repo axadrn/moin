@@ -77,15 +77,16 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
-| `get_backups` | how each database is backed up, the daily check, and the moments to go back to | read |
-| `restore_app` | goes back to a moment (`moment`, its id or label) or a time (`at`), to the minute; keeps a copy first, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | write, destructive |
-| `download_backup` | a full copy of a database in the app's own bucket; call again with `id` until `state` is `ready`, then `link` works for 15 minutes | write |
+| `get_backups` | how each database is backed up: how often, how long, Every change, the newest copy, the daily check, and the moments to go back to | read |
+| `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30) and, for SQLite, `every_change` | write |
+| `restore_app` | goes back to a moment (`moment`, its id or label: a copy, `before-v12`, `undo-…`, `1h`) or a time (`at`): SQLite with Every change to that minute, else the newest copy at or before it; keeps the database before, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | write, destructive |
+| `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`; it works for 15 minutes | write |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each | read |
 | `add_bucket` | adds a bucket; the first is the default | write |
 | `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
 | `set_default_bucket` | makes a bucket the default | write |
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
-| `set_app_bucket` | moves an app's uploads and backups to a bucket; the history starts again there | write |
+| `set_app_bucket` | moves an app's uploads and backups to a bucket; the copies start again there | write |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the newest check and the last outages | read |
 | `set_uptime_check` | the path of a domain's check, or pauses and resumes it | write |

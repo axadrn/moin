@@ -62,7 +62,7 @@ echo "SELECT * FROM customers" | moin sql
 
 ## Change data
 
-Edit a cell, add a row or delete one. moin remembers the moment before each change, so [Backups](/docs/guides/backups) offers "Before your edit" or "Before your SQL change" to go back to.
+Edit a cell, add a row or delete one. moin takes a copy right before each change, so [Backups](/docs/guides/backups) offers "Before your edit" or "Before your SQL change" to go back to.
 
 ```surfaces
 Web: the app page, **Data**, a database, a table: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row

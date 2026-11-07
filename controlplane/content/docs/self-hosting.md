@@ -203,7 +203,7 @@ Once a day the control plane asks GitHub for the newest version. When one is out
 
 ## Database backup
 
-Like your apps' databases, the control plane's SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `controlplane/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
+Like Every change of your apps' SQLite files, the control plane's SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `controlplane/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
 
 | File | What is in it | Backup |
 | --- | --- | --- |

@@ -61,7 +61,7 @@ Add another bucket the same way, with another name: a client's data in the clien
 
 ### Choose the bucket of an app
 
-Moves the uploads and the backups of one app to another bucket. Its history starts again there, so you can go back to moments from the move on; what is in the old bucket stays.
+Moves the uploads and the backups of one app to another bucket. Its copies start again there; what is in the old bucket stays.
 
 ```surfaces
 Web: the app, **Data**, **Use another bucket**, then **Move**
@@ -74,7 +74,7 @@ MCP: set_app_bucket
 
 ### Change a bucket
 
-Renames it, points it at another place, gives it new keys or makes it the default. An empty secret key keeps the stored one. The history starts again in a new place; the old place keeps what it has.
+Renames it, points it at another place, gives it new keys or makes it the default. An empty secret key keeps the stored one. The copies start again in a new place; the old place keeps what it has.
 
 ```surfaces
 Web: **Settings**, **Bucket**, **Change** on the bucket, then **Save bucket**; **Make default**

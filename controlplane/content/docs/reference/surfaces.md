@@ -36,7 +36,8 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Uptime check path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
 | App metrics, 1h to 30d | ✓ | ✓ `metrics` | ✓ | ✓ | ✓ |
 | Backups, the daily check and the moments to go back to | ✓ | ✓ `backups` | ✓ | ✓ | ✓ |
-| Go back to a moment, to the minute | ✓ | ✓ `restore --to` | ✓ `enter`, `t` | ✓ | ✓ |
+| How often, how long, Every change | ✓ | ✓ `backups --every --keep --every-change` | Setup: it opens the web. | ✓ | ✓ `set_backups` |
+| Go back to a copy, or a minute (SQLite) | ✓ | ✓ `restore --to` | ✓ `enter`, `t` | ✓ | ✓ |
 | Undo a restore | ✓ | ✓ `restore --to undo-…` | ✓ | ✓ | ✓ |
 | Download a copy | ✓ | ✓ `backup download` | ✓ `c` | ✓ | ✓ |
 | Update a catalog app | ✓ | ✓ `update` | ✓ `U` | ✓ | ✓ |

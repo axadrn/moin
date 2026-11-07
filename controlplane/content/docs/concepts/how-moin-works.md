@@ -24,7 +24,7 @@ workspace            your team, your bucket and your servers
 
 moin deploy   laptop ──▶ your bucket ──▶ web-1     (your code, gone after the deploy)
 GitHub       GitHub ──────────────────▶ web-2     (no bucket needed)
-backups      web-1, web-2 ──▶ your bucket          (every change for 7 days, only there)
+backups      web-1, web-2 ──▶ your bucket          (copies on your schedule, only there)
 ```
 
 ## The words
@@ -45,8 +45,8 @@ The five that matter most are in [moin in five words](/docs/moin-in-five-words).
 | **domain** | the name people type to reach your app, such as `shop.example.com`, always with HTTPS. Every app also gets an [instant address](/docs/guides/domains#instant-address) |
 | **env vars** | the settings and secrets of an app, such as a password it needs, kept encrypted |
 | **bucket** | your own box on the internet, for example at Cloudflare R2: your backups and uploads go there, not to us |
-| **backup** | moin writes down every change of your database in your bucket for 7 days, so you can go back to any minute; every day it checks that going back works |
-| **restore** | going back: the database as it was at the minute you pick. A restore can be undone for 7 days |
+| **backup** | a copy of your app's database in your bucket, on the schedule you pick; with SQLite moin can also write down every change. Every day it checks that a copy restores |
+| **restore** | going back to a copy (or, for SQLite with Every change, to a minute). A restore can be undone as long as the copies are kept |
 | **health check** | after a deploy, moin checks that the app starts and stays up |
 | **catalog** | the place with apps you install in one click, such as n8n or Umami |
 | **API token** | a key for the CLI, scripts and AI agents, for one workspace |

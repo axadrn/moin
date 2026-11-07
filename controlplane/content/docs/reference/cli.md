@@ -142,7 +142,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin catalog` | the [catalog](/docs/guides/catalog), each app with its newest version |
 | `moin catalog <app>` | one catalog app with every version |
 | `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's |
-| `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the moment before |
+| `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the copy before it |
 
 ## Env vars
 
@@ -171,9 +171,10 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin backups [app]` | how each database is backed up, the daily check, and the moments to go back to |
-| `moin restore [app] --to <moment> [--db <path>] [--yes]` | goes back to a moment from `moin backups`, by its ID or label (`1h`, `before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. Keeps the state before, so it can be undone for 7 days, and waits until the restore is done, at most 10 minutes while the server is offline |
-| `moin backup download [app] [--db <path>] [--link]` | saves a full copy of a database in the current folder, from your bucket; `--link` prints its 15 minute link instead |
+| `moin backups [app]` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to |
+| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d --every-change on\|off` | sets how often the app is copied, how long each copy stays and, for SQLite, whether every change is written down; any one of them or all |
+| `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`1h`, `before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. SQLite with Every change goes to that minute, everything else to the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
+| `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a copy of a database in the current folder, straight from your bucket: the newest, or the one `--to` names; `--link` prints its 15 minute link instead |
 
 ## Bucket
 
@@ -184,7 +185,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
 | `moin buckets default <name>` | makes a bucket the default for apps without one of their own |
 | `moin buckets rm <name> [--confirm <name>]` | asks you to type its name and removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
-| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; the history starts again there |
+| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; the copies start again there |
 
 | Flag | Takes |
 | --- | --- |
@@ -217,7 +218,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app shop` is `
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type shop to confirm:` |
 | Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `agent uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
-| Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, adding and setting things | nothing |
+| Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm shop`, and the control plane checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
 

@@ -37,7 +37,7 @@ moin reads each app's image registry once an hour, so every version shows the ho
 
 ## Update an app
 
-The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys. moin remembers the moment before, so its [backups](/docs/guides/backups) offer "Before the update to 3.4.1".
+The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys. moin takes a copy right before, so its [backups](/docs/guides/backups) offer "Before the update to 3.4.1".
 
 ```surfaces
 Web: the app page, **Update** (or another version, **Deploy**)

@@ -17,7 +17,7 @@ No. Builds run on your server: `moin deploy` sends your code through your own bu
 
 ## How is moin different from Coolify, Kamal or Heroku?
 
-moin holds no SSH key to your servers, your code and backups stay in your own bucket, and every restore is checked every day. [Why moin](/docs/why-moin) compares them fact by fact.
+moin holds no SSH key to your servers, your code and backups stay in your own bucket, and every day moin checks that a copy restores. [Why moin](/docs/why-moin) compares them fact by fact.
 
 ## Do I need a domain?
 
@@ -73,4 +73,4 @@ AGPL keeps moin open: whoever runs a changed moin as a service shares the change
 
 ## Why the name?
 
-**moin** /mɔɪn/ is Hamburg for hello, at any hour. Hamburg is a container port: millions of boxes, packed once, shipped anywhere, nothing goes missing. Your apps are containers too, and moin ships them to your servers and keeps every change to their data.
+**moin** /mɔɪn/ is Hamburg for hello, at any hour. Hamburg is a container port: millions of boxes, packed once, shipped anywhere, nothing goes missing. Your apps are containers too, and moin ships them to your servers and keeps copies of their data.
