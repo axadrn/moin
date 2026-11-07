@@ -222,17 +222,6 @@
   html:has(dialog:modal) {
     overflow: hidden;
   }
-  /* A new page fades in 120 ms instead of a hard cut. */
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 120ms;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    ::view-transition-old(root),
-    ::view-transition-new(root) {
-      animation: none;
-    }
-  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings:
@@ -457,12 +446,9 @@
   }
 }
 
-/* Every link loads a whole page. The browser keeps the old page on screen
-   until the new one is painted, then fades between them: no flash, no
-   script. A browser without it simply loads the page. */
-@view-transition {
-  navigation: auto;
-}
+/* Every link loads a whole page, with no fade: the browser keeps the old
+   page on screen until the new one is painted, so there is no flash, and a
+   fade would show both pages at once (a ghost on Back). */
 
 /* Feedback (DESIGN.md): a button that did its job shows a check in place of
    its label for a moment, at the same size; a line in the page under its

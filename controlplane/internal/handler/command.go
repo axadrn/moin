@@ -16,10 +16,11 @@ type CommandHandler struct {
 	apps    *service.AppService
 	servers *service.ServerService
 	docs    *service.DocsService
+	catalog *service.CatalogService
 }
 
-func NewCommandHandler(apps *service.AppService, servers *service.ServerService, docs *service.DocsService) *CommandHandler {
-	return &CommandHandler{apps: apps, servers: servers, docs: docs}
+func NewCommandHandler(apps *service.AppService, servers *service.ServerService, docs *service.DocsService, catalog *service.CatalogService) *CommandHandler {
+	return &CommandHandler{apps: apps, servers: servers, docs: docs, catalog: catalog}
 }
 
 // Search answers what matches q: apps, servers, buckets, places and
@@ -55,6 +56,9 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 		for _, page := range h.docs.FlatDocsList() {
 			input.Docs = append(input.Docs, pages.SearchDoc{Title: page.Title, Group: page.Group, Href: "/docs/" + page.Slug})
 		}
+	}
+	if h.catalog != nil {
+		input.Catalog = h.catalog.Store().Entries()
 	}
 	// recent are the IDs of the picks this browser remembers, the most
 	// used and latest first (moin.js).

@@ -180,6 +180,7 @@ templ HomeDifferent() {
 			@homeReason("One binary.", "CLI, terminal UI and agent: one Go binary.", "/docs/why-moin#a-small-stack")
 			@homeReason("The agent only dials out.", "Your server keeps no port open for moin.", "/docs/why-moin#the-agent-only-dials-out")
 			@homeReason("Restores are checked.", "Every day, from your own bucket.", "/docs/why-moin#backups-whose-restores-are-checked")
+			@homeReason("Every way in.", "Web, terminal, CLI, API and AI agents all do the same.", "/docs/why-moin#every-way-in")
 		}
 	</section>
 }
@@ -274,11 +275,21 @@ templ homePlanRows(rows ...string) {
 // ---------------------------------------------------------------- end
 // HomeEnd is the end of the page: the wordmark, the promise again and the
 // way in.
+// HomeEnd is the end of the page in one card: the name, where it comes
+// from, the promise and the way in. "Nothing goes missing" leads into
+// "Lose nothing".
 templ HomeEnd() {
 	<section id="start" class={ homeSection, "items-start" }>
 		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8 sm:p-14">
 			@blocks.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
-			<p class={ homeStatement }>
+			<p class="text-lg text-muted-foreground sm:text-xl">
+				<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
+			</p>
+			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
+				<p>I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing.</p>
+				<p>Your apps are containers too. { brand.Name } ships them to your servers and keeps every change to their data.</p>
+			</div>
+			<p class={ homeStatement, "pt-4" }>
 				Deploy anything. <span class="text-muted-foreground/60">Lose nothing.</span>
 			</p>
 			<div class="flex flex-wrap gap-2">

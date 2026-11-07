@@ -53,6 +53,10 @@ In short: with SSH-based tools, whoever runs the tool holds a key that opens a s
 
 moin writes down every change of your database for 7 days, so you can go back to any moment. It goes to your own bucket. A full backup comes before every deploy, restore and data edit. Every day moin restores a backup into a throwaway copy and checks that the data came back, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
 
+## Every way in
+
+Use moin the way you like: click in the web, type in the terminal, script it with the CLI or the API, or let an AI agent do it through MCP. Each one does the same work, so you never get stuck in one of them. [Where things work](/docs/reference/surfaces) lists what each one does.
+
 ## Keyboard first
 
 One box finds everything: `⌘K` in the web, `space` in the terminal UI. Type a few letters, even with a typo, and press `enter`. `j` and `k` move through lists, `?` shows every key. [Palette and keys](/docs/reference/palette).

@@ -32,8 +32,8 @@ func NewCatalogHandler(catalog *service.CatalogService, servers *service.ServerS
 	return &CatalogHandler{catalog: catalog, servers: servers, workspaces: workspaces, appURL: appURL}
 }
 
-// view is the catalog: the apps of the category in the query that the
-// search finds, in the order it asks.
+// view is the catalog: the apps of the category in the query, in the
+// order it asks.
 func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 	store := h.catalog.Store()
 	view := pages.CatalogView{Base: base}
@@ -47,7 +47,6 @@ func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 		}
 	}
 	view.Category = pages.CategoryFromSlug(r.URL.Query().Get("category"), view.Categories)
-	view.Query = strings.TrimSpace(r.URL.Query().Get("q"))
 	view.Sort = pages.SortUpdated
 	if r.URL.Query().Get("sort") == pages.SortName {
 		view.Sort = pages.SortName
@@ -56,12 +55,12 @@ func (h *CatalogHandler) view(r *http.Request, base string) pages.CatalogView {
 	for _, entry := range store.Entries() {
 		all = append(all, pages.CatalogEntryView{Entry: entry, Versions: store.Versions(entry.Slug)})
 	}
-	view.Apps = pages.FilterCatalog(all, view.Category, view.Query, view.Sort)
+	view.Apps = pages.FilterCatalog(all, view.Category, "", view.Sort)
 	return view
 }
 
-// renderCatalog is the catalog page, or for a keystroke of its search
-// (htmx) only the list, with the address bar set to the search.
+// renderCatalog is the catalog page, or for a choice of its category or
+// order (htmx) only the list, with the address bar set to it.
 func renderCatalog(w http.ResponseWriter, r *http.Request, view pages.CatalogView, page templ.Component) {
 	w.Header().Add("Vary", "HX-Request")
 	if isAction(r) {

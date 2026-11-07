@@ -8,6 +8,7 @@ import (
 
 	"github.com/axadrn/moin/internal/find"
 
+	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
@@ -58,6 +59,7 @@ type SearchInput struct {
 	Servers   []model.Server
 	Buckets   []service.Bucket
 	Docs      []SearchDoc
+	Catalog   []catalog.Entry
 	CanChange bool
 	IsOwner   bool
 	GitHub    bool
@@ -71,6 +73,7 @@ const (
 	groupServers = "Servers"
 	groupPages   = "Pages"
 	groupActions = "Actions"
+	groupCatalog = "Catalog"
 	groupDocs    = "Docs"
 )
 
@@ -124,6 +127,10 @@ func SearchItems(in SearchInput) []SearchItem {
 	}
 	for _, app := range in.Apps {
 		items = append(items, paletteActions(in, app)...)
+	}
+	// The catalog: an app you can install, on its page in the workspace.
+	for _, entry := range in.Catalog {
+		items = append(items, SearchItem{Group: groupCatalog, Title: entry.Name, Where: "Catalog › " + entry.Category, Icon: icon.Package, Href: in.Base + "/catalog/" + entry.Slug})
 	}
 	for _, doc := range in.Docs {
 		items = append(items, SearchItem{Group: groupDocs, Title: doc.Title, Where: "Docs › " + doc.Group, Icon: icon.BookOpen, Href: doc.Href})

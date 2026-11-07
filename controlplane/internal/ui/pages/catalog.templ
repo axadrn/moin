@@ -130,40 +130,30 @@ templ CatalogInstall(view CatalogInstallView) {
 
 // ---------------------------------------------------------------- parts
 
-// catalogBody is the catalog itself: the search, the category and the
-// order, then the apps. Typing asks the server (htmx active search, the
-// same matching as the palette), which answers the list and keeps the
-// address bar in step; without JavaScript the form loads the page with
-// ?q=, which renders filtered.
+// catalogBody is the catalog itself: the category and the order, then
+// the apps. A choice asks the server (htmx), which answers the list and
+// keeps the address bar in step; without JavaScript the form loads the
+// page. No search of its own: the magnifier of the navbar finds apps.
 templ catalogBody(view CatalogView) {
 	<form
 		id="catalog-form"
 		method="get"
 		action={ templ.SafeURL(view.Base) }
-		role="search"
-		class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_10rem]"
+		class="grid grid-cols-2 gap-2 sm:max-w-sm"
 		hx-get={ view.Base }
 		hx-trigger="change, submit"
 		hx-target="#catalog-results"
 		hx-swap="outerHTML"
 		hx-sync="this:replace"
 	>
-		<label for="catalog-search" class="sr-only">Search apps</label>
-		@kit.Input(templ.Attributes{
-			"id": "catalog-search", "name": "q", "type": "search", "value": view.Query, "placeholder": "Search apps",
-			"autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true,
-			"hx-get": view.Base, "hx-trigger": "input changed delay:80ms", "hx-target": "#catalog-results", "hx-swap": "outerHTML", "hx-sync": "closest form:replace",
-		})
-		<div class="grid grid-cols-2 gap-2 sm:contents">
-			@kit.Select(kit.SelectProps{ID: "catalog-category", Name: "category", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
-			@kit.Select(kit.SelectProps{ID: "catalog-sort", Name: "sort", Label: "Order", Options: []kit.Option{{Value: SortUpdated, Label: "Updated"}, {Value: SortName, Label: "Name"}}, Value: view.Sort})
-		</div>
+		@kit.Select(kit.SelectProps{ID: "catalog-category", Name: "category", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
+		@kit.Select(kit.SelectProps{ID: "catalog-sort", Name: "sort", Label: "Order", Options: []kit.Option{{Value: SortUpdated, Label: "Updated"}, {Value: SortName, Label: "Name"}}, Value: view.Sort})
 	</form>
 	@CatalogResults(view)
 }
 
-// CatalogResults is the list of apps the search and the category leave,
-// also the answer to every keystroke of the search. Each icon sits in a
+// CatalogResults is the list of apps of the category, also the answer to
+// a choice of the category or the order. Each icon sits in a
 // box of its size: its padding is a share of what holds it, and without
 // the box that is the whole row.
 templ CatalogResults(view CatalogView) {
@@ -184,12 +174,8 @@ templ CatalogResults(view CatalogView) {
 			<p class="px-1 text-sm text-muted-foreground">
 				Missing one? <a href="/docs/guides/catalog#add-an-app" class="text-foreground underline-offset-4 hover:underline">Ask for it</a>
 			</p>
-		} else {
-			<p class="px-1 pt-2 text-sm text-muted-foreground" data-catalog-empty>
-				No app called “<span class="text-foreground">{ view.Query }</span>” yet.
-				<a href="/docs/guides/catalog#add-an-app" class="text-foreground underline-offset-4 hover:underline">Ask for it</a>
-			</p>
 		}
+
 	</div>
 }
 
