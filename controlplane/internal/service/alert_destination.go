@@ -3,14 +3,11 @@ package service
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"log/slog"
 	"net"
@@ -49,16 +46,32 @@ const (
 	alertTimeout = 10 * time.Second
 	// alertDestinationLimit is how many destinations a workspace may have.
 	alertDestinationLimit = 20
-	// AlertSignatureHeader carries the HMAC-SHA256 of a webhook body.
-	AlertSignatureHeader = "X-Moin-Signature"
 )
 
-var (
-	alertNamePattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-	telegramTokenPattern = regexp.MustCompile(`^[0-9]{3,20}:[A-Za-z0-9_-]{20,100}$`)
-	telegramChatPattern  = regexp.MustCompile(`^(-?[0-9]{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$`)
-	discordHosts         = []string{"discord.com", "discordapp.com", "ptb.discord.com", "canary.discord.com"}
-)
+var alertNamePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// destination is one kind of alert destination, each in its own file:
+// check takes what a new one needs from the input, hint is what lists
+// show of it, send posts one alert to it.
+type destination interface {
+	check(input AlertDestinationInput) (alertTarget, error)
+	hint(to alertTarget) string
+	send(ctx context.Context, sender *alertSender, to alertTarget, message alertMessage) error
+}
+
+// destinations are the kinds of alert destinations by name.
+var destinations = map[string]destination{
+	model.AlertSlack:    slackDestination{},
+	model.AlertDiscord:  discordDestination{},
+	model.AlertTelegram: telegramDestination{},
+	model.AlertWebhook:  webhookDestination{},
+}
+
+// alertTarget is where a destination posts: the URL, or the bot token of
+// Telegram with its chat ID. signingSecret signs the body of a webhook.
+type alertTarget struct {
+	target, chatID, signingSecret string
+}
 
 // AlertDestinationInput is a new alert destination. URL is the incoming
 // webhook of Slack or Discord, or the webhook; BotToken and ChatID are for
@@ -99,7 +112,8 @@ func (s *AlertService) AddDestination(member *model.WorkspaceMember, source Sour
 		return model.AlertDestination{}, "", err
 	}
 	kind := strings.ToLower(strings.TrimSpace(input.Kind))
-	if !slices.Contains(model.AlertKinds, kind) {
+	destinationKind, ok := destinations[kind]
+	if !ok {
 		return model.AlertDestination{}, "", ErrAlertKind
 	}
 	name := strings.TrimSpace(input.Name)
@@ -110,20 +124,9 @@ func (s *AlertService) AddDestination(member *model.WorkspaceMember, source Sour
 	if err != nil {
 		return model.AlertDestination{}, "", err
 	}
-	target, chatID := strings.TrimSpace(input.URL), strings.TrimSpace(input.ChatID)
-	if kind == model.AlertTelegram {
-		target = strings.TrimSpace(input.BotToken)
-		if !telegramTokenPattern.MatchString(target) {
-			return model.AlertDestination{}, "", ErrAlertBotToken
-		}
-		if !telegramChatPattern.MatchString(chatID) {
-			return model.AlertDestination{}, "", ErrAlertChatID
-		}
-	} else {
-		chatID = ""
-		if !validAlertURL(kind, target) {
-			return model.AlertDestination{}, "", ErrAlertURL
-		}
+	to, err := destinationKind.check(input)
+	if err != nil {
+		return model.AlertDestination{}, "", err
 	}
 	count, err := s.destinations.Count(actor.WorkspaceID)
 	if err != nil {
@@ -134,10 +137,10 @@ func (s *AlertService) AddDestination(member *model.WorkspaceMember, source Sour
 	}
 	destination := model.AlertDestination{
 		ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, Name: name, Kind: kind,
-		ChatID: chatID, Hint: alertHint(kind, target, chatID), Events: strings.Join(events, ","),
+		ChatID: to.chatID, Hint: destinationKind.hint(to), Events: strings.Join(events, ","),
 		CreatedAt: s.now().UTC(),
 	}
-	destination.Target = s.box.Seal(target, destination.ID+"/target")
+	destination.Target = s.box.Seal(to.target, destination.ID+"/target")
 	signingSecret := ""
 	if kind == model.AlertWebhook {
 		raw := make([]byte, 32)
@@ -260,34 +263,18 @@ func (s *AlertService) deliver(ctx context.Context, destination model.AlertDesti
 	if err != nil {
 		return &AlertSendError{Message: "the destination cannot be opened with this control plane's key; add it again"}
 	}
-	switch destination.Kind {
-	case model.AlertSlack:
-		return s.sender.post(ctx, target, map[string]any{"text": slackText(message)}, nil, target)
-	case model.AlertDiscord:
-		body := map[string]any{"content": discordText(message), "allowed_mentions": map[string]any{"parse": []string{}}}
-		return s.sender.post(ctx, target, body, nil, target)
-	case model.AlertTelegram:
-		body := map[string]any{"chat_id": destination.ChatID, "text": telegramText(message), "parse_mode": "HTML", "disable_web_page_preview": true}
-		return s.sender.post(ctx, s.sender.telegramAPI+"/bot"+target+"/sendMessage", body, nil, target)
-	case model.AlertWebhook:
-		signingSecret, err := s.box.Open(destination.Secret, destination.ID+"/secret")
+	destinationKind, ok := destinations[destination.Kind]
+	if !ok {
+		return &AlertSendError{Message: "unknown kind " + destination.Kind}
+	}
+	to := alertTarget{target: target, chatID: destination.ChatID}
+	if destination.Secret != "" {
+		to.signingSecret, err = s.box.Open(destination.Secret, destination.ID+"/secret")
 		if err != nil {
 			return &AlertSendError{Message: "the signing secret cannot be opened with this control plane's key; add the destination again"}
 		}
-		return s.sender.post(ctx, target, message.Payload, func(body []byte) http.Header {
-			signature := Signature(signingSecret, body)
-			return http.Header{AlertSignatureHeader: {signature}}
-		}, target, signingSecret)
 	}
-	return &AlertSendError{Message: "unknown kind " + destination.Kind}
-}
-
-// Signature is the value of the signature header of a webhook body:
-// sha256= and the hex HMAC-SHA256 of the body under the signing secret.
-func Signature(signingSecret string, body []byte) string {
-	mac := hmac.New(sha256.New, []byte(signingSecret))
-	mac.Write(body)
-	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	return destinationKind.send(ctx, s.sender, to, message)
 }
 
 // alertSender posts alerts over HTTP.
@@ -407,75 +394,26 @@ func alertEvents(events []string) ([]string, error) {
 	return ordered, nil
 }
 
-// validAlertURL says whether address fits kind: an incoming webhook of
-// Slack or Discord, or any http or https URL for a webhook.
-func validAlertURL(kind, address string) bool {
+// alertURL parses the URL of a destination: it needs a host and no
+// user name or password.
+func alertURL(address string) (*url.URL, bool) {
 	parsed, err := url.Parse(address)
 	if err != nil || parsed.Host == "" || parsed.User != nil {
-		return false
+		return nil, false
 	}
-	switch kind {
-	case model.AlertSlack:
-		return parsed.Scheme == "https" && parsed.Hostname() == "hooks.slack.com" && strings.HasPrefix(parsed.Path, "/services/")
-	case model.AlertDiscord:
-		return parsed.Scheme == "https" && slices.Contains(discordHosts, parsed.Hostname()) && strings.HasPrefix(parsed.Path, "/api/webhooks/")
-	case model.AlertWebhook:
-		return parsed.Scheme == "https" || parsed.Scheme == "http"
-	}
-	return false
+	return parsed, true
 }
 
-// alertHint is what lists show of a target: never all of it.
-func alertHint(kind, target, chatID string) string {
-	if kind == model.AlertTelegram {
-		return "chat " + chatID
-	}
+// chatHint is what lists show of the webhook of a chat: the host and the
+// last four characters, never all of it.
+func chatHint(target string) string {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return ""
-	}
-	if kind == model.AlertWebhook {
-		if parsed.Path == "" || parsed.Path == "/" {
-			return parsed.Scheme + "://" + parsed.Host
-		}
-		return parsed.Scheme + "://" + parsed.Host + "/…"
 	}
 	last := target
 	if len(last) > 4 {
 		last = last[len(last)-4:]
 	}
 	return parsed.Host + "/…" + last
-}
-
-// slackText is an alert in Slack's mrkdwn.
-func slackText(message alertMessage) string {
-	escape := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace
-	lines := []string{"*" + escape(message.Title()) + "*"}
-	for _, line := range message.Lines {
-		lines = append(lines, escape(line))
-	}
-	lines = append(lines, "<"+message.URL+"|Open in "+brand.Name+">")
-	return strings.Join(lines, "\n")
-}
-
-// discordText is an alert in Discord's markdown. The link sits in angle
-// brackets, so Discord shows no preview of it.
-func discordText(message alertMessage) string {
-	escape := strings.NewReplacer(`\`, `\\`, "*", `\*`, "_", `\_`, "~", `\~`, "`", "\\`", "|", `\|`).Replace
-	lines := []string{"**" + escape(message.Title()) + "**"}
-	for _, line := range message.Lines {
-		lines = append(lines, escape(line))
-	}
-	lines = append(lines, "Open in "+brand.Name+": <"+message.URL+">")
-	return strings.Join(lines, "\n")
-}
-
-// telegramText is an alert in Telegram's HTML.
-func telegramText(message alertMessage) string {
-	lines := []string{"<b>" + html.EscapeString(message.Title()) + "</b>"}
-	for _, line := range message.Lines {
-		lines = append(lines, html.EscapeString(line))
-	}
-	lines = append(lines, `<a href="`+html.EscapeString(message.URL)+`">Open in `+brand.Name+`</a>`)
-	return strings.Join(lines, "\n")
 }
