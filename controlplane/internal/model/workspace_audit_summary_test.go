@@ -94,25 +94,29 @@ var summaryCases = []struct{ action, target, metadata, want string }{
 	{"uptime.path_set", "blog", `{"domain":"blog.de","path":"/health"}`,
 		"set the uptime check of blog.de of blog to /health"},
 	{"backup.taken", "blog", `{}`,
-		"took a snapshot of blog"},
+		"backed up blog"},
 	{"backup.restored", "blog", `{"snapshot":"s1"}`,
-		"restored blog from the snapshot s1"},
+		"restored blog from the backup s1"},
 	{"backup.restored", "blog", `{"at":"2026-11-03 14:00 UTC"}`,
 		"restored blog to 2026-11-03 14:00 UTC"},
+	{"backup.restored", "blog", `{"to":"Before v12"}`,
+		"restored blog to before v12"},
+	{"backup.downloaded", "blog", `{}`,
+		"downloaded a copy of blog"},
 	{"backup.snapshot_before_changes", "blog", `{"on":"true"}`,
-		"turned the snapshot before changes on for blog"},
+		"turned the backup before changes on for blog"},
 	{"backup.snapshot_before_changes", "blog", `{"on":"false"}`,
-		"turned the snapshot before changes off for blog"},
+		"turned the backup before changes off for blog"},
 	{"backup.failed", "blog", `{"database":"main"}`,
 		"could not back up main of blog"},
 	{"backup.recovered", "blog", `{"database":"main"}`,
 		"backs up main of blog again"},
 	{"backup.drill_passed", "blog", `{"database":"main"}`,
-		"restored main of blog in a restore drill and checked it"},
+		"checked that main of blog can go back"},
 	{"drill.failed", "blog", `{"database":"main","error":"checksum mismatch"}`,
-		"could not restore main of blog in the restore check: checksum mismatch"},
+		"could not go back with main of blog in the daily check: checksum mismatch"},
 	{"drill.recovered", "blog", `{"database":"main"}`,
-		"restores main of blog in the restore check again"},
+		"goes back with main of blog in the daily check again"},
 	{"data.sql", "blog", `{}`,
 		"ran SQL in blog"},
 	{"data.sql", "blog", `{"statements":"UPDATE on users","changes":"1"}`,
@@ -269,6 +273,15 @@ func TestSummaryOfEveryKind(t *testing.T) {
 		event := WorkspaceAuditEvent{Action: c.action, TargetID: c.target, Metadata: c.metadata}
 		if got := event.Summary(); got != c.want {
 			t.Errorf("%s %s: Summary() = %q, want %q", c.action, c.metadata, got, c.want)
+		}
+	}
+	tested := map[string]bool{}
+	for _, c := range summaryCases {
+		tested[c.action] = true
+	}
+	for action := range summaries {
+		if !tested[action] {
+			t.Errorf("%s has a summary but no case here", action)
 		}
 	}
 }
