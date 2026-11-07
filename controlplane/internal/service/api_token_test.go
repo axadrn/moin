@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestRevokeAccessRevokesAPITokens(t *testing.T) {
 				{ID: "other-1", UserID: "other", WorkspaceID: other.Workspace.ID},
 			} {
 				token.TokenHash, token.Prefix, token.Scopes, token.Kind, token.CreatedAt = token.ID, token.ID, "read", model.APITokenKindPersonal, now
-				if err := tokens.Create(&token); err != nil {
+				if err := tokens.Create(&token, MaxAPITokensPerUser); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -82,6 +83,43 @@ func TestRevokeAccessRevokesAPITokens(t *testing.T) {
 	}
 }
 
+func TestConcurrentAPITokenCreatesStayWithinTheLimit(t *testing.T) {
+	database, workspaces, _ := workspaceTestService(t)
+	user := testutil.SeedUser(t, database, testutil.UserOptions{ID: "user"})
+	store := repository.NewAPITokens(database)
+	tokens := NewAPITokenService(store, workspaces)
+
+	tries := MaxAPITokensPerUser + 10
+	errs := make(chan error, tries)
+	var wait sync.WaitGroup
+	for range tries {
+		wait.Go(func() {
+			_, _, err := tokens.Create("user", CreateAPITokenInput{Name: "Script", WorkspaceID: user.Workspace.ID})
+			errs <- err
+		})
+	}
+	wait.Wait()
+	close(errs)
+	created, refused := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			created++
+		case errors.Is(err, ErrAPITokenLimit):
+			refused++
+		default:
+			t.Fatalf("Create() error = %v", err)
+		}
+	}
+	count, err := store.CountByUserID("user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created != MaxAPITokensPerUser || refused != tries-MaxAPITokensPerUser || count != MaxAPITokensPerUser {
+		t.Fatalf("created %d, refused %d, stored %d, want %d, %d, %d", created, refused, count, MaxAPITokensPerUser, tries-MaxAPITokensPerUser, MaxAPITokensPerUser)
+	}
+}
+
 func TestAPITokenAuthenticateRecordsUseAtMostOncePerMinute(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "user"})
@@ -91,7 +129,7 @@ func TestAPITokenAuthenticateRecordsUseAtMostOncePerMinute(t *testing.T) {
 	service := &APITokenService{tokens: store, now: func() time.Time { return now }}
 	expiresAt := now.Add(2 * time.Minute)
 	raw := APITokenMarker + "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrst"
-	err := store.Create(&model.APIToken{ID: "token", UserID: "user", WorkspaceID: fixture.Workspace.ID, TokenHash: hashToken(raw), Prefix: "abcdefgh", Scopes: "read", Kind: model.APITokenKindPersonal, ExpiresAt: &expiresAt, CreatedAt: now})
+	err := store.Create(&model.APIToken{ID: "token", UserID: "user", WorkspaceID: fixture.Workspace.ID, TokenHash: hashToken(raw), Prefix: "abcdefgh", Scopes: "read", Kind: model.APITokenKindPersonal, ExpiresAt: &expiresAt, CreatedAt: now}, MaxAPITokensPerUser)
 	if err != nil {
 		t.Fatal(err)
 	}

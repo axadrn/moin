@@ -9,7 +9,10 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-var ErrAPITokenNotFound = errors.New("api token not found")
+var (
+	ErrAPITokenNotFound = errors.New("api token not found")
+	ErrAPITokenLimit    = errors.New("api token limit reached")
+)
 
 // APITokens stores the personal and device API tokens.
 type APITokens struct {
@@ -20,11 +23,15 @@ func NewAPITokens(db *sqlx.DB) *APITokens {
 	return &APITokens{db: db}
 }
 
-func (r *APITokens) Create(token *model.APIToken) error {
-	_, err := r.db.Exec(`
+// Create stores a token unless the user already holds limit tokens. Count
+// and insert are one statement, so two creates at once cannot pass the limit.
+func (r *APITokens) Create(token *model.APIToken, limit int) error {
+	result, err := r.db.Exec(`
 		INSERT INTO api_tokens (
 			id, user_id, workspace_id, name, token_hash, prefix, scopes, kind, last_used_at, expires_at, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+		WHERE (SELECT COUNT(*) FROM api_tokens WHERE user_id = $2) < $12
 	`,
 		token.ID,
 		token.UserID,
@@ -37,8 +44,19 @@ func (r *APITokens) Create(token *model.APIToken) error {
 		token.LastUsedAt,
 		token.ExpiresAt,
 		token.CreatedAt,
+		limit,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrAPITokenLimit
+	}
+	return nil
 }
 
 func (r *APITokens) ByTokenHash(tokenHash string) (*model.APIToken, error) {

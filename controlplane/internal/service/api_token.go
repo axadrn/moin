@@ -157,14 +157,6 @@ func (s *APITokenService) issue(token *model.APIToken, source Source) (*model.AP
 	if err != nil {
 		return nil, "", err
 	}
-	count, err := s.tokens.CountByUserID(token.UserID)
-	if err != nil {
-		return nil, "", err
-	}
-	if count >= MaxAPITokensPerUser {
-		return nil, "", ErrAPITokenLimit
-	}
-
 	secret := make([]byte, 32)
 	_, err = rand.Read(secret)
 	if err != nil {
@@ -175,7 +167,10 @@ func (s *APITokenService) issue(token *model.APIToken, source Source) (*model.AP
 	token.ID = uuid.New().String()
 	token.TokenHash = hashToken(raw)
 	token.Prefix = body[:apiTokenPrefixLength]
-	err = s.tokens.Create(token)
+	err = s.tokens.Create(token, MaxAPITokensPerUser)
+	if errors.Is(err, repository.ErrAPITokenLimit) {
+		return nil, "", ErrAPITokenLimit
+	}
 	if err != nil {
 		return nil, "", err
 	}
