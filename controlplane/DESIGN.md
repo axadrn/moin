@@ -299,7 +299,9 @@ notes say it under Changed.
 | deploy | one version of an app, v12; also the verb | release (in copy), build, rollout |
 | restart | start the live deploy again, applying the changes that wait | apply, reload |
 | domain | a name the app answers on, the instant address included | address, route, routing (in copy) |
-| backup | a copy of an app's data in the bucket | snapshot (in copy), dump |
+| backup | the history of an app's database in your bucket: every change of the last 7 days | snapshot, dump, continuous backup, point in time |
+| restore | going back to a minute of the last 7 days; it can be undone for 7 days | rollback (that is for deploys), recover |
+| check | the daily test that going back works | drill, verification |
 | bucket | the S3-compatible bucket you bring, for backups and uploads | storage, S3 (alone), object storage (in copy) |
 | workspace | the space apps, servers and the team belong to | organization, account, team (for the space) |
 | team | the people in a workspace | members (in copy), users |
