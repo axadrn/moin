@@ -87,7 +87,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	users := repository.NewUsers(database)
 	tokens := repository.NewTokens(database)
-	sessions := repository.NewSessionRepository(database)
+	sessions := repository.NewSessions(database)
 	files := repository.NewFiles(database)
 	subscriptions := repository.NewSubscriptions(database)
 	adminEvents := repository.NewAdmin(database)
@@ -136,7 +136,7 @@ func New(cfg *config.Config) (*App, error) {
 		fileService,
 		email, workspaceService,
 	)
-	apiTokenService := service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaceService)
+	apiTokenService := service.NewAPITokenService(repository.NewAPITokens(database), workspaceService)
 	auth.UseAPITokens(apiTokenService)
 	secrets, err := secret.New(cfg.SecretsKey)
 	if err != nil {

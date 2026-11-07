@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,10 +8,14 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/service"
+	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
 func TestLogoutPreservesCookieWhenRevocationFails(t *testing.T) {
-	sessionRepository := &failingLogoutSessionRepository{}
+	// A closed database fails every query, like a database that is down.
+	database := testutil.NewDatabase(t)
+	sessionRepository := repository.NewSessions(database)
+	_ = database.Close()
 	authService := service.NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
@@ -30,12 +33,4 @@ func TestLogoutPreservesCookieWhenRevocationFails(t *testing.T) {
 	if len(recorder.Result().Cookies()) != 0 {
 		t.Fatal("logout cleared the cookie after revocation failed")
 	}
-}
-
-type failingLogoutSessionRepository struct {
-	repository.SessionRepository
-}
-
-func (r *failingLogoutSessionRepository) DeleteByTokenHash(string) error {
-	return errors.New("temporary database failure")
 }

@@ -11,27 +11,16 @@ import (
 
 var ErrAPITokenNotFound = errors.New("api token not found")
 
-type APITokenRepository interface {
-	Create(token *model.APIToken) error
-	ByTokenHash(tokenHash string) (*model.APIToken, error)
-	ListByUserID(userID string) ([]model.APIToken, error)
-	CountByUserID(userID string) (int, error)
-	// TouchLastUsed records a use. A non-nil expiresAt also moves the
-	// expiry, for device tokens.
-	TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error
-	DeleteByIDForUser(id, userID string) error
-	DeleteByUserID(userID string) error
-}
-
-type apiTokenRepository struct {
+// APITokens stores the personal and device API tokens.
+type APITokens struct {
 	db *sqlx.DB
 }
 
-func NewAPITokenRepository(db *sqlx.DB) APITokenRepository {
-	return &apiTokenRepository{db: db}
+func NewAPITokens(db *sqlx.DB) *APITokens {
+	return &APITokens{db: db}
 }
 
-func (r *apiTokenRepository) Create(token *model.APIToken) error {
+func (r *APITokens) Create(token *model.APIToken) error {
 	_, err := r.db.Exec(`
 		INSERT INTO api_tokens (
 			id, user_id, workspace_id, name, token_hash, prefix, scopes, kind, last_used_at, expires_at, created_at
@@ -52,7 +41,7 @@ func (r *apiTokenRepository) Create(token *model.APIToken) error {
 	return err
 }
 
-func (r *apiTokenRepository) ByTokenHash(tokenHash string) (*model.APIToken, error) {
+func (r *APITokens) ByTokenHash(tokenHash string) (*model.APIToken, error) {
 	token := &model.APIToken{}
 	err := r.db.Get(token, `SELECT * FROM api_tokens WHERE token_hash = $1`, tokenHash)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -65,7 +54,7 @@ func (r *apiTokenRepository) ByTokenHash(tokenHash string) (*model.APIToken, err
 }
 
 // ListByUserID returns the tokens of a user, newest first.
-func (r *apiTokenRepository) ListByUserID(userID string) ([]model.APIToken, error) {
+func (r *APITokens) ListByUserID(userID string) ([]model.APIToken, error) {
 	tokens := []model.APIToken{}
 	err := r.db.Select(&tokens, `
 		SELECT * FROM api_tokens
@@ -75,13 +64,15 @@ func (r *apiTokenRepository) ListByUserID(userID string) ([]model.APIToken, erro
 	return tokens, err
 }
 
-func (r *apiTokenRepository) CountByUserID(userID string) (int, error) {
+func (r *APITokens) CountByUserID(userID string) (int, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(*) FROM api_tokens WHERE user_id = $1`, userID)
 	return count, err
 }
 
-func (r *apiTokenRepository) TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error {
+// TouchLastUsed records a use. A non-nil expiresAt also moves the
+// expiry, for device tokens.
+func (r *APITokens) TouchLastUsed(id string, lastUsedAt time.Time, expiresAt *time.Time) error {
 	if expiresAt != nil {
 		_, err := r.db.Exec(`UPDATE api_tokens SET last_used_at = $1, expires_at = $2 WHERE id = $3`, lastUsedAt, *expiresAt, id)
 		return err
@@ -91,7 +82,7 @@ func (r *apiTokenRepository) TouchLastUsed(id string, lastUsedAt time.Time, expi
 }
 
 // DeleteByIDForUser revokes a token. Another user's token is not found.
-func (r *apiTokenRepository) DeleteByIDForUser(id, userID string) error {
+func (r *APITokens) DeleteByIDForUser(id, userID string) error {
 	result, err := r.db.Exec(`DELETE FROM api_tokens WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return err
@@ -107,7 +98,7 @@ func (r *apiTokenRepository) DeleteByIDForUser(id, userID string) error {
 }
 
 // DeleteByUserID revokes every token of a user.
-func (r *apiTokenRepository) DeleteByUserID(userID string) error {
+func (r *APITokens) DeleteByUserID(userID string) error {
 	_, err := r.db.Exec(`DELETE FROM api_tokens WHERE user_id = $1`, userID)
 	return err
 }

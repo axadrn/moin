@@ -45,7 +45,7 @@ func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 	auth := service.NewAuthService(
 		users,
 		repository.NewTokens(database),
-		repository.NewSessionRepository(database),
+		repository.NewSessions(database),
 		workspaces,
 		email,
 		false,
@@ -57,7 +57,7 @@ func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 	)
 	files := service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
 	userService := service.NewUserService(users, files, email, workspaces)
-	tokens := service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
+	tokens := service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
 	return bearerTestEnvironment{
 		database:      database,
 		auth:          auth,

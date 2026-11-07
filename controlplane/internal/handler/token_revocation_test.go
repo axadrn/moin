@@ -47,9 +47,9 @@ func newTokenRevocationTest(t *testing.T) *tokenRevocationTest {
 		subscriptions,
 		email,
 	)
-	test.auth = service.NewAuthService(users, repository.NewTokens(database), repository.NewSessionRepository(database), workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	test.auth = service.NewAuthService(users, repository.NewTokens(database), repository.NewSessions(database), workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	userService := service.NewUserService(users, service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage()), email, workspaces)
-	test.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
+	test.tokens = service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
 	test.login = NewAuthHandler(test.auth, userService, workspaces, &config.Config{})
 	test.auth.UseAPITokens(test.tokens)
 	test.account = NewAccountHandler(test.auth, userService, nil)

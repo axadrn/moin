@@ -34,7 +34,7 @@ type AuthService struct {
 	beta                     *BetaService
 	userRepository           *repository.Users
 	tokenRepository          *repository.Tokens
-	sessionRepository        repository.SessionRepository
+	sessionRepository        *repository.Sessions
 	workspaceService         *WorkspaceService
 	emailService             *EmailService
 	isProduction             bool
@@ -51,7 +51,7 @@ type AuthService struct {
 func NewAuthService(
 	userRepository *repository.Users,
 	tokenRepository *repository.Tokens,
-	sessionRepository repository.SessionRepository,
+	sessionRepository *repository.Sessions,
 	workspaceService *WorkspaceService,
 	emailService *EmailService,
 	isProduction bool,

@@ -74,7 +74,7 @@ func newEnvironment(t *testing.T) *environment {
 	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, env.updates, true, true, []string{"ada@example.com"}, repository.NewWorkspaceAudit(database))
 	env.services.Alerts = service.NewAlertService(email, repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), repository.NewApps(database, database), repository.NewAlertDestinations(database), repository.NewWorkspaceAudit(database), box)
 	env.services.Status = service.NewStatusService(env.services.Apps, env.services.Servers, nil)
-	env.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
+	env.tokens = service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
 	tokenAuth := middleware.APITokenAuth(env.tokens, env.services.Users)
 	env.server = mcp.NewServer(env.services)
 	mux := http.NewServeMux()

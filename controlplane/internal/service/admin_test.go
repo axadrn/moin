@@ -20,12 +20,12 @@ func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
 	if err := repository.NewSubscriptions(database).Update(target.Subscription); err != nil {
 		t.Fatalf("upgrade target subscription: %v", err)
 	}
-	sessions := repository.NewSessionRepository(database)
+	sessions := repository.NewSessions(database)
 	auth := NewAuthService(
 		nil, nil, sessions, nil, nil,
 		false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
+	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
 	adminRepository := repository.NewAdmin(database)
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 
@@ -136,8 +136,8 @@ func TestAdminSessionRevocationIncludesIssuedImpersonationSessions(t *testing.T)
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "revoked-operator", Email: "revoked@example.com", Verified: true})
 	securityOperator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "security-operator", Email: "security@example.com", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "impersonated-target"})
-	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
 	admin := NewAdminService(
 		repository.NewAdmin(database),
 		repository.NewUsers(database),
@@ -179,7 +179,7 @@ func TestStopImpersonationSessionRollsBackWhenAuditCannotCommit(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-operator", Email: "atomic@example.com", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-target"})
-	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	adminRepository := repository.NewAdmin(database)
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{operator.User.Email})
 
@@ -262,7 +262,7 @@ func hasAdminAuditAction(events []model.AdminAuditEvent, action string) bool {
 func TestDashboardShowsTheNetworkOnlyWhereItIsSet(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "network-operator", Email: "network@example.com", Verified: true})
-	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	admin := NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), auth, []string{operator.User.Email})
 	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
 	if err != nil {

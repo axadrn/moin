@@ -71,7 +71,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	environment.auth = service.NewAuthService(
 		userRepository,
 		repository.NewTokens(database),
-		repository.NewSessionRepository(database),
+		repository.NewSessions(database),
 		environment.workspaces,
 		email,
 		false,
@@ -91,7 +91,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	billingHandler := api.NewBillingHandler(environment.payments, environment.workspaces)
 	accountHandler := api.NewAccountHandler(environment.auth, environment.users, environment.files)
 	sessionsHandler := api.NewSessionsHandler(environment.auth)
-	environment.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), environment.workspaces)
+	environment.tokens = service.NewAPITokenService(repository.NewAPITokens(database), environment.workspaces)
 	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
 	environment.auth.UseAPITokens(environment.tokens)
 	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.tokens)

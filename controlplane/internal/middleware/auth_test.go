@@ -357,7 +357,7 @@ func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.U
 	authService := service.NewAuthService(
 		userRepository,
 		repository.NewTokens(database),
-		repository.NewSessionRepository(database),
+		repository.NewSessions(database),
 		workspaceService,
 		emailService,
 		false,
