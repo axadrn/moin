@@ -59,7 +59,7 @@ func TestUptimeStateKeepsThePause(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	app, _ := apps.Get(owner.WorkspaceID, "blog")

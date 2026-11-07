@@ -740,16 +740,26 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 	return out
 }
 
-func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy, changed bool) {
-	current, err := h.apps.Get(workspaceID, app)
+// NewChange is the answer to a change of app: the app as it is now, and
+// the deploy that applies it, if one does.
+func NewChange(apps *service.AppService, workspaceID, app string, deploy *model.Deploy, changed bool) (Change, error) {
+	current, err := apps.Get(workspaceID, app)
 	if err != nil {
-		ServiceError(w, err)
-		return
+		return Change{}, err
 	}
 	answer := Change{App: NewApp(*current), Unchanged: !changed}
 	if deploy != nil {
 		applied := NewDeploy(*deploy)
 		answer.Deploy = &applied
+	}
+	return answer, nil
+}
+
+func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy, changed bool) {
+	answer, err := NewChange(h.apps, workspaceID, app, deploy, changed)
+	if err != nil {
+		ServiceError(w, err)
+		return
 	}
 	JSON(w, http.StatusOK, answer)
 }
@@ -772,13 +782,7 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	var changed bool
-	var err error
-	if request.Service != "" {
-		changed, err = h.apps.SetServiceDomains(actor(r), r.PathValue("app"), request.Service, request.Domains)
-	} else {
-		changed, err = h.apps.SetDomains(actor(r), r.PathValue("app"), request.Domains, request.Canonical)
-	}
+	changed, err := h.apps.SetDomains(actor(r), r.PathValue("app"), request.Service, request.Domains, request.Canonical)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -791,11 +795,7 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	show := r.URL.Query().Get("show") == "true"
-	if show && !CanWrite(r) {
-		Error(w, http.StatusForbidden, "insufficient_scope", "Showing the password needs a token with read and write access.")
-		return
-	}
-	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"), show)
+	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"), show, ctxkeys.APIToken(r.Context()))
 	if err != nil {
 		ServiceError(w, err)
 		return

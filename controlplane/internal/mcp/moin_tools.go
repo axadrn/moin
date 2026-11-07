@@ -960,29 +960,12 @@ func (c Change) Summary() string {
 }
 
 func (t moinTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
-	current, err := t.services.Apps.Get(caller.Token.WorkspaceID, app)
-	if err != nil {
-		return Change{}, err
-	}
-	answer := Change{api.Change{App: api.NewApp(*current), Unchanged: !changed}}
-	if deploy != nil {
-		applied := api.NewDeploy(*deploy)
-		answer.Deploy = &applied
-	}
-	return answer, nil
+	answer, err := api.NewChange(t.services.Apps, caller.Token.WorkspaceID, app, deploy, changed)
+	return Change{answer}, err
 }
 
 func (t moinTools) setDomains(_ context.Context, caller Caller, input DomainsInput) (Change, error) {
-	var changed bool
-	var err error
-	if input.Service != "" {
-		if input.Canonical != "" {
-			return Change{}, InvalidField("canonical", "canonical is for the main service only.")
-		}
-		changed, err = t.services.Apps.SetServiceDomains(caller.actor(), input.App, input.Service, input.Domains)
-	} else {
-		changed, err = t.services.Apps.SetDomains(caller.actor(), input.App, input.Domains, input.Canonical)
-	}
+	changed, err := t.services.Apps.SetDomains(caller.actor(), input.App, input.Service, input.Domains, input.Canonical)
 	if err != nil {
 		return Change{}, err
 	}
@@ -1016,10 +999,7 @@ func (i Instant) Summary() string {
 }
 
 func (t moinTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
-	if input.Show && !caller.Token.HasScope(model.APITokenScopeWrite) {
-		return Instant{}, &ToolError{Code: "insufficient_scope", Message: "Showing the password needs a token with read and write access."}
-	}
-	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App, input.Show)
+	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App, input.Show, caller.Token)
 	if err != nil {
 		return Instant{}, err
 	}

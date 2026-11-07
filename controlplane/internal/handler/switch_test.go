@@ -241,7 +241,7 @@ func TestAgentUpdatesSwitch(t *testing.T) {
 // answers itself as stored; a domain the app does not have stays as it is.
 func TestUptimeSwitch(t *testing.T) {
 	s := newSwitches(t)
-	if _, err := s.apps.SetDomains(s.actor(), "blog", []string{"blog.example.com"}, ""); err != nil {
+	if _, err := s.apps.SetDomains(s.actor(), "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/uptime/on"

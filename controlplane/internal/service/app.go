@@ -446,10 +446,24 @@ func (s *AppService) apply(actor Actor, action, idOrName string) (*model.Deploy,
 	return s.start(actor, action, app, deploy, protocol.DeployStart{})
 }
 
-// SetDomains replaces the app's domains and the canonical one ("" for none).
-// The app takes them on its next restart, start or deploy (ChangesWaiting).
-// changed is false when the app had these domains already.
-func (s *AppService) SetDomains(actor Actor, idOrName string, domains []string, canonical string) (changed bool, err error) {
+// SetDomains replaces the domains of one service of the app: the main one
+// for an empty service, with the canonical one ("" for none), or another
+// service of compose.yml, which has no canonical domain. The app takes them
+// on its next restart, start or deploy (ChangesWaiting). changed is false
+// when the service had these domains already.
+func (s *AppService) SetDomains(actor Actor, idOrName, service string, domains []string, canonical string) (changed bool, err error) {
+	if service != "" {
+		if canonical != "" {
+			return false, ErrServiceCanonical
+		}
+		return s.setServiceDomains(actor, idOrName, service, domains)
+	}
+	return s.setMainDomains(actor, idOrName, domains, canonical)
+}
+
+// setMainDomains replaces the domains of the main service and the
+// canonical one.
+func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []string, canonical string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err

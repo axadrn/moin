@@ -158,7 +158,7 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 		return app, nil, err
 	}
 	if domain != "" {
-		_, err = s.apps.SetDomains(actor, app.ID, []string{domain}, "")
+		_, err = s.apps.SetDomains(actor, app.ID, "", []string{domain}, "")
 		if err != nil {
 			return app, nil, err
 		}

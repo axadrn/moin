@@ -116,6 +116,15 @@ func (a App) DomainList() []string {
 	return domains
 }
 
+// DomainsOf returns the domains of a service, the main one for "", and its
+// canonical domain: only the main service has one.
+func (a App) DomainsOf(service string) (domains []string, canonical string) {
+	if service == "" {
+		return a.DomainList(), a.Canonical
+	}
+	return a.ServiceDomainMap()[service], ""
+}
+
 // Bucket is one of a workspace's S3-compatible buckets, where the uploads
 // and backups of its apps go. SecretKey is sealed. One bucket of a
 // workspace is its default: apps without a bucket of their own use it.

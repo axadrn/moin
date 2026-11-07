@@ -82,7 +82,7 @@ func TestUptimeChecksEveryDomainAndRecordsOutages(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de", "www.blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de", "www.blog.de"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	// Before the first deploy nothing is checked.
@@ -154,7 +154,7 @@ func TestUptimeCheckSettings(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	deploy, err := deployUpload(apps)
@@ -213,7 +213,7 @@ func TestRunUptimeChecksAtTheOffsetAndStops(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", []string{"blog.de"}, ""); err != nil {
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.de"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	deploy, err := deployUpload(apps)
