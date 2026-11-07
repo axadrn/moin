@@ -2,7 +2,7 @@
 
 ## Custom rules
 
-Add project-specific rules here. Keep generated defaults below this section easy to merge with future releases of the starter template.
+moin stands on its own: it started from a starter template, but it follows only its own rules now and never keeps code just to stay easy to merge with one.
 
 - This is the moin control plane. How moin works is in `content/docs`, the only source of truth.
 - The agent, CLI, TUI and the protocol package live at the root of this repo, one Go module for all. The repo is public: never commit secrets, `.env` files or anything private.
