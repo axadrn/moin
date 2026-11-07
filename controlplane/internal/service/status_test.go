@@ -73,8 +73,8 @@ func TestStatusIssues(t *testing.T) {
 	}
 	for kind, path := range map[string]string{
 		IssueDeployFailed: "/apps/shop",
-		IssueBackupFailed: "/apps/shop/backups",
-		IssueDrillFailed:  "/apps/shop/backups",
+		IssueBackupFailed: "/apps/shop/data?db=postgres-db",
+		IssueDrillFailed:  "/apps/shop/data?db=data-app.db",
 		IssueDomainDown:   "/apps/shop/uptime",
 		IssueDiskFull:     "/servers/" + server.ID + "/metrics",
 		IssueAgentBehind:  "/servers",

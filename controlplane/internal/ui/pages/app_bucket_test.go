@@ -32,8 +32,8 @@ func TestBucketsPage(t *testing.T) {
 	}
 }
 
-// The backups tab picks the app's bucket among several and marks a
-// snapshot in an older bucket, whose restore names that bucket.
+// Data picks the app's bucket among several and marks a backup in an
+// older bucket, whose restore names that bucket.
 func TestBackupsPickTheBucket(t *testing.T) {
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
 	current := service.Bucket{Name: "client-a", Bucket: "client", Folder: "workspace-1/"}
@@ -49,16 +49,20 @@ func TestBackupsPickTheBucket(t *testing.T) {
 		}}}},
 	}
 	var html strings.Builder
-	if err := AppBackups(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/backups"), &html); err != nil {
+	ctx := projectPageContext("/app/tiny-rocket-co/apps/shop/data")
+	if err := BackupSettings(view).Render(ctx, &html); err != nil {
+		t.Fatal(err)
+	}
+	if err := DatabaseBackups(view, "/data/app.db").Render(ctx, &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`id="app-bucket-form"`, "The default (default)", `data-snapshot-bucket="default"`, `name="bucket" value="default"`, "data-bucket-older"} {
+	for _, want := range []string{`id="app-bucket-form"`, "The default (default)", `data-snapshot-bucket="default"`, `name="bucket:20261101T110000Z-manual" value="default"`, "data-bucket-older", `data-confirm-name="shop"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}
 	}
 	if strings.Contains(page, `data-snapshot-bucket="client-a"`) {
-		t.Error("a snapshot in the app's own bucket is marked as older")
+		t.Error("a backup in the app's own bucket is marked as older")
 	}
 }

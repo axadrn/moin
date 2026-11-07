@@ -186,11 +186,3 @@ templ PinSwitch(app model.App) {
 	</form>
 }
 
-// dataNav switches the Data section between its tables and its backups.
-templ dataNav(appName, active string) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName }}
-	@kit.Segmented("data-tabs", "Data", []kit.Segment{
-		{Label: "Browse", Href: appPath + "/data", Active: active == "browse"},
-		{Label: "Backups", Href: appPath + "/backups", Active: active == "backups"},
-	})
-}

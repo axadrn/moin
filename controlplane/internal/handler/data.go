@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/repository"
@@ -18,8 +19,10 @@ import (
 
 const dataPageRows = 50
 
-// Data is the data page of an app: its tables and a page of rows of one,
-// read live from the server.
+// Data is the Data section of an app, read live from the server: its
+// databases, one database with its tables and backups (?db=), or the rows
+// of one table (?db=&table=). A table without a database, an older link,
+// is in the first database.
 func (h *AppsHandler) Data(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, databases, err := h.apps.Databases(workspace.ID, r.PathValue("app"))
@@ -31,42 +34,44 @@ func (h *AppsHandler) Data(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load databases failed", err)
 		return
 	}
-	view := pages.DataView{App: *app, Databases: databases, Limit: dataPageRows}
-	if len(databases) == 0 {
-		render(w, r, pages.AppData(view))
-		return
-	}
+	view := pages.DataView{App: *app, Databases: databases, Limit: dataPageRows, Now: time.Now()}
 	query := r.URL.Query()
-	view.Database = databases[0].Path
-	if slices.ContainsFunc(databases, func(d protocol.Database) bool { return d.Path == query.Get("db") }) {
-		view.Database = query.Get("db")
+	database, table := query.Get("db"), query.Get("table")
+	if !slices.ContainsFunc(databases, func(d protocol.Database) bool { return d.Path == database }) {
+		database = ""
+		if table != "" && len(databases) > 0 {
+			database = databases[0].Path
+		}
 	}
-	tables, err := h.apps.Tables(r.Context(), workspace.ID, app.ID, view.Database)
+	view.Backups, err = h.backupsView(r, app, database != "" && table == "")
 	if err != nil {
-		view.Error = errorMessage(err)
+		renderError(w, "load backups failed", err)
+		return
+	}
+	if database == "" {
+		view.Status, err = h.apps.BackupStatus(workspace.ID, app.ID)
+		if err != nil {
+			renderError(w, "load backup status failed", err)
+			return
+		}
 		render(w, r, pages.AppData(view))
 		return
 	}
-	view.Tables, view.Migration = tables.Tables, tables.Migration
-	view.Schema = query.Get("view") == "schema"
-	if len(view.Tables) == 0 {
-		render(w, r, pages.AppData(view))
-		return
-	}
-	name := query.Get("table")
-	if !slices.ContainsFunc(view.Tables, func(t protocol.DBTable) bool { return t.Name == name }) {
-		name = view.Tables[0].Name
-	}
-	if view.Schema {
-		index := slices.IndexFunc(view.Tables, func(t protocol.DBTable) bool { return t.Name == name })
-		view.Table = &view.Tables[index]
+	view.Database = database
+	if table == "" {
+		tables, err := h.apps.Tables(r.Context(), workspace.ID, app.ID, database)
+		if err != nil {
+			view.Error = errorMessage(err)
+		}
+		view.Tables, view.Migration = tables.Tables, tables.Migration
 		render(w, r, pages.AppData(view))
 		return
 	}
 	view.Offset, _ = strconv.Atoi(query.Get("offset"))
-	rows, err := h.apps.Rows(r.Context(), workspace.ID, app.ID, view.Database, name, view.Offset, view.Limit)
+	rows, err := h.apps.Rows(r.Context(), workspace.ID, app.ID, database, table, view.Offset, view.Limit)
 	if err != nil {
 		view.Error = errorMessage(err)
+		view.Table = &protocol.DBTable{Name: table}
 		render(w, r, pages.AppData(view))
 		return
 	}

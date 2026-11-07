@@ -1,410 +1,469 @@
 package pages
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/checkbox"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/kbd"
-	tablecomp "github.com/axadrn/moin/controlplane/internal/ui/components/table"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/textarea"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 	"net/url"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
 )
 
-// DataView is the data page of an app: its databases, the tables of one,
-// and a page of rows of one table.
+// DataView is the Data section of an app, at one of three depths: its
+// databases (no Database), one database with its tables and backups
+// (Database, no Table), or the rows of one table (Table).
 type DataView struct {
 	App       model.App
 	Databases []protocol.Database
+	// Database is the path of the open database; Table its open table.
 	Database  string
-	Tables    []protocol.DBTable
 	Table     *protocol.DBTable
+	Tables    []protocol.DBTable
+	Migration *protocol.DBMigration
 	Result    protocol.DBResult
 	Offset    int
 	Limit     int
-	// Schema shows the table's CREATE statements instead of its rows.
-	Schema    bool
-	Migration *protocol.DBMigration
 	// Error says why the server could not answer.
 	Error string
+	// Status is what the agent last said about each database's backup, for
+	// the list.
+	Status []model.BackupStatus
+	// Backups is the open database's backups: its bucket, the buckets the
+	// app may pick, the ones it left, and what the agent reports.
+	Backups BackupsView
+	Now     time.Time
 }
 
-// AppData is the data page of an app: the tables of its database next to
-// the rows or the schema of one, then the SQL console.
+// AppData is the Data section: the databases as a list that drills down,
+// a database with its tables, SQL and backups, then a table with its rows.
 templ AppData(view DataView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " data", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Data"}}}) {
+	@layouts.App(dataTitle(view)) {
 		@panelPage(templ.Attributes{"data-app-data": view.App.Name}) {
-			@appHeader(view.App, "data")
-			@appSection(view.App.Name, "data") {
-				@dataNav(view.App.Name, "browse")
-				if view.Error != "" {
-					<div role="alert">
-						@emptyState("The data could not be read", view.Error, "")
-					</div>
-				} else if len(view.Databases) == 0 {
-					@emptyStateWith("No database yet", noDatabase(), "moin deploy "+view.App.Name)
-				} else {
-					<div class="grid items-stretch gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-						@dataSidebar(view)
-						if view.Table != nil {
-							@dataTable(view)
-						} else {
-							@panel(panelProps{Title: "No tables yet", Docs: "/docs/guides/data#the-schema-belongs-to-your-code", Description: "Tables come from your migrations, after the next deploy."}) {
-								@emptyHint("Or create one with SQL below.", "")
-							}
+			switch  {
+				case view.Table != nil:
+					@dataTablePage(view)
+				case view.Database != "":
+					@dataDatabasePage(view)
+				default:
+					@dataListPage(view)
+			}
+		}
+		@dataScripts()
+		// The app's changes come as the event "apps": the head reloads on it,
+		// so a restore that stops the app shows there.
+		@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Slug)
+	}
+}
+
+func dataTitle(view DataView) string {
+	switch {
+	case view.Table != nil:
+		return view.Table.Name + " · " + view.App.Name
+	case view.Database != "":
+		return databaseName(view.Database) + " · " + view.App.Name
+	}
+	return view.App.Name + " data"
+}
+
+// dataListPage is the first page of Data: every database of the app, each a
+// row with how its backup is, then the backup settings of the app.
+templ dataListPage(view DataView) {
+	@appHeader(view.App, "data")
+	@appSection(view.App.Name, "data") {
+		if len(view.Databases) == 0 {
+			@kit.Card("", nil) {
+				@kit.Quiet() {
+					No SQLite file on a volume and no Postgres service yet.
+				}
+				@kit.Command("moin deploy " + view.App.Name)
+			}
+		} else {
+			@kit.Section("Databases", nil) {
+				@kit.List() {
+					for _, database := range view.Databases {
+						@kit.Row(databaseURL(ctx, view.App.Name, database.Path)) {
+							@kit.RowText(shortPath(database.Path), databaseKind(database))
+							@databaseBackupValue(view, database.Path)
 						}
-					</div>
-					@dataConsole(view)
+					}
 				}
 			}
+		}
+		@BackupSettings(view.Backups)
+	}
+}
+
+// databaseBackupValue is the value of a database's row: when its last
+// change reached the bucket, or that its backup fails.
+templ databaseBackupValue(view DataView, database string) {
+	{{ backup, known := backupStatusOf(view.Status, database) }}
+	if view.Backups.Storage == nil {
+		<span class="shrink-0 text-sm text-muted-foreground">No backups</span>
+	} else if known && backup.BackupError() != "" {
+		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ backup.BackupError() }>
+			@status.Symbol(status.KindFailed)
+			Backup fails
+		</span>
+	} else if known && backup.ReplicatedAt != nil {
+		<span class="shrink-0 text-sm text-muted-foreground tabular-nums" title={ stamp(*backup.ReplicatedAt) }>Backed up { ago(*backup.ReplicatedAt, view.Now) }</span>
+	}
+}
+
+func backupStatusOf(statuses []model.BackupStatus, database string) (model.BackupStatus, bool) {
+	for _, backup := range statuses {
+		if backup.Database == database {
+			return backup, true
+		}
+	}
+	return model.BackupStatus{}, false
+}
+
+// dataDatabasePage is one database: its tables, its backups with Back up
+// now, and the SQL console.
+templ dataDatabasePage(view DataView) {
+	@dataHeader(view.App, kit.Back{Label: "Data", Href: dataPath(ctx, view.App.Name)}, databaseName(view.Database))
+	@appSection(view.App.Name, "data") {
+		@dataTrail(view)
+		if view.Error != "" {
+			@dataError(view.Error)
+		} else {
+			@kit.Section("Tables", nil) {
+				if len(view.Tables) == 0 {
+					@kit.Card("", nil) {
+						@kit.Quiet() {
+							No tables yet. Your migrations make them on the next deploy.
+						}
+					}
+				} else {
+					@kit.List() {
+						for _, table := range view.Tables {
+							@kit.Row(tableURL(ctx, view.App.Name, view.Database, table.Name, 0)) {
+								@kit.RowText(table.Name, tableKind(table))
+								<span class="shrink-0 text-sm text-muted-foreground tabular-nums" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
+							}
+						}
+						if view.Migration != nil {
+							@kit.Row("") {
+								<span class="flex-1 font-medium" data-migration>Migrations</span>
+								<span class="min-w-0 truncate text-sm text-muted-foreground" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="font-mono">{ view.Migration.Version }</span></span>
+							}
+						}
+					}
+				}
+			}
+			@DatabaseBackups(view.Backups, view.Database)
+			@dataConsole(view)
 		}
 	}
 }
 
-func dataURL(view DataView, table string, offset int) string {
-	query := url.Values{}
-	if len(view.Databases) > 1 {
-		query.Set("db", view.Database)
+// dataTablePage is one table: its rows on a card to edit in place, then
+// how it is built.
+templ dataTablePage(view DataView) {
+	{{ table := *view.Table }}
+	@dataHeader(view.App, kit.Back{Label: databaseName(view.Database), Href: databaseURL(ctx, view.App.Name, view.Database)}, table.Name)
+	@appSection(view.App.Name, "data") {
+		@dataTrail(view)
+		if view.Error != "" {
+			@dataError(view.Error)
+		} else {
+			@dataRows(view)
+			@dataSchema(table)
+		}
 	}
+}
+
+// dataHeader is the head of a page under Data: on a phone the way back
+// and the page's name, on the desktop the head of the app, which keeps its
+// tabs under it.
+templ dataHeader(app model.App, back kit.Back, title string) {
+	<div class="sm:hidden">
+		@kit.Header(back, title)
+	</div>
+	<div class="hidden sm:block">
+		@appHeader(app, "app")
+	</div>
+}
+
+// dataTrail is where a page under Data is, on the desktop, where the head
+// is the app's: Data, the database, the table. Each step but the last goes
+// back to it.
+templ dataTrail(view DataView) {
+	<nav aria-label="Data" class="-mb-2 hidden items-center gap-1 px-1 text-sm sm:flex">
+		<a href={ templ.SafeURL(dataPath(ctx, view.App.Name)) } class={ dataTrailLink }>Data</a>
+		@dataTrailChevron()
+		if view.Table != nil {
+			<a href={ templ.SafeURL(databaseURL(ctx, view.App.Name, view.Database)) } class={ dataTrailLink }>{ databaseName(view.Database) }</a>
+			@dataTrailChevron()
+			<span class="min-w-0 truncate font-medium" aria-current="page">{ view.Table.Name }</span>
+		} else {
+			<span class="min-w-0 truncate font-medium" aria-current="page">{ databaseName(view.Database) }</span>
+		}
+	</nav>
+}
+
+const dataTrailLink = "flex h-8 min-w-0 items-center truncate rounded-full font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
+
+templ dataTrailChevron() {
+	<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+}
+
+// dataError is why the server could not answer: a state of the page.
+templ dataError(message string) {
+	<p role="alert" class="flex items-center gap-2 px-1 text-sm text-failed" data-data-error>
+		@status.Symbol(status.KindFailed)
+		<span class="min-w-0 break-words">{ message }</span>
+	</p>
+}
+
+func dataPath(ctx context.Context, app string) string {
+	return ctxkeys.AppBasePath(ctx) + "/apps/" + app + "/data"
+}
+
+func databaseURL(ctx context.Context, app, database string) string {
+	return dataPath(ctx, app) + "?db=" + url.QueryEscape(database)
+}
+
+func tableURL(ctx context.Context, app, database, table string, offset int) string {
+	query := url.Values{}
+	query.Set("db", database)
 	query.Set("table", table)
 	if offset > 0 {
 		query.Set("offset", strconv.Itoa(offset))
 	}
-	return "?" + query.Encode()
+	return dataPath(ctx, app) + "?" + query.Encode()
 }
 
-func schemaURL(view DataView, table string) string {
-	return dataURL(view, table, 0) + "&view=schema"
-}
-
-// dataSidebar lists the databases and tables, and says how the schema
-// changes.
-templ dataSidebar(view DataView) {
-	@panel(panelProps{Title: "Tables", Description: tablesLine(view), Docs: "/docs/guides/data#browse-rows", Body: panelBodyRows}) {
-		if len(view.Databases) > 1 {
-			<nav aria-label="Databases" class="mb-6">
-				<p class="px-3 pb-1 text-xs text-muted-foreground">Database</p>
-				<ul class="flex flex-col gap-1" role="list">
-					for _, database := range view.Databases {
-						<li>
-							@dataNavItem("?db="+url.QueryEscape(database.Path), database.Path == view.Database, templ.Attributes{"title": database.Path}) {
-								@icon.Database(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
-								<span class="min-w-0 flex-1 truncate font-mono">{ shortPath(database.Path) }</span>
-							}
-						</li>
-					}
-				</ul>
-			</nav>
-		}
-		<nav aria-label="Tables">
-			<ul class="flex flex-col gap-1" role="list">
-				for _, table := range view.Tables {
-					<li>
-						@dataNavItem(dataURL(view, table.Name, 0), view.Table != nil && view.Table.Name == table.Name, templ.Attributes{"data-table-link": table.Name}) {
-							if table.Type == "view" {
-								@icon.Eye(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
-							} else {
-								@icon.Table(icon.Props{Class: "size-4 shrink-0 text-muted-foreground"})
-							}
-							<span class="min-w-0 flex-1 truncate">{ table.Name }</span>
-							<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ fmt.Sprint(table.Rows) }</span>
-						}
-					</li>
-				}
-			</ul>
-		</nav>
-		<div class="flex flex-col gap-1 px-3 pt-6 text-xs text-muted-foreground" data-migration>
-			<p class="text-sm font-medium text-foreground">Migrations</p>
-			if view.Migration != nil {
-				<p><span class="text-foreground">{ view.Migration.Tool }</span> at <span class="font-mono text-foreground">{ view.Migration.Version }</span></p>
-				if view.Migration.AppliedAt != "" {
-					<p class="tabular-nums">applied { view.Migration.AppliedAt }</p>
-				}
-			} else {
-				<p>No migration tool found.</p>
-			}
-			<p>The schema changes with the migrations in your repo, on deploy.</p>
-		</div>
+// databaseName is what a database is called: a SQLite file by its name, a
+// Postgres service by its key in moin, postgres-db.
+func databaseName(database string) string {
+	if strings.HasPrefix(database, "/") {
+		return path.Base(database)
 	}
+	return database
 }
 
-// tablesLine is the line under the Tables title: how many, in which file.
-func tablesLine(view DataView) string {
-	return plural(len(view.Tables), "table", "tables") + " in " + shortPath(view.Database)
+// databaseKind is SQLite or Postgres.
+func databaseKind(database protocol.Database) string {
+	if database.Postgres() {
+		return "Postgres"
+	}
+	return "SQLite"
 }
 
-// dataNavItem is one row of the sidebar lists, soft gray when selected.
-templ dataNavItem(href string, active bool, attrs templ.Attributes) {
-	<a
-		href={ templ.SafeURL(href) }
-		class={ "flex h-9 items-center gap-2.5 rounded-xl px-3 text-sm transition-colors",
-			templ.KV("bg-muted font-medium", active),
-			templ.KV("hover:bg-muted/60", !active) }
-		if active {
-			aria-current="page"
-		}
-		{ attrs... }
-	>
-		{ children... }
-	</a>
+func tableKind(table protocol.DBTable) string {
+	if table.Type == "view" {
+		return "View"
+	}
+	return ""
 }
 
-templ dataTable(view DataView) {
-	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
+// dataRows is the rows of a table on a card: each cell edits in place,
+// each row has one action, Delete. Add row opens a form over the rows.
+templ dataRows(view DataView) {
 	{{ table := *view.Table }}
-	{{ withRowID := table.RowID }}
 	{{ editable := service.Editable(table) }}
-	@panel(panelProps{Heading: "data-table-heading", Title: table.Name, Description: tableLine(view), Body: panelBodyFlush, Action: addRowAction(view)}) {
-		@dataToolbar(view)
-		if view.Schema {
-			@dataSchema(table)
-		} else {
-			if table.Type == "table" {
-				@newRowForm(dataPath, view.Database, table)
+	{{ shown := view.Offset + len(view.Result.Rows) }}
+	@kit.Card(plural(int(table.Rows), "row", "rows"), addRowAction(table)) {
+		if table.Type == "table" {
+			@newRowForm(dataPath(ctx, view.App.Name), view.Database, table)
+		}
+		if table.Type == "table" && !editable {
+			@kit.Quiet() {
+				No primary key, so a row has no name to edit it by. Change rows with SQL.
 			}
-			<div class={ dataScrollClasses + " max-h-[32rem]" }>
-				@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-rows": true}}) {
-					@tablecomp.Header() {
-						@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
+		}
+		if len(view.Result.Rows) == 0 {
+			@kit.Quiet() {
+				No rows yet.
+			}
+		} else {
+			<div class={ dataScroll }>
+				<table class={ dataTableClass } data-rows>
+					<thead>
+						<tr>
 							for _, column := range table.Columns {
-								@tablecomp.Head(tablecomp.HeadProps{Class: utils.CN(dataHeadClasses, map[string]bool{"text-right": isNumeric(column)})}) {
+								<th scope="col" class={ dataHead, templ.KV("text-right", isNumeric(column)) }>
 									<span class="inline-flex items-center gap-1.5">
 										if column.PrimaryKey {
-											@icon.KeyRound(icon.Props{Class: "size-3.5 text-muted-foreground", Attributes: templ.Attributes{"aria-label": "primary key"}})
+											@icon.KeyRound(icon.Props{Class: "size-3.5", Attributes: templ.Attributes{"aria-label": "primary key"}})
 										}
-										<span>{ column.Name }</span>
-										<span class="font-mono text-xs font-normal text-muted-foreground">{ strings.ToLower(column.Type) }</span>
+										<span class="text-foreground">{ column.Name }</span>
+										<span class="font-mono text-xs font-normal">{ strings.ToLower(column.Type) }</span>
 									</span>
-								}
+								</th>
 							}
 							if editable {
-								@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses + " w-12"}) {
-									<span class="sr-only">Delete</span>
-								}
+								<th scope="col" class={ dataHead }><span class="sr-only">Delete</span></th>
 							}
-						}
-					}
-					@tablecomp.Body() {
+						</tr>
+					</thead>
+					<tbody>
 						for _, row := range view.Result.Rows {
-							{{ ref := rowRefOf(table, row, withRowID) }}
-							@tablecomp.Row(tablecomp.RowProps{Class: "group/row", Attributes: templ.Attributes{"data-row": ref.RowID + ref.Key}}) {
+							{{ ref := rowRefOf(table, row, table.RowID) }}
+							<tr class={ dataRow } data-row={ ref.RowID + ref.Key }>
 								for index, column := range table.Columns {
-									{{ value := cellValue(row, index, withRowID) }}
+									{{ value := cellValue(row, index, table.RowID) }}
 									if editable && !isBlob(column) {
-										@tablecomp.Cell(tablecomp.CellProps{Class: dataEditCellClasses}) {
-											@DataCell(dataPath, view.Database, table.Name, ref, column, value, "")
-										}
+										<td class="py-0 pr-1 first:pl-3">
+											@DataCell(dataPath(ctx, view.App.Name), view.Database, table.Name, ref, column, value, "")
+										</td>
 									} else {
-										@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-right": isNumeric(column), "text-muted-foreground italic": value == nil})}) {
-											{ cellText(value) }
-										}
+										<td class={ dataCell, templ.KV("text-right", isNumeric(column)), templ.KV("text-muted-foreground italic", value == nil) }>{ cellText(value) }</td>
 									}
 								}
 								if editable {
-									@tablecomp.Cell(tablecomp.CellProps{Class: "py-0 pr-4 text-right"}) {
-										@button.Button(button.Props{
-											Variant: button.VariantGhost,
-											Size:    button.SizeIconSm,
-											Class:   "text-muted-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100",
-											Attributes: templ.Attributes{
-												"aria-label": "Delete " + strings.ToLower(ref.Label()),
-												"title":      "Delete this row",
-												"hx-post":    dataPath + "/delete",
-												"hx-vals":    deleteRowVals(view.Database, table.Name, ref),
-												"hx-target":  "closest tr",
-												"hx-swap":    "outerHTML",
-												"hx-disable": "this",
-												"hx-confirm": "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone.",
-											},
-										}) {
+									<td class="w-11 py-0 text-right">
+										<button
+											type="button"
+											class="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-failed focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-40 [&_svg]:size-4"
+											aria-label={ "Delete " + strings.ToLower(ref.Label()) }
+											title="Delete"
+											hx-post={ dataPath(ctx, view.App.Name) + "/delete" }
+											hx-vals={ deleteRowVals(view.Database, table.Name, ref) }
+											hx-target="closest tr"
+											hx-swap="outerHTML"
+											hx-disable="this"
+											hx-confirm={ "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone." }
+											data-confirm-action="Delete"
+										>
 											@icon.Trash2()
-										}
-									}
+										</button>
+									</td>
 								}
-							}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		if view.Offset > 0 || int64(shown) < table.Rows {
+			<div class="flex items-center justify-between gap-2" data-pager>
+				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
+				<div class="flex gap-2">
+					if view.Offset > 0 {
+						@kit.Button(kit.Secondary, tableURL(ctx, view.App.Name, view.Database, table.Name, max(view.Offset-view.Limit, 0)), nil) {
+							Newer
 						}
 					}
-				}
-				if len(view.Result.Rows) == 0 {
-					<div class="px-6 pt-6">
-						if table.Type == "table" {
-							@emptyHint("No rows yet. Add the first one with Add row, or with SQL below.", "")
-						} else {
-							@emptyHint("This view returns no rows right now.", "")
+					if int64(shown) < table.Rows {
+						@kit.Button(kit.Secondary, tableURL(ctx, view.App.Name, view.Database, table.Name, view.Offset+view.Limit), nil) {
+							Older
 						}
-					</div>
-				}
+					}
+				</div>
 			</div>
 		}
 	}
 }
 
-// tableLine is the line under the table's name: its size and how to work
-// with what is shown.
-func tableLine(view DataView) string {
-	table := *view.Table
-	rows := plural(int(table.Rows), "row", "rows")
-	switch {
-	case view.Schema:
-		return rows + ". Its columns, indexes and the statement that created it."
-	case table.Type == "view":
-		return rows + ". A view, read only."
-	case service.Editable(table):
-		return rows + ". Click a cell to edit, Enter saves, Esc cancels."
-	}
-	return rows + ". No primary key, so rows have no name to edit them by: add rows here, change them with SQL below."
-}
-
-// addRowAction is the one action of the table card: Add row, on the rows
-// of a table (not a view, not the schema).
-func addRowAction(view DataView) templ.Component {
-	if view.Schema || view.Table.Type != "table" {
+// addRowAction is the one action of the rows card: Add row, on a table,
+// not a view.
+func addRowAction(table protocol.DBTable) templ.Component {
+	if table.Type != "table" {
 		return nil
 	}
 	return addRowButton()
 }
 
 templ addRowButton() {
-	@button.Button(button.Props{
-		Size:       button.SizeSm,
-		Attributes: templ.Attributes{"data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"},
-	}) {
-		@icon.Plus(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
+	@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button", "data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"}) {
 		Add row
 	}
 }
 
-// dataToolbar switches between the rows and the schema of a table, and
-// pages through the rows.
-templ dataToolbar(view DataView) {
-	{{ table := *view.Table }}
-	{{ shown := view.Offset + len(view.Result.Rows) }}
-	<div class="flex flex-wrap items-center justify-between gap-2 px-6 pb-4">
-		@tabNav("Table view") {
-			@tabLink(dataURL(view, table.Name, 0), "Rows", !view.Schema, nil)
-			@tabLink(schemaURL(view, table.Name), "Schema", view.Schema, templ.Attributes{"data-schema-link": true})
-		}
-		if !view.Schema && (view.Offset > 0 || int64(shown) < table.Rows) {
-			<div class="flex items-center gap-2" data-pager>
-				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
-				@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Disabled: view.Offset == 0, Href: dataURL(view, table.Name, max(view.Offset-view.Limit, 0))}) {
-					Newer
-				}
-				@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Disabled: int64(shown) >= table.Rows, Href: dataURL(view, table.Name, view.Offset+view.Limit)}) {
-					Older
-				}
-			</div>
-		}
-	</div>
-}
+// The tables of the data pages run edge to edge in their card, a line
+// between two rows; the first and the last column sit on the card's 24 px,
+// so values line up with its title.
+const (
+	dataScroll     = "-mx-6 max-h-[36rem] overflow-auto overscroll-contain"
+	dataTableClass = "w-full border-collapse text-sm"
+	dataHead       = "sticky top-0 z-10 h-11 bg-card px-3 text-left align-middle font-medium whitespace-nowrap text-muted-foreground first:pl-6 last:pr-6"
+	dataRow        = "border-t border-border"
+	dataCell       = "h-11 max-w-[22rem] truncate px-3 font-mono whitespace-nowrap first:pl-6 last:pr-6"
+	dataTerm       = "moin-term overflow-x-auto rounded-3xl bg-terminal px-5 py-4 whitespace-pre-wrap text-terminal-foreground"
+)
 
+// dataSchema is how a table is built: its columns, then the statement that
+// made it and its indexes. The schema changes with the migrations in the
+// repo, not here.
 templ dataSchema(table protocol.DBTable) {
-	<div class={ dataScrollClasses }>
-		@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-schema-columns": true}}) {
-			@tablecomp.Header() {
-				@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
-					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses}) {
-						Column
-					}
-					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses}) {
-						Type
-					}
-					@tablecomp.Head(tablecomp.HeadProps{Class: dataHeadClasses + " w-full"}) {
-						Constraints
-					}
-				}
-			}
-			@tablecomp.Body() {
-				for _, column := range table.Columns {
-					@tablecomp.Row() {
-						@tablecomp.Cell(tablecomp.CellProps{Class: dataCellClasses + " font-sans font-medium"}) {
-							{ column.Name }
-						}
-						@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-muted-foreground": column.Type == ""})}) {
-							{ strings.ToLower(orDash(column.Type)) }
-						}
-						@tablecomp.Cell(tablecomp.CellProps{Class: "first:pl-6 last:pr-6"}) {
-							<span class="flex gap-1.5">
-								if column.PrimaryKey {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										primary key
-									}
-								}
-								if column.NotNull {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										not null
-									}
-								}
-							</span>
-						}
-					}
-				}
+	@kit.Section("Columns", nil) {
+		@kit.List() {
+			for _, column := range table.Columns {
+				<div role="listitem" class={ dataListRow } data-schema-column={ column.Name }>
+					@kit.RowText(column.Name, columnNote(column))
+					<span class="shrink-0 font-mono text-sm text-muted-foreground">{ columnType(column) }</span>
+				</div>
 			}
 		}
-	</div>
-	<div class="flex flex-col gap-3 px-6 pt-6">
-		<p class="text-sm font-medium">Statement</p>
-		<pre class={ dataTermClasses } data-table-sql>{ table.SQL }</pre>
-		if len(table.Indexes) > 0 {
-			<p class="pt-3 text-sm font-medium">Indexes</p>
+	}
+	@kit.Section("Statement", nil) {
+		<div class="flex flex-col gap-2">
+			<pre class={ dataTerm } data-table-sql>{ table.SQL }</pre>
 			for _, index := range table.Indexes {
-				<pre class={ dataTermClasses }>{ index }</pre>
+				<pre class={ dataTerm }>{ index }</pre>
 			}
-		}
-		<p class="text-xs text-muted-foreground">To change the schema, add a migration to your repo and deploy. moin takes a snapshot before every deploy.</p>
-	</div>
+		</div>
+	}
 }
 
+// dataListRow is a kit.Row without a link, for a row whose parts the page
+// draws itself.
+const dataListRow = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden"
+
+func columnType(column protocol.DBColumn) string {
+	if column.Type == "" {
+		return "—"
+	}
+	return strings.ToLower(column.Type)
+}
+
+func columnNote(column protocol.DBColumn) string {
+	notes := []string{}
+	if column.PrimaryKey {
+		notes = append(notes, "Primary key")
+	}
+	if column.NotNull {
+		notes = append(notes, "Not null")
+	}
+	return strings.Join(notes, " · ")
+}
+
+// newRowForm adds a row: a field per column. It opens with Add row and
+// closes with Cancel.
 templ newRowForm(dataPath, database string, table protocol.DBTable) {
-	<form id="new-row" hidden class="px-6 pb-6" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
+	<form id="new-row" hidden class="flex flex-col gap-4" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
 		@csrf.Token()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
-		<div class="rounded-2xl bg-muted/60 p-4">
-			<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-				for _, column := range table.Columns {
-					<label class="flex min-w-0 flex-col gap-1">
-						<span class="flex items-baseline gap-1.5 text-sm font-medium">
-							{ column.Name }
-							<span class="font-mono text-xs font-normal text-muted-foreground">{ strings.ToLower(column.Type) }</span>
-						</span>
-						@input.Input(input.Props{
-							Type:        "text",
-							Name:        "value:" + column.Name,
-							Placeholder: newRowPlaceholder(column),
-							Class:       "font-mono",
-							Attributes:  templ.Attributes{"spellcheck": "false", "autocomplete": "off"},
-						})
-					</label>
+		<div class="grid items-start gap-4 sm:grid-cols-2">
+			for _, column := range table.Columns {
+				@kit.Field(column.Name, "new-row-"+column.Name, strings.ToLower(column.Type)) {
+					@kit.Input(templ.Attributes{"id": "new-row-" + column.Name, "type": "text", "name": "value:" + column.Name, "placeholder": newRowPlaceholder(column), "spellcheck": "false", "autocomplete": "off"})
 				}
-			</div>
-			<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-				<span class="text-xs text-muted-foreground">Empty fields get the column's default.</span>
-				<div class="flex gap-2">
-					@button.Button(button.Props{Variant: button.VariantSecondary, Attributes: templ.Attributes{"data-new-row-cancel": true}}) {
-						Cancel
-					}
-					@button.Button(button.Props{Type: button.TypeSubmit}) {
-						Save row
-					}
-				</div>
-			</div>
+			}
+		</div>
+		<div class="flex flex-wrap items-center justify-end gap-2">
+			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button", "data-new-row-cancel": true}) {
+				Cancel
+			}
+			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+				Save row
+			}
 		</div>
 	</form>
 }
@@ -420,7 +479,7 @@ func newRowPlaceholder(column protocol.DBColumn) string {
 }
 
 // DataCell is one editable cell: a form that saves on Enter or when it
-// loses focus with a changed value.
+// loses focus with a changed value. No box until it has the focus.
 templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol.DBColumn, value any, state string) {
 	<form
 		class="m-0"
@@ -441,128 +500,125 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 		if value == nil {
 			<input type="hidden" name="was_null" value="1"/>
 		}
-		@input.Input(input.Props{
-			Type:        "text",
-			Name:        "value",
-			Value:       cellInput(value),
-			Placeholder: utils.IfElse(value == nil, "NULL", ""),
-			Class: utils.CN(
-				// A cell of the table: no box until it has focus.
-				"field-sizing-content w-full min-w-24 max-w-[22rem] truncate rounded-xl bg-transparent px-3 font-mono placeholder:italic focus-visible:bg-background dark:bg-transparent",
-				map[string]bool{"text-right": isNumeric(column), "text-live": state == "saved", "text-failed": state == "failed"},
-			),
-			Attributes: templ.Attributes{"aria-label": column.Name, "spellcheck": "false", "autocomplete": "off", "data-original": cellInput(value)},
-		})
+		<input
+			type="text"
+			name="value"
+			value={ cellInput(value) }
+			if value == nil {
+				placeholder="NULL"
+			}
+			aria-label={ column.Name }
+			spellcheck="false"
+			autocomplete="off"
+			data-original={ cellInput(value) }
+			class={ "h-11 w-full min-w-24 max-w-[22rem] truncate rounded-full bg-transparent px-3 font-mono text-base outline-none field-sizing-content placeholder:text-muted-foreground placeholder:italic hover:bg-foreground/4 focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm",
+				templ.KV("text-right", isNumeric(column)), templ.KV("text-live", state == "saved"), templ.KV("text-failed", state == "failed") }
+		/>
 	</form>
 }
 
+// dataConsole runs SQL on the database: reads only, unless Allow changes
+// is on.
 templ dataConsole(view DataView) {
-	{{ dataPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/data" }}
-	@panel(panelProps{Heading: "sql-heading", Title: "SQL", Docs: "/docs/guides/data#run-sql", Description: "Reads only, until you allow changes. The same as moin sql " + view.App.Name + " in your terminal.", Body: panelBodyFlush}) {
-		<form class="flex flex-col gap-3 px-6" hx-post={ dataPath + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']">
-			@csrf.Token()
-			<input type="hidden" name="db" value={ view.Database }/>
-			<label for="sql" class="sr-only">SQL</label>
-			@textarea.Textarea(textarea.Props{
-				ID:          "sql",
-				Name:        "sql",
-				Rows:        4,
-				Placeholder: sqlPlaceholder(view),
-				Class:       "moin-term field-sizing-fixed min-h-0 w-full resize-y border-0 bg-terminal font-mono text-terminal-foreground dark:bg-terminal",
-				Attributes:  templ.Attributes{"spellcheck": "false", "data-sql": true},
-			})
-			<p hidden class="flex items-center gap-2 text-xs text-running" data-sql-schema-hint>
-				@icon.TriangleAlert(icon.Props{Class: "size-3.5 shrink-0"})
-				This changes the schema. Put it in a migration in your repo, or the next deploy will not know about it.
-			</p>
-			<div class="flex flex-wrap items-center justify-between gap-3">
-				<label class="flex cursor-pointer items-center gap-2 text-sm">
-					@checkbox.Checkbox(checkbox.Props{Name: "write", Value: "1"})
-					Allow changes
-					<span class="text-xs text-muted-foreground">INSERT, UPDATE, DELETE</span>
-				</label>
-				<div class="flex items-center gap-2">
-					@kbd.Kbd(kbd.Props{Class: "hidden sm:inline-flex"}) {
-						⌘↵
-					}
-					@button.Button(button.Props{Type: button.TypeSubmit}) {
-						@icon.Play(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-start"}})
+	@kit.Section("SQL", nil) {
+		@kit.Card("", nil) {
+			<form class="flex flex-col gap-4" hx-post={ dataPath(ctx, view.App.Name) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
+				@csrf.Token()
+				<input type="hidden" name="db" value={ view.Database }/>
+				<label for="sql" class="sr-only">SQL</label>
+				@kit.TextArea(templ.Attributes{"id": "sql", "name": "sql", "rows": "4", "placeholder": sqlPlaceholder(view), "spellcheck": "false", "autocomplete": "off", "data-sql": true})
+				<p hidden class="px-1 text-sm text-running" data-sql-schema-hint>This changes the schema. Put it in a migration, or the next deploy will not know about it.</p>
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<label class="flex cursor-pointer items-center gap-3 px-1">
+						@kit.Switch(templ.Attributes{"name": "write", "value": "1", "data-sql-write": true})
+						<span class="text-sm font-medium">Allow changes</span>
+					</label>
+					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
 						Run
 					}
 				</div>
-			</div>
-		</form>
-		<div id="sql-result" class="min-w-0"></div>
+			</form>
+			<div id="sql-result" class="min-w-0 empty:hidden"></div>
+		}
 	}
-	<script nonce={ templ.GetNonce(ctx) }>
-		(() => {
-			const page = document.currentScript.closest('[data-app-data]') || document;
-			const sql = page.querySelector('[data-sql]');
-			const hint = page.querySelector('[data-sql-schema-hint]');
-			sql?.addEventListener('input', () => {
-				hint.hidden = !/^\s*(create|alter|drop)\b/i.test(sql.value);
-			});
-			// Add row opens the new row form, Cancel closes it again.
-			const toggle = page.querySelector('[data-new-row-toggle]');
-			const form = page.querySelector('[data-new-row]');
-			const showForm = open => {
-				form.hidden = !open;
-				toggle.setAttribute('aria-expanded', String(open));
-				if (open) form.querySelector('input[type=text]')?.focus();
-				else toggle.focus();
-			};
-			toggle?.addEventListener('click', () => showForm(form.hidden));
-			page.querySelector('[data-new-row-cancel]')?.addEventListener('click', () => showForm(false));
-			sql?.addEventListener('keydown', event => {
-				if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-					event.preventDefault();
-					sql.form.requestSubmit();
-				}
-			});
-			// Enter saves a cell, Esc puts its value back.
-			page.addEventListener('keydown', event => {
-				const input = event.target.closest?.('[data-rows] input[name=value]');
-				if (!input) return;
-				if (event.key === 'Escape') {
-					input.value = input.dataset.original;
-					input.blur();
-				}
-				if (event.key === 'Enter') {
-					event.preventDefault();
-					input.blur();
-				}
-			});
-		})();
-	</script>
 }
+
+// dataScripts is the script of the data pages: the SQL console's keys and
+// migration line, the cells' Enter and Esc, and Add row.
+templ dataScripts() {
+	@dataScript.Once() {
+		<script nonce={ templ.GetNonce(ctx) }>
+			(() => {
+				// SQL that creates, alters or drops gets the line about migrations.
+				document.addEventListener("input", (event) => {
+					const sql = event.target.closest?.("[data-sql]");
+					if (!sql) return;
+					sql.form.querySelector("[data-sql-schema-hint]").hidden = !/^\s*(create|alter|drop)\b/i.test(sql.value);
+				});
+				document.addEventListener("keydown", (event) => {
+					// ⌘↵ or ctrl+↵ runs the SQL.
+					const sql = event.target.closest?.("[data-sql]");
+					if (sql && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+						event.preventDefault();
+						sql.form.requestSubmit();
+						return;
+					}
+					// Enter saves a cell, Esc puts its value back.
+					const cell = event.target.closest?.("[data-rows] input[name=value]");
+					if (!cell) return;
+					if (event.key === "Escape") {
+						cell.value = cell.dataset.original;
+						cell.blur();
+					}
+					if (event.key === "Enter") {
+						event.preventDefault();
+						cell.blur();
+					}
+				});
+				// Add row opens the new row form, Cancel closes it again.
+				document.addEventListener("click", (event) => {
+					const toggle = event.target.closest("[data-new-row-toggle], [data-new-row-cancel]");
+					if (!toggle) return;
+					const form = document.querySelector("[data-new-row]");
+					const button = document.querySelector("[data-new-row-toggle]");
+					if (!form || !button) return;
+					const open = toggle.matches("[data-new-row-toggle]") && form.hidden;
+					form.hidden = !open;
+					button.setAttribute("aria-expanded", String(open));
+					if (open) form.querySelector("input[type=text]")?.focus();
+					else button.focus();
+				});
+			})();
+		</script>
+	}
+}
+
+// dataScript puts the script of the data pages on a page once.
+var dataScript = templ.NewOnceHandle()
 
 func sqlPlaceholder(view DataView) string {
-	if view.Table == nil {
-		return "SELECT * FROM sqlite_schema"
+	if len(view.Tables) == 0 {
+		if strings.HasPrefix(view.Database, "/") {
+			return "SELECT * FROM sqlite_schema"
+		}
+		return "SELECT * FROM information_schema.tables"
 	}
-	return "SELECT * FROM " + view.Table.Name + " LIMIT 20"
+	return "SELECT * FROM " + view.Tables[0].Name + " LIMIT 20"
 }
 
-// DataResult is the answer of the SQL console: an error is an alert, a
-// change a status line, a read the rows it found.
+// DataResult is the answer of the SQL console: an error in red, a change
+// the rows it changed, a read the rows it found.
 templ DataResult(result protocol.DBResult, write bool, message string) {
 	if message != "" {
-		<div class="px-6 pt-6">
-			@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Attributes: templ.Attributes{"data-sql-error": true}}) {
-				@icon.CircleAlert()
-				@alert.Title(alert.TitleProps{Class: "font-mono font-normal"}) {
-					{ message }
-				}
-			}
-		</div>
+		<p role="alert" class="px-1 font-mono text-sm break-words text-failed" data-sql-error>{ message }</p>
 	} else if write {
-		<p role="status" class="flex items-center gap-2 px-6 pt-6 text-sm font-medium" data-sql-changes>
+		<p role="status" class="flex items-center gap-2 px-1 text-sm font-medium" data-sql-changes>
 			@icon.Check(icon.Props{Class: "size-4 shrink-0 text-live"})
 			{ plural(int(result.Changes), "row changed", "rows changed") }
 		</p>
 	} else {
-		<div class="flex flex-col gap-3 pt-6">
-			<p role="status" class="px-6 text-xs text-muted-foreground tabular-nums">
+		<div class="flex flex-col gap-2">
+			<p role="status" class="px-1 text-xs text-muted-foreground tabular-nums">
 				{ plural(len(result.Rows), "row", "rows") }
 				if result.Truncated {
 					, more not shown
@@ -570,45 +626,30 @@ templ DataResult(result protocol.DBResult, write bool, message string) {
 			</p>
 			if len(result.Columns) > 0 {
 				{{ numeric := numericColumns(result) }}
-				<div class={ dataScrollClasses + " max-h-[24rem]" }>
-					@tablecomp.Table(tablecomp.Props{Attributes: templ.Attributes{"data-sql-result": true}}) {
-						@tablecomp.Header() {
-							@tablecomp.Row(tablecomp.RowProps{Class: "hover:bg-transparent"}) {
+				<div class={ dataScroll }>
+					<table class={ dataTableClass } data-sql-result>
+						<thead>
+							<tr>
 								for index, column := range result.Columns {
-									@tablecomp.Head(tablecomp.HeadProps{Class: utils.CN(dataHeadClasses, map[string]bool{"text-right": numeric[index]})}) {
-										{ column }
-									}
+									<th scope="col" class={ dataHead, templ.KV("text-right", numeric[index]) }>{ column }</th>
 								}
-							}
-						}
-						@tablecomp.Body() {
+							</tr>
+						</thead>
+						<tbody>
 							for _, row := range result.Rows {
-								@tablecomp.Row() {
+								<tr class={ dataRow }>
 									for index, value := range row {
-										@tablecomp.Cell(tablecomp.CellProps{Class: utils.CN(dataCellClasses, map[string]bool{"text-right": numeric[index], "text-muted-foreground italic": value == nil})}) {
-											{ cellText(value) }
-										}
+										<td class={ dataCell, templ.KV("text-right", numeric[index]), templ.KV("text-muted-foreground italic", value == nil) }>{ cellText(value) }</td>
 									}
-								}
+								</tr>
 							}
-						}
-					}
+						</tbody>
+					</table>
 				</div>
 			}
 		</div>
 	}
 }
-
-// The tables of the data page run edge to edge in their card with the
-// table's own row lines; the first and the last column sit on the card's
-// 24 px, so values line up with the title.
-const (
-	dataScrollClasses   = "overflow-auto overscroll-contain [&>[data-slot=table-container]]:overflow-visible"
-	dataHeadClasses     = "sticky top-0 z-10 bg-card text-muted-foreground first:pl-6 last:pr-6"
-	dataCellClasses     = "max-w-[22rem] truncate font-mono first:pl-6 last:pr-6"
-	dataEditCellClasses = "max-w-[22rem] py-1 px-0 first:pl-3 whitespace-normal"
-	dataTermClasses     = "moin-term overflow-x-auto rounded-2xl bg-terminal px-4 py-3 font-mono text-sm whitespace-pre-wrap text-terminal-foreground"
-)
 
 // isNumeric says whether a column holds numbers, by SQLite's type affinity,
 // so its values align right.
@@ -726,8 +767,4 @@ func cellInput(value any) string {
 func isBlob(column protocol.DBColumn) bool {
 	kind := strings.ToUpper(column.Type)
 	return strings.Contains(kind, "BLOB") || kind == "BYTEA"
-}
-
-templ noDatabase() {
-	moin finds SQLite files on the volumes of the live release and every service that runs Postgres. Deploy an app that keeps its database on a volume, like <code class="font-mono">/data/app.db</code>, or runs <code class="font-mono">postgres:17</code>.
 }
