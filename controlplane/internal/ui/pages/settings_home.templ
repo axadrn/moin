@@ -46,7 +46,7 @@ templ SettingsHome(view SettingsHomeView) {
 						@kit.RowText("Alerts", "")
 					}
 					@kit.Row(base + "/bucket") {
-						@kit.RowText("Storage", "")
+						@kit.RowText("Bucket", "")
 					}
 					@kit.Row(base + "/activity") {
 						@kit.RowText("Activity", "")
@@ -103,7 +103,7 @@ templ SettingsHome(view SettingsHomeView) {
 						@kit.RowText("Docs", "")
 					}
 					@kit.Row("/changelog") {
-						<div class="min-w-0 flex-1 font-medium" data-changelog={ build.Version }>What's new</div>
+						<div class="min-w-0 flex-1 font-medium" data-changelog={ build.Version }>Changelog</div>
 						<span data-changelog-dot hidden class="size-2 rounded-full bg-foreground" aria-label="New"></span>
 						<span class="font-mono text-sm text-muted-foreground">{ build.Version }</span>
 					}
