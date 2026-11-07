@@ -90,7 +90,8 @@ func SearchItems(in SearchInput) []SearchItem {
 }
 
 // HereItems are what you can do on the page you are on: the sections and the
-// actions of its app, with their keys. space shows them (which-key).
+// actions of its app, with their keys. The palette lists them first when
+// nothing is typed.
 func HereItems(in SearchInput) []SearchItem {
 	for _, app := range in.Apps {
 		if app.Name != in.Here {

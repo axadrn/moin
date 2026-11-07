@@ -48,7 +48,7 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 	})
 	query := r.URL.Query().Get("q")
 	found := pages.MatchSearch(items, query, 14)
-	// Nothing typed: what you can do here comes first (which-key).
+	// Nothing typed: what you can do on this page comes first.
 	if query == "" {
 		here := pages.HereItems(pages.SearchInput{Base: ctxkeys.AppBasePath(r.Context()), Here: r.URL.Query().Get("here"), Apps: apps, CanChange: h.servers.RequireChanges(workspace.ID) == nil})
 		found = append(here, found...)

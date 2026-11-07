@@ -14,8 +14,8 @@ templ Section(title string, action templ.Component) {
 	</section>
 }
 
-// List is a group of rows on one card. No lines between the rows: their
-// height keeps them apart, and a hovered row lights up inside the card.
+// List is a group of rows on one card, a thin line between two rows, inset
+// like iOS; a hovered row lights up inside the card.
 templ List() {
 	<div class="flex flex-col rounded-4xl bg-card p-1.5" role="list">
 		{ children... }
@@ -38,7 +38,15 @@ templ Row(href string) {
 	}
 }
 
-const rowClass = "relative flex min-h-16 items-center gap-3 rounded-3xl px-5 py-3"
+const rowClass = "relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 text-left before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:before:opacity-0 [&:hover+*]:before:opacity-0"
+
+// RowButton is a Row that does something on the page instead of opening
+// one: Attributes carry hx-post and the like. Danger makes its words red.
+templ RowButton(danger bool, attributes templ.Attributes) {
+	<button type="button" role="listitem" class={ rowClass, "outline-none hover:bg-foreground/4 focus-visible:bg-foreground/4 active:bg-foreground/7", templ.KV("text-failed", danger) } { attributes... }>
+		{ children... }
+	</button>
+}
 
 // RowText is the main part of a Row: a name, and a second line only when
 // there is something to say.

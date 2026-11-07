@@ -117,7 +117,7 @@ func (h *authHandler) VerifyForgotPassword(w http.ResponseWriter, r *http.Reques
 		redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
-	redirect(w, r, fmt.Sprintf("/app/%s/settings?tab=security&password_removed=1", members[0].Slug), http.StatusSeeOther)
+	redirect(w, r, fmt.Sprintf("/app/%s/settings/account?tab=security&password_removed=1", members[0].Slug), http.StatusSeeOther)
 }
 
 func (h *authHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) {

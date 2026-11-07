@@ -25,12 +25,13 @@ templ Apps(apps []model.App, servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Apps") {
 		@panelPage() {
-			<header class="flex flex-wrap items-center justify-between gap-3 pt-2">
-				<h1 class="text-3xl font-semibold tracking-tight">Apps</h1>
-				@kit.Button(kit.Primary, basePath+"/apps/new", nil) {
-					New app
-				}
-			</header>
+			@kit.Header(kit.Back{Label: "Overview", Href: basePath + "/overview"}, "Apps") {
+				<div class="sm:ml-auto">
+					@kit.Button(kit.Primary, basePath+"/apps/new", nil) {
+						New app
+					}
+				</div>
+			}
 			if len(apps) == 0 {
 				@kit.List() {
 					@kit.Row(basePath + "/apps/new") {
@@ -50,10 +51,7 @@ templ NewApp(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("New app") {
 		@panelPage() {
-			<header class="flex flex-col gap-1 pt-2">
-				<h1 class="text-3xl font-semibold tracking-tight">New app</h1>
-				<p class="text-muted-foreground">Three ways to start. Pick the one that fits.</p>
-			</header>
+			@kit.Header(kit.Back{Label: "Apps", Href: basePath + "/apps"}, "New app")
 			if len(servers) == 0 {
 				@kit.List() {
 					@kit.Row(basePath + "/servers") {

@@ -55,7 +55,7 @@ templ appCI(appName string, hook bool) {
 								}
 							</div>
 							@fieldHint("image-ref", "") {
-								Same as <code class="font-mono">moin deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings?tab=tokens") }>Settings</a>.
+								Same as <code class="font-mono">moin deploy --image</code>. A private registry needs a login in <a href={ templ.SafeURL(basePath + "/settings/account?tab=tokens") }>Settings</a>.
 							}
 						}
 					</form>
