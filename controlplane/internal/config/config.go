@@ -426,19 +426,6 @@ func (r *envReader) duration(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
-func (r *envReader) integer(key string, fallback int) int {
-	value := r.string(key, "")
-	if value == "" {
-		return fallback
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil {
-		r.errors = append(r.errors, fmt.Errorf("%s must be an integer: %w", key, err))
-		return fallback
-	}
-	return parsed
-}
-
 func (r *envReader) prefixes(key string, fallback []netip.Prefix) []netip.Prefix {
 	prefixes := append([]netip.Prefix(nil), fallback...)
 	value := r.string(key, "")

@@ -1,13 +1,8 @@
 package payment
 
 import (
-	"errors"
 	"net/http"
 	"time"
-)
-
-var (
-	errProviderRejected = errors.New("payment provider rejected the request")
 )
 
 const checkoutWebhookGrace = 4 * 24 * time.Hour
