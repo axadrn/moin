@@ -167,6 +167,8 @@ Rules every page follows:
   | only tells | `kit.Row("")`, `kit.RowFact` | still: no light, the lines stay |
   | holds a control | `kit.RowControl`, `kit.RowForm`, with `kit.RowLabel` | still: the switch, select or field is what you press |
 
+  Two lit rows never touch: the light sits 3 px inside the row, so the open
+  row and the one under the mouse keep room between them, in every list.
   `/dev/kit` shows each kind.
 - **Icons only in the catalog.** A catalog app shows its logo
   (`kit.AppIcon`) where you browse and pick; your own apps go by their
