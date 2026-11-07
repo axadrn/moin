@@ -42,7 +42,6 @@ func TestSQLiteCrashRule(t *testing.T) {
 		{name: "building", step: "", live: "before", built: "half", want: "before"},
 		{name: "switching, nothing moved", step: "switching", live: "before", built: "half", want: "before"},
 		{name: "between the renames", step: "aside", aside: "before", built: "restored", want: "before"},
-		{name: "between the renames, the app made an empty file", step: "aside", live: "empty", aside: "before", built: "restored", want: "before", stray: true},
 		{name: "the second rename done", step: "aside", live: "restored", aside: "before", want: "restored", switched: true},
 		{name: "switched", step: "switched", live: "restored", aside: "before", want: "restored", switched: true},
 	} {
@@ -204,4 +203,42 @@ func sqliteDatabase(t *testing.T) (string, *sql.DB) {
 	t.Cleanup(func() { db.Close() })
 	db.Exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY)`)
 	return file, db
+}
+
+// Nothing of an app the hub sent no schedule for is deleted: the
+// default would be a guess.
+func TestNoPruneWithoutSchedule(t *testing.T) {
+	b := newBackups(newApps(t.TempDir(), nil), nil)
+	b.configure(&protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws"}, nil, map[string]protocol.Schedule{})
+	old := protocol.Copy{ID: "20200101T000000Z", At: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
+	if err := b.prune(context.Background(), "shop", protocol.Database{Path: "/data/app.db"}, []protocol.Copy{{At: time.Now()}, old}); err != nil {
+		t.Fatalf("prune touched the bucket: %v", err)
+	}
+}
+
+// An edit takes the app's lock, as a deploy and a restore do: it waits
+// for one that holds it.
+func TestEditsTakeTheAppLock(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	file, _ := sqliteDatabase(t)
+	release := a.releaseDir("shop", 1)
+	os.MkdirAll(release, 0o700)
+	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
+	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
+	a.backups = newBackups(a, nil)
+	unlock := a.lock("shop")
+	done := make(chan error, 1)
+	go func() {
+		_, err := a.query(context.Background(), protocol.DBQuery{DBRequest: protocol.DBRequest{App: "shop"}, SQL: `INSERT INTO notes DEFAULT VALUES`, Write: true})
+		done <- err
+	}()
+	select {
+	case <-done:
+		t.Fatal("the edit did not wait for the lock")
+	case <-time.After(200 * time.Millisecond):
+	}
+	unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 }

@@ -269,6 +269,9 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 		if a.backups != nil && a.backups.busy(request.App) {
 			return protocol.DBResult{}, fmt.Errorf("a restore of %s runs: edit its data when it is done", request.App)
 		}
+		// The app's lock, as a deploy and a restore take it: a restore
+		// that starts now waits for the copy and the write.
+		defer a.lock(request.App)()
 		// A copy just before the change, so "Before your edit" is exact.
 		before = a.backups.copyBefore(ctx, request.App, database.Path, func(format string, args ...any) { slog.Warn("backup: " + fmt.Sprintf(format, args...)) })
 	}

@@ -98,7 +98,7 @@ type backups struct {
 // the last one failed, the newest daily check and what the hub heard
 // last.
 type state struct {
-	copied             time.Time
+	copied, lastID     time.Time
 	failed             string
 	checkedAt          time.Time
 	checkErr, reported string
@@ -176,14 +176,24 @@ func (b *backups) where(app string, database protocol.Database) (*protocol.Bucke
 	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
 }
 
-// copy streams a copy of a database into the bucket as id.
-func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) error {
+// copy streams a copy of a database into the bucket as id, or as the
+// next second when a copy of the database already has id: the IDs of a
+// database only grow, so no copy overwrites another. It returns the ID.
+func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
-		return err
+		return "", err
 	}
 	b.copying.Lock()
 	defer b.copying.Unlock()
+	at, _ := time.Parse(protocol.CopyIDLayout, id)
+	b.mu.Lock()
+	s := b.state(app, database)
+	if !at.After(s.lastID) {
+		at = s.lastID.Add(time.Second)
+	}
+	s.lastID, id = at, at.Format(protocol.CopyIDLayout)
+	b.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, copyTimeout)
 	defer cancel()
 	reader, writer := io.Pipe()
@@ -193,15 +203,14 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	_, err = uploader.Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres())), Body: reader})
 	reader.CloseWithError(errors.New("the upload ended"))
 	if err != nil {
-		return fmt.Errorf("copy %s: %w", database.Path, err)
+		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
-	at, _ := time.Parse(protocol.CopyIDLayout, id)
 	b.mu.Lock()
-	if s := b.state(app, database); at.After(s.copied) {
+	if at.After(s.copied) {
 		s.copied = at
 	}
 	b.mu.Unlock()
-	return nil
+	return id, nil
 }
 
 // copies are the copies of a database in the bucket, newest first.
@@ -246,10 +255,17 @@ func (b *backups) object(ctx context.Context, app string, database protocol.Data
 	return object.Body, nil
 }
 
-// prune deletes the copies and undos older than the app keeps them, but
-// never the newest copy.
+// prune deletes the copies and undos older than the app keeps them,
+// counted from the newest copy, never that one, and nothing of an app
+// the hub sent no schedule for.
 func (b *backups) prune(ctx context.Context, app string, database protocol.Database, copies []protocol.Copy) error {
-	before := time.Now().Add(-time.Duration(b.schedule(app).Keep) * day)
+	b.mu.Lock()
+	_, scheduled := b.schedules[app]
+	b.mu.Unlock()
+	if !scheduled || len(copies) == 0 {
+		return nil
+	}
+	before := copies[0].At.Add(-time.Duration(b.schedule(app).Keep) * day)
 	var err error
 	for index, copy := range copies {
 		if index > 0 && copy.At.Before(before) {
@@ -337,14 +353,18 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 	if err != nil {
 		return err
 	}
-	if len(copies) > 0 && time.Since(copies[0].At) < due && !copies[0].At.After(time.Now()) {
+	// Copies from the future, after the clock jumped, do not count.
+	for len(copies) > 0 && copies[0].At.After(time.Now()) {
+		copies = copies[1:]
+	}
+	if len(copies) > 0 && time.Since(copies[0].At) < due {
 		b.mu.Lock()
 		b.state(app, database).copied = copies[0].At
 		b.mu.Unlock()
 		return nil
 	}
-	id := newCopyID()
-	if err := b.copy(ctx, app, database, id); err != nil {
+	id, err := b.copy(ctx, app, database, newCopyID())
+	if err != nil {
 		return err
 	}
 	at, _ := time.Parse(protocol.CopyIDLayout, id)
@@ -387,7 +407,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	}
 	status.Error = s.failed
 	// Copies that stopped coming are a problem too, with an alert.
-	if every := time.Duration(b.schedule(app).Every) * time.Minute; status.Error == "" && !s.copied.IsZero() && time.Since(s.copied) > 2*every {
+	if every := time.Duration(b.schedule(app).Every) * time.Minute; status.Error == "" && !s.copied.IsZero() && time.Since(s.copied) > max(2*every, every+copyTimeout) {
 		status.Error = "the copies are late: the newest is from " + s.copied.UTC().Format("Jan 2 15:04 UTC")
 	}
 	if full {
@@ -449,7 +469,7 @@ func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(st
 	id, took := newCopyID(), false
 	for _, database := range b.databases(ctx, app) {
 		if only == "" || database.Path == only {
-			err := b.copy(ctx, app, database, id)
+			_, err := b.copy(ctx, app, database, id)
 			if err != nil {
 				logf("the copy of %s before the change failed: %s", database.Path, err)
 			}
@@ -537,7 +557,12 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	if err != nil {
 		return err
 	}
-	mark := restoreMark{ID: request.ID, App: request.App, Database: database.Path, Undo: newCopyID(), From: request.Undo, State: protocol.RestoreRunning}
+	// The undo's ID grows past every undo there, as a copy's does.
+	undo := newCopyID()
+	if undos, _ := b.engine(request.App, database).Undos(ctx); len(undos) > 0 && undo <= undos[0].ID {
+		undo = strayID(undos[0].ID)
+	}
+	mark := restoreMark{ID: request.ID, App: request.App, Database: database.Path, Undo: undo, From: request.Undo, State: protocol.RestoreRunning}
 	if err := writeState(b.markFile(mark.ID), mark); err != nil {
 		return fmt.Errorf("write the restore down: %w", err)
 	}
@@ -560,11 +585,14 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	default:
 		err = errors.New("pick a copy, a minute or an undo to go back to")
 	}
-	// Each step is written down before the next: the crash rule reads it.
+	// Each step is written down before the next: the crash rule reads
+	// it. Only "switching" must be: the rule reads a mark left there.
 	step := func(reached string) error {
 		mark.Step = reached
-		if err := writeState(b.markFile(mark.ID), mark); err != nil {
+		if err := writeState(b.markFile(mark.ID), mark); err != nil && reached == "switching" {
 			return err
+		} else if err != nil {
+			slog.Warn("backup: write down the step of a restore", "step", reached, "error", err)
 		}
 		if b.crash != nil && b.crash(reached) {
 			return errCrash
@@ -679,8 +707,8 @@ func recoverFrom(step string, aside, built bool, putBack func() error) (bool, er
 	return true, nil
 }
 
-// strayID names the undo of what stood in the live place during a
-// restore: a second after the restore's own undo, never the same.
+// strayID is the ID a second after an undo's: for what stood in the live
+// place during a restore, or the next restore's undo.
 func strayID(undo string) string {
 	at, _ := time.Parse(protocol.CopyIDLayout, undo)
 	return at.Add(time.Second).Format(protocol.CopyIDLayout)

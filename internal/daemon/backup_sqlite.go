@@ -141,8 +141,10 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string, step
 	if err := checkpoint(ctx, live); err != nil {
 		return errors.Join(fmt.Errorf("fold the log into the database: %w; nothing changed", err), start())
 	}
-	if err := step("switching"); err != nil {
+	if err := step("switching"); errors.Is(err, errCrash) {
 		return err
+	} else if err != nil {
+		return errors.Join(fmt.Errorf("write the restore down: %w; nothing changed", err), start())
 	}
 	if err := os.Rename(live, aside); err != nil {
 		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
@@ -205,8 +207,16 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 	// No live file is never switched: the built one is what would be there.
 	switched, err := recoverFrom(mark.Step, exists(aside), exists(built) || !exists(live), func() error {
 		if exists(live) {
-			if err := os.Rename(live, undoFile(live, strayID(mark.Undo))); err != nil {
+			// The app stops first, so it writes into no undo, and the
+			// stray file goes with its log, so no foreign log is replayed.
+			if _, err := e.b.apps.stopServices(ctx, e.app); err != nil {
 				return err
+			}
+			stray := undoFile(live, strayID(mark.Undo))
+			for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+				if err := os.Rename(live+suffix, stray+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
 			}
 		}
 		return errors.Join(os.Rename(aside, live), syncFile(filepath.Dir(live)))
@@ -341,11 +351,19 @@ func (b *backups) pruneGenerations(ctx context.Context, app string, database pro
 	}
 	client, current := s3Client(bucket), folder+"/litestream/"+generation(database.HostPath)+"/"
 	for _, old := range folders(ctx, client, bucket.Bucket, folder+"/litestream/") {
-		list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(old)})
-		if err != nil || old == current || slices.ContainsFunc(list.Contents, func(object types.Object) bool { return object.LastModified.After(before) }) {
+		var objects []types.Object
+		pages := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(old)})
+		for pages.HasMorePages() {
+			page, err := pages.NextPage(ctx)
+			if err != nil {
+				return err
+			}
+			objects = append(objects, page.Contents...)
+		}
+		if old == current || slices.ContainsFunc(objects, func(object types.Object) bool { return object.LastModified.After(before) }) {
 			continue
 		}
-		for _, object := range list.Contents {
+		for _, object := range objects {
 			if _, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: object.Key}); err != nil {
 				return err
 			}

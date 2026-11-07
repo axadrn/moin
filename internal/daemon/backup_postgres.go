@@ -129,16 +129,18 @@ func pgRoom(ctx context.Context, t pgTarget) error {
 	out, err := admin(ctx, t, `SELECT pg_database_size(:'db') || ' ' || current_setting('data_directory');`, map[string]string{"db": t.database})
 	need, dir, _ := strings.Cut(out, " ")
 	var df bytes.Buffer
-	if err != nil || t.exec(ctx, nil, &df, "df", "-Pk", dir) != nil {
-		return nil
+	if err == nil {
+		err = t.exec(ctx, nil, &df, "df", "-Pk", dir)
 	}
-	var size int64
-	fmt.Sscan(need, &size)
+	var size, free int64
 	fields := strings.Fields(df.String())
-	var free int64
-	if len(fields) >= 10 {
-		fmt.Sscan(fields[len(fields)-3], &free)
+	if _, scanErr := fmt.Sscan(need, &size); err == nil && (scanErr != nil || len(fields) < 10) {
+		err = errors.New("df said nothing")
 	}
+	if err != nil {
+		return fmt.Errorf("see how much room the Postgres has: %w", err)
+	}
+	fmt.Sscan(fields[len(fields)-3], &free)
 	if free*1024 < size+512<<20 {
 		return fmt.Errorf("the volume of the Postgres has %s free and this needs %s: free some space", human.Size(float64(free*1024)), human.Size(float64(size+512<<20)))
 	}
@@ -174,8 +176,10 @@ ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "bu
 		}
 	}
 	ctx = context.WithoutCancel(ctx)
-	if err := step("switching"); err != nil {
+	if err := step("switching"); errors.Is(err, errCrash) {
 		return err
+	} else if err != nil {
+		return errors.Join(fmt.Errorf("write the restore down: %w; nothing changed", err), start())
 	}
 	if err := rename(ctx, t, live, aside); err != nil {
 		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
@@ -240,6 +244,12 @@ func (e *postgresEngine) Recover(ctx context.Context, mark restoreMark) (bool, e
 	}
 	switched, err := recoverFrom(mark.Step, asideThere, builtThere || !liveThere, func() error {
 		if liveThere {
+			// The app stops first, so it writes into no undo.
+			if others := e.others(); len(others) > 0 {
+				if _, err := e.b.apps.stopServices(ctx, e.app, others...); err != nil {
+					return err
+				}
+			}
 			if err := rename(ctx, t, live, undoName(live, strayID(mark.Undo))); err != nil {
 				return err
 			}

@@ -296,6 +296,7 @@ func TestBackupSQLite(t *testing.T) {
 	test.b.crash = func(at string) bool {
 		if at == "aside" {
 			os.WriteFile(live, nil, 0o644)
+			os.WriteFile(live+"-wal", []byte("a log of the stray file"), 0o644)
 		}
 		return at == "aside"
 	}
@@ -304,6 +305,34 @@ func TestBackupSQLite(t *testing.T) {
 	}
 	if after, _ := test.b.engine(app, test.database).Undos(test.ctx); len(after) != len(undos)+1 {
 		t.Fatalf("the stray file is no undo: %d, %d", len(after), len(undos))
+	}
+	if strays, _ := filepath.Glob(live + ".moin-before-*-wal"); len(strays) != 1 || exists(live+"-wal") {
+		t.Fatalf("the stray file's log: %v, live -wal %v", strays, exists(live+"-wal"))
+	}
+	// A step that cannot be written after "switching" stops nothing: the
+	// restore ends, the app runs on the restored data.
+	marks := filepath.Dir(test.b.markFile("x"))
+	test.b.crash = func(at string) bool {
+		if at == "switching" {
+			os.Chmod(marks, 0o500)
+		}
+		return false
+	}
+	err := test.b.restore(test.ctx, protocol.BackupRestore{ID: "unwritten", App: app, Database: test.database.Path, Copy: first.ID})
+	os.Chmod(marks, 0o700)
+	test.b.crash = nil
+	if err != nil || rows() != "a,b" || !test.running() {
+		t.Fatalf("an unwritten step: %v, %q, running %v", err, rows(), test.running())
+	}
+	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone {
+		t.Fatalf("back to the third copy: %+v", state)
+	}
+	// Two copies in one second never overwrite each other.
+	id := newCopyID()
+	one, err1 := test.b.copy(test.ctx, app, test.database, id)
+	two, err2 := test.b.copy(test.ctx, app, test.database, id)
+	if err1 != nil || err2 != nil || one == two || two <= one {
+		t.Fatalf("two copies in one second: %s %s %v %v", one, two, err1, err2)
 	}
 	// No edit while a restore works on the app.
 	test.b.restoring[app] = true
@@ -348,15 +377,17 @@ func TestBackupSQLite(t *testing.T) {
 		t.Fatalf("the copy before an edit: %+v %v", result.Before, err)
 	}
 	// A copy from the future, after the clock jumped, does not stop the
-	// copies.
-	before := len(test.copies())
+	// copies: the newest real one counts (the broken copy above is a
+	// minute ahead).
 	test.b.mu.Lock()
 	test.b.state(app, test.database).copied = time.Now().Add(time.Hour)
 	test.b.mu.Unlock()
-	time.Sleep(1100 * time.Millisecond)
 	test.b.tick(test.ctx)
-	if len(test.copies()) != before+1 {
-		t.Fatalf("no copy after a copy from the future: %d", len(test.copies()))
+	test.b.mu.Lock()
+	copied := test.b.state(app, test.database).copied
+	test.b.mu.Unlock()
+	if copied.After(time.Now()) {
+		t.Fatalf("the copies wait for one from the future: %v", copied)
 	}
 	// Turning Every change off removes what it wrote down.
 	test.b.configure(test.bucket, nil, map[string]protocol.Schedule{app: {Every: 15, Keep: 1}})
