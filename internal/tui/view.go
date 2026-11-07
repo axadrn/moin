@@ -292,9 +292,9 @@ func (m model) pickerView(u ui, w, maxH int) string {
 	for i := start; i < len(hs) && i < start+n; i++ {
 		h := hs[i]
 		sel := i == m.pick.at
-		cells := []cell{{u.faint(h.e.kind), 8, false}, {highlight(u, h.e.title, h.pos, sel), tw, false}, {u.muted(h.e.hint), max(0, iw-8-tw-kw-3), false}}
+		cells := []cell{{u.faint(h.Item.kind), 8, false}, {highlight(u, h.Item.title, h.Positions, sel), tw, false}, {u.muted(h.Item.hint), max(0, iw-8-tw-kw-3), false}}
 		if kw > 0 {
-			cells = append(cells, cell{u.strong(h.e.key), kw, true})
+			cells = append(cells, cell{u.strong(h.Item.key), kw, true})
 		}
 		body = append(body, u.row(cells, iw, sel))
 	}

@@ -5,12 +5,11 @@ package tui
 // with the key that does the same without it. Like ⌘K in the web app.
 
 import (
-	"github.com/axadrn/moin/internal/find"
 	"slices"
-	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/axadrn/moin/internal/find"
 )
 
 // picker is the open palette: what is typed and the row picked.
@@ -129,11 +128,8 @@ func (m model) tabOr(app string) tab {
 	return tDeploys
 }
 
-type hit struct {
-	e     entry
-	score int
-	pos   []int
-}
+// hit is an entry the palette found, and the letters that matched.
+type hit = find.Hit[entry]
 
 const recentMax = 8
 
@@ -147,8 +143,9 @@ func (m model) remember(title string) model {
 	return m
 }
 
-// hits are the entries that match the query, the best first. Without a
-// query they are what you can do here, the recent picks, then every app,
+// hits are the entries that match the query, the best first, in the
+// order of the web palette (find.Rank and find.Start). Without a query
+// they are what you can do here, the recent picks, then every app,
 // server and place; with one, a recent pick wins a tie.
 func (m model) hits() []hit {
 	q := ""
@@ -156,45 +153,28 @@ func (m model) hits() []hit {
 		q = strings.TrimSpace(m.pick.query)
 	}
 	entries := m.entries()
-	if q == "" {
-		var out []hit
-		seen := map[string]bool{}
-		add := func(e entry) {
-			if !seen[e.title] {
-				out = append(out, hit{e: e})
-				seen[e.title] = true
-			}
-		}
-		for _, e := range m.here() {
-			add(e)
-		}
-		for _, title := range m.recent {
-			for _, e := range entries {
-				if e.title == title {
-					add(e)
-				}
-			}
-		}
+	title := func(e entry) string { return e.title }
+	if q != "" {
+		picked := func(e entry) int { return slices.Index(m.recent, e.title) }
+		return find.Rank(q, entries, title, picked)
+	}
+	var picks, basics []entry
+	for _, t := range m.recent {
 		for _, e := range entries {
-			if e.kind == "app" || e.kind == "server" || e.kind == "place" || e.kind == "keys" {
-				add(e)
+			if e.title == t {
+				picks = append(picks, e)
 			}
 		}
-		return out
+	}
+	for _, e := range entries {
+		if e.kind == "app" || e.kind == "server" || e.kind == "place" || e.kind == "keys" {
+			basics = append(basics, e)
+		}
 	}
 	var out []hit
-	for _, e := range entries {
-		// The same matching as the web palette.
-		found, ok := find.Name(q, e.title)
-		if !ok {
-			continue
-		}
-		if i := slices.Index(m.recent, e.title); i >= 0 {
-			found.Score += recentMax - i
-		}
-		out = append(out, hit{e, found.Score, found.Positions})
+	for _, e := range find.Start(m.here(), picks, basics, title) {
+		out = append(out, hit{Item: e})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].score > out[j].score })
 	return out
 }
 
@@ -208,7 +188,7 @@ func (m model) pickKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		hs := m.hits()
 		m.pick = nil
 		if p.at < len(hs) {
-			return hs[p.at].e.do(m.remember(hs[p.at].e.title))
+			return hs[p.at].Item.do(m.remember(hs[p.at].Item.title))
 		}
 		return m, nil
 	case "down", "ctrl+n", "ctrl+j", "tab":
