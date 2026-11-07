@@ -1,0 +1,189 @@
+package kit
+
+import "strconv"
+
+// Chart is one or two lines over time, like Stocks or Weather: the values
+// at the newest time big on top, the plot under them with a soft area
+// under the first line, the scale on the right and three times under it.
+// The server draws it as SVG, sized to its place; the pointer or a finger
+// on the plot shows the values and the time under it, and leaving it
+// shows the newest again. The first line is ink, the second muted: a
+// chart has no colors of its own (DESIGN.md, Character).
+templ Chart(p ChartProps) {
+	@chartOnce.Once() {
+		@chartScript()
+	}
+	{{ xs := chartXs(p.Times) }}
+	{{ top := chartTop(p) }}
+	{{ last := chartLast(p) }}
+	{{ breaks := chartBreaks(p.Times, p.Gap) }}
+	<figure class="m-0 flex min-w-0 flex-col gap-3" data-chart data-chart-last={ strconv.Itoa(last) }>
+		// The points for the script, as JSON that is never run: shorter
+		// than an attribute, where every quote would be escaped.
+		@templ.Raw(`<script type="application/json" data-chart-points>` + chartPoints(p, xs, top) + `</script>`)
+		<div class="flex min-h-8 flex-wrap items-end justify-between gap-x-4 gap-y-1">
+			<div class="flex min-w-0 flex-wrap items-end gap-x-5">
+				for i, line := range p.Lines {
+					<span class="flex flex-col">
+						if len(p.Lines) > 1 {
+							<span class={ "flex items-center gap-1.5 text-xs", chartInk(i) }>
+								<span class="h-0.5 w-3 rounded-full bg-current" aria-hidden="true"></span>
+								<span class="text-muted-foreground">{ line.Label }</span>
+							</span>
+						}
+						<span class="text-2xl font-semibold tracking-tight tabular-nums" data-chart-value>{ chartLineValue(p, line, last) }</span>
+					</span>
+				}
+			</div>
+			<span class="text-xs text-muted-foreground tabular-nums" data-chart-time>
+				if last >= 0 {
+					{ chartMarkTime(p, last) }
+				}
+			</span>
+		</div>
+		<div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2">
+			<div class="relative h-36 touch-pan-y select-none" data-chart-plot>
+				<div class="absolute inset-x-0 top-0 border-t border-dashed border-border"></div>
+				<div class="absolute inset-x-0 top-1/2 border-t border-dashed border-border"></div>
+				<div class="absolute inset-x-0 bottom-0 border-t border-border"></div>
+				<svg viewBox={ "0 0 " + strconv.Itoa(chartWidth) + " " + strconv.Itoa(chartHeight) } preserveAspectRatio="none" class="absolute inset-0 size-full overflow-visible" aria-hidden="true">
+					for i, line := range p.Lines {
+						{{ stroke, area := chartPaths(xs, line.Values, breaks, top) }}
+						<g class={ chartInk(i) }>
+							if area != "" {
+								<path d={ area } fill="currentColor" fill-opacity="0.08" stroke="none"></path>
+							}
+							if stroke != "" {
+								<path d={ stroke } fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+							}
+						</g>
+					}
+				</svg>
+				for index, words := range p.Marks {
+					if index >= 0 && index < len(xs) {
+						<span class="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-foreground bg-card" style={ chartAt(xs[index], chartMarkY(p, index, top)) } title={ words + ", " + p.Time(p.Times[index]) } data-chart-mark>
+							<span class="sr-only">{ words }</span>
+						</span>
+					}
+				}
+				<div class="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-foreground/30" data-chart-cursor hidden></div>
+				for i := range p.Lines {
+					<span class={ "pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card", chartDot(i) } data-chart-dot hidden></span>
+				}
+			</div>
+			<div class="-my-2 flex flex-col justify-between text-right text-xs text-muted-foreground tabular-nums" aria-hidden="true">
+				<span>{ p.Value(top) }</span>
+				<span>{ p.Value(top / 2) }</span>
+				<span>{ p.Value(0) }</span>
+			</div>
+			<div class="flex justify-between gap-2 text-xs text-muted-foreground tabular-nums">
+				for _, tick := range chartTicks(p) {
+					<span>{ tick }</span>
+				}
+			</div>
+		</div>
+	</figure>
+}
+
+// chartOnce puts the script of Chart on a page once, however many it has.
+var chartOnce = templ.NewOnceHandle()
+
+// chartScript shows what is under the pointer or the finger: the cursor,
+// a dot on each line, and the values and the time on top. It reads the
+// points the server wrote into its data-chart-points. Leaving the plot, or
+// lifting the finger, shows the newest values again.
+templ chartScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			// A chart that reloads itself brings this script again: once
+			// is enough.
+			if (window.moinChart) return;
+			window.moinChart = true;
+			const pointsOf = (chart) => (chart.chartPoints ||= JSON.parse(chart.querySelector("[data-chart-points]")?.textContent || "[]"));
+			const show = (chart, at) => {
+				const points = pointsOf(chart);
+				const pointing = at >= 0;
+				const point = points[pointing ? at : Number(chart.dataset.chartLast)];
+				chart.querySelectorAll("[data-chart-value]").forEach((value, n) => { value.textContent = point ? point.v[n] : "—"; });
+				chart.querySelector("[data-chart-time]").textContent = point ? (point.m ? point.m + " · " : "") + point.t : "";
+				const cursor = chart.querySelector("[data-chart-cursor]");
+				cursor.hidden = !pointing;
+				if (pointing) cursor.style.left = point.x + "%";
+				chart.querySelectorAll("[data-chart-dot]").forEach((dot, n) => {
+					dot.hidden = !pointing || point.y[n] < 0;
+					if (!dot.hidden) Object.assign(dot.style, { left: point.x + "%", top: point.y[n] + "%" });
+				});
+			};
+			const nearest = (points, x) => {
+				let best = -1;
+				points.forEach((point, i) => { if (best < 0 || Math.abs(point.x - x) < Math.abs(points[best].x - x)) best = i; });
+				return best;
+			};
+			let active = null;
+			const leave = () => {
+				if (active) show(active, -1);
+				active = null;
+			};
+			const point = (event) => {
+				const plot = event.target.closest?.("[data-chart-plot]");
+				const chart = plot?.closest("[data-chart]");
+				if (active && active !== chart) leave();
+				if (!chart) return;
+				const box = plot.getBoundingClientRect();
+				const at = nearest(pointsOf(chart), ((event.clientX - box.left) / box.width) * 100);
+				if (at < 0) return;
+				active = chart;
+				show(chart, at);
+			};
+			document.addEventListener("pointermove", point);
+			document.addEventListener("pointerdown", point);
+			document.addEventListener("pointerout", (event) => {
+				if (active && !active.querySelector("[data-chart-plot]").contains(event.relatedTarget)) leave();
+			});
+			document.addEventListener("pointerup", (event) => { if (event.pointerType !== "mouse") leave(); });
+			document.addEventListener("pointercancel", leave);
+		})();
+	</script>
+}
+
+// chartInk is the color of a line: the first ink, the second muted.
+func chartInk(i int) string {
+	if i == 0 {
+		return "text-foreground"
+	}
+	return "text-muted-foreground"
+}
+
+// chartDot is the color of a line's dot under the pointer.
+func chartDot(i int) string {
+	if i == 0 {
+		return "bg-foreground"
+	}
+	return "bg-muted-foreground"
+}
+
+// chartMarkTime is the time of a point as the chart shows it on top: its
+// mark first, when it has one.
+func chartMarkTime(p ChartProps, i int) string {
+	if words := p.Marks[i]; words != "" {
+		return words + " · " + p.Time(p.Times[i])
+	}
+	return p.Time(p.Times[i])
+}
+
+// chartMarkY is where a mark sits: on the first line, or at the bottom.
+func chartMarkY(p ChartProps, i int, top float64) float64 {
+	if len(p.Lines) == 0 || i >= len(p.Lines[0].Values) {
+		return chartHeight
+	}
+	v := p.Lines[0].Values[i]
+	if v != v {
+		return chartHeight
+	}
+	return chartY(v, top)
+}
+
+// chartAt places a mark: x from 0 to 1, y in the box.
+func chartAt(x, y float64) templ.SafeCSS {
+	return templ.SafeCSS("left: " + chartPercent(x*100) + "; top: " + chartPercent(y/chartHeight*100))
+}
