@@ -42,10 +42,10 @@ func TestEveryFrameFitsTheScreen(t *testing.T) {
 		{"confirm", func(m model) model { return press(m.withApp("shop", tDeploys), "R") }},
 		{"deploy log", func(m model) model {
 			m = m.withApp("shop", tDeploys)
-			next, _ := m.data(startedMsg{app: "shop", deploy: m.app.detail.Deploys[0], title: "redeploy v44"})
+			next, _ := m.received(startedMsg{app: "shop", deploy: m.app.detail.Deploys[0], title: "redeploy v44"})
 			m = next.(model)
 			for _, l := range []string{"downloading the source", "building", "#1 [build 1/5] FROM golang", "error: something", "health check GET / 200", "v44 is live"} {
-				next, _ = m.data(lineMsg{m.out.id, l})
+				next, _ = m.received(lineMsg{m.out.id, l})
 				m = next.(model)
 			}
 			return m
