@@ -5,11 +5,11 @@ import (
 	"unicode/utf8"
 )
 
-// AppIcon is an app's icon, like on a phone's home screen: the logo of a
-// catalog app on a white tile in both themes (logos are drawn for a white
-// page), or the first letter of the app on an ink tile. Every list of apps
-// and an app's head show it, so the names line up. head makes it as high
-// as a title (44 px); else it fits a row.
+// AppIcon is the icon of a catalog app, like on a phone's home screen: its
+// logo on a white tile in both themes (logos are drawn for a white page),
+// or its first letter on an ink tile. Only the catalog shows icons: there
+// they help you pick; your own apps go by their names (DESIGN.md, Pages).
+// head makes it as high as a title (44 px); else it fits a row.
 templ AppIcon(name, logo string, head bool) {
 	if logo != "" {
 		<span class={ appIconClass(head), "bg-white p-1.5 ring-1 ring-black/5 dark:ring-white/15" } aria-hidden="true">
