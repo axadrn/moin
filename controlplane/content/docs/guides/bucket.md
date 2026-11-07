@@ -32,7 +32,7 @@ moin keeps the bucket's secret key encrypted and uses it for one thing: to sign 
 Tells moin which bucket to use. Do it once per workspace: one bucket serves all your servers and apps. The first bucket is the workspace's default.
 
 ```surfaces
-Web: **Buckets** in the sidebar, then **Add bucket**
+Web: **Settings**, **Bucket**, then **Add bucket**
 CLI: moin buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \
@@ -133,7 +133,7 @@ One bucket is the **default**: every app without a bucket of its own uploads and
 Lists every bucket, the default first, with the apps that use it and the apps that keep older backups in it. Secret keys never show.
 
 ```surfaces
-Web: **Buckets** in the sidebar
+Web: **Settings**, **Bucket**
 CLI: moin buckets
 TUI: opens the web: `w`, then `k`
 API: GET /api/v1/buckets
@@ -169,7 +169,7 @@ A server's agent needs this release or newer to back up an app to its own bucket
 Renames a bucket, points it at another place, gives it new keys or makes it the default. Leave the secret key empty to keep the stored one. A new place starts with a full copy, and the old place keeps what it has.
 
 ```surfaces
-Web: **Buckets** in the sidebar, **Change** on the bucket, then **Save bucket**; **Make default**
+Web: **Settings**, **Bucket**, **Change** on the bucket, then **Save bucket**; **Make default**
 CLI: moin buckets edit client-a --name client-b
 CLI: moin buckets edit client-a --access-key <access-key>
 CLI: moin buckets default client-a
@@ -184,7 +184,7 @@ MCP: set_default_bucket
 Removes a bucket from moin. What is in it stays there.
 
 ```surfaces
-Web: **Buckets** in the sidebar, **Remove** on the bucket, then type its name
+Web: **Settings**, **Bucket**, **Remove** on the bucket, then type its name
 CLI: moin buckets rm client-a
 TUI: opens the web: `w`, then `k`
 API: DELETE /api/v1/buckets/{name}

@@ -144,7 +144,7 @@ On hosted moin you pay per workspace: $29 a month or $249 a year, with unlimited
 Only the owner of the workspace sees the plan and pays, on the web: **Billing** in the sidebar. Buying and cancelling happen only on the web.
 
 ```surfaces
-Web: **Billing** in the sidebar
+Web: **Settings**, **Billing**
 API: GET /api/v1/workspaces/{slug}/billing
 MCP: get_billing
 ```

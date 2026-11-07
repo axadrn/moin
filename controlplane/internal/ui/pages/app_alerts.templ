@@ -6,18 +6,10 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/badge"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/checkbox"
-	field "github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
+	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
 )
 
 // AlertsView is the alerts page: where the alerts of the workspace go.
@@ -29,40 +21,42 @@ type AlertsView struct {
 	SigningSecret string
 }
 
-// alertKindItems give the kind select its labels.
-var alertKindItems = []selectcomp.ItemData{
+// alertKinds give the kind select its labels.
+var alertKinds = []kit.Option{
 	{Value: model.AlertSlack, Label: "Slack"},
 	{Value: model.AlertDiscord, Label: "Discord"},
 	{Value: model.AlertTelegram, Label: "Telegram"},
 	{Value: model.AlertWebhook, Label: "Webhook"},
 }
 
+// Alerts is where the alerts of the workspace go: by mail to owners and
+// admins, and to the destinations listed here.
 templ Alerts(view AlertsView) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Alerts") {
 		@panelPage(templ.Attributes{"data-alerts-page": true}) {
-			@pageHeader("Alerts", "When a site goes down or comes back, a server goes offline or comes back, or a deploy fails. Owners and admins get a mail; send it to Slack, Discord, Telegram or a webhook too.")
+			@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Alerts")
 			<div id="alerts" class="flex flex-col gap-6">
 				if view.SigningSecret != "" && view.Created != nil {
-					@alert.Alert(alert.Props{Attributes: templ.Attributes{"data-signing-secret": true}}) {
-						@icon.KeyRound()
-						@alert.Title() {
-							{ "Signing secret of " + view.Created.Name + ", shown this once" }
+					<div data-signing-secret>
+						@kit.Card("Signing secret of "+view.Created.Name, nil) {
+							@kit.Quiet() {
+								Shown this once. Every post carries <code class="font-mono text-foreground">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret.
+							}
+							@kit.Command(view.SigningSecret)
 						}
-						@alert.Description(alert.DescriptionProps{Class: "flex flex-col gap-3"}) {
-							<p>Every post carries <code class="font-mono">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret. Store it with your webhook.</p>
-							@command(view.SigningSecret)
-						}
-					}
+					</div>
 				}
 				@alertDestinations(view)
 				if ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) {
 					@alertDestinationForm()
 				}
-				@panel(panelProps{Title: "Email", Docs: "/docs/guides/alerts#who-gets-it"}) {
-					<p class="text-sm text-pretty text-muted-foreground">
-						Every owner and admin with a verified address gets each alert by mail. Each turns it off for themselves under
-						<a class="underline underline-offset-4" href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/settings") }>Settings</a>.
-					</p>
+				@kit.Section("Email", nil) {
+					@kit.List() {
+						@kit.Row(basePath + "/settings/account") {
+							@kit.RowText("Owners and admins", "Each turns it off for themselves")
+						}
+					}
 				}
 			</div>
 		}
@@ -75,81 +69,71 @@ templ alertDestinations(view AlertsView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ manage := ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) }}
 	{{ now := time.Now() }}
-	@panel(panelProps{Title: "Destinations", Docs: "/docs/guides/alerts#slack-discord-telegram-and-webhooks", Description: "Each gets the events it is set for, one message per event.", Body: panelBodyRows, Attrs: templ.Attributes{"data-alert-destinations": true}}) {
-		if len(view.Destinations) == 0 {
-			<div class="px-3 pb-3">
-				@emptyHint("No destinations yet. Alerts go by mail only.", "")
-			</div>
-		} else {
-			@item.Group(item.GroupProps{Class: "w-auto gap-1"}) {
+	@kit.Section("Destinations", nil) {
+		<div data-alert-destinations>
+			@kit.List() {
+				if len(view.Destinations) == 0 {
+					@kit.Row("") {
+						@kit.RowText("None yet", "Alerts go by mail only")
+					}
+				}
 				for _, destination := range view.Destinations {
-					@item.Item(item.Props{Size: item.SizeXs, Class: "rounded-xl hover:bg-muted/60", Attributes: templ.Attributes{"role": "listitem", "data-alert-destination": destination.Name}}) {
-						@item.Content(item.ContentProps{Class: "min-w-0"}) {
-							@item.Title() {
-								<span class="truncate">{ destination.Name }</span>
-								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-									{ model.AlertKindLabel(destination.Kind) }
-								}
-								if destination.FailingSince != nil {
-									@badge.Badge(badge.Props{Variant: badge.VariantDestructive, Attributes: templ.Attributes{"data-alert-failing": true}}) {
-										{ "Failing since " + ago(*destination.FailingSince, now) }
-									}
-								}
-							}
-							@item.Description(item.DescriptionProps{Class: "text-xs"}) {
+					@actionRow(templ.Attributes{"data-alert-destination": destination.Name}) {
+						<div class="min-w-0 flex-1">
+							<div class="flex min-w-0 items-center gap-2">
+								<span class="truncate font-medium">{ destination.Name }</span>
+								<span class="shrink-0 text-sm text-muted-foreground">{ model.AlertKindLabel(destination.Kind) }</span>
+							</div>
+							<div class="truncate text-sm text-muted-foreground">
 								<span class="font-mono">{ destination.Hint }</span>
 								{ " · " + alertEventsText(destination) }
-								if destination.FailingSince != nil {
-									<span class="block text-failed">{ destination.LastError }</span>
-								} else if destination.LastSentAt != nil {
-									<span title={ stamp(*destination.LastSentAt) }>{ " · last sent " + ago(*destination.LastSentAt, now) }</span>
+								if destination.FailingSince == nil && destination.LastSentAt != nil {
+									<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + ago(*destination.LastSentAt, now) }</span>
 								}
+							</div>
+							if destination.FailingSince != nil {
+								<div class="flex min-w-0 items-center gap-2 pt-1 text-sm text-failed" data-alert-failing>
+									@status.Symbol(status.KindFailed)
+									<span class="truncate">{ "Failing since " + ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
+								</div>
 							}
-						}
+						</div>
 						if manage {
-							@item.Actions() {
-								@button.Button(button.Props{
-									Variant: button.VariantSecondary,
-									Size:    button.SizeSm,
-									Attributes: templ.Attributes{
-										"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
-										"hx-target":  "#alerts",
-										"hx-select":  "#alerts",
-										"hx-swap":    "outerHTML",
-										"hx-disable": "this",
-									},
+							<div class="flex w-full items-center gap-2 sm:w-auto">
+								@kit.Button(kit.Secondary, "", templ.Attributes{
+									"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
+									"hx-target":  "#alerts",
+									"hx-select":  "#alerts",
+									"hx-swap":    "outerHTML",
+									"hx-disable": "this",
 								}) {
 									Send test
 								}
-								@button.Button(button.Props{
-									Variant: button.VariantGhost,
-									Size:    button.SizeSm,
-									Attributes: templ.Attributes{
-										"hx-delete":  basePath + "/alerts/destinations/" + destination.Name,
-										"hx-target":  "#alerts",
-										"hx-select":  "#alerts",
-										"hx-swap":    "outerHTML",
-										"hx-disable": "this",
-										"hx-confirm": "Remove " + destination.Name + "? Its alerts stop.",
-									},
+								@kit.Button(kit.Danger, "", templ.Attributes{
+									"hx-delete":  basePath + "/alerts/destinations/" + destination.Name,
+									"hx-target":  "#alerts",
+									"hx-select":  "#alerts",
+									"hx-swap":    "outerHTML",
+									"hx-disable": "this",
+									"hx-confirm": "Remove " + destination.Name + "? Its alerts stop.",
 								}) {
 									Remove
 								}
-							}
+							</div>
 						}
 					}
 				}
 			}
-		}
+		</div>
 	}
 }
 
-// alertDestinationForm adds a destination. The fields of the kind show;
-// a small script switches them when the kind changes.
+// alertDestinationForm adds a destination. Telegram has a bot token and a
+// chat ID instead of a URL: CSS shows the fields of the picked kind.
 templ alertDestinationForm() {
-	@panel(panelProps{Title: "Add a destination", Docs: "/docs/guides/alerts#add-a-destination", Description: "The URL and the bot token are stored encrypted and never shown again."}) {
+	@kit.Card("Add a destination", nil) {
 		<form
-			class="flex flex-col gap-6"
+			class="group/alert flex flex-col gap-4"
 			hx-post={ ctxkeys.AppBasePath(ctx) + "/alerts/destinations" }
 			hx-target="#alerts"
 			hx-select="#alerts"
@@ -158,91 +142,46 @@ templ alertDestinationForm() {
 			data-alert-form
 		>
 			@csrf.Token()
-			<div class="grid items-start gap-3 sm:grid-cols-2">
-				@field.Field(field.Props{Class: "gap-1"}) {
-					@field.Label(field.LabelProps{For: "alert-kind"}) {
-						Kind
-					}
-					@selectcomp.Select(selectcomp.Props{Name: "kind", DefaultValue: model.AlertSlack, Items: alertKindItems}) {
-						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "alert-kind", Class: "w-full", Attributes: templ.Attributes{"aria-describedby": "alert-kind-hint"}}) {
-							@selectcomp.Value()
-						}
-						@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-							@selectcomp.Group() {
-								for _, kind := range alertKindItems {
-									@selectcomp.Item(selectcomp.ItemProps{Value: kind.Value}) {
-										{ model.AlertKindLabel(kind.Value) }
-									}
-								}
-							}
-						}
-					}
-					@fieldHint("alert-kind", "")
+			<div class="grid items-start gap-4 sm:grid-cols-2">
+				@kit.Field("Kind", "alert-kind", "") {
+					@kit.Select(kit.SelectProps{ID: "alert-kind", Name: "kind", Label: "Kind", Options: alertKinds, Value: model.AlertSlack})
 				}
-				@alertField("name", "Name", "team-chat", "Lowercase letters, digits and dashes.", "text", "")
-				@alertField("url", "Webhook URL", "https://hooks.slack.com/services/…", "Slack: an incoming webhook. Discord: Server settings, Integrations, Webhooks. Webhook: any http or https URL.", "password", "url")
-				@alertField("bot_token", "Bot token", "123456:ABC-DEF…", "From @BotFather. Add the bot to the chat first.", "password", "telegram")
-				@alertField("chat_id", "Chat ID", "-1001234567890", "The chat, group or channel the bot writes to, or @channelname.", "text", "telegram")
+				@alertField("name", "Name", "team-chat", "Lowercase letters, digits and dashes", "text", "")
 			</div>
-			<fieldset class="flex flex-col gap-3">
-				<legend class="mb-3 text-sm font-medium">Events</legend>
-				<div class="grid gap-3 sm:grid-cols-3">
+			@alertField("url", "Webhook URL", "https://hooks.slack.com/services/…", "Stored encrypted, never shown again", "password", "url")
+			@alertField("bot_token", "Bot token", "123456:ABC-DEF…", "From @BotFather; add the bot to the chat first", "password", "telegram")
+			@alertField("chat_id", "Chat ID", "-1001234567890", "The chat, group or channel, or @channelname", "text", "telegram")
+			<div class="flex flex-col gap-2">
+				<span class="px-1 text-sm font-medium">Events</span>
+				<div class="grid gap-x-6 sm:grid-cols-2">
 					for _, event := range model.AlertEvents {
-						@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-							@checkbox.Checkbox(checkbox.Props{ID: "alert-event-" + strings.ReplaceAll(event, ".", "-"), Name: "events", Value: event, Checked: true})
-							@field.Label(field.LabelProps{For: "alert-event-" + strings.ReplaceAll(event, ".", "-"), Class: "font-normal"}) {
-								{ model.AlertEventLabel(event) }
-							}
-						}
+						{{ id := "alert-event-" + strings.ReplaceAll(event, ".", "-") }}
+						<label for={ id } class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-1">
+							<span class="text-sm">{ model.AlertEventLabel(event) }</span>
+							@kit.Switch(templ.Attributes{"id": id, "name": "events", "value": event, "checked": true})
+						</label>
 					}
 				</div>
-			</fieldset>
-			<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<p class="text-xs text-muted-foreground">Send a test once it is added.</p>
-				@button.Button(button.Props{Type: button.TypeSubmit}) {
+			</div>
+			<div class="flex justify-end">
+				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
 					Add destination
 				}
 			</div>
 		</form>
-		<script nonce={ templ.GetNonce(ctx) }>
-			(function() {
-				if (window.moinAlertForm) return;
-				window.moinAlertForm = true;
-				// The URL is for Slack, Discord and webhooks; the bot token and
-				// the chat ID for Telegram.
-				document.addEventListener("change", function(event) {
-					const form = event.target.closest && event.target.closest("[data-alert-form]");
-					if (!form || event.target.name !== "kind") return;
-					const telegram = event.target.value === "telegram";
-					form.querySelectorAll("[data-alert-kind]").forEach(function(part) {
-						part.hidden = (part.dataset.alertKind === "telegram") !== telegram;
-					});
-				});
-			})();
-		</script>
 	}
 }
 
-// alertField is one field of the destination form; for names the kinds
-// it belongs to, url or telegram, and hides the Telegram ones at first.
+// alertField is one field of the destination form. forKind telegram shows
+// it only for Telegram, url for every other kind.
 templ alertField(name, label, placeholder, hint, kind, forKind string) {
 	{{ id := "alert-" + strings.ReplaceAll(name, "_", "-") }}
-	{{ attrs := templ.Attributes{} }}
-	if forKind != "" {
-		{{ attrs["data-alert-kind"] = forKind }}
-	}
-	if forKind == "telegram" {
-		{{ attrs["hidden"] = true }}
-	}
-	<div class="sm:col-span-2" { attrs... }>
-		@field.Field(field.Props{Class: "gap-1"}) {
-			@field.Label(field.LabelProps{For: id}) {
-				{ label }
-			}
-			@input.Input(input.Props{ID: id, Name: name, Type: kind, Placeholder: placeholder, Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "aria-describedby": id + "-hint"}})
-			@fieldHint(id, "") {
-				{ hint }
-			}
+	<div
+		data-alert-kind={ forKind }
+		class={ templ.KV("group-has-[input[value=telegram]:checked]/alert:hidden", forKind == "url"), templ.KV("hidden group-has-[input[value=telegram]:checked]/alert:block", forKind == "telegram") }
+	>
+		@kit.Field(label, id, hint) {
+			@kit.Input(templ.Attributes{"id": id, "name": name, "type": kind, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"})
 		}
 	</div>
 }

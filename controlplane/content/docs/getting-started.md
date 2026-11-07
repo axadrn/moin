@@ -88,7 +88,7 @@ Your code and your backups go into your own bucket, never to us.
 Then tell moin:
 
 ```surfaces
-Web: **Buckets** in the sidebar, then **Add bucket**
+Web: **Settings**, **Bucket**, then **Add bucket**
 CLI: moin buckets add default \
   --endpoint https://<account-id>.r2.cloudflarestorage.com \
   --bucket <bucket-name> \

@@ -16,12 +16,9 @@ templ Billing() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ workspace := ctxkeys.Workspace(ctx) }}
 	{{ basePath := "/app/" + workspace.Slug }}
-	@layouts.App("Plan") {
+	@layouts.App("Billing") {
 		@panelPage() {
-			<header class="flex flex-col gap-1 pt-2">
-				<h1 class="text-3xl font-semibold tracking-tight">Plan</h1>
-				<p class="text-muted-foreground">One price for { workspace.Name }, the whole team included.</p>
-			</header>
+			@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Billing")
 			@billingCurrent(subscription, basePath)
 			// The offer shows while there is something to buy: in the trial
 			// and when the workspace is read-only, not on a plan it has.
@@ -117,12 +114,12 @@ templ billingOffer(plan access.Plan, basePath string) {
 		</div>
 		<div class="flex flex-col gap-1">
 			<p class="flex items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:hidden">
-				<span class="text-3xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
+				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
 				<span class="text-muted-foreground">a year</span>
-				<span class="text-sm font-medium text-live">Save { yearlySaving(plan) }</span>
+				<span class="text-sm font-medium">Save { yearlySaving(plan) }</span>
 			</p>
 			<p class="hidden items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:flex">
-				<span class="text-3xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
 				<span class="text-muted-foreground">a month</span>
 			</p>
 			<p class="text-muted-foreground">Unlimited servers, apps and teammates.</p>
