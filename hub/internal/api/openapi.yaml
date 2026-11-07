@@ -6,6 +6,11 @@ info:
     JSON API of moin. Every endpoint under `/api/v1` uses the same
     services and rules as the web app.
 
+    IDs and names: every workspace, app, server and bucket has a name you give it and an
+    ID that never changes. Answers carry `id` as the UUID without dashes, 32 characters,
+    the form links carry. A path or a field that names one takes its name, its ID with or
+    without dashes, or a link part like `my-app-<id>`, whose last 32 characters count.
+
     Authentication: sign in with one of the `/api/v1/auth` endpoints and send the returned
     token as `Authorization: Bearer <token>`. A browser frontend on the same site may use
     the `session_token` cookie instead. Cookie requests that change state need the
@@ -1437,6 +1442,40 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No app with this ID or name belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    patch:
+      tags: [Apps]
+      operationId: renameApp
+      summary: Rename an app
+      description: The same rules as creating one. Links count its ID and keep working. On its server the app keeps its folder, so its data, its backups and its instant address stay; the next restart or deploy gives its containers the new name.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameAppRequest'
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The renamed app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`: not 1 to 63 lowercase letters, digits or dashes starting with a letter or digit, or taken in the workspace.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:
@@ -3811,7 +3850,7 @@ paths:
       tags: [Workspaces]
       operationId: renameWorkspace
       summary: Rename a workspace
-      description: The slug stays the same.
+      description: The slug, the name in the workspace's links, follows the name. Links count the ID, so old ones keep working.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -4488,14 +4527,14 @@ components:
       name: id
       in: path
       required: true
-      description: The server ID or name from `GET /api/v1/servers`.
+      description: The server's name or ID from `GET /api/v1/servers`, or a link part like `web-1-<id>`.
       schema:
         type: string
     AppName:
       name: app
       in: path
       required: true
-      description: The app ID or name from `GET /api/v1/apps`.
+      description: The app's name or ID from `GET /api/v1/apps`, or a link part like `my-app-<id>`.
       schema:
         type: string
     CatalogSlug:
@@ -4509,7 +4548,7 @@ components:
       name: name
       in: path
       required: true
-      description: The bucket's name in moin from `GET /api/v1/buckets`.
+      description: The bucket's name in moin or its ID from `GET /api/v1/buckets`, or a link part like `default-<id>`.
       schema:
         type: string
     DeployNumber:
@@ -4524,7 +4563,7 @@ components:
       name: workspaceSlug
       in: path
       required: true
-      description: The workspace slug. Unknown workspaces and workspaces the account does not belong to answer 404.
+      description: The workspace's slug or ID, or a link part like `acme-<id>`. Unknown workspaces and workspaces the account does not belong to answer 404.
       schema:
         type: string
     InvitationID:
@@ -5090,6 +5129,7 @@ components:
       properties:
         id:
           type: string
+          description: The server's ID, 32 characters; it never changes.
         name:
           type: string
         online:
@@ -5179,6 +5219,14 @@ components:
           type: string
           maxLength: 64
           description: Empty or left out gets the next free `web-1`, `web-2` …
+    RenameAppRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 63
     RenameServerRequest:
       type: object
       required: [name]
@@ -5220,6 +5268,7 @@ components:
       properties:
         id:
           type: string
+          description: The app's ID, 32 characters; it never changes.
         name:
           type: string
         server_id:
@@ -5975,8 +6024,11 @@ components:
           type: integer
     Bucket:
       type: object
-      required: [name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at]
+      required: [id, name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at]
       properties:
+        id:
+          type: string
+          description: The bucket's ID, 32 characters; it never changes.
         name:
           type: string
           description: The bucket's name in moin, like default or client-a.
@@ -6601,10 +6653,12 @@ components:
       properties:
         id:
           type: string
+          description: The workspace's ID, 32 characters; it never changes.
         name:
           type: string
         slug:
           type: string
+          description: The name in its links, `acme` in `/app/acme-<id>`; it follows the name.
     WorkspaceRole:
       type: string
       enum: [owner, admin, member]

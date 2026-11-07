@@ -98,7 +98,7 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 		t.Fatalf("body = %s", recorder.Body.String())
 	}
 	calls := environment.payments.checkoutCalls()
-	want := checkoutCall{workspaceID: seeded.workspace.ID, workspaceSlug: seeded.workspace.Slug, planID: "pro", interval: "yearly", email: "owner@example.com", name: seeded.workspace.Name}
+	want := checkoutCall{workspaceID: seeded.workspace.ID, workspaceSlug: seeded.workspace.Link(), planID: "pro", interval: "yearly", email: "owner@example.com", name: seeded.workspace.Name}
 	if len(calls) != 1 || calls[0] != want {
 		t.Fatalf("checkout calls = %#v", calls)
 	}

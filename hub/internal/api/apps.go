@@ -13,6 +13,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/internal/link"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -140,9 +141,9 @@ type envRequest struct {
 
 func NewApp(app model.App) App {
 	return App{
-		ID:              app.ID,
+		ID:              link.ID(app.ID),
 		Name:            app.Name,
-		ServerID:        app.ServerID,
+		ServerID:        link.ID(app.ServerID),
 		ServerName:      app.ServerName,
 		LatestNumber:    app.LatestNumber,
 		LatestStatus:    app.LatestStatus,
@@ -269,6 +270,27 @@ func (h *AppsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, AppDetail{App: NewApp(*app), Deploys: NewDeploys(deploys, app.LiveNumber)})
+}
+
+// renameAppRequest is the body of PATCH /api/v1/apps/{app}.
+type renameAppRequest struct {
+	Name string `json:"name"`
+}
+
+// Rename gives an app a new name and answers it. Links count its ID, so
+// they keep working; its data, backups and instant address stay, and the
+// next restart names its containers after it.
+func (h *AppsHandler) Rename(w http.ResponseWriter, r *http.Request) {
+	var request renameAppRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	app, err := h.apps.Rename(actor(r), r.PathValue("app"), request.Name)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewApp(*app))
 }
 
 // Delete stops the app on its server and removes it. Its data stays there.

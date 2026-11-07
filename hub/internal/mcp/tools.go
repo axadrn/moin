@@ -12,6 +12,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/link"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -65,7 +66,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "rename_workspace",
 		Title:       "Rename a workspace",
-		Description: "Changes the display name of a workspace (2 to 80 characters). The slug and every link stay the same. Only owners and admins may rename. Needs a token with read and write access.",
+		Description: "Changes the name of a workspace (2 to 80 characters). Its slug, the name in its links, follows; links count the ID, so every old link keeps working. Only owners and admins may rename. Needs a token with read and write access.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Rename a workspace", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, Write(tools.renameWorkspace))
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
@@ -377,7 +378,7 @@ type RenamedWorkspace struct {
 }
 
 func (r RenamedWorkspace) Summary() string {
-	return fmt.Sprintf("Renamed the workspace to %s. The slug stays %s.", r.Workspace.Name, r.Workspace.Slug)
+	return fmt.Sprintf("Renamed the workspace to %s, slug %s. Old links keep working.", r.Workspace.Name, r.Workspace.Slug)
 }
 
 func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input RenameInput) (RenamedWorkspace, error) {
@@ -474,7 +475,7 @@ func (t builtinTools) boundMembership(caller Caller) (api.Membership, error) {
 		return api.Membership{}, err
 	}
 	for _, membership := range api.NewMemberships(memberships) {
-		if membership.Workspace.ID == caller.Token.WorkspaceID {
+		if membership.Workspace.ID == link.ID(caller.Token.WorkspaceID) {
 			return membership, nil
 		}
 	}

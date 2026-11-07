@@ -33,7 +33,7 @@ func TestPaidAccountShape(t *testing.T) {
 	}
 	membership := workspaces[0].(map[string]any)
 	workspace := membership["workspace"].(map[string]any)
-	if membership["role"] != "owner" || workspace["slug"] != "paid-workspace" || workspace["id"] != "workspace-paid" {
+	if membership["role"] != "owner" || workspace["slug"] != "paid-workspace" || workspace["id"] != "workspacepaid" {
 		t.Fatalf("membership = %#v", membership)
 	}
 	value, hasAvatar := body["avatar_url"]

@@ -8,6 +8,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // APITokensHandler lists, creates and revokes the personal API tokens of the
@@ -131,7 +132,7 @@ func NewAPIToken(token model.APIToken, now time.Time) APIToken {
 		Prefix:      token.Prefix,
 		Scopes:      token.ScopeList(),
 		Kind:        token.Kind,
-		WorkspaceID: token.WorkspaceID,
+		WorkspaceID: link.ID(token.WorkspaceID),
 		LastUsedAt:  utcTime(token.LastUsedAt),
 		ExpiresAt:   utcTime(token.ExpiresAt),
 		Expired:     token.IsExpired(now),

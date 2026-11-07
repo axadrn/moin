@@ -30,7 +30,7 @@ func TestStatus(t *testing.T) {
 	response = environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/status", bearer: reader})
 	expectStatus(t, response, http.StatusOK)
 	status = decodeBody[api.StatusResponse](t, response)
-	if status.OK || len(status.Issues) != 1 || status.Issues[0].Kind != "server.down" || status.Issues[0].Target != "web-1" || status.Issues[0].Path != "/servers/web-1-id/security" {
+	if status.OK || len(status.Issues) != 1 || status.Issues[0].Kind != "server.down" || status.Issues[0].Target != "web-1" || status.Issues[0].Path != "/servers/web-1-web1id/security" {
 		t.Fatalf("server offline = %+v", status)
 	}
 	if status.Counts.Servers != 1 || status.Counts.ServersOnline != 0 {

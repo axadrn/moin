@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // serverEventsHeartbeat keeps proxies from closing a quiet stream.
@@ -79,7 +80,7 @@ type createServerRequest struct {
 
 func NewServer(server model.Server) Server {
 	return Server{
-		ID:            server.ID,
+		ID:            link.ID(server.ID),
 		Name:          server.Name,
 		Online:        server.Online,
 		Hostname:      server.Hostname,

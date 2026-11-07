@@ -6,6 +6,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // Bucket is one bucket of the workspace, without its secret key. Folder is
@@ -13,6 +14,7 @@ import (
 // upload and back up there now; OlderBackups are the apps that moved away
 // and keep their older backups there.
 type Bucket struct {
+	ID           string    `json:"id"`
 	Name         string    `json:"name"`
 	Default      bool      `json:"default"`
 	Endpoint     string    `json:"endpoint"`
@@ -55,6 +57,7 @@ type AppBucketRequest struct {
 // NewBucket is the JSON shape of a bucket.
 func NewBucket(bucket service.Bucket) Bucket {
 	return Bucket{
+		ID:           link.ID(bucket.ID),
 		Name:         bucket.Name,
 		Default:      bucket.Default,
 		Endpoint:     bucket.Endpoint,

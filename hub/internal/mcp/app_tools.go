@@ -26,6 +26,9 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, newTool("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeApp)))
+	mcpsdk.AddTool(server, newTool("rename_app", "Rename an app",
+		"Gives an app a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Links count its ID, so they keep working; its data, backups and instant address stay. The next restart or deploy gives its containers the new name. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.renameApp)))
 	mcpsdk.AddTool(server, newTool("pin_app", "Pin or unpin an app",
 		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.pinApp)))
@@ -114,6 +117,29 @@ func (t moinTools) pinApp(_ context.Context, caller Caller, input PinInput) (Pin
 		return PinnedApp{}, err
 	}
 	return PinnedApp{api.NewApp(*app)}, nil
+}
+
+// RenameAppInput is the input of rename_app.
+type RenameAppInput struct {
+	App  string `json:"app" jsonschema:"the app name or ID"`
+	Name string `json:"name" jsonschema:"the new name"`
+}
+
+// RenamedApp is the output of rename_app.
+type RenamedApp struct {
+	api.App
+}
+
+func (a RenamedApp) Summary() string {
+	return fmt.Sprintf("Renamed the app to %s. Its links keep working; restart it to give its containers the name.", a.Name)
+}
+
+func (t moinTools) renameApp(_ context.Context, caller Caller, input RenameAppInput) (RenamedApp, error) {
+	app, err := t.services.Apps.Rename(caller.actor(), input.App, input.Name)
+	if err != nil {
+		return RenamedApp{}, err
+	}
+	return RenamedApp{api.NewApp(*app)}, nil
 }
 
 // AppDetail is the output of get_app.

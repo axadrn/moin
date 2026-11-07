@@ -121,6 +121,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces),
 		Alerts:      api.NewAlertsHandler(alerts),
 		Apps:        api.NewAppsHandler(apps),
+		Servers:     api.NewServersHandler(servers),
 		Status:      api.NewStatusHandler(service.NewStatusService(apps, servers, nil)),
 		Device:      api.NewDeviceHandler(environment.devices, "https://app.example.com"),
 	}

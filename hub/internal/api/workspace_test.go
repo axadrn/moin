@@ -12,6 +12,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/testutil"
+	"github.com/axadrn/moin/internal/link"
 )
 
 // seedTeam seeds the billing workspace roles on the moin plan, which
@@ -117,11 +118,17 @@ func TestWorkspaceRename(t *testing.T) {
 	} {
 		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":"Renamed by ` + test.role + `"}`, bearer: seeded.token(test.role)})
 		expectStatus(t, recorder, test.status)
-		if test.status == http.StatusOK && decodeBody[struct {
+		if test.status != http.StatusOK {
+			continue
+		}
+		renamed := decodeBody[struct {
 			Workspace api.Workspace `json:"workspace"`
-		}](t, recorder).Workspace.Name != "Renamed by "+test.role {
+		}](t, recorder).Workspace
+		// The slug, the name in the workspace's links, follows the name.
+		if renamed.Name != "Renamed by "+test.role || renamed.Slug != "renamed-by-"+test.role {
 			t.Fatalf("rename by %s = %s", test.role, recorder.Body.String())
 		}
+		seeded.workspace.Slug = renamed.Slug
 	}
 	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":" "}`, bearer: seeded.owner})
 	expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
@@ -463,13 +470,13 @@ func TestWorkspaceInvitationAccept(t *testing.T) {
 	accepted := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: newcomer})
 	expectStatus(t, accepted, http.StatusOK)
 	membership := decodeBody[api.Membership](t, accepted)
-	if membership.Workspace.ID != seeded.workspace.ID || membership.Role != model.WorkspaceRoleMember {
+	if membership.Workspace.ID != link.ID(seeded.workspace.ID) || membership.Role != model.WorkspaceRoleMember {
 		t.Fatalf("membership = %#v", membership)
 	}
 	joined := decodeBody[struct {
 		Items []api.Membership `json:"items"`
 	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: newcomer}))
-	if len(joined.Items) != 1 || joined.Items[0].Workspace.ID != seeded.workspace.ID {
+	if len(joined.Items) != 1 || joined.Items[0].Workspace.ID != link.ID(seeded.workspace.ID) {
 		t.Fatalf("newcomer workspaces = %#v", joined.Items)
 	}
 	again := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: newcomer})

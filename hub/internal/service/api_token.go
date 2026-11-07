@@ -13,6 +13,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
+	"github.com/axadrn/moin/internal/link"
 	"github.com/google/uuid"
 )
 
@@ -79,6 +80,10 @@ func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*mod
 	}
 	if input.ExpiresInDays < 0 || input.ExpiresInDays > MaxAPITokenExpiryDays {
 		return nil, "", ErrAPITokenExpiry
+	}
+	// The API shows workspace IDs without dashes, as links carry them.
+	if id, ok := link.Parse(input.WorkspaceID); ok {
+		input.WorkspaceID = id
 	}
 	now := s.now().UTC()
 	token := &model.APIToken{

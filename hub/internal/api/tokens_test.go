@@ -10,6 +10,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/testutil"
+	"github.com/axadrn/moin/internal/link"
 )
 
 var rawAPITokenPattern = regexp.MustCompile(`^pat_[a-z2-7]{52}$`)
@@ -69,7 +70,7 @@ func TestCreateAPITokenRevealsItOnce(t *testing.T) {
 	if token.ExpiresAt == nil || token.ExpiresAt.Sub(token.CreatedAt) != 30*24*time.Hour {
 		t.Fatalf("expires_at = %v, created_at = %v", token.ExpiresAt, token.CreatedAt)
 	}
-	if token.WorkspaceID != owner.workspaceID {
+	if token.WorkspaceID != link.ID(owner.workspaceID) {
 		t.Fatalf("workspace_id = %q, want %q", token.WorkspaceID, owner.workspaceID)
 	}
 
@@ -278,7 +279,7 @@ func TestAPITokenIsBoundToOneWorkspace(t *testing.T) {
 	list := decodeBody[struct {
 		Items []api.Membership `json:"items"`
 	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: created.Token}))
-	if len(list.Items) != 1 || list.Items[0].Workspace.ID != owner.workspaceID {
+	if len(list.Items) != 1 || list.Items[0].Workspace.ID != link.ID(owner.workspaceID) {
 		t.Fatalf("token workspaces = %#v", list.Items)
 	}
 	all := decodeBody[struct {

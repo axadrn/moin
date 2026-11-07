@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/mcp"
+	"github.com/axadrn/moin/internal/link"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -34,7 +35,8 @@ func TestMetricsTool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env.services.Servers.Receive(server.Server.ID, message)
+	serverID, _ := link.Parse(server.Server.ID)
+	env.services.Servers.Receive(serverID, message)
 
 	app := output[mcp.Metrics](t, call(t, session, "get_metrics", map[string]any{"app": "shop"}))
 	if app.App == nil || app.App.Now == nil || app.App.Now.CPU != 12.5 || len(app.App.Points) != 1 {

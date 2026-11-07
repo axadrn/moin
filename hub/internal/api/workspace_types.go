@@ -1,8 +1,12 @@
 package api
 
-import "github.com/axadrn/moin/hub/internal/model"
+import (
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/internal/link"
+)
 
-// Workspace is the public JSON shape of a workspace.
+// Workspace is the public JSON shape of a workspace. Its ID is the UUID
+// without dashes, as links carry it; the API takes either.
 type Workspace struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -11,7 +15,7 @@ type Workspace struct {
 
 // NewWorkspace converts a workspace model into its public JSON shape.
 func NewWorkspace(workspace *model.Workspace) Workspace {
-	return Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug}
+	return Workspace{ID: link.ID(workspace.ID), Name: workspace.Name, Slug: workspace.Slug}
 }
 
 // Membership is a workspace the user belongs to and the user's role in it.
