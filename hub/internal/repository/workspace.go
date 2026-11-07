@@ -77,14 +77,17 @@ func (r *Workspaces) ByID(id string) (*model.Workspace, error) {
 	return workspace, nil
 }
 
+// BySlugForUser finds a workspace of the user by a link to it
+// (<slug>-<id>), its ID or its slug.
 func (r *Workspaces) BySlugForUser(slug, userID string) (*model.Workspace, error) {
 	workspace := &model.Workspace{}
 	err := r.db.Get(workspace, `
 		SELECT o.*
 		FROM workspaces o
 		JOIN workspace_members m ON m.workspace_id = o.id
-		WHERE o.slug = $1 AND m.user_id = $2
-	`, slug, userID)
+		WHERE (o.id = $1 OR o.slug = $2) AND m.user_id = $3
+		ORDER BY o.id = $1 DESC LIMIT 1
+	`, idOf(slug), slug, userID)
 	if err == sql.ErrNoRows {
 		return nil, ErrWorkspaceNotFound
 	}
@@ -103,13 +106,18 @@ func (r *Workspaces) ListForUser(userID string) ([]model.WorkspaceMembership, er
 	return workspaces, err
 }
 
-func (r *Workspaces) UpdateName(id, name string, updatedAt time.Time, event *model.ActivityEvent) error {
+// UpdateName renames a workspace; its slug, the name in its links,
+// follows. ErrWorkspaceSlugTaken means another workspace has the slug.
+func (r *Workspaces) UpdateName(id, name, slug string, updatedAt time.Time, event *model.ActivityEvent) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`UPDATE workspaces SET name = $1, updated_at = $2 WHERE id = $3`, name, updatedAt, id)
+	result, err := tx.Exec(`UPDATE workspaces SET name = $1, slug = $2, updated_at = $3 WHERE id = $4`, name, slug, updatedAt, id)
+	if err != nil && isSlugConflict(err) {
+		return ErrWorkspaceSlugTaken
+	}
 	if err != nil {
 		return err
 	}

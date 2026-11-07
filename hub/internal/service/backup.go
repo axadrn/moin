@@ -163,7 +163,7 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 	}
 	for _, app := range apps {
 		if app.ServerID == serverID {
-			config.Schedules[app.Name] = scheduleOf(&app)
+			config.Schedules[app.Folder] = scheduleOf(&app)
 		}
 		if app.ServerID != serverID || app.BucketID == nil || *app.BucketID == bucket.ID {
 			continue
@@ -179,7 +179,7 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 		if config.AppBuckets == nil {
 			config.AppBuckets = map[string]*protocol.Bucket{}
 		}
-		config.AppBuckets[app.Name] = own
+		config.AppBuckets[app.Folder] = own
 	}
 	return config, nil
 }
@@ -225,7 +225,8 @@ func (s *AppService) configureDaemon(serverID, workspaceID string) {
 	}
 }
 
-// appIDs are the IDs of a server's apps by name.
+// appIDs are the IDs of a server's apps by folder, the name the
+// daemon knows each by.
 func (s *AppService) appIDs(serverID, workspaceID string) map[string]string {
 	apps, err := s.apps.ListByWorkspaceID(workspaceID)
 	if err != nil {
@@ -235,7 +236,7 @@ func (s *AppService) appIDs(serverID, workspaceID string) map[string]string {
 	ids := map[string]string{}
 	for _, app := range apps {
 		if app.ServerID == serverID {
-			ids[app.Name] = app.ID
+			ids[app.Folder] = app.ID
 		}
 	}
 	return ids
@@ -458,7 +459,7 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
 	defer cancel()
 	var backups protocol.Backups
-	err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Name}, &backups)
+	err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Folder}, &backups)
 	if err != nil {
 		return nil, err
 	}
@@ -748,12 +749,12 @@ func (s *AppService) reconcileRestores(serverID string) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), backupTimeout)
 		var backups protocol.Backups
-		err = s.servers.Request(ctx, serverID, protocol.TypeBackupRestores, protocol.BackupRequest{App: app.Name}, &backups)
+		err = s.servers.Request(ctx, serverID, protocol.TypeBackupRestores, protocol.BackupRequest{App: app.Folder}, &backups)
 		var daemonErr *DaemonError
 		if errors.As(err, &daemonErr) {
 			// A daemon before backup.restores.
 			backups = protocol.Backups{}
-			err = s.servers.Request(ctx, serverID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Name}, &backups)
+			err = s.servers.Request(ctx, serverID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Folder}, &backups)
 		}
 		cancel()
 		if err != nil && len(backups.Restores) == 0 {
@@ -868,7 +869,7 @@ func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target 
 	if err != nil {
 		return protocol.BackupRestore{}, "", err
 	}
-	request := protocol.BackupRestore{App: app.Name, Database: backup.Database}
+	request := protocol.BackupRestore{App: app.Folder, Database: backup.Database}
 	now := s.now().UTC()
 	if target.At != nil {
 		at := target.At.UTC()
@@ -994,8 +995,8 @@ func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, databa
 	if err != nil {
 		return nil, err
 	}
-	key := protocol.DatabaseFolder(*bucket, app.Name, app.ID, backup.Database) + "/" + protocol.CopyFile(copy.Copy, backup.Kind == protocol.DatabasePostgres)
-	name := app.Name + "-" + path.Base(protocol.DatabaseFolder(*bucket, app.Name, app.ID, backup.Database)) + "-" + path.Base(key)
+	key := protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database) + "/" + protocol.CopyFile(copy.Copy, backup.Kind == protocol.DatabasePostgres)
+	name := app.Name + "-" + path.Base(protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database)) + "-" + path.Base(key)
 	link, err := s3.NewPresignClient(bucketClient(*bucket)).PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket:                     aws.String(bucket.Bucket),
 		Key:                        aws.String(key),
@@ -1038,7 +1039,7 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 	if !ok {
 		return
 	}
-	app, err := s.apps.ByIDOrNameForWorkspace(backups.App, workspaceID)
+	app, err := s.apps.ByFolderForWorkspace(backups.App, workspaceID)
 	if err != nil || app.ServerID != serverID {
 		return
 	}

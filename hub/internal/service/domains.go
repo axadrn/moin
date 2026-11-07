@@ -230,7 +230,7 @@ func (s *AppService) instantHost(app *model.App, server *model.Server) string {
 		return ""
 	}
 	ipv4, _ := ServerAddresses(*server)
-	return protocol.InstantHost(app.Name, ipv4, app.Instant)
+	return protocol.InstantHost(app.Folder, ipv4, app.Instant)
 }
 
 // fillInstant fills the instant address of a deploy: the provider, the
@@ -264,7 +264,7 @@ func (s *AppService) fillInstant(app *model.App, domains *protocol.Domains) erro
 		domains.InstantProtect = instantUser + ":" + string(hash)
 	}
 	// The address the app gets, until the deploy reports the one it serves.
-	if host := protocol.InstantHost(app.Name, domains.InstantIP, app.Instant); host != app.InstantHost && app.LiveNumber == 0 {
+	if host := protocol.InstantHost(app.Folder, domains.InstantIP, app.Instant); host != app.InstantHost && app.LiveNumber == 0 {
 		_ = s.apps.SetInstantHost(app.ID, host)
 	}
 	return nil

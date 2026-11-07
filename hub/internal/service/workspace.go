@@ -292,10 +292,33 @@ func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *m
 	name = strings.TrimSpace(name)
 	now := time.Now()
 	event := activityEvent(workspace.ID, actor.UserID, source, "workspace.updated", "workspace", workspace.ID, map[string]string{"from": workspace.Name, "name": name}, now)
-	if err := s.workspaces.UpdateName(workspace.ID, name, now, event); err != nil {
-		return fmt.Errorf("update workspace: %w", err)
+	// The slug, the name in the workspace's links, follows the name like
+	// at create: the short form, else with -2 to -9, else with a random
+	// suffix. The same short form keeps the slug it has. Links count the
+	// ID, so the old ones keep working.
+	base := workspaceSlug(name)
+	for attempt := 1; ; attempt++ {
+		slug := base
+		switch {
+		case base == workspaceSlug(workspace.Name):
+			slug = workspace.Slug
+		case attempt > 12:
+			return fmt.Errorf("update workspace: %w", repository.ErrWorkspaceSlugTaken)
+		case attempt > 9:
+			slug = base + "-" + strings.ReplaceAll(uuid.New().String()[:6], "-", "")
+		case attempt > 1:
+			slug = base + "-" + strconv.Itoa(attempt)
+		}
+		err := s.workspaces.UpdateName(workspace.ID, name, slug, now, event)
+		if errors.Is(err, repository.ErrWorkspaceSlugTaken) && slug != workspace.Slug {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("update workspace: %w", err)
+		}
+		workspace.Name, workspace.Slug = name, slug
+		return nil
 	}
-	return nil
 }
 
 // The changes of the team take source, how the change came in, for the

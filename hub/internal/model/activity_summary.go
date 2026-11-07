@@ -39,6 +39,9 @@ var appSummaries = map[string]summarize{
 	"app.created": func(target string, d map[string]string) string {
 		return "created the app " + target + " on " + d["server"]
 	},
+	"app.renamed": func(target string, d map[string]string) string {
+		return "renamed the app " + d["from"] + " to " + target
+	},
 	"app.deployed": func(target string, d map[string]string) string {
 		return "deployed " + target + version(d) + source(d)
 	},

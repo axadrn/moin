@@ -18,7 +18,7 @@ func TestUploadKeys(t *testing.T) {
 	var keys []string
 	for _, item := range []struct{ workspace, appID string }{{"ws-one", "app-1"}, {"ws-two", "app-2"}, {"ws-one", "app-3"}} {
 		bucket.Workspace = item.workspace
-		keys = append(keys, uploadKey(bucket, &model.App{ID: item.appID, Name: "blog"}, testUpload))
+		keys = append(keys, uploadKey(bucket, &model.App{ID: item.appID, Name: "blog", Folder: "blog"}, testUpload))
 	}
 	if keys[0] != "moin/ws-one/blog/app-1/uploads/"+testUpload+".tar.gz" {
 		t.Fatalf("key = %s", keys[0])
@@ -31,7 +31,7 @@ func TestUploadKeys(t *testing.T) {
 		}
 	}
 	bucket.Path = ""
-	if key := uploadKey(bucket, &model.App{ID: "app-1", Name: "blog"}, testUpload); key != "ws-one/blog/app-1/uploads/"+testUpload+".tar.gz" {
+	if key := uploadKey(bucket, &model.App{ID: "app-1", Name: "blog", Folder: "blog"}, testUpload); key != "ws-one/blog/app-1/uploads/"+testUpload+".tar.gz" {
 		t.Errorf("key without a folder = %s", key)
 	}
 }

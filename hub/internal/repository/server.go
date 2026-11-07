@@ -66,10 +66,11 @@ func (r *Servers) get(query string, args ...any) (*model.Server, error) {
 	return server, nil
 }
 
-// ByIDOrNameForWorkspace finds a server of the user by its ID or its name, so the
-// CLI can say `moin servers rm prod`.
+// ByIDOrNameForWorkspace finds a server of the user by a link to it
+// (<name>-<id>), its ID or its name, so the CLI can say
+// `moin servers rm web-1`.
 func (r *Servers) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.Server, error) {
-	return r.get(`SELECT * FROM servers WHERE workspace_id = $1 AND (id = $2 OR name = $2)`, workspaceID, idOrName)
+	return r.get(`SELECT * FROM servers WHERE workspace_id = $1 AND (id = $2 OR name = $3) ORDER BY id = $2 DESC LIMIT 1`, workspaceID, idOf(idOrName), idOrName)
 }
 
 func (r *Servers) ByInstallTokenHash(hash string) (*model.Server, error) {

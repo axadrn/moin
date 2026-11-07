@@ -151,5 +151,5 @@ func (s *AppService) deploySource(ctx context.Context, actor Actor, action strin
 // backups: <path>/<workspace>/<app>/<app ID>/uploads/<id>.tar.gz. The
 // daemon deletes what it never fetched after a day.
 func uploadKey(bucket protocol.Bucket, app *model.App, id string) string {
-	return strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace, app.Name, app.ID, "uploads", id+".tar.gz"), "/")
+	return strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace, app.Folder, app.ID, "uploads", id+".tar.gz"), "/")
 }

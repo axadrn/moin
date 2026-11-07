@@ -7,6 +7,8 @@ import "testing"
 var summaryCases = []struct{ action, target, metadata, want string }{
 	{"app.created", "blog", `{"server":"web-1"}`,
 		"created the app blog on web-1"},
+	{"app.renamed", "blog", `{"from":"my-app","to":"blog"}`,
+		"renamed the app my-app to blog"},
 	{"app.deployed", "blog", `{"number":"12","ref":"main","commit":"abc1234"}`,
 		"deployed blog v12 from main at abc1234"},
 	{"app.deployed", "blog", `{"number":"12","image":"ghcr.io/axadrn/blog:1"}`,

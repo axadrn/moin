@@ -324,7 +324,7 @@ func (s *AppService) FlushMetrics(final bool) {
 		}
 		ids := make(map[metricsKey]string, len(apps))
 		for _, app := range apps {
-			ids[metricsKey{server: app.ServerID, app: app.Name}] = app.ID
+			ids[metricsKey{server: app.ServerID, app: app.Folder}] = app.ID
 		}
 		var rows []model.MetricsRow
 		for _, item := range batch {
@@ -406,7 +406,7 @@ func (s *AppService) ServerMetrics(workspaceID, idOrName, rangeName string) (*mo
 	}
 	for _, app := range apps {
 		if app.ServerID == server.ID {
-			metrics.Apps = append(metrics.Apps, AppMetricsNow{Name: app.Name, Now: s.metricsNow(metricsKey{server: server.ID, app: app.Name}, now)})
+			metrics.Apps = append(metrics.Apps, AppMetricsNow{Name: app.Name, Now: s.metricsNow(metricsKey{server: server.ID, app: app.Folder}, now)})
 		}
 	}
 	slices.SortStableFunc(metrics.Apps, func(a, b AppMetricsNow) int {
@@ -439,7 +439,7 @@ func (s *AppService) AppMetrics(workspaceID, idOrName, rangeName string) (*model
 		return nil, AppMetrics{}, err
 	}
 	now := s.now()
-	key := metricsKey{server: app.ServerID, app: app.Name}
+	key := metricsKey{server: app.ServerID, app: app.Folder}
 	metrics := AppMetrics{Range: r, Server: app.ServerName, ServerOnline: s.servers.Online(app.ServerID)}
 	metrics.Now = s.metricsNow(key, now)
 	metrics.Points, err = s.metricsPoints(key, app.ID, r, now)

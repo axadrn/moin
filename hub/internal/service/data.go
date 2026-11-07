@@ -69,7 +69,7 @@ func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database
 	ctx, cancel := context.WithTimeout(ctx, dataTimeout)
 	defer cancel()
 	var tables protocol.DBTables
-	err = s.servers.Request(ctx, app.ServerID, protocol.TypeDBTables, protocol.DBRequest{App: app.Name, Database: database}, &tables)
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeDBTables, protocol.DBRequest{App: app.Folder, Database: database}, &tables)
 	return tables, err
 }
 
@@ -126,7 +126,7 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	query := protocol.DBQuery{
-		DBRequest: protocol.DBRequest{App: app.Name, Database: database},
+		DBRequest: protocol.DBRequest{App: app.Folder, Database: database},
 		SQL:       sql,
 		Params:    params,
 		Write:     write,

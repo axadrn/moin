@@ -16,11 +16,11 @@ type MetricsRow struct {
 	Load   int64  `db:"load"`
 }
 
-// MetricsApp names an app the way a daemon does: by its server and name.
+// MetricsApp names an app the way a daemon does: by its server and folder.
 type MetricsApp struct {
 	ID       string `db:"id"`
 	ServerID string `db:"server_id"`
-	Name     string `db:"name"`
+	Folder   string `db:"folder"`
 }
 
 // MetricsDeploy is a deploy that went live, for the marks on the charts.

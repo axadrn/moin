@@ -16,7 +16,13 @@ import (
 // build.
 type DeployStart struct {
 	DeployID string `json:"deploy_id"`
-	App      string `json:"app"`
+	// App names the app on the server in every message: its folder, the
+	// name it was created with, which a rename never changes. Name is its
+	// name now, which its Compose project and containers carry, such as
+	// my-app-web-1; a hub from before renames sends none, and the daemon
+	// takes App.
+	App  string `json:"app"`
+	Name string `json:"name,omitempty"`
 	// AppID is the app's ID in the hub. Its backups live under
 	// it, so an app removed and created again with the same name starts
 	// with an empty backup folder.

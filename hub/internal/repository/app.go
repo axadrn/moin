@@ -7,13 +7,23 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/internal/link"
 	"github.com/jmoiron/sqlx"
 )
 
+// idOf is the ID a link, an ID or a UUID names, or "" for a plain name,
+// which matches no ID.
+func idOf(ref string) string {
+	id, _ := link.Parse(ref)
+	return id
+}
+
 var (
-	ErrAppNotFound      = errors.New("app not found")
-	ErrRestoreNotFound  = errors.New("restore not found")
-	ErrDuplicateApp     = errors.New("app name already exists")
+	ErrAppNotFound     = errors.New("app not found")
+	ErrRestoreNotFound = errors.New("restore not found")
+	ErrDuplicateApp    = errors.New("app name already exists")
+	// ErrFolderTaken means another app of the workspace has the folder.
+	ErrFolderTaken      = errors.New("app folder taken")
 	ErrDeployNotFound   = errors.New("deploy not found")
 	ErrRegistryNotFound = errors.New("registry not found")
 	ErrNoBucket         = errors.New("no backup bucket")
@@ -45,11 +55,17 @@ const appSelect = `
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *Apps) Create(app *model.App) error {
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, created_at)
-		VALUES ($1, $2, $3, $4, $5)`,
-		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.CreatedAt)
+	if app.Folder == "" {
+		app.Folder = app.Name
+	}
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
+	}
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.folder") {
+		return ErrFolderTaken
 	}
 	return err
 }
@@ -66,8 +82,38 @@ func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	return app, nil
 }
 
+// ByIDOrNameForWorkspace finds an app of the workspace by a link to it
+// (<name>-<id>), its ID or its name.
 func (r *Apps) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.App, error) {
-	return r.get(appSelect+` WHERE a.workspace_id = $1 AND (a.id = $2 OR a.name = $2)`, workspaceID, idOrName)
+	return r.get(appSelect+` WHERE a.workspace_id = $1 AND (a.id = $2 OR a.name = $3) ORDER BY a.id = $2 DESC LIMIT 1`, workspaceID, idOf(idOrName), idOrName)
+}
+
+// ByFolderForWorkspace finds an app by the folder its server keeps it
+// under, the name it was created with.
+func (r *Apps) ByFolderForWorkspace(folder, workspaceID string) (*model.App, error) {
+	return r.get(appSelect+` WHERE a.workspace_id = $1 AND a.folder = $2`, workspaceID, folder)
+}
+
+// FolderTaken says whether an app of the workspace has the folder.
+func (r *Apps) FolderTaken(workspaceID, folder string) (bool, error) {
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM apps WHERE workspace_id = $1 AND folder = $2`, workspaceID, folder)
+	return count > 0, err
+}
+
+// Rename gives an app a new name; its folder stays.
+func (r *Apps) Rename(id, workspaceID, name string) error {
+	result, err := r.db.Exec(`UPDATE apps SET name = $1 WHERE id = $2 AND workspace_id = $3`, name, id, workspaceID)
+	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
+		return ErrDuplicateApp
+	}
+	if err != nil {
+		return err
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return ErrAppNotFound
+	}
+	return nil
 }
 
 func (r *Apps) ByID(id string) (*model.App, error) {

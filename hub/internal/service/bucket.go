@@ -64,7 +64,7 @@ type Bucket struct {
 // AppFolder is where an app's uploads and backups go in the bucket:
 // <path>/<workspace ID>/<app>/<app ID>/.
 func (b Bucket) AppFolder(app *model.App) string {
-	return b.Folder + app.Name + "/" + app.ID + "/"
+	return b.Folder + app.Folder + "/" + app.ID + "/"
 }
 
 // BucketInput is a bucket as people enter it. An empty SecretKey keeps the

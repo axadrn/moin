@@ -136,6 +136,22 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 		return nil, err
 	}
 	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, CreatedAt: s.now().UTC()}
+	// The folder is the name, unless an app renamed away from it still
+	// has it: then my-app-2, my-app-3 …
+	for number := 1; ; number++ {
+		app.Folder = name
+		if number > 1 {
+			suffix := "-" + strconv.Itoa(number)
+			app.Folder = strings.TrimRight(name[:min(len(name), 63-len(suffix))], "-") + suffix
+		}
+		taken, err := s.apps.FolderTaken(actor.WorkspaceID, app.Folder)
+		if err != nil {
+			return nil, err
+		}
+		if !taken {
+			break
+		}
+	}
 	err = s.apps.Create(app)
 	if err != nil {
 		return nil, err
@@ -143,6 +159,31 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	s.servers.record(actor, "app.created", "app", name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
 	s.reconfigure(server.ID, actor.WorkspaceID)
+	return s.apps.ByID(app.ID)
+}
+
+// Rename gives an app a new name under the rules of Create. Links to it
+// keep working, since they count its ID. Its server keeps it under its
+// folder, so its data, its backups and its instant address stay; the
+// containers take the new name on the next deploy or restart.
+func (s *AppService) Rename(actor Actor, idOrName, name string) (*model.App, error) {
+	name = strings.TrimSpace(name)
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if app.Name == name {
+		return app, nil
+	}
+	if !appNamePattern.MatchString(name) {
+		return nil, ErrAppName
+	}
+	err = s.apps.Rename(app.ID, actor.WorkspaceID, name)
+	if err != nil {
+		return nil, err
+	}
+	s.servers.record(actor, "app.renamed", "app", name, map[string]string{"from": app.Name, "to": name})
+	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }
 
@@ -175,7 +216,7 @@ func (s *AppService) Delete(ctx context.Context, actor Actor, idOrName, confirm 
 	if server.DaemonTokenHash != nil {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
-		err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppRemove, protocol.AppRemove{App: app.Name}, nil)
+		err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppRemove, protocol.AppRemove{App: app.Folder}, nil)
 		if err != nil {
 			return err
 		}
@@ -434,7 +475,7 @@ func (s *AppService) Stop(ctx context.Context, actor Actor, idOrName string) err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppStop, protocol.AppStop{App: app.Name}, nil)
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeAppStop, protocol.AppStop{App: app.Folder}, nil)
 	if err != nil {
 		return err
 	}
@@ -559,7 +600,7 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 
 // waitingActions are the changes an app takes only on its next restart,
 // start or deploy: saving never restarts it (DESIGN.md, Feedback).
-var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set"}
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set", "app.renamed"}
 
 // ChangesWaiting counts the changes made to an app since its live deploy
 // started, which its next restart applies. A stopped app or one never
@@ -877,7 +918,7 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	if err != nil {
 		return nil, err
 	}
-	start.DeployID, start.App, start.AppID, start.Number = deploy.ID, app.Name, app.ID, deploy.Number
+	start.DeployID, start.App, start.Name, start.AppID, start.Number = deploy.ID, app.Folder, app.Name, app.ID, deploy.Number
 	start.Domains = &protocol.Domains{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect, Services: serviceDomains(app)}
 	err = s.fillInstant(app, start.Domains)
 	if err != nil {
@@ -1141,7 +1182,7 @@ func (s *AppService) Logs(ctx context.Context, workspaceID, idOrName string, tai
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	var result protocol.LogsResult
-	err = s.servers.Request(ctx, app.ServerID, protocol.TypeLogs, protocol.LogsRequest{App: app.Name, Tail: tail}, &result)
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeLogs, protocol.LogsRequest{App: app.Folder, Tail: tail}, &result)
 	return result.Lines, err
 }
 

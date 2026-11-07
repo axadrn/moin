@@ -96,7 +96,7 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second+30*time.Second)
 	defer cancel()
 	result := ExecResult{Service: service, ExitCode: -1}
-	start := protocol.ExecStart{App: app.Name, Service: service, Argv: input.Argv, Timeout: timeout}
+	start := protocol.ExecStart{App: app.Folder, Service: service, Argv: input.Argv, Timeout: timeout}
 	err = s.servers.Stream(ctx, app.ServerID, protocol.TypeExecStart, start, func(message protocol.Message) (bool, error) {
 		switch message.Type {
 		case protocol.TypeExecOutput:

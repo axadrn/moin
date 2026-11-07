@@ -12,6 +12,11 @@ type App struct {
 	WorkspaceID string `db:"workspace_id"`
 	ServerID    string `db:"server_id"`
 	Name        string `db:"name"`
+	// Folder is the name the app was created with and never changes: its
+	// server keeps the app under it (its folder there, its backups' folder
+	// in the bucket, its instant address), so a rename loses nothing.
+	// Every message to the daemon names the app by it.
+	Folder string `db:"folder"`
 	// Pinned keeps the app above the others that run fine.
 	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`

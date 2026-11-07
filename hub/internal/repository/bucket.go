@@ -25,9 +25,11 @@ func (r *Apps) Buckets(workspaceID string) ([]model.Bucket, error) {
 	return buckets, err
 }
 
+// Bucket finds a bucket of the workspace by a link to it (<name>-<id>),
+// its ID or its name.
 func (r *Apps) Bucket(workspaceID, name string) (*model.Bucket, error) {
 	var bucket model.Bucket
-	err := r.db.Get(&bucket, `SELECT * FROM buckets WHERE workspace_id = $1 AND name = $2`, workspaceID, name)
+	err := r.db.Get(&bucket, `SELECT * FROM buckets WHERE workspace_id = $1 AND (id = $2 OR name = $3) ORDER BY id = $2 DESC LIMIT 1`, workspaceID, idOf(name), name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrBucketNotFound
 	}

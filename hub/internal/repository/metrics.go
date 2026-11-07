@@ -78,7 +78,7 @@ func (r *Apps) PruneMetrics(minutesBefore, hoursBefore int64) error {
 // MetricsApps are all apps, to find an app by its server and name.
 func (r *Apps) MetricsApps() ([]model.MetricsApp, error) {
 	apps := []model.MetricsApp{}
-	err := r.db.Select(&apps, `SELECT id, server_id, name FROM apps`)
+	err := r.db.Select(&apps, `SELECT id, server_id, folder FROM apps`)
 	return apps, err
 }
 
