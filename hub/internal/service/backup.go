@@ -406,6 +406,8 @@ func BackupProblem(raw string) string {
 		return "The bucket can't be reached."
 	case strings.Contains(text, "is not running"):
 		return "The database is not running."
+	case strings.Contains(text, "copies are late"):
+		return "The copies are late."
 	case strings.Contains(text, "daily check failed"):
 		return "The daily check could not restore the newest copy."
 	case strings.Contains(text, "every change"):
@@ -447,9 +449,23 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	}
 	databases := make([]DatabaseBackups, 0, len(backups.Databases))
 	for _, backup := range backups.Databases {
-		databases = append(databases, DatabaseBackups{DatabaseBackup: backup, Problem: BackupProblem(backup.Error), Moments: Moments(backup, remembered, now)})
+		problem := BackupProblem(backup.Error)
+		if problem == "" && late(app, backup.CopiedAt, now) {
+			problem = "The copies are late."
+		}
+		databases = append(databases, DatabaseBackups{DatabaseBackup: backup, Problem: problem, Moments: Moments(backup, remembered, now)})
 	}
 	return databases, nil
+}
+
+// late says the newest copy is older than twice how often the app is
+// copied: the copies stopped coming.
+func late(app *model.App, copiedAt *time.Time, now time.Time) bool {
+	every := time.Duration(scheduleOf(app).Every) * time.Minute
+	if every <= 0 {
+		every = time.Duration(protocol.DefaultSchedule.Every) * time.Minute
+	}
+	return copiedAt != nil && now.Sub(*copiedAt) > 2*every
 }
 
 // SetBackupSchedule sets how often the daemon copies an app's databases,

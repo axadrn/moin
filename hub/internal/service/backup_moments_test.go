@@ -480,7 +480,7 @@ func TestDownloads(t *testing.T) {
 	if err != nil || download.Copy != "20261107T140200Z" || download.Size != 42 || download.Database != "/data/app.db" {
 		t.Fatalf("newest: %+v %v", download, err)
 	}
-	key := owner.WorkspaceID + "/shop/" + app.ID + "/data-app.db/copies/20261107T140200Z.db.gz"
+	key := owner.WorkspaceID + "/shop/" + app.ID + "/data~app.db/copies/20261107T140200Z.db.gz"
 	if !strings.HasPrefix(download.Link, "https://s3.example.com/owner/"+key) || !strings.Contains(download.Link, "X-Amz-Expires=900") {
 		t.Fatalf("link %s", download.Link)
 	}
@@ -524,5 +524,30 @@ func TestBackupSchedule(t *testing.T) {
 	config := apps.backupConfig(owner.WorkspaceID, app.ServerID)
 	if got := config.Schedules["shop"]; got != (protocol.Schedule{Every: 15, Keep: 30}) {
 		t.Fatalf("to the daemon: %+v", got)
+	}
+}
+
+// Copies that stopped coming are a problem, also when the daemon says
+// nothing about it; a restore keeps edits out.
+func TestLateCopiesAndEditsDuringARestore(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
+	app, err := apps.Create(owner, "shop", "web-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	copied := time.Now().UTC().Add(-3 * time.Hour)
+	backupDaemon(t, apps, servers, server, daemon, protocol.DatabaseBackup{Database: "/data/app.db", CopiedAt: &copied})
+	_, databases, err := apps.Backups(context.Background(), owner.WorkspaceID, "shop")
+	if err != nil || len(databases) != 1 || databases[0].Problem != "The copies are late." {
+		t.Fatalf("late copies: %+v %v", databases, err)
+	}
+	if BackupProblem("the copies are late: the newest is from Nov 7 10:00 UTC") != "The copies are late." {
+		t.Error("the daemon's late copies")
+	}
+	if err := apps.apps.AddRestore(Restore{ID: "r-late", WorkspaceID: owner.WorkspaceID, AppID: app.ID, App: "shop", State: RestoreRunning, StartedAt: time.Now().UTC()}, time.Now().Add(-keepRestores)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.Query(context.Background(), owner, "shop", "", "DELETE FROM notes", nil, true, 0); !errors.Is(err, ErrRestoreRunning) {
+		t.Fatalf("an edit during a restore: %v", err)
 	}
 }

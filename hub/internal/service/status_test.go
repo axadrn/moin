@@ -107,3 +107,24 @@ func finishDeploy(t *testing.T, apps *AppService, appID string, number int, stat
 		t.Fatal(err)
 	}
 }
+
+// TestStatusLateCopies: copies that stopped coming need you, in one
+// short sentence, also when the daemon said nothing.
+func TestStatusLateCopies(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	status := NewStatusService(apps, servers, nil)
+	status.release = "dev"
+	app, err := apps.Create(owner, "shop", server.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finishDeploy(t, apps, app.ID, 1, model.DeploySucceeded)
+	copied := time.Now().UTC().Add(-5 * time.Hour)
+	if err := apps.apps.SetBackupStatus(model.BackupStatus{AppID: app.ID, Database: "postgres-db", CopiedAt: &copied, UpdatedAt: copied}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := status.Status(owner.WorkspaceID)
+	if err != nil || len(got.Issues) != 1 || got.Issues[0].Detail != "backups of postgres-db stopped: the copies are late" {
+		t.Fatalf("issues = %+v %v", got.Issues, err)
+	}
+}

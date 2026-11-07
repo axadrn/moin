@@ -105,6 +105,16 @@ func (s *AppService) query(ctx context.Context, workspaceID, idOrName, database,
 	if err != nil {
 		return protocol.DBResult{}, err
 	}
+	// A restore works on the data: an edit waits until it is done.
+	if write {
+		restores, err := s.apps.Restores(app.ID)
+		if err != nil {
+			return protocol.DBResult{}, err
+		}
+		if slices.ContainsFunc(restores, func(restore model.BackupRestore) bool { return restore.Active() }) {
+			return protocol.DBResult{}, ErrRestoreRunning
+		}
+	}
 	if len(databases) == 0 {
 		return protocol.DBResult{}, ErrNoDatabase
 	}
