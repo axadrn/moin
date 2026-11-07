@@ -40,9 +40,9 @@ your server       your bucket
 └────────────┘    └─────────┘
 ```
 
-The temp file sits next to the database and goes right after the upload, also when the upload fails. The copy is gzipped (made smaller) on its way.
+The temp file sits next to the database and goes right after the upload, also when the upload fails; if the daemon stops in the middle, it goes at the next start. So the disk next to the database needs room for one more copy of it for a moment: moin looks first and says so when there is not enough. The copy is gzipped (made smaller) on its way. A copy gets an hour; one that takes longer stops, so it never holds up the next.
 
-**Postgres.** `pg_dump` is the same for Postgres: a clean copy while your app keeps running. `pg_dump` writes a stream, like water from a tap. moin points the tap straight at your bucket, so nothing waits on your server's disk. A big database needs no extra room on the server.
+**Postgres.** `pg_dump` is the same for Postgres: a clean copy while your app keeps running. `pg_dump` writes a stream, like water from a tap. moin points the tap straight at your bucket, so nothing waits on your server's disk. A copy needs no extra room on the server.
 
 ```
 Postgres
@@ -72,7 +72,7 @@ The list **Go back to** offers, newest first:
 
 - **1 minute ago**, **15 minutes ago**, **1 hour ago**, **Yesterday this time**: SQLite with Every change only.
 - **At 14:00**: a copy from your schedule.
-- **Before v12**, **Before the update to 3.4.1**, **Before your SQL change**: moin takes one extra copy right before every deploy, every catalog update and every data edit you make in moin (SQL, a cell, a row). So "Before v12" is exactly the data v12 found.
+- **Before v12**, **Before the update to 3.4.1**, **Before your SQL change**: moin takes one extra copy right before every deploy, every catalog update and every data edit you make in moin (SQL, a cell, a row). So "Before v12" is the data just before v12 started. If that one copy fails, the deploy log says so and the deploy goes on; the scheduled copies are still there.
 - **Before the restore at 14:05**: the database as it was before a restore. Going back to it undoes that restore.
 
 A time works too, like 14:01: SQLite with Every change goes to that minute, everything else to the newest copy at or before it.
@@ -84,15 +84,18 @@ A restore never changes your data in place. moin builds the database beside the 
 ```
 1 build beside, the app runs
   app.db           live
-  app.db.restore   built
+  app.db.moin-restore  built
 
 2 stop the app, switch
-  app.db  ─▶ app.db.before-…
-  app.db.restore ─▶ app.db
+  app.db ─▶
+    app.db.moin-before-…
+  app.db.moin-restore ─▶
+    app.db
 
 3 start the app
-  app.db           restored
-  app.db.before-…  the undo
+  app.db  restored
+  app.db.moin-before-…
+          the undo
 ```
 
 The same for Postgres, with databases instead of files:
@@ -100,27 +103,29 @@ The same for Postgres, with databases instead of files:
 ```
 1 build beside, the app runs
   shop             live
-  shop_restore     built
+  moin_restore_…   built
 
 2 stop the app, switch
-  shop  ─▶ shop_before_…
-  shop_restore ─▶ shop
+  shop ─▶ moin_before_…
+  moin_restore_… ─▶ shop
 
 3 start the app
   shop             restored
-  shop_before_…    the undo
+  moin_before_…    the undo
 ```
 
-- **SQLite.** moin unpacks the copy into `app.db.restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, renames it to `app.db.before-<time>` and the restored file to `app.db`, and starts the app. The stop lasts a moment.
-- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `shop_restore` in the same Postgres, while your app keeps running. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `shop_before_<time>` and `shop_restore` to `shop`, and starts them again.
+- **SQLite.** moin unpacks the copy into `app.db.moin-restore` next to the live file (or, for a minute, has Litestream rebuild it there) and checks it. Then it stops the app, folds the live file's log into it, renames it to `app.db.moin-before-<time>` and the restored file to `app.db`, and starts the app. The stop lasts a moment.
+- **Postgres.** The copy flows from your bucket straight into `pg_restore`, into a new database `moin_restore_<hash>` in the same Postgres, while your app keeps running; it gets the owner of the live database. Then moin stops the app's other services (the Postgres keeps running), renames `shop` to `moin_before_<time>_<hash>` and the built one to `shop`, and starts them again. Settings and grants of the database itself (`ALTER DATABASE … SET`, `GRANT … ON DATABASE`) are not in a copy: set them again after a restore. Databases whose name starts with `moin_` are moin's own; name yours otherwise.
+
+Both need room for one more database beside the live one: moin looks first. While a restore runs, edits through moin wait: they would be lost, or lose it.
 
 The undo stays as long as you keep copies, then moin removes it. Undo = the same switch the other way.
 
-**If the server dies in the middle.** Before it stops the app, moin writes a small note: "restoring". When the daemon starts again it reads the note and follows one rule: the live database is missing and the old one is there, so the old one goes back. Then it starts the app and tells you how the restore ended. Your app always runs on a whole database, the one before or the restored one, never half of one.
+**If the server dies in the middle.** moin writes a small note before it changes anything, and writes in it how far it came: "switching", "aside" (the first rename is done), "switched". When the daemon starts again it reads the note and follows one rule: before the switch nothing moved; after it the restore is done; in between, the old database goes back, and anything the app made in its place meanwhile (an empty file on its start) is kept aside as an undo of its own. Then it starts the app and tells you how the restore ended. If the rule cannot act yet (a Postgres that does not answer), the note stays and the next start tries again. Your app always runs on a whole database, the one before or the restored one, never half of one.
 
 ## The daily check
 
-Every day moin takes the newest copy from your bucket and restores it into a throwaway database on your server. SQLite: a temp file and SQLite's own `PRAGMA integrity_check`, which reads every page. Postgres: a throwaway database `shop_check` where moin reads every row of every table, then drops it. The app shows when the check last ran, and an [alert](/docs/guides/alerts) goes out when it fails. "Backed up" means "copied, then restored and read".
+Every day moin takes the newest copy from your bucket and restores it into a throwaway database on your server. SQLite: a temp file and SQLite's own `PRAGMA integrity_check`, which reads every page. Postgres: a throwaway database `moin_check_<hash>` where moin reads every row of every table, then drops it. So the check needs room for one more copy of the database for a while: next to the file for SQLite, in the volume of the Postgres. moin looks first, and the check fails with the numbers when there is not enough. The app shows when the check last ran, and an [alert](/docs/guides/alerts) goes out when it fails. "Backed up" means "copied, then restored and read".
 
 ## A copy for yourself
 
@@ -140,6 +145,7 @@ Everything of one workspace goes into one folder named after the workspace's ID,
             └─ <database>/
                ├─ copies/
                └─ litestream/
+                  └─ <generation>/
 ```
 
 | Folder | What is in it |
@@ -148,16 +154,16 @@ Everything of one workspace goes into one folder named after the workspace's ID,
 | `<workspace>/` | your workspace's ID; it never changes |
 | `<app-id>/` | a new app with the same name gets a new one, so old copies never mix with new |
 | `uploads/` | your code on its way to the server (`moin deploy`) |
-| `<database>/` | one per database: `data-app.db` for `/data/app.db`, `postgres-db` for the service `db` |
+| `<database>/` | one per database, its path with `~` for `/`: `data~app.db` for `/data/app.db`, `postgres-db` for the service `db`, `postgres-db~analytics` for another database in it |
 | `copies/` | the copies, named by their time in UTC: `20261107T140000Z.db.gz` for SQLite, `20261107T140000Z.dump` for Postgres |
-| `litestream/` | SQLite with Every change: every change |
+| `litestream/` | SQLite with Every change: every change, in generations. A restore starts a new one; the one before stays until it is older than you keep copies |
 
 ## How long things stay
 
 The daemon deletes what is too old, once a minute after a copy and once an hour for uploads:
 
 - **Copies** and **Every change**: as long as the app keeps copies (**Keep**). The newest copy always stays, so a database that stopped changing is never left without one.
-- **The undo of a restore** (`app.db.before-…` next to the file, `shop_before_…` in the same Postgres): as long as the app keeps copies.
+- **The undo of a restore** (`app.db.moin-before-…` next to the file, `moin_before_…` in the same Postgres): as long as the app keeps copies.
 - **Uploads**: until the server has them, a day at most.
 
 moin never deletes the rest:
@@ -179,8 +185,8 @@ The daemon does it all, with one small set of verbs and one file per kind of dat
 | Verb | SQLite | Postgres |
 | --- | --- | --- |
 | **Copy** | `VACUUM INTO` a temp file, gzip, upload | `pg_dump -Fc` straight into the upload |
-| **Restore** | build `app.db.restore`, rename twice | `pg_restore` into `shop_restore`, rename twice |
-| **Check** | `PRAGMA integrity_check` | read every table of `shop_check` |
+| **Restore** | build `app.db.moin-restore`, rename twice | `pg_restore` into `moin_restore_…`, rename twice |
+| **Check** | `PRAGMA integrity_check` | read every table of `moin_check_…` |
 | **Record** | Litestream, with Every change | |
 
-Once a minute the daemon looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**.
+Once a minute the daemon looks at each database: when the newest copy is older than **how often**, it takes one and deletes copies and undos older than **how long to keep**. When the newest copy is older than twice **how often**, the copies are late: the app says so and an [alert](/docs/guides/alerts) goes out.
