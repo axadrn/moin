@@ -14,7 +14,8 @@ type Segment struct {
 
 // Segmented is the one control for "one of these": the sections of an
 // app, Fields or Text, a time range. Pills in a pill, the open one lifted.
-// Each choice is a plain link to its page.
+// Each choice is a plain link to its page. A Key opens it from the
+// keyboard; the palette and ? show the keys, the tabs stay quiet.
 templ Segmented(id, label string, segments []Segment) {
 	<nav id={ id } class="flex h-11 w-full max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] sm:w-fit" aria-label={ label }>
 		for _, s := range segments {
@@ -30,9 +31,6 @@ templ Segmented(id, label string, segments []Segment) {
 				}
 			>
 				{ s.Label }
-				if s.Key != "" {
-					<kbd class="hidden font-sans text-xs text-muted-foreground sm:inline">{ s.Key }</kbd>
-				}
 			</a>
 		}
 	</nav>
