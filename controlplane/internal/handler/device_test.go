@@ -27,7 +27,7 @@ type deviceHandlerTest struct {
 func newDeviceHandlerTest(t *testing.T) deviceHandlerTest {
 	t.Helper()
 	database, workspaces, owner, _ := invitationHandlerTestSetup(t)
-	tokens := service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaces)
+	tokens := service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
 	logins := service.NewDeviceLoginService(repository.NewDeviceLogins(database), tokens)
 	return deviceHandlerTest{handler: NewDeviceHandler(logins, workspaces, &config.Config{}), logins: logins, workspaces: workspaces, owner: owner}
 }

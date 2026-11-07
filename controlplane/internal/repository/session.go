@@ -11,28 +11,16 @@ import (
 
 var ErrSessionNotFound = errors.New("session not found")
 
-type SessionRepository interface {
-	Create(session *model.Session) error
-	ReplaceAllForUser(session *model.Session) error
-	ByTokenHash(tokenHash string) (*model.Session, error)
-	ListByUserID(userID string, now time.Time) ([]model.Session, error)
-	UpdateLastSeen(id string, lastSeenAt time.Time) error
-	DeleteByTokenHash(tokenHash string) error
-	DeleteByIDForUser(id, userID string) error
-	DeleteOthersForUser(userID, keepSessionID string) error
-	DeleteAllForUser(userID string) error
-	DeleteExpired(now time.Time) error
-}
-
-type sessionRepository struct {
+// Sessions stores the sign-in sessions of the web and the API.
+type Sessions struct {
 	db *sqlx.DB
 }
 
-func NewSessionRepository(db *sqlx.DB) SessionRepository {
-	return &sessionRepository{db: db}
+func NewSessions(db *sqlx.DB) *Sessions {
+	return &Sessions{db: db}
 }
 
-func (r *sessionRepository) Create(session *model.Session) error {
+func (r *Sessions) Create(session *model.Session) error {
 	_, err := r.db.Exec(
 		insertSessionQuery,
 		session.ID,
@@ -53,7 +41,7 @@ const insertSessionQuery = `
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
-func (r *sessionRepository) ReplaceAllForUser(session *model.Session) error {
+func (r *Sessions) ReplaceAllForUser(session *model.Session) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -81,7 +69,7 @@ func (r *sessionRepository) ReplaceAllForUser(session *model.Session) error {
 	return tx.Commit()
 }
 
-func (r *sessionRepository) ByTokenHash(tokenHash string) (*model.Session, error) {
+func (r *Sessions) ByTokenHash(tokenHash string) (*model.Session, error) {
 	session := &model.Session{}
 	err := r.db.Get(session, `SELECT * FROM sessions WHERE token_hash = $1`, tokenHash)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -90,7 +78,7 @@ func (r *sessionRepository) ByTokenHash(tokenHash string) (*model.Session, error
 	return session, err
 }
 
-func (r *sessionRepository) ListByUserID(userID string, now time.Time) ([]model.Session, error) {
+func (r *Sessions) ListByUserID(userID string, now time.Time) ([]model.Session, error) {
 	if _, err := r.db.Exec(`DELETE FROM sessions WHERE user_id = $1 AND expires_at <= $2`, userID, now); err != nil {
 		return nil, err
 	}
@@ -104,7 +92,7 @@ func (r *sessionRepository) ListByUserID(userID string, now time.Time) ([]model.
 	return sessions, err
 }
 
-func (r *sessionRepository) UpdateLastSeen(id string, lastSeenAt time.Time) error {
+func (r *Sessions) UpdateLastSeen(id string, lastSeenAt time.Time) error {
 	result, err := r.db.Exec(`UPDATE sessions SET last_seen_at = $1 WHERE id = $2`, lastSeenAt, id)
 	if err != nil {
 		return err
@@ -112,12 +100,12 @@ func (r *sessionRepository) UpdateLastSeen(id string, lastSeenAt time.Time) erro
 	return requireSessionRow(result)
 }
 
-func (r *sessionRepository) DeleteByTokenHash(tokenHash string) error {
+func (r *Sessions) DeleteByTokenHash(tokenHash string) error {
 	_, err := r.db.Exec(`DELETE FROM sessions WHERE token_hash = $1`, tokenHash)
 	return err
 }
 
-func (r *sessionRepository) DeleteByIDForUser(id, userID string) error {
+func (r *Sessions) DeleteByIDForUser(id, userID string) error {
 	result, err := r.db.Exec(`DELETE FROM sessions WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return err
@@ -125,17 +113,17 @@ func (r *sessionRepository) DeleteByIDForUser(id, userID string) error {
 	return requireSessionRow(result)
 }
 
-func (r *sessionRepository) DeleteOthersForUser(userID, keepSessionID string) error {
+func (r *Sessions) DeleteOthersForUser(userID, keepSessionID string) error {
 	_, err := r.db.Exec(`DELETE FROM sessions WHERE (user_id = $1 OR impersonator_user_id = $1) AND id <> $2`, userID, keepSessionID)
 	return err
 }
 
-func (r *sessionRepository) DeleteAllForUser(userID string) error {
+func (r *Sessions) DeleteAllForUser(userID string) error {
 	_, err := r.db.Exec(`DELETE FROM sessions WHERE user_id = $1 OR impersonator_user_id = $1`, userID)
 	return err
 }
 
-func (r *sessionRepository) DeleteExpired(now time.Time) error {
+func (r *Sessions) DeleteExpired(now time.Time) error {
 	_, err := r.db.Exec(`DELETE FROM sessions WHERE expires_at <= $1`, now)
 	return err
 }

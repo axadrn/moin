@@ -73,7 +73,7 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 			users := repository.NewUsers(database)
 			email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 			auth := service.NewAuthService(
-				users, repository.NewTokens(database), repository.NewSessionRepository(database), workspaces, email,
+				users, repository.NewTokens(database), repository.NewSessions(database), workspaces, email,
 				false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 			)
 			auth.SetBeta(service.NewBetaService(test.open, []string{"admin@example.com"}, repository.NewWorkspaceInvitations(database), repository.NewSubscriptions(database)))

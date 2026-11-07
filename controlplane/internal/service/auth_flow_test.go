@@ -27,7 +27,7 @@ func newAuthFlowEnvironment(t *testing.T) authFlowEnvironment {
 	database := testutil.NewDatabase(t)
 	userRepository := repository.NewUsers(database)
 	tokenRepository := repository.NewTokens(database)
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	subscriptionRepository := repository.NewSubscriptions(database)
 	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 	emailService := NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")

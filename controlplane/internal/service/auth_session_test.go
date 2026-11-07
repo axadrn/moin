@@ -19,7 +19,7 @@ func TestDatabaseSessionLifecycle(t *testing.T) {
 	userID := "user-1"
 	seedSessionTestUser(t, database, userID)
 
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil,
 		nil,
@@ -84,7 +84,7 @@ func TestStartSessionTruncatesUserAgent(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -103,7 +103,7 @@ func TestStartSessionRotatesExistingBrowserSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -133,7 +133,7 @@ func TestStartSessionRotatesExistingBrowserSession(t *testing.T) {
 func TestStartFreshSessionRevokesEveryExistingSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
@@ -179,7 +179,7 @@ func TestCreateSessionReturnsTokenWithoutCookie(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -216,7 +216,7 @@ func TestCreateSessionReturnsTokenWithoutCookie(t *testing.T) {
 func TestCreateFreshSessionRevokesEveryExistingSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
@@ -256,7 +256,7 @@ func TestRevokeSessionByTokenDeletesOnlyThatSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -292,7 +292,7 @@ func TestRevokeOtherSessionsKeepsCurrentSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -322,7 +322,7 @@ func TestSessionRevocationIsScopedToUser(t *testing.T) {
 	seedSessionTestUser(t, database, "user-1")
 	seedSessionTestUser(t, database, "user-2")
 	authService := NewAuthService(
-		nil, nil, repository.NewSessionRepository(database), nil, nil,
+		nil, nil, repository.NewSessions(database), nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -358,7 +358,7 @@ func TestSessionRevocationIsScopedToUser(t *testing.T) {
 func TestExpiredSessionIsRejectedAndRemoved(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
 		false, -time.Minute, time.Hour, time.Hour, time.Hour, time.Hour,
@@ -383,7 +383,7 @@ func TestAuthenticationCleansExpiredSessionsForDormantUsers(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "dormant-user")
 	seedSessionTestUser(t, database, "active-user")
-	sessionRepository := repository.NewSessionRepository(database)
+	sessionRepository := repository.NewSessions(database)
 	now := time.Now()
 	expired := &model.Session{
 		ID:         "expired-session",
@@ -413,19 +413,29 @@ func TestAuthenticationCleansExpiredSessionsForDormantUsers(t *testing.T) {
 }
 
 func TestActivityUpdateFailureDoesNotInvalidateSession(t *testing.T) {
+	database := sessionTestDatabase(t)
+	seedSessionTestUser(t, database, "user-1")
+	sessionRepository := repository.NewSessions(database)
 	now := time.Now()
-	repositoryWithFailure := &activityFailureSessionRepository{
-		session: &model.Session{
-			ID:         "session-1",
-			UserID:     "user-1",
-			TokenHash:  hashToken("valid-token"),
-			ExpiresAt:  now.Add(time.Hour),
-			LastSeenAt: now.Add(-10 * time.Minute),
-			CreatedAt:  now.Add(-time.Hour),
-		},
+	err := sessionRepository.Create(&model.Session{
+		ID:         "session-1",
+		UserID:     "user-1",
+		TokenHash:  hashToken("valid-token"),
+		ExpiresAt:  now.Add(time.Hour),
+		LastSeenAt: now.Add(-10 * time.Minute),
+		CreatedAt:  now.Add(-time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	// Recording the activity fails; reading the session still works.
+	_, err = database.Exec(`CREATE TRIGGER fail_last_seen BEFORE UPDATE OF last_seen_at ON sessions
+		BEGIN SELECT RAISE(ABORT, 'temporary write failure'); END`)
+	if err != nil {
+		t.Fatalf("create failing trigger: %v", err)
 	}
 	authService := NewAuthService(
-		nil, nil, repositoryWithFailure, nil, nil,
+		nil, nil, sessionRepository, nil, nil,
 		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 
@@ -436,23 +446,10 @@ func TestActivityUpdateFailureDoesNotInvalidateSession(t *testing.T) {
 	if session.ID != "session-1" {
 		t.Fatalf("session ID = %q, want session-1", session.ID)
 	}
-}
-
-type activityFailureSessionRepository struct {
-	repository.SessionRepository
-	session *model.Session
-}
-
-func (r *activityFailureSessionRepository) ByTokenHash(string) (*model.Session, error) {
-	return r.session, nil
-}
-
-func (r *activityFailureSessionRepository) UpdateLastSeen(string, time.Time) error {
-	return errors.New("temporary write failure")
-}
-
-func (r *activityFailureSessionRepository) DeleteExpired(time.Time) error {
-	return nil
+	stored, err := sessionRepository.ByTokenHash(hashToken("valid-token"))
+	if err != nil || !stored.LastSeenAt.Before(now.Add(-time.Minute)) {
+		t.Fatalf("stored session = %+v, %v; want the activity update to have failed", stored, err)
+	}
 }
 
 func sessionTestDatabase(t *testing.T) *sqlx.DB {

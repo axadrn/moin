@@ -57,12 +57,12 @@ type CreateAPITokenInput struct {
 // APITokenService creates, lists, revokes and authenticates personal API
 // tokens. A token acts for its user with the scopes it was given.
 type APITokenService struct {
-	tokens     repository.APITokenRepository
+	tokens     *repository.APITokens
 	workspaces *WorkspaceService
 	now        func() time.Time
 }
 
-func NewAPITokenService(tokens repository.APITokenRepository, workspaces *WorkspaceService) *APITokenService {
+func NewAPITokenService(tokens *repository.APITokens, workspaces *WorkspaceService) *APITokenService {
 	return &APITokenService{tokens: tokens, workspaces: workspaces, now: time.Now}
 }
 

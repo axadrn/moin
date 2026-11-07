@@ -31,7 +31,7 @@ func newDeviceLoginEnvironment(t *testing.T) deviceLoginEnvironment {
 	environment := newAuthFlowEnvironment(t)
 	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
 	clock := &deviceClock{now: time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)}
-	tokens := NewAPITokenService(repository.NewAPITokenRepository(environment.database), environment.workspaceService)
+	tokens := NewAPITokenService(repository.NewAPITokens(environment.database), environment.workspaceService)
 	tokens.now = clock.Now
 	logins := NewDeviceLoginService(repository.NewDeviceLogins(environment.database), tokens)
 	logins.now = clock.Now
