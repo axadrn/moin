@@ -157,16 +157,17 @@ Every answer to a click or a form takes one of these shapes, the same on
 every page. Nothing on the page moves to make room for it. There are no
 toasts.
 
-- **If it worked:** the button that did it says so: "Save" turns into
-  "Saved ✓" for a moment and back, at the same size (`kit.Done`). What
-  changed on the page is the rest of the answer.
+- **If it worked:** the button that did it shows a check for a moment in
+  place of its label, at the same size. No words: what changed on the page
+  is the rest of the answer.
 - **If a field is wrong** (empty, too long, taken, not a domain): the field
   turns red and takes the focus, what was typed stays, and the line under
   it says why in one short sentence (`kit.Field`). A field in one row with
   its button has that line too.
 - **If it failed and no field is to blame** (agent offline, not allowed):
-  a red line under the button that sent it, in place, until the next try.
-  The page stays as it was.
+  a red line in the page under the row, form or head that sent it, until
+  the next try. Never floating over other content. The page stays as it
+  was.
 - **If a control saves itself** (a switch, a cell): its new state is the
   answer. If saving fails, it goes back and says why under it.
 - **If something was copied:** the copy icon turns into a check for a
