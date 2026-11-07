@@ -15,8 +15,8 @@ import (
 func TestCreateFreeSubscriptionPersistsActivePlan(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "free-subscription-user"})
-	subscriptionRepository := repository.NewSubscriptionRepository(database)
-	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))
+	subscriptionRepository := repository.NewSubscriptions(database)
+	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 
 	if _, err := database.Exec(`DELETE FROM subscriptions WHERE id = $1`, fixture.Subscription.ID); err != nil {
 		t.Fatalf("delete fixture subscription: %v", err)
@@ -40,7 +40,7 @@ func TestCreateFreeSubscriptionPersistsActivePlan(t *testing.T) {
 func TestEnsureSubscriptionRestoresOneFreeRowConcurrently(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "ensure-subscription-user"})
-	subscriptionService := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptionService := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	if _, err := database.Exec(`DELETE FROM subscriptions WHERE workspace_id = $1`, fixture.Workspace.ID); err != nil {
 		t.Fatalf("delete fixture subscription: %v", err)
 	}
@@ -81,8 +81,8 @@ func TestEnsureSubscriptionRestoresOneFreeRowConcurrently(t *testing.T) {
 func TestEndPaidAccessClearsProviderSubscriptionState(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "downgrade-user"})
-	subscriptionRepository := repository.NewSubscriptionRepository(database)
-	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))
+	subscriptionRepository := repository.NewSubscriptions(database)
+	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 
 	providerCustomerID := "customer-1"
 	providerSubscriptionID := "subscription-1"
@@ -125,7 +125,7 @@ func TestEndPaidAccessClearsProviderSubscriptionState(t *testing.T) {
 	if err := subscriptionService.UpdateSubscription(subscription); err != nil {
 		t.Fatalf("repeated UpdateSubscription() error = %v", err)
 	}
-	events, err := repository.NewAdminRepository(database).ListAuditEvents(10)
+	events, err := repository.NewAdmin(database).ListAuditEvents(10)
 	if err != nil {
 		t.Fatalf("ListAuditEvents() error = %v", err)
 	}
@@ -139,7 +139,7 @@ func TestProviderEventIDsPreserveRepeatedSubscriptionTransitions(t *testing.T) {
 		t.Run(provider, func(t *testing.T) {
 			database := testutil.NewDatabase(t)
 			fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "audit-transition-" + provider})
-			subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+			subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 			providerSubscriptionID := "subscription-" + provider
 			periodEnd := time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second)
 			fixture.Subscription.Provider = provider
@@ -162,7 +162,7 @@ func TestProviderEventIDsPreserveRepeatedSubscriptionTransitions(t *testing.T) {
 				}
 			}
 
-			events, err := repository.NewAdminRepository(database).ListAuditEvents(10)
+			events, err := repository.NewAdmin(database).ListAuditEvents(10)
 			if err != nil {
 				t.Fatalf("ListAuditEvents() error = %v", err)
 			}
@@ -176,8 +176,8 @@ func TestProviderEventIDsPreserveRepeatedSubscriptionTransitions(t *testing.T) {
 func TestCheckoutStateRejectsConcurrentCreationAndReusesOpenURL(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "checkout-marker-user"})
-	repo := repository.NewSubscriptionRepository(database)
-	subscriptions := NewSubscriptionService(repo, repository.NewAdminRepository(database))
+	repo := repository.NewSubscriptions(database)
+	subscriptions := NewSubscriptionService(repo, repository.NewAdmin(database))
 	expiresAt := time.Now().Add(time.Hour)
 	pendingUntil := expiresAt.Add(checkoutWebhookTestGrace)
 	checkoutURL, attemptID, reused, err := subscriptions.BeginCheckout(fixture.Workspace.ID, model.ProviderPolar, model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly, expiresAt, pendingUntil)
@@ -262,7 +262,7 @@ func TestLocalTrialCanStartProviderCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	expiresAt := time.Now().Add(time.Hour)
 	_, attemptID, reused, err := subscriptions.BeginCheckout(
 		fixture.Workspace.ID,
@@ -282,7 +282,7 @@ const checkoutWebhookTestGrace = 4 * 24 * time.Hour
 func TestConcurrentCheckoutCreationAllowsOneProviderAttempt(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "concurrent-checkout-user"})
-	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	expiresAt := time.Now().Add(time.Hour)
 	pendingUntil := expiresAt.Add(checkoutWebhookTestGrace)
 	start := make(chan struct{})

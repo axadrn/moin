@@ -91,7 +91,7 @@ func TestWorkspaceServiceRoleBoundaries(t *testing.T) {
 	database, workspaces, mailer := workspaceTestService(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "roles-owner", Email: "owner@example.com", Name: "Owner"})
 	owner.Subscription.PlanID = model.SubscriptionPlanPro
-	if err := repository.NewSubscriptionRepository(database).Update(owner.Subscription); err != nil {
+	if err := repository.NewSubscriptions(database).Update(owner.Subscription); err != nil {
 		t.Fatalf("upgrade owner workspace: %v", err)
 	}
 	admin := createWorkspaceTestUser(t, database, "roles-admin", "admin@example.com")
@@ -191,7 +191,7 @@ func TestWorkspaceNameRejectsControlCharacters(t *testing.T) {
 func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "delete-billing-owner", Name: "Owner"})
-	subscriptions := repository.NewSubscriptionRepository(database)
+	subscriptions := repository.NewSubscriptions(database)
 	providerSubscriptionID := "provider-subscription-1"
 	owner.Subscription.PlanID = model.SubscriptionPlanPro
 	owner.Subscription.Provider = model.ProviderStripe
@@ -226,7 +226,7 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 	if _, err := repository.NewWorkspaceRepository(database).ByID(owner.Workspace.ID); !errors.Is(err, repository.ErrWorkspaceNotFound) {
 		t.Fatalf("deleted workspace lookup error = %v, want ErrWorkspaceNotFound", err)
 	}
-	events, err := repository.NewAdminRepository(database).ListAuditEvents(10)
+	events, err := repository.NewAdmin(database).ListAuditEvents(10)
 	if err != nil {
 		t.Fatalf("ListAuditEvents() error = %v", err)
 	}
@@ -238,7 +238,7 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 func TestPendingCheckoutBlocksWorkspaceDeletion(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "pending-checkout-owner", Name: "Owner"})
-	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	pendingUntil := time.Now().Add(time.Hour)
 	if _, _, _, err := subscriptions.BeginCheckout(owner.Workspace.ID, model.ProviderStripe, model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly, pendingUntil.Add(-time.Minute), pendingUntil); err != nil {
 		t.Fatalf("BeginCheckout() error = %v", err)
@@ -257,7 +257,7 @@ func TestPendingCheckoutBlocksWorkspaceDeletion(t *testing.T) {
 func TestConcurrentPaidWebhookAndDeletionKeepWorkspaceRecoverable(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "webhook-delete-owner", Name: "Owner"})
-	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	pendingUntil := time.Now().Add(time.Hour)
 	if _, _, _, err := subscriptions.BeginCheckout(owner.Workspace.ID, model.ProviderStripe, model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly, pendingUntil.Add(-time.Minute), pendingUntil); err != nil {
 		t.Fatalf("BeginCheckout() error = %v", err)
@@ -301,7 +301,7 @@ func TestConcurrentPaidWebhookAndDeletionKeepWorkspaceRecoverable(t *testing.T) 
 	if successes != 1 || billingBlocks != 1 {
 		t.Fatalf("successes = %d, billing blocks = %d", successes, billingBlocks)
 	}
-	stored, err := repository.NewSubscriptionRepository(database).ByWorkspaceID(owner.Workspace.ID)
+	stored, err := repository.NewSubscriptions(database).ByWorkspaceID(owner.Workspace.ID)
 	if err != nil || stored.PlanID != model.SubscriptionPlanPro || valueOrEmpty(stored.ProviderSubscriptionID) != providerSubscriptionID {
 		t.Fatalf("stored subscription = %#v, error = %v", stored, err)
 	}
@@ -311,7 +311,7 @@ func workspaceTestService(t *testing.T) (*sqlx.DB, *WorkspaceService, *testutil.
 	t.Helper()
 	database := testutil.NewDatabase(t)
 	users := repository.NewUsers(database)
-	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	mailer := testutil.NewMemoryMailer()
 	email := NewEmailService(mailer, "https://app.example.com", "Test App")
 	workspaces := NewWorkspaceService(
@@ -415,7 +415,7 @@ func TestWorkspaceSlugsTakeASuffixOnlyWhenTaken(t *testing.T) {
 func TestTheTrialComesOncePerPerson(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	user := createWorkspaceTestUser(t, database, "trial-user", "trial@example.com")
-	subscriptions := repository.NewSubscriptionRepository(database)
+	subscriptions := repository.NewSubscriptions(database)
 
 	first, err := workspaces.CreateDefault(user.ID, "Trial")
 	if err != nil {

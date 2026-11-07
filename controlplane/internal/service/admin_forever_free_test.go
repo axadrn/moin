@@ -17,8 +17,8 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "operator", Email: "operator@example.com", Name: "Operator", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "target", Email: "target@example.com", Name: "Target"})
 	payer := testutil.SeedUser(t, database, testutil.UserOptions{ID: "payer", Email: "payer@example.com", Name: "Payer"})
-	subscriptions := repository.NewSubscriptionRepository(database)
-	adminRepository := repository.NewAdminRepository(database)
+	subscriptions := repository.NewSubscriptions(database)
+	adminRepository := repository.NewAdmin(database)
 
 	trialEnd := time.Now().Add(20 * 24 * time.Hour).UTC().Truncate(time.Second)
 	target.Workspace.CreatedAt = trialEnd.AddDate(0, 0, -30)

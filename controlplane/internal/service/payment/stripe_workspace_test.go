@@ -38,7 +38,7 @@ func TestStripeRejectsInvalidWebhookSignature(t *testing.T) {
 func TestStripeWebhookBindsCustomerToWorkspace(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-workspace"})
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	provider := &StripeProvider{cfg: &config.Config{}, subscriptionService: subscriptions}
 	payload, _ := json.Marshal(map[string]any{
 		"id":       "checkout-1",
@@ -72,7 +72,7 @@ func TestStripePeriodEndComesFromTheItemSinceBasil(t *testing.T) {
 func TestStripeUnknownPriceKeepsThePlan(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-unknown-price"})
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	provider := &StripeProvider{cfg: &config.Config{StripePriceIDProMonthly: "price_pro"}, subscriptionService: subscriptions}
 	before, err := subscriptions.Subscription(fixture.Workspace.ID)
 	if err != nil {

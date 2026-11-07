@@ -44,7 +44,7 @@ func newEnvironment(t *testing.T) *environment {
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	env := &environment{database: database, mailer: mailer}
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),
@@ -54,7 +54,7 @@ func newEnvironment(t *testing.T) *environment {
 		subscriptions,
 		email,
 	)
-	files := service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
+	files := service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
 	env.services.Users = service.NewUserService(users, files, email, workspaces)
 	env.services.Workspaces = workspaces
 	env.services.Subscriptions = subscriptions

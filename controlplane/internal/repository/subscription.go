@@ -17,38 +17,24 @@ var (
 	ErrSubscriptionAlreadyPaid = errors.New("subscription is already paid")
 )
 
-type SubscriptionRepository interface {
-	Create(sub *model.Subscription) error
-	CreateIfMissing(sub *model.Subscription) error
-	ByWorkspaceID(workspaceID string) (*model.Subscription, error)
-	ByProviderSubscriptionID(providerSubID string) (*model.Subscription, error)
-	ByProviderCustomerID(providerCustomerID string) (*model.Subscription, error)
-	Update(sub *model.Subscription) error
-	UpdateIfProviderStateNewer(sub *model.Subscription, providerSubID string, stateUpdatedAt time.Time, subscriptionCreatedAt *time.Time) (bool, error)
-	UpdateIfProviderPaymentNewer(sub *model.Subscription, providerSubID string, paymentUpdatedAt time.Time) (bool, error)
-	UpdateIfProviderOrderNewer(sub *model.Subscription, orderUpdatedAt time.Time) (bool, error)
-	BeginCheckout(workspaceID, attemptID, provider, planID, interval string, expiresAt, pendingUntil, now time.Time) (string, bool, error)
-	FinishCheckout(workspaceID, attemptID, checkoutURL string, expiresAt, pendingUntil, now time.Time) error
-	RejectCheckout(workspaceID, attemptID string, now time.Time) error
-}
-
-type subscriptionRepository struct {
+// Subscriptions stores the subscription of each workspace.
+type Subscriptions struct {
 	db *sqlx.DB
 }
 
-func NewSubscriptionRepository(db *sqlx.DB) SubscriptionRepository {
-	return &subscriptionRepository{db: db}
+func NewSubscriptions(db *sqlx.DB) *Subscriptions {
+	return &Subscriptions{db: db}
 }
 
-func (r *subscriptionRepository) Create(sub *model.Subscription) error {
+func (r *Subscriptions) Create(sub *model.Subscription) error {
 	return r.create(sub, "")
 }
 
-func (r *subscriptionRepository) CreateIfMissing(sub *model.Subscription) error {
+func (r *Subscriptions) CreateIfMissing(sub *model.Subscription) error {
 	return r.create(sub, " ON CONFLICT (workspace_id) DO NOTHING")
 }
 
-func (r *subscriptionRepository) create(sub *model.Subscription, conflictClause string) error {
+func (r *Subscriptions) create(sub *model.Subscription, conflictClause string) error {
 	query := `
 		INSERT INTO subscriptions (
 			id, workspace_id, plan_id, status, provider,
@@ -91,7 +77,7 @@ func (r *subscriptionRepository) create(sub *model.Subscription, conflictClause 
 	return err
 }
 
-func (r *subscriptionRepository) ByWorkspaceID(workspaceID string) (*model.Subscription, error) {
+func (r *Subscriptions) ByWorkspaceID(workspaceID string) (*model.Subscription, error) {
 	sub := &model.Subscription{}
 	query := `SELECT * FROM subscriptions WHERE workspace_id = $1`
 
@@ -106,7 +92,7 @@ func (r *subscriptionRepository) ByWorkspaceID(workspaceID string) (*model.Subsc
 	return sub, nil
 }
 
-func (r *subscriptionRepository) ByProviderSubscriptionID(providerSubID string) (*model.Subscription, error) {
+func (r *Subscriptions) ByProviderSubscriptionID(providerSubID string) (*model.Subscription, error) {
 	sub := &model.Subscription{}
 	query := `SELECT * FROM subscriptions WHERE provider_subscription_id = $1`
 
@@ -121,7 +107,7 @@ func (r *subscriptionRepository) ByProviderSubscriptionID(providerSubID string) 
 	return sub, nil
 }
 
-func (r *subscriptionRepository) ByProviderCustomerID(providerCustomerID string) (*model.Subscription, error) {
+func (r *Subscriptions) ByProviderCustomerID(providerCustomerID string) (*model.Subscription, error) {
 	sub := &model.Subscription{}
 	query := `SELECT * FROM subscriptions WHERE provider_customer_id = $1`
 
@@ -136,7 +122,7 @@ func (r *subscriptionRepository) ByProviderCustomerID(providerCustomerID string)
 	return sub, nil
 }
 
-func (r *subscriptionRepository) Update(sub *model.Subscription) error {
+func (r *Subscriptions) Update(sub *model.Subscription) error {
 	updated, err := r.updateWhere(sub, "TRUE")
 	if err != nil {
 		return err
@@ -147,7 +133,7 @@ func (r *subscriptionRepository) Update(sub *model.Subscription) error {
 	return nil
 }
 
-func (r *subscriptionRepository) UpdateIfProviderStateNewer(
+func (r *Subscriptions) UpdateIfProviderStateNewer(
 	sub *model.Subscription,
 	providerSubID string,
 	stateUpdatedAt time.Time,
@@ -207,7 +193,7 @@ func (r *subscriptionRepository) UpdateIfProviderStateNewer(
 	return r.execConditionalUpdate(sub.WorkspaceID, query, args...)
 }
 
-func (r *subscriptionRepository) UpdateIfProviderPaymentNewer(
+func (r *Subscriptions) UpdateIfProviderPaymentNewer(
 	sub *model.Subscription,
 	providerSubID string,
 	paymentUpdatedAt time.Time,
@@ -235,7 +221,7 @@ func (r *subscriptionRepository) UpdateIfProviderPaymentNewer(
 	)
 }
 
-func (r *subscriptionRepository) UpdateIfProviderOrderNewer(sub *model.Subscription, orderUpdatedAt time.Time) (bool, error) {
+func (r *Subscriptions) UpdateIfProviderOrderNewer(sub *model.Subscription, orderUpdatedAt time.Time) (bool, error) {
 	query := `
 		UPDATE subscriptions
 		SET provider = $1,
@@ -262,7 +248,7 @@ func (r *subscriptionRepository) UpdateIfProviderOrderNewer(sub *model.Subscript
 	)
 }
 
-func (r *subscriptionRepository) updateWhere(sub *model.Subscription, condition string, conditionArgs ...any) (bool, error) {
+func (r *Subscriptions) updateWhere(sub *model.Subscription, condition string, conditionArgs ...any) (bool, error) {
 	query := `
 		UPDATE subscriptions
 		SET plan_id = $1,
@@ -315,7 +301,7 @@ func (r *subscriptionRepository) updateWhere(sub *model.Subscription, condition 
 	return r.execConditionalUpdate(sub.WorkspaceID, query, args...)
 }
 
-func (r *subscriptionRepository) BeginCheckout(workspaceID, attemptID, provider, planID, interval string, expiresAt, pendingUntil, now time.Time) (string, bool, error) {
+func (r *Subscriptions) BeginCheckout(workspaceID, attemptID, provider, planID, interval string, expiresAt, pendingUntil, now time.Time) (string, bool, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return "", false, err
@@ -355,7 +341,7 @@ func (r *subscriptionRepository) BeginCheckout(workspaceID, attemptID, provider,
 	return "", false, tx.Commit()
 }
 
-func (r *subscriptionRepository) FinishCheckout(workspaceID, attemptID, checkoutURL string, expiresAt, pendingUntil, now time.Time) error {
+func (r *Subscriptions) FinishCheckout(workspaceID, attemptID, checkoutURL string, expiresAt, pendingUntil, now time.Time) error {
 	if checkoutURL == "" {
 		return ErrCheckoutURLMissing
 	}
@@ -373,7 +359,7 @@ func (r *subscriptionRepository) FinishCheckout(workspaceID, attemptID, checkout
 	return nil
 }
 
-func (r *subscriptionRepository) RejectCheckout(workspaceID, attemptID string, now time.Time) error {
+func (r *Subscriptions) RejectCheckout(workspaceID, attemptID string, now time.Time) error {
 	_, err := r.execConditionalUpdate(workspaceID, `
 		UPDATE subscriptions
 		SET checkout_attempt_id = NULL, checkout_provider = '', checkout_plan_id = '',
@@ -384,7 +370,7 @@ func (r *subscriptionRepository) RejectCheckout(workspaceID, attemptID string, n
 	return err
 }
 
-func (r *subscriptionRepository) execConditionalUpdate(workspaceID, query string, args ...any) (bool, error) {
+func (r *Subscriptions) execConditionalUpdate(workspaceID, query string, args ...any) (bool, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return false, err

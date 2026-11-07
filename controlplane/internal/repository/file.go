@@ -12,24 +12,16 @@ var (
 	ErrFileNotFound = errors.New("file not found")
 )
 
-type FileRepository interface {
-	Create(file *model.File) error
-	ByID(id string) (*model.File, error)
-	FileByType(ownerType, ownerID, fileType string) (*model.File, error)
-	Files(ownerType, ownerID string) ([]*model.File, error)
-	AllUserFiles(userID string) ([]*model.File, error)
-	Delete(id string) error
-}
-
-type fileRepository struct {
+// Files stores the metadata of uploaded files.
+type Files struct {
 	db *sqlx.DB
 }
 
-func NewFileRepository(db *sqlx.DB) *fileRepository {
-	return &fileRepository{db: db}
+func NewFiles(db *sqlx.DB) *Files {
+	return &Files{db: db}
 }
 
-func (r *fileRepository) Create(file *model.File) error {
+func (r *Files) Create(file *model.File) error {
 	query := `INSERT INTO files (id, user_id, owner_type, owner_id, type, filename, original_name, mime_type, size, storage_path, public, created_at)
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
@@ -51,7 +43,7 @@ func (r *fileRepository) Create(file *model.File) error {
 	return err
 }
 
-func (r *fileRepository) ByID(id string) (*model.File, error) {
+func (r *Files) ByID(id string) (*model.File, error) {
 	file := &model.File{}
 	query := `SELECT * FROM files WHERE id = $1`
 
@@ -63,7 +55,7 @@ func (r *fileRepository) ByID(id string) (*model.File, error) {
 	return file, err
 }
 
-func (r *fileRepository) FileByType(ownerType, ownerID, fileType string) (*model.File, error) {
+func (r *Files) FileByType(ownerType, ownerID, fileType string) (*model.File, error) {
 	file := &model.File{}
 	query := `SELECT * FROM files WHERE owner_type = $1 AND owner_id = $2 AND type = $3 ORDER BY created_at DESC LIMIT 1`
 
@@ -75,7 +67,7 @@ func (r *fileRepository) FileByType(ownerType, ownerID, fileType string) (*model
 	return file, err
 }
 
-func (r *fileRepository) Files(ownerType, ownerID string) ([]*model.File, error) {
+func (r *Files) Files(ownerType, ownerID string) ([]*model.File, error) {
 	var files []*model.File
 	query := `SELECT * FROM files WHERE owner_type = $1 AND owner_id = $2`
 
@@ -87,7 +79,7 @@ func (r *fileRepository) Files(ownerType, ownerID string) ([]*model.File, error)
 	return files, nil
 }
 
-func (r *fileRepository) AllUserFiles(userID string) ([]*model.File, error) {
+func (r *Files) AllUserFiles(userID string) ([]*model.File, error) {
 	var files []*model.File
 	query := `SELECT * FROM files WHERE user_id = $1 ORDER BY created_at DESC`
 
@@ -99,7 +91,7 @@ func (r *fileRepository) AllUserFiles(userID string) ([]*model.File, error) {
 	return files, nil
 }
 
-func (r *fileRepository) Delete(id string) error {
+func (r *Files) Delete(id string) error {
 	query := `DELETE FROM files WHERE id = $1`
 	_, err := r.db.Exec(query, id)
 	return err

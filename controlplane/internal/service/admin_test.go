@@ -17,7 +17,7 @@ func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "operator", Email: "operator@example.com", Name: "Operator", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "target", Email: "target@example.com", Name: "Target"})
 	target.Subscription.PlanID = model.SubscriptionPlanPro
-	if err := repository.NewSubscriptionRepository(database).Update(target.Subscription); err != nil {
+	if err := repository.NewSubscriptions(database).Update(target.Subscription); err != nil {
 		t.Fatalf("upgrade target subscription: %v", err)
 	}
 	sessions := repository.NewSessionRepository(database)
@@ -26,7 +26,7 @@ func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
 		false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
 	)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
-	adminRepository := repository.NewAdminRepository(database)
+	adminRepository := repository.NewAdmin(database)
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 
 	operatorRecorder := httptest.NewRecorder()
@@ -139,7 +139,7 @@ func TestAdminSessionRevocationIncludesIssuedImpersonationSessions(t *testing.T)
 	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
 	admin := NewAdminService(
-		repository.NewAdminRepository(database),
+		repository.NewAdmin(database),
 		repository.NewUsers(database),
 		auth,
 		[]string{operator.User.Email, securityOperator.User.Email},
@@ -180,7 +180,7 @@ func TestStopImpersonationSessionRollsBackWhenAuditCannotCommit(t *testing.T) {
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-operator", Email: "atomic@example.com", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-target"})
 	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	adminRepository := repository.NewAdminRepository(database)
+	adminRepository := repository.NewAdmin(database)
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{operator.User.Email})
 
 	operatorRecorder := httptest.NewRecorder()
@@ -233,7 +233,7 @@ func TestStopImpersonationSessionRollsBackWhenAuditCannotCommit(t *testing.T) {
 
 func TestAdminAuditRetention(t *testing.T) {
 	database := testutil.NewDatabase(t)
-	repo := repository.NewAdminRepository(database)
+	repo := repository.NewAdmin(database)
 	old := time.Now().Add(-181 * 24 * time.Hour)
 	if err := repo.CreateAuditEvent(&model.AdminAuditEvent{ID: "old", Action: "old", TargetType: "user", TargetID: "1", Metadata: "{}", CreatedAt: old}); err != nil {
 		t.Fatalf("CreateAuditEvent() error = %v", err)
@@ -263,7 +263,7 @@ func TestDashboardShowsTheNetworkOnlyWhereItIsSet(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "network-operator", Email: "network@example.com", Verified: true})
 	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	admin := NewAdminService(repository.NewAdminRepository(database), repository.NewUsers(database), auth, []string{operator.User.Email})
+	admin := NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), auth, []string{operator.User.Email})
 	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
 	if err != nil {
 		t.Fatalf("StartSession() error = %v", err)

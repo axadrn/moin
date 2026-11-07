@@ -18,7 +18,7 @@ type authFlowEnvironment struct {
 	database               *sqlx.DB
 	auth                   *AuthService
 	userRepository         *repository.Users
-	subscriptionRepository repository.SubscriptionRepository
+	subscriptionRepository *repository.Subscriptions
 	workspaceService       *WorkspaceService
 }
 
@@ -26,10 +26,10 @@ func newAuthFlowEnvironment(t *testing.T) authFlowEnvironment {
 	t.Helper()
 	database := testutil.NewDatabase(t)
 	userRepository := repository.NewUsers(database)
-	tokenRepository := repository.NewTokenRepository(database)
+	tokenRepository := repository.NewTokens(database)
 	sessionRepository := repository.NewSessionRepository(database)
-	subscriptionRepository := repository.NewSubscriptionRepository(database)
-	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))
+	subscriptionRepository := repository.NewSubscriptions(database)
+	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 	emailService := NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	workspaceService := NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),

@@ -58,7 +58,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	environment := &apiEnvironment{database: database, mailer: mailer}
-	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	environment.workspaces = service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
 		repository.NewWorkspaceMemberRepository(database),
@@ -70,7 +70,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	)
 	environment.auth = service.NewAuthService(
 		userRepository,
-		repository.NewTokenRepository(database),
+		repository.NewTokens(database),
 		repository.NewSessionRepository(database),
 		environment.workspaces,
 		email,
@@ -82,7 +82,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		10*time.Minute,
 	)
 	environment.storage = testutil.NewMemoryStorage()
-	files := service.NewFileService(repository.NewFileRepository(database), environment.storage)
+	files := service.NewFileService(repository.NewFiles(database), environment.storage)
 	environment.files = files
 	environment.users = service.NewUserService(userRepository, files, email, environment.workspaces)
 	authenticate := middleware.AuthMiddleware(environment.auth, environment.users)
@@ -95,7 +95,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
 	environment.auth.UseAPITokens(environment.tokens)
 	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.tokens)
-	environment.admin = service.NewAdminService(repository.NewAdminRepository(database), userRepository, environment.auth, []string{testAdminEmail})
+	environment.admin = service.NewAdminService(repository.NewAdmin(database), userRepository, environment.auth, []string{testAdminEmail})
 	adminHandler := api.NewAdminHandler(environment.admin)
 
 	clientIPs := middleware.NewClientIPResolver(nil)

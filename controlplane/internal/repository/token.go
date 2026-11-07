@@ -16,22 +16,17 @@ var (
 	ErrTokenUsed     = errors.New("token has already been used")
 )
 
-type TokenRepository interface {
-	Create(token *model.Token) error
-	ConsumeToken(tokenHash string) (*model.Token, error)
-	DeleteByUserAndType(userID, tokenType string) error
-	DeleteExpired(now time.Time) error
-}
-
-type tokenRepository struct {
+// Tokens stores the one-time tokens that email links carry: magic links,
+// email verification, password resets and email changes.
+type Tokens struct {
 	db *sqlx.DB
 }
 
-func NewTokenRepository(db *sqlx.DB) TokenRepository {
-	return &tokenRepository{db: db}
+func NewTokens(db *sqlx.DB) *Tokens {
+	return &Tokens{db: db}
 }
 
-func (r *tokenRepository) Create(token *model.Token) error {
+func (r *Tokens) Create(token *model.Token) error {
 	if token.ID == "" {
 		token.ID = uuid.New().String()
 	}
@@ -55,7 +50,7 @@ func (r *tokenRepository) Create(token *model.Token) error {
 }
 
 // ConsumeToken atomically deletes and returns a valid single-use token.
-func (r *tokenRepository) ConsumeToken(tokenHash string) (*model.Token, error) {
+func (r *Tokens) ConsumeToken(tokenHash string) (*model.Token, error) {
 	var t model.Token
 	now := time.Now()
 
@@ -77,13 +72,13 @@ func (r *tokenRepository) ConsumeToken(tokenHash string) (*model.Token, error) {
 	return &t, nil
 }
 
-func (r *tokenRepository) DeleteByUserAndType(userID, tokenType string) error {
+func (r *Tokens) DeleteByUserAndType(userID, tokenType string) error {
 	query := `DELETE FROM tokens WHERE user_id = $1 AND type = $2`
 	_, err := r.db.Exec(query, userID, tokenType)
 	return err
 }
 
-func (r *tokenRepository) DeleteExpired(now time.Time) error {
+func (r *Tokens) DeleteExpired(now time.Time) error {
 	_, err := r.db.Exec(`DELETE FROM tokens WHERE expires_at <= $1`, now)
 	return err
 }

@@ -63,7 +63,7 @@ func TestDeleteAccountRequiresAnotherWorkspaceOwner(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "delete-owner", Email: "delete@example.com", Name: "Delete Owner"})
 	users := repository.NewUsers(database)
-	files := NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
+	files := NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
 	email := NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 	userService := NewUserService(users, files, email, workspaces)
 
@@ -108,7 +108,7 @@ func TestConcurrentAccountDeletionKeepsAnWorkspaceOwner(t *testing.T) {
 	users := repository.NewUsers(database)
 	userService := NewUserService(
 		users,
-		NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage()),
+		NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage()),
 		NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App"),
 		workspaces,
 	)
@@ -159,7 +159,7 @@ func TestRefusedAccountDeletionKeepsFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("save avatar: %v", err)
 	}
-	err = repository.NewFileRepository(database).Create(&model.File{
+	err = repository.NewFiles(database).Create(&model.File{
 		ID:          "file-delete-files-owner",
 		UserID:      fixture.User.ID,
 		OwnerType:   "user",
@@ -175,7 +175,7 @@ func TestRefusedAccountDeletionKeepsFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create file row: %v", err)
 	}
-	files := NewFileService(repository.NewFileRepository(database), storage)
+	files := NewFileService(repository.NewFiles(database), storage)
 	email := NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 	userService := NewUserService(repository.NewUsers(database), files, email, workspaces)
 
