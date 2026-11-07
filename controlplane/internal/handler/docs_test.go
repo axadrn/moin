@@ -78,17 +78,18 @@ func TestDocsPageEndsWithTheNextPage(t *testing.T) {
 func TestDocsRedirectsWhatIsNoPage(t *testing.T) {
 	handler := newDocsTestHandler(t)
 	for path, target := range map[string]string{
-		"/docs/introduction":    "/docs/getting-started",
-		"/docs/introduction.md": "/docs/getting-started.md",
-		"/docs/guides":          "/docs",
+		"/docs/guides": "/docs",
 	} {
 		response := serveDocs(t, handler, path)
 		if location := response.Header().Get("Location"); location != target {
 			t.Errorf("%s goes to %q, want %q", path, location, target)
 		}
 	}
-	if code := serveDocs(t, handler, "/docs/missing").Code; code != http.StatusNotFound {
-		t.Errorf("missing page answers %d", code)
+	// A page that was renamed is gone: no old address leads to the new one.
+	for _, path := range []string{"/docs/missing", "/docs/introduction"} {
+		if code := serveDocs(t, handler, path).Code; code != http.StatusNotFound {
+			t.Errorf("%s answers %d", path, code)
+		}
 	}
 }
 

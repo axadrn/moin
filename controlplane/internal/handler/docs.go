@@ -45,15 +45,6 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.DocsHome(groups))
 		return
 	}
-	// The introduction became Get started.
-	if slug == "introduction" {
-		target := "/docs/getting-started"
-		if markdown {
-			target += ".md"
-		}
-		http.Redirect(w, r, target, http.StatusPermanentRedirect)
-		return
-	}
 	page, err := h.docsService.DocPage(slug)
 	if err != nil {
 		if markdown {
