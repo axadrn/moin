@@ -30,7 +30,6 @@ templ ServerSecurity(view SecurityView) {
 	@layouts.App(server.Name + " security") {
 		@panelPage(templ.Attributes{"data-server-security": server.Name}) {
 			@serverHead(server, "security")
-			<div id="server-added" class="empty:hidden"></div>
 			<div id="server-security" class="flex flex-col gap-6">
 				@securityState(view, securityPath)
 				@securityKeys(view)
@@ -64,6 +63,9 @@ templ ServerSecurity(view SecurityView) {
 						@kit.RowText("New install command", "The old one stops working")
 					}
 				}
+				// The new command shows here, out of band, until its agent
+				// used it.
+				<div id="server-added" class="empty:hidden"></div>
 				@kit.List() {
 					if view.Integrations.Cloudflare {
 						@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")

@@ -464,8 +464,8 @@
 }
 
 /* Feedback (DESIGN.md): a button that did its job shows a check in place of
-   its label for a moment, at the same size; a line under a form says what
-   failed or what follows. moin.js sets both. */
+   its label for a moment, at the same size; a line in the page under its
+   row or form says what failed. moin.js sets both. */
 @layer components {
   [data-done] {
     position: relative;
@@ -488,15 +488,12 @@
     background: var(--primary-foreground);
   }
   [data-said] {
-    position: absolute;
-    z-index: 30;
-    max-width: min(24rem, calc(100vw - 2rem));
-    border-radius: 1rem;
-    background: var(--card);
-    padding: 0.5rem 0.875rem;
+    padding: 0.5rem 1.25rem;
     font-size: 0.875rem;
     color: var(--muted-foreground);
-    box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+  }
+  header + [data-said] {
+    padding-inline: 0;
   }
   [data-said="failed"] {
     color: var(--failed);
