@@ -67,7 +67,7 @@ type RenameServerInput struct {
 
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
-	Server string `json:"server,omitempty" jsonschema:"the server name: lowercase letters, digits and dashes; empty gets one like brave-otter"`
+	Server string `json:"server,omitempty" jsonschema:"the server name: lowercase letters, digits and dashes; empty gets the next free web-1, web-2 …"`
 	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 

@@ -104,7 +104,7 @@ func NewServerService(servers *repository.Servers, activity *repository.Activity
 func (s *ServerService) Create(actor Actor, name string) (*model.Server, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		name = s.freeName(actor.WorkspaceID)
+		name = s.SuggestName(actor.WorkspaceID)
 	}
 	if !validServerName(name) {
 		return nil, "", ErrServerName

@@ -86,7 +86,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | --- | --- | --- |
 | `GET /api/v1/servers` | read | servers, with their `security` (what the daemon set up) and `rules` from `/etc/moin/rules` |
 | `GET /api/v1/servers/events` | read | the server list as server-sent events |
-| `POST /api/v1/servers` | write | adds a server and answers its install command once; its token connects one daemon within an hour. An empty name gets a generated one |
+| `POST /api/v1/servers` | write | adds a server and answers its install command once; its token connects one daemon within an hour. An empty name gets the next free `web-1`, `web-2` … |
 | `POST /api/v1/servers/{id}/install` | write | a new one-time install command; the old one stops working |
 | `PATCH /api/v1/servers/{id}` | write | renames a server: `{"name": "…"}` |
 | `DELETE /api/v1/servers/{id}?confirm=<name>` | write | removes a server; answers the `uninstall_command` that removes its daemon (empty when no daemon ever connected) and the `apps` that went with an offline server |

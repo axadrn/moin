@@ -47,7 +47,7 @@ Account
 
 Servers
   servers            List servers
-  servers add        Add a server and print its install command: servers add [web-1], no name gets one like brave-otter
+  servers add        Add a server and print its install command: servers add [web-1], no name gets the next free web-N
   servers rm         Remove a server: servers rm web-1 [--confirm web-1]
   servers rename     Rename a server: servers rename web-1 shop-1
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
@@ -525,7 +525,7 @@ func addServer(ctx context.Context, config client.Config, args []string, stdout 
 	if err != nil {
 		return err
 	}
-	// Without a name the hub picks one like brave-otter.
+	// Without a name the hub picks the next free web-1, web-2 …
 	created, err := api.AddServer(ctx, strings.Join(flags.Args(), " "))
 	var apiErr *client.Error
 	if errors.As(err, &apiErr) && apiErr.Code == "subscription_required" {

@@ -51,7 +51,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin servers` | lists servers: status, daemon version, access, rules |
-| `moin servers add [name]` | adds a server and prints its install command; without a name it gets one like `brave-otter` |
+| `moin servers add [name]` | adds a server and prints its install command; without a name it gets the next free `web-1`, `web-2` … |
 | `moin servers install-command <name>` | a new one-time install command, to install or move the daemon; the old one stops working |
 | `moin servers rename <name> <new name>` | renames a server; its apps stay on it |
 | `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its daemon there |

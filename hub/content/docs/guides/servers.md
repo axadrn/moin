@@ -38,7 +38,7 @@ curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 
 It installs Docker if it is missing, installs the daemon as the `moin-daemon` service and connects it.
 
-- The name: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace. Leave it empty and moin picks one like `brave-otter`.
+- The name: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …, the next free number; the web fills that in.
 - Not root? Put `sudo` before `sh`. The command works once; if the install stops halfway, get [a new install command](#a-new-install-command).
 - `MOIN_URL=http://127.0.0.1:8090` before `sh` makes the daemon dial that address instead of the hub's `APP_URL`, as on a server that runs the hub too ([one server](/docs/self-hosting#one-server)).
 

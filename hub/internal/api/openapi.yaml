@@ -969,7 +969,7 @@ paths:
       tags: [Servers]
       operationId: createServer
       summary: Add a server
-      description: Answers the install command once. Its install token connects one daemon within an hour. An empty name gets a generated one.
+      description: Answers the install command once. Its install token connects one daemon within an hour. An empty name gets the next free web-1, web-2 …
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -5178,7 +5178,7 @@ components:
         name:
           type: string
           maxLength: 64
-          description: Empty or left out gets a name like `brave-otter`.
+          description: Empty or left out gets the next free `web-1`, `web-2` …
     RenameServerRequest:
       type: object
       required: [name]

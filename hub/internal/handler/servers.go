@@ -37,7 +37,7 @@ func (h *ServersHandler) ServersPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "read daemon updates failed", err)
 		return
 	}
-	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers), autoUpdate))
+	render(w, r, pages.Servers(servers, h.servers.CanAdd(workspace.ID), h.removed(r, servers), autoUpdate, service.NextServerName(servers)))
 }
 
 // removed is the server Delete just removed, named in ?removed=, so the
@@ -73,7 +73,7 @@ func (h *ServersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Server not added", err, map[string]string{"name": "server-name"})
 		return
 	}
-	render(w, r, pages.ServerAddForm())
+	render(w, r, pages.ServerAddForm(h.servers.SuggestName(actor(r).WorkspaceID)))
 	render(w, r, pages.ServerAdded(pages.AddedServer{ID: server.ID, Name: server.Name, Command: h.servers.InstallCommand(installToken)}))
 	answerDone(w, r, server.Name+" added", "")
 }

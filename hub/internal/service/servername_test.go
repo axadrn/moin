@@ -1,22 +1,27 @@
 package service
 
 import (
-	"regexp"
 	"testing"
+
+	"github.com/axadrn/moin/hub/internal/model"
 )
 
-func TestNameWordsAreShortLowercaseAndUnique(t *testing.T) {
-	word := regexp.MustCompile(`^[a-z]{2,9}$`)
-	for _, list := range [][]string{nameAdjectives, nameNouns} {
-		seen := map[string]bool{}
-		for _, w := range list {
-			if !word.MatchString(w) || seen[w] {
-				t.Errorf("word %q is not short lowercase ASCII or comes twice", w)
-			}
-			seen[w] = true
+func TestNextServerNameTakesTheLowestFreeNumber(t *testing.T) {
+	for _, test := range []struct {
+		names []string
+		want  string
+	}{
+		{nil, "web-1"},
+		{[]string{"web-1"}, "web-2"},
+		{[]string{"web-1", "web-3"}, "web-2"},
+		{[]string{"prod", "web-2", "web-1"}, "web-3"},
+	} {
+		var servers []model.Server
+		for _, name := range test.names {
+			servers = append(servers, model.Server{Name: name})
 		}
-		if len(list) < 200 {
-			t.Errorf("only %d words", len(list))
+		if got := NextServerName(servers); got != test.want {
+			t.Errorf("NextServerName(%v) = %s, want %s", test.names, got, test.want)
 		}
 	}
 }

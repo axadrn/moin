@@ -27,7 +27,7 @@ type RemovedServer struct {
 
 // Servers is every server of the workspace, live: the list, adding one,
 // and whether daemons update by themselves.
-templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool) {
+templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoUpdate bool, suggestion string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Servers") {
 		@panelPage() {
@@ -40,7 +40,7 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 			@ServerList(servers)
 			if canAdd {
 				@kit.Card("Add a server", nil) {
-					@ServerAddForm()
+					@ServerAddForm(suggestion)
 				}
 			}
 			@kit.Section("Daemons", nil) {
@@ -53,9 +53,10 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 	}
 }
 
-// ServerAddForm is the add form. A request replaces it to reset it after the
+// ServerAddForm is the add form, its name filled in with the next free
+// web-N. A request replaces it to reset it after the
 // server was added; a wrong name keeps it as it is (DESIGN.md, Feedback).
-templ ServerAddForm() {
+templ ServerAddForm(suggestion string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<form
 		id="server-add-form"
@@ -67,7 +68,7 @@ templ ServerAddForm() {
 		@kit.CSRF()
 		<label for="server-name" class="sr-only">Server name</label>
 		@kit.Inline() {
-			@kit.Input(templ.Attributes{"id": "server-name", "name": "name", "type": "text", "placeholder": "Name, or empty for a made-up one", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+			@kit.Input(templ.Attributes{"id": "server-name", "name": "name", "type": "text", "value": suggestion, "placeholder": "Name, like web-1", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
 			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
 				Add server
 			}
