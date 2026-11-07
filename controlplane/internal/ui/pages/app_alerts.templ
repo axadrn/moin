@@ -8,6 +8,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // AlertsView is the alerts page: where the alerts of the workspace go.
@@ -86,13 +87,13 @@ templ alertDestinations(view AlertsView) {
 								<span class="font-mono">{ destination.Hint }</span>
 								{ " · " + alertEventsText(destination) }
 								if destination.FailingSince == nil && destination.LastSentAt != nil {
-									<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + ago(*destination.LastSentAt, now) }</span>
+									<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + human.Ago(*destination.LastSentAt, now) }</span>
 								}
 							</div>
 							if destination.FailingSince != nil {
 								<div class="flex min-w-0 items-center gap-2 pt-1 text-sm text-failed" data-alert-failing>
 									@kit.Dot(kit.StateFailed)
-									<span class="truncate">{ "Failing since " + ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
+									<span class="truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
 								</div>
 							}
 						</div>

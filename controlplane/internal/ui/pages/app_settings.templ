@@ -7,6 +7,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // Settings is your account, one tab at a time: Profile (picture, name,
@@ -190,7 +191,7 @@ func sessionNote(session model.Session, currentSessionID string, now time.Time) 
 	if session.ID == currentSessionID {
 		return "This browser"
 	}
-	return "Active " + ago(session.LastSeenAt, now)
+	return "Active " + human.Ago(session.LastSeenAt, now)
 }
 
 // settingsAccountDanger is the end of the security tab: remove the

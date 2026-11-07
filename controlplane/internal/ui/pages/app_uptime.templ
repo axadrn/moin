@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // UptimeView is the uptime of an app's domains.
@@ -240,9 +241,9 @@ func lastCheckNote(domain service.UptimeDomain, now time.Time) string {
 	if domain.CheckedAt == nil {
 		return ""
 	}
-	note := fmt.Sprintf("%d ms, %s", domain.ResponseMS, ago(*domain.CheckedAt, now))
+	note := fmt.Sprintf("%d ms, %s", domain.ResponseMS, human.Ago(*domain.CheckedAt, now))
 	if domain.Error != "" {
-		note = domain.Error + ", " + ago(*domain.CheckedAt, now)
+		note = domain.Error + ", " + human.Ago(*domain.CheckedAt, now)
 	}
 	return note
 }
@@ -269,7 +270,7 @@ func sinceText(domain service.UptimeDomain, now time.Time) string {
 	if domain.Since == nil {
 		return "Not yet"
 	}
-	return ago(*domain.Since, now)
+	return human.Ago(*domain.Since, now)
 }
 
 func sinceNote(domain service.UptimeDomain) string {
@@ -286,20 +287,9 @@ func outageText(outage model.UptimeOutage, now time.Time) string {
 	if outage.EndedAt != nil {
 		end, length = *outage.EndedAt, "down for "
 	}
-	text := length + roughly(end.Sub(outage.StartedAt))
+	text := length + human.Duration(end.Sub(outage.StartedAt))
 	if outage.Reason != "" {
 		text += " · " + outage.Reason
 	}
 	return text
-}
-
-// roughly is a length of time in minutes, hours or days.
-func roughly(d time.Duration) string {
-	switch {
-	case d < time.Hour:
-		return fmt.Sprintf("%d min", max(1, int(d.Minutes()+0.5)))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%dh %02dm", int(d.Hours()), int(d.Minutes())%60)
-	}
-	return fmt.Sprintf("%d days", int(d.Hours()/24))
 }

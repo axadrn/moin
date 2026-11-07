@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -9,6 +8,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // AddedServer is the one-time install command of a server just added.
@@ -238,14 +238,5 @@ func serverLastSeen(server model.Server, now time.Time) string {
 	if server.LastSeenAt == nil {
 		return "never"
 	}
-	age := now.Sub(*server.LastSeenAt)
-	switch {
-	case age < time.Minute:
-		return "just now"
-	case age < time.Hour:
-		return fmt.Sprintf("%dm ago", int(age.Minutes()))
-	case age < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(age.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(age.Hours()/24))
+	return human.Ago(*server.LastSeenAt, now)
 }

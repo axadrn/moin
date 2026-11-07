@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/axadrn/moin/internal/human"
 )
 
 // A server's disk alerts once it is diskFullAt percent full, and says so
@@ -55,8 +57,8 @@ func (s *ServerService) checkDisk(serverID string, used, total uint64) {
 	}
 	details := map[string]string{
 		"used_percent": fmt.Sprintf("%.0f", percent),
-		"used":         humanBytes(used),
-		"total":        humanBytes(total),
+		"used":         human.Size(float64(used)),
+		"total":        human.Size(float64(total)),
 	}
 	action := "disk.ok"
 	if next {
@@ -72,24 +74,4 @@ func diskState(full bool, percent float64) bool {
 		return percent >= diskOKAt
 	}
 	return percent >= diskFullAt
-}
-
-// humanBytes writes a size the way people read it: 38 GB, 512 MB.
-func humanBytes(bytes uint64) string {
-	const unit = 1000
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	value, prefix := float64(bytes), ""
-	for _, next := range []string{"kB", "MB", "GB", "TB", "PB"} {
-		value /= unit
-		prefix = next
-		if value < unit {
-			break
-		}
-	}
-	if value < 10 {
-		return fmt.Sprintf("%.1f %s", value, prefix)
-	}
-	return fmt.Sprintf("%.0f %s", value, prefix)
 }

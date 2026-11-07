@@ -12,6 +12,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // Apps is every app of the workspace, in the one order: what needs you,
@@ -366,7 +367,7 @@ func appLastDeployLine(deploys []api.Deploy) string {
 	if len(deploys) == 0 {
 		return "Deploy it with moin deploy"
 	}
-	return "Last deploy " + ago(deploys[0].CreatedAt, time.Now())
+	return "Last deploy " + human.Ago(deploys[0].CreatedAt, time.Now())
 }
 
 templ loadLogsButton(appPath string) {
@@ -467,7 +468,7 @@ templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected
 				<span class="font-semibold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
 				@deployStatus(deploy, app.LiveNumber)
 				<span class="ml-auto text-sm whitespace-nowrap text-muted-foreground tabular-nums" title={ stamp(deploy.CreatedAt) }>
-					{ ago(deploy.CreatedAt, now) }
+					{ human.Ago(deploy.CreatedAt, now) }
 				</span>
 			</span>
 			if deploy.Commit != "" {

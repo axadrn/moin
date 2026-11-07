@@ -9,6 +9,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -76,7 +77,7 @@ func spark(points []client.MetricsPoint, value func(client.MetricsPoint) float64
 
 func percentNow(value float64) string { return strconv.FormatFloat(value, 'f', 1, 64) + "%" }
 
-func rateNow(value float64) string { return client.Bytes(value) + "/s" }
+func rateNow(value float64) string { return human.Size(value) + "/s" }
 
 func rangeText(name string) string {
 	switch name {
@@ -108,9 +109,9 @@ func printAppMetrics(w io.Writer, answer client.AppMetrics) {
 	}
 	memory := value(func(now *client.AppMetricsNow) string {
 		if now.MemoryLimit == 0 {
-			return client.Bytes(float64(now.MemoryUsed))
+			return human.Size(float64(now.MemoryUsed))
 		}
-		return client.Bytes(float64(now.MemoryUsed)) + " of " + client.Bytes(float64(now.MemoryLimit))
+		return human.Size(float64(now.MemoryUsed)) + " of " + human.Size(float64(now.MemoryLimit))
 	})
 	fmt.Fprintln(w)
 	table(w, []string{"", "NOW", strings.ToUpper(answer.Range)}, [][]string{
@@ -151,10 +152,10 @@ func printServerMetrics(w io.Writer, answer client.ServerMetrics) {
 			return percentNow(now.CPU) + style.Muted.Render(fmt.Sprintf(" %d cores, load %.2f", now.Cores, now.Load))
 		}), spark(answer.Points, func(p client.MetricsPoint) float64 { return p.CPU })},
 		{"Memory", value(func(now *client.ServerMetricsNow) string {
-			return client.Bytes(float64(now.MemoryUsed)) + " of " + client.Bytes(float64(now.MemoryTotal))
+			return human.Size(float64(now.MemoryUsed)) + " of " + human.Size(float64(now.MemoryTotal))
 		}), spark(answer.Points, func(p client.MetricsPoint) float64 { return float64(p.Memory) })},
 		{"Disk", value(func(now *client.ServerMetricsNow) string {
-			return client.Bytes(float64(now.DiskUsed)) + " of " + client.Bytes(float64(now.DiskTotal)) + style.Muted.Render(" "+client.Share(float64(now.DiskUsed), float64(now.DiskTotal)))
+			return human.Size(float64(now.DiskUsed)) + " of " + human.Size(float64(now.DiskTotal)) + style.Muted.Render(" "+client.Share(float64(now.DiskUsed), float64(now.DiskTotal)))
 		}), spark(answer.Points, func(p client.MetricsPoint) float64 { return float64(p.Disk) })},
 		{"Net in", value(func(now *client.ServerMetricsNow) string { return rateNow(now.NetRx) }), spark(answer.Points, func(p client.MetricsPoint) float64 { return p.NetRx })},
 		{"Net out", value(func(now *client.ServerMetricsNow) string { return rateNow(now.NetTx) }), spark(answer.Points, func(p client.MetricsPoint) float64 { return p.NetTx })},
@@ -168,7 +169,7 @@ func printServerMetrics(w io.Writer, answer client.ServerMetrics) {
 			rows = append(rows, []string{app.App, "-", style.Muted.Render("not running"), "-"})
 			continue
 		}
-		rows = append(rows, []string{app.App, percentNow(app.Now.CPU), client.Bytes(float64(app.Now.MemoryUsed)), rateNow(app.Now.NetRx + app.Now.NetTx)})
+		rows = append(rows, []string{app.App, percentNow(app.Now.CPU), human.Size(float64(app.Now.MemoryUsed)), rateNow(app.Now.NetRx + app.Now.NetTx)})
 	}
 	fmt.Fprintln(w)
 	table(w, []string{"APP", "CPU", "MEMORY", "NETWORK"}, rows)

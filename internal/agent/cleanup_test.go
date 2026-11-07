@@ -59,7 +59,4 @@ func TestReclaimed(t *testing.T) {
 			t.Errorf("reclaimed(%q) = %d, want %d", out, got, want)
 		}
 	}
-	if got := sizeText(2_100_000_000); got != "2.1 GB" {
-		t.Errorf("sizeText = %q", got)
-	}
 }

@@ -1,10 +1,10 @@
 package pages
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // The parts every page of the control panel is built from.
@@ -133,32 +133,12 @@ templ switchForm(id, action, switchID, name, note string, on bool) {
 	}
 }
 
-// ago is how long ago t was, short: "now", "4m ago", "3h ago", "12d ago".
-func ago(t time.Time, now time.Time) string {
-	age := now.Sub(t)
-	switch {
-	case age < 45*time.Second:
-		return "just now"
-	case age < time.Hour:
-		return fmt.Sprintf("%dm ago", max(1, int(age.Minutes()+0.5)))
-	case age < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(age.Hours()))
-	case age < 60*24*time.Hour:
-		return fmt.Sprintf("%dd ago", int(age.Hours()/24))
-	}
-	return t.Format("Jan 2, 2006")
-}
-
-// took is the length of a deploy: "14s", "1m 05s".
+// took is the length of a deploy, "14s" or "1m 5s", and nothing while it runs.
 func took(start time.Time, end *time.Time) string {
 	if end == nil {
 		return ""
 	}
-	d := end.Sub(start).Round(time.Second)
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", max(0, int(d.Seconds())))
-	}
-	return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
+	return human.Duration(end.Sub(start))
 }
 
 func stamp(t time.Time) string {

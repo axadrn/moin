@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 )
 
 func (m model) serversView(u ui, w, h int) string {
@@ -192,11 +193,11 @@ func (m model) serverMetrics(u ui, s client.Server, w, h int) string {
 		"",
 		row("cpu", fmt.Sprintf("%.0f%% of %d cores", n.CPU, n.Cores), cpu),
 		"",
-		row("memory", client.Bytes(float64(n.MemoryUsed))+" of "+client.Bytes(float64(n.MemoryTotal)), mem),
+		row("memory", human.Size(float64(n.MemoryUsed))+" of "+human.Size(float64(n.MemoryTotal)), mem),
 		"",
-		row("disk", client.Bytes(float64(n.DiskUsed))+" of "+client.Bytes(float64(n.DiskTotal)), disk),
+		row("disk", human.Size(float64(n.DiskUsed))+" of "+human.Size(float64(n.DiskTotal)), disk),
 		"",
-		u.faint(fmt.Sprintf("load %.2f · in %s/s · out %s/s", n.Load, client.Bytes(n.NetRx), client.Bytes(n.NetTx))),
+		u.faint(fmt.Sprintf("load %.2f · in %s/s · out %s/s", n.Load, human.Size(n.NetRx), human.Size(n.NetTx))),
 	}
 	return u.panel("Metrics", rl, body, w, h, false)
 }

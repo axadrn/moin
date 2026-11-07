@@ -139,21 +139,6 @@ func Sparkline(values []float64, width int) string {
 	return string(line)
 }
 
-// Bytes is a size for people: 512 MB, 1.5 GB.
-func Bytes(value float64) string {
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	unit := 0
-	for value >= 1024 && unit < len(units)-1 {
-		value /= 1024
-		unit++
-	}
-	precision := 1
-	if unit == 0 || value >= 10 {
-		precision = 0
-	}
-	return strconv.FormatFloat(value, 'f', precision, 64) + " " + units[unit]
-}
-
 // Share is used of total in percent, like 42%; "-" without a total.
 func Share(used, total float64) string {
 	if total <= 0 {

@@ -18,6 +18,7 @@ import (
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/dotenv"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/protocol"
 )
@@ -289,7 +290,7 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	if files == 1 {
 		noun = "file"
 	}
-	step(stdout, "Uploading %d %s to your bucket %s", files, noun, style.Muted.Render("("+size(source.Len())+")"))
+	step(stdout, "Uploading %d %s to your bucket %s", files, noun, style.Muted.Render("("+human.Size(float64(source.Len()))+")"))
 	started, err := api.Deploy(ctx, name, source.Bytes())
 	var apiErr *client.Error
 	if errors.As(err, &apiErr) && apiErr.Code == "no_bucket" {
@@ -539,13 +540,13 @@ func printDeploys(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	for _, deploy := range detail.Deploys {
 		took := "-"
 		if deploy.FinishedAt != nil {
-			took = style.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+			took = human.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
 		}
 		status := deploy.Status
 		if deploy.Number == detail.App.LiveNumber && status == "succeeded" {
 			status = "live"
 		}
-		rows = append(rows, []string{fmt.Sprintf("v%d", deploy.Number), badge(stdout, style.Deploy(deploy, detail.App.LiveNumber), status), since(deploy.CreatedAt, now), took, deployNote(deploy)})
+		rows = append(rows, []string{fmt.Sprintf("v%d", deploy.Number), badge(stdout, style.Deploy(deploy, detail.App.LiveNumber), status), human.Ago(deploy.CreatedAt, now), took, deployNote(deploy)})
 	}
 	table(stdout, []string{"DEPLOY", "STATUS", "STARTED", "TOOK", "NOTE"}, rows)
 	fmt.Fprintln(stdout)
@@ -554,9 +555,9 @@ func printDeploys(stdout io.Writer, detail client.AppDetail, now time.Time) {
 
 // deployTimes is "started 3 min ago, took 41s".
 func deployTimes(deploy client.Deploy, now time.Time) string {
-	text := "started " + since(deploy.CreatedAt, now)
+	text := "started " + human.Ago(deploy.CreatedAt, now)
 	if deploy.FinishedAt != nil {
-		text += ", took " + style.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
+		text += ", took " + human.Duration(deploy.FinishedAt.Sub(deploy.CreatedAt))
 	}
 	return text
 }
@@ -1108,16 +1109,6 @@ func sortedKeys(values map[string]string) []string {
 	}
 	slices.Sort(keys)
 	return keys
-}
-
-func size(bytes int) string {
-	switch {
-	case bytes >= 1<<20:
-		return fmt.Sprintf("%.1f MB", float64(bytes)/(1<<20))
-	case bytes >= 1<<10:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/(1<<10))
-	}
-	return fmt.Sprintf("%d B", bytes)
 }
 
 // logLine mutes the container prefix of a log line, "web-1  | ".

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/api"
+	"github.com/axadrn/moin/internal/human"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -36,9 +37,9 @@ func (m Metrics) Summary() string {
 		if app.Now == nil {
 			return app.App + " sent no metrics in the last two minutes."
 		}
-		summary := fmt.Sprintf("%s now: CPU %.1f%%, memory %s", app.App, app.Now.CPU, bytesText(app.Now.MemoryUsed))
+		summary := fmt.Sprintf("%s now: CPU %.1f%%, memory %s", app.App, app.Now.CPU, human.Size(float64(app.Now.MemoryUsed)))
 		if app.Now.MemoryLimit > 0 {
-			summary += " of " + bytesText(app.Now.MemoryLimit)
+			summary += " of " + human.Size(float64(app.Now.MemoryLimit))
 		}
 		summary += "."
 		if len(app.Deploys) > 0 {
@@ -56,32 +57,17 @@ func (m Metrics) Summary() string {
 	}
 	now := server.Now
 	summary := fmt.Sprintf("%s now: CPU %.1f%%, memory %s of %s, disk %s of %s.", server.Server, now.CPU,
-		bytesText(now.MemoryUsed), bytesText(now.MemoryTotal), bytesText(now.DiskUsed), bytesText(now.DiskTotal))
+		human.Size(float64(now.MemoryUsed)), human.Size(float64(now.MemoryTotal)), human.Size(float64(now.DiskUsed)), human.Size(float64(now.DiskTotal)))
 	apps := []string{}
 	for _, app := range server.Apps {
 		if app.Now != nil && len(apps) < 3 {
-			apps = append(apps, app.App+" "+bytesText(app.Now.MemoryUsed))
+			apps = append(apps, app.App+" "+human.Size(float64(app.Now.MemoryUsed)))
 		}
 	}
 	if len(apps) > 0 {
 		summary += " Most memory: " + strings.Join(apps, ", ") + "."
 	}
 	return summary
-}
-
-// bytesText is a size for people: 512 MB, 1.5 GB.
-func bytesText(value uint64) string {
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	size := float64(value)
-	unit := 0
-	for size >= 1024 && unit < len(units)-1 {
-		size /= 1024
-		unit++
-	}
-	if unit == 0 || size >= 10 {
-		return fmt.Sprintf("%.0f %s", size, units[unit])
-	}
-	return fmt.Sprintf("%.1f %s", size, units[unit])
 }
 
 func (t moinTools) getMetrics(_ context.Context, caller Caller, input MetricsInput) (Metrics, error) {

@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/axadrn/moin/internal/human"
 )
 
 // cleanupEvery is how often the agent frees disk besides after each deploy;
@@ -155,7 +156,7 @@ func (a *apps) cleanup(ctx context.Context) {
 		freed += reclaimed(out)
 	}
 	if freed > 0 || removed > 0 {
-		slog.Info("cleanup: freed disk", "freed", sizeText(freed), "images", removed)
+		slog.Info("cleanup: freed disk", "freed", human.Size(float64(freed)), "images", removed)
 	}
 }
 
@@ -185,18 +186,6 @@ func reclaimed(out string) int64 {
 	unit := strings.ToUpper(strings.TrimSuffix(strings.TrimSuffix(match[2], "B"), "i"))
 	multiplier := map[string]float64{"": 1, "K": 1e3, "M": 1e6, "G": 1e9, "T": 1e12}[unit]
 	return int64(value * multiplier)
-}
-
-// sizeText writes bytes as people read them: 2.1 GB.
-func sizeText(bytes int64) string {
-	switch {
-	case bytes >= 1e9:
-		return fmt.Sprintf("%.1f GB", float64(bytes)/1e9)
-	case bytes >= 1e6:
-		return fmt.Sprintf("%.0f MB", float64(bytes)/1e6)
-	default:
-		return fmt.Sprintf("%d kB", bytes/1e3)
-	}
 }
 
 // cleanups frees disk once a day, first a few minutes after the agent starts.

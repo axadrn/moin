@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // ServerMetricsView is the metrics page of a server.
@@ -100,30 +101,16 @@ func percentText(value float64) string {
 	return fmt.Sprintf("%.0f%%", value)
 }
 
-// bytesText is a size for people: 512 MB, 1.5 GB.
-func bytesText(value float64) string {
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	unit := 0
-	for value >= 1024 && unit < len(units)-1 {
-		value /= 1024
-		unit++
-	}
-	if unit == 0 || value >= 10 {
-		return fmt.Sprintf("%.0f %s", value, units[unit])
-	}
-	return fmt.Sprintf("%.1f %s", value, units[unit])
-}
-
-func rateText(value float64) string { return bytesText(value) + "/s" }
+func rateText(value float64) string { return human.Size(value) + "/s" }
 
 func loadText(value float64) string { return fmt.Sprintf("%.2f", value) }
 
 // usedOf is "1.2 GB of 4 GB"; without a total, the used part only.
 func usedOf(used, total uint64) string {
 	if total == 0 {
-		return bytesText(float64(used))
+		return human.Size(float64(used))
 	}
-	return bytesText(float64(used)) + " of " + bytesText(float64(total))
+	return human.Size(float64(used)) + " of " + human.Size(float64(total))
 }
 
 // shareOf is the share of used in total in percent, "" without a total.

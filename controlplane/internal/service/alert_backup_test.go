@@ -127,15 +127,6 @@ func TestCheckDiskAlertsOnceAndAcrossRestarts(t *testing.T) {
 	}
 }
 
-// TestHumanBytes reads sizes the way people do.
-func TestHumanBytes(t *testing.T) {
-	for bytes, want := range map[uint64]string{512: "512 B", 1_500_000: "1.5 MB", 38_000_000_000: "38 GB", 2_100_000_000_000: "2.1 TB"} {
-		if got := humanBytes(bytes); got != want {
-			t.Errorf("humanBytes(%d) = %q, want %q", bytes, got, want)
-		}
-	}
-}
-
 // TestBackupAndDiskAlertsReachEveryDestination: the new events go to
 // every destination that gets them, in the words of each, and a
 // destination for deploys only gets none of them.

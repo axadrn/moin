@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 )
 
 func (m model) dashboard(u ui, w, h int) string {
@@ -374,7 +375,7 @@ func (m model) activityPanel(u ui, w, h int) string {
 		if i >= n {
 			break
 		}
-		when := padR(ago(e.CreatedAt, now), 8)
+		when := padR(human.Ago(e.CreatedAt, now), 8)
 		body = append(body, truncate(u.faint(when)+" "+u.text(shortActor(e.Actor))+" "+u.muted(e.Summary), iw))
 	}
 	if len(m.events) == 0 {
