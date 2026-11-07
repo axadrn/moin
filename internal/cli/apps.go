@@ -797,231 +797,272 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 // app whose env vars to list.
 var envCommands = []string{"ls", "list", "set", "rm", "remove", "unset", "pull", "push"}
 
-// env manages the env vars of an app: ls, set, rm and pull.
+// env manages the env vars of an app: ls, set, rm, pull and push. list is
+// ls; remove and unset are rm. In every one, usage mistakes show before a
+// missing login.
 func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := "ls"
 	if len(args) > 0 && slices.Contains(envCommands, args[0]) {
 		command, args = args[0], args[1:]
 	}
-	usage := map[string]string{
-		"set":  "env set [--app <app>] [app] KEY=value ...",
-		"rm":   "env rm [--app <app>] KEY ... [--yes]",
-		"pull": "env pull [--app <app>] [file] [--yes]",
-		"push": "env push [--app <app>] [file] [--yes]",
-	}[command]
-	if usage == "" {
-		usage = "env [--show] [app]"
-		if command == "remove" || command == "unset" {
-			usage = "env rm [--app <app>] KEY ... [--yes]"
-		}
+	switch command {
+	case "ls", "list":
+		return envList(ctx, command, args, stdout)
+	case "set":
+		return envSet(ctx, args, stdout)
+	case "rm", "remove", "unset":
+		return envRm(ctx, command, args, stdin, stdout)
+	case "pull":
+		return envPull(ctx, args, stdin, stdout)
+	case "push":
+		return envPush(ctx, args, stdin, stdout)
 	}
-	flags := newFlags("env "+command, usage).withApp()
-	show := new(bool)
-	if command == "ls" || command == "list" {
-		flags.BoolVar(show, "show", false, "show the values")
-	}
-	if slices.Contains([]string{"rm", "remove", "unset", "pull", "push"}, command) {
-		flags.withYes()
-	}
+	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
+}
+
+// envList lists the env vars of an app, the values hidden without --show.
+func envList(ctx context.Context, command string, args []string, stdout io.Writer) error {
+	flags := newFlags("env "+command, "env [--show] [app]").withApp()
+	show := flags.Bool("show", false, "show the values")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	// Usage mistakes show before a missing login.
 	api, apiErr := apiClient()
-	switch command {
-	case "ls", "list":
-		if flags.NArg() > 1 {
-			return flags.wrong()
-		}
-		name, err := flags.app(flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		values, err := api.Env(ctx, name)
-		if err != nil {
-			return err
-		}
-		if len(values) == 0 {
-			fmt.Fprintf(stdout, "%s has no env vars.\n", name)
-			hint(stdout, "Set one with", build.Name+" env set KEY=value")
-			return nil
-		}
-		for _, key := range sortedKeys(values) {
-			value := style.Muted.Render("••••••")
-			if *show {
-				value = values[key]
-			}
-			fmt.Fprintln(stdout, key+style.Muted.Render("=")+value)
-		}
-		if !*show && isTTY(stdout) {
-			hint(stdout, "Values hidden. Show them with", build.Name+" env --show")
-		}
-		return nil
-	case "set":
-		pairs := flags.Args()
-		app := ""
-		if len(pairs) > 0 && !strings.Contains(pairs[0], "=") {
-			app, pairs = pairs[0], pairs[1:]
-		}
-		set := map[string]string{}
-		for _, pair := range pairs {
-			key, value, ok := strings.Cut(pair, "=")
-			if !ok {
-				return fmt.Errorf("%q is not KEY=value", pair)
-			}
-			set[key] = value
-		}
-		if len(set) == 0 {
-			return flags.wrong()
-		}
-		name, err := flags.app(app)
-		if err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		_, err = api.SetEnv(ctx, name, set, nil)
-		if err != nil {
-			return err
-		}
-		done(stdout, "Set %s on %s", strings.Join(sortedKeys(set), ", "), style.Bold.Render(name))
-		hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
-		return nil
-	case "rm", "remove", "unset":
-		if flags.NArg() == 0 {
-			return flags.wrong()
-		}
-		name, err := flags.app("")
-		if err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		// Only keys the app has are removed; the others say so.
-		current, err := api.Env(ctx, name)
-		if err != nil {
-			return err
-		}
-		var remove, missing []string
-		for _, key := range flags.Args() {
-			if _, ok := current[key]; ok {
-				remove = append(remove, key)
-			} else {
-				missing = append(missing, key)
-			}
-		}
-		if len(missing) > 0 {
-			fmt.Fprintf(stdout, "%s has no %s.\n", name, strings.Join(missing, ", "))
-		}
-		if len(remove) == 0 {
-			return nil
-		}
-		keys := strings.Join(remove, ", ")
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s?", keys, name))
-		if err != nil {
-			return err
-		}
-		_, err = api.SetEnv(ctx, name, nil, remove)
-		if err != nil {
-			return err
-		}
-		done(stdout, "Removed %s from %s", keys, style.Bold.Render(name))
-		hint(stdout, "The app drops them when it restarts. Now:", build.Name+" restart "+name)
-		return nil
-	case "pull":
-		if flags.NArg() > 1 {
-			return flags.wrong()
-		}
-		path := ".env"
-		if flags.NArg() == 1 {
-			path = flags.Arg(0)
-		}
-		name, err := flags.app("")
-		if err != nil {
-			return err
-		}
-		if _, err := os.Stat(path); err == nil {
-			err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Replace %s with the env vars of %s?", path, name))
-			if err != nil {
-				return err
-			}
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		values, err := api.Env(ctx, name)
-		if err != nil {
-			return err
-		}
-		err = os.WriteFile(path, []byte(dotenv.Format(values)), 0o600)
-		if err != nil {
-			return err
-		}
-		done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
-		return nil
-	case "push":
-		if flags.NArg() > 1 {
-			return flags.wrong()
-		}
-		path := ".env"
-		if flags.NArg() == 1 {
-			path = flags.Arg(0)
-		}
-		name, err := flags.app("")
-		if err != nil {
-			return err
-		}
-		text, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		next, err := dotenv.Parse(string(text))
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		current, err := api.Env(ctx, name)
-		if err != nil {
-			return err
-		}
-		change := dotenv.Diff(current, next)
-		if change.None() {
-			fmt.Fprintf(stdout, "%s matches the env vars of %s. Nothing changes.\n", path, name)
-			return nil
-		}
-		// The keys only, never a value: the terminal may be shared or recorded.
-		for _, line := range []struct {
-			mark string
-			keys []string
-			tint lipgloss.Style
-		}{{"+", change.Added, style.Success}, {"~", change.Changed, style.Warning}, {"-", change.Removed, style.Danger}} {
-			for _, key := range line.keys {
-				fmt.Fprintln(stdout, "  "+line.tint.Render(line.mark)+" "+key)
-			}
-		}
-		question := fmt.Sprintf("Replace the env vars of %s with %s?", name, path)
-		if len(change.Removed) > 0 {
-			question = fmt.Sprintf("Replace the env vars of %s with %s? %s %s.", name, path, strings.Join(change.Removed, ", "), pluralWord(int64(len(change.Removed)), "is removed", "are removed"))
-		}
-		if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
-			return err
-		}
-		change, err = api.ReplaceEnv(ctx, name, next)
-		if err != nil {
-			return err
-		}
-		done(stdout, "The env vars of %s: %s", style.Bold.Render(name), change)
-		hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	values, err := api.Env(ctx, name)
+	if err != nil {
+		return err
+	}
+	if len(values) == 0 {
+		fmt.Fprintf(stdout, "%s has no env vars.\n", name)
+		hint(stdout, "Set one with", build.Name+" env set KEY=value")
 		return nil
 	}
-	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
+	for _, key := range sortedKeys(values) {
+		value := style.Muted.Render("••••••")
+		if *show {
+			value = values[key]
+		}
+		fmt.Fprintln(stdout, key+style.Muted.Render("=")+value)
+	}
+	if !*show && isTTY(stdout) {
+		hint(stdout, "Values hidden. Show them with", build.Name+" env --show")
+	}
+	return nil
+}
+
+// envSet sets KEY=value pairs on an app; a first argument without = is the
+// app.
+func envSet(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("env set", "env set [--app <app>] [app] KEY=value ...").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, apiErr := apiClient()
+	pairs := flags.Args()
+	app := ""
+	if len(pairs) > 0 && !strings.Contains(pairs[0], "=") {
+		app, pairs = pairs[0], pairs[1:]
+	}
+	set := map[string]string{}
+	for _, pair := range pairs {
+		key, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			return fmt.Errorf("%q is not KEY=value", pair)
+		}
+		set[key] = value
+	}
+	if len(set) == 0 {
+		return flags.wrong()
+	}
+	name, err := flags.app(app)
+	if err != nil {
+		return err
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	_, err = api.SetEnv(ctx, name, set, nil)
+	if err != nil {
+		return err
+	}
+	done(stdout, "Set %s on %s", strings.Join(sortedKeys(set), ", "), style.Bold.Render(name))
+	hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
+	return nil
+}
+
+// envRm removes keys from an app after asking. Only keys the app has are
+// removed; the others say so.
+func envRm(ctx context.Context, command string, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("env "+command, "env rm [--app <app>] KEY ... [--yes]").withApp().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, apiErr := apiClient()
+	if flags.NArg() == 0 {
+		return flags.wrong()
+	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	current, err := api.Env(ctx, name)
+	if err != nil {
+		return err
+	}
+	var remove, missing []string
+	for _, key := range flags.Args() {
+		if _, ok := current[key]; ok {
+			remove = append(remove, key)
+		} else {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) > 0 {
+		fmt.Fprintf(stdout, "%s has no %s.\n", name, strings.Join(missing, ", "))
+	}
+	if len(remove) == 0 {
+		return nil
+	}
+	keys := strings.Join(remove, ", ")
+	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s?", keys, name))
+	if err != nil {
+		return err
+	}
+	_, err = api.SetEnv(ctx, name, nil, remove)
+	if err != nil {
+		return err
+	}
+	done(stdout, "Removed %s from %s", keys, style.Bold.Render(name))
+	hint(stdout, "The app drops them when it restarts. Now:", build.Name+" restart "+name)
+	return nil
+}
+
+// envPull writes the env vars of an app to a file, .env by default, and
+// asks before it replaces one.
+func envPull(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("env pull", "env pull [--app <app>] [file] [--yes]").withApp().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, apiErr := apiClient()
+	path, err := envFile(flags)
+	if err != nil {
+		return err
+	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Replace %s with the env vars of %s?", path, name))
+		if err != nil {
+			return err
+		}
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	values, err := api.Env(ctx, name)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(path, []byte(dotenv.Format(values)), 0o600)
+	if err != nil {
+		return err
+	}
+	done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
+	return nil
+}
+
+// envPush replaces the env vars of an app with a file, .env by default:
+// it shows the keys that change and asks first.
+func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("env push", "env push [--app <app>] [file] [--yes]").withApp().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, apiErr := apiClient()
+	path, err := envFile(flags)
+	if err != nil {
+		return err
+	}
+	name, err := flags.app("")
+	if err != nil {
+		return err
+	}
+	text, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	next, err := dotenv.Parse(string(text))
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if apiErr != nil {
+		return apiErr
+	}
+	current, err := api.Env(ctx, name)
+	if err != nil {
+		return err
+	}
+	change := dotenv.Diff(current, next)
+	if change.None() {
+		fmt.Fprintf(stdout, "%s matches the env vars of %s. Nothing changes.\n", path, name)
+		return nil
+	}
+	printEnvChange(stdout, change)
+	question := fmt.Sprintf("Replace the env vars of %s with %s?", name, path)
+	if len(change.Removed) > 0 {
+		question = fmt.Sprintf("Replace the env vars of %s with %s? %s %s.", name, path, strings.Join(change.Removed, ", "), pluralWord(int64(len(change.Removed)), "is removed", "are removed"))
+	}
+	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		return err
+	}
+	change, err = api.ReplaceEnv(ctx, name, next)
+	if err != nil {
+		return err
+	}
+	done(stdout, "The env vars of %s: %s", style.Bold.Render(name), change)
+	hint(stdout, "The app gets them when it restarts. Now:", build.Name+" restart "+name)
+	return nil
+}
+
+// envFile is the file env pull and push work on: the one argument, or .env.
+func envFile(flags *flagSet) (string, error) {
+	switch flags.NArg() {
+	case 0:
+		return ".env", nil
+	case 1:
+		return flags.Arg(0), nil
+	}
+	return "", flags.wrong()
+}
+
+// printEnvChange lists the keys a push adds, changes and removes. The keys
+// only, never a value: the terminal may be shared or recorded.
+func printEnvChange(stdout io.Writer, change dotenv.Change) {
+	for _, line := range []struct {
+		mark string
+		keys []string
+		tint lipgloss.Style
+	}{{"+", change.Added, style.Success}, {"~", change.Changed, style.Warning}, {"-", change.Removed, style.Danger}} {
+		for _, key := range line.keys {
+			fmt.Fprintln(stdout, "  "+line.tint.Render(line.mark)+" "+key)
+		}
+	}
 }
 
 // runWithEnv starts a local command with the env vars of an app, without a file.
