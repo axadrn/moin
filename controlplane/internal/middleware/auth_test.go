@@ -140,7 +140,7 @@ func TestAuthMiddlewarePrefersImpersonationAndFallsBackToOperator(t *testing.T) 
 		t.Fatalf("fallback cleared cookies = %#v", cookies)
 	}
 
-	adminService := service.NewAdminService(repository.NewAdminRepository(database), repository.NewUserRepository(database), authService, []string{"operator@example.com"})
+	adminService := service.NewAdminService(repository.NewAdminRepository(database), repository.NewUsers(database), authService, []string{"operator@example.com"})
 	adminRequest := httptest.NewRequest(http.MethodGet, "/admin", nil)
 	ctx := ctxkeys.WithUser(adminRequest.Context(), operator.User)
 	ctx = ctxkeys.WithSession(ctx, operatorSession)
@@ -257,7 +257,7 @@ func TestWithWorkspaceLoadsWorkspaceAndRejectsCrossTenantAccess(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	alice := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-alice", Name: "Alice"})
 	bob := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-bob", Name: "Bob"})
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
@@ -310,7 +310,7 @@ func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
 	if _, err := database.Exec(`DELETE FROM subscriptions WHERE workspace_id = $1`, fixture.Workspace.ID); err != nil {
 		t.Fatalf("delete fixture subscription: %v", err)
 	}
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
 	workspaces := service.NewWorkspaceService(
 		repository.NewWorkspaceRepository(database),
@@ -340,7 +340,7 @@ func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
 }
 
 func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.UserService, *service.SubscriptionService) {
-	userRepository := repository.NewUserRepository(database)
+	userRepository := repository.NewUsers(database)
 	subscriptionRepository := repository.NewSubscriptionRepository(database)
 	fileService := service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
 	subscriptionService := service.NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))

@@ -13,7 +13,7 @@ import (
 func TestEmailAlertsAreOnByDefault(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "ada", Verified: true})
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	members := repository.NewWorkspaceMemberRepository(database)
 	for i, on := range []bool{true, false, true} {
 		if i > 0 {

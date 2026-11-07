@@ -54,7 +54,7 @@ const testAdminEmail = "operator@example.com"
 func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	userRepository := repository.NewUserRepository(database)
+	userRepository := repository.NewUsers(database)
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	environment := &apiEnvironment{database: database, mailer: mailer}

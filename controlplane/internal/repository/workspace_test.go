@@ -236,7 +236,7 @@ func createBareUser(t *testing.T, database *sqlx.DB, id, email string) *model.Us
 	t.Helper()
 	now := time.Now()
 	user := &model.User{ID: id, Email: email, Name: id, CreatedAt: now}
-	if err := repository.NewUserRepository(database).Create(user); err != nil {
+	if err := repository.NewUsers(database).Create(user); err != nil {
 		t.Fatalf("create user %s: %v", id, err)
 	}
 	return user

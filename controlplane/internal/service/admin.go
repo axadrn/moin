@@ -32,7 +32,7 @@ var (
 
 type AdminService struct {
 	repository  repository.AdminRepository
-	users       repository.UserRepository
+	users       *repository.Users
 	auth        *AuthService
 	adminEmails map[string]struct{}
 	// network, when set, counts what moin runs everywhere (UseNetwork).
@@ -45,7 +45,7 @@ type AdminService struct {
 	oldAddress *OldAddressService
 }
 
-func NewAdminService(repo repository.AdminRepository, users repository.UserRepository, auth *AuthService, adminEmails []string) *AdminService {
+func NewAdminService(repo repository.AdminRepository, users *repository.Users, auth *AuthService, adminEmails []string) *AdminService {
 	allowed := make(map[string]struct{}, len(adminEmails))
 	for _, email := range adminEmails {
 		allowed[strings.ToLower(strings.TrimSpace(email))] = struct{}{}

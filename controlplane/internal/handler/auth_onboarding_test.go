@@ -21,14 +21,14 @@ type onboardingTest struct {
 	workspaces *service.WorkspaceService
 	owner      testutil.UserFixture
 	mailer     *testutil.MemoryMailer
-	users      repository.UserRepository
+	users      *repository.Users
 }
 
 func newOnboardingTest(t *testing.T) onboardingTest {
 	t.Helper()
 	database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 	email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	auth := service.NewAuthService(users, nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	handler := NewAuthHandler(auth, nil, workspaces, &config.Config{})
 	return onboardingTest{handler: handler, workspaces: workspaces, owner: owner, mailer: mailer, users: users}

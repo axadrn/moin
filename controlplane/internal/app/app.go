@@ -85,7 +85,7 @@ func New(cfg *config.Config) (*App, error) {
 		}
 	}()
 
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	tokens := repository.NewTokenRepository(database)
 	sessions := repository.NewSessionRepository(database)
 	files := repository.NewFileRepository(database)

@@ -20,7 +20,7 @@ func TestUpdatePasswordRequiresCurrentPasswordAndPersistsNewHash(t *testing.T) {
 		Password: validTestPassword,
 		Verified: true,
 	})
-	userRepository := repository.NewUserRepository(database)
+	userRepository := repository.NewUsers(database)
 	userService := NewUserService(userRepository, nil, nil, nil)
 	newPassword := "Z7!mP4#qR9@vL2$x"
 
@@ -52,7 +52,7 @@ func TestUpdatePasswordRequiresCurrentPasswordAndPersistsNewHash(t *testing.T) {
 func TestUpdatePasswordRejectsPasswordlessAccount(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "passwordless-user", Verified: true})
-	userService := NewUserService(repository.NewUserRepository(database), nil, nil, nil)
+	userService := NewUserService(repository.NewUsers(database), nil, nil, nil)
 
 	if err := userService.UpdatePassword(fixture.User.ID, "anything", validTestPassword); err == nil {
 		t.Fatal("UpdatePassword() accepted a passwordless account")
@@ -62,7 +62,7 @@ func TestUpdatePasswordRejectsPasswordlessAccount(t *testing.T) {
 func TestDeleteAccountRequiresAnotherWorkspaceOwner(t *testing.T) {
 	database, workspaces, _ := workspaceTestService(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "delete-owner", Email: "delete@example.com", Name: "Delete Owner"})
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	files := NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
 	email := NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 	userService := NewUserService(users, files, email, workspaces)
@@ -105,7 +105,7 @@ func TestConcurrentAccountDeletionKeepsAnWorkspaceOwner(t *testing.T) {
 		t.Fatalf("add second owner: %v", err)
 	}
 
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	userService := NewUserService(
 		users,
 		NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage()),
@@ -177,7 +177,7 @@ func TestRefusedAccountDeletionKeepsFiles(t *testing.T) {
 	}
 	files := NewFileService(repository.NewFileRepository(database), storage)
 	email := NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
-	userService := NewUserService(repository.NewUserRepository(database), files, email, workspaces)
+	userService := NewUserService(repository.NewUsers(database), files, email, workspaces)
 
 	err = userService.DeleteAccount(fixture.User.ID)
 	if !errors.Is(err, ErrSoleWorkspaceOwner) {

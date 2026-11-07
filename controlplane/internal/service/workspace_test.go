@@ -310,7 +310,7 @@ func TestConcurrentPaidWebhookAndDeletionKeepWorkspaceRecoverable(t *testing.T) 
 func workspaceTestService(t *testing.T) (*sqlx.DB, *WorkspaceService, *testutil.MemoryMailer) {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	subscriptions := NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
 	mailer := testutil.NewMemoryMailer()
 	email := NewEmailService(mailer, "https://app.example.com", "Test App")
@@ -330,7 +330,7 @@ func createWorkspaceTestUser(t *testing.T, database *sqlx.DB, id, email string) 
 	t.Helper()
 	now := time.Now()
 	user := &model.User{ID: id, Email: email, Name: id, CreatedAt: now}
-	if err := repository.NewUserRepository(database).Create(user); err != nil {
+	if err := repository.NewUsers(database).Create(user); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	return user

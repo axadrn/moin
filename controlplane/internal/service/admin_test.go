@@ -27,7 +27,7 @@ func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
 	)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
 	adminRepository := repository.NewAdminRepository(database)
-	admin := NewAdminService(adminRepository, repository.NewUserRepository(database), auth, []string{"operator@example.com"})
+	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 
 	operatorRecorder := httptest.NewRecorder()
 	operatorRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
@@ -140,7 +140,7 @@ func TestAdminSessionRevocationIncludesIssuedImpersonationSessions(t *testing.T)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
 	admin := NewAdminService(
 		repository.NewAdminRepository(database),
-		repository.NewUserRepository(database),
+		repository.NewUsers(database),
 		auth,
 		[]string{operator.User.Email, securityOperator.User.Email},
 	)
@@ -181,7 +181,7 @@ func TestStopImpersonationSessionRollsBackWhenAuditCannotCommit(t *testing.T) {
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-target"})
 	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 	adminRepository := repository.NewAdminRepository(database)
-	admin := NewAdminService(adminRepository, repository.NewUserRepository(database), auth, []string{operator.User.Email})
+	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{operator.User.Email})
 
 	operatorRecorder := httptest.NewRecorder()
 	operatorSession, err := auth.StartSession(operatorRecorder, httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
@@ -263,7 +263,7 @@ func TestDashboardShowsTheNetworkOnlyWhereItIsSet(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "network-operator", Email: "network@example.com", Verified: true})
 	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	admin := NewAdminService(repository.NewAdminRepository(database), repository.NewUserRepository(database), auth, []string{operator.User.Email})
+	admin := NewAdminService(repository.NewAdminRepository(database), repository.NewUsers(database), auth, []string{operator.User.Email})
 	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
 	if err != nil {
 		t.Fatalf("StartSession() error = %v", err)

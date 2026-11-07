@@ -40,7 +40,7 @@ type environment struct {
 func newEnvironment(t *testing.T) *environment {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	env := &environment{database: database, mailer: mailer}

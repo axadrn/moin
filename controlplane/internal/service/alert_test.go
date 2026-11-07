@@ -30,7 +30,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 			t.Fatal(err)
 		}
 		if user.mute {
-			if err := repository.NewUserRepository(database).SetEmailAlerts(user.id, false); err != nil {
+			if err := repository.NewUsers(database).SetEmailAlerts(user.id, false); err != nil {
 				t.Fatal(err)
 			}
 		}
