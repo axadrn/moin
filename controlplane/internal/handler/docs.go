@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -42,7 +43,16 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(docsIndexMarkdown(groups)))
 			return
 		}
-		render(w, r, pages.DocsHome(groups))
+		query := strings.TrimSpace(r.URL.Query().Get("q"))
+		hits := pages.FindDocs(groups, query, docsHits)
+		w.Header().Add("Vary", "HX-Request")
+		// A keystroke of the search on the home (htmx) gets only the list.
+		if isAction(r) {
+			w.Header().Set("HX-Replace-Url", docsSearchURL(query))
+			render(w, r, pages.DocsResults(groups, query, hits))
+			return
+		}
+		render(w, r, pages.DocsHome(groups, query, hits))
 		return
 	}
 	// The introduction became Get started.
@@ -76,6 +86,34 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 	}
 	_, next := h.docsService.PrevNextPages(page)
 	render(w, r, pages.Docs(page, groups, next))
+}
+
+// docsHits is how many answers a docs search shows at most.
+const docsHits = 20
+
+// SearchDocs answers the search of a docs page (htmx): the pages and
+// sections that match q. Opened as a page, it is the docs home with that
+// search.
+func (h *DocsHandler) SearchDocs(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if !isAction(r) {
+		http.Redirect(w, r, docsSearchURL(query), http.StatusFound)
+		return
+	}
+	if _, err := h.docsService.DocsTree(); err != nil {
+		renderError(w, "docs unavailable", err)
+		return
+	}
+	w.Header().Add("Vary", "HX-Request")
+	render(w, r, pages.DocsSearchOptions(query, pages.FindDocs(h.docsService.Groups(), query, docsHits)))
+}
+
+// docsSearchURL is the docs home with a search.
+func docsSearchURL(query string) string {
+	if query == "" {
+		return "/docs"
+	}
+	return "/docs?" + url.Values{"q": {query}}.Encode()
 }
 
 // docsIndexMarkdown is /docs.md: every page under its topic, linked to its

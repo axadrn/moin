@@ -10,26 +10,28 @@ Open source apps in one click, such as Umami, n8n, Open WebUI, Grafana, Nextclou
 ## Install an app
 
 ```surfaces
-Web: **Apps**, **From the catalog**, the app, **Install**
+Web: **Apps**, **New app**, **Open the catalog**, the app, **Install**; on the site, **Deploy with moin** on its page
 CLI: moin catalog install umami --server web-1 [--version 3.4.1] [--name stats] [--domain stats.example.com]
 TUI: opens the web: `w`, then `c`
 API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, generates every secret as an encrypted env var, sets `VERSION` and deploys. No version takes the newest, no name the app's own, like `umami`. Add a [domain](/docs/guides/domains) now or later. Some apps have a first login, such as Umami's admin and `umami`; its catalog page says so, and `moin env --show` shows the generated passwords.
+It creates the app, generates every secret as an encrypted env var, sets `VERSION` and deploys. No version takes the newest, no name the app's own, like `umami`. Add a [domain](/docs/guides/domains) now or later. Some apps have a first login, such as Umami's admin and `umami`; its page in the catalog says so under **First sign-in**, and `moin env --show` shows the generated passwords.
 
 ## See the catalog
 
-The public catalog is at [/apps](/apps), one page per app.
+The public catalog is at [/catalog](/catalog), one page per app: what it is, its website, source and license, its image on its registry, and its versions.
 
 ```surfaces
-Web: **Apps**, **From the catalog**; or /apps on the site
+Web: **Apps**, **New app**, **Open the catalog**; or /catalog on the site
 CLI: moin catalog, then moin catalog umami for its versions
 TUI: opens the web: `w`, then `c`
 API: GET /api/v1/catalog, GET /api/v1/catalog/{slug}
 MCP: list_catalog, get_catalog_app
 ```
+
+The search finds an app by its name, its category or what it does, and a typo still finds it: `nfty` finds ntfy. Next to it, pick a category, and the order: newest release first, or by name. The search and the category stay in the address, so a link shows the same list.
 
 moin reads each app's image registry once an hour, so every version shows the hour it ships, newest first. Any of them can be installed, an older one too.
 

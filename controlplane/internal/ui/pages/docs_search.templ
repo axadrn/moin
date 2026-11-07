@@ -1,35 +1,127 @@
 package pages
 
 import (
+	"sort"
 	"strings"
+
+	"github.com/axadrn/moin/internal/find"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
-// docsSearchField is the search on top of the docs home: it looks like a
-// field and opens the search in the middle of the screen.
-templ docsSearchField() {
-	<button type="button" data-docs-search-open aria-keyshortcuts="Meta+K /" class="flex h-11 w-full items-center gap-3 rounded-full bg-card px-5 text-left text-base text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm">
-		@icon.Search(icon.Props{Class: "size-5 shrink-0"})
-		<span class="flex-1">Search the docs</span>
-		<kbd class="hidden font-sans text-xs sm:inline">⌘K</kbd>
-	</button>
+// DocHit is what the docs search finds: a page, or a section of one,
+// which opens at its heading.
+type DocHit struct {
+	Title string
+	// Where is the topic of a page, or the page of a section.
+	Where string
+	Href  string
 }
 
-// docsSearch is the search over every page and every section of the docs,
-// in the middle of the screen: ⌘K, ctrl+k, / or a search button open it.
-// Every page and section is in the page already, so typing filters at once
-// with no request; the arrows pick, Enter opens, Escape or a click outside
-// closes it.
+// FindDocs is the answer of the docs search: the pages whose title and
+// the sections whose heading match query (find.Name, the matching of the
+// palette, so a typo still finds), the best first and at most limit.
+// Without a query it is every page.
+func FindDocs(groups []model.DocGroup, query string, limit int) []DocHit {
+	type hit struct {
+		DocHit
+		score int
+	}
+	var hits []hit
+	typed := strings.TrimSpace(query) != ""
+	for _, group := range groups {
+		for _, page := range group.Pages {
+			if m, ok := find.Name(query, page.Title); ok {
+				// A page wins over a section that matches as well.
+				hits = append(hits, hit{DocHit{page.Title, group.Title, docsPageURL(page)}, m.Score + 5})
+			}
+			if !typed {
+				continue
+			}
+			for _, heading := range page.Headings {
+				if heading.Level != 2 {
+					continue
+				}
+				if m, ok := find.Name(query, heading.Text); ok {
+					hits = append(hits, hit{DocHit{heading.Text, page.Title, docsPageURL(page) + "#" + heading.ID}, m.Score})
+				}
+			}
+		}
+	}
+	if !typed {
+		limit = len(hits)
+	}
+	sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
+	out := make([]DocHit, 0, min(len(hits), limit))
+	for _, h := range hits[:min(len(hits), limit)] {
+		out = append(out, h.DocHit)
+	}
+	return out
+}
+
+// docsSearchField is the search on top of the docs home. Typing asks the
+// server (htmx active search), which answers the list under it and keeps
+// the address bar in step; without JavaScript, Enter loads /docs?q=, which
+// renders the same list.
+templ docsSearchField(query string) {
+	<form method="get" action="/docs" role="search">
+		<label for="docs-q" class="sr-only">Search the docs</label>
+		@kit.Input(templ.Attributes{
+			"id": "docs-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs",
+			"autocomplete": "off", "spellcheck": "false", "aria-keyshortcuts": "Meta+K /",
+			"hx-get": "/docs", "hx-trigger": "input changed delay:80ms", "hx-target": "#docs-results", "hx-swap": "outerHTML", "hx-sync": "this:replace",
+		})
+	</form>
+}
+
+// DocsResults is the body of the docs home: every page under its topic,
+// or, once something is typed, what the search finds. It is also the
+// answer to every keystroke of the search.
+templ DocsResults(groups []model.DocGroup, query string, hits []DocHit) {
+	<div id="docs-results" class="flex flex-col gap-8">
+		if strings.TrimSpace(query) == "" {
+			<div class="grid items-start gap-8 md:grid-cols-2">
+				for _, group := range groups {
+					@kit.Section(group.Title, nil) {
+						@kit.List() {
+							for _, page := range group.Pages {
+								@kit.Row(docsPageURL(page)) {
+									@kit.RowText(page.Title, "")
+								}
+							}
+						}
+					}
+				}
+			</div>
+		} else if len(hits) == 0 {
+			<p class="px-1 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
+		} else {
+			@kit.List() {
+				for _, hit := range hits {
+					@kit.Row(hit.Href) {
+						@kit.RowText(hit.Title, hit.Where)
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// docsSearch is the search of a docs page, in the middle of the screen:
+// ⌘K, ctrl+k, / or the search button open it. What you type goes to the
+// server (DocsSearchOptions), the arrows pick, Enter opens, Escape or a
+// click outside closes it.
 templ docsSearch(groups []model.DocGroup) {
 	<dialog id="docs-search" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search the docs">
 		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl">
-			<div class="relative shrink-0">
+			<form method="get" action="/docs" role="search" class="relative shrink-0">
 				<label for="docs-search-input" class="sr-only">Search the docs</label>
 				@icon.Search(icon.Props{Class: "pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground"})
 				<input
 					id="docs-search-input"
+					name="q"
 					type="search"
 					autocomplete="off"
 					spellcheck="false"
@@ -38,48 +130,45 @@ templ docsSearch(groups []model.DocGroup) {
 					aria-expanded="true"
 					aria-controls="docs-search-results"
 					aria-autocomplete="list"
+					hx-get="/docs/search"
+					hx-trigger="input changed delay:80ms"
+					hx-target="#docs-search-results"
+					hx-swap="innerHTML"
+					hx-sync="this:replace"
 					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
 				/>
-			</div>
+			</form>
 			<div id="docs-search-results" role="listbox" aria-label="Pages" class="flex flex-col gap-0.5 overflow-y-auto border-t border-border p-1.5">
-				for _, group := range groups {
-					for _, page := range group.Pages {
-						@docsSearchOption(docsPageURL(page), page.Title, group.Title, page.Title+" "+page.Description+" "+group.Title, false)
-						for _, heading := range page.Headings {
-							if heading.Level == 2 {
-								@docsSearchOption(docsPageURL(page)+"#"+heading.ID, heading.Text, page.Title, page.Title+" "+heading.Text, true)
-							}
-						}
-					}
-				}
-				<p data-docs-search-none hidden class="order-last px-4 py-3 text-sm text-muted-foreground">Nothing found.</p>
+				@DocsSearchOptions("", FindDocs(groups, "", 0))
 			</div>
 		</div>
 	</dialog>
 	@docsSearchScript()
 }
 
-// docsSearchOption is a page, or a section of one (shown only once you
-// type). The words it is found by are in data-find.
-templ docsSearchOption(href, name, where, find string, section bool) {
-	<a
-		href={ templ.SafeURL(href) }
-		role="option"
-		aria-selected="false"
-		data-find={ strings.ToLower(find) }
-		if section {
-			data-section
-			hidden
-		}
-		class="flex min-h-11 items-center gap-3 rounded-3xl px-4 py-2 text-sm outline-none aria-selected:bg-foreground/6"
-	>
-		<span class="min-w-0 flex-1 truncate font-medium">{ name }</span>
-		<span class="shrink-0 truncate text-xs text-muted-foreground">{ where }</span>
-	</a>
+// DocsSearchOptions are the answers of the search of a docs page.
+templ DocsSearchOptions(query string, hits []DocHit) {
+	if len(hits) == 0 {
+		<p class="px-4 py-3 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
+	}
+	for i, hit := range hits {
+		<a
+			href={ templ.SafeURL(hit.Href) }
+			role="option"
+			aria-selected={ ifElse(i == 0, "true", "false") }
+			class="flex min-h-11 items-center gap-3 rounded-3xl px-4 py-2 text-sm outline-none aria-selected:bg-foreground/6"
+		>
+			<span class="min-w-0 flex-1 truncate font-medium">{ hit.Title }</span>
+			<span class="shrink-0 truncate text-xs text-muted-foreground">{ hit.Where }</span>
+		</a>
+	}
 }
 
 var docsSearchOnce = templ.NewOnceHandle()
 
+// docsSearchScript opens and closes the search of a docs page and moves
+// through its answers; the server finds them. On the docs home, ⌘K and /
+// go to its field instead.
 templ docsSearchScript() {
 	@docsSearchOnce.Once() {
 		<script nonce={ templ.GetNonce(ctx) }>
@@ -87,54 +176,37 @@ templ docsSearchScript() {
 				const dialog = () => document.getElementById("docs-search");
 				const field = () => document.getElementById("docs-search-input");
 				const options = () => [...dialog().querySelectorAll("[role=option]")];
-				const shown = () => options().filter((option) => !option.hidden).sort((a, b) => a.style.order - b.style.order);
 				const typing = (target) => target instanceof Element && target.closest("input, textarea, select, [contenteditable]");
 				const pick = (option) => {
 					for (const each of options()) each.setAttribute("aria-selected", String(each === option));
 					option?.scrollIntoView({ block: "nearest" });
 				};
-				// Without words it lists the pages; with words, the pages and
-				// sections that hold every one of them.
-				const filter = () => {
-					const words = field().value.toLowerCase().split(/\s+/).filter(Boolean);
-					const typed = words.join(" ");
-					for (const option of options()) {
-						option.hidden = words.length === 0 ? option.hasAttribute("data-section") : !words.every((word) => option.dataset.find.includes(word));
-						// A name that starts with what you typed comes first,
-						// then pages, then sections.
-						const name = option.firstElementChild.textContent.toLowerCase();
-						option.style.order = typed && name.startsWith(typed) ? 0 : option.hasAttribute("data-section") ? 2 : 1;
-					}
-					dialog().querySelector("[data-docs-search-none]").hidden = shown().length > 0;
-					pick(shown()[0]);
-				};
 				const open = () => {
+					const home = document.getElementById("docs-q");
+					if (home) return home.focus();
 					if (!dialog() || dialog().open) return;
-					field().value = "";
-					filter();
 					dialog().showModal();
-					field().focus();
+					field().select();
 				};
 				document.addEventListener("click", (event) => {
-					if (event.target.closest("[data-docs-search-open]")) open();
-					else if (event.target === dialog()) dialog().close();
-				});
-				document.addEventListener("input", (event) => {
-					if (event.target === field()) filter();
+					if (event.target.closest("[data-docs-search-open]")) {
+						event.preventDefault();
+						open();
+					} else if (event.target === dialog()) dialog().close();
 				});
 				document.addEventListener("mouseover", (event) => {
 					const option = event.target.closest("#docs-search [role=option]");
 					if (option && option.getAttribute("aria-selected") !== "true") pick(option);
 				});
 				document.addEventListener("keydown", (event) => {
-					if (!dialog()) return;
+					if (!dialog() && !document.getElementById("docs-q")) return;
 					if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
 						event.preventDefault();
 						open();
 						return;
 					}
-					if (event.target !== field()) return;
-					const list = shown();
+					if (!dialog() || event.target !== field()) return;
+					const list = options();
 					const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
 					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 						event.preventDefault();

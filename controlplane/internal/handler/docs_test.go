@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 		t.Fatalf("status = %d, body is no page", response.Code)
 	}
-	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-search"`} {
+	for _, want := range []string{">Start</h2>", ">Apps</h2>", `href="/docs/getting-started"`, `href="/docs/guides/domains"`, `id="docs-q"`, `hx-get="/docs"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("docs home misses %q", want)
 		}
@@ -28,8 +29,32 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	if strings.Index(body, ">Start</h2>") > strings.Index(body, ">Apps</h2>") {
 		t.Error("topics are out of order")
 	}
-	if strings.Contains(body, "hx-get") {
+	if regexp.MustCompile(`<a [^>]*hx-`).MatchString(body) || strings.Contains(body, "hx-boost") {
 		t.Error("docs links load whole pages, never with htmx")
+	}
+}
+
+func TestDocsSearchFindsPagesAndSectionsWithATypo(t *testing.T) {
+	handler := newDocsTestHandler(t)
+	// Opened as a page, the search renders the home with what it finds.
+	body := serveDocs(t, handler, "/docs?q=domians").Body.String()
+	if !strings.Contains(body, `href="/docs/guides/domains"`) || strings.Contains(body, ">Start</h2>") {
+		t.Errorf("search page does not list only what it finds:\n%s", body)
+	}
+	if !strings.Contains(body, `value="domians"`) {
+		t.Error("search page loses what was typed")
+	}
+	// A keystroke gets only the list, and the address bar follows.
+	request := httptest.NewRequest(http.MethodGet, "/docs?q=first", nil)
+	request.Header.Set("HX-Request", "true")
+	recorder := httptest.NewRecorder()
+	handler.ShowDocs(recorder, request)
+	fragment := recorder.Body.String()
+	if strings.Contains(strings.ToLower(fragment), "<!doctype html>") || !strings.Contains(fragment, `href="/docs/getting-started#first-step"`) {
+		t.Errorf("search answer = %q", fragment)
+	}
+	if got := recorder.Header().Get("HX-Replace-Url"); got != "/docs?q=first" {
+		t.Errorf("HX-Replace-Url = %q", got)
 	}
 }
 

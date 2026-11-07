@@ -87,12 +87,13 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
+	mux.HandleFunc("GET /docs/search", docs.SearchDocs)
 	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(content.Root, app.Cfg.AppURL, build.Name))
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
-	mux.HandleFunc("GET /apps", catalogPages.List)
-	mux.HandleFunc("GET /apps/{slug}", catalogPages.Show)
-	mux.HandleFunc("GET /apps/{slug}/logo", catalogPages.Logo)
+	mux.HandleFunc("GET /catalog", catalogPages.List)
+	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
+	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
 	// The legal pages describe the hosted service; a self-hosted control
 	// plane answers them with not found.
 	if app.Cfg.Billing {
@@ -171,7 +172,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/install", workspace(servers.NewInstall))
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/{id}/install", workspace(servers.Install))
 	apps := handler.NewAppsHandler(app.AppService, app.ServerService, app.UserService, app.CatalogService)
-	mux.HandleFunc("GET /apps/{slug}/install", middleware.RequireAuth(catalogPages.Start))
+	mux.HandleFunc("GET /catalog/{slug}/install", middleware.RequireAuth(catalogPages.Start))
 	mux.HandleFunc("GET /app/{workspaceSlug}/catalog", workspace(catalogPages.InApp))
 	mux.HandleFunc("GET /app/{workspaceSlug}/catalog/{slug}", workspace(catalogPages.InstallPage))
 	mux.HandleFunc("POST /app/{workspaceSlug}/catalog/{slug}/install", workspace(catalogPages.Install))
