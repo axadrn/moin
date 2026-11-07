@@ -22,7 +22,7 @@ It lists the full backups, how far back a point in time restore reaches, and the
 Takes a full backup right now, before you try something risky.
 
 ```surfaces
-Web: the app, **Backups**, **Back up now**
+Web: the app page, **Data**, a database, **Back up now**
 CLI: moin backup
 TUI: on the app, `N`
 API: POST /api/v1/apps/{app}/backups
@@ -34,7 +34,7 @@ MCP: back_up_app
 Puts the database back to one full backup. Its ID is the time it was taken, then why, like `20261031T143638Z-manual`: copy it from the list, moin refuses anything else.
 
 ```surfaces
-Web: the app, **Backups**, **Restore** on a backup
+Web: the app page, **Data**, a database: pick a backup under **Backups**, **Restore**, then type the app name
 CLI: moin restore <snapshot-id>
 TUI: on the app, `b`, pick the backup, `enter`, then type the app name
 API: POST /api/v1/apps/{app}/restore
@@ -45,7 +45,7 @@ A backup in an older bucket, from before the app moved, restores from that bucke
 
 ## Restore to a point in time
 
-Puts the database back to any second of the last 7 days. Deleted the wrong rows at 14:02? Restore to 14:01.
+Puts the database back to any second of the last 7 days. Deleted the wrong rows at 14:02? Restore to 14:01. The web restores the backups in its list; for a second of your choice use the CLI, the TUI, the API or MCP.
 
 ```surfaces
 Web: the app, **Backups**, **Restore to a point in time**: pick the day and the time, then **Restore to this time**
@@ -62,7 +62,7 @@ Times are in UTC. A time without a day, like `14:01`, means today. The API and M
 On by default: a full backup before moin changes anything, so a bad migration or a wrong `UPDATE` is one click from undone.
 
 ```surfaces
-Web: the app, **Backups**, **Snapshot before every change**
+Web: the app page, **Data**, **Back up before every change**
 CLI: moin backups auto off
 CLI: moin backups auto on
 TUI: on the app, `b`, then `a`

@@ -10,7 +10,7 @@ Browse the tables of your app's live database, edit a cell, add or delete a row 
 ## See the tables
 
 ```surfaces
-Web: the app, **Data**
+Web: the app page, **Data**, a database
 CLI: moin db
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
@@ -24,7 +24,7 @@ Tables with their row counts, and the migration tool with its newest version whe
 Newest first, at most 1000 rows. `--limit` (CLI) or `limit` (API, MCP) chooses fewer; outside 1 to 1000 it is refused.
 
 ```surfaces
-Web: the app, **Data**, click a table
+Web: the app page, **Data**, a database, a table
 CLI: moin db rows <table>
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/rows
@@ -36,7 +36,7 @@ MCP: query_database
 A table's `CREATE` statement and its indexes.
 
 ```surfaces
-Web: the app, **Data**, a table, **Schema**
+Web: the app page, **Data**, a database, a table: **Columns** and **Statement** under the rows
 CLI: moin db schema <table>
 TUI: opens the web: `w`, then `d`
 API: GET /api/v1/apps/{app}/databases/tables
@@ -48,7 +48,7 @@ MCP: list_tables
 A query only reads, unless you say it may change data.
 
 ```surfaces
-Web: the app, **Data**, the **SQL** box, **Run**
+Web: the app page, **Data**, a database, **SQL**, **Run**
 CLI: moin sql "SELECT status, count(*) FROM orders GROUP BY status"
 TUI: opens the web: `w`, then `d`
 API: POST /api/v1/apps/{app}/databases/query
@@ -65,8 +65,8 @@ echo "SELECT * FROM customers" | moin sql
 Edit a cell, add a row or delete one. With [backups](/docs/guides/backups) set up, moin takes a full backup first, so one restore undoes it.
 
 ```surfaces
-Web: the app, **Data**: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
-Web: or tick **Allow changes** in the **SQL** box
+Web: the app page, **Data**, a database, a table: click a cell, type, then `Enter`; **Add row**; or the trash icon on a row
+Web: or turn on **Allow changes** under **SQL**
 CLI: moin sql --write "UPDATE settings SET value = 'on' WHERE key = 'maintenance'"
 TUI: opens the web: `w`, then `d`
 API: PATCH /api/v1/apps/{app}/databases/rows
