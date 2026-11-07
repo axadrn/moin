@@ -1,87 +1,65 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/table"
-	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 	"strconv"
 	"strings"
+
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
 // AdminOldAddress shows what still arrives on the old addresses of the
 // control plane, so the operator knows when one can go.
 templ AdminOldAddress(report *model.OldAddress) {
-	@layouts.Admin("Old address") {
-		<div class="flex flex-col gap-6">
-			@pageHeader("Old address", oldAddressLine(report))
-			<dl class="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-3">
-				@statCard("Requests", strconv.Itoa(report.Total), "last "+strconv.Itoa(report.Days)+" days")
-				@statCard("Last request", oldAddressLast(report), "UTC")
-				@statCard("Can it go?", oldAddressVerdict(report), "after "+strconv.Itoa(report.QuietDays)+" quiet days")
-			</dl>
-			if len(report.Rows) > 0 {
-				@panel(panelProps{Title: "By day", Description: "Agents, the CLI and webhooks still on the old address."}) {
-					<div class="-mx-6">
-						@table.Table() {
-							@table.Header() {
-								@table.Row() {
-									@table.Head(table.HeadProps{Class: "px-4 first:pl-6"}) {
-										Day
-									}
-									@table.Head(table.HeadProps{Class: "px-4"}) {
-										Host
-									}
-									@table.Head(table.HeadProps{Class: "px-4"}) {
-										Kind
-									}
-									@table.Head(table.HeadProps{Class: "px-4 pr-6 text-right"}) {
-										Requests
-									}
-								}
-							}
-							@table.Body() {
-								for _, row := range report.Rows {
-									@table.Row() {
-										@table.Cell(table.CellProps{Class: "px-4 py-3 first:pl-6 tabular-nums"}) {
-											{ row.Day }
-										}
-										@table.Cell(table.CellProps{Class: "px-4 py-3 font-mono"}) {
-											{ row.Host }
-										}
-										@table.Cell(table.CellProps{Class: "px-4 py-3"}) {
-											{ row.Kind }
-										}
-										@table.Cell(table.CellProps{Class: "px-4 py-3 pr-6 text-right tabular-nums"}) {
-											{ strconv.Itoa(row.Requests) }
-										}
-									}
+	@layouts.Admin("Old domain · Admin") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, "Old domain")
+			if len(report.Hosts) == 0 {
+				@kit.List() {
+					@kit.Row("") {
+						@kit.RowText("No old domain is set", "Put it in OLD_URLS.")
+					}
+				}
+			} else {
+				@kit.List() {
+					@adminFact("Domain", strings.Join(report.Hosts, ", "))
+					@adminFact("Can it go?", oldAddressVerdict(report))
+					@adminFact("Requests", strconv.Itoa(report.Total)+" in "+strconv.Itoa(report.Days)+" days")
+					@adminFact("Last request", oldAddressLast(report))
+				}
+				if len(report.Rows) > 0 {
+					@kit.Section("By day", nil) {
+						@kit.List() {
+							for _, row := range report.Rows {
+								@kit.Row("") {
+									<div class="min-w-0 flex-1">
+										<div class="truncate font-medium tabular-nums">{ row.Day }</div>
+										<div class="truncate text-sm text-muted-foreground"><span class="font-mono">{ row.Host }</span> · { row.Kind }</div>
+									</div>
+									<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ strconv.Itoa(row.Requests) }</span>
 								}
 							}
 						}
-					</div>
+					}
 				}
 			}
-		</div>
+		}
 	}
-}
-
-func oldAddressLine(report *model.OldAddress) string {
-	if len(report.Hosts) == 0 {
-		return "No old address is set: OLD_URLS is empty."
-	}
-	return "What still arrives on " + strings.Join(report.Hosts, ", ") + "."
 }
 
 func oldAddressLast(report *model.OldAddress) string {
 	if report.LastAt == nil {
 		return "None"
 	}
-	return report.LastAt.Format("Jan 2, 15:04")
+	return report.LastAt.UTC().Format("Jan 2, 15:04 UTC")
 }
 
+// oldAddressVerdict is whether the old address can go: after so many quiet
+// days.
 func oldAddressVerdict(report *model.OldAddress) string {
 	if report.Quiet {
 		return "Yes"
 	}
-	return "Not yet"
+	return "Not yet, after " + strconv.Itoa(report.QuietDays) + " quiet days"
 }

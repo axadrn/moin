@@ -46,62 +46,70 @@ func (h *AdminHandler) OldAddress(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AdminOldAddress(report))
 }
 
+// User is one user's page: the facts and what an operator can do.
+func (h *AdminHandler) User(w http.ResponseWriter, r *http.Request) {
+	user, err := h.admin.User(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"))
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	render(w, r, pages.AdminUser(user))
+}
+
+// Activity is what operators did, the last 50 events.
+func (h *AdminHandler) Activity(w http.ResponseWriter, r *http.Request) {
+	dashboard, err := h.admin.Dashboard(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), "", 1)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	render(w, r, pages.AdminActivity(dashboard.Events))
+}
+
 func (h *AdminHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request) {
-	err := h.admin.RevokeUserSessions(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"))
+	userID := r.PathValue("userID")
+	err := h.admin.RevokeUserSessions(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID)
 	if err != nil {
 		h.handleError(w, r, err)
 		return
 	}
-	query := r.FormValue("q")
-	page, _ := strconv.Atoi(r.FormValue("page"))
 	if !isAction(r) {
-		values := url.Values{}
-		if query != "" {
-			values.Set("q", query)
-		}
-		values.Set("page", strconv.Itoa(page))
-		redirect(w, r, "/admin?"+values.Encode(), http.StatusSeeOther)
+		redirect(w, r, "/admin/users/"+url.PathEscape(userID), http.StatusSeeOther)
 		return
 	}
-	dashboard, err := h.admin.Dashboard(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), query, page)
+	user, err := h.admin.User(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID)
 	if err != nil {
 		h.handleError(w, r, err)
 		return
 	}
-	answerDone(w, r, "Sessions revoked", "The user has been signed out everywhere.")
-	render(w, r, pages.AdminDashboardContent(dashboard))
+	answerDone(w, r, "Sessions revoked", "Signed out everywhere.")
+	render(w, r, pages.AdminUserFacts(user))
 }
 
 // ForeverFree makes the first workspace of a user free forever, or ends it.
 func (h *AdminHandler) ForeverFree(w http.ResponseWriter, r *http.Request) {
+	userID := r.PathValue("userID")
 	on := r.FormValue("forever_free") == "true"
-	err := h.admin.SetForeverFree(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"), on)
+	err := h.admin.SetForeverFree(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID, on)
 	if err != nil {
 		h.handleError(w, r, err)
 		return
 	}
-	query := r.FormValue("q")
-	page, _ := strconv.Atoi(r.FormValue("page"))
 	if !isAction(r) {
-		values := url.Values{}
-		if query != "" {
-			values.Set("q", query)
-		}
-		values.Set("page", strconv.Itoa(page))
-		redirect(w, r, "/admin?"+values.Encode(), http.StatusSeeOther)
+		redirect(w, r, "/admin/users/"+url.PathEscape(userID), http.StatusSeeOther)
 		return
 	}
-	dashboard, err := h.admin.Dashboard(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), query, page)
+	user, err := h.admin.User(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID)
 	if err != nil {
 		h.handleError(w, r, err)
 		return
 	}
 	if on {
-		answerDone(w, r, "Free forever", "Their first workspace has everything, without paying.")
+		answerDone(w, r, "Free forever", "")
 	} else {
-		answerDone(w, r, "Free forever ended", "The rest of their trial, then they pay to make changes.")
+		answerDone(w, r, "Free forever ended", "")
 	}
-	render(w, r, pages.AdminDashboardContent(dashboard))
+	render(w, r, pages.AdminUserPlan(user))
 }
 
 func (h *AdminHandler) StartImpersonation(w http.ResponseWriter, r *http.Request) {
@@ -114,12 +122,14 @@ func (h *AdminHandler) StartImpersonation(w http.ResponseWriter, r *http.Request
 }
 
 func (h *AdminHandler) StopImpersonation(w http.ResponseWriter, r *http.Request) {
-	err := h.admin.StopImpersonation(w, ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()))
+	user := ctxkeys.User(r.Context())
+	err := h.admin.StopImpersonation(w, user, ctxkeys.Session(r.Context()))
 	if err != nil {
 		h.handleError(w, r, err)
 		return
 	}
-	redirect(w, r, "/admin", http.StatusSeeOther)
+	// Back to the page of the user you viewed as.
+	redirect(w, r, "/admin/users/"+url.PathEscape(user.ID), http.StatusSeeOther)
 }
 
 func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err error) {

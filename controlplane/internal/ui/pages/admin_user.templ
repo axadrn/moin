@@ -1,0 +1,130 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+)
+
+// AdminUser is one user for the operator: the facts, View as user (the one
+// thing you come here for), free forever, and revoking every session at
+// the end. Nothing here is offered for your own account or, to view as,
+// for another operator.
+templ AdminUser(user *model.AdminUser) {
+	{{ self := ctxkeys.User(ctx) != nil && ctxkeys.User(ctx).ID == user.ID }}
+	@layouts.Admin(adminUserName(*user) + " · Admin") {
+		@panelPage() {
+			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, adminUserName(*user)) {
+				if !self && !user.IsAdmin {
+					<div class="sm:ml-auto">
+						@kit.Button(kit.Primary, "", templ.Attributes{
+							"hx-post":    "/admin/users/" + user.ID + "/impersonate",
+							"hx-swap":    "none",
+							"hx-disable": "this",
+						}) {
+							View as user
+						}
+					</div>
+				}
+			}
+			@AdminUserFacts(user)
+			if adminCanBeFreeForever(*user) {
+				@AdminUserPlan(user)
+			}
+			if !self {
+				@kit.List() {
+					@kit.RowButton(true, templ.Attributes{
+						"hx-post":    "/admin/users/" + user.ID + "/sessions/revoke",
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Revoke every session of " + user.Email + "? They are signed out everywhere, and their API tokens stop working.",
+					}) {
+						<span class="font-medium">Revoke sessions</span>
+					}
+				}
+			}
+		}
+	}
+}
+
+// AdminUserFacts are the facts of a user, swapped in again after an action
+// changed them.
+templ AdminUserFacts(user *model.AdminUser) {
+	<div id="admin-user-facts" hx-swap-oob="true">
+		@kit.List() {
+			@adminFact("Email", user.Email)
+			@adminFact("Verified", adminYesNo(user.EmailVerifiedAt != nil))
+			if user.IsAdmin {
+				@adminFact("Role", "Operator")
+			}
+			@adminFact("Joined", user.CreatedAt.UTC().Format("Jan 2, 2006"))
+			@adminFact("Workspaces", strconv.Itoa(user.WorkspaceCount))
+			@adminFact("Sessions", strconv.Itoa(user.ActiveSessionCount))
+		}
+	</div>
+}
+
+// AdminUserPlan is the plan of the first workspace the user created and
+// free forever: on or off, both ask first and want the email typed out.
+// A paying workspace is not made free forever, so it has no button.
+templ AdminUserPlan(user *model.AdminUser) {
+	{{ on := user.Plan != model.AdminPlanFreeForever }}
+	<div id="admin-user-plan" hx-swap-oob="true">
+		@kit.List() {
+			@adminFact("Plan", adminPlanLabel(*user))
+			if user.Plan != model.AdminPlanPaying {
+				@kit.RowButton(false, adminForeverFreeAttributes(user, on)) {
+					<span class="font-medium">
+						if on {
+							Make free forever
+						} else {
+							End free forever
+						}
+					</span>
+				}
+			}
+		}
+	</div>
+}
+
+func adminForeverFreeAttributes(user *model.AdminUser, on bool) templ.Attributes {
+	attributes := templ.Attributes{
+		"hx-post":           "/admin/users/" + user.ID + "/forever-free",
+		"hx-vals":           `{"forever_free": "` + strconv.FormatBool(on) + `"}`,
+		"hx-swap":           "none",
+		"hx-disable":        "this",
+		"data-confirm-name": user.Email,
+	}
+	if on {
+		attributes["hx-confirm"] = "Make " + user.Email + " free forever? Their first workspace gets everything, forever, without paying."
+		attributes["data-confirm-action"] = "Make free forever"
+	} else {
+		attributes["hx-confirm"] = "End free forever for " + user.Email + "? They get the rest of their trial, or read-only once it is over, until they pay."
+		attributes["data-confirm-action"] = "End free forever"
+	}
+	return attributes
+}
+
+// adminCanBeFreeForever is whether the user has a plan to show: billing is
+// on and they created a workspace.
+func adminCanBeFreeForever(user model.AdminUser) bool {
+	return user.Plan != "" && user.Plan != model.AdminPlanNoWorkspace
+}
+
+// adminFact is a row with a word and its value, like iOS Settings, About.
+templ adminFact(label, value string) {
+	@kit.Row("") {
+		<span class="shrink-0 font-medium">{ label }</span>
+		<span class="min-w-0 flex-1 truncate text-right text-sm text-muted-foreground">{ value }</span>
+	}
+}
+
+func adminYesNo(yes bool) string {
+	if yes {
+		return "Yes"
+	}
+	return "No"
+}

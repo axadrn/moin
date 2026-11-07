@@ -266,7 +266,7 @@ To stop asking GitHub, set `UPDATE_CHECK=false`. Then update with `sh update.sh`
 
 **The admin page.** `/admin` is for the addresses in `ADMIN_EMAILS` only: users, sessions, operator activity and **Update now**. Nobody else sees it. Your control plane counts only its own people; it never sees anyone else's.
 
-**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old address**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
+**A new address.** When the control plane moves to a new address, set `APP_URL` to it and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. The control plane answers on both: a browser on the old address goes on to the same page on the new one, and agents and the CLI move to it by themselves. Webhooks and API calls on the old address keep working. Admins see under **Admin**, **Old domain**, or `GET /api/v1/admin/old-address`, what still arrives there, by day and kind; after 14 quiet days it can go.
 
 ## Move or rebuild
 
