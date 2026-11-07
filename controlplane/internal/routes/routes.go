@@ -319,7 +319,6 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo/auto-deploy", workspace(apps.SetAutoDeploy))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo/unlink", workspace(apps.UnlinkRepo))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo/deploy", workspace(apps.DeployRef))
-	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/backups", workspace(apps.Backups))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/restore", workspace(apps.BackupRestore))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/backups/download", workspace(apps.BackupDownload))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/uptime", workspace(apps.Uptime))

@@ -158,7 +158,7 @@ func (s *AlertService) backupFailedMessage(e alertEvent) alertMessage {
 			"Error: " + orDash(reason),
 			"New changes are not in your bucket until this is fixed. What is there stays. See: moin backups " + e.target,
 		},
-		URL:     e.base + "/apps/" + e.target + "/backups",
+		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
 	}
 }
@@ -167,7 +167,7 @@ func (s *AlertService) backupRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Backups of " + e.target + " work again",
 		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Every change goes to your bucket again."},
-		URL:     e.base + "/apps/" + e.target + "/backups",
+		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}
 }
@@ -181,7 +181,7 @@ func (s *AlertService) drillFailedMessage(e alertEvent) alertMessage {
 			"Error: " + orDash(reason),
 			"The daily check could not go back to the newest state. Download a copy now and look: moin backups " + e.target,
 		},
-		URL:     e.base + "/apps/" + e.target + "/backups",
+		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},
 	}
 }
@@ -190,7 +190,7 @@ func (s *AlertService) drillRecoveredMessage(e alertEvent) alertMessage {
 	return alertMessage{
 		Symbol: "🟢", Heading: "Daily check of " + e.target + " passes again",
 		Lines:   []string{"Database: " + e.details["database"] + ", app " + e.target + ". Going back works again."},
-		URL:     e.base + "/apps/" + e.target + "/backups",
+		URL:     e.base + "/apps/" + e.target + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target)},
 	}
 }

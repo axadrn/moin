@@ -12,12 +12,6 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
 
-// Backups was the backups page of an app. The backups are in Data now,
-// with their database.
-func (h *AppsHandler) Backups(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+r.PathValue("app")+"/data", http.StatusMovedPermanently)
-}
-
 // BackupRestore puts a database back to the moment picked.
 func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 	moment := r.FormValue("moment")
