@@ -47,6 +47,12 @@ templ Base(props ...SEOProps) {
 			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
 			@components.Scripts()
 			<script defer nonce={ templ.GetNonce(ctx) } src={ tuiutils.ScriptURL("/assets/js/moin.js") }></script>
+			// A link starts loading when the pointer rests on it, so the page
+			// is there on the click (Chrome and Edge; others ignore it). Only
+			// pages: never sign in or out, GitHub or the API.
+			<script type="speculationrules" nonce={ templ.GetNonce(ctx) }>
+				{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/auth/*"}},{"not":{"href_matches":"/api/*"}},{"not":{"href_matches":"/*/github/*"}},{"not":{"href_matches":"/*\\?*"}}]},"eagerness":"moderate"}]}
+			</script>
 			// Site-wide enhancements
 			@themeScript()
 			if len(props) > 0 && props[0].Public {
