@@ -32,20 +32,20 @@ var (
 )
 
 type WorkspaceService struct {
-	workspaces    repository.WorkspaceRepository
-	members       repository.WorkspaceMemberRepository
-	invitations   repository.WorkspaceInvitationRepository
-	audit         repository.WorkspaceAuditRepository
+	workspaces    *repository.Workspaces
+	members       *repository.WorkspaceMembers
+	invitations   *repository.WorkspaceInvitations
+	audit         *repository.WorkspaceAudit
 	users         *repository.Users
 	subscriptions *SubscriptionService
 	email         *EmailService
 }
 
 func NewWorkspaceService(
-	workspaces repository.WorkspaceRepository,
-	members repository.WorkspaceMemberRepository,
-	invitations repository.WorkspaceInvitationRepository,
-	audit repository.WorkspaceAuditRepository,
+	workspaces *repository.Workspaces,
+	members *repository.WorkspaceMembers,
+	invitations *repository.WorkspaceInvitations,
+	audit *repository.WorkspaceAudit,
 	users *repository.Users,
 	subscriptions *SubscriptionService,
 	email *EmailService,

@@ -43,7 +43,7 @@ func (e *AgentError) Error() string { return "agent: " + e.Message }
 // ServerService manages servers and the live sessions of their agents. The
 // sessions live in memory: there is one control plane process.
 type ServerService struct {
-	audit   repository.WorkspaceAuditRepository
+	audit   *repository.WorkspaceAudit
 	servers repository.ServerRepository
 	appURL  string
 	now     func() time.Time
@@ -85,7 +85,7 @@ type agentSession struct {
 	goneOnce sync.Once
 }
 
-func NewServerService(servers repository.ServerRepository, audit repository.WorkspaceAuditRepository, appURL string) *ServerService {
+func NewServerService(servers repository.ServerRepository, audit *repository.WorkspaceAudit, appURL string) *ServerService {
 	return &ServerService{
 		audit:       audit,
 		servers:     servers,

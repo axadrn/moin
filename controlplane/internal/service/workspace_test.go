@@ -43,7 +43,7 @@ func TestWorkspaceServiceInvitationFlowAndMultipleWorkspaces(t *testing.T) {
 		t.Fatalf("joined workspace = %q, want %q", joined.ID, owner.Workspace.ID)
 	}
 
-	member, err := repository.NewWorkspaceMemberRepository(database).ByWorkspaceAndUser(owner.Workspace.ID, invitee.ID)
+	member, err := repository.NewWorkspaceMembers(database).ByWorkspaceAndUser(owner.Workspace.ID, invitee.ID)
 	if err != nil || member.Role != model.WorkspaceRoleMember {
 		t.Fatalf("accepted member = %#v, error = %v", member, err)
 	}
@@ -110,7 +110,7 @@ func TestWorkspaceServiceRoleBoundaries(t *testing.T) {
 		t.Fatalf("accept member: %v", err)
 	}
 
-	members := repository.NewWorkspaceMemberRepository(database)
+	members := repository.NewWorkspaceMembers(database)
 	adminMembership, _ := members.ByWorkspaceAndUser(owner.Workspace.ID, admin.ID)
 	memberMembership, _ := members.ByWorkspaceAndUser(owner.Workspace.ID, member.ID)
 
@@ -203,7 +203,7 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); !errors.Is(err, ErrActiveSubscription) {
 		t.Fatalf("Delete() active subscription error = %v, want ErrActiveSubscription", err)
 	}
-	if _, err := repository.NewWorkspaceRepository(database).ByID(owner.Workspace.ID); err != nil {
+	if _, err := repository.NewWorkspaces(database).ByID(owner.Workspace.ID); err != nil {
 		t.Fatalf("active workspace was deleted: %v", err)
 	}
 
@@ -223,7 +223,7 @@ func TestWorkspaceDeletionRequiresBillingToEnd(t *testing.T) {
 	if err := workspaces.Delete(owner.WorkspaceMember, owner.Workspace); err != nil {
 		t.Fatalf("Delete() after provider subscription ended error = %v", err)
 	}
-	if _, err := repository.NewWorkspaceRepository(database).ByID(owner.Workspace.ID); !errors.Is(err, repository.ErrWorkspaceNotFound) {
+	if _, err := repository.NewWorkspaces(database).ByID(owner.Workspace.ID); !errors.Is(err, repository.ErrWorkspaceNotFound) {
 		t.Fatalf("deleted workspace lookup error = %v, want ErrWorkspaceNotFound", err)
 	}
 	events, err := repository.NewAdmin(database).ListAuditEvents(10)
@@ -315,10 +315,10 @@ func workspaceTestService(t *testing.T) (*sqlx.DB, *WorkspaceService, *testutil.
 	mailer := testutil.NewMemoryMailer()
 	email := NewEmailService(mailer, "https://app.example.com", "Test App")
 	workspaces := NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		users,
 		subscriptions,
 		email,

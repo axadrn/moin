@@ -99,7 +99,7 @@ func SeedUser(t testing.TB, database *sqlx.DB, options UserOptions) UserFixture 
 		Metadata:    "{}",
 		CreatedAt:   now,
 	}
-	if err := repository.NewWorkspaceRepository(database).CreateWithOwner(workspace, member, subscription, event); err != nil {
+	if err := repository.NewWorkspaces(database).CreateWithOwner(workspace, member, subscription, event); err != nil {
 		t.Fatalf("create fixture workspace: %v", err)
 	}
 

@@ -34,10 +34,10 @@ func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 	email := service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		users,
 		subscriptions,
 		email,

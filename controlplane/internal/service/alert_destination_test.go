@@ -81,7 +81,7 @@ type alertFixture struct {
 	alerts   *AlertService
 	chat     *fakeChat
 	url      string
-	audit    repository.WorkspaceAuditRepository
+	audit    *repository.WorkspaceAudit
 	owner    *model.WorkspaceMember
 	database *sqlx.DB
 }
@@ -91,8 +91,8 @@ func newAlertFixture(t *testing.T) alertFixture {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner", Name: "Ada", Verified: true})
 	apps := repository.NewAppRepository(database, database)
-	audit := repository.NewWorkspaceAuditRepository(database)
-	alerts := NewAlertService(NewEmailService(testutil.NewMemoryMailer(), "https://moin.example.com", "moin"), repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), apps, repository.NewAlertDestinations(database), audit, testBox(t))
+	audit := repository.NewWorkspaceAudit(database)
+	alerts := NewAlertService(NewEmailService(testutil.NewMemoryMailer(), "https://moin.example.com", "moin"), repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), apps, repository.NewAlertDestinations(database), audit, testBox(t))
 	servers := NewServerService(repository.NewServerRepository(database), audit, "https://moin.example.com")
 	server, _, err := servers.Create(owner, "web-1")
 	if err != nil {

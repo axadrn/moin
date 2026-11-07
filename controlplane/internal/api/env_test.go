@@ -60,10 +60,10 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	environment := &apiEnvironment{database: database, mailer: mailer}
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	environment.workspaces = service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		userRepository,
 		subscriptions,
 		email,
@@ -99,7 +99,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	adminHandler := api.NewAdminHandler(environment.admin)
 
 	clientIPs := middleware.NewClientIPResolver(nil)
-	audit := repository.NewWorkspaceAuditRepository(database)
+	audit := repository.NewWorkspaceAudit(database)
 	servers := service.NewServerService(repository.NewServerRepository(database), audit, "https://app.example.com")
 	environment.updates = service.NewUpdateService("v0.2.0", "http://127.0.0.1:1/releases", t.TempDir(), false, true, []string{testAdminEmail}, audit)
 	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
@@ -107,7 +107,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		t.Fatal(err)
 	}
 	apps := service.NewAppService(repository.NewAppRepository(database, database), servers, box)
-	alerts := service.NewAlertService(email, repository.NewWorkspaceRepository(database), repository.NewWorkspaceMemberRepository(database), repository.NewAppRepository(database, database), repository.NewAlertDestinations(database), audit, box)
+	alerts := service.NewAlertService(email, repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), repository.NewAppRepository(database, database), repository.NewAlertDestinations(database), audit, box)
 	handlers := api.Handlers{
 		Version:     api.NewVersionHandler(environment.updates, servers),
 		Meta:        api.NewMetaHandler(testSupportEmail),

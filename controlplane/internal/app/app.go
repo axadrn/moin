@@ -91,10 +91,10 @@ func New(cfg *config.Config) (*App, error) {
 	files := repository.NewFiles(database)
 	subscriptions := repository.NewSubscriptions(database)
 	adminEvents := repository.NewAdmin(database)
-	workspaces := repository.NewWorkspaceRepository(database)
-	members := repository.NewWorkspaceMemberRepository(database)
-	invitations := repository.NewWorkspaceInvitationRepository(database)
-	workspaceAuditEvents := repository.NewWorkspaceAuditRepository(database)
+	workspaces := repository.NewWorkspaces(database)
+	members := repository.NewWorkspaceMembers(database)
+	invitations := repository.NewWorkspaceInvitations(database)
+	workspaceAuditEvents := repository.NewWorkspaceAudit(database)
 	email := service.NewEmailService(mailer.NewProvider(cfg), cfg.AppURL, brand.Name)
 	// A self-hosted control plane may start without a bucket; files such as
 	// avatars wait for one.

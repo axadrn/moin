@@ -260,10 +260,10 @@ func TestWithWorkspaceLoadsWorkspaceAndRejectsCrossTenantAccess(t *testing.T) {
 	users := repository.NewUsers(database)
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		users,
 		subscriptions,
 		service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App"),
@@ -313,10 +313,10 @@ func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
 	users := repository.NewUsers(database)
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
 	workspaces := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		users,
 		subscriptions,
 		service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App"),
@@ -346,10 +346,10 @@ func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.U
 	subscriptionService := service.NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 	emailService := service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	workspaceService := service.NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		userRepository,
 		subscriptionService,
 		emailService,

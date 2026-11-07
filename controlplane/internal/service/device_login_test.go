@@ -23,7 +23,7 @@ type deviceLoginEnvironment struct {
 	tokens *APITokenService
 	clock  *deviceClock
 	user   testutil.UserFixture
-	audit  repository.WorkspaceAuditRepository
+	audit  *repository.WorkspaceAudit
 }
 
 func newDeviceLoginEnvironment(t *testing.T) deviceLoginEnvironment {
@@ -35,7 +35,7 @@ func newDeviceLoginEnvironment(t *testing.T) deviceLoginEnvironment {
 	tokens.now = clock.Now
 	logins := NewDeviceLoginService(repository.NewDeviceLogins(environment.database), tokens)
 	logins.now = clock.Now
-	return deviceLoginEnvironment{logins: logins, tokens: tokens, clock: clock, user: user, audit: repository.NewWorkspaceAuditRepository(environment.database)}
+	return deviceLoginEnvironment{logins: logins, tokens: tokens, clock: clock, user: user, audit: repository.NewWorkspaceAudit(environment.database)}
 }
 
 func (e deviceLoginEnvironment) start(t *testing.T) StartedDeviceLogin {

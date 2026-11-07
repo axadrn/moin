@@ -32,10 +32,10 @@ func newAuthFlowEnvironment(t *testing.T) authFlowEnvironment {
 	subscriptionService := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
 	emailService := NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	workspaceService := NewWorkspaceService(
-		repository.NewWorkspaceRepository(database),
-		repository.NewWorkspaceMemberRepository(database),
-		repository.NewWorkspaceInvitationRepository(database),
-		repository.NewWorkspaceAuditRepository(database),
+		repository.NewWorkspaces(database),
+		repository.NewWorkspaceMembers(database),
+		repository.NewWorkspaceInvitations(database),
+		repository.NewWorkspaceAudit(database),
 		userRepository,
 		subscriptionService,
 		emailService,

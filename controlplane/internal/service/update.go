@@ -75,7 +75,7 @@ type UpdateService struct {
 	check      bool
 	dir        string
 	admins     map[string]struct{}
-	audit      repository.WorkspaceAuditRepository
+	audit      *repository.WorkspaceAudit
 	client     *http.Client
 	now        func() time.Time
 
@@ -88,7 +88,7 @@ type UpdateService struct {
 // NewUpdateService checks url for releases when check is on. dir is where
 // the request, status and heartbeat files of the updater live. selfHosted
 // is false on the hosted control plane, which shows no update at all.
-func NewUpdateService(version, url, dir string, selfHosted, check bool, adminEmails []string, audit repository.WorkspaceAuditRepository) *UpdateService {
+func NewUpdateService(version, url, dir string, selfHosted, check bool, adminEmails []string, audit *repository.WorkspaceAudit) *UpdateService {
 	admins := make(map[string]struct{}, len(adminEmails))
 	for _, address := range adminEmails {
 		admins[strings.ToLower(strings.TrimSpace(address))] = struct{}{}

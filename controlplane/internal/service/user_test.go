@@ -85,7 +85,7 @@ func TestDeleteAccountRequiresAnotherWorkspaceOwner(t *testing.T) {
 	if _, err := users.ByID(fixture.User.ID); !errors.Is(err, repository.ErrUserNotFound) {
 		t.Fatalf("deleted user lookup error = %v, want ErrUserNotFound", err)
 	}
-	workspace, err := repository.NewWorkspaceRepository(database).ByID(fixture.Workspace.ID)
+	workspace, err := repository.NewWorkspaces(database).ByID(fixture.Workspace.ID)
 	if err != nil {
 		t.Fatalf("workspace was deleted with departing owner: %v", err)
 	}

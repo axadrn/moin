@@ -238,13 +238,13 @@ func TestCheckoutStateRejectsConcurrentCreationAndReusesOpenURL(t *testing.T) {
 		Metadata:    "{}",
 		CreatedAt:   time.Now(),
 	}
-	if err := repository.NewWorkspaceRepository(database).DeleteIfBillingInactive(fixture.Workspace.ID, time.Now(), deleteEvent); !errors.Is(err, repository.ErrWorkspaceBillingActive) {
+	if err := repository.NewWorkspaces(database).DeleteIfBillingInactive(fixture.Workspace.ID, time.Now(), deleteEvent); !errors.Is(err, repository.ErrWorkspaceBillingActive) {
 		t.Fatalf("paid DeleteIfBillingInactive() error = %v, want ErrWorkspaceBillingActive", err)
 	}
 	if err := subscriptions.EndPaidAccess(stored); err != nil {
 		t.Fatalf("EndPaidAccess() error = %v", err)
 	}
-	if err := repository.NewWorkspaceRepository(database).DeleteIfBillingInactive(fixture.Workspace.ID, time.Now(), deleteEvent); err != nil {
+	if err := repository.NewWorkspaces(database).DeleteIfBillingInactive(fixture.Workspace.ID, time.Now(), deleteEvent); err != nil {
 		t.Fatalf("DeleteIfBillingInactive() after termination error = %v", err)
 	}
 }

@@ -27,7 +27,7 @@ func TestBucketRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	servers := service.NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
+	servers := service.NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAudit(database), "https://moin.example.com")
 	apps := service.NewAppService(repository.NewAppRepository(database, database), servers, box)
 	actor := service.Actor{WorkspaceID: "workspace-owner", UserID: "owner"}
 	server, _, err := servers.Create(actor, "web-1")
