@@ -2,8 +2,6 @@ package pages
 
 import (
 	"fmt"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/axadrn/moin/controlplane/internal/access"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
@@ -61,7 +59,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 			@kit.List() {
 				for _, member := range members {
 					@kit.RowControl(templ.Attributes{"data-member": member.ID}) {
-						@kit.Avatar("", member.Name, initial(member.Name, member.Email), "size-9")
+						@kit.Avatar("", member.Name, model.Initial(member.Name+member.Email), "size-9")
 						@kit.RowText(member.Name, member.Email)
 						if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
 							<div class="flex w-full items-center gap-2 sm:w-auto">
@@ -178,15 +176,6 @@ func roleOptions(owners bool) []kit.Option {
 		options = append([]kit.Option{{Value: model.WorkspaceRoleOwner, Label: "Owner"}}, options...)
 	}
 	return options
-}
-
-// initial is the first letter of a name, or of the email without one.
-func initial(name, email string) string {
-	r, _ := utf8.DecodeRuneInString(strings.TrimSpace(name + email))
-	if r == utf8.RuneError {
-		return "?"
-	}
-	return strings.ToUpper(string(r))
 }
 
 // seatText counts the members, and the seats when the plan limits them.

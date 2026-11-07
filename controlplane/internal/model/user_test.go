@@ -27,3 +27,21 @@ func TestUserInitial(t *testing.T) {
 		}
 	}
 }
+
+func TestUserInitials(t *testing.T) {
+	for name, want := range map[string]string{"Ada Lovelace": "AL", "ada b. lovelace": "AL", "Ada": "A", "": "U", "Émile Zola": "ÉZ"} {
+		if got := (&User{Name: name, Email: "user@example.com"}).Initials(); got != want {
+			t.Errorf("Initials(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// An app, a workspace or a member without a name shows the first letter of
+// what it has, or a question mark.
+func TestInitial(t *testing.T) {
+	for text, want := range map[string]string{"shop": "S", " ölaf": "Ö", "ada@example.com": "A", "": "?", "  ": "?"} {
+		if got := Initial(text); got != want {
+			t.Errorf("Initial(%q) = %q, want %q", text, got, want)
+		}
+	}
+}

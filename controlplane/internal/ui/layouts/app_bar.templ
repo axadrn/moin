@@ -1,9 +1,6 @@
 package layouts
 
 import (
-	"strings"
-	"unicode/utf8"
-
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
@@ -84,28 +81,13 @@ templ palette(basePath string) {
 // (IdentityUpdates).
 templ UserAvatar(user *model.User) {
 	<span id="bar-avatar" class="contents">
-		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-9")
+		@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-9")
 	</span>
 }
 
 // IdentityUpdates is what a changed name or picture swaps into the bar.
 templ IdentityUpdates(user *model.User) {
 	<span id="bar-avatar" class="contents" hx-swap-oob="true">
-		@kit.Avatar(user.AvatarURL, user.Name, userInitials(user), "size-9")
+		@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-9")
 	</span>
-}
-
-func workspaceInitial(name string) string {
-	first, _ := utf8.DecodeRuneInString(name)
-	return strings.ToUpper(string(first))
-}
-
-func userInitials(user *model.User) string {
-	words := strings.Fields(user.Name)
-	if len(words) < 2 {
-		return user.Initial()
-	}
-	first, _ := utf8.DecodeRuneInString(words[0])
-	last, _ := utf8.DecodeRuneInString(words[len(words)-1])
-	return strings.ToUpper(string(first) + string(last))
 }

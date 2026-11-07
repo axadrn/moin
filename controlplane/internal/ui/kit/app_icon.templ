@@ -1,9 +1,6 @@
 package kit
 
-import (
-	"strings"
-	"unicode/utf8"
-)
+import "github.com/axadrn/moin/controlplane/internal/model"
 
 // AppIcon is the icon of a catalog app, like on a phone's home screen: its
 // logo on a white tile in both themes (logos are drawn for a white page),
@@ -17,7 +14,7 @@ templ AppIcon(name, logo string, head bool) {
 		</span>
 	} else {
 		<span class={ appIconClass(head), "bg-foreground font-semibold text-background" } aria-hidden="true">
-			{ appInitial(name) }
+			{ model.Initial(name) }
 		</span>
 	}
 }
@@ -27,9 +24,4 @@ func appIconClass(head bool) string {
 		return "flex size-11 shrink-0 items-center justify-center rounded-[28%] text-lg"
 	}
 	return "flex size-9 shrink-0 items-center justify-center rounded-[28%] text-sm"
-}
-
-func appInitial(name string) string {
-	first, _ := utf8.DecodeRuneInString(name)
-	return strings.ToUpper(string(first))
 }

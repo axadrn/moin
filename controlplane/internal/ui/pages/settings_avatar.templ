@@ -33,7 +33,7 @@ templ SettingsAvatarSection(user *model.User) {
 templ SettingsAvatarDisplay(user *model.User) {
 	@templ.Fragment("settings-avatar-display") {
 		<div id="settings-avatar" hx-swap-oob="true">
-			@kit.Avatar(user.AvatarURL, user.Name, settingsInitials(user), "size-16")
+			@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-16")
 		</div>
 	}
 }

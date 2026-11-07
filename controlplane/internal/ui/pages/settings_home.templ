@@ -2,7 +2,6 @@ package pages
 
 import (
 	"strings"
-	"unicode/utf8"
 
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
@@ -82,7 +81,7 @@ templ SettingsHome(view SettingsHomeView) {
 			@kit.Section("You", nil) {
 				@kit.List() {
 					@kit.Row(base + "/settings/account") {
-						@kit.Avatar(user.AvatarURL, user.Name, settingsInitials(user), "size-9")
+						@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-9")
 						@kit.RowText(user.Name, user.Email)
 					}
 				}
@@ -131,7 +130,7 @@ templ SettingsHome(view SettingsHomeView) {
 // workspaceRowText is a workspace in the list: its initial, its name, and
 // your role in it under the name.
 templ workspaceRowText(item model.WorkspaceMembership) {
-	<span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">{ settingsInitial(item.Name) }</span>
+	<span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">{ model.Initial(item.Name) }</span>
 	@kit.RowText(item.Name, model.WorkspaceRoleLabel(item.Role))
 }
 
@@ -141,21 +140,6 @@ func gitHubValue(accounts []string) string {
 		return "Connect"
 	}
 	return strings.Join(accounts, ", ")
-}
-
-func settingsInitial(name string) string {
-	first, _ := utf8.DecodeRuneInString(name)
-	return strings.ToUpper(string(first))
-}
-
-func settingsInitials(user *model.User) string {
-	words := strings.Fields(user.Name)
-	if len(words) < 2 {
-		return user.Initial()
-	}
-	first, _ := utf8.DecodeRuneInString(words[0])
-	last, _ := utf8.DecodeRuneInString(words[len(words)-1])
-	return strings.ToUpper(string(first) + string(last))
 }
 
 // SettingsGitHub is the GitHub connection of the workspace, once for every

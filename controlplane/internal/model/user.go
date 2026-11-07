@@ -29,16 +29,32 @@ func (u *User) HasPassword() bool {
 	return u.PasswordSet || (u.PasswordHash != nil && *u.PasswordHash != "")
 }
 
-// Initial is the letter of the avatar without a picture: the first of the
-// name, or of the email when there is no name. Every avatar shows the same.
-func (u *User) Initial() string {
-	text := strings.TrimSpace(u.Name)
-	if text == "" {
-		text = strings.TrimSpace(u.Email)
-	}
-	first, _ := utf8.DecodeRuneInString(text)
+// Initial is the first letter of text in upper case, or "?" without one:
+// the tile of an app or a workspace, the avatar of a member.
+func Initial(text string) string {
+	first, _ := utf8.DecodeRuneInString(strings.TrimSpace(text))
 	if first == utf8.RuneError {
 		return "?"
 	}
 	return strings.ToUpper(string(first))
+}
+
+// Initial is the letter of the avatar without a picture: the first of the
+// name, or of the email when there is no name. Every avatar shows the same.
+func (u *User) Initial() string {
+	if strings.TrimSpace(u.Name) != "" {
+		return Initial(u.Name)
+	}
+	return Initial(u.Email)
+}
+
+// Initials are the letters of your own avatar without a picture: the first
+// and the last word of a name of two words or more, "AL" for Ada Lovelace,
+// else Initial.
+func (u *User) Initials() string {
+	words := strings.Fields(u.Name)
+	if len(words) < 2 {
+		return u.Initial()
+	}
+	return Initial(words[0]) + Initial(words[len(words)-1])
 }

@@ -27,14 +27,6 @@ func TestAppLayoutHasTheBarAndNoSidebar(t *testing.T) {
 	}
 }
 
-func TestUserInitials(t *testing.T) {
-	for name, want := range map[string]string{"Ada Lovelace": "AL", "ada b. lovelace": "AL", "Ada": "A", "": "U", "Émile Zola": "ÉZ"} {
-		if got := userInitials(&model.User{Name: name, Email: "user@example.com"}); got != want {
-			t.Errorf("userInitials(%q) = %q, want %q", name, got, want)
-		}
-	}
-}
-
 func TestBaseLayoutShowsReadOnlyImpersonationBanner(t *testing.T) {
 	operatorID := "operator"
 	ctx := context.Background()
