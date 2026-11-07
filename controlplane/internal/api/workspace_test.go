@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -402,6 +403,14 @@ func TestWorkspaceActivityPagination(t *testing.T) {
 	// Every member sees the activity.
 	memberView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), bearer: seeded.member})
 	expectStatus(t, memberView, http.StatusOK)
+	// The actor by name to everyone, the email only to admins and owners.
+	adminView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), bearer: seeded.admin})
+	if body := memberView.Body.String(); strings.Contains(body, `"actor_email"`) || !strings.Contains(body, `"actor_name"`) {
+		t.Fatalf("a member's activity = %s", body)
+	}
+	if body := adminView.Body.String(); !strings.Contains(body, `"actor_email":"`) || !strings.Contains(body, `"actor_name"`) {
+		t.Fatalf("an admin's activity = %s", body)
+	}
 	for _, query := range []string{"?limit=0", "?limit=201", "?limit=ten"} {
 		invalid := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity" + query), bearer: seeded.owner})
 		expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")

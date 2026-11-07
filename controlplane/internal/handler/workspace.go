@@ -66,7 +66,7 @@ func (h *WorkspaceHandler) ActivityPage(w http.ResponseWriter, r *http.Request) 
 	}
 	var choices model.ActivityChoices
 	if err == nil && after == "" {
-		choices, err = h.workspaces.ActivityChoices(member.WorkspaceID)
+		choices, err = h.workspaces.ActivityChoices(member)
 	}
 	if err != nil {
 		slog.Error("activity could not be loaded", "error", err, "workspace_id", member.WorkspaceID)

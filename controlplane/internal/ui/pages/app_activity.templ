@@ -101,6 +101,9 @@ templ ActivityRows(view ActivityView) {
 					if label := event.ViaLabel(); label != "" {
 						<span>{ "via " + label }</span>
 					}
+					if view.Admin && event.ActorName != "" && event.ActorEmail != "" {
+						<span class="break-all">{ event.ActorEmail }</span>
+					}
 					if view.Admin && event.IP != "" {
 						<span class="tabular-nums">{ event.IP }</span>
 					}
@@ -135,19 +138,34 @@ templ activityFilters(view ActivityView) {
 		hx-push-url="true"
 		data-activity-filters
 	>
-		@activitySelect("app", "All apps", view.Filter.App, view.Choices.Apps)
-		@activitySelect("server", "All servers", view.Filter.Server, view.Choices.Servers)
-		@activitySelect("user", "Everyone", view.Filter.User, view.Choices.Users)
+		@activitySelect("app", "All apps", view.Filter.App, valueOptions(view.Choices.Apps))
+		@activitySelect("server", "All servers", view.Filter.Server, valueOptions(view.Choices.Servers))
+		@activitySelect("user", "Everyone", view.Filter.User, userOptions(view.Choices.Users))
 	</form>
 }
 
-// activitySelect picks one of values, or all of them.
-templ activitySelect(name, all, current string, values []string) {
-	{{ options := []kit.Option{{Value: "", Label: all}} }}
-	for _, value := range values {
-		{{ options = append(options, kit.Option{Value: value, Label: value}) }}
-	}
+// activitySelect picks one of the options, or all of them.
+templ activitySelect(name, all, current string, choices []kit.Option) {
+	{{ options := append([]kit.Option{{Value: "", Label: all}}, choices...) }}
 	@kit.Select(kit.SelectProps{ID: "activity-" + name, Name: name, Label: all, Options: options, Value: current})
+}
+
+// valueOptions are options that show their value.
+func valueOptions(values []string) []kit.Option {
+	options := []kit.Option{}
+	for _, value := range values {
+		options = append(options, kit.Option{Value: value, Label: value})
+	}
+	return options
+}
+
+// userOptions are the people by name, filtered by user ID.
+func userOptions(users []model.ActivityUser) []kit.Option {
+	options := []kit.Option{}
+	for _, user := range users {
+		options = append(options, kit.Option{Value: user.Value(), Label: user.Label()})
+	}
+	return options
 }
 
 templ activityIcon(action string) {

@@ -24,8 +24,10 @@ type ActivityEvent struct {
 	ID          string  `db:"id"`
 	WorkspaceID string  `db:"workspace_id"`
 	ActorUserID *string `db:"actor_user_id"`
+	// ActorName is the member's name now, empty once the account is gone.
+	ActorName string `db:"actor_name"`
 	// ActorEmail is the member's email now, or at the time of the event once
-	// the account is gone.
+	// the account is gone. Only admins and owners see it.
 	ActorEmail string `db:"actor_email"`
 	Action     string `db:"action"`
 	TargetType string `db:"target_type"`
@@ -45,12 +47,41 @@ type ActivityEvent struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
-// ActivityChoices are the apps, servers and member emails the activity of a
+// ActivityChoices are the apps, servers and people the activity of a
 // workspace can be filtered by.
 type ActivityChoices struct {
-	Apps    []string `json:"apps"`
-	Servers []string `json:"servers"`
-	Users   []string `json:"users"`
+	Apps    []string
+	Servers []string
+	Users   []ActivityUser
+}
+
+// ActivityUser is someone who changed something: ID is empty once the
+// account is gone, Email only admins and owners see.
+type ActivityUser struct {
+	ID    string `db:"id"`
+	Name  string `db:"name"`
+	Email string `db:"email"`
+}
+
+// Value is what the filter by this person sends: the user ID, or the email
+// of an account that is gone.
+func (u ActivityUser) Value() string {
+	if u.ID != "" {
+		return u.ID
+	}
+	return u.Email
+}
+
+// Label names the person in the filter: the name, else the email.
+func (u ActivityUser) Label() string {
+	switch {
+	case u.Name != "":
+		return u.Name
+	case u.Email != "":
+		return u.Email
+	default:
+		return "A member"
+	}
 }
 
 // ActivityFilter narrows the activity to one app, server or member. User is a
@@ -97,12 +128,16 @@ func (e ActivityEvent) Details() map[string]string {
 	return details
 }
 
-// Actor names who did it: the member's email, or GitHub, a deploy hook or moin
-// itself for changes that came without a member.
+// Actor names who did it: the member's name, else the email, or GitHub, a
+// deploy hook or moin itself for changes that came without a member.
 func (e ActivityEvent) Actor() string {
 	switch {
+	case e.ActorName != "":
+		return e.ActorName
 	case e.ActorEmail != "":
 		return e.ActorEmail
+	case e.ActorUserID != nil:
+		return "A member"
 	case e.Via == "github":
 		return "GitHub"
 	case e.Via == "hook":

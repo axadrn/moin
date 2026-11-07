@@ -1,9 +1,12 @@
 package service
 
 import (
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
+	"github.com/axadrn/moin/controlplane/internal/repository"
 	"github.com/axadrn/moin/controlplane/internal/testutil"
 )
 
@@ -38,5 +41,75 @@ func TestOnlyManagersSeeInvitationsAndRequests(t *testing.T) {
 		if event.IP != "" || event.UserAgent != "" {
 			t.Fatalf("a member sees the request: %+v", event)
 		}
+	}
+}
+
+// The activity names the actor to the whole team; only admins and owners see
+// the email, as in Members, also in the filter choices. An account that is
+// gone is "A former member" to the rest of the team.
+func TestOnlyManagersSeeActorEmails(t *testing.T) {
+	database, workspaces, _ := workspaceTestService(t)
+	owner := testutil.SeedUser(t, database, testutil.UserOptions{ID: "emails-owner", Email: "owner@example.com", Name: "Owner"})
+	if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, "ada@example.com", model.WorkspaceRoleMember, Source{Via: "web"}); err != nil {
+		t.Fatal(err)
+	}
+	gone := createWorkspaceTestUser(t, database, "emails-gone", "gone@example.com")
+	err := repository.NewActivity(database).Create(&model.ActivityEvent{ID: "gone-event", WorkspaceID: owner.Workspace.ID, ActorUserID: &gone.ID, Action: "app.deployed", Metadata: "{}", CreatedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`DELETE FROM users WHERE id = $1`, gone.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		role        string
+		gone, email string
+		choices     []string
+		emails      []string
+	}{
+		{role: model.WorkspaceRoleAdmin, gone: "gone@example.com", email: "owner@example.com", choices: []string{"gone@example.com", "Owner"}, emails: []string{"gone@example.com", "owner@example.com"}},
+		{role: model.WorkspaceRoleMember, gone: "A former member", choices: []string{"Owner"}},
+	} {
+		t.Run(test.role, func(t *testing.T) {
+			viewer := &model.WorkspaceMember{WorkspaceID: owner.Workspace.ID, UserID: "viewer", Role: test.role}
+			events, _, err := workspaces.ActivityPage(viewer, model.ActivityFilter{}, "", 50)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mine, theirs *model.ActivityEvent
+			for i, event := range events {
+				switch {
+				case event.ActorUserID == nil:
+					theirs = &events[i]
+				case *event.ActorUserID == owner.User.ID:
+					mine = &events[i]
+				}
+			}
+			if mine == nil || theirs == nil {
+				t.Fatalf("events = %+v", events)
+			}
+			if mine.Actor() != "Owner" || mine.ActorName != "Owner" || mine.ActorEmail != test.email {
+				t.Fatalf("the owner's event = %q, name %q, email %q, want Owner, Owner, %q", mine.Actor(), mine.ActorName, mine.ActorEmail, test.email)
+			}
+			if theirs.Actor() != test.gone || (test.email == "" && theirs.ActorEmail != "") {
+				t.Fatalf("the gone account's event = %q, email %q, want %q", theirs.Actor(), theirs.ActorEmail, test.gone)
+			}
+
+			choices, err := workspaces.ActivityChoices(viewer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var labels, emails []string
+			for _, user := range choices.Users {
+				labels = append(labels, user.Label())
+				if user.Email != "" {
+					emails = append(emails, user.Email)
+				}
+			}
+			if !slices.Equal(labels, test.choices) || !slices.Equal(emails, test.emails) {
+				t.Fatalf("filter choices = %v, emails %v, want %v, %v", labels, emails, test.choices, test.emails)
+			}
+		})
 	}
 }

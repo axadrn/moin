@@ -12,7 +12,7 @@ import (
 )
 
 // Event is one thing that happened in the workspace. Actor and Summary read
-// as a sentence: "ada@example.com deployed blog v12". Via is web, cli, tui,
+// as a sentence: "Ada Lovelace deployed blog v12". Via is web, cli, tui,
 // api, mcp, hook, github or system, Token the API token by name. IP and
 // UserAgent are there for admins only.
 type Event struct {

@@ -234,7 +234,8 @@ func (s *WorkspaceService) Activity(workspaceID string) ([]model.ActivityEvent, 
 // workspace, newest first, and the event ID to continue after, empty on the
 // last page. Members who may not view it get ErrActivityPermission; a
 // page has 1 to 200 events. Only members who may manage members see the IP
-// and the user agent of a request.
+// and the user agent of a request and, as in Members, the actor's email;
+// everyone sees the name.
 func (s *WorkspaceService) ActivityPage(member *model.WorkspaceMember, filter model.ActivityFilter, afterID string, limit int) ([]model.ActivityEvent, string, error) {
 	if member == nil || !member.Can(model.WorkspacePermissionViewActivity) {
 		return nil, "", ErrActivityPermission
@@ -246,7 +247,10 @@ func (s *WorkspaceService) ActivityPage(member *model.WorkspaceMember, filter mo
 	}
 	if !member.Can(model.WorkspacePermissionManageMembers) {
 		for i := range events {
-			events[i].IP, events[i].UserAgent = "", ""
+			if events[i].ActorUserID == nil && events[i].ActorEmail != "" {
+				events[i].ActorName = "A former member"
+			}
+			events[i].IP, events[i].UserAgent, events[i].ActorEmail = "", "", ""
 		}
 	}
 	if len(events) <= limit {
@@ -256,10 +260,26 @@ func (s *WorkspaceService) ActivityPage(member *model.WorkspaceMember, filter mo
 	return events, events[limit-1].ID, nil
 }
 
-// ActivityChoices returns what the activity of a workspace can be filtered
-// by.
-func (s *WorkspaceService) ActivityChoices(workspaceID string) (model.ActivityChoices, error) {
-	return s.activity.Choices(workspaceID)
+// ActivityChoices returns what the activity of the member's workspace can
+// be filtered by. Members who may not manage members get the people by name
+// only: no emails, no accounts that are gone.
+func (s *WorkspaceService) ActivityChoices(member *model.WorkspaceMember) (model.ActivityChoices, error) {
+	if member == nil || !member.Can(model.WorkspacePermissionViewActivity) {
+		return model.ActivityChoices{}, ErrActivityPermission
+	}
+	choices, err := s.activity.Choices(member.WorkspaceID)
+	if err != nil || member.Can(model.WorkspacePermissionManageMembers) {
+		return choices, err
+	}
+	users := []model.ActivityUser{}
+	for _, user := range choices.Users {
+		if user.ID != "" {
+			user.Email = ""
+			users = append(users, user)
+		}
+	}
+	choices.Users = users
+	return choices, nil
 }
 
 func (s *WorkspaceService) UpdateName(actor *model.WorkspaceMember, workspace *model.Workspace, name string, source Source) error {

@@ -17,12 +17,12 @@ MCP: list_activity
 
 | When (UTC) | Who | Via | What |
 | --- | --- | --- | --- |
-| 2026-11-02 14:03:07 | ada@example.com | CLI, token ci | deployed shop v42 from main at 3f2a9c1 |
+| 2026-11-02 14:03:07 | Ada Lovelace | CLI, token ci | deployed shop v42 from main at 3f2a9c1 |
 | 2026-11-02 14:03:51 | moin | moin | made v42 of shop live after 44s |
-| 2026-11-02 14:10:12 | ben@example.com | Web | set STRIPE_KEY in the env of shop |
-| 2026-11-02 14:12:30 | ben@example.com | Web | edited status of row 1182 in orders of shop |
-| 2026-11-02 14:25:44 | ada@example.com | MCP, token claude | ran UPDATE on orders in shop, 3 rows changed |
-| 2026-11-02 16:40:02 | ada@example.com | Web | set the backups of shop to every 15 minutes, kept 30 days, every change on |
+| 2026-11-02 14:10:12 | Ben Okafor | Web | set STRIPE_KEY in the env of shop |
+| 2026-11-02 14:12:30 | Ben Okafor | Web | edited status of row 1182 in orders of shop |
+| 2026-11-02 14:25:44 | Ada Lovelace | MCP, token claude | ran UPDATE on orders in shop, 3 rows changed |
+| 2026-11-02 16:40:02 | Ada Lovelace | Web | set the backups of shop to every 15 minutes, kept 30 days, every change on |
 | 2026-11-03 03:00:18 | moin | moin | checked that the newest copy of app.db of shop restores |
 
 ## Find one change
@@ -54,7 +54,7 @@ The CLI prints the next `--cursor` at the end. In the API and MCP, send `next_cu
 ## What it records
 
 - **When**: the exact time, stored in UTC. The web shows UTC with seconds, the CLI and the TUI your local time with its zone, the API and MCP RFC 3339.
-- **Who**: the person by email, the API token by name, a deploy hook, a GitHub push with its branch and commit, or moin itself: a deploy that ended, a server that connected or went offline, a domain that went down or came back, a daily check.
+- **Who**: the person by name, the API token by name, a deploy hook, a GitHub push with its branch and commit, or moin itself: a deploy that ended, a server that connected or went offline, a domain that went down or came back, a daily check.
 - **How**: the web, the CLI, the TUI, the API, an agent over MCP, a deploy hook or GitHub.
 - **Where from**: the IP address and browser or program. Only admins and owners see them.
 - **What**: the action and what it touched, with the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, exit codes and error messages.
@@ -71,7 +71,8 @@ It covers deploys and how they ended, redeploys, restarts, starts, stops, rollba
 
 ## Good to know
 
-- The whole team sees the activity; only admins and owners see IP addresses and browsers.
-- Someone who deletes their account keeps their email on their old changes.
+- The whole team sees the activity and who did what, by name; only admins and owners see emails, IP addresses and browsers, as in the team list.
+- Filter by a person with their email in the CLI, the API and MCP; the web lists them by name.
+- Someone who deletes their account keeps their email on their old changes, for admins and owners; the rest of the team sees "A former member".
 - Deleting a workspace deletes its activity.
 - Who may do what: [Roles](/docs/guides/team#roles).

@@ -6747,14 +6747,19 @@ components:
           $ref: '#/components/schemas/WorkspaceRole'
     WorkspaceEvent:
       type: object
-      required: [id, actor_user_id, actor_email, action, target_type, target_id, metadata, actor, summary, via, token, app, server, created_at]
+      required: [id, actor_user_id, actor_name, action, target_type, target_id, metadata, actor, summary, via, token, app, server, created_at]
       properties:
         id:
           type: string
         actor_user_id:
           type: [string, 'null']
+        actor_name:
+          type: string
+          description: The member's name, `A former member` for an account that is gone, empty for changes without a member.
+          examples: [Ada Lovelace]
         actor_email:
           type: string
+          description: The member's email, or the one of an account that is gone. Only for admins and owners; left out for members, as in the team list.
         action:
           type: string
           examples: [app.deployed, data.sql, backup.restored, workspace.invitation.sent]
@@ -6767,8 +6772,8 @@ components:
           description: 'JSON text with details of the event, such as `{"number":"12","ref":"main"}`, and settings before and after, such as `{"from":"member","to":"admin"}`. Env values, secrets, tokens, passwords, SQL text and row contents are never in it; a SQL write has the kind of statement, its tables and the row count.'
         actor:
           type: string
-          description: The member's email, or `GitHub`, `A deploy hook` or `moin` for changes without a member.
-          examples: [ada@example.com]
+          description: The member's name, else the email for admins and owners, or `GitHub`, `A deploy hook` or `moin` for changes without a member.
+          examples: [Ada Lovelace]
         summary:
           type: string
           description: What happened, to read after the actor.

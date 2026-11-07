@@ -105,13 +105,16 @@ type WorkspaceDetail struct {
 type WorkspaceEvent struct {
 	ID          string  `json:"id"`
 	ActorUserID *string `json:"actor_user_id"`
-	ActorEmail  string  `json:"actor_email"`
-	Action      string  `json:"action"`
-	TargetType  string  `json:"target_type"`
-	TargetID    string  `json:"target_id"`
-	Metadata    string  `json:"metadata"`
-	// Actor and Summary read as a sentence: "ada@example.com deployed
-	// blog v12". Via is web, cli, tui, api, mcp, hook, github or system;
+	// ActorName is the member's name; ActorEmail is for admins and owners
+	// only, left out for members.
+	ActorName  string `json:"actor_name"`
+	ActorEmail string `json:"actor_email,omitempty"`
+	Action     string `json:"action"`
+	TargetType string `json:"target_type"`
+	TargetID   string `json:"target_id"`
+	Metadata   string `json:"metadata"`
+	// Actor and Summary read as a sentence: "Ada Lovelace deployed blog
+	// v12". Via is web, cli, tui, api, mcp, hook, github or system;
 	// Token is the API token it came with, by name.
 	Actor   string `json:"actor"`
 	Summary string `json:"summary"`
@@ -403,6 +406,7 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 		item := WorkspaceEvent{
 			ID:          event.ID,
 			ActorUserID: event.ActorUserID,
+			ActorName:   event.ActorName,
 			ActorEmail:  event.ActorEmail,
 			Action:      event.Action,
 			TargetType:  event.TargetType,

@@ -22,9 +22,10 @@ func NewActivity(db *sqlx.DB) *Activity {
 	return &Activity{db: db}
 }
 
-// activityColumns are the columns of an event; actor_email is the member's
-// email now, or the one stored with the event once the account is gone.
-const activityColumns = `e.id, e.workspace_id, e.actor_user_id, COALESCE(u.email, e.actor_email) AS actor_email,
+// activityColumns are the columns of an event; actor_name is the member's
+// name now, actor_email the email now, or the one stored with the event once
+// the account is gone.
+const activityColumns = `e.id, e.workspace_id, e.actor_user_id, COALESCE(u.name, '') AS actor_name, COALESCE(u.email, e.actor_email) AS actor_email,
 	e.action, e.target_type, e.target_id, e.metadata, e.via, e.token_name, e.ip, e.user_agent, e.app, e.server, e.created_at`
 
 // execer is a database or a transaction.
@@ -121,8 +122,8 @@ func (r *Activity) ListPage(workspaceID string, filter model.ActivityFilter, aft
 	return events, err
 }
 
-// Choices returns the apps, servers and member emails that occur in the
-// activity of a workspace, sorted, for its filters.
+// Choices returns the apps, servers and people that occur in the activity
+// of a workspace, sorted, for its filters.
 func (r *Activity) Choices(workspaceID string) (model.ActivityChoices, error) {
 	var choices model.ActivityChoices
 	err := r.db.Select(&choices.Apps, `SELECT DISTINCT app FROM activity_events WHERE workspace_id = $1 AND app != '' ORDER BY app`, workspaceID)
@@ -134,10 +135,10 @@ func (r *Activity) Choices(workspaceID string) (model.ActivityChoices, error) {
 		return choices, err
 	}
 	err = r.db.Select(&choices.Users, `
-		SELECT DISTINCT COALESCE(u.email, e.actor_email) AS email
+		SELECT DISTINCT COALESCE(e.actor_user_id, '') AS id, COALESCE(u.name, '') AS name, COALESCE(u.email, e.actor_email) AS email
 		FROM activity_events e LEFT JOIN users u ON u.id = e.actor_user_id
 		WHERE e.workspace_id = $1 AND COALESCE(u.email, e.actor_email) != ''
-		ORDER BY email
+		ORDER BY lower(name), email
 	`, workspaceID)
 	return choices, err
 }

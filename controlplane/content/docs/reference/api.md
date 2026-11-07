@@ -75,7 +75,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/workspaces/{slug}/leave` | session | leaves the workspace |
 | `GET /api/v1/invitations/{token}` | read | an invitation, from its email link |
 | `POST /api/v1/invitations/{token}/accept` | session | accepts it |
-| `GET /api/v1/activity` | read | who did what, newest first, with `next_cursor`; `app`, `server` and `user` filter it |
+| `GET /api/v1/activity` | read | who did what, newest first, with `next_cursor`; `app`, `server` and `user` filter it. The actor by name; `actor_email` only for admins and owners |
 | `GET /api/v1/workspaces/{slug}/activity` | read | the same, for the workspace in the path |
 | `GET /api/v1/workspaces/{slug}/billing` | read | the plan and the subscription, where billing is on |
 | `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | session | a checkout link; the billing portal (owner) |
