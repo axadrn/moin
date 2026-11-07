@@ -98,6 +98,25 @@ func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			done(stdout, "Unpinned %s", style.Bold.Render(app.Name))
 		}
 		return nil
+	case "rename":
+		flags := newFlags("apps rename", "apps rename <app> <new name>")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		if apiErr != nil {
+			return apiErr
+		}
+		if flags.NArg() != 2 {
+			return flags.wrong()
+		}
+		renamed, err := api.RenameApp(ctx, flags.Arg(0), flags.Arg(1))
+		if err != nil {
+			return err
+		}
+		done(stdout, "Renamed %s to %s. Its links, data and backups stay", flags.Arg(0), style.Bold.Render(renamed.Name))
+		hint(stdout, "Its containers take the name on the next restart:", build.Name+" restart "+renamed.Name)
+		hint(stdout, "In its repo, set x-moin.app: "+renamed.Name+" in compose.yml for", build.Name+" deploy")
+		return nil
 	case "rm":
 		flags := newFlags("apps rm", "apps rm <app> [--confirm <app>]").withApp().withConfirm()
 		if err := flags.parse(args); err != nil {

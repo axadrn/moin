@@ -52,7 +52,7 @@ func (m model) loadWorkspace() tea.Cmd {
 		if err != nil {
 			return nil
 		}
-		ws.slug, ws.name = team.Workspace.Slug, team.Workspace.Name
+		ws.id, ws.slug, ws.name = team.Workspace.ID, team.Workspace.Slug, team.Workspace.Name
 		if account, err := api.Account(ctx); err == nil {
 			ws.email, ws.user = account.Email, account.Name
 		}

@@ -110,9 +110,10 @@ type screen struct {
 
 // workspace is who and where the token is.
 type workspace struct {
-	slug, name, email, user string
-	version                 string
-	selfHosted              bool
+	id, slug, name, email string
+	user                  string
+	version               string
+	selfHosted            bool
 }
 
 // appData is what the open app shows. It belongs to one app and is

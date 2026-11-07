@@ -1,6 +1,7 @@
 package client
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"net/http"
@@ -102,6 +103,7 @@ func (c *Client) Activity(ctx context.Context, query ActivityQuery) (ActivityPag
 // still open.
 type Team struct {
 	Workspace struct {
+		ID   string `json:"id"`
 		Name string `json:"name"`
 		Slug string `json:"slug"`
 	} `json:"workspace"`
@@ -132,6 +134,7 @@ func (c *Client) Team(ctx context.Context) (Team, error) {
 	var list struct {
 		Items []struct {
 			Workspace struct {
+				ID   string `json:"id"`
 				Slug string `json:"slug"`
 			} `json:"workspace"`
 		} `json:"items"`
@@ -144,7 +147,7 @@ func (c *Client) Team(ctx context.Context) (Team, error) {
 		return Team{}, errors.New("this token reaches no workspace: log in with a token of your team")
 	}
 	var team Team
-	err = c.do(ctx, http.MethodGet, "/api/v1/workspaces/"+list.Items[0].Workspace.Slug, nil, &team)
+	err = c.do(ctx, http.MethodGet, "/api/v1/workspaces/"+cmp.Or(list.Items[0].Workspace.ID, list.Items[0].Workspace.Slug), nil, &team)
 	return team, err
 }
 

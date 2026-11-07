@@ -19,8 +19,8 @@ import (
 
 type saved struct {
 	Workspace struct {
-		Slug, Name, Email, User, Version string
-		SelfHosted                       bool
+		ID, Slug, Name, Email, User, Version string
+		SelfHosted                           bool
 	}
 	Apps    []client.App
 	Servers []client.Server
@@ -67,7 +67,7 @@ func (m model) restoreCache() model {
 		return m
 	}
 	w := s.Workspace
-	m.ws = workspace{slug: w.Slug, name: w.Name, email: w.Email, user: w.User, version: w.Version, selfHosted: w.SelfHosted}
+	m.ws = workspace{id: w.ID, slug: w.Slug, name: w.Name, email: w.Email, user: w.User, version: w.Version, selfHosted: w.SelfHosted}
 	m.apps, m.servers, m.status, m.events, m.recent = s.Apps, s.Servers, s.Status, s.Events, s.Recent
 	m.cached = len(s.Apps) > 0 || len(s.Servers) > 0
 	return m
@@ -84,7 +84,7 @@ func (m model) saveCache() error {
 		return err
 	}
 	var s saved
-	s.Workspace.Slug, s.Workspace.Name, s.Workspace.Email, s.Workspace.User = m.ws.slug, m.ws.name, m.ws.email, m.ws.user
+	s.Workspace.ID, s.Workspace.Slug, s.Workspace.Name, s.Workspace.Email, s.Workspace.User = m.ws.id, m.ws.slug, m.ws.name, m.ws.email, m.ws.user
 	s.Workspace.Version, s.Workspace.SelfHosted = m.ws.version, m.ws.selfHosted
 	s.Apps, s.Servers, s.Status, s.Recent, s.SavedAt = m.apps, m.servers, m.status, m.recent, m.now()
 	s.Events = m.events[:min(len(m.events), 20)]

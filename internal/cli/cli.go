@@ -61,6 +61,7 @@ Servers
 Apps
   apps               List apps; one app with its domains and deploys: apps <app>
   apps add           Add an app: apps add --server <server> <name>
+  apps rename        Rename an app; links, data and backups stay: apps rename my-app blog
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--confirm <app>]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
 

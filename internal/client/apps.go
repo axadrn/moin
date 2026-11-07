@@ -101,6 +101,13 @@ func (c *Client) App(ctx context.Context, app string) (AppDetail, error) {
 	return response, err
 }
 
+// RenameApp gives an app a new name. app is its name, ID or link.
+func (c *Client) RenameApp(ctx context.Context, app, name string) (App, error) {
+	var response App
+	err := c.do(ctx, http.MethodPatch, appPath(app), map[string]string{"name": name}, &response)
+	return response, err
+}
+
 // AddApp creates an app on a server.
 func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
 	var response App

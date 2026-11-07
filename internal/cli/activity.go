@@ -117,7 +117,7 @@ func team(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		if err != nil {
 			return err
 		}
-		done(stdout, "Renamed the workspace to %s. Its links stay the same.", name)
+		done(stdout, "Renamed the workspace to %s. Its old links keep working.", name)
 		return nil
 	case "resend", "revoke":
 		if len(rest) != 1 {

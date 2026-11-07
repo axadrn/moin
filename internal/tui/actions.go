@@ -6,6 +6,7 @@ package tui
 import (
 	"errors"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/link"
 	"slices"
 	"sort"
 	"strings"
@@ -76,7 +77,7 @@ func (m model) appActions(name string) []action {
 	out = append(out, action{"*", pinWord, func(m model) (tea.Model, tea.Cmd) { return m, m.pin(name, !a.Pinned) }})
 	out = append(out,
 		action{"X", "run a command", func(m model) (tea.Model, tea.Cmd) { return m.openExec(name) }},
-		action{"W", "open in web", func(m model) (tea.Model, tea.Cmd) { return m.browse("/apps/" + name) }},
+		action{"W", "open in web", func(m model) (tea.Model, tea.Cmd) { return m.browse("/apps/" + m.appLink(name)) }},
 	)
 	return out
 }
@@ -90,7 +91,7 @@ type page struct {
 func (m model) webPages() []page {
 	data := page{"d", "Data", "Browse and edit the rows of a database.", "/apps"}
 	if app := m.lastApp(); app != "" {
-		data = page{"d", "Data of " + app, "Browse and edit the rows of its databases.", "/apps/" + app + "/data"}
+		data = page{"d", "Data of " + app, "Browse and edit the rows of its databases.", "/apps/" + m.appLink(app) + "/data"}
 	}
 	out := []page{
 		{"a", "Servers", "Add, rename, order and remove servers.", "/servers"},
@@ -125,10 +126,20 @@ func (m model) lastApp() string {
 // browse opens a page of the workspace in the web app.
 func (m model) browse(path string) (tea.Model, tea.Cmd) {
 	base := m.url + "/app"
-	if m.ws.slug != "" {
-		base += "/" + m.ws.slug
+	if m.ws.slug != "" || m.ws.id != "" {
+		base += "/" + link.To(m.ws.slug, m.ws.id)
 	}
 	return m.browseURL(base + path)
+}
+
+// appLink is how a link names the app: its name and its ID, which counts.
+func (m model) appLink(name string) string {
+	for _, app := range m.apps {
+		if app.Name == name {
+			return link.To(app.Name, app.ID)
+		}
+	}
+	return name
 }
 
 func (m model) browseURL(url string) (tea.Model, tea.Cmd) {
