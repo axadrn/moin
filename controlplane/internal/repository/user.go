@@ -15,25 +15,16 @@ var (
 	ErrDuplicateEmail = errors.New("email already exists")
 )
 
-type UserRepository interface {
-	Create(user *model.User) error
-	ByID(id string) (*model.User, error)
-	ByEmail(email string) (*model.User, error)
-	Update(user *model.User) error
-	UpdateName(userID, name string, updatedAt time.Time) error
-	SetEmailAlerts(userID string, on bool) error
-	Delete(id string) error
-}
-
-type userRepository struct {
+// Users stores the user accounts.
+type Users struct {
 	db *sqlx.DB
 }
 
-func NewUserRepository(db *sqlx.DB) UserRepository {
-	return &userRepository{db: db}
+func NewUsers(db *sqlx.DB) *Users {
+	return &Users{db: db}
 }
 
-func (r *userRepository) Create(user *model.User) error {
+func (r *Users) Create(user *model.User) error {
 	if user.CreatedAt.IsZero() {
 		user.CreatedAt = time.Now()
 	}
@@ -55,7 +46,7 @@ func (r *userRepository) Create(user *model.User) error {
 	return nil
 }
 
-func (r *userRepository) ByID(id string) (*model.User, error) {
+func (r *Users) ByID(id string) (*model.User, error) {
 	user := &model.User{}
 	query := `SELECT * FROM users WHERE id = $1`
 
@@ -67,7 +58,7 @@ func (r *userRepository) ByID(id string) (*model.User, error) {
 	return user, err
 }
 
-func (r *userRepository) ByEmail(email string) (*model.User, error) {
+func (r *Users) ByEmail(email string) (*model.User, error) {
 	user := &model.User{}
 	query := `SELECT * FROM users WHERE email = $1`
 
@@ -79,7 +70,7 @@ func (r *userRepository) ByEmail(email string) (*model.User, error) {
 	return user, err
 }
 
-func (r *userRepository) Update(user *model.User) error {
+func (r *Users) Update(user *model.User) error {
 	query := `UPDATE users SET email = $1, password_hash = $2, pending_email = $3, email_verified_at = $4, name = $5, updated_at = $6 WHERE id = $7`
 
 	user.UpdatedAt = time.Now()
@@ -87,7 +78,7 @@ func (r *userRepository) Update(user *model.User) error {
 	return err
 }
 
-func (r *userRepository) UpdateName(userID, name string, updatedAt time.Time) error {
+func (r *Users) UpdateName(userID, name string, updatedAt time.Time) error {
 	result, err := r.db.Exec(`UPDATE users SET name = $1, updated_at = $2 WHERE id = $3`, name, updatedAt, userID)
 	if err != nil {
 		return err
@@ -103,7 +94,7 @@ func (r *userRepository) UpdateName(userID, name string, updatedAt time.Time) er
 }
 
 // SetEmailAlerts turns the email alerts of the user on or off.
-func (r *userRepository) SetEmailAlerts(userID string, on bool) error {
+func (r *Users) SetEmailAlerts(userID string, on bool) error {
 	result, err := r.db.Exec(`UPDATE users SET email_alerts = $1 WHERE id = $2`, on, userID)
 	if err != nil {
 		return err
@@ -114,7 +105,7 @@ func (r *userRepository) SetEmailAlerts(userID string, on bool) error {
 	return nil
 }
 
-func (r *userRepository) Delete(id string) error {
+func (r *Users) Delete(id string) error {
 	query := `DELETE FROM users WHERE id = $1`
 
 	result, err := r.db.Exec(query, id)

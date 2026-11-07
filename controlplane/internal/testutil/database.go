@@ -59,7 +59,7 @@ func SeedUser(t testing.TB, database *sqlx.DB, options UserOptions) UserFixture 
 		Name:            options.Name,
 		CreatedAt:       now,
 	}
-	if err := repository.NewUserRepository(database).Create(user); err != nil {
+	if err := repository.NewUsers(database).Create(user); err != nil {
 		t.Fatalf("create fixture user: %v", err)
 	}
 

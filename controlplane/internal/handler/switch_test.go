@@ -42,7 +42,7 @@ func newSwitches(t *testing.T) *switches {
 	}
 	servers := service.NewServerService(repository.NewServerRepository(database), repository.NewWorkspaceAuditRepository(database), "https://moin.example.com")
 	apps := service.NewAppService(repository.NewAppRepository(database, database), servers, box)
-	users := service.NewUserService(repository.NewUserRepository(database), nil, nil, nil)
+	users := service.NewUserService(repository.NewUsers(database), nil, nil, nil)
 	s := &switches{t: t, database: database, ada: ada, apps: apps, servers: servers, users: users, handler: NewAppsHandler(apps, servers, users, nil)}
 	server, _, err := servers.Create(s.actor(), "web-1")
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *switches) post(pattern, path string, form url.Values, run http.HandlerF
 	request := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("HX-Request", "true")
-	user, err := repository.NewUserRepository(s.database).ByID(s.ada.User.ID)
+	user, err := repository.NewUsers(s.database).ByID(s.ada.User.ID)
 	if err != nil {
 		s.t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestEmailAlertsSwitch(t *testing.T) {
 			form.Set("on", "1")
 		}
 		body := s.post("/app/{workspaceSlug}/profile/email-alerts", path, form, handler.EmailAlerts)
-		user, err := repository.NewUserRepository(s.database).ByID("ada")
+		user, err := repository.NewUsers(s.database).ByID("ada")
 		if err != nil {
 			t.Fatal(err)
 		}

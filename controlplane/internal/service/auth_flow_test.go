@@ -17,7 +17,7 @@ const validTestPassword = "correct horse battery staple"
 type authFlowEnvironment struct {
 	database               *sqlx.DB
 	auth                   *AuthService
-	userRepository         repository.UserRepository
+	userRepository         *repository.Users
 	subscriptionRepository repository.SubscriptionRepository
 	workspaceService       *WorkspaceService
 }
@@ -25,7 +25,7 @@ type authFlowEnvironment struct {
 func newAuthFlowEnvironment(t *testing.T) authFlowEnvironment {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	userRepository := repository.NewUserRepository(database)
+	userRepository := repository.NewUsers(database)
 	tokenRepository := repository.NewTokenRepository(database)
 	sessionRepository := repository.NewSessionRepository(database)
 	subscriptionRepository := repository.NewSubscriptionRepository(database)

@@ -30,7 +30,7 @@ type bearerTestEnvironment struct {
 func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	email := service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
 	workspaces := service.NewWorkspaceService(

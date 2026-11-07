@@ -70,7 +70,7 @@ func TestClosedSignupOnEachKindOfControlPlane(t *testing.T) {
 			if err := workspaces.Invite(owner.WorkspaceMember, owner.Workspace, "mate@example.com", model.WorkspaceRoleMember, service.Source{Via: "web"}); err != nil {
 				t.Fatalf("Invite() error = %v", err)
 			}
-			users := repository.NewUserRepository(database)
+			users := repository.NewUsers(database)
 			email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 			auth := service.NewAuthService(
 				users, repository.NewTokenRepository(database), repository.NewSessionRepository(database), workspaces, email,

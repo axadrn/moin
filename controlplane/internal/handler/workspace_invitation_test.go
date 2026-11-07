@@ -206,7 +206,7 @@ func TestOnboardingValidatesPendingInvitationBeforeSkippingWorkspace(t *testing.
 				}
 			}
 			email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
-			auth := service.NewAuthService(repository.NewUserRepository(database), nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+			auth := service.NewAuthService(repository.NewUsers(database), nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
 			handler := NewAuthHandler(auth, nil, workspaces, &config.Config{})
 			form := url.Values{"name": {"Invited User"}, "workspace": {"Invited Team"}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/onboarding", strings.NewReader(form.Encode()))
@@ -235,7 +235,7 @@ func TestOnboardingValidatesPendingInvitationBeforeSkippingWorkspace(t *testing.
 func invitationHandlerTestSetup(t *testing.T) (*sqlx.DB, *service.WorkspaceService, testutil.UserFixture, *testutil.MemoryMailer) {
 	t.Helper()
 	database := testutil.NewDatabase(t)
-	users := repository.NewUserRepository(database)
+	users := repository.NewUsers(database)
 	mailer := testutil.NewMemoryMailer()
 	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
 	workspaces := service.NewWorkspaceService(
@@ -259,7 +259,7 @@ func createHandlerTestUser(t *testing.T, database *sqlx.DB, id, email, name stri
 	t.Helper()
 	now := time.Now()
 	user := &model.User{ID: id, Email: email, Name: name, CreatedAt: now}
-	if err := repository.NewUserRepository(database).Create(user); err != nil {
+	if err := repository.NewUsers(database).Create(user); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	return user

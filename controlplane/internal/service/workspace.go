@@ -36,7 +36,7 @@ type WorkspaceService struct {
 	members       repository.WorkspaceMemberRepository
 	invitations   repository.WorkspaceInvitationRepository
 	audit         repository.WorkspaceAuditRepository
-	users         repository.UserRepository
+	users         *repository.Users
 	subscriptions *SubscriptionService
 	email         *EmailService
 }
@@ -46,7 +46,7 @@ func NewWorkspaceService(
 	members repository.WorkspaceMemberRepository,
 	invitations repository.WorkspaceInvitationRepository,
 	audit repository.WorkspaceAuditRepository,
-	users repository.UserRepository,
+	users *repository.Users,
 	subscriptions *SubscriptionService,
 	email *EmailService,
 ) *WorkspaceService {

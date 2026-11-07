@@ -32,7 +32,7 @@ var (
 type AuthService struct {
 	// beta closes sign-up to everyone it does not let in; nil keeps it open.
 	beta                     *BetaService
-	userRepository           repository.UserRepository
+	userRepository           *repository.Users
 	tokenRepository          repository.TokenRepository
 	sessionRepository        repository.SessionRepository
 	workspaceService         *WorkspaceService
@@ -49,7 +49,7 @@ type AuthService struct {
 }
 
 func NewAuthService(
-	userRepository repository.UserRepository,
+	userRepository *repository.Users,
 	tokenRepository repository.TokenRepository,
 	sessionRepository repository.SessionRepository,
 	workspaceService *WorkspaceService,

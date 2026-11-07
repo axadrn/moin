@@ -26,7 +26,7 @@ func newBillingHandler(t *testing.T, provider *paymentProviderStub) *BillingHand
 		repository.NewWorkspaceMemberRepository(database),
 		repository.NewWorkspaceInvitationRepository(database),
 		repository.NewWorkspaceAuditRepository(database),
-		repository.NewUserRepository(database),
+		repository.NewUsers(database),
 		subscriptions,
 		service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App"),
 	)
