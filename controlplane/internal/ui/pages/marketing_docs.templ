@@ -82,38 +82,31 @@ func docsMarkdownURL(page *model.DocPage) string {
 // docsSurfacesOnce keeps the script of the surfaces blocks once on a page.
 var docsSurfacesOnce = templ.NewOnceHandle()
 
-// docsSurfaces makes the surfaces blocks (Web | CLI | TUI | API | MCP tabs)
-// share one choice: picking a surface opens it on every block of the page,
-// and the browser keeps it for the next pages. The block that was clicked
-// stays where it is on the screen while the blocks above it change height.
+// docsSurfaces makes the surfaces blocks (a choice of Web, CLI, TUI, API
+// and MCP) share one choice: picking a surface picks it on every block of
+// the page, and the browser keeps it for the next pages. The block that
+// was clicked stays where it is on the screen while the blocks above it
+// change height. Without the script each block still works on its own.
 templ docsSurfaces() {
 	@docsSurfacesOnce.Once() {
 		<script nonce={ templ.GetNonce(ctx) }>
 			(() => {
 				const key = "moin-docs-surface";
 				const show = (value, picked) => {
-					if (!/^[a-z]+$/.test(value || "") || !window.templ?.tabs) return;
+					if (!/^[a-z]+$/.test(value || "")) return;
 					const top = picked?.getBoundingClientRect().top;
-					document.querySelectorAll("[data-surfaces]").forEach((root) => {
-						if (root !== picked && root.querySelector(`[data-slot="tabs-trigger"][data-templ-value="${value}"]`)) {
-							window.templ.tabs.setActive(root, value);
-						}
-					});
+					document.querySelectorAll(`[data-surfaces] input[type=radio][value="${value}"]`).forEach((radio) => { radio.checked = true; });
 					if (picked) window.scrollBy(0, picked.getBoundingClientRect().top - top);
 				};
-				document.addEventListener("tabs-value-change", (event) => {
-					if (!event.target.hasAttribute?.("data-surfaces")) return;
-					try { localStorage.setItem(key, event.detail.value); } catch {}
-					show(event.detail.value, event.target);
+				document.addEventListener("change", (event) => {
+					const block = event.target.closest?.("[data-surfaces]");
+					if (!block || event.target.type !== "radio") return;
+					try { localStorage.setItem(key, event.target.value); } catch {}
+					show(event.target.value, block);
 				});
-				const restore = () => {
-					let value = null;
-					try { value = localStorage.getItem(key); } catch {}
-					show(value, null);
-				};
-				// The component bundle loads deferred, after this script.
-				if (window.templ?.tabs) restore();
-				else document.addEventListener("DOMContentLoaded", restore, { once: true });
+				let value = null;
+				try { value = localStorage.getItem(key); } catch {}
+				show(value, null);
 			})();
 		</script>
 	}

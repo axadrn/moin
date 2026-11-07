@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -25,7 +26,8 @@ import (
 //	MCP: set_integrations
 //	```
 //
-// The docs show it as tabs, one per surface the block names, in this order.
+// The docs show it as a choice, one per surface the block names, in this
+// order.
 // Web and TUI lines are inline markdown, the others a line of code. A
 // surface named twice gets both lines. A command that ends in a backslash
 // goes on in the next line, as in a shell. Any other line is ignored.
@@ -93,6 +95,8 @@ var kindSurfaces = ast.NewNodeKind("Surfaces")
 type surfacesNode struct {
 	ast.BaseBlock
 	entries []surfaceEntry
+	// n counts the blocks of a page from 1, so each has its own choice.
+	n int
 }
 
 func (n *surfacesNode) Kind() ast.NodeKind { return kindSurfaces }
@@ -112,13 +116,13 @@ func (surfacesTransformer) Transform(doc *ast.Document, reader text.Reader, _ pa
 		}
 		return ast.WalkContinue, nil
 	})
-	for _, block := range blocks {
+	for n, block := range blocks {
 		var body bytes.Buffer
 		for i := 0; i < block.Lines().Len(); i++ {
 			line := block.Lines().At(i)
 			body.Write(line.Value(source))
 		}
-		node := &surfacesNode{entries: parseSurfaces(body.String())}
+		node := &surfacesNode{entries: parseSurfaces(body.String()), n: n + 1}
 		block.Parent().ReplaceChild(block.Parent(), block, node)
 	}
 }
@@ -146,7 +150,7 @@ func (r surfacesRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer)
 			}
 			items = append(items, item)
 		}
-		return ast.WalkSkipChildren, surfacesView(items).Render(context.Background(), w)
+		return ast.WalkSkipChildren, surfacesView(fmt.Sprintf("surface-%d", node.n), items).Render(context.Background(), w)
 	})
 }
 
@@ -161,7 +165,7 @@ func (r surfacesRenderer) inlineHTML(line string) string {
 	return strings.TrimSuffix(html, "</p>")
 }
 
-// surfacesExtension renders surfaces blocks as tabs.
+// surfacesExtension renders surfaces blocks as a choice of surfaces.
 type surfacesExtension struct{}
 
 func (surfacesExtension) Extend(m goldmark.Markdown) {

@@ -1,9 +1,9 @@
 package markdown
 
-import "github.com/axadrn/moin/controlplane/internal/ui/components/tabs"
+import "github.com/axadrn/moin/controlplane/internal/ui/kit"
 
-// surfaceItem is one tab of a surfaces block: a line of code, or lines of
-// rendered inline markdown.
+// surfaceItem is one surface of a surfaces block: a line of code, or lines
+// of rendered inline markdown.
 type surfaceItem struct {
 	Value string
 	Label string
@@ -12,26 +12,18 @@ type surfaceItem struct {
 	HTML  []string
 }
 
-// surfacesView is a surfaces block as shadcn tabs on a card, like the
-// package manager tabs of shadcn's docs. The first tab is open; the docs
-// page script opens the surface the reader picked last on every block.
-templ surfacesView(items []surfaceItem) {
-	@tabs.Tabs(tabs.Props{
-		DefaultValue: items[0].Value,
-		Class:        "mt-6 gap-0 overflow-hidden rounded-[18px] bg-card",
-		Attributes:   templ.Attributes{"data-surfaces": ""},
-	}) {
-		<div class="px-3 pt-3">
-			@tabs.List(tabs.ListProps{Class: "max-w-full overflow-x-auto"}) {
-				for _, item := range items {
-					@tabs.Trigger(tabs.TriggerProps{Value: item.Value, Class: "flex-none"}) {
-						{ item.Label }
-					}
-				}
-			}
+// surfacesView is a surfaces block on a card: a kit.Choice of the
+// surfaces over what to do on the one picked. The checked radio shows its
+// part by CSS alone, so it works without a script; the first is picked.
+// The docs page script makes every block of a page show the surface the
+// reader picked last. name is the block's own radio group.
+templ surfacesView(name string, items []surfaceItem) {
+	<div class={ "mt-6 min-w-0 overflow-hidden rounded-[18px] bg-card", surfacesShown } data-surfaces>
+		<div class="max-w-full overflow-x-auto px-3 pt-3 [scrollbar-width:none]">
+			@kit.Choice(name, "Where", surfaceOptions(items), items[0].Value)
 		</div>
 		for _, item := range items {
-			@tabs.Content(tabs.ContentProps{Value: item.Value, Class: "min-w-0 text-base [&_[data-slot=code-block]]:mt-0"}) {
+			<div class="hidden min-w-0 text-base [&_[data-slot=code-block]]:mt-0" data-surface={ item.Value }>
 				if item.Code {
 					<pre class="m-0 rounded-none bg-transparent px-6 py-4 pr-14"><code>{ item.Text }</code></pre>
 				} else {
@@ -41,7 +33,19 @@ templ surfacesView(items []surfaceItem) {
 						</p>
 					}
 				}
-			}
+			</div>
 		}
+	</div>
+}
+
+// surfacesShown shows the part of the checked surface, one rule per
+// surface, written out so Tailwind finds them.
+const surfacesShown = "[&:has([value=web]:checked)_[data-surface=web]]:block [&:has([value=cli]:checked)_[data-surface=cli]]:block [&:has([value=tui]:checked)_[data-surface=tui]]:block [&:has([value=api]:checked)_[data-surface=api]]:block [&:has([value=mcp]:checked)_[data-surface=mcp]]:block"
+
+func surfaceOptions(items []surfaceItem) []kit.Option {
+	options := make([]kit.Option, 0, len(items))
+	for _, item := range items {
+		options = append(options, kit.Option{Value: item.Value, Label: item.Label})
 	}
+	return options
 }
