@@ -93,7 +93,7 @@ func (h *AppsHandler) DataCell(w http.ResponseWriter, r *http.Request) {
 	state := "saved"
 	err := h.apps.UpdateCell(r.Context(), actor(r), r.PathValue("app"), database, table, row, columnName, value)
 	if err != nil {
-		toastError(w, r, "Cell not saved", errorMessage(err))
+		answerError(w, r, "Cell not saved", errorMessage(err))
 		state = "failed"
 	}
 	render(w, r, pages.DataCell(dataPath, database, table, ref, column, shown, state))
@@ -107,9 +107,9 @@ func (h *AppsHandler) DataDelete(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Row not deleted", err, nil)
 		return
 	}
-	// The row goes; the answer only carries the toast.
+	// The row goes; the answer only carries the feedback.
 	w.Header().Set("HX-Reswap", "delete")
-	toastDone(w, r, ref.Label()+" deleted", "")
+	answerDone(w, r, ref.Label()+" deleted", "")
 }
 
 // dataRow reads the row a cell or delete names: a rowid, or the values of

@@ -462,3 +462,43 @@
 @view-transition {
   navigation: auto;
 }
+
+/* Feedback (DESIGN.md): a button that did its job shows a check in place of
+   its label for a moment, at the same size; a line under a form says what
+   failed or what follows. moin.js sets both. */
+@layer components {
+  [data-done] {
+    position: relative;
+    color: transparent !important;
+  }
+  [data-done] > * {
+    visibility: hidden;
+  }
+  [data-done]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    background: var(--foreground);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .bg-primary[data-done]::after {
+    background: var(--primary-foreground);
+  }
+  [data-said] {
+    position: absolute;
+    z-index: 30;
+    max-width: min(24rem, calc(100vw - 2rem));
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+  }
+  [data-said="failed"] {
+    color: var(--failed);
+  }
+}

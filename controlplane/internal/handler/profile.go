@@ -29,11 +29,11 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	updatedUser, err := h.users.UpdateName(user.ID, name)
 	if err != nil {
 		slog.Error("failed to update name", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Name not saved", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Name not saved", "Something went wrong. Please try again.")
 		return
 	}
 	render(w, r, layouts.IdentityUpdates(updatedUser))
-	toastDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
+	answerDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
 }
 
 // EmailAlerts turns the user's email alerts on or off and answers the
@@ -45,7 +45,7 @@ func (h *ProfileHandler) EmailAlerts(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to set email alerts", "error", err, "user_id", user.ID)
 		on = user.EmailAlerts
-		toastError(w, r, "Setting not saved", "Something went wrong. Please try again.")
+		answerError(w, r, "Setting not saved", "Something went wrong. Please try again.")
 	}
 	render(w, r, pages.EmailAlertsForm(on))
 }

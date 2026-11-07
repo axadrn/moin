@@ -24,7 +24,7 @@ func (h *AppsHandler) BackupNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBackups(w, r)
-	toastDone(w, r, "Snapshot taken", "It is the newest under Snapshots.")
+	answerDone(w, r, "Snapshot taken", "It is the newest under Snapshots.")
 }
 
 // BackupRestore restores a database from a snapshot or a point in time.
@@ -39,7 +39,7 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 			parsed, err = time.Parse("2006-01-02T15:04", raw)
 		}
 		if err != nil {
-			toastFailed(w, r, database+" not restored", "Choose a date and a time.")
+			answerFailed(w, r, database+" not restored", "Choose a date and a time.")
 			return
 		}
 		at = &parsed
@@ -50,7 +50,7 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBackups(w, r)
-	toastDone(w, r, database+" restored", "The app runs again. The state before is a snapshot.")
+	answerDone(w, r, database+" restored", "The app runs again. The state before is a snapshot.")
 }
 
 // BackupSettings turns the snapshot before every change on or off and
@@ -64,7 +64,7 @@ func (h *AppsHandler) BackupSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		app = stored
-		toastError(w, r, "Setting not saved", errorMessage(err))
+		answerError(w, r, "Setting not saved", errorMessage(err))
 	}
 	render(w, r, pages.BackupSettingsForm(*app))
 }
@@ -85,7 +85,7 @@ func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	if app.BucketName != "" {
 		bucket = app.BucketName
 	}
-	toastDone(w, r, "Uploads and new backups go to "+bucket, "Older backups stay where they are; restores of them read from there.")
+	answerDone(w, r, "Uploads and new backups go to "+bucket, "Older backups stay where they are; restores of them read from there.")
 }
 
 // Bucket is the buckets page.
@@ -119,10 +119,10 @@ func (h *AppsHandler) AddBucket(w http.ResponseWriter, r *http.Request) {
 	}
 	h.renderBucket(w, r)
 	if bucket.Default {
-		toastDone(w, r, "Bucket added", "Backups and moin deploy of every app use it now.")
+		answerDone(w, r, "Bucket added", "Backups and moin deploy of every app use it now.")
 		return
 	}
-	toastDone(w, r, "Bucket added", "Pick it for an app on the app's Backups tab.")
+	answerDone(w, r, "Bucket added", "Pick it for an app on the app's Backups tab.")
 }
 
 // EditBucket changes a bucket.
@@ -133,7 +133,7 @@ func (h *AppsHandler) EditBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	toastDone(w, r, "Bucket saved", "Its apps upload and back up there now.")
+	answerDone(w, r, "Bucket saved", "Its apps upload and back up there now.")
 }
 
 // DefaultBucket makes a bucket the workspace's default.
@@ -145,7 +145,7 @@ func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	toastDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their older backups stay in the old default.")
+	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their older backups stay in the old default.")
 }
 
 // RemoveBucket forgets a bucket nothing uses.
@@ -156,7 +156,7 @@ func (h *AppsHandler) RemoveBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	toastDone(w, r, "Bucket removed", "What is in it stays there.")
+	answerDone(w, r, "Bucket removed", "What is in it stays there.")
 }
 
 // bucketFailed answers a bucket form that failed and reports whether it

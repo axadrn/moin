@@ -27,7 +27,7 @@ func (h *AppsHandler) UptimeCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderUptime(w, r)
-	toastDone(w, r, "Path of "+domain+" saved", "The next check goes there.")
+	answerDone(w, r, "Path of "+domain+" saved", "The next check goes there.")
 }
 
 // UptimeOn is the switch that pauses or resumes the check of a domain: it
@@ -44,7 +44,7 @@ func (h *AppsHandler) UptimeOn(w http.ResponseWriter, r *http.Request) {
 			failed(w, r, "Check of "+domain+" not saved", err, nil)
 			return
 		}
-		toastError(w, r, "Check of "+domain+" not saved", errorMessage(err))
+		answerError(w, r, "Check of "+domain+" not saved", errorMessage(err))
 	}
 	render(w, r, pages.UptimeSwitchForm(*app, view))
 }

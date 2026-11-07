@@ -108,3 +108,84 @@ addEventListener("pageshow", (event) => {
 addEventListener("unhandledrejection", (event) => {
   if (event.reason?.name === "AbortError") event.preventDefault();
 });
+
+// Feedback (DESIGN.md): the answer to a click shows where you clicked. The
+// server sends it into #feedback (kit.Feedback); it goes to the element that
+// sent the request. "done" turns its button into a check for a moment,
+// "failed" and "note" put the words in a line under its form.
+let asking = null;
+// The answer goes to the element whose response it came with.
+document.addEventListener("htmx:before:response", (event) => { asking = event.target; });
+
+const buttonOf = (source) =>
+  source?.closest("button") ||
+  (document.activeElement?.closest?.("button") && source?.contains(document.activeElement) ? document.activeElement.closest("button") : null) ||
+  source?.querySelector?.("button[type=submit], button:not([type])");
+
+// saySaid puts a line under the form or button that sent a request. It
+// floats under it, so nothing on the page moves, and goes with the next try
+// or after a while.
+function saySaid(source, kind, text) {
+  const place = source?.closest("form") || source;
+  const box = place?.parentElement;
+  if (!box) return;
+  box.querySelectorAll(":scope > [data-said]").forEach((line) => line.remove());
+  if (getComputedStyle(box).position === "static") box.style.position = "relative";
+  const line = Object.assign(document.createElement("p"), { role: kind === "failed" ? "alert" : "status", textContent: text });
+  line.dataset.said = kind;
+  line.style.top = `${place.offsetTop + place.offsetHeight + 6}px`;
+  const right = box.clientWidth - place.offsetLeft - place.offsetWidth;
+  if (right < place.offsetLeft) line.style.right = `${right}px`;
+  else line.style.left = `${place.offsetLeft}px`;
+  box.append(line);
+  setTimeout(() => line.remove(), 8000);
+}
+
+const feedbackBox = document.getElementById("feedback");
+if (feedbackBox) new MutationObserver(() => {
+  for (const answer of [...feedbackBox.children]) {
+    answer.remove();
+    const { feedback: kind, title } = answer.dataset;
+    const more = answer.textContent.trim();
+    if (kind === "done") {
+      const button = buttonOf(asking);
+      if (button) {
+        button.dataset.done = "";
+        setTimeout(() => delete button.dataset.done, 1600);
+      }
+      if (more) saySaid(asking, "note", more);
+    } else {
+      const text = [title, more].filter(Boolean).join(". ");
+      saySaid(asking, kind, text);
+    }
+  }
+}).observe(feedbackBox, { childList: true });
+
+// A new try clears the line of the last one.
+document.addEventListener("htmx:before:request", (event) => {
+  const place = event.target.closest("form") || event.target;
+  place.parentElement?.querySelectorAll(":scope > [data-said]").forEach((line) => line.remove());
+});
+
+// A field a request failed on turns red and takes the focus; its message
+// replaces the hint under it, or goes in a line under its form when it has
+// none. Changing the field clears it again.
+document.addEventListener("moin:invalid", (event) => {
+  const { field: id, title, message } = event.detail;
+  const field = document.getElementById(id);
+  if (!field) return;
+  const hint = document.querySelector(`[data-field-hint="${CSS.escape(id)}"]`);
+  const error = hint?.querySelector("[data-hint-error]");
+  field.setAttribute("aria-invalid", "true");
+  if (message && error) {
+    error.textContent = message;
+    hint.dataset.invalid = "";
+  } else if (message) {
+    saySaid(field, "failed", message);
+  }
+  field.focus();
+  field.addEventListener("input", () => {
+    field.removeAttribute("aria-invalid");
+    if (hint) delete hint.dataset.invalid;
+  }, { once: true });
+});

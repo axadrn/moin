@@ -34,7 +34,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 			view, err := apiTokensView(r, h.tokens, newAPITokenForm(r))
 			if err != nil {
 				slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
-				toastDone(w, r, "Token created", "Reload the page to see it in the list.")
+				answerDone(w, r, "Token created", "Reload the page to see it in the list.")
 				render(w, r, pages.APITokenReveal(raw))
 				return
 			}
@@ -46,11 +46,11 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 		field, message, ok := apiTokenFormError(err)
 		if !ok {
 			slog.Error("failed to create api token", "error", err, "user_id", user.ID)
-			toastFailed(w, r, "Token not created", "Something went wrong. Please try again.")
+			answerFailed(w, r, "Token not created", "Something went wrong. Please try again.")
 			return
 		}
 		if field == "form" {
-			toastFailed(w, r, "Token not created", message)
+			answerFailed(w, r, "Token not created", message)
 			return
 		}
 		form.Errors[field] = message
@@ -58,7 +58,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	view, err := apiTokensView(r, h.tokens, form)
 	if err != nil {
 		slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Token not created", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Token not created", "Something went wrong. Please try again.")
 		return
 	}
 	render(w, r, pages.APITokenCreateForm(view, true))
@@ -71,14 +71,14 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	err := h.tokens.Revoke(user.ID, tokenID, service.RequestSource(r.Context()))
 	switch {
 	case errors.Is(err, repository.ErrAPITokenNotFound):
-		toastError(w, r, "Token not found", "That token was already revoked.")
+		answerError(w, r, "Token not found", "That token was already revoked.")
 	case err != nil:
 		slog.Error("failed to revoke api token", "error", err, "user_id", user.ID, "token_id", tokenID)
-		toastFailed(w, r, "Token not revoked", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Token not revoked", "Something went wrong. Please try again.")
 		return
 	default:
 		slog.Info("api token revoked", "token_id", tokenID, "user_id", user.ID)
-		toastDone(w, r, "Token revoked", "Requests with it no longer work.")
+		answerDone(w, r, "Token revoked", "Requests with it no longer work.")
 	}
 	view, err := apiTokensView(r, h.tokens, newAPITokenForm(r))
 	if err != nil {

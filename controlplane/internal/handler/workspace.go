@@ -176,7 +176,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("create workspace failed", "error", err, "user_id", user.ID)
-		toastFailed(w, r, "Workspace not created", "Something went wrong. Please try again.")
+		answerFailed(w, r, "Workspace not created", "Something went wrong. Please try again.")
 		return
 	}
 	redirect(w, r, fmt.Sprintf("/app/%s/dashboard", workspace.Slug), http.StatusSeeOther)
@@ -225,7 +225,7 @@ func (h *WorkspaceHandler) renderWorkspaceAction(w http.ResponseWriter, r *http.
 
 	render(w, r, pages.WorkspaceContent(members, invitations))
 	render(w, r, layouts.WorkspaceUpdate(workspace, workspaces))
-	toastDone(w, r, title, description)
+	answerDone(w, r, title, description)
 }
 
 func (h *WorkspaceHandler) redirectToFirstWorkspace(w http.ResponseWriter, r *http.Request, userID string) {
@@ -282,7 +282,7 @@ func (h *WorkspaceHandler) handleError(w http.ResponseWriter, r *http.Request, t
 	case isAction(r) && field != "":
 		fieldError(w, title, field, description)
 	case isAction(r):
-		toastFailed(w, r, title, description)
+		answerFailed(w, r, title, description)
 	default:
 		w.WriteHeader(status)
 		render(w, r, pages.ErrorPage(status, title, description))

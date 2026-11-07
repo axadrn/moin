@@ -6,29 +6,25 @@ the CLI. They share these rules. Change a token here and in the code at once.
 ## Character
 
 **Native.** It should feel like an Apple system app (Settings, Music, Finder
-in iOS and macOS), not a website and not a dashboard template. The owner
-chose this look from three candidates (moin Looks artifact).
+in iOS and macOS), not a website and not a dashboard template.
 
-- **Grouped and rounded.** Content sits in grouped lists and cards with big
-  radii (see Geometry), soft system grays; separators only between rows
-  inside a group.
-- **Clear titles.** Sizes and weights come only from the five-size scale in
-  "Pages": page title, number, section title, body, small. The landing page
-  may use its display size for the hero; the control panel never does.
+- **Calm.** One big answer per page, one primary button, the rest quiet.
+  Few words: a title, the content, a button. A sentence only when nothing
+  else says what happens. The app explains itself; the docs explain ideas.
+- **Rounded.** Everything you press is a capsule; everything that groups
+  content has big corners; inside, the radius is smaller (see Geometry).
 - **Dark:** pure black ground (#000), grouped surfaces #1c1c1e, controls
   #2c2c2e, text white, secondary #98989f. **Light:** ground #f2f2f7,
   surfaces white, controls #e5e5ea, text black, secondary #6e6e73. Both are
   first-class.
-- **Monochrome brand.** Color only carries status: green live, amber
-  running, red failed, as filled soft chips with a dot and the word.
-  Primary action is an inverted pill (white on black in dark, black on white
-  in light); secondary actions are gray pills. One primary per view.
-- **Selection** is a soft gray row, in the sidebar and in lists. The sidebar
-  is shadcn's sidebar-07: workspace switcher on top, the places and the apps
-  in groups, the user at the bottom, collapsible to icons. Generous padding inside every rounded shape: text never sits
-  close to a rounded edge.
+- **Monochrome brand.** Color only carries meaning: green live, amber
+  running, red failed. The primary action is an inverted pill (white on
+  black in dark, black on white in light); every other button is a gray
+  pill. One primary per page.
 - **Alive.** Live dots pulse softly, running states blink, changes swap in
   place without layout jumps. Reduced motion turns it off.
+- **Phone first.** Every page works with a thumb: 44 px targets, no
+  sideways scrolling, a list that drills down where the desktop shows tabs.
 - Real product, real output. The landing page keeps its floating pill
   navbar.
 - **The harbor.** moin is Hamburg, and shipping containers are app
@@ -73,214 +69,117 @@ image are the same shapes. The story behind the name is Why moin in the FAQ.
 
 ## Geometry
 
-One system, set globally, never per page. The components come from
-shadcn-templ in the `base-luma` style (`components.json`, applied with
-`shadcn-templ apply bKsE3bpA`: luma, stone, Geist, lucide), the corners from
-one token, `--radius: 0.5rem` in `assets/css/globals.css`, with the radius
-scale of the shadcn-templ theming docs (`sm` 0.6×, `md` 0.8×, `lg` 1×, `xl`
-1.4×, `2xl` 1.8×, `3xl` 2.2×, `4xl` 2.6×).
+One system, in one place: the kit (`internal/ui/kit`). A page gives a kit
+part its content, never a height, radius, padding or color. To change the
+look, change the kit, not a page. `/dev/kit` (only with `APP_ENV=development`)
+shows every part in every state, light and dark: check a part there once
+instead of on every page.
 
 | Part | Value |
 | --- | --- |
-| Input, select trigger, button (default), next to each other | 36 px high, pill |
-| Button `sm` / `lg` | 32 px / 40 px, pill |
-| Textarea, menu and command items | `rounded-2xl` (14.4 px) |
-| Select, dropdown and popover menus | `rounded-3xl` (17.6 px), 6 px padding around the items |
-| Cards, dialogs, panels | `rounded-4xl` (20.8 px) |
-| Boxes and rows inside a card | `rounded-2xl` or `rounded-xl` |
+| Everything you press: buttons, fields, segments, chips, the search | 44 px high, a capsule (`rounded-full`) |
+| Groups: cards, lists, dialogs, the palette | `rounded-4xl`, 24 px inside |
+| Inside a group: rows, boxes, a log | the group's radius minus its padding (`rounded-3xl`), so the curves run parallel |
+| Page | `kit.Page`: one width (`max-w-5xl`), 16 px gutters on phones, 24 px from `sm` |
 
-Pages pass layout classes (width, margins, `font-mono`) to components, never
-heights, radii, paddings or colors of a control. Every select puts its items
-in `select.Group` (with a `select.Label` when nothing else names the list), every
-dropdown its items in `dropdown.Group`, so the open menu keeps space around the
-highlighted item. To change the look, change the style or `--radius`, not a
-page. Marketing illustrations (terminal, chat, the product frame) keep their
-own shapes.
+Never a card in a card. Marketing illustrations (terminal, chat, the
+product frame) keep their own shapes.
 
 ## Navigation
 
-htmx boosted navigation (swap `#main`) for every click inside the app:
-sidebar nav, app list, tabs, settings. Full page loads only where the
-context changes: sign in/out, switching workspace, the Stripe checkout
-redirect, and the first load.
+Every page is a full page load; there is no hx-boost and no client router.
 
-How it works (`internal/ui/layouts/app.templ`, `appBoost`):
-
-- The body of every control panel page carries
-  `hx-boost:inherited='{"target":"#main","select":"#main","swap":"outerHTML","selectOOB":"#sidebar-nav,#app-header"}'`.
-  Every plain link and form inside the app is boosted without any attribute
-  of its own: htmx fetches the full page, swaps its `#main` and brings the
-  sidebar places (`#sidebar-nav`) and the top bar with the path
-  (`#app-header`) along, pushes the URL and updates the title. The apps list
-  reloads itself after every push. Reload, back and a link opened directly
-  give the full page, as every route still renders one.
-- A tab is a plain `<a href>` to its own URL that renders the full page with
-  that tab open. Do not add `hx-get`, `hx-target` or `hx-push-url` to it: the
-  boost does all of it. Elements with their own `hx-get`/`hx-post` are not
-  boosted and keep working as before.
-- A part that refreshes itself (`hx-get` with `hx-trigger="… from:body"`)
-  renders its content with the page and may carry `hx-swap-oob="true"` for
-  its fragment answer: a boosted answer drops those markers, so the part
-  stays in `#main`. Never leave a part empty until an event fills it.
-- A link that changes the context opts out with `hx-boost="false"`: another
-  workspace, `/workspaces/new`, `/admin`, sign in and out. A link to a page
-  outside the panel (no `#main`) loads as a full page by itself; a link with
-  `target="_blank"`, `mailto:` or another origin is never boosted. Forms
-  that end in a redirect (checkout, sign out) answer with `HX-Redirect`
-  through `redirect()`, which loads the whole page.
-- Scripts in swapped content run again with the page's nonce
-  (`inlineScriptNonce`). A page script runs once per visit, so it binds to
-  its own elements (`document.currentScript.closest(...)`), never once per
-  document. When it must listen on `document` or `window`, or holds an
-  `EventSource` or timer, it stops all of it when the page goes:
-
-  ```js
-  const gone = new AbortController();
-  document.addEventListener("htmx:before:history:update", () => gone.abort(), { once: true });
-  document.addEventListener("click", onClick, { signal: gone.signal });
-  gone.signal.addEventListener("abort", () => events.close());
-  ```
-
-  Never wait for `DOMContentLoaded` or `load`: they do not fire after a swap.
+- **A link changes the page.** Tabs, rows, the bar and the palette are plain
+  `<a href>` links to the page's own URL. `@view-transition { navigation:
+  auto; }` holds the old page until the new one paints, so nothing flashes.
+- **htmx only acts on the page:** save, delete, a switch, a search, a part
+  that reloads itself. Never to switch pages.
+- **One tab bar per page at most** (`kit.Segmented`). A second level is a
+  list that drills down to its own page ("‹ shop" back), never a second tab
+  bar. Filters that only narrow (a time range) are a `kit.Select`.
+- **On a phone** an app's sections are a list on its first page, each row
+  with its value ("Deploys · v12 live ›"); on the desktop they are the tab
+  bar. The same links either way.
+- **The bar** is the wordmark (home), the workspace name, the search and
+  your picture. The workspace and your picture both open Settings, a page,
+  not a menu.
+- **The palette** (`⌘K`, `ctrl+k`, `/` or the search in the bar) opens in
+  the middle of the screen, a native `<dialog>`. It finds apps, servers,
+  places and actions, and shows each one's key. The same palette is in the
+  TUI. There is no which-key menu.
+- **Live parts** use `kit.Live(url)`, the only way a page opens a stream
+  (hx-sse). It closes when the page is left, and a page back from the
+  back-forward cache loads fresh (`moin.js`). A part that reloads itself
+  has `hx-get` and `hx-trigger="<event> from:body"` and renders its content
+  with the page; it is never empty until an event fills it.
+- **Scripts** live in the component that needs them (`templ.OnceHandle`)
+  or in `assets/js/moin.js` when every page needs them. Both listen on
+  `document`, so HTML that htmx swaps in works at once. No page script.
 
 ## Pages
 
-Calm like shadcn's dashboard-01, Linear and Vercel: a clear header, cards on
-the page ground, few lines, the same spacing everywhere. The helpers live in
-`internal/ui/pages/app_parts.templ`; use them, do not rebuild them per page.
-
 Rules every page follows:
 
-- **For dummies.** Clear over clever, uniform everywhere. Someone who opens
-  a page for the first time sees what it is, what state things are in and
-  the one thing to do next. Same thing, same look, on every page.
+- **For dummies.** Someone who opens a page for the first time sees what it
+  is, what state things are in and the one thing to do next.
+- **One question per page.** Its answer is the first thing on it, big: an
+  app's head says "Live · v12 · 2 min ago" or "v13 failed" in the page
+  title size, with the one primary action next to it.
 - **Five sizes, no others.** No `text-[…px]`, no other `text-*` size on a
   page:
 
   | Name | Classes | Use |
   | --- | --- | --- |
-  | page title | `text-3xl font-bold tracking-tight` | the `h1`, once per page (`pageHeader`) |
-  | number | `text-2xl font-semibold tracking-tight tabular-nums` | the value of a `statCard` |
-  | section title | `text-base font-semibold` | card titles (`panel`), empty state titles |
-  | body | `text-sm` | everything else: rows, forms, descriptions (muted with `text-muted-foreground`) |
-  | small | `text-xs text-muted-foreground` | meta next to a value: times, counts, hints under a field |
+  | page title | `text-3xl font-semibold tracking-tight` | the `h1`, once per page |
+  | number | `text-2xl font-semibold tracking-tight tabular-nums` | a value that is the point |
+  | section title | `text-base font-medium` | card titles |
+  | body | `text-sm` | everything else (muted with `text-muted-foreground`) |
+  | small | `text-xs text-muted-foreground` | meta next to a value: times, counts |
 
-- **Weights.** `font-normal` for text, `font-medium` for names in rows and
-  labels, `font-semibold`/`font-bold` only for titles and numbers.
 - **Families.** Geist (`font-sans`) for everything; Geist Mono (`font-mono`)
   only for code, commands, IDs, keys, commits, paths and log lines.
-- **Same height.** Cards in one row have the same height: the row is a
-  `grid items-stretch`, each card `h-full`.
-- **One left edge.** Page title, tabs, card edges and the text in cards line
-  up: the page gutter, then the card's 24 px. Nothing is indented on its own.
-
-- **Page.** `@panelPage()` sets the width (`max-w-7xl`), the gutters and
-  stacks its children with `gap-6`. Put sections straight into it. Never
-  `mt-*`/`mb-*` between sections, and never inside a reusable panel.
-  Every card takes the full width of the page; no narrow `max-w-*` column
-  for some pages. Forms keep their fields short with grids (`lg:grid-cols-2`
-  or `-3`) or `sm:max-w-sm` on a single field.
-- **Forms.** A one-field form puts its button next to the field. A form
-  with more fields ends with its buttons right aligned.
-- **Header.** `@pageHeader(title, description) { actions }`: the page
-  title, one muted body line below it, the actions right
-  aligned at its bottom (below on phones). The description says what the
-  page is for in one sentence. An app page uses
-  `@appHeader(app, tab, description) { actions }`: the name, its status chip,
-  the line, the actions, and the tabs below. A page about one server uses
-  `@statusHeader(name, chip, description)` the same way, without tabs.
-- **Tabs.** `@tabNav(label) { @tabLink(...) }` (`@appTabs(app, tab)` on app pages): a segmented control of plain `<a href>`
-  links, one per page (boosted, see Navigation), the active one
-  `aria-current="page"`. Tabs switch pages, never content in place.
-- **Cards.** Every block is a `card.Card`, one per topic, built with
-  `@panel(panelProps{...}) { body }`: `card.Header` with `card.Title`
-  (section title), an optional `card.Description` (one muted sentence) and at most
-  one `card.Action` (a small button). The guide that explains the card is
-  `Docs`: a muted ghost book icon right of the title, "How it works" in its
-  tooltip and `aria-label` (`docsButton`), never a text link. The card's own
-  spacing (24 px) stays; never pass paddings, heights or radii to a card.
-  The body is `Body: ""` (padded text and forms), `panelBodyRows` (row lists:
-  rows bring `px-3`, so their text lines up with the title) or
-  `panelBodyFlush` (logs and tables edge to edge).
-- **Lines.** No `border-b`, `border-t`, `divide-y` or `<hr>` inside a card
-  or between header and body: space separates. Rows are separated by space,
-  a soft `hover:bg-muted/60` and a selected `bg-muted`, `rounded-xl`.
-  Tables use `table` with its own row lines only.
-- **Grid.** Cards side by side sit in `grid items-stretch gap-4`, each
-  `h-full`, so their edges line up. Two equal columns from `lg`
-  (`lg:grid-cols-2`), so the rows of a page share the same edges.
-- **Spacing scale.** 24 px between sections and inside cards, 16 px between
-  cards in a grid, 12 px between fields of a form, 8 px between a control
-  and its button, 4 px between a label and its value.
-- **Numbers.** `@statGrid() { @statCard(label, value, note) }`: up to four
-  cards in a row, the label muted body, the value in the number size, an
-  optional small note. No value is `—`, muted.
-- **Status.** The state of the thing a page or row is about is a chip:
-  `status.Status{Kind, Chip: true}` with the word ("live v4", "deploying
-  v5", "failed"). Inside lists and timelines use the plain
-  `status.Status{Kind}` (symbol and word, no pill). One chip per row.
-- **Actions.** One primary (`button.VariantDefault`) per area: the page
-  header or a card. Others are `VariantSecondary`; small tools in a card
-  (copy, show values, load) are `SizeSm` secondary or ghost icons.
-  Destructive actions (remove an app, a server) live in their own card at the
-  end of the page: `@dangerPanel(title, body) { button }` with a
-  `VariantDestructive` button behind a confirm. No red hover classes on gray
-  buttons.
-- **Empty states.** `@emptyState(title, body, cmd)`: what is missing, what
-  makes it appear, and the command to type. Inside a card that already has a
-  title, one muted sentence plus the command is enough:
-  `@emptyHint(text, cmd)`. Never a blank card.
+- **Parts.** `kit.Card` (a topic with its title and at most one action),
+  `kit.List` and `kit.Row` (grouped rows, a line between rows, inset like
+  iOS), `kit.Section` (a quiet title over a list), `kit.Grid` (cards side by
+  side, as high as the highest), `kit.Field`, `kit.Input`, `kit.Select`,
+  `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.Command`.
+- **No explaining.** No description line under a title, no help icon next
+  to it. A card about an empty thing says what is missing in one sentence
+  and shows the one button or command that fills it.
+- **Danger at the end.** Stop, remove and disconnect sit at the bottom of
+  Settings, as red text buttons that ask first.
 - **Text.** Muted for secondary facts, `tabular-nums` for numbers and
   times. Times are relative ("3h ago") with the full stamp as `title`.
 
 ## Feedback
 
 Every answer to a click or a form takes one of these shapes, the same on
-every page. Nothing on the page moves to make room for it. The helpers are
-in `internal/handler/feedback.go` and `@fieldHint` in
-`internal/ui/pages/app_parts.templ`; use them, never build feedback by hand.
+every page. Nothing on the page moves to make room for it. There are no
+toasts.
 
+- **If it worked:** the button that did it says so: "Save" turns into
+  "Saved ✓" for a moment and back, at the same size (`kit.Done`). What
+  changed on the page is the rest of the answer.
 - **If a field is wrong** (empty, too long, taken, not a domain): the field
-  turns red and takes the focus, and what was typed stays. Its message
-  replaces the hint in the line under the field. In a form with labels
-  above the fields (sign in, password, bucket, dialogs) every field has
-  that line, `@fieldHint(id, err) { hint }`, empty when there is no hint,
-  so the message only swaps text. Keep it to one short sentence.
-  Handler: `fieldError(w, title, field, message)`, or
-  `failed(w, r, title, err, fields)` for a service error.
-- **If the field sits in one row with its button** (add app, add server,
-  env var, domain, name, email, invite): the same, but the row has no hint
-  line, so the message is a toast. Never text under the row.
-- **If an action worked**: a toast that says what happened,
-  `toastDone(w, r, title, description)`. Title: the thing and the past
-  verb, "blog added", "Domain blog.de added". Description: what follows,
-  if anything, "Deploy v5 applies it now."
-- **If it worked only in part** (password changed, other sessions not
-  signed out): a warning toast, `toastWarning(...)`, that says what is left.
-- **If an action failed and no field is to blame** (agent offline, not
-  allowed, a key the provider refused): a toast,
-  `toastFailed(w, r, title, description)` or `failed(...)`. Title: what did
-  not happen, "Rollback not started", "Server not removed"; description:
-  why, in one sentence. The page stays as it was.
-- **If a control saves itself** (a switch, a cell of the data browser):
-  its new state is the answer, no toast. If saving fails, it goes back (the
-  cell turns red) and a toast says why. A switch is a `@switchForm` with a
-  `@savedSwitch`: it posts to its own endpoint, which saves only that one
-  setting through one service method and answers the form as stored; the
-  switch is disabled while it saves.
-- **If something was copied**: the copy icon turns into a check for a
-  moment. The button keeps its size and its label.
+  turns red and takes the focus, what was typed stays, and the line under
+  it says why in one short sentence (`kit.Field`). A field in one row with
+  its button has that line too.
+- **If it failed and no field is to blame** (agent offline, not allowed):
+  a red line under the button that sent it, in place, until the next try.
+  The page stays as it was.
+- **If a control saves itself** (a switch, a cell): its new state is the
+  answer. If saving fails, it goes back and says why under it.
+- **If something was copied:** the copy icon turns into a check for a
+  moment.
 - **If a state lasts** while the page is open (trial ended, read-only
-  workspace, server offline, a backup that needs attention, data that could
-  not be read): an alert in the page, rendered with the page. Never a
-  toast, and never an alert inserted as the answer to a click.
-- **If a request runs**: the button that sent it is disabled until the
+  workspace, server offline): a line in the page, rendered with the page.
+- **If a request runs:** the button that sent it is disabled until the
   answer (`hx-disable`) and keeps its size; a running deploy or restore
   shows the running status. No spinner that moves anything.
-- **If it is a console** (SQL, logs): its answer is its output area, an
-  error included.
+- **Saving never restarts an app.** Changes that need a restart wait; the
+  app's head says "2 changes waiting" next to Restart.
 
-Toasts read like the CLI: short and concrete, never "Success", "Error" or
+Messages read like the CLI: short and concrete, never "Success", "Error" or
 "successfully".
 
 ## Asking first
@@ -308,7 +207,10 @@ up to the first "? " is the title, the rest the description. The dialog
 (`blocks.ConfirmDialog`, in the base layout) repeats the label of the
 clicked button, or `data-confirm-action`. Add `data-confirm-name` for
 tier 1. Never `window.confirm` and no question dialog of a page's own;
-only the account keeps its dialog, as the server checks the DELETE. CLI:
+only the account keeps its dialog, as the server checks the DELETE. The
+confirm dialog, the palette and the list of `kit.Select` are the only
+overlays: no menus, popovers or
+sheets. CLI:
 `confirm` and `confirmName` in `internal/cli/args.go`; TUI: `confirmFirst`
 and `confirmName`; MCP: `confirmed`.
 
