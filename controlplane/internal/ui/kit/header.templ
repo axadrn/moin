@@ -12,6 +12,20 @@ type Back struct {
 // top, then the title, big. Children go next to the title: a status, the
 // actions (put them in a group with sm:ml-auto to push them right).
 templ Header(back Back, title string) {
+	@header(back, nil, title) {
+		{ children... }
+	}
+}
+
+// HeaderIcon is Header with an icon before the title, as high as the
+// title's line: an app's icon on its page.
+templ HeaderIcon(back Back, icon templ.Component, title string) {
+	@header(back, icon, title) {
+		{ children... }
+	}
+}
+
+templ header(back Back, icon templ.Component, title string) {
 	<header class="flex flex-col gap-1">
 		<div class="flex h-6 items-center">
 			if back.Href != "" {
@@ -22,6 +36,11 @@ templ Header(back Back, title string) {
 			}
 		</div>
 		<div class="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-3">
+			if icon != nil {
+				<span class="mr-1">
+					@icon
+				</span>
+			}
 			<h1 class="mr-2 py-1 text-3xl font-semibold tracking-tight text-balance">{ title }</h1>
 			{ children... }
 		</div>
