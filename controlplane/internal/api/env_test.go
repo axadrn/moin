@@ -100,7 +100,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 
 	clientIPs := middleware.NewClientIPResolver(nil)
 	audit := repository.NewWorkspaceAudit(database)
-	servers := service.NewServerService(repository.NewServerRepository(database), audit, "https://app.example.com")
+	servers := service.NewServerService(repository.NewServers(database), audit, "https://app.example.com")
 	environment.updates = service.NewUpdateService("v0.2.0", "http://127.0.0.1:1/releases", t.TempDir(), false, true, []string{testAdminEmail}, audit)
 	box, err := secret.New(bytes.Repeat([]byte{1}, 32))
 	if err != nil {

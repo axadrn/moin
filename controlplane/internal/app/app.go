@@ -142,7 +142,7 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize secrets: %w", err)
 	}
-	serverService := service.NewServerService(repository.NewServerRepository(database), workspaceAuditEvents, cfg.AppURL)
+	serverService := service.NewServerService(repository.NewServers(database), workspaceAuditEvents, cfg.AppURL)
 	appService := service.NewAppService(repository.NewAppRepository(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
 	// The catalog ships in content/catalog; its releases come from the
