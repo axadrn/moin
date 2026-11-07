@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // ActivityView is one page of the workspace activity, newest first. Next is
@@ -108,7 +109,7 @@ templ ActivityRows(view ActivityView) {
 					}
 				</p>
 			</div>
-			<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ ago(event.CreatedAt, now) }</span>
+			<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ human.Ago(event.CreatedAt, now) }</span>
 		}
 	}
 	if view.Next != "" {

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // DefaultURL is the hosted control plane.
@@ -549,14 +550,5 @@ func (s Server) LastSeen(now time.Time) string {
 	if s.LastSeenAt == nil {
 		return "-"
 	}
-	age := now.Sub(*s.LastSeenAt)
-	switch {
-	case age < time.Minute:
-		return fmt.Sprintf("%ds ago", int(age.Seconds()))
-	case age < time.Hour:
-		return fmt.Sprintf("%dm ago", int(age.Minutes()))
-	case age < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(age.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(age.Hours()/24))
+	return human.Ago(*s.LastSeenAt, now)
 }

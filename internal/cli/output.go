@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/charmbracelet/colorprofile"
 	"golang.org/x/term"
@@ -223,7 +224,7 @@ func (p *progress) draw() {
 	frame := style.Spinner[p.frame%len(style.Spinner)]
 	elapsed := ""
 	if since := time.Since(p.started); since >= time.Second {
-		elapsed = " · " + style.Duration(since)
+		elapsed = " · " + human.Duration(since)
 	}
 	// One row only: a wrapped spinner line would not clear.
 	width := 80
@@ -255,7 +256,7 @@ func (p *progress) end() {
 }
 
 func (p *progress) elapsed() string {
-	return style.Duration(time.Since(p.started))
+	return human.Duration(time.Since(p.started))
 }
 
 // clip cuts text to width cells and ends it with … when it was longer.

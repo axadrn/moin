@@ -9,6 +9,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -48,7 +49,7 @@ func catalog(ctx context.Context, args []string, stdout io.Writer) error {
 		if entry.Latest != nil {
 			latest = entry.Latest.Tag
 			if entry.Latest.Date != nil {
-				latest += style.Muted.Render(", " + since(*entry.Latest.Date, now))
+				latest += style.Muted.Render(", " + human.Ago(*entry.Latest.Date, now))
 			}
 		}
 		rows = append(rows, []string{entry.Slug, entry.Category, latest, dash(entry.Database), entry.Pitch})
@@ -85,7 +86,7 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 	for _, version := range shown {
 		date := style.Muted.Render("-")
 		if version.Date != nil {
-			date = version.Date.Local().Format("2006-01-02") + style.Muted.Render(", "+since(*version.Date, now))
+			date = version.Date.Local().Format("2006-01-02") + style.Muted.Render(", "+human.Ago(*version.Date, now))
 		}
 		rows = append(rows, []string{version.Tag, date})
 	}

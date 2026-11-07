@@ -135,7 +135,7 @@ Rules every page follows:
 - **For dummies.** Someone who opens a page for the first time sees what it
   is, what state things are in and the one thing to do next.
 - **One question per page.** Its answer is the first thing on it, big: an
-  app's head says "Live · v12 · 2 min ago" or "v13 failed" in the page
+  app's head says "Live · v12 · 2m ago" or "v13 failed" in the page
   title size, with the one primary action next to it.
 - **Five sizes, no others.** No `text-[…px]`, no other `text-*` size on a
   page:
@@ -188,6 +188,10 @@ Rules every page follows:
   Settings, as red text buttons that ask first.
 - **Text.** Muted for secondary facts, `tabular-nums` for numbers and
   times. Times are relative ("3h ago") with the full stamp as `title`.
+- **Times, sizes and durations** read the same on every surface and come
+  from one place, `internal/human`: "just now", "4m ago", "3h ago",
+  "12d ago", then the date; "512 B", "1.5 KB", "38 GB" (1024 to a KB);
+  "850ms", "16s", "2m 5s", "3h 10m", "3d 4h".
 
 ## Feedback
 

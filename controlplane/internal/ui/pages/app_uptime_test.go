@@ -27,7 +27,7 @@ func TestUptimeShowsEveryDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-uptime-domain="shop.de"`, `data-uptime-domain="www.shop.de"`, `placeholder="/health"`, "100%", "99.50%", "down for 30 min · HTTP 502", "data-server-offline", `data-uptime-state="down"`} {
+	for _, want := range []string{`data-uptime-domain="shop.de"`, `data-uptime-domain="www.shop.de"`, `placeholder="/health"`, "100%", "99.50%", "down for 30m · HTTP 502", "data-server-offline", `data-uptime-state="down"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}

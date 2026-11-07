@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -32,7 +33,7 @@ func (m model) appView(u ui, w, h int) string {
 	}
 	right := ""
 	if m.app.detail != nil && len(m.app.detail.Deploys) > 0 {
-		right = u.muted("deployed " + ago(m.app.detail.Deploys[0].CreatedAt, m.now()))
+		right = u.muted("deployed " + human.Ago(m.app.detail.Deploys[0].CreatedAt, m.now()))
 	}
 	l1 := spread(u.strong(a.Name)+"   "+chip+"   "+u.muted(strings.Join(meta, " · ")), right, w)
 	out := []string{l1, ""}
@@ -163,9 +164,9 @@ func (m model) deploysTab(u ui, w, h int, a client.App) string {
 		}
 		took := ""
 		if d.FinishedAt != nil {
-			took = span(d.FinishedAt.Sub(d.CreatedAt))
+			took = human.Duration(d.FinishedAt.Sub(d.CreatedAt))
 		}
-		body = append(body, u.row([]cell{{u.strong(fmt.Sprintf("v%d", d.Number)), 5, false}, {chip, 15, false}, {u.text(source(d)), srcW, false}, {u.muted(ago(d.CreatedAt, now)), 11, false}, {u.faint(took), 0, true}}, iw, i == at))
+		body = append(body, u.row([]cell{{u.strong(fmt.Sprintf("v%d", d.Number)), 5, false}, {chip, 15, false}, {u.text(source(d)), srcW, false}, {u.muted(human.Ago(d.CreatedAt, now)), 11, false}, {u.faint(took), 0, true}}, iw, i == at))
 	}
 	list := u.panel("Deploys", u.faint(fmt.Sprintf("%d shown", len(deploys))), body, lw, h, true)
 	if !wide {
@@ -202,7 +203,7 @@ func (m model) deploysTab(u ui, w, h int, a client.App) string {
 	}
 	kv("started", u.text(d.CreatedAt.Local().Format("Jan 2 15:04:05")))
 	if d.FinishedAt != nil {
-		kv("took", u.text(span(d.FinishedAt.Sub(d.CreatedAt))))
+		kv("took", u.text(human.Duration(d.FinishedAt.Sub(d.CreatedAt))))
 	}
 	if d.Error != "" {
 		det = append(det, "")
@@ -339,7 +340,7 @@ func (m model) backupsTab(u ui, w, h int) string {
 		case d.DrillError != "":
 			kv("daily check", u.bad("failed"))
 		case d.VerifiedAt != nil:
-			kv("daily check", u.good("passed")+u.muted(" "+ago(*d.VerifiedAt, now)))
+			kv("daily check", u.good("passed")+u.muted(" "+human.Ago(*d.VerifiedAt, now)))
 		default:
 			kv("daily check", u.faint("not yet"))
 		}
@@ -525,9 +526,9 @@ func (m model) uptimeTab(u ui, w, h int) string {
 		pc := func(v *float64) cell { return cell{u.text(client.Percent(v)), 7, true} }
 		body = append(body, u.row([]cell{{u.strong(d.Domain), dw, false}, {u.chip(state, state), 12, false}, pc(d.Uptime24h), pc(d.Uptime7d), pc(d.Uptime30d), {"", 1, false}, {u.muted(check), 0, false}}, iw, i == at))
 		for _, o := range d.Outages {
-			lasted := u.bad("ongoing " + span(now.Sub(o.StartedAt)))
+			lasted := u.bad("ongoing " + human.Duration(now.Sub(o.StartedAt)))
 			if o.EndedAt != nil {
-				lasted = u.muted("down " + span(o.EndedAt.Sub(o.StartedAt)))
+				lasted = u.muted("down " + human.Duration(o.EndedAt.Sub(o.StartedAt)))
 			}
 			outages = append(outages, u.faint(o.StartedAt.Local().Format("Jan 2 15:04"))+"  "+padR(u.text(d.Domain), dw)+" "+lasted+"  "+u.faint(o.Reason))
 		}
@@ -569,9 +570,9 @@ func (m model) metricsTab(u ui, w, h int) string {
 		rx = append(rx, p.NetRx)
 		tx = append(tx, p.NetTx)
 	}
-	memNow := client.Bytes(float64(n.MemoryUsed))
+	memNow := human.Size(float64(n.MemoryUsed))
 	if n.MemoryLimit > 0 {
-		memNow += u.faint(" of " + client.Bytes(float64(n.MemoryLimit)))
+		memNow += u.faint(" of " + human.Size(float64(n.MemoryLimit)))
 	}
 	sw := max(8, iw-28)
 	row := func(label, now string, vals []float64) []string {
@@ -580,9 +581,9 @@ func (m model) metricsTab(u ui, w, h int) string {
 	body := []string{""}
 	body = append(body, row("CPU", fmt.Sprintf("%.1f%%", n.CPU), cpu)...)
 	body = append(body, row("Memory", memNow, mem)...)
-	body = append(body, row("Network in", client.Bytes(n.NetRx)+"/s", rx)...)
-	body = append(body, row("Network out", client.Bytes(n.NetTx)+"/s", tx)...)
-	body = append(body, u.faint(fmt.Sprintf("%d containers · %s · newest sample %s", n.Containers, mt.Server, ago(n.At, m.now()))))
+	body = append(body, row("Network in", human.Size(n.NetRx)+"/s", rx)...)
+	body = append(body, row("Network out", human.Size(n.NetTx)+"/s", tx)...)
+	body = append(body, u.faint(fmt.Sprintf("%d containers · %s · newest sample %s", n.Containers, mt.Server, human.Ago(n.At, m.now()))))
 	return u.panel("Metrics", rangeLine, body, w, h, true)
 }
 

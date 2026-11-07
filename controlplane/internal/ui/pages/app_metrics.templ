@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // AppMetricsPage is the metrics of an app, a page under it ("‹ shop"):
@@ -40,7 +41,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 				@kit.List() {
 					if now := m.Now; now != nil {
 						@serverStat("CPU", "of the whole server", percentText(now.CPU))
-						@serverStat("Memory", appLimitNote(now), bytesText(float64(now.MemoryUsed)))
+						@serverStat("Memory", appLimitNote(now), human.Size(float64(now.MemoryUsed)))
 						@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
 						@serverStat("Containers", "", strconv.Itoa(now.Containers))
 					} else {
@@ -62,7 +63,7 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 			} else {
 				@kit.Grid() {
 					@serverChart("CPU", metricsChartProps{ID: "app-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Marks: marks}, times, m.Range)
-					@serverChart("Memory", metricsChartProps{ID: "app-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: bytesText, Marks: marks}, times, m.Range)
+					@serverChart("Memory", metricsChartProps{ID: "app-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: human.Size, Marks: marks}, times, m.Range)
 					@serverChart("Network", metricsChartProps{ID: "app-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText, Marks: marks}, times, m.Range)
 				}
 			}
@@ -74,7 +75,7 @@ func appLimitNote(now *service.MetricsNow) string {
 	if now.MemoryLimit == 0 {
 		return "no limit"
 	}
-	return "of " + bytesText(float64(now.MemoryLimit)) + ", " + shareOf(now.MemoryUsed, now.MemoryLimit)
+	return "of " + human.Size(float64(now.MemoryLimit)) + ", " + shareOf(now.MemoryUsed, now.MemoryLimit)
 }
 
 func rangeTitle(r service.MetricsRange) string {
@@ -140,8 +141,8 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 			} else {
 				@kit.Grid() {
 					@serverChart("CPU", metricsChartProps{ID: "server-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Top: 100}, times, m.Range)
-					@serverChart("Memory", metricsChartProps{ID: "server-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: bytesText, Top: totalTop(m.Now, false)}, times, m.Range)
-					@serverChart("Disk", metricsChartProps{ID: "server-disk", Lines: []kit.ChartLine{metricsLine("Disk", m.Points, diskOf)}, Value: bytesText, Top: totalTop(m.Now, true)}, times, m.Range)
+					@serverChart("Memory", metricsChartProps{ID: "server-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: human.Size, Top: totalTop(m.Now, false)}, times, m.Range)
+					@serverChart("Disk", metricsChartProps{ID: "server-disk", Lines: []kit.ChartLine{metricsLine("Disk", m.Points, diskOf)}, Value: human.Size, Top: totalTop(m.Now, true)}, times, m.Range)
 					@serverChart("Network", metricsChartProps{ID: "server-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText}, times, m.Range)
 				}
 			}
@@ -234,7 +235,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
 						if now := app.Now; now != nil {
 							@kit.RowText(app.Name, "CPU "+percentText(now.CPU)+" · network "+rateText(now.NetRx+now.NetTx))
-							<span class="shrink-0 font-medium tabular-nums">{ bytesText(float64(now.MemoryUsed)) }</span>
+							<span class="shrink-0 font-medium tabular-nums">{ human.Size(float64(now.MemoryUsed)) }</span>
 						} else {
 							@kit.RowText(app.Name, "")
 							<span class="shrink-0 text-sm text-muted-foreground">not running</span>

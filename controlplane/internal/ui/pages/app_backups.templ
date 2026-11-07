@@ -2,7 +2,6 @@ package pages
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // BackupsView is the backups of an app: its bucket, the buckets of the
@@ -239,7 +239,7 @@ func checkedText(backup service.DatabaseBackups, now time.Time) string {
 	if backup.VerifiedAt == nil {
 		return "not checked yet"
 	}
-	return "checked " + ago(*backup.VerifiedAt, now)
+	return "checked " + human.Ago(*backup.VerifiedAt, now)
 }
 
 func verifiedStamp(backup service.DatabaseBackups) string {
@@ -280,7 +280,7 @@ templ backupDownload(view BackupsView, database string) {
 	} else if download != nil && download.State == service.DownloadReady && download.Link != "" {
 		@kit.RowAttrs(download.Link, templ.Attributes{"id": "db-download", "download": true, "data-download-ready": true}) {
 			<span class="min-w-0 flex-1 truncate font-medium">Download the copy</span>
-			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ size(download.Size) }</span>
+			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(download.Size)) }</span>
 		}
 	} else {
 		@kit.RowButton(false, templ.Attributes{"id": "db-download", "hx-post": appPath + "/backups/download", "hx-vals": downloadVals(database), "hx-target": "#db-backups", "hx-swap": "outerHTML", "hx-disable": "this", "data-download": true}) {
@@ -311,16 +311,4 @@ func orAWS(endpoint string) string {
 		return "AWS S3"
 	}
 	return endpoint
-}
-
-func size(bytes int64) string {
-	switch {
-	case bytes < 1<<10:
-		return fmt.Sprintf("%d B", bytes)
-	case bytes < 1<<20:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/(1<<10))
-	case bytes < 1<<30:
-		return fmt.Sprintf("%.1f MB", float64(bytes)/(1<<20))
-	}
-	return fmt.Sprintf("%.1f GB", float64(bytes)/(1<<30))
 }

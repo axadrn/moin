@@ -6,7 +6,6 @@ package style
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/axadrn/moin/internal/client"
@@ -150,19 +149,6 @@ func Deploy(deploy client.Deploy, liveNumber int) string {
 		return Badge(StatusDone, "succeeded")
 	}
 	return Badge(StatusOf(deploy.Status), deploy.Status)
-}
-
-// Duration is "850ms", "16s", "2m 5s" or "3h 10m".
-func Duration(d time.Duration) string {
-	switch {
-	case d < time.Second:
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
-	}
-	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 // steps are how the agent's own deploy log lines start (logf in

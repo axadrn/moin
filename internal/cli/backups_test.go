@@ -22,7 +22,7 @@ func TestBackupsList(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	for _, want := range []string{"backed up · checked 2 h ago", "1h", "1 hour ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "dial tcp: i/o timeout", "nothing to go back to yet", "moin restore shop --to <moment>", "moin backup download shop"} {
+	for _, want := range []string{"backed up · checked 2h ago", "1h", "1 hour ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "dial tcp: i/o timeout", "nothing to go back to yet", "moin restore shop --to <moment>", "moin backup download shop"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("no %q in\n%s", want, stdout)
 		}

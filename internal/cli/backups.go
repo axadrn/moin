@@ -13,6 +13,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -104,7 +105,7 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 		os.Remove(file)
 		return err
 	}
-	done(stdout, "Saved %s (%s), a full copy of %s.", file, byteSize(download.Size), download.Database)
+	done(stdout, "Saved %s (%s), a full copy of %s.", file, human.Size(float64(download.Size)), download.Database)
 	return nil
 }
 
@@ -290,7 +291,7 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 		case database.Since == nil:
 			fmt.Fprintln(w, "  "+style.Muted.Render("starting: nothing in the bucket yet"))
 		case database.VerifiedAt != nil:
-			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" backed up · checked "+since(*database.VerifiedAt, now)))
+			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" backed up · checked "+human.Ago(*database.VerifiedAt, now)))
 		default:
 			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" backed up · not checked yet"))
 		}
@@ -313,27 +314,4 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 	}
 	hint(w, "Go back:", build.Name+" restore "+app+" --to <moment>, or a time like 14:01 UTC")
 	hint(w, "A full copy:", build.Name+" backup download "+app)
-}
-
-func since(t, now time.Time) string {
-	d := now.Sub(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%d min ago", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%d h ago", int(d.Hours()))
-	}
-	return fmt.Sprintf("%d days ago", int(d.Hours()/24))
-}
-
-func byteSize(bytes int64) string {
-	switch {
-	case bytes < 1<<10:
-		return fmt.Sprintf("%d B", bytes)
-	case bytes < 1<<20:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/(1<<10))
-	}
-	return fmt.Sprintf("%.1f MB", float64(bytes)/(1<<20))
 }

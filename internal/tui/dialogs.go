@@ -4,9 +4,7 @@ package tui
 // answer.
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -126,37 +124,4 @@ func (m model) promptKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m = p.live(m, value)
 	}
 	return m, nil
-}
-
-// ago is a rough age: "now", "40s", "5m", "3h", "2d".
-func ago(t time.Time, now time.Time) string {
-	d := now.Sub(t)
-	switch {
-	case d < 5*time.Second:
-		return "now"
-	case d < time.Minute:
-		return fmt.Sprintf("%ds ago", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-}
-
-// span is a duration in a few characters: "850ms", "16s", "2m 5s".
-func span(d time.Duration) string {
-	switch {
-	case d < time.Second:
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	case d < time.Hour && int(d.Seconds())%60 == 0:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
-	case int(d.Minutes())%60 == 0:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }

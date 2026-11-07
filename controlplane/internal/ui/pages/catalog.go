@@ -13,6 +13,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/catalog"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/ui/kit"
+	"github.com/axadrn/moin/internal/human"
 )
 
 // CatalogEntryView is a catalog app with its releases, newest first.
@@ -187,7 +188,7 @@ func released(version catalog.Version, now time.Time) string {
 	if version.Date.IsZero() {
 		return ""
 	}
-	return "released " + ago(version.Date, now)
+	return "released " + human.Ago(version.Date, now)
 }
 
 // catalogJSONLD describes the app for search engines, as JSON-LD.
