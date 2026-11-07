@@ -6,41 +6,41 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
 	"github.com/axadrn/moin/controlplane/internal/config"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/icons"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
+// Auth is the way in: GitHub first where it is set up, else a link by
+// email, and a password for those who set one.
 templ Auth(errorMsg string) {
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "Sign in",
-		Description: "Sign in to " + brand.Name + " or create your account",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		@blocks.AuthShell(brand.Name) {
-			{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
-			@blocks.AuthCard(authTitle(ctx), authDescription(ctx, github)) {
-				@field.Group(field.GroupProps{Class: "gap-5"}) {
-					if github {
-						@button.Button(button.Props{Href: "/auth/github", Size: button.SizeLg, Class: blocks.AuthPrimary}) {
-							@icons.Github(icons.Props{Class: "size-4"})
-							Continue with GitHub
-						}
-						@blocks.AuthOr()
-					}
-					@AuthMagicLinkForm(errorMsg)
-					if config.GoogleOAuthEnabled {
-						@blocks.AuthOr()
-						@blocks.OAuthButtons(true, false)
-					}
-					<p class="mt-3 text-center text-sm text-muted-foreground">
-						<a href="/auth/password" class="underline-offset-4 hover:text-foreground hover:underline">Sign in with a password</a>
-					</p>
-				}
+	{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
+	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
+		if ctxkeys.RenderConfig(ctx).Billing {
+			@authLine() {
+				30 days free. No card.
 			}
 		}
+		@authStack() {
+			if github {
+				@kit.Button(kit.Primary, "/auth/github", nil) {
+					@icons.Github(icons.Props{Class: "size-4"})
+					Continue with GitHub
+				}
+				@authOr()
+			}
+			@AuthMagicLinkForm(errorMsg)
+			if config.GoogleOAuthEnabled {
+				@kit.Button(kit.Secondary, "/auth/google", nil) {
+					@icons.Google(icons.Props{Class: "size-4"})
+					Continue with Google
+				}
+			}
+			@authLink("/auth/password") {
+				Sign in with a password
+			}
+		}
+		@authTerms()
 	}
 }
 
@@ -51,15 +51,4 @@ func authTitle(ctx context.Context) string {
 		return "Start free"
 	}
 	return "Sign in"
-}
-
-// authDescription is the one line under the title.
-func authDescription(ctx context.Context, github bool) string {
-	if ctxkeys.RenderConfig(ctx).Billing {
-		return "30 days free. No card."
-	}
-	if github {
-		return "With GitHub or a link by email."
-	}
-	return "We send you a link by email."
 }

@@ -33,7 +33,7 @@ func (h *ProfileHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, layouts.IdentityUpdates(updatedUser))
-	answerDone(w, r, "Name saved", "Your team sees it in moin and in the activity.")
+	answerDone(w, r, "Name saved", "")
 }
 
 // EmailAlerts turns the user's email alerts on or off and answers the

@@ -21,8 +21,8 @@ func NewAPITokensHandler(tokens *service.APITokenService) *APITokensHandler {
 	return &APITokensHandler{tokens: tokens}
 }
 
-// Create stores a token and answers with the fresh dialog, the list and the
-// one-time reveal. Invalid input re-renders the form inside the open dialog.
+// Create stores a token and answers with an empty form, the list and the
+// one-time reveal. Invalid input re-renders the form with what is wrong.
 func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	input, form := parseAPITokenForm(r)
@@ -38,7 +38,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 				render(w, r, pages.APITokenReveal(raw))
 				return
 			}
-			render(w, r, pages.APITokenCreateDialog(view))
+			render(w, r, pages.APITokenCreate(view))
 			render(w, r, pages.APITokenList(view))
 			render(w, r, pages.APITokenReveal(raw))
 			return
@@ -78,7 +78,7 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 		slog.Info("api token revoked", "token_id", tokenID, "user_id", user.ID)
-		answerDone(w, r, "Token revoked", "Requests with it no longer work.")
+		answerDone(w, r, "Token revoked", "")
 	}
 	view, err := apiTokensView(r, h.tokens, newAPITokenForm(r))
 	if err != nil {

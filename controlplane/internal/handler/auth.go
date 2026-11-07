@@ -126,14 +126,14 @@ func (h *authHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) 
 	user, err := h.authService.VerifyEmailChange(token)
 	if err != nil {
 		slog.Warn("email change verification failed", "error", err)
-		render(w, r, pages.VerifyEmailError("Invalid or expired verification link"))
+		render(w, r, pages.VerifyEmailError("It expired or was used already."))
 		return
 	}
 
 	_, err = h.authService.StartFreshSession(w, r, user.ID)
 	if err != nil {
 		slog.Error("failed to create session after email change", "error", err, "user_id", user.ID)
-		render(w, r, pages.VerifyEmailError("An error occurred. Please try again."))
+		render(w, r, pages.VerifyEmailError("Something went wrong. Open the link again."))
 		return
 	}
 

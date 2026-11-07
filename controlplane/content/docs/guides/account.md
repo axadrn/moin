@@ -29,11 +29,11 @@ API: PATCH /api/v1/account/name
 ## Change your picture
 
 ```surfaces
-Web: **Settings**, **Profile** tab, **Picture**
+Web: **Settings**, **Profile** tab, **Picture**, **Upload**
 API: POST /api/v1/account/avatar
 ```
 
-`DELETE /api/v1/account/avatar` takes it away again.
+**Remove** next to it, or `DELETE /api/v1/account/avatar`, takes it away again.
 
 ## Email alerts
 
@@ -93,7 +93,7 @@ MCP has no login: agents send a personal API token, see [MCP](/docs/guides/mcp).
 
 CI, the GitHub Action, scripts and agents sign in with a personal API token. Each token belongs to one workspace and can read, or read and write.
 
-The dialog starts at **Read and write**, which the CLI needs. A read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
+The form starts at **Read and write**, which the CLI needs. A read only token cannot add servers, deploy or read rows and env values. Pick **Read only** for a script or agent that should only look.
 
 ```surfaces
 Web: **Settings**, **Tokens** tab, **Create token**

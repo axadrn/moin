@@ -2,77 +2,34 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/brand"
-	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/alert"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/empty"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
+// VerifyEmailSuccess says the new address is in, and goes on to the app
+// by itself after a moment.
 templ VerifyEmailSuccess() {
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "Email Changed",
-		Description: "Your email has been changed",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Email verified", "Your email address is updated.") {
-				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
-					@empty.Header() {
-						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-live/10 text-live"}) {
-							@icon.CircleCheck()
-						}
-						@empty.Description() {
-							Redirecting you to settings. 
-						}
-					}
-					@empty.Content() {
-						<script nonce={ templ.GetNonce(ctx) }>
-							setTimeout(() => {
-								window.location.href = '/app';
-							}, 3000);
-						</script>
-						@button.Button(button.Props{Size: button.SizeLg, Href: "/app", Class: blocks.AuthPrimary}) {
-							Go to settings 
-						}
-					}
-				}
+	@authScreen(layouts.SEOProps{Title: "Email changed", Description: "Your email has been changed"}, "Email changed") {
+		<script nonce={ templ.GetNonce(ctx) }>
+			setTimeout(() => { window.location.href = "/app"; }, 3000);
+		</script>
+		@authStack() {
+			@kit.Button(kit.Primary, "/app", nil) {
+				{ "Open " + brand.Name }
 			}
 		}
 	}
 }
 
+// VerifyEmailError says why the link to the new address did not work.
 templ VerifyEmailError(errorMessage string) {
-	@layouts.Auth(layouts.SEOProps{
-		Title:       "Verification Failed",
-		Description: "Email verification failed",
-		Path:        ctxkeys.URLPath(ctx),
-	}) {
-		@blocks.AuthShell(brand.Name) {
-			@blocks.AuthCard("Verification failed", "The link did not work. It may have expired or been used already.") {
-				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
-					@empty.Header() {
-						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-destructive/10 text-destructive"}) {
-							@icon.CircleX()
-						}
-						@empty.Description() {
-							The verification link may have expired or already been used. 
-						}
-					}
-					@empty.Content(empty.ContentProps{Class: "max-w-none"}) {
-						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
-							@icon.CircleAlert()
-							@alert.Description() {
-								{ errorMessage }
-							}
-						}
-						@button.Button(button.Props{Size: button.SizeLg, Href: "/auth", Class: blocks.AuthPrimary}) {
-							Try again 
-						}
-					}
-				}
+	@authScreen(layouts.SEOProps{Title: "Link not valid", Description: "Email verification failed"}, "Link not valid") {
+		@authLine() {
+			{ errorMessage }
+		}
+		@authStack() {
+			@kit.Button(kit.Primary, "/auth", nil) {
+				Sign in
 			}
 		}
 	}

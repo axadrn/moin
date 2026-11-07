@@ -2,13 +2,10 @@ package pages
 
 import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/card"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/collapsible"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
 )
 
@@ -129,98 +126,4 @@ templ newHookButton(appName string, replaces bool) {
 	@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: attributes}) {
 		New deploy hook
 	}
-}
-
-// SettingsRegistriesSection lists the registry logins agents pull private images with.
-templ SettingsRegistriesSection(logins []service.RegistryLogin) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="settings-registries">
-		@card.Card() {
-			@card.Header() {
-				@card.Title(card.TitleProps{Class: "text-base font-semibold"}) {
-					Registries
-				}
-				@card.Description() {
-					Logins your servers use to pull private images built in CI. Passwords and tokens are stored encrypted and only handed to the agent for the pull.
-				}
-				@card.Action() {
-					@docsButton("/docs/guides/ci#1-save-a-registry-login", "How it works", "")
-				}
-			}
-			@card.Content(card.ContentProps{Class: "flex flex-col gap-6"}) {
-				if len(logins) > 0 {
-					@item.Group(item.GroupProps{Class: "-mx-3 w-auto gap-1"}) {
-						for _, login := range logins {
-							@item.Item(item.Props{Size: item.SizeXs, Class: "rounded-xl hover:bg-muted/60", Attributes: templ.Attributes{"role": "listitem", "data-registry": login.Host}}) {
-								@item.Content(item.ContentProps{Class: "min-w-0"}) {
-									@item.Title() {
-										<span class="truncate font-mono">{ login.Host }</span>
-									}
-									@item.Description(item.DescriptionProps{Class: "text-xs"}) {
-										as { login.Username }
-									}
-								}
-								@item.Actions() {
-									@button.Button(button.Props{
-										Variant: button.VariantGhost,
-										Size:    button.SizeSm,
-										Attributes: templ.Attributes{
-											"hx-delete":  basePath + "/settings/registries/" + login.Host,
-											"hx-target":  "#settings-registries",
-											"hx-swap":    "outerHTML",
-											"hx-disable": "this",
-											"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
-										},
-									}) {
-										Remove
-									}
-								}
-							}
-						}
-					}
-				}
-				<form
-					class="flex flex-col gap-3"
-					hx-post={ basePath + "/settings/registries" }
-					hx-target="#settings-registries"
-					hx-swap="outerHTML"
-					hx-disable="find button[type='submit']"
-				>
-					@csrf.Token()
-					<div class="grid gap-3 sm:grid-cols-3">
-						@field.Field(field.Props{Class: "gap-1"}) {
-							@field.Label(field.LabelProps{For: "registry-host"}) {
-								Registry
-							}
-							@input.Input(input.Props{ID: "registry-host", Name: "host", Type: "text", Placeholder: "ghcr.io", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "aria-describedby": "registry-host-hint"}})
-							@fieldHint("registry-host", "") {
-								The host name, like ghcr.io.
-							}
-						}
-						@field.Field(field.Props{Class: "gap-1"}) {
-							@field.Label(field.LabelProps{For: "registry-username"}) {
-								Username
-							}
-							@input.Input(input.Props{ID: "registry-username", Name: "username", Type: "text", Attributes: templ.Attributes{"autocomplete": "off", "required": true, "aria-describedby": "registry-username-hint"}})
-							@fieldHint("registry-username", "")
-						}
-						@field.Field(field.Props{Class: "gap-1"}) {
-							@field.Label(field.LabelProps{For: "registry-password"}) {
-								Password or token
-							}
-							@input.Input(input.Props{ID: "registry-password", Name: "password", Type: "password", Attributes: templ.Attributes{"autocomplete": "new-password", "required": true, "aria-describedby": "registry-password-hint"}})
-							@fieldHint("registry-password", "") {
-								Stored encrypted.
-							}
-						}
-					</div>
-					<div class="flex justify-end">
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
-							Save login
-						}
-					</div>
-				</form>
-			}
-		}
-	</div>
 }

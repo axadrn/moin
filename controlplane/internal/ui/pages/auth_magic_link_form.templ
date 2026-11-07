@@ -1,15 +1,9 @@
 package pages
 
 import (
-	"strconv"
-
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/blocks"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 // AuthMagicLinkForm is the email sign-in. Where GitHub sign-in is set up,
@@ -20,44 +14,36 @@ templ AuthMagicLinkForm(errorMsg string) {
 		id="magic-link-form"
 		action="/auth/magic-link"
 		method="POST"
+		class="flex flex-col gap-3"
 		hx-post="/auth/magic-link"
 		hx-target="#magic-link-form"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
 	>
 		@csrf.Token()
-		@field.Group(field.GroupProps{Class: "gap-3"}) {
-			@field.Field(field.Props{Class: "gap-2"}) {
-				@field.Label(field.LabelProps{For: "email", Class: "sr-only"}) {
-					Email
-				}
-				@input.Input(input.Props{
-					ID:          "email",
-					Name:        "email",
-					Type:        "email",
-					Placeholder: "you@company.com",
-					Class:       "h-11 text-base",
-					Attributes: templ.Attributes{
-						"aria-invalid":     strconv.FormatBool(errorMsg != ""),
-						"aria-describedby": "email-hint",
-						"autocomplete":     "email",
-						"autofocus":        !second,
-						"required":         "",
-					},
-				})
-				@fieldHint("email", errorMsg)
-			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: magicLinkVariant(second), Size: button.SizeLg, Class: blocks.AuthPrimary}) {
-				Continue with email
-				@icon.ArrowRight(icon.Props{Class: "size-4"})
-			}
+		@formField("", "email", "", errorMsg) {
+			<label for="email" class="sr-only">Email</label>
+			@kit.Input(templ.Attributes{
+				"id":               "email",
+				"name":             "email",
+				"type":             "email",
+				"placeholder":      "you@company.com",
+				"aria-invalid":     ariaInvalid(errorMsg),
+				"aria-describedby": "email-hint",
+				"autocomplete":     "email",
+				"autofocus":        !second,
+				"required":         true,
+			})
+		}
+		@kit.Button(magicLinkKind(second), "", templ.Attributes{"type": "submit"}) {
+			Continue with email
 		}
 	</form>
 }
 
-func magicLinkVariant(second bool) button.Variant {
+func magicLinkKind(second bool) kit.Kind {
 	if second {
-		return button.VariantSecondary
+		return kit.Secondary
 	}
-	return button.VariantDefault
+	return kit.Primary
 }

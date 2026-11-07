@@ -46,7 +46,7 @@ func (h *AccountHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to reload user", "error", err, "user_id", user.ID)
 	}
-	answerDone(w, r, "Picture saved", "Your team sees it next to your name.")
+	answerDone(w, r, "Picture saved", "")
 	if updatedUser != nil {
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-display")
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-form")
@@ -66,7 +66,7 @@ func (h *AccountHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to reload user", "error", err, "user_id", user.ID)
 	}
-	answerDone(w, r, "Picture removed", "Your initial shows instead.")
+	answerDone(w, r, "Picture removed", "")
 	if updatedUser != nil {
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-display")
 		renderFragment(w, r, pages.SettingsAvatarSection(updatedUser), "settings-avatar-form")
