@@ -563,6 +563,8 @@ type DomainCheck struct {
 	Advice string
 	Found  []string
 	Points bool
+	// Checked says the domain was looked up, so Found and Points hold.
+	Checked bool
 	// FromCompose says x-moin.domains in compose.yml sets the domain, so
 	// it changes there, not in moin.
 	FromCompose bool
@@ -666,6 +668,23 @@ func resolvesTo(found []string, ipv4, ipv6 string) bool {
 // CheckDomains looks up every domain of an app and compares it with the
 // address its agent connects from.
 func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName string) ([]DomainCheck, error) {
+	return s.domainChecks(ctx, workspaceID, idOrName, func(string) bool { return true })
+}
+
+// Domains lists the domains of an app like CheckDomains, with the record
+// each needs, but looks none up: what the web shows when it opens.
+func (s *AppService) Domains(workspaceID, idOrName string) ([]DomainCheck, error) {
+	return s.domainChecks(context.Background(), workspaceID, idOrName, func(string) bool { return false })
+}
+
+// CheckDomain lists the domains of an app like Domains and looks up only
+// the one named.
+func (s *AppService) CheckDomain(ctx context.Context, workspaceID, idOrName, domain string) ([]DomainCheck, error) {
+	return s.domainChecks(ctx, workspaceID, idOrName, func(name string) bool { return name == domain })
+}
+
+// domainChecks lists the domains of an app and looks up those lookup says.
+func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName string, lookup func(string) bool) ([]DomainCheck, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
 		return nil, err
@@ -682,6 +701,14 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 	// check looks one domain up: does it point at the server?
 	check := func(domain DomainCheck) DomainCheck {
 		domain.Address, domain.IPv4, domain.IPv6, domain.Advice = address, ipv4, ipv6, DNSAdvice(ipv4, ipv6)
+		if server.Tunnel {
+			domain.Address = server.TunnelID + ".cfargotunnel.com"
+			domain.Advice = "CNAME record to " + domain.Address
+		}
+		if !lookup(domain.Domain) {
+			return domain
+		}
+		domain.Checked = true
 		lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		domain.Found, _ = net.DefaultResolver.LookupHost(lookupCtx, domain.Domain)
 		cancel()
@@ -689,8 +716,6 @@ func (s *AppService) CheckDomains(ctx context.Context, workspaceID, idOrName str
 		if server.Tunnel {
 			// moin points the domain at the tunnel itself; Cloudflare proxies
 			// it, so it resolves to Cloudflare's addresses.
-			domain.Address = server.TunnelID + ".cfargotunnel.com"
-			domain.Advice = "CNAME record to " + domain.Address
 			domain.Points = len(domain.Found) > 0
 		}
 		return domain

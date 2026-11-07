@@ -8,167 +8,199 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/field"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/item"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/status"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// UptimeView is the uptime page of an app.
+// UptimeView is the uptime of an app's domains.
 type UptimeView struct {
 	App    model.App
 	Uptime service.AppUptime
 	Now    time.Time
 }
 
-// AppUptime is the uptime page: per domain its state, uptime over 24
-// hours, 7 and 30 days, the newest check, the last outages and the
-// settings of its check.
+// AppUptime is the uptime page, one step under the app's domains: per
+// domain its state, the uptime over 24 hours, 7 and 30 days, the newest
+// check, the last outages and the settings of its check.
 templ AppUptime(view UptimeView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " uptime", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Uptime"}}}) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	@layouts.App(view.App.Name + " uptime") {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
-			@appHeader(view.App, "addresses")
-			@appSection(view.App.Name, "addresses") {
-				@AppUptimeBody(view)
-			}
-		}
-	}
-}
-
-// AppUptimeBody is the checks of every domain, on the Addresses section
-// and as the answer to a change of a check.
-templ AppUptimeBody(view UptimeView) {
-	<div id="app-uptime" class="flex flex-col gap-6">
-		if !view.Uptime.ServerOnline && view.App.ServerName != "" {
-			@stateAlert(templ.Attributes{"data-server-offline": true}) {
-				The server { view.App.ServerName } is offline: its agent does not answer. The activity says since when.
-			}
-		}
-		if len(view.Uptime.Domains) == 0 {
-			@emptyState("No domains to check", "Add a domain to the app and deploy it; from then on moin checks it every minute.", "moin domains add blog.de")
-		}
-		for _, domain := range view.Uptime.Domains {
-			@uptimeDomain(view, domain)
-		}
-	</div>
-}
-
-// uptimeDomain is one domain: its state, the numbers, the outages and the
-// settings of its check.
-templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
-	@panel(panelProps{
-		Title:       domain.Domain,
-		Description: "GET https://" + domain.Domain + domain.Path,
-		Docs:        "/docs/guides/uptime",
-		Action:      uptimeChip(domain, view.Now),
-		Attrs:       templ.Attributes{"data-uptime-domain": domain.Domain},
-	}) {
-		<div class="flex flex-col gap-6">
-			@statGrid() {
-				@statCard("Last 24 hours", percent(domain.Uptime24h), averageNote(domain))
-				@statCard("Last 7 days", percent(domain.Uptime7d), "")
-				@statCard("Last 30 days", percent(domain.Uptime30d), "")
-				@statCard("Newest check", lastCheck(domain), lastCheckNote(domain, view.Now))
-			}
-			<dl class="grid gap-4 sm:grid-cols-2">
-				@backupFact("HTTPS certificate", certText(domain, view.Now), certNote(domain))
-				@backupFact("Down or up since", sinceText(domain, view.Now), sinceNote(domain))
-			</dl>
-			@uptimeOutages(domain, view.Now)
-			@uptimeSettings(view.App, domain)
-		</div>
-	}
-}
-
-templ uptimeChip(domain service.UptimeDomain, now time.Time) {
-	switch domain.State {
-		case model.UptimeUp:
-			@status.Status(status.Props{Kind: status.KindLive, Chip: true, Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
-				Up
-			}
-		case model.UptimeDown:
-			@status.Status(status.Props{Kind: status.KindFailed, Chip: true, Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
-				Down
-			}
-		case model.UptimePaused:
-			@status.Status(status.Props{Kind: status.KindIdle, Chip: true, Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
-				Paused
-			}
-		default:
-			@status.Status(status.Props{Kind: status.KindWaiting, Chip: true, Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
-				Waiting for the first check
-			}
-	}
-}
-
-// uptimeOutages lists the last outages, newest first.
-templ uptimeOutages(domain service.UptimeDomain, now time.Time) {
-	<div class="flex flex-col gap-2">
-		<p class="text-sm font-medium">Last outages</p>
-		if len(domain.Outages) == 0 {
-			<p class="text-sm text-muted-foreground">None in the last 90 days.</p>
-		} else {
-			@item.Group(item.GroupProps{Class: "gap-1", Attributes: templ.Attributes{"data-outages": true}}) {
-				for _, outage := range domain.Outages {
-					@item.Item(item.Props{Size: item.SizeXs, Class: "rounded-xl hover:bg-muted/60", Attributes: templ.Attributes{"role": "listitem", "data-outage": stamp(outage.StartedAt)}}) {
-						@item.Content() {
-							@item.Title(item.TitleProps{Class: "tabular-nums"}) {
-								<span title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</span>
-							}
-							@item.Description(item.DescriptionProps{Class: "text-xs"}) {
-								{ outageText(outage, now) }
-							}
+			@kit.Header(kit.Back{Label: view.App.Name, Href: appPath + "/addresses"}, "Uptime")
+			<div id="app-uptime" class="flex flex-col gap-6">
+				@uptimeServerOffline(view)
+				if len(view.Uptime.Domains) == 0 {
+					@kit.Card("", nil) {
+						@kit.Quiet() {
+							No domain to check yet.
 						}
+						@kit.Command("moin domains add " + view.App.Name + ".example.com")
+					}
+				}
+				for _, domain := range view.Uptime.Domains {
+					@uptimeDomain(view, domain)
+				}
+			</div>
+		}
+	}
+}
+
+// AppUptimeBody is the uptime of each domain in a row, on the Domains
+// section of an app; a row opens the uptime page.
+templ AppUptimeBody(view UptimeView) {
+	if len(view.Uptime.Domains) > 0 {
+		@kit.Section("Uptime", nil) {
+			@uptimeServerOffline(view)
+			@kit.List() {
+				for _, domain := range view.Uptime.Domains {
+					@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name + "/uptime") {
+						@kit.RowText(domain.Domain, uptimeNote(domain))
+						@uptimeState(domain)
 					}
 				}
 			}
 		}
+	}
+}
+
+// uptimeServerOffline is the line that says the app's server is offline,
+// so its checks say little.
+templ uptimeServerOffline(view UptimeView) {
+	if !view.Uptime.ServerOnline && view.App.ServerName != "" {
+		<p class="px-1" data-server-offline>
+			@status.Status(status.Props{Kind: status.KindFailed, Class: "text-sm font-normal whitespace-normal"}) {
+				{ view.App.ServerName } is offline
+			}
+		</p>
+	}
+}
+
+// uptimeDomain is one domain: its numbers and outages, then its check.
+templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
+	<div data-uptime-domain={ domain.Domain }>
+		@kit.Section(domain.Domain, uptimeState(domain)) {
+			<div class="flex flex-col gap-4">
+				@kit.List() {
+					@uptimeFact("Last 24 hours", orNone(percent(domain.Uptime24h)), averageNote(domain))
+					@uptimeFact("Last 7 days", orNone(percent(domain.Uptime7d)), "")
+					@uptimeFact("Last 30 days", orNone(percent(domain.Uptime30d)), "")
+					@uptimeFact("Newest check", orNone(lastCheck(domain)), lastCheckNote(domain, view.Now))
+					@uptimeFact("Certificate", certText(domain, view.Now), certNote(domain))
+					if domain.Since != nil {
+						@uptimeFact(sinceLabel(domain), sinceText(domain, view.Now), sinceNote(domain))
+					}
+					if len(domain.Outages) == 0 {
+						@uptimeFact("Outages", "None in 90 days", "")
+					}
+				}
+				if len(domain.Outages) > 0 {
+					<div data-outages>
+						@kit.List() {
+							for _, outage := range domain.Outages {
+								<div role="listitem" class={ routingRow } data-outage={ stamp(outage.StartedAt) }>
+									<div class="min-w-0 flex-1">
+										<div class="font-medium tabular-nums" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
+										<div class="text-sm text-muted-foreground">{ outageText(outage, view.Now) }</div>
+									</div>
+								</div>
+							}
+						}
+					</div>
+				}
+				@uptimeSettings(view.App, domain)
+			</div>
+		}
 	</div>
+}
+
+// uptimeFact is a row with a number on the right and what it means.
+templ uptimeFact(label, value, note string) {
+	@kit.Row("") {
+		@kit.RowText(label, note)
+		<span class="shrink-0 text-sm tabular-nums">{ value }</span>
+	}
+}
+
+// uptimeState is the state of a domain's check as a status.
+templ uptimeState(domain service.UptimeDomain) {
+	switch domain.State {
+		case model.UptimeUp:
+			@status.Status(status.Props{Kind: status.KindLive, Class: "text-sm", Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
+				Up
+			}
+		case model.UptimeDown:
+			@status.Status(status.Props{Kind: status.KindFailed, Class: "text-sm", Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
+				Down
+			}
+		case model.UptimePaused:
+			@status.Status(status.Props{Kind: status.KindIdle, Class: "text-sm", Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
+				Paused
+			}
+		default:
+			@status.Status(status.Props{Kind: status.KindWaiting, Class: "text-sm", Attributes: templ.Attributes{"data-uptime-state": domain.State}}) {
+				Waiting
+			}
+	}
 }
 
 // uptimeSettings is the path of the check and the switch that pauses it.
 templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/check" }}
 	{{ id := "uptime-" + domain.Domain }}
-	<div class="grid gap-4 lg:grid-cols-2">
-		<form class="flex flex-col gap-3 sm:flex-row sm:items-end" hx-post={ action } hx-target="#app-uptime" hx-select="#app-uptime" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-uptime-path-form={ domain.Domain }>
+	@kit.List() {
+		<form role="listitem" class={ routingFieldRow } hx-post={ action } hx-target="#app-uptime" hx-select="#app-uptime" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-uptime-path-form={ domain.Domain }>
 			@csrf.Token()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
-			@field.Field(field.Props{Class: "min-w-0 flex-1 gap-1"}) {
-				@field.Label(field.LabelProps{For: id + "-path"}) {
-					Path
+			@kit.Field("Path", id+"-path", "") {
+				@kit.Inline() {
+					@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"})
+					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+						Save
+					}
 				}
-				@input.Input(input.Props{ID: id + "-path", Name: "path", Type: "text", Value: customPath(domain), Placeholder: domain.Path + " (health path or /)", Class: "font-mono", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false"}})
-			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
-				Save path
 			}
 		</form>
 		@UptimeSwitchForm(app, domain)
-	</div>
+	}
 }
 
-// UptimeSwitchForm is the switch that pauses the check of a domain.
+// UptimeSwitchForm is the switch that pauses the check of a domain, a row
+// that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@switchForm(id+"-form", ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/uptime/on") {
+	<form id={ id + "-form" } role="listitem" class={ routingRow } hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on" } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+		@csrf.Token()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
-		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-			@field.Content() {
-				@field.Label(field.LabelProps{For: id + "-on"}) {
-					Uptime check
-				}
-				@field.Description() {
-					Checked from outside every minute. Off pauses it, for maintenance or a domain you do not serve yet.
-				}
-			}
-			@savedSwitch(id+"-on", !domain.Paused)
-		}
+		<label for={ id + "-on" } class="min-w-0 flex-1 cursor-pointer font-medium">Check every minute</label>
+		@kit.Switch(templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused})
+	</form>
+}
+
+// uptimeNote is the uptime of a domain in a few words, for its row.
+func uptimeNote(domain service.UptimeDomain) string {
+	if value := percent(domain.Uptime30d); value != "" {
+		return value + " over 30 days"
 	}
+	return "No check yet"
+}
+
+func orNone(value string) string {
+	if value == "" {
+		return "None yet"
+	}
+	return value
+}
+
+func sinceLabel(domain service.UptimeDomain) string {
+	switch domain.State {
+	case model.UptimeUp:
+		return "Up since"
+	case model.UptimeDown:
+		return "Down since"
+	}
+	return "Since"
 }
 
 func customPath(domain service.UptimeDomain) string {
@@ -190,7 +222,7 @@ func percent(value *float64) string {
 
 func averageNote(domain service.UptimeDomain) string {
 	if domain.Uptime24h == nil {
-		return "No check yet."
+		return ""
 	}
 	return fmt.Sprintf("%d ms on average", domain.AverageMS)
 }
@@ -207,7 +239,7 @@ func lastCheck(domain service.UptimeDomain) string {
 
 func lastCheckNote(domain service.UptimeDomain, now time.Time) string {
 	if domain.CheckedAt == nil {
-		return "Within a minute."
+		return ""
 	}
 	note := fmt.Sprintf("%d ms, %s", domain.ResponseMS, ago(*domain.CheckedAt, now))
 	if domain.Error != "" {
@@ -229,9 +261,9 @@ func certText(domain service.UptimeDomain, now time.Time) string {
 
 func certNote(domain service.UptimeDomain) string {
 	if domain.CertExpiresAt == nil {
-		return "The next check reads it."
+		return ""
 	}
-	return "Until " + domain.CertExpiresAt.UTC().Format("Jan 2, 2006") + ". The proxy renews it by itself."
+	return "Until " + domain.CertExpiresAt.UTC().Format("Jan 2, 2006")
 }
 
 func sinceText(domain service.UptimeDomain, now time.Time) string {
