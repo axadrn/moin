@@ -57,9 +57,16 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 				break
 			}
 			logf("removing %s with its data", app)
-			_, err := a.output(ctx, "docker", "compose", "-p", project(app), "down", "--volumes", "--rmi", "all", "--remove-orphans")
-			if err != nil {
-				return nil, fmt.Errorf("remove %s: %w", app, err)
+			// The project it runs as, and the one from before renames
+			// with the volumes compose named after it.
+			for _, name := range []string{a.projectOf(app), project(app)} {
+				_, err := a.output(ctx, "docker", "compose", "-p", name, "down", "--volumes", "--rmi", "all", "--remove-orphans")
+				if err != nil {
+					return nil, fmt.Errorf("remove %s: %w", app, err)
+				}
+			}
+			for _, volume := range a.volumeNames(app) {
+				_, _ = a.output(ctx, "docker", "volume", "rm", "-f", volume)
 			}
 			// A Postgres a restore switched runs on a volume of moin's,
 			// outside the app's own.

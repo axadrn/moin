@@ -188,6 +188,9 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	var detected protocol.Detected
 	if start.FromNumber > 0 {
 		detected, err = a.rollBack(start.App, start.FromNumber, release, logf)
+		if err == nil {
+			err = a.pinFile(ctx, start, composeFile)
+		}
 	} else {
 		// prepareRelease may give start the image of the running release.
 		detected, err = a.prepareRelease(ctx, &start, release, logf)
@@ -319,6 +322,9 @@ func (a *apps) writeCompose(ctx context.Context, start protocol.DeployStart, con
 		return detected, err
 	}
 	err = finish(config, start, detected, running, composeFile)
+	if err == nil {
+		err = a.pinFile(ctx, start, composeFile)
+	}
 	if err != nil {
 		return detected, err
 	}
@@ -362,7 +368,7 @@ func (a *apps) build(ctx context.Context, start protocol.DeployStart, config map
 	if detected.Kind == "railpack" {
 		environment = buildEnv(start.Env)
 	}
-	err := a.run(ctx, logf, environment, "compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "build")
+	err := a.run(ctx, logf, environment, "compose", "-p", a.projectOf(start.App), "-f", composeFile, "--progress", "plain", "build")
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
@@ -383,15 +389,21 @@ func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, com
 			a.mu.Unlock()
 		}
 	}
+	err := a.switchProject(ctx, start.App, nameOf(start), logf)
+	if err != nil {
+		return err
+	}
 	logf("starting")
 	// A restart brings nothing new, so compose would leave the containers
 	// as they are: recreate them.
 	restart := start.SourceURL == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
-	err := a.start(ctx, start.App, composeFile, detected, restart, logf)
+	err = a.start(ctx, start.App, composeFile, detected, restart, logf)
 	if err != nil {
 		if previous > 0 && previous != start.Number {
 			logf("starting v%d again", previous)
-			rollbackErr := a.compose(ctx, start.App, filepath.Join(a.releaseDir(start.App, previous), "compose.json"), logf, "up", "-d", "--remove-orphans")
+			previousFile := filepath.Join(a.releaseDir(start.App, previous), "compose.json")
+			_ = a.pinFile(ctx, start, previousFile)
+			rollbackErr := a.compose(ctx, start.App, previousFile, logf, "up", "-d", "--remove-orphans")
 			if rollbackErr == nil {
 				return fmt.Errorf("%w; v%d is running again", err, previous)
 			}
@@ -440,7 +452,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 	// fine: the service passes once it runs stableFor without a restart,
 	// and fails if it does not within startWindow.
 	restarts := func() string {
-		ids, _ := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "-a", "-q", detected.Service)
+		ids, _ := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "-a", "-q", detected.Service)
 		if len(strings.Fields(ids)) == 0 {
 			return ""
 		}
@@ -448,7 +460,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		return strings.TrimSpace(count)
 	}
 	running, err := a.stable(ctx, func() (bool, string) {
-		ids, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
+		ids, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
 		return err == nil && strings.TrimSpace(ids) != "", restarts() + " " + strings.TrimSpace(ids)
 	})
 	if err != nil {
@@ -461,7 +473,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		_ = a.compose(ctx, app, composeFile, logf, "logs", "--no-color", "--tail", "20", detected.Service)
 		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
 	}
-	ids, _ := a.output(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
+	ids, _ := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "--status", "running", "-q", detected.Service)
 	containers := strings.Fields(ids)
 	if len(containers) == 0 {
 		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
@@ -857,7 +869,7 @@ func (a *apps) copySource(ctx context.Context, app string, number int, target st
 // pull fetches the main service's image. A registry login goes into a
 // throwaway Docker config, so no credentials stay on the server.
 func (a *apps) pull(ctx context.Context, start protocol.DeployStart, composeFile, service string, logf func(string, ...any)) error {
-	args := []string{"compose", "-p", project(start.App), "-f", composeFile, "--progress", "plain", "pull", service}
+	args := []string{"compose", "-p", a.projectOf(start.App), "-f", composeFile, "--progress", "plain", "pull", service}
 	if start.Registry == nil {
 		return a.run(ctx, logf, nil, args...)
 	}
@@ -1300,7 +1312,7 @@ func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol
 		return protocol.LogsResult{}, errors.New("invalid app name")
 	}
 	tail := min(max(request.Tail, 1), 1000)
-	output, err := a.output(ctx, "docker", "compose", "-p", project(request.App), "logs", "--no-color", "--timestamps", "--tail", strconv.Itoa(tail))
+	output, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(request.App), "logs", "--no-color", "--timestamps", "--tail", strconv.Itoa(tail))
 	if err != nil {
 		return protocol.LogsResult{}, err
 	}
@@ -1333,7 +1345,7 @@ func (a *apps) remove(ctx context.Context, app string) error {
 		return errors.New("invalid app name")
 	}
 	defer a.lock(app)()
-	args := []string{"compose", "-p", project(app)}
+	args := []string{"compose", "-p", a.projectOf(app)}
 	if current := a.current(app); current > 0 {
 		args = append(args, "-f", filepath.Join(a.releaseDir(app, current), "compose.json"))
 	}
@@ -1344,6 +1356,8 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.RemoveAll(filepath.Join(a.appDir(app), "releases"))
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
 	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
+	// Its containers are gone; volumes.json stays with the volumes.
+	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
 	if a.backups != nil {
 		a.backups.forget(a.backups.running())
 	}
@@ -1375,14 +1389,14 @@ func (a *apps) stop(ctx context.Context, app string) error {
 	if current == 0 {
 		return errors.New("the app has no release on this server")
 	}
-	_, err := a.output(ctx, "docker", "compose", "-p", project(app), "-f", filepath.Join(a.releaseDir(app, current), "compose.json"), "stop")
+	_, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", filepath.Join(a.releaseDir(app, current), "compose.json"), "stop")
 	return err
 }
 
 // compose runs docker compose on a release and streams its output as log
 // lines.
 func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
-	return a.run(ctx, logf, nil, append([]string{"compose", "-p", project(app), "-f", composeFile, "--progress", "plain"}, args...)...)
+	return a.run(ctx, logf, nil, append([]string{"compose", "-p", a.projectOf(app), "-f", composeFile, "--progress", "plain"}, args...)...)
 }
 
 // run runs docker with extra environment and streams its output as log lines.

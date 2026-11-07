@@ -19,9 +19,13 @@ const (
 	labelMode  = ourName + ".mode"
 	labelSetup = ourName + ".setup"
 	labelToken = ourName + ".token"
+	// labelApp names the app of a container: its folder.
+	labelApp = ourName + ".app"
 )
 
-// project is the Compose project of an app.
+// project is the Compose project an app ran as before renames, and the
+// start of the names of its images and routers. The project it runs as
+// now is apps.projectOf.
 func project(app string) string { return ourName + "-" + app }
 
 // appOfProject is the app a Compose project belongs to.

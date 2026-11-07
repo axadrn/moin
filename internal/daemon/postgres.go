@@ -42,7 +42,7 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 		return pgTarget{}, errors.New("invalid app or service name")
 	}
 	out, err := a.output(ctx, "docker", "ps", "-q", "--filter", "status=running",
-		"--filter", "label=com.docker.compose.project="+project(app),
+		"--filter", "label=com.docker.compose.project="+a.projectOf(app),
 		"--filter", "label=com.docker.compose.service="+database.Service)
 	if err != nil {
 		return pgTarget{}, err

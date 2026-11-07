@@ -361,7 +361,10 @@ func (s *sampler) containers(ctx context.Context, seconds float64, first bool, m
 	limit := make(chan struct{}, 4)
 	var wait sync.WaitGroup
 	for index, container := range running {
-		app, ok := appOfProject(container.Labels["com.docker.compose.project"])
+		app, ok := container.Labels[labelApp], true
+		if app == "" {
+			app, ok = appOfProject(container.Labels["com.docker.compose.project"])
+		}
 		if !ok || !appIDPattern.MatchString(app) {
 			results[index].err = errors.New("not a moin app")
 			continue

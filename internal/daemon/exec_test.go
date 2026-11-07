@@ -13,7 +13,7 @@ import (
 // nothing in it reaches a shell, and a word that looks like a flag of
 // compose is the command's.
 func TestExecArgs(t *testing.T) {
-	got := execArgs("shop", "/var/lib/moin/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
+	got := execArgs(project("shop"), "/var/lib/moin/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
 	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/moin/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
