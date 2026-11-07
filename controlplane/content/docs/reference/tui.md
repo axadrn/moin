@@ -12,8 +12,8 @@ Without a token, `moin` signs you in first: it shows a code, opens the browser t
 
 Every view fills the screen, from 80 by 24 up. The header says where you are, the footer the keys you need most there, and results and errors: a result for a few seconds, an error in red a little longer.
 
-- **`space`** opens the menu. It lists every action of the place you are in, grouped, each with one key: `space a s` opens the app `shop`, `space R` redeploys the open app. `backspace` goes up a level, `esc` closes it.
-- **`space space`** searches, like the leader key of LazyVim or Doom Emacs: type a few letters of an app, a server, a view or an action, like `shop logs` or `redeploy api`, then `enter`. The words may come in any order, the letters it matched show bold, and what you picked last comes first. `ctrl+k` does the same from anywhere, and `/` everywhere but in the logs.
+- **`space`** opens the palette, a box in the middle of the screen, like `⌘K` in the web app. `ctrl+k` opens it too, from anywhere, and `/` everywhere but in the logs. It finds every app, server, place and action: type a few letters, like `shop logs` or `redeploy api`, move with `↑` `↓` or `ctrl+n` `ctrl+p`, then `enter` runs it; `esc` closes it. The words may come in any order, the letters it matched show bold, and what you picked last comes first. With nothing typed, the sections and actions of the app you are on come first, or what you can do to the server you are on.
+- **Every entry shows its key** at the right: the key that does the same without the palette, like `R` for redeploy in an app. So you learn the keys on the way, and `?` lists them all.
 - **`esc`** always goes back one level and closes what is open first. `q` quits on the dashboard and goes back elsewhere; `ctrl+c` quits from anywhere.
 - **`?`** shows every key of the place you are in, grouped, and the ones that work everywhere; on a small screen `↑` `↓` scroll them.
 - **`↑` `↓`** or **`j` `k`** move, `g` `G` go to the first and the last row, `pgup` `pgdown` a page.
@@ -40,8 +40,7 @@ A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be u
 
 | Key | Where | Does |
 | --- | --- | --- |
-| `space` | everywhere | the menu of every action here |
-| `space space`, `ctrl+k` or `/` | everywhere | searches every app, server, view and action |
+| `space`, `ctrl+k` or `/` | everywhere | the palette: finds every app, server, place and action and runs it |
 | `esc` | everywhere | back one level |
 | `?` | everywhere | every key of this place |
 | `q` | everywhere | quits on the dashboard, goes back elsewhere |
@@ -86,4 +85,4 @@ A question like "Stop shop?" waits for `y`; `esc` cancels. A restore cannot be u
 
 ## In the web app
 
-These open in the browser from the web app view (`w` on the dashboard, or `space w`), signed in as you: add a server, the catalog, the team, connect GitHub, buckets, alert destinations, the data browser, your settings with API tokens and registry logins, and on moin.run your billing. The CLI, the API and MCP reach most of them too; [Where things work](/docs/reference/surfaces) says which.
+These open in the browser from the web app view (`w` on the dashboard, or `web app` in the palette), signed in as you: add a server, the catalog, the team, connect GitHub, buckets, alert destinations, the data browser, your settings with API tokens and registry logins, and on moin.run your billing. The CLI, the API and MCP reach most of them too; [Where things work](/docs/reference/surfaces) says which.

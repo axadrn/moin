@@ -1,9 +1,9 @@
 // Package tui is what `moin` opens without a command: full-screen views of
 // the daily work, live from the control plane. It starts on the dashboard;
-// `space` opens the menu, `space space` or `ctrl+k` searches, `esc` goes back.
+// `space`, `ctrl+k` or `/` opens the palette, `esc` goes back.
 //
 // tui.go holds the state and the message loop, keys.go the keys, load.go
-// the calls to the control plane, menu.go the menu and the search, and
+// the calls to the control plane, palette.go the palette, and
 // the view files draw it.
 package tui
 
@@ -200,10 +200,8 @@ type model struct {
 	shown    bool   // env values visible
 	rng      int    // metrics range, an index into ranges
 
-	menu    []string // the which-key path; nil when closed
-	menuOn  bool
 	pick    *picker
-	recent  []string // the titles of the last picks of the search, newest first
+	recent  []string // the titles of the last picks of the palette, newest first
 	help    bool
 	helpTop int // the first line the keys layer shows
 	prompt  *prompt

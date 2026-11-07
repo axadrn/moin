@@ -19,12 +19,11 @@ func TestEveryFrameFitsTheScreen(t *testing.T) {
 	}{
 		{"dashboard", func(m model) model { return m }},
 		{"dashboard servers focus", func(m model) model { return press(m, "tab", "down") }},
-		{"menu", func(m model) model { return press(m, "space") }},
-		{"menu apps", func(m model) model { return press(m, "space", "a") }},
-		{"menu in app", func(m model) model { return press(m.withApp("shop", tDeploys), "space") }},
-		{"picker", func(m model) model { return press(m, "ctrl+k") }},
-		{"picker query", func(m model) model { return press(m, "ctrl+k", "s", "h", "o", "p") }},
-		{"picker nothing", func(m model) model { return press(m, "ctrl+k", "x", "y", "z", "q") }},
+		{"palette", func(m model) model { return press(m, "space") }},
+		{"palette in app", func(m model) model { return press(m.withApp("shop", tDeploys), "space") }},
+		{"palette on server", func(m model) model { m, _ = m.open(screen{v: vServer, server: "web-1"}); return press(m, "space") }},
+		{"palette query", func(m model) model { return press(m, "ctrl+k", "s", "h", "o", "p") }},
+		{"palette nothing", func(m model) model { return press(m, "ctrl+k", "x", "y", "z", "q") }},
 		{"help", func(m model) model { return press(m, "?") }},
 		{"help in app", func(m model) model { return press(m.withApp("shop", tLogs), "?") }},
 		{"deploys", func(m model) model { return m.withApp("shop", tDeploys) }},
@@ -116,7 +115,7 @@ func TestDashboardShowsWhatRunsAndWhatNeedsYou(t *testing.T) {
 		"web-1", "12%", "edge-02", "v0.9.8 ↑", "lab", "offline",
 		"Recent activity", "ada deployed shop v43",
 		"Needs you", "plausible", "Plausible 2.1 → 2.2",
-		"moin.", "acme › dashboard", "space menu",
+		"moin.", "acme › dashboard", "space palette",
 	} {
 		if !strings.Contains(frame, want) {
 			t.Errorf("the dashboard lacks %q", want)

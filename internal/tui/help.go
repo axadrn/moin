@@ -16,9 +16,8 @@ type keyGroup struct {
 }
 
 var everywhere = keyGroup{"Everywhere", []kb{
-	{"space", "the menu"},
-	{"space space", "search"},
-	{"ctrl+k  /", "search"},
+	{"space", "the palette: find, go, run"},
+	{"ctrl+k  /", "the palette too"},
 	{"esc", "back one level"},
 	{"?", "these keys"},
 	{"↑↓  j k", "move"},

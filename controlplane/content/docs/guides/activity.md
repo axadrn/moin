@@ -48,7 +48,7 @@ Lists who changed what, newest first.
 ```surfaces
 Web: **Activity** in the sidebar
 CLI: moin activity
-TUI: `a` on the dashboard, or `space v`
+TUI: `a` on the dashboard, or `activity` in the palette (`space`)
 API: GET /api/v1/activity
 MCP: list_activity
 ```
