@@ -453,7 +453,7 @@ func (t builtinTools) invitation(caller Caller, input InvitationInput) (*model.W
 	if !member.Can(model.WorkspacePermissionManageMembers) {
 		return nil, nil, model.WorkspaceInvitation{}, service.ErrWorkspacePermission
 	}
-	invitations, err := t.services.Workspaces.PendingInvitations(workspace.ID)
+	invitations, err := t.services.Workspaces.PendingInvitations(member)
 	if err != nil {
 		return nil, nil, model.WorkspaceInvitation{}, err
 	}

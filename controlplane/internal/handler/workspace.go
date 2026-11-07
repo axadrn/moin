@@ -41,15 +41,12 @@ func (h *WorkspaceHandler) Page(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Workspace unavailable", "The workspace members could not be loaded. Please try again."))
 		return
 	}
-	var invitations []model.WorkspaceInvitation
-	if member.Can(model.WorkspacePermissionManageMembers) {
-		invitations, err = h.workspaces.PendingInvitations(workspace.ID)
-		if err != nil {
-			slog.Error("invitations could not be loaded", "error", err, "workspace_id", workspace.ID)
-			w.WriteHeader(http.StatusInternalServerError)
-			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Workspace unavailable", "The invitations could not be loaded. Please try again."))
-			return
-		}
+	invitations, err := h.workspaces.PendingInvitations(member)
+	if err != nil {
+		slog.Error("invitations could not be loaded", "error", err, "workspace_id", workspace.ID)
+		w.WriteHeader(http.StatusInternalServerError)
+		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Workspace unavailable", "The invitations could not be loaded. Please try again."))
+		return
 	}
 	render(w, r, pages.Workspace(members, invitations))
 }
@@ -203,13 +200,10 @@ func (h *WorkspaceHandler) renderWorkspaceAction(w http.ResponseWriter, r *http.
 		h.handleError(w, r, "Team page not refreshed", err)
 		return
 	}
-	var invitations []model.WorkspaceInvitation
-	if member.Can(model.WorkspacePermissionManageMembers) {
-		invitations, err = h.workspaces.PendingInvitations(workspace.ID)
-		if err != nil {
-			h.handleError(w, r, "Team page not refreshed", err)
-			return
-		}
+	invitations, err := h.workspaces.PendingInvitations(member)
+	if err != nil {
+		h.handleError(w, r, "Team page not refreshed", err)
+		return
 	}
 
 	workspaces, err := h.workspaces.ListForUser(user.ID)

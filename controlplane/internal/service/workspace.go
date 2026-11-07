@@ -216,8 +216,14 @@ func (s *WorkspaceService) Members(viewer *model.WorkspaceMember) ([]model.Works
 	return members, nil
 }
 
-func (s *WorkspaceService) PendingInvitations(workspaceID string) ([]model.WorkspaceInvitation, error) {
-	return s.invitations.ListPendingByWorkspace(workspaceID, time.Now())
+// PendingInvitations returns the invitations of the member's workspace
+// nobody accepted yet, none for members who may not manage members, so
+// nobody else learns who is invited.
+func (s *WorkspaceService) PendingInvitations(member *model.WorkspaceMember) ([]model.WorkspaceInvitation, error) {
+	if member == nil || !member.Can(model.WorkspacePermissionManageMembers) {
+		return []model.WorkspaceInvitation{}, nil
+	}
+	return s.invitations.ListPendingByWorkspace(member.WorkspaceID, time.Now())
 }
 
 func (s *WorkspaceService) Activity(workspaceID string) ([]model.ActivityEvent, error) {
@@ -226,14 +232,22 @@ func (s *WorkspaceService) Activity(workspaceID string) ([]model.ActivityEvent, 
 
 // ActivityPage returns one page of the activity of the member's
 // workspace, newest first, and the event ID to continue after, empty on the
-// last page. Members who may not view it get ErrActivityPermission.
+// last page. Members who may not view it get ErrActivityPermission; a
+// page has 1 to 200 events. Only members who may manage members see the IP
+// and the user agent of a request.
 func (s *WorkspaceService) ActivityPage(member *model.WorkspaceMember, filter model.ActivityFilter, afterID string, limit int) ([]model.ActivityEvent, string, error) {
 	if member == nil || !member.Can(model.WorkspacePermissionViewActivity) {
 		return nil, "", ErrActivityPermission
 	}
+	limit = min(max(limit, 1), 200)
 	events, err := s.activity.ListPage(member.WorkspaceID, filter, afterID, limit+1)
 	if err != nil {
 		return nil, "", err
+	}
+	if !member.Can(model.WorkspacePermissionManageMembers) {
+		for i := range events {
+			events[i].IP, events[i].UserAgent = "", ""
+		}
 	}
 	if len(events) <= limit {
 		return events, "", nil

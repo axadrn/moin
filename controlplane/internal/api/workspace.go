@@ -201,12 +201,9 @@ func NewWorkspaceDetail(workspaces *service.WorkspaceService, workspace *model.W
 	if err != nil {
 		return WorkspaceDetail{}, err
 	}
-	invitations := []model.WorkspaceInvitation{}
-	if member.Can(model.WorkspacePermissionManageMembers) {
-		invitations, err = workspaces.PendingInvitations(workspace.ID)
-		if err != nil {
-			return WorkspaceDetail{}, err
-		}
+	invitations, err := workspaces.PendingInvitations(member)
+	if err != nil {
+		return WorkspaceDetail{}, err
 	}
 
 	detail := WorkspaceDetail{
@@ -401,7 +398,6 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 	if err != nil {
 		return ActivityPage{}, err
 	}
-	admin := member.Can(model.WorkspacePermissionManageMembers)
 	page := ActivityPage{Items: make([]WorkspaceEvent, 0, len(events))}
 	for _, event := range events {
 		item := WorkspaceEvent{
@@ -419,9 +415,10 @@ func NewActivityPage(workspaces *service.WorkspaceService, member *model.Workspa
 			App:         event.App,
 			Server:      event.Server,
 			CreatedAt:   event.CreatedAt.UTC(),
-		}
-		if admin {
-			item.IP, item.UserAgent = event.IP, event.UserAgent
+			// The service leaves them empty for members who may not
+			// manage members.
+			IP:        event.IP,
+			UserAgent: event.UserAgent,
 		}
 		page.Items = append(page.Items, item)
 	}
