@@ -26,7 +26,7 @@ The CLI reads the token from stdin. It is stored encrypted, and the agent gets i
 A secret URL that deploys an image when CI calls it. moin shows it once: store it as the CI secret `MOIN_DEPLOY_HOOK`.
 
 ```surfaces
-Web: the app, **Deploy from CI**, **Show**, **Deploy hook**, **New deploy hook**
+Web: the app's **Deploys** tab, **Deploy from CI**, **New deploy hook**
 CLI: moin hook <app-name>
 TUI: on the app, `W` opens **Deploy from CI** in the web
 API: POST /api/v1/apps/{app}/hook
@@ -85,7 +85,7 @@ Installs `moin` from your control plane and runs `moin deploy` with a personal A
 ## Deploy an image by hand
 
 ```surfaces
-Web: the app, **Deploy from CI**, **Show**, **Deploy an image**, **Deploy image**
+Web: the app's **Deploys** tab, **Deploy from CI**, **Deploy image**
 CLI: moin deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
 TUI: on the app, `I`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys

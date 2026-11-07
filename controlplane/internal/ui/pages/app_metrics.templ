@@ -12,55 +12,60 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/ui/layouts"
 )
 
-// AppMetricsPage is the metrics tab of an app: CPU, memory and network of
-// its containers now and over a range, with its deploys marked.
+// AppMetricsPage is the metrics of an app, a page under it ("‹ shop"):
+// CPU, memory and network of its containers now and over a range, with its
+// deploys marked.
 templ AppMetricsPage(view AppMetricsView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ path := basePath + "/apps/" + view.App.Name + "/metrics" }}
-	@layouts.AppShell(layouts.AppProps{Title: view.App.Name + " metrics", Crumbs: []layouts.Crumb{{Label: "Apps", Href: basePath + "/apps"}, {Label: view.App.Name, Href: basePath + "/apps/" + view.App.Name}, {Label: "Metrics"}}}) {
+	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
+	@layouts.App(view.App.Name + " metrics") {
 		@panelPage(templ.Attributes{"data-app-metrics": view.App.Name}) {
-			@appHeader(view.App, "app")
-			@appSection(view.App.Name, "app") {
-				@appMetricsPanel(view, path)
-			}
+			@kit.Header(kit.Back{Label: view.App.Name, Href: appPath}, "Metrics")
+			@appMetricsPanel(view, appPath+"/metrics")
 		}
 	}
 }
 
+// appMetricsPanel is everything under the head; it reloads itself every
+// 15 seconds on the last hour, and when another range is picked.
 templ appMetricsPanel(view AppMetricsView, path string) {
 	{{ m := view.Metrics }}
 	{{ rows := metricsRows(m.Points, m.Deploys, true) }}
 	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.ServerOnline && m.Server != "" {
-			@stateAlert(templ.Attributes{"data-server-offline": true}) {
-				The server { m.Server } is offline: its agent sends no metrics.
-			}
+			<p class="px-1 text-sm text-failed" data-server-offline>{ m.Server } is offline: its agent sends no metrics.</p>
 		}
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			@sectionTitle(rangeTitle(m.Range))
-			@metricsRanges(path, m.Range.Name)
-		</div>
-		@statGrid(templ.Attributes{"data-metrics-now": true}) {
-			if now := m.Now; now != nil {
-				@statCard("CPU", percentText(now.CPU), "of the whole server")
-				@statCard("Memory", bytesText(float64(now.MemoryUsed)), appLimitNote(now))
-				@statCard("Network in", rateText(now.NetRx), "")
-				@statCard("Network out", rateText(now.NetTx), containersNote(now.Containers))
-			} else {
-				@statCard("CPU", "", "no sample in the last two minutes")
-				@statCard("Memory", "", "")
-				@statCard("Network in", "", "")
-				@statCard("Network out", "", "")
-			}
-		}
-		if len(rows) == 0 {
-			@emptyState("No metrics yet", "The agent sends them every 15 seconds while the app runs. An older agent starts once it has updated itself.", "moin metrics "+view.App.Name)
-		} else {
-			<div class="grid gap-6 lg:grid-cols-2">
-				@metricsPanel("CPU", "The app's share of the whole server.", metricsChartProps{ID: "app-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Deploys: true})
-				@metricsPanel("Memory", "Without the page cache the kernel can take back.", metricsChartProps{ID: "app-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Deploys: true})
-				@metricsPanel("Network", "Bytes per second in and out of its containers.", metricsChartProps{ID: "app-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText, Deploys: true})
+		@serverRangeSelect(path, m.Range.Name)
+		@kit.Section("Now", nil) {
+			<div data-metrics-now>
+				@kit.List() {
+					if now := m.Now; now != nil {
+						@serverStat("CPU", "of the whole server", percentText(now.CPU))
+						@serverStat("Memory", appLimitNote(now), bytesText(float64(now.MemoryUsed)))
+						@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
+						@serverStat("Containers", "", strconv.Itoa(now.Containers))
+					} else {
+						@serverStat("CPU", "No sample in the last two minutes", "")
+						@serverStat("Memory", "", "")
+						@serverStat("Network", "", "")
+					}
+				}
 			</div>
+		}
+		@kit.Section(rangeTitle(m.Range), nil) {
+			if len(rows) == 0 {
+				@kit.Card("", nil) {
+					@kit.Quiet() {
+						No metrics yet. The agent sends them every 15 seconds while the app runs.
+					}
+					@kit.Command("moin metrics " + view.App.Name)
+				}
+			} else {
+				@kit.Grid() {
+					@serverChart("CPU", metricsChartProps{ID: "app-cpu", Config: cpuConfig, Rows: rows, Range: m.Range.Name, Value: percentText, Deploys: true})
+					@serverChart("Memory", metricsChartProps{ID: "app-memory", Config: memoryConfig, Rows: rows, Range: m.Range.Name, Value: bytesText, Deploys: true})
+					@serverChart("Network", metricsChartProps{ID: "app-network", Config: networkConfig, Rows: rows, Range: m.Range.Name, Value: rateText, Deploys: true})
+				}
+			}
 		}
 	</div>
 }
@@ -70,13 +75,6 @@ func appLimitNote(now *service.MetricsNow) string {
 		return "no limit"
 	}
 	return "of " + bytesText(float64(now.MemoryLimit)) + ", " + shareOf(now.MemoryUsed, now.MemoryLimit)
-}
-
-func containersNote(n int) string {
-	if n == 1 {
-		return "1 container"
-	}
-	return strconv.Itoa(n) + " containers"
 }
 
 func rangeTitle(r service.MetricsRange) string {
@@ -89,22 +87,6 @@ func rangeTitle(r service.MetricsRange) string {
 		return "Last 30 days, 4 hour averages"
 	}
 	return "Last hour, every 15 seconds, live"
-}
-
-// metricsRanges switches the range: plain links, as a segmented control.
-templ metricsRanges(path, active string) {
-	@tabNav("Range") {
-		for _, r := range service.MetricsRanges {
-			@tabLink(path+"?range="+r.Name, r.Name, r.Name == active, templ.Attributes{"data-metrics-range-link": r.Name})
-		}
-	}
-}
-
-// metricsPanel is a card with one chart.
-templ metricsPanel(title, description string, p metricsChartProps) {
-	@panel(panelProps{Title: title, Description: description, Attrs: templ.Attributes{"data-metrics-chart": p.ID}}) {
-		@metricsChart(p)
-	}
 }
 
 templ metricsChart(p metricsChartProps) {

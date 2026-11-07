@@ -8,7 +8,7 @@ order: 5
 Every server and every app has its CPU, memory, disk and network, live and over the last 30 days. Nothing to install or set up: no Prometheus, no Grafana. A self-hosted control plane does the same.
 
 ```surfaces
-Web: **Servers**, the server, **Metrics**; the app's **Metrics** tab
+Web: **Servers**, the server, **Metrics**; the app, **Metrics**
 CLI: moin metrics <app-name>, or moin metrics --server web-1; --range 24h
 TUI: on the app, `m`, or on a server; `[` `]` change the range
 API: GET /api/v1/apps/{app}/metrics?range=1h, GET /api/v1/servers/{id}/metrics?range=24h

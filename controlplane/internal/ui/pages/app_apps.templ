@@ -143,6 +143,12 @@ type AppPageView struct {
 	// Selected is the deploy whose log the Deploys section shows; 0 shows
 	// the newest and follows the next one that starts.
 	Selected int
+	// Repo is the GitHub card of the Deploys section, as far as it is known
+	// without asking GitHub.
+	Repo *RepoView
+	// Logs is the container logs of the Logs section; nil when the agent
+	// did not answer in time, and the section loads them itself.
+	Logs *AppLogsView
 }
 
 // AppPage is an app: the head stays, the section under it answers one
@@ -155,11 +161,11 @@ templ AppPage(view AppPageView) {
 			@appSection(app.Name, view.Section) {
 				switch view.Section {
 					case "deploys":
-						@appDeploysSection(app, view.Deploys, view.Selected, view.Selected == 0)
+						@appDeploysSection(app, view.Deploys, view.Selected, view.Selected == 0, view.Repo)
 					case "addresses":
 						@appAddressesSection(view)
 					case "logs":
-						@appLogsSection(app, view.Deploys)
+						@appLogsSection(app, view.Deploys, view.Logs)
 					case "settings":
 						@appSettingsSection(app, view.EnvKeys)
 					default:
@@ -262,15 +268,16 @@ func appAddresses(app model.App) []string {
 
 // appDeploysSection answers "how does code get in?": the versions, the log
 // of the one picked, GitHub and CI.
-templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follow bool) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
+templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follow bool, repo *RepoView) {
 	<div class="grid items-stretch gap-4 lg:grid-cols-2">
 		@appDeploys(app, deploys, selected, follow)
 		@DeployLogPanel(app, selectedDeploy(deploys, selected), follow, false)
 	</div>
-	<div hx-get={ appPath + "/repo" } hx-trigger="load" hx-swap="outerHTML">
-		@AppRepo(RepoView{App: app})
-	</div>
+	if repo != nil {
+		@AppRepo(*repo)
+	} else {
+		@AppRepo(RepoView{App: app, Enabled: true, Connected: true, Loading: app.Repo == ""})
+	}
 	@appCI(app.Name, app.DeployHookHash != nil)
 }
 
@@ -286,22 +293,40 @@ templ appAddressesSection(view AppPageView) {
 }
 
 // appLogsSection answers "what happens in it?": the container logs, and a
-// command to run in it.
-templ appLogsSection(app model.App, deploys []api.Deploy) {
+// command to run in it. The logs come with the page; only when the agent is
+// slow to answer they load into a box that keeps their place.
+templ appLogsSection(app model.App, deploys []api.Deploy, logs *AppLogsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	@panel(panelProps{Heading: "app-logs-heading", Title: "Logs", Action: loadLogsButton(appPath), Body: panelBodyFlush}) {
-		<div id="app-logs" hx-get={ appPath + "/logs/lines" } hx-trigger="load" hx-swap="outerHTML" class="px-6 text-sm text-muted-foreground">Loading…</div>
+	@kit.Card("Last 200 lines", loadLogsButton(appPath)) {
+		<div class="-mx-6">
+			if logs != nil {
+				@AppLogs(logs.Lines, logs.Message)
+			} else {
+				<div id="app-logs" hx-get={ appPath + "/logs/lines" } hx-trigger="load" hx-swap="outerHTML" class={ appLogsBox, "h-80 sm:h-[30rem]" }>
+					<p class="px-6 text-sm text-muted-foreground">Reading the logs…</p>
+				</div>
+			}
+		</div>
 	}
 	@appExec(app, deploys)
 }
+
+// AppLogsView is the container logs as the page shows them: the last lines,
+// or why they could not be read.
+type AppLogsView struct {
+	Lines   []string
+	Message string
+}
+
+// appLogsBox is the box of the container logs: the newest line at the
+// bottom and in view (flex-col-reverse), few lines at the top.
+const appLogsBox = "flex max-h-[30rem] flex-col-reverse justify-end-safe overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 
 // appSettingsSection answers "how is it set up?": its env, the pin, and at
 // the end what stops or removes it.
 templ appSettingsSection(app model.App, envKeys []string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name }}
-	@panel(panelProps{Heading: "app-env-heading", Title: "Environment", Body: panelBodyRows}) {
-		@AppEnv(app.Name, envKeys, nil)
-	}
+	@AppEnv(app.Name, envKeys, nil)
 	@kit.List() {
 		@PinSwitch(app)
 	}
@@ -508,18 +533,15 @@ templ deployStatus(deploy api.Deploy, liveNumber int) {
 	}
 }
 
-// AppLogs shows the container logs, or why they could not be read.
+// AppLogs shows the container logs, or why they could not be read, in the
+// box the page kept for them.
 templ AppLogs(lines []string, message string) {
-	if message != "" {
-		<div id="app-logs" class="flex items-center gap-2 px-6 text-sm text-failed">
-			<span aria-hidden="true">✗</span>
-			<span>{ message }</span>
-		</div>
-	} else if len(lines) == 0 {
-		<div id="app-logs" class="px-6 text-sm text-muted-foreground">No log lines yet.</div>
-	} else {
-		// Newest at the bottom and in view (flex-col-reverse), no script.
-		<div id="app-logs" class="flex max-h-[30rem] flex-col-reverse overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" tabindex="0" aria-label="Container logs">
+	<div id="app-logs" class={ appLogsBox } tabindex="0" aria-label="Container logs">
+		if message != "" {
+			<p class="flex gap-2 px-6 text-sm text-failed"><span aria-hidden="true">✗</span>{ message }</p>
+		} else if len(lines) == 0 {
+			<p class="px-6 text-sm text-muted-foreground">No log lines yet.</p>
+		} else {
 			<div class="moin-term moin-term-lines">
 				for _, line := range lines {
 					{{ entry := parseLogLine(line) }}
@@ -532,8 +554,8 @@ templ AppLogs(lines []string, message string) {
 					</div>
 				}
 			</div>
-		</div>
-	}
+		}
+	</div>
 }
 
 // logLine is one line of docker compose logs --timestamps:
@@ -562,31 +584,22 @@ func parseLogLine(line string) logLine {
 	return entry
 }
 
-// AppEnv is the env list with its add form. values holds the shown values;
-// keys without one show as dots.
+// AppEnv is the env vars of an app, one row each, and the row that sets
+// one. values holds the shown values; keys without one show as dots. Saving
+// never restarts the app: the head then says what waits for Restart.
 templ AppEnv(appName string, keys []string, values map[string]string) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ envPath := basePath + "/apps/" + appName + "/env" }}
-	<div id="app-env" class="flex flex-col gap-4">
-		<div class="flex flex-wrap items-center justify-between gap-3 px-3">
-			if len(keys) == 0 {
-				<span class="text-sm text-muted-foreground">No variables yet.</span>
-			} else if len(values) == 0 {
-				@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}) {
-					Show values
+	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
+	<div id="app-env">
+		@kit.Section("Environment", envModes(appName, false)) {
+			@kit.List() {
+				if len(keys) == 0 {
+					@kit.Row("") {
+						@kit.RowText("No env vars yet", "")
+					}
 				}
-			} else {
-				@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}) {
-					Hide values
-				}
-			}
-			@envModes(appName, false)
-		</div>
-		if len(keys) > 0 {
-			<ul class="flex flex-col" role="list">
 				for _, key := range keys {
-					<li data-env={ key } class="group/env flex min-h-12 items-center gap-3 rounded-2xl px-3 hover:bg-foreground/4">
-						<span class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
+					@envRow() {
+						<span data-env={ key } class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
 						<span class="min-w-0 flex-1 truncate text-right font-mono text-sm text-muted-foreground">
 							if value, ok := values[key]; ok {
 								<span data-env-value class="text-foreground">{ value }</span>
@@ -602,33 +615,48 @@ templ AppEnv(appName string, keys []string, values map[string]string) {
 							hx-target="#app-env"
 							hx-swap="outerHTML"
 							hx-disable="this"
-							hx-confirm={ "Remove " + key + "? The next deploy drops it." }
-							class="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/env:opacity-100"
+							hx-confirm={ "Remove " + key + "? The next deploy or restart drops it." }
+							data-confirm-action="Remove"
+							class="-my-1.5 -mr-3.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
 						>
 							@icon.X(icon.Props{Class: "size-4"})
 						</button>
-					</li>
+					}
 				}
-			</ul>
-		}
-		<form
-			class="flex flex-col gap-2 px-3 sm:flex-row"
-			hx-post={ envPath }
-			hx-target="#app-env"
-			hx-swap="outerHTML"
-			hx-disable="find button[type='submit']"
-		>
-			@csrf.Token()
-			<label for="env-key" class="sr-only">Name</label>
-			<div class="sm:w-48 sm:shrink-0">
-				@kit.Input(templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "spellcheck": "false", "required": true})
-			</div>
-			<label for="env-value" class="sr-only">Value</label>
-			@kit.Input(templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"})
-			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
-				Add
+				if len(keys) > 0 {
+					if len(values) == 0 {
+						@kit.RowButton(false, templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}) {
+							<span class="font-medium">Show values</span>
+						}
+					} else {
+						@kit.RowButton(false, templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}) {
+							<span class="font-medium">Hide values</span>
+						}
+					}
+				}
+				@envFormRow() {
+					<form
+						class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row"
+						hx-post={ envPath }
+						hx-target="#app-env"
+						hx-swap="outerHTML"
+						hx-disable="find button[type='submit']"
+						data-env-set
+					>
+						@csrf.Token()
+						<label for="env-key" class="sr-only">Name</label>
+						<div class="sm:w-56 sm:shrink-0">
+							@kit.Input(templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true})
+						</div>
+						<label for="env-value" class="sr-only">Value</label>
+						@kit.Input(templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"})
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+							Set
+						}
+					</form>
+				}
 			}
-		</form>
+		}
 	</div>
 }
 

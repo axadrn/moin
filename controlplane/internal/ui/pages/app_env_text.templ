@@ -1,97 +1,115 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/textarea"
 	"github.com/axadrn/moin/controlplane/internal/ui/csrf"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 	"github.com/axadrn/moin/internal/dotenv"
 )
 
-// envModes is the switch between one row per env var and one .env text.
+// envModes is the switch between one row per env var and one .env text. It
+// swaps the env part only; the address stays.
 templ envModes(appName string, text bool) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
-	@kit.Segmented("env-modes", "Edit as", []kit.Segment{
-		{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
-		{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
-	})
+	<div class="shrink-0">
+		@kit.Segmented("env-modes", "Edit as", []kit.Segment{
+			{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+			{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+		})
+	</div>
 }
 
-func boolString(on bool) string {
-	if on {
-		return "true"
-	}
-	return "false"
+// envRow is one env var in the list: a kit.Row that lights up under the
+// pointer, as its remove button acts on it.
+templ envRow() {
+	<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:bg-foreground/4 hover:before:opacity-0 [&:hover+*]:before:opacity-0">
+		{ children... }
+	</div>
+}
+
+// envFormRow is the last row of the list, the one that sets an env var:
+// it keeps its line, as it does not light up.
+templ envFormRow() {
+	<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden">
+		{ children... }
+	</div>
 }
 
 // AppEnvText is every env var of an app as one .env text to edit. Saving
 // shows what changes first; problem is why the text was refused.
 templ AppEnvText(appName, text, problem string) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
-	<div id="app-env" class="flex flex-col gap-3">
-		<div class="flex flex-wrap items-center justify-between gap-3 px-3">
-			<span class="text-sm text-muted-foreground">One KEY=value per line.</span>
-			@envModes(appName, true)
-		</div>
-		<form class="flex flex-col gap-2 px-3" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']">
-			@csrf.Token()
-			<label for="env-text" class="sr-only">Env vars</label>
-			@textarea.Textarea(textarea.Props{
-				ID:          "env-text",
-				Name:        "text",
-				Rows:        10,
-				Value:       text,
-				Placeholder: "DATABASE_URL=postgres://…\nAPI_KEY=…",
-				Class:       "w-full resize-y font-mono text-sm",
-				Attributes:  templ.Attributes{"spellcheck": "false", "autocomplete": "off", "aria-describedby": "env-text-problem"},
-			})
-			if problem != "" {
-				<p id="env-text-problem" class="text-xs text-destructive" role="alert">{ problem }</p>
+	<div id="app-env">
+		@kit.Section("Environment", envModes(appName, true)) {
+			@kit.Card("", nil) {
+				<form class="flex flex-col gap-4" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-env-text>
+					@csrf.Token()
+					<div class="flex flex-col gap-2">
+						<label for="env-text" class="sr-only">Env vars</label>
+						@kit.TextArea(envTextAttributes(problem)) {
+							{ text }
+						}
+						if problem != "" {
+							<p id="env-text-problem" class="px-1 text-sm text-failed" role="alert">{ problem }</p>
+						}
+					</div>
+					<div class="flex justify-end">
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+							Review changes
+						}
+					</div>
+				</form>
 			}
-			<div class="flex justify-end">
-				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary}) {
-					Review changes
-				}
-			</div>
-		</form>
+		}
 	</div>
+}
+
+func envTextAttributes(problem string) templ.Attributes {
+	attributes := templ.Attributes{"id": "env-text", "name": "text", "rows": "10", "placeholder": "DATABASE_URL=postgres://…\nAPI_KEY=…", "spellcheck": "false", "autocomplete": "off"}
+	if problem != "" {
+		attributes["aria-invalid"] = "true"
+		attributes["aria-describedby"] = "env-text-problem"
+	}
+	return attributes
 }
 
 // AppEnvReview says which keys the text adds, changes and removes, and
 // asks before it replaces the env vars. The values never show here.
 templ AppEnvReview(appName, text string, change dotenv.Change) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appName + "/env" }}
-	<div id="app-env" class="flex flex-col gap-3 px-3" data-env-review>
-		<p class="text-sm font-medium">This replaces the env vars of { appName }:</p>
-		<ul class="flex flex-col gap-1 font-mono text-sm" role="list">
-			for _, key := range change.Added {
-				<li><span class="text-live">+</span> { key } <span class="font-sans text-xs text-muted-foreground">new</span></li>
+	<div id="app-env" data-env-review>
+		@kit.Section("Environment", envModes(appName, true)) {
+			@kit.Card("This replaces the env vars", nil) {
+				<ul class="flex flex-col gap-1 px-1 font-mono text-sm" role="list">
+					for _, key := range change.Added {
+						<li><span class="text-live">+</span> { key } <span class="font-sans text-xs text-muted-foreground">new</span></li>
+					}
+					for _, key := range change.Changed {
+						<li><span class="text-running">~</span> { key } <span class="font-sans text-xs text-muted-foreground">new value</span></li>
+					}
+					for _, key := range change.Removed {
+						<li><span class="text-failed">-</span> { key } <span class="font-sans text-xs text-muted-foreground">removed</span></li>
+					}
+				</ul>
+				<form class="flex flex-wrap justify-end gap-2" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button">
+					@csrf.Token()
+					<input type="hidden" name="text" value={ text }/>
+					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "name": "back", "value": "1"}) {
+						Back to the text
+					}
+					@kit.Button(replaceKind(len(change.Removed) > 0), "", templ.Attributes{"type": "submit", "name": "confirm", "value": "1", "data-env-replace": true}) {
+						Replace
+					}
+				</form>
 			}
-			for _, key := range change.Changed {
-				<li><span class="text-running">~</span> { key } <span class="font-sans text-xs text-muted-foreground">new value</span></li>
-			}
-			for _, key := range change.Removed {
-				<li><span class="text-destructive">-</span> { key } <span class="font-sans text-xs text-muted-foreground">removed</span></li>
-			}
-		</ul>
-		<form class="flex flex-wrap justify-end gap-2" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button">
-			@csrf.Token()
-			<input type="hidden" name="text" value={ text }/>
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Attributes: templ.Attributes{"name": "back", "value": "1"}}) {
-				Back to the text
-			}
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: buttonFor(len(change.Removed) > 0), Attributes: templ.Attributes{"name": "confirm", "value": "1"}}) {
-				Replace
-			}
-		</form>
+		}
 	</div>
 }
 
-// buttonFor is the destructive button when the change removes something.
-func buttonFor(removes bool) button.Variant {
+// replaceKind is the red button when the change removes something.
+func replaceKind(removes bool) kit.Kind {
 	if removes {
-		return button.VariantDestructive
+		return kit.Danger
 	}
-	return button.VariantDefault
+	return kit.Primary
 }

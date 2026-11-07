@@ -4,10 +4,7 @@ import (
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
 	"github.com/axadrn/moin/controlplane/internal/model"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/button"
-	"github.com/axadrn/moin/controlplane/internal/ui/components/input"
-	selectcomp "github.com/axadrn/moin/controlplane/internal/ui/components/select"
-	"github.com/axadrn/moin/controlplane/internal/ui/utils"
+	"github.com/axadrn/moin/controlplane/internal/ui/kit"
 )
 
 // execServices are the services of the live release a command can run in:
@@ -32,51 +29,45 @@ func execServices(app model.App, deploys []api.Deploy) []string {
 	return nil
 }
 
-func execServiceItems(services []string) []selectcomp.ItemData {
-	items := make([]selectcomp.ItemData, 0, len(services))
+func execServiceOptions(services []string) []kit.Option {
+	options := make([]kit.Option, 0, len(services))
 	for _, service := range services {
-		items = append(items, selectcomp.ItemData{Value: service, Label: service})
+		options = append(options, kit.Option{Value: service, Label: service})
 	}
-	return items
+	return options
 }
 
 // appExec runs one command in a container of the app, for owners and
 // admins: the output streams in as the command writes it. No shell reads
-// the command.
+// the command. With one service there is nothing to pick.
 templ appExec(app model.App, deploys []api.Deploy) {
 	if ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) {
 		{{ services := execServices(app, deploys) }}
 		if len(services) > 0 {
-			@panel(panelProps{Heading: "app-exec-heading", Title: "Run a command", Docs: "/docs/guides/exec", Description: "One command in a container on " + app.ServerName + ", like rails db:migrate. No shell: wrap pipes in sh -c '…'. The activity keeps the command, never the output."}) {
+			@kit.Card("Run a command", nil) {
 				<form
-					class="flex flex-col gap-3"
+					class="flex flex-col gap-4"
 					data-exec-form
 					data-exec-url={ "/api/v1/apps/" + app.Name + "/exec?workspace=" + ctxkeys.Workspace(ctx).Slug }
 				>
 					<div class="flex flex-col gap-2 sm:flex-row">
-						<label for="exec-service" class="sr-only">Service</label>
-						@selectcomp.Select(selectcomp.Props{Name: "service", DefaultValue: services[0], Items: execServiceItems(services)}) {
-							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "exec-service", Class: "sm:w-40"}) {
-								@selectcomp.Value()
-							}
-							@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
-								@selectcomp.Group() {
-									for _, service := range services {
-										@selectcomp.Item(selectcomp.ItemProps{Value: service}) {
-											{ service }
-										}
-									}
-								}
-							}
+						if len(services) > 1 {
+							<div class="sm:w-40 sm:shrink-0">
+								@kit.Select(kit.SelectProps{ID: "exec-service", Name: "service", Label: "Service", Options: execServiceOptions(services)})
+							</div>
+						} else {
+							<input type="hidden" name="service" value={ services[0] }/>
 						}
 						<label for="exec-command" class="sr-only">Command</label>
-						@input.Input(input.Props{ID: "exec-command", Name: "line", Type: "text", Placeholder: "rails db:migrate", Class: "min-w-0 flex-1 font-mono placeholder:font-sans", Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "required": true, "data-exec-line": true}})
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantSecondary, Class: "shrink-0", Attributes: templ.Attributes{"data-exec-run": true}}) {
+						@kit.Input(templ.Attributes{"id": "exec-command", "name": "line", "type": "text", "placeholder": "rails db:migrate", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true, "data-exec-line": true})
+						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-exec-run": true}) {
 							Run
 						}
 					</div>
-					<p class="text-sm text-muted-foreground" data-exec-status hidden></p>
-					<pre class="moin-term max-h-[30rem] overflow-auto overscroll-contain rounded-2xl bg-terminal px-4 py-3 font-mono text-sm whitespace-pre-wrap text-terminal-foreground" data-exec-output hidden></pre>
+					<p class="px-1 text-sm text-muted-foreground" data-exec-status hidden></p>
+					<div class="-mx-6 flex max-h-[30rem] flex-col-reverse overflow-auto overscroll-contain" data-exec-box hidden>
+						<pre class="moin-term px-6 whitespace-pre-wrap" data-exec-output></pre>
+					</div>
 				</form>
 				@appExecScript()
 			}
@@ -92,6 +83,7 @@ templ appExecScript() {
 			const form = document.querySelector("[data-exec-form]");
 			if (!form || form.dataset.execBound) return;
 			form.dataset.execBound = "true";
+			const box = form.querySelector("[data-exec-box]");
 			const output = form.querySelector("[data-exec-output]");
 			const status = form.querySelector("[data-exec-status]");
 			const run = form.querySelector("[data-exec-run]");
@@ -105,7 +97,7 @@ templ appExecScript() {
 				event.preventDefault();
 				const data = new FormData(form);
 				output.textContent = "";
-				output.hidden = false;
+				box.hidden = false;
 				run.disabled = true;
 				say("Running…", false);
 				try {
@@ -119,7 +111,7 @@ templ appExecScript() {
 						const body = await response.json().catch(() => ({}));
 						const fields = body.error && body.error.fields ? Object.values(body.error.fields).join(" ") : "";
 						say(fields || (body.error && body.error.message) || "The command did not run.", true);
-						output.hidden = output.textContent === "";
+						box.hidden = output.textContent === "";
 						return;
 					}
 					const reader = response.body.getReader();
@@ -141,9 +133,8 @@ templ appExecScript() {
 							if (!body) continue;
 							const value = JSON.parse(body);
 							if (name === "output") {
-								const atEnd = output.scrollTop + output.clientHeight >= output.scrollHeight - 4;
+								// The box keeps the newest line in view while you are at the bottom.
 								output.textContent += value.data;
-								if (atEnd) output.scrollTop = output.scrollHeight;
 							} else if (name === "done") {
 								const notes = [];
 								if (value.timed_out) notes.push("stopped waiting after the timeout");
@@ -159,7 +150,7 @@ templ appExecScript() {
 					say("The connection broke: " + error.message, true);
 				} finally {
 					run.disabled = false;
-					if (output.textContent === "") output.hidden = true;
+					if (output.textContent === "") box.hidden = true;
 				}
 			});
 		})();

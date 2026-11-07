@@ -12,6 +12,7 @@ import (
 
 	"github.com/axadrn/moin/controlplane/internal/api"
 	"github.com/axadrn/moin/controlplane/internal/ctxkeys"
+	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/pages"
 )
@@ -206,34 +207,50 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-// renderRepo renders the repository panel. Error says why the repos could
-// not be listed: a state of the panel, not of a click.
+// renderRepo renders the GitHub card. Error says why the repos could not
+// be listed: a state of the card, not of a click.
 func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	app, err := h.apps.Get(workspace.ID, r.PathValue("app"))
+	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
 		renderError(w, "load app failed", err)
 		return
 	}
-	view := pages.RepoView{App: *app}
-	_, err = h.apps.GitHubInstallURL(actor(r))
-	view.Enabled = err == nil
-	installations, err := h.apps.GitHubInstallations(workspace.ID)
+	view, err := h.repoView(r, app, true)
 	if err != nil {
 		renderError(w, "load github installations failed", err)
 		return
 	}
-	view.Connected, view.Installations = len(installations) > 0, installations
-	if view.Enabled && view.Connected && app.Repo == "" {
-		view.Repos, err = h.apps.GitHubRepos(r.Context(), workspace.ID)
-		if err != nil {
-			view.Error = errorMessage(err)
-		}
-		if len(view.Repos) > 0 {
-			view.Branches = h.branches(r, view.Repos[0].FullName)
-		}
-	}
 	render(w, r, pages.AppRepo(view))
+}
+
+// repoView is the GitHub card of app. With listRepos it asks GitHub for the
+// repos the link form offers; without, the card renders with the page and
+// asks for them itself (Loading).
+func (h *AppsHandler) repoView(r *http.Request, app *model.App, listRepos bool) (pages.RepoView, error) {
+	workspace := ctxkeys.Workspace(r.Context())
+	view := pages.RepoView{App: *app}
+	_, err := h.apps.GitHubInstallURL(actor(r))
+	view.Enabled = err == nil
+	installations, err := h.apps.GitHubInstallations(workspace.ID)
+	if err != nil {
+		return view, err
+	}
+	view.Connected, view.Installations = len(installations) > 0, installations
+	if !view.Enabled || !view.Connected || app.Repo != "" {
+		return view, nil
+	}
+	if !listRepos {
+		view.Loading = true
+		return view, nil
+	}
+	view.Repos, err = h.apps.GitHubRepos(r.Context(), workspace.ID)
+	if err != nil {
+		view.Error = errorMessage(err)
+	}
+	if len(view.Repos) > 0 {
+		view.Branches = h.branches(r, view.Repos[0].FullName)
+	}
+	return view, nil
 }
 
 // ServerSecurity is the security page of a server.

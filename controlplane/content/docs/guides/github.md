@@ -12,7 +12,7 @@ Connect GitHub once, link a repo to an app, and moin deploys any branch, tag or 
 Installs the moin GitHub App on your account or an organization. Once per workspace.
 
 ```surfaces
-Web: the app, **GitHub**, **Connect GitHub**
+Web: **Settings**, **GitHub**, **Connect GitHub**; or the app's **Deploys** tab, **GitHub**, **Connect GitHub**
 CLI: moin github
 TUI: opens the web: `w`, then `g`
 API: GET /api/v1/github
@@ -24,7 +24,7 @@ Connecting always happens on github.com: the CLI, the API and MCP give you the l
 ## Link a repo
 
 ```surfaces
-Web: the app, **GitHub**, choose the repo and the branch, **Deploy**
+Web: the app's **Deploys** tab, **GitHub**, choose the repo and the branch, **Deploy**
 CLI: moin link <owner>/<repo> --branch main
 TUI: on the app, `W` opens its GitHub panel in the web
 API: PUT /api/v1/apps/{app}/repo
@@ -36,7 +36,7 @@ Deploy every push is on by default. On the web, **Deploy** links and deploys in 
 ## Deploy from GitHub
 
 ```surfaces
-Web: the app, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
+Web: the app's **Deploys** tab, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
 CLI: moin deploy --ref <ref>
 TUI: on the app, `B`, type a branch, tag or commit or nothing, then `enter`
 API: POST /api/v1/apps/{app}/deploys
@@ -54,7 +54,7 @@ Empty means the linked branch. The API takes `{"ref": "v1.4.0"}`, or `{"ref": ""
 ## Deploy every push
 
 ```surfaces
-Web: the app, **GitHub**, **Deploy every push**
+Web: the app's **Deploys** tab, **GitHub**, **Deploy every push**
 CLI: moin link <owner>/<repo> --auto=false
 TUI: on the app, `W` opens its GitHub panel in the web
 API: PUT /api/v1/apps/{app}/repo
@@ -83,7 +83,7 @@ Branches list the default one first. Your repo is missing? Under the list, every
 The app stops following the repo and keeps running.
 
 ```surfaces
-Web: the app, **GitHub**, **Unlink**
+Web: the app's **Deploys** tab, **GitHub**, **Unlink**
 CLI: moin unlink
 TUI: on the app, `W` opens its GitHub panel in the web
 API: DELETE /api/v1/apps/{app}/repo

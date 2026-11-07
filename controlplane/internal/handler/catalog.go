@@ -191,6 +191,6 @@ func (h *CatalogHandler) Update(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Not updated", err, nil)
 		return
 	}
-	answerDone(w, r, "Update started", fmt.Sprintf("v%d deploys %s after a snapshot.", deploy.Number, r.FormValue("version")))
+	answerDone(w, r, "Update started", fmt.Sprintf("v%d deploys %s after a backup.", deploy.Number, r.FormValue("version")))
 	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Name, http.StatusSeeOther)
 }
