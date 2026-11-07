@@ -254,6 +254,28 @@ func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
 	answerDone(w, r, "Image deploy started", fmt.Sprintf("v%d pulls %s.", deploy.Number, deploy.Image))
 }
 
+// RenameApp gives the app a new name and shows its settings under the new
+// link. Its data, backups and instant address stay; the next restart
+// names its containers after it.
+func (h *AppsHandler) RenameApp(w http.ResponseWriter, r *http.Request) {
+	before, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
+	if err != nil {
+		failed(w, r, "App not renamed", err, nil)
+		return
+	}
+	renamed, err := h.apps.Rename(actor(r), before.ID, r.FormValue("name"))
+	if err != nil {
+		failed(w, r, "App not renamed", err, map[string]string{"name": "app-rename"})
+		return
+	}
+	r.SetPathValue("app", renamed.ID)
+	w.Header().Set("HX-Replace-Url", ctxkeys.AppBasePath(r.Context())+"/apps/"+renamed.Link()+"/settings")
+	h.appPage(w, r, "settings")
+	if renamed.Name != before.Name {
+		answerDone(w, r, before.Name+" renamed", "It is "+renamed.Name+" now and its links keep working. The next restart gives its containers the name.")
+	}
+}
+
 // RotateHook shows a new deploy hook URL once.
 func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 	before, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))

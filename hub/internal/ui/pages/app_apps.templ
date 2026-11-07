@@ -320,10 +320,29 @@ type AppLogsView struct {
 // bottom and in view (flex-col-reverse), few lines at the top.
 const appLogsBox = "flex max-h-[30rem] flex-col-reverse justify-end-safe overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 
-// appSettingsSection answers "how is it set up?": its env, the pin, and at
-// the end what stops or removes it.
+// appSettingsSection answers "how is it set up?": its name, its env, the
+// pin, and at the end what stops or removes it.
 templ appSettingsSection(app model.App, envKeys []string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
+	@kit.Card("Name", nil) {
+		<form
+			hx-post={ appPath + "/name" }
+			hx-target="#main"
+			hx-select="#main"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+			data-rename-app
+		>
+			@kit.CSRF()
+			<label for="app-rename" class="sr-only">App name</label>
+			@kit.Inline() {
+				@kit.Input(templ.Attributes{"id": "app-rename", "name": "name", "type": "text", "value": app.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
+				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					Save
+				}
+			}
+		</form>
+	}
 	@AppEnv(app.Link(), envKeys, nil)
 	@kit.List() {
 		@PinSwitch(app)
