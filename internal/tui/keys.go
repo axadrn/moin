@@ -1,7 +1,7 @@
 package tui
 
-// Keys. The same key does the same thing in every view: `space` the menu,
-// `space space`, `ctrl+k` or `/` the search, `?` the keys, `esc` back.
+// Keys. The same key does the same thing in every view: `space`, `ctrl+k`
+// or `/` the palette, `?` the keys, `esc` back.
 // Each view adds its own, and the actions of an app work from every tab
 // of it.
 
@@ -32,8 +32,6 @@ func (m model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.promptKey(k)
 	case m.pick != nil:
 		return m.pickKey(k)
-	case m.menuOn:
-		return m.menuKey(s)
 	case m.help:
 		return m.helpKey(s)
 	}
@@ -41,17 +39,12 @@ func (m model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.execKey(k)
 	}
 	switch s {
-	case "ctrl+k":
-		m = m.openPicker()
-		return m, nil
+	case "ctrl+k", "space":
+		return m.openPicker(), nil
 	case "/":
 		if !(m.cur.v == vApp && m.cur.tab == tLogs) {
-			m = m.openPicker()
-			return m, nil
+			return m.openPicker(), nil
 		}
-	case "space":
-		m.menuOn, m.menu = true, nil
-		return m, nil
 	case "?":
 		m.help = true
 		return m, nil

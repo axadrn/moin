@@ -64,12 +64,11 @@ func (m model) render() string {
 		pop := m.promptView(f, pw)
 		body = overlay(body, pop, (w-pw)/2, max(1, bh-len(lines(pop))-1))
 	case m.pick != nil:
+		// in the middle of the screen; the header and the footer are as
+		// high, so the middle of the body is the middle of the screen
 		pw := min(88, w-8)
 		pop := m.pickerView(f, pw, min(22, bh-2))
-		body = overlay(body, pop, (w-pw)/2, max(1, (bh-len(lines(pop)))/3))
-	case m.menuOn:
-		pop := m.menuView(f, cw)
-		body = overlay(body, pop, margin, max(0, bh-len(lines(pop))))
+		body = overlay(body, pop, (w-pw)/2, max(0, (bh-len(lines(pop)))/2))
 	case m.help:
 		pw, ph := m.helpSize()
 		pop := m.helpView(f, pw, ph)
@@ -84,7 +83,7 @@ func (m model) render() string {
 
 // layered is whether a layer sits over the view.
 func (m model) layered() bool {
-	return m.ask != nil || m.restore != nil || m.prompt != nil || m.pick != nil || m.menuOn || m.help
+	return m.ask != nil || m.restore != nil || m.prompt != nil || m.pick != nil || m.help
 }
 
 func (m model) crumbs() []string {
@@ -147,7 +146,7 @@ func (m model) header(u ui) []string {
 
 func (m model) footer(u ui) []string {
 	w := m.w
-	right := u.keys(kb{"space", "menu"}, kb{"ctrl+k", "search"}, kb{"?", "keys"})
+	right := u.keys(kb{"space", "palette"}, kb{"?", "keys"})
 	l := u.keys(m.viewKeys()...)
 	if m.notice != "" {
 		mark := u.good(dot)
@@ -163,7 +162,7 @@ func (m model) footer(u ui) []string {
 		right = ""
 	}
 	if wid(l)+wid(right)+6 > w {
-		right = u.keys(kb{"space", "menu"}, kb{"?", "keys"})
+		right = u.keys(kb{"space", "palette"})
 	}
 	if wid(l)+wid(right)+6 > w {
 		l = truncate(l, w-wid(right)-6)
@@ -175,9 +174,7 @@ func (m model) footer(u ui) []string {
 func (m model) viewKeys() []kb {
 	switch {
 	case m.pick != nil:
-		return []kb{{"↑↓", "move"}, {"enter", "open"}, {"esc", "close"}}
-	case m.menuOn:
-		return []kb{{"key", "choose"}, {"backspace", "up"}, {"esc", "close"}}
+		return []kb{{"type", "to find"}, {"↑↓", "move"}, {"enter", "run"}, {"esc", "close"}}
 	case m.ask != nil && m.ask.name != "":
 		return []kb{{"type", "the name"}, {"enter", "confirm"}, {"esc", "cancel"}}
 	case m.ask != nil:
@@ -276,62 +273,13 @@ func appState(a client.App) (string, string) {
 // float paints an overlay on its own background.
 func (u ui) floating(s string, w int) string { return fill(s, u.p.Raised, w) }
 
-func (m model) menuView(u ui, w int) string {
-	title, groups := m.menuGroups()
-	iw := inner(w)
-	kw := 3
-	for _, g := range groups {
-		for _, it := range g.items {
-			kw = max(kw, wid(it.key))
-		}
-	}
-	colw := 24
-	if len(groups) > 1 {
-		colw = max(20, min(28, (iw-3*(len(groups)-1))/len(groups)))
-	} else {
-		colw = iw
-	}
-	var cols []string
-	for _, g := range groups {
-		col := []string{u.faint(g.name), ""}
-		for _, it := range g.items {
-			label := u.text(it.label)
-			if it.sub != "" {
-				label = u.text(it.label) + u.faint(" ›")
-			}
-			col = append(col, padR(u.strong(padL(it.key, kw))+"  "+label, colw))
-		}
-		cols = append(cols, strings.Join(col, "\n"))
-	}
-	// as many groups side by side as fit, the rest below
-	per := max(1, (iw+3)/(colw+3))
-	var rows []string
-	for i := 0; i < len(cols); i += per {
-		rows = append(rows, hjoin(3, cols[i:min(i+per, len(cols))]...))
-		if i+per < len(cols) {
-			rows = append(rows, "")
-		}
-	}
-	path := "space"
-	if title != "" {
-		path += sep + title
-	}
-	right := u.faint("esc close")
-	if title != "" {
-		right = u.faint("backspace up · esc close")
-	}
-	body := append([]string{""}, lines(strings.Join(rows, "\n"))...)
-	body = append(body, "")
-	return u.floating(u.panel(path, right, body, w, len(body)+chrome, true), w)
-}
-
 func (m model) pickerView(u ui, w, maxH int) string {
 	iw := inner(w)
 	hs := m.hits()
 	caret := u.strong("▏")
 	q := u.strong(m.pick.query) + caret
 	if m.pick.query == "" {
-		q = caret + u.faint("apps, servers, views, actions …")
+		q = caret + u.faint("apps, servers, places, actions …")
 	}
 	input := spread(u.strong("›")+" "+q, u.faint(fmt.Sprintf("%d", len(hs))), iw)
 	body := []string{input, u.rule(iw)}
@@ -340,11 +288,21 @@ func (m model) pickerView(u ui, w, maxH int) string {
 	if m.pick.at >= n {
 		start = m.pick.at - n + 1
 	}
-	tw := min(36, iw/2)
+	// the key of each entry flush right, so the keys are learnt on the
+	// way; the columns fit every entry, so they stay put while you type
+	kw, tw := 0, 0
+	for _, e := range m.entries() {
+		kw, tw = max(kw, wid(e.key)), max(tw, wid(e.title)+2)
+	}
+	tw = min(tw, 36, iw/2)
 	for i := start; i < len(hs) && i < start+n; i++ {
 		h := hs[i]
 		sel := i == m.pick.at
-		body = append(body, u.row([]cell{{u.faint(h.e.kind), 8, false}, {highlight(u, h.e.title, h.pos, sel), tw, false}, {u.muted(h.e.hint), 0, false}}, iw, sel))
+		cells := []cell{{u.faint(h.e.kind), 8, false}, {highlight(u, h.e.title, h.pos, sel), tw, false}, {u.muted(h.e.hint), max(0, iw-8-tw-kw-3), false}}
+		if kw > 0 {
+			cells = append(cells, cell{u.strong(h.e.key), kw, true})
+		}
+		body = append(body, u.row(cells, iw, sel))
 	}
 	if len(hs) == 0 {
 		body = append(body, "", u.muted("Nothing matches “"+m.pick.query+"”"))
@@ -352,8 +310,8 @@ func (m model) pickerView(u ui, w, maxH int) string {
 	for len(body) < maxH-chrome-2 {
 		body = append(body, "")
 	}
-	body = append(body, u.rule(iw), u.keys(kb{"↑↓", "move"}, kb{"enter", "open"}, kb{"esc", "close"}))
-	return u.floating(u.panel("Search", "", body, w, len(body)+chrome, true), w)
+	body = append(body, u.rule(iw), u.keys(kb{"↑↓", "move"}, kb{"enter", "run"}, kb{"esc", "close"}))
+	return u.floating(u.panel("", "", body, w, len(body)+chrome, true), w)
 }
 
 func highlight(u ui, s string, pos []int, sel bool) string {

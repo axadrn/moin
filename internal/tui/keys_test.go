@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -35,9 +36,9 @@ func TestEscGoesBackOneLevelAndQQuitsOnlyTheDashboard(t *testing.T) {
 	if m.cur.tab != tLogs || len(m.stack) != 1 {
 		t.Fatalf("a tab key switches in place: %+v, stack %d", m.cur, len(m.stack))
 	}
-	m = press(m, "space", "s") // the servers, from the menu
+	m = press(m, "space", "s", "e", "r", "v", "e", "r", "s", "enter") // the servers, from the palette
 	if m.cur.v != vServers || len(m.stack) != 2 {
-		t.Fatalf("space s opens the servers on top: %+v, stack %d", m.cur, len(m.stack))
+		t.Fatalf("the palette opens the servers on top: %+v, stack %d", m.cur, len(m.stack))
 	}
 	m = press(m, "esc")
 	if m.cur.v != vApp || m.cur.tab != tLogs {
@@ -63,16 +64,12 @@ func TestEscGoesBackOneLevelAndQQuitsOnlyTheDashboard(t *testing.T) {
 
 func TestEscClosesALayerBeforeItGoesBack(t *testing.T) {
 	m := press(fixture(120, 40), "enter", "space")
-	if !m.menuOn {
-		t.Fatal("space opens the menu")
+	if m.pick == nil {
+		t.Fatal("space opens the palette")
 	}
-	m = press(m, "esc")
-	if m.menuOn || m.cur.v != vApp {
-		t.Fatalf("esc closes the menu and stays in the app: menu %v, %+v", m.menuOn, m.cur)
-	}
-	m = press(m, "ctrl+k", "x", "esc")
+	m = press(m, "x", "esc")
 	if m.pick != nil || m.cur.v != vApp {
-		t.Fatal("esc closes the jump list first")
+		t.Fatalf("esc closes the palette and stays in the app: %+v", m.cur)
 	}
 	m = press(m, "?")
 	if !m.help {
@@ -116,57 +113,62 @@ func TestDashboardTabMovesBetweenPanels(t *testing.T) {
 	}
 }
 
-func TestWhichKeyNamesEveryActionAndRunsIt(t *testing.T) {
+func TestPaletteListsWhatIsHereFirstWithItsKeys(t *testing.T) {
 	m := press(fixture(120, 40), "space")
-	_, groups := m.menuGroups()
-	if len(groups) != 1 || groups[0].name != "Go to" {
-		t.Fatalf("on the dashboard the menu has Go to only, got %d groups", len(groups))
-	}
-	m = press(m, "a")
-	title, groups := m.menuGroups()
-	if title != "apps" || len(groups[0].items) != len(m.apps) {
-		t.Fatalf("space a lists the apps, got %q with %d", title, len(groups[0].items))
-	}
-	keys := map[string]bool{}
-	for _, it := range groups[0].items {
-		if keys[it.key] {
-			t.Errorf("key %q twice in the apps menu", it.key)
+	for _, h := range m.hits() {
+		if h.e.kind == "section" || h.e.kind == "action" {
+			t.Fatalf("on the dashboard nothing typed lists places only, got %s %q", h.e.kind, h.e.title)
 		}
-		keys[it.key] = true
 	}
-	m = press(m, "backspace")
-	if len(m.menu) != 0 || !m.menuOn {
-		t.Fatal("backspace goes up one menu level")
-	}
-	m = press(m, "a", "b")
-	if m.menuOn || m.cur.v != vApp || m.cur.app != "blog" {
-		t.Fatalf("space a b opens blog, got %+v", m.cur)
+	m = press(m, "b", "l", "o", "g", "enter")
+	if m.pick != nil || m.cur.v != vApp || m.cur.app != "blog" {
+		t.Fatalf("blog enter opens blog, got %+v", m.cur)
 	}
 	m = press(m, "space")
-	_, groups = m.menuGroups()
-	names := []string{}
-	for _, g := range groups {
-		names = append(names, g.name)
+	hs := m.hits()
+	here := m.here()
+	if len(here) != len(tabs)+len(m.appActions("blog")) {
+		t.Fatalf("on an app here are its sections and actions, got %d", len(here))
 	}
-	if strings.Join(names, ",") != "Go to,blog,Do" {
-		t.Fatalf("in an app the menu has its views and actions, got %v", names)
+	keys := map[string]string{}
+	for i, e := range here {
+		if hs[i].e.title != e.title {
+			t.Fatalf("what is here comes first: row %d is %q, want %q", i, hs[i].e.title, e.title)
+		}
+		if e.key == "" {
+			t.Errorf("%q shows no key", e.title)
+		}
+		if other, ok := keys[e.key]; ok {
+			t.Errorf("key %q is %q and %q", e.key, other, e.title)
+		}
+		keys[e.key] = e.title
 	}
-	seen := map[string]string{}
-	for _, g := range groups {
-		for _, it := range g.items {
-			if other, ok := seen[it.key]; ok {
-				t.Errorf("key %q is %q and %q", it.key, other, it.label)
-			}
-			seen[it.key] = it.label
+	// the key it shows does the same without the palette
+	if direct := press(m, "esc", "m"); direct.cur.tab != tMetrics {
+		t.Fatal("m opens the metrics")
+	}
+	frame := checkFrame(t, "palette in app", m)
+	for _, want := range []string{"blog metrics", "redeploy blog", "section", "action"} {
+		if !strings.Contains(frame, want) {
+			t.Errorf("the palette in an app lacks %q:\n%s", want, frame)
 		}
 	}
-	m = press(m, "m")
-	if m.cur.tab != tMetrics || m.menuOn {
-		t.Fatalf("space m opens the metrics, got %+v", m.cur)
+	at := 0
+	for i, h := range hs {
+		if h.e.title == "redeploy blog" {
+			at = i
+		}
 	}
-	m = press(m, "space", "R")
-	if m.ask == nil || !strings.Contains(m.ask.title, "Redeploy blog") {
-		t.Fatal("space R asks before it redeploys")
+	for range at {
+		m = press(m, "down")
+	}
+	m = press(m, "enter")
+	if m.pick != nil || m.ask == nil || !strings.Contains(m.ask.title, "Redeploy blog") {
+		t.Fatal("enter on redeploy blog asks before it redeploys")
+	}
+	m = press(fixture(120, 40), "s", "enter", "space")
+	if hs := m.hits(); len(hs) < 2 || hs[0].e.title != "update the agent on web-1" || hs[0].e.key != "u" {
+		t.Fatalf("on a server its actions come first, got %v", titles(hs))
 	}
 }
 
@@ -207,7 +209,7 @@ func TestPickerFiltersAndJumps(t *testing.T) {
 	m := press(fixture(120, 40), "ctrl+k")
 	all := m.hits()
 	for _, h := range all {
-		if h.e.kind != "app" && h.e.kind != "server" && h.e.kind != "view" {
+		if h.e.kind != "app" && h.e.kind != "server" && h.e.kind != "place" && h.e.kind != "keys" {
 			t.Fatalf("without a query the list shows places only, got %s %q", h.e.kind, h.e.title)
 		}
 	}
@@ -565,20 +567,6 @@ func TestPasteGoesIntoTheOpenInput(t *testing.T) {
 	}
 }
 
-func TestAssignKeysGivesEveryNameOne(t *testing.T) {
-	keys := assignKeys([]string{"shop", "shop-2", "s", "ss", "api"})
-	seen := map[string]bool{}
-	for _, k := range keys {
-		if seen[k] {
-			t.Errorf("key %q twice in %v", k, keys)
-		}
-		seen[k] = true
-	}
-	if keys["shop"] != "s" || keys["api"] != "a" {
-		t.Errorf("first letters first: %v", keys)
-	}
-}
-
 func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 	m := press(fixture(120, 40), "ctrl+k", "l", "o", "g", "s", "space", "b", "l", "o", "g")
 	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
@@ -599,8 +587,8 @@ func TestSearchTakesWordsInAnyOrderAndRemembersPicks(t *testing.T) {
 	if hs := m.hits(); len(hs) == 0 || hs[0].e.title != "blog logs" {
 		t.Fatalf("without a query the last pick comes first, got %v", titles(hs))
 	}
-	if n := len(m.hits()); n != len(m.apps)+len(m.servers)+4+1 {
-		t.Errorf("recent, then the apps, servers and views, each once: %d", n)
+	if n := len(m.hits()); n != 1+len(m.apps)+len(m.servers)+len(m.places()) {
+		t.Errorf("recent, then the apps, servers and places, each once: %d", n)
 	}
 	for i := range 12 {
 		m = m.remember(fmt.Sprint("x", i))
@@ -618,7 +606,7 @@ func TestHelpShowsEveryKeyOfThePlaceAndScrolls(t *testing.T) {
 			t.Errorf("the keys of an app lack %q", a.label)
 		}
 	}
-	for _, want := range []string{"Env", "set KEY=value", "all in $EDITOR", "Tabs", "metrics", "Everywhere", "space space"} {
+	for _, want := range []string{"Env", "set KEY=value", "all in $EDITOR", "Tabs", "metrics", "Everywhere", "the palette"} {
 		if !strings.Contains(frame, want) {
 			t.Errorf("the keys lack %q", want)
 		}
@@ -670,27 +658,54 @@ func TestTheWheelScrollsAndAClickOpensATab(t *testing.T) {
 	}
 }
 
-func TestSpaceSpaceSearches(t *testing.T) {
-	m := press(fixture(120, 40), "space")
-	_, groups := m.menuGroups()
-	if first := groups[0].items[0]; first.key != "space" || first.label != "search" {
-		t.Fatalf("the menu starts with space search, got %q %q", first.key, first.label)
-	}
-	m = press(m, "space")
-	if m.menuOn || m.pick == nil {
-		t.Fatalf("space space opens the search: menu %v, search %v", m.menuOn, m.pick != nil)
-	}
-	m = press(m, "esc", "space", "a", "space")
-	if m.menuOn || m.pick == nil {
-		t.Fatal("space searches from a submenu too")
-	}
-	for _, k := range []string{"ctrl+k", "/"} {
+func TestSpaceCtrlKAndSlashOpenThePaletteInTheMiddle(t *testing.T) {
+	for _, k := range []string{"space", "ctrl+k", "/"} {
 		if press(fixture(120, 40), k).pick == nil {
-			t.Errorf("%s opens the search", k)
+			t.Errorf("%s opens the palette", k)
 		}
 	}
-	frame := checkFrame(t, "menu", press(fixture(120, 40), "space"))
-	if !strings.Contains(frame, "space  search") {
-		t.Errorf("the menu shows space  search:\n%s", frame)
+	if m := press(fixture(120, 40), "space", "space"); m.pick == nil || m.pick.query != "" {
+		t.Error("space space opens the palette and types nothing")
+	}
+	if m := press(fixture(120, 40).withApp("shop", tLogs), "/"); m.pick != nil || m.prompt == nil {
+		t.Error("/ in the logs filters them")
+	}
+	if m := press(fixture(120, 40), "ctrl+k", "s", "h", "o", "p", "space", "l"); m.pick.query != "shop l" {
+		t.Errorf("space types a space once something is typed, got %q", m.pick.query)
+	}
+	for _, size := range [][2]int{{80, 24}, {120, 40}} {
+		for _, pal := range []palette{dark, light} {
+			m := fixture(size[0], size[1]).withApp("shop", tDeploys)
+			m.pal = pal
+			frame := strings.Split(checkFrame(t, "palette", press(m, "space")), "\n")
+			top, bottom, left, right := -1, -1, -1, -1
+			// the palette is the only box that starts below the header and
+			// is not as wide as the screen
+			for y, l := range frame {
+				r := []rune(l)
+				x, end := slices.Index(r, '╭'), slices.Index(r, '╮')
+				if top < 0 && y > 1 && x > margin && end > x {
+					top, left, right = y, x, len(r)-1-end
+				}
+				if top >= 0 && bottom < 0 && left >= 0 && left < len(r) && r[left] == '╰' {
+					bottom = y
+				}
+			}
+			if top < 0 || bottom < 0 {
+				t.Fatalf("no palette box at %dx%d:\n%s", size[0], size[1], strings.Join(frame, "\n"))
+			}
+			above, below := top, len(frame)-1-bottom
+			if d := above - below; d < -1 || d > 1 {
+				t.Errorf("at %dx%d the palette is not in the middle: %d lines above, %d below", size[0], size[1], above, below)
+			}
+			if d := left - right; d < -1 || d > 1 {
+				t.Errorf("at %dx%d the palette is not in the middle: %d columns left, %d right", size[0], size[1], left, right)
+			}
+			for _, want := range []string{"apps, servers, places, actions", "shop logs", "enter run", "esc close"} {
+				if !strings.Contains(strings.Join(frame, "\n"), want) {
+					t.Errorf("at %dx%d the palette lacks %q", size[0], size[1], want)
+				}
+			}
+		}
 	}
 }
