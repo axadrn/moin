@@ -147,7 +147,7 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 	f.add(t, model.AlertWebhook, "hook", f.url+"/hook", "")
 	f.add(t, model.AlertWebhook, "deploys-only", f.url+"/deploys", "", "deploy.failed")
 	at := time.Date(2026, 11, 4, 3, 0, 0, 0, time.UTC)
-	backups := "https://moin.example.com/app/owner-workspace/apps/shop/backups"
+	backups := "https://moin.example.com/app/owner-workspace/apps/shop/data"
 	servers := "https://moin.example.com/app/owner-workspace/servers"
 
 	f.alerts.Send(owner.WorkspaceID, "backup.failed", "shop", map[string]string{"database": "postgres-db", "error": "continuous backup: <denied> & co"}, at)
