@@ -142,7 +142,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}", toOverview)
 	mux.HandleFunc("GET /app/{workspaceSlug}/overview", workspace(overview.Page))
-	mux.HandleFunc("GET /app/{workspaceSlug}/search", workspace(handler.NewCommandHandler(app.AppService, app.ServerService).Search))
+	mux.HandleFunc("GET /app/{workspaceSlug}/search", workspace(handler.NewCommandHandler(app.AppService, app.ServerService, app.DocsService).Search))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.Home))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/account", workspace(settings.SettingsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/github", workspace(settings.GitHub))

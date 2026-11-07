@@ -1,27 +1,27 @@
 package layouts
 
-import "github.com/axadrn/moin/controlplane/internal/ui/components/kbd"
 
 // AppShortcuts is the dialog ? opens: every key of the panel, the same as
 // in the terminal UI.
 templ AppShortcuts() {
-	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop:bg-black/30 backdrop:backdrop-blur-sm">
-		<h2 id="app-shortcuts-title" class="text-base font-medium">Keyboard shortcuts</h2>
-		<p class="mt-1 text-sm text-muted-foreground">Anywhere in the panel, unless you are typing. The same as in the terminal UI.</p>
+	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop:bg-black/30">
+		<h2 id="app-shortcuts-title" class="text-base font-medium">Keys</h2>
 		<dl class="mt-5 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 text-sm">
-			@shortcut([]string{"/"}, "Search, or run anything")
-			@shortcut([]string{"⌘", "K"}, "The same")
+			@shortcut([]string{"⌘", "K"}, "The palette: find and do anything")
+			@shortcut([]string{"/"}, "The same")
+			@shortcut([]string{"Ctrl", "J"}, "In the palette: down (Ctrl K up)")
+			@shortcut([]string{"J", "K"}, "Down and up a list, Enter opens")
+			@shortcut([]string{"G", "G"}, "To the top (Shift G to the end)")
+			@shortcut([]string{"-"}, "One level up")
 			@shortcut([]string{"G", "H"}, "Overview")
 			@shortcut([]string{"G", "S"}, "Servers")
-			@shortcut([]string{"G", "Y"}, "Activity")
 			@shortcut([]string{"G", ","}, "Settings")
-			@shortcut([]string{"D", "O", "L", "B", "E"}, "On an app: Deploys, Addresses, Logs, Data, Settings")
-			@shortcut([]string{"Space"}, "What you can do here")
+			@shortcut([]string{"D", "O", "L", "B", "E"}, "On an app: Deploys, Domains, Logs, Data, Settings")
 			@shortcut([]string{"?"}, "This list")
 			@shortcut([]string{"Esc"}, "Close, or leave a field")
 		</dl>
 		<form method="dialog" class="mt-6 flex justify-end">
-			<button class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Done</button>
+			<button class="h-11 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground">Done</button>
 		</form>
 	</dialog>
 }
@@ -29,9 +29,7 @@ templ AppShortcuts() {
 templ shortcut(keys []string, label string) {
 	<dt class="flex gap-1">
 		for _, key := range keys {
-			@kbd.Kbd() {
-				{ key }
-			}
+			<kbd class="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-muted px-1.5 font-sans text-xs text-muted-foreground">{ key }</kbd>
 		}
 	</dt>
 	<dd class="text-muted-foreground">{ label }</dd>

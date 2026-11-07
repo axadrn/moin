@@ -60,7 +60,7 @@ templ palette(basePath string) {
 					aria-controls="search-results"
 					aria-autocomplete="list"
 					hx-get={ basePath + "/search" }
-					hx-include="#search-here"
+					hx-include="#search-here, #search-recent"
 					hx-trigger="input changed delay:80ms, focus"
 					hx-target="#search-results"
 					hx-swap="innerHTML"
@@ -68,6 +68,7 @@ templ palette(basePath string) {
 					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
 				/>
 				<input type="hidden" id="search-here" name="here" value=""/>
+				<input type="hidden" id="search-recent" name="recent" value=""/>
 			</div>
 			<div
 				id="search-results"

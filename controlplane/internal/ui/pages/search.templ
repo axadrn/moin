@@ -1,114 +1,189 @@
 package pages
 
 import (
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/axadrn/moin/internal/find"
 
 	"github.com/axadrn/moin/controlplane/internal/model"
 	"github.com/axadrn/moin/controlplane/internal/service"
 	"github.com/axadrn/moin/controlplane/internal/ui/components/icon"
 )
 
-// SearchItem is one answer of the search in the bar: a place to go to, or
-// an action that posts after a confirm.
+// SearchItem is one answer of the palette: a page to go to, or something to
+// do. Where is the way to it, shown small under the title like a path
+// ("shop › Settings"); the palette matches the title and where together.
 type SearchItem struct {
 	Group string
 	Title string
-	Hint  string
-	// Key is the key that does the same without the search.
-	Key   string
-	Icon  func(...icon.Props) templ.Component
-	Href  string
-	// Post, with Confirm and Accept, makes the item an action.
+	Where string
+	// Key is the key that does the same without the palette.
+	Key  string
+	Icon func(...icon.Props) templ.Component
+	Href string
+	// External opens Href in a new tab, like the app's own site.
+	External bool
+	// Post makes the item an action. Confirm, with Accept, asks first; it
+	// is empty for what is harmless (DESIGN.md, Asking first).
 	Post    string
 	Confirm string
 	Accept  string
 }
 
-// SearchInput is what the search knows about the workspace.
+// ID is what the palette remembers an item by, for Recent.
+func (item SearchItem) ID() string {
+	if item.Post != "" {
+		return "post " + item.Post
+	}
+	return item.Href
+}
+
+// SearchDoc is a page of the docs the palette can open.
+type SearchDoc struct {
+	Title string
+	Group string
+	Href  string
+}
+
+// SearchInput is what the palette knows about the workspace.
 type SearchInput struct {
 	Base string
-	// Here is the app the page is about, for the "Here" answers.
+	// Here is the app the page is about, for "On this page".
 	Here      string
 	Apps      []model.App
 	Servers   []model.Server
 	Buckets   []service.Bucket
+	Docs      []SearchDoc
 	CanChange bool
 	IsOwner   bool
+	GitHub    bool
 }
 
-// SearchItems is everything the search can find, in the order it lists
-// them: apps first, then servers, places, and what you can do.
+// The groups of the palette, in the order it shows them.
+const (
+	groupHere    = "On this page"
+	groupRecent  = "Recent"
+	groupApps    = "Apps"
+	groupServers = "Servers"
+	groupPages   = "Pages"
+	groupActions = "Actions"
+	groupDocs    = "Docs"
+)
+
+// SearchItems is everything the palette can find: every page that has its
+// own address, every app and server, what you can do with them, and the
+// docs.
 func SearchItems(in SearchInput) []SearchItem {
 	items := []SearchItem{}
 	for _, app := range in.Apps {
-		items = append(items, SearchItem{Group: "Apps", Title: app.Name, Hint: app.ServerName, Icon: icon.Box, Href: in.Base + "/apps/" + app.Name})
+		items = append(items, SearchItem{Group: groupApps, Title: app.Name, Where: app.ServerName, Icon: icon.Box, Href: in.Base + "/apps/" + app.Name})
 	}
 	for _, server := range in.Servers {
-		items = append(items, SearchItem{Group: "Servers", Title: server.Name, Icon: icon.Server, Href: in.Base + "/servers/" + server.ID + "/security"})
+		path := in.Base + "/servers/" + server.ID
+		items = append(items,
+			SearchItem{Group: groupServers, Title: server.Name, Where: "Servers", Icon: icon.Server, Href: path + "/security"},
+			SearchItem{Group: groupPages, Title: "Security", Where: server.Name, Icon: icon.Shield, Href: path + "/security"},
+			SearchItem{Group: groupPages, Title: "Metrics", Where: server.Name, Icon: icon.Activity, Href: path + "/metrics"},
+		)
 	}
-	for _, bucket := range in.Buckets {
-		items = append(items, SearchItem{Group: "Buckets", Title: bucket.Name, Icon: icon.Archive, Href: in.Base + "/bucket"})
+	for _, app := range in.Apps {
+		path := in.Base + "/apps/" + app.Name
+		for _, section := range appSections[1:] {
+			items = append(items, SearchItem{Group: groupPages, Title: section.Label, Where: app.Name, Key: strings.ToUpper(section.Key), Icon: sectionIcon(section.ID), Href: path + section.Path})
+		}
+		items = append(items, SearchItem{Group: groupPages, Title: "Metrics", Where: app.Name, Icon: icon.Activity, Href: path + "/metrics"})
 	}
 	places := []SearchItem{
 		{Title: "Overview", Key: "G H", Icon: icon.Gauge, Href: in.Base + "/overview"},
 		{Title: "Apps", Key: "G A", Icon: icon.Boxes, Href: in.Base + "/apps"},
-		{Title: "New app", Hint: "deploy something new", Icon: icon.Plus, Href: in.Base + "/apps/new"},
+		{Title: "New app", Where: "Apps", Icon: icon.Plus, Href: in.Base + "/apps/new"},
+		{Title: "Catalog", Where: "Apps › New app", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
 		{Title: "Servers", Key: "G S", Icon: icon.Server, Href: in.Base + "/servers"},
-		{Title: "Catalog", Hint: "47 apps in one click", Icon: icon.LayoutGrid, Href: in.Base + "/catalog"},
-		{Title: "Buckets", Key: "G B", Icon: icon.Archive, Href: in.Base + "/bucket"},
-		{Title: "Activity", Key: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
-		{Title: "Team", Key: "G T", Icon: icon.Users, Href: in.Base + "/workspace"},
-		{Title: "Alerts", Key: "G L", Icon: icon.Bell, Href: in.Base + "/alerts"},
 		{Title: "Settings", Key: "G ,", Icon: icon.Settings, Href: in.Base + "/settings"},
+		{Title: "Team", Where: "Settings", Key: "G T", Icon: icon.Users, Href: in.Base + "/workspace"},
+		{Title: "Alerts", Where: "Settings", Key: "G L", Icon: icon.Bell, Href: in.Base + "/alerts"},
+		{Title: "Bucket", Where: "Settings", Key: "G B", Icon: icon.Archive, Href: in.Base + "/bucket"},
+		{Title: "Activity", Where: "Settings", Key: "G Y", Icon: icon.Activity, Href: in.Base + "/activity"},
+		{Title: "Account", Where: "Settings", Icon: icon.User, Href: in.Base + "/settings/account"},
+		{Title: "Security", Where: "Settings › Account", Icon: icon.Shield, Href: in.Base + "/settings/account?tab=security"},
+		{Title: "Tokens", Where: "Settings › Account", Icon: icon.Key, Href: in.Base + "/settings/account?tab=tokens"},
+	}
+	if in.GitHub {
+		places = append(places, SearchItem{Title: "GitHub", Where: "Settings", Icon: icon.Github, Href: in.Base + "/settings/github"})
 	}
 	if in.IsOwner {
-		places = append(places, SearchItem{Title: "Billing", Hint: "your plan", Icon: icon.CreditCard, Href: in.Base + "/billing"})
+		places = append(places, SearchItem{Title: "Billing", Where: "Settings", Icon: icon.CreditCard, Href: in.Base + "/billing"})
 	}
 	for _, place := range places {
-		place.Group = "Go to"
+		place.Group = groupPages
 		items = append(items, place)
 	}
 	for _, app := range in.Apps {
-		path := in.Base + "/apps/" + app.Name
-		items = append(items, SearchItem{Group: "Do", Title: "Logs of " + app.Name, Icon: icon.ScrollText, Href: path + "/logs"})
-		if !in.CanChange {
-			continue
-		}
-		if app.LatestNumber > 0 {
-			items = append(items,
-				SearchItem{Group: "Do", Title: "Deploy " + app.Name, Hint: "build the newest source", Icon: icon.Rocket, Post: path + "/redeploy", Confirm: "Build the newest source of " + app.Name + " again and release it?", Accept: "Deploy"},
-				SearchItem{Group: "Do", Title: "Restart " + app.Name, Hint: "no build", Icon: icon.RotateCw, Post: path + "/restart", Confirm: "Start the live release of " + app.Name + " again? No build, the env and domains as they are now.", Accept: "Restart"},
-			)
-		}
-		if app.LiveNumber > 1 {
-			items = append(items, SearchItem{Group: "Do", Title: "Roll back " + app.Name, Hint: "to v" + strconv.Itoa(app.LiveNumber-1), Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Release the version of " + app.Name + " before the live one again?", Accept: "Roll back"})
-		}
-		items = append(items, SearchItem{Group: "Do", Title: "Back up " + app.Name + " now", Icon: icon.DatabaseBackup, Href: path + "/backups"})
+		items = append(items, paletteActions(in, app)...)
+	}
+	for _, doc := range in.Docs {
+		items = append(items, SearchItem{Group: groupDocs, Title: doc.Title, Where: "Docs › " + doc.Group, Icon: icon.BookOpen, Href: doc.Href})
 	}
 	return items
 }
 
-// HereItems are what you can do on the page you are on: the sections and the
-// actions of its app, with their keys. The palette lists them first when
-// nothing is typed.
+// paletteActions are what you can do with an app from anywhere. Harmless
+// ones run at once; rolling back asks first (DESIGN.md, Asking first).
+// Switches and values are not here: the palette cannot show what they are
+// now, so they stay on their pages.
+func paletteActions(in SearchInput, app model.App) []SearchItem {
+	path := in.Base + "/apps/" + app.Name
+	var items []SearchItem
+	for _, domain := range appAddresses(app) {
+		items = append(items, SearchItem{Group: groupActions, Title: "Open " + domain, Where: app.Name, Icon: icon.ExternalLink, Href: "https://" + domain, External: true})
+		break
+	}
+	if !in.CanChange {
+		return items
+	}
+	if app.Stopped {
+		return append(items, SearchItem{Group: groupActions, Title: "Start " + app.Name, Where: app.Name, Icon: icon.Play, Post: path + "/start"})
+	}
+	if app.LatestNumber > 0 {
+		items = append(items, SearchItem{Group: groupActions, Title: "Deploy " + app.Name, Where: app.Name, Key: "R", Icon: icon.Rocket, Post: path + "/redeploy"})
+	}
+	if app.LiveNumber > 0 {
+		items = append(items, SearchItem{Group: groupActions, Title: "Restart " + app.Name, Where: app.Name, Key: "T", Icon: icon.RotateCw, Post: path + "/restart"})
+	}
+	if app.LiveNumber > 1 {
+		items = append(items, SearchItem{Group: groupActions, Title: "Roll back " + app.Name, Where: app.Name + " › to v" + strconv.Itoa(app.LiveNumber-1), Key: "P", Icon: icon.Undo2, Post: path + "/rollback", Confirm: "Roll back " + app.Name + " to v" + strconv.Itoa(app.LiveNumber-1) + "? It runs that deploy again.", Accept: "Roll back"})
+	}
+	return items
+}
+
+func sectionIcon(id string) func(...icon.Props) templ.Component {
+	switch id {
+	case "deploys":
+		return icon.Rocket
+	case "addresses":
+		return icon.Globe
+	case "logs":
+		return icon.ScrollText
+	case "data":
+		return icon.Database
+	}
+	return icon.Settings
+}
+
+// HereItems are what goes with the page you are on: the sections and the
+// actions of its app, first when nothing is typed.
 func HereItems(in SearchInput) []SearchItem {
 	for _, app := range in.Apps {
 		if app.Name != in.Here {
 			continue
 		}
-		path := in.Base + "/apps/" + app.Name
-		group := "Here · " + app.Name
-		items := []SearchItem{
-			{Group: group, Title: "Deploys", Key: "D", Icon: icon.Rocket, Href: path + "/deploys"},
-			{Group: group, Title: "Addresses", Key: "O", Icon: icon.Globe, Href: path + "/addresses"},
-			{Group: group, Title: "Logs", Key: "L", Icon: icon.ScrollText, Href: path + "/logs"},
-			{Group: group, Title: "Data", Key: "B", Icon: icon.Database, Href: path + "/data"},
-			{Group: group, Title: "Settings", Key: "E", Icon: icon.Settings, Href: path + "/settings"},
-		}
+		var items []SearchItem
 		for _, item := range SearchItems(SearchInput{Base: in.Base, Apps: []model.App{app}, CanChange: in.CanChange}) {
-			if item.Group == "Do" && item.Href != path+"/logs" {
-				item.Group = group
+			if item.Group == groupPages || item.Group == groupActions {
+				item.Group = groupHere
 				items = append(items, item)
 			}
 		}
@@ -117,42 +192,93 @@ func HereItems(in SearchInput) []SearchItem {
 	return nil
 }
 
-// MatchSearch keeps the items that have every word of the query, at most
-// limit of them. An empty query lists the apps, servers and places.
-func MatchSearch(items []SearchItem, query string, limit int) []SearchItem {
-	words := strings.Fields(strings.ToLower(query))
-	found := []SearchItem{}
+// MatchSearch is the palette's answer to query. Typed, it is every item
+// that matches (find.Name, the same matching as the terminal UI), the best
+// first, those picked often and lately (recent, the IDs best first) lifted,
+// grouped in the order of their best answer, the docs last and at most
+// three of them. Not typed, it is what goes with this page (here), the
+// recent picks, then the apps and the places.
+func MatchSearch(items []SearchItem, here []SearchItem, recent []string, query string, limit int) []SearchItem {
+	byID := map[string]SearchItem{}
 	for _, item := range items {
-		if len(words) == 0 && item.Group == "Do" {
-			continue
-		}
-		text := strings.ToLower(item.Title + " " + item.Group)
-		all := true
-		for _, word := range words {
-			if !strings.Contains(text, word) {
-				all = false
-				break
-			}
-		}
-		if all {
-			found = append(found, item)
-		}
-		if len(found) == limit {
-			break
+		if _, ok := byID[item.ID()]; !ok {
+			byID[item.ID()] = item
 		}
 	}
-	return found
+	if strings.TrimSpace(query) == "" {
+		out := slices.Clone(here)
+		seen := map[string]bool{}
+		for _, item := range here {
+			seen[item.ID()] = true
+		}
+		for _, id := range recent {
+			if item, ok := byID[id]; ok && !seen[id] && len(out) < len(here)+5 {
+				item.Group = groupRecent
+				out = append(out, item)
+				seen[id] = true
+			}
+		}
+		for _, item := range items {
+			if (item.Group == groupApps || (item.Group == groupPages && item.Where == "")) && !seen[item.ID()] {
+				out = append(out, item)
+				seen[item.ID()] = true
+			}
+		}
+		return out[:min(len(out), limit+len(here))]
+	}
+	type hit struct {
+		item  SearchItem
+		score int
+	}
+	var hits []hit
+	for _, item := range items {
+		m, ok := find.Name(query, item.Title+" "+item.Where)
+		if !ok {
+			continue
+		}
+		score := m.Score
+		if i := slices.Index(recent, item.ID()); i >= 0 {
+			score += 20 - min(i, 19)
+		}
+		hits = append(hits, hit{item, score})
+	}
+	sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
+	var order []string
+	byGroup := map[string][]SearchItem{}
+	docs := 0
+	for _, h := range hits {
+		if h.item.Group == groupDocs {
+			if docs == 3 {
+				continue
+			}
+			docs++
+		}
+		if _, ok := byGroup[h.item.Group]; !ok && h.item.Group != groupDocs {
+			order = append(order, h.item.Group)
+		}
+		byGroup[h.item.Group] = append(byGroup[h.item.Group], h.item)
+	}
+	order = append(order, groupDocs)
+	out := []SearchItem{}
+	for _, group := range order {
+		for _, item := range byGroup[group] {
+			if len(out) < limit || group == groupDocs {
+				out = append(out, item)
+			}
+		}
+	}
+	return out
 }
 
-// SearchResults is the list under the search field. The first answer is
-// picked, so Enter opens it.
+// SearchResults is the list of the palette. The first answer is picked, so
+// Enter opens it.
 templ SearchResults(items []SearchItem, query string) {
 	if len(items) == 0 {
 		<p class="px-4 py-6 text-center text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
 	}
 	for i, item := range items {
 		if i == 0 || items[i-1].Group != item.Group {
-			<div class="px-3 pt-2.5 pb-1 text-xs font-medium text-muted-foreground" role="presentation">{ item.Group }</div>
+			<div class="px-3 pt-3 pb-1 text-xs font-medium text-muted-foreground" role="presentation">{ item.Group }</div>
 		}
 		if item.Post != "" {
 			<button
@@ -163,8 +289,11 @@ templ SearchResults(items []SearchItem, query string) {
 				class={ searchOptionClass }
 				hx-post={ item.Post }
 				hx-swap="none"
-				hx-confirm={ item.Confirm }
-				data-confirm-action={ item.Accept }
+				if item.Confirm != "" {
+					hx-confirm={ item.Confirm }
+					data-confirm-action={ item.Accept }
+				}
+				data-pick={ item.ID() }
 			>
 				@searchOption(item)
 			</button>
@@ -174,7 +303,12 @@ templ SearchResults(items []SearchItem, query string) {
 				role="option"
 				aria-selected={ strconv.FormatBool(i == 0) }
 				href={ templ.SafeURL(item.Href) }
+				if item.External {
+					target="_blank"
+					rel="noopener"
+				}
 				class={ searchOptionClass }
+				data-pick={ item.ID() }
 			>
 				@searchOption(item)
 			</a>
@@ -183,16 +317,20 @@ templ SearchResults(items []SearchItem, query string) {
 }
 
 // Only the picked answer is lit; the mouse picks too (moin.js).
-const searchOptionClass = "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm outline-none aria-selected:bg-muted"
+const searchOptionClass = "flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm outline-none aria-selected:bg-muted"
 
+// searchOption is one answer: its icon, its title with where it is under
+// it, and its key.
 templ searchOption(item SearchItem) {
-	<span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted [&_svg]:size-4">
+	<span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted [&_svg]:size-4">
 		@item.Icon()
 	</span>
-	<span class="min-w-0 flex-1 truncate font-medium">{ item.Title }</span>
-	if item.Hint != "" {
-		<span class="shrink-0 truncate text-sm text-muted-foreground">{ item.Hint }</span>
-	}
+	<span class="flex min-w-0 flex-1 flex-col">
+		<span class="truncate font-medium">{ item.Title }</span>
+		if item.Where != "" {
+			<span class="truncate text-xs text-muted-foreground">{ item.Where }</span>
+		}
+	</span>
 	if item.Key != "" {
 		<kbd class="shrink-0 rounded-md bg-muted px-1.5 font-mono text-xs text-muted-foreground">{ item.Key }</kbd>
 	}

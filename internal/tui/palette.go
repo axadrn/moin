@@ -5,6 +5,7 @@ package tui
 // with the key that does the same without it. Like ⌘K in the web app.
 
 import (
+	"github.com/axadrn/moin/internal/find"
 	"slices"
 	"sort"
 	"strings"
@@ -134,105 +135,13 @@ type hit struct {
 	pos   []int
 }
 
-// fuzzy scores q as a subsequence of s: runs and word starts win. pos are
-// the rune positions that matched.
-func fuzzy(q, s string) (int, []int, bool) {
-	q = strings.ToLower(strings.TrimSpace(q))
-	if q == "" {
-		return 0, nil, true
-	}
-	rs := []rune(strings.ToLower(s))
-	var pos []int
-	score, prev, j := 0, -2, 0
-	qr := []rune(q)
-	for i := 0; i < len(rs) && j < len(qr); i++ {
-		if qr[j] == ' ' {
-			j++
-			if j >= len(qr) {
-				break
-			}
-		}
-		if rs[i] != qr[j] {
-			continue
-		}
-		pos = append(pos, i)
-		score++
-		if i == prev+1 {
-			score += 5
-		}
-		if i == 0 || strings.ContainsRune(" -_./", rs[i-1]) {
-			score += 8
-		}
-		prev = i
-		j++
-	}
-	for j < len(qr) && qr[j] == ' ' {
-		j++
-	}
-	if j < len(qr) {
-		return 0, nil, false
-	}
-	if strings.Contains(string(rs), q) {
-		score += 25
-	}
-	if strings.HasPrefix(string(rs), q) {
-		score += 10
-	}
-	score -= len(rs) / 4
-	return score, pos, true
-}
-
-// match scores q against s like fuzzy, but the words of q may also come
-// in any order, each in another word of s: "logs shop" finds "shop logs".
-// The order as typed always ranks first.
+// match scores q against s: find.Name, the same matching as the web
+// palette. pos are the rune positions that matched.
 func match(q, s string) (int, []int, bool) {
-	if sc, pos, ok := fuzzy(q, s); ok {
-		return sc + 100, pos, true
-	}
-	words := strings.Fields(q)
-	if len(words) < 2 {
-		return 0, nil, false
-	}
-	// the words of s with the rune index each starts at
-	type part struct {
-		text string
-		at   int
-	}
-	var parts []part
-	at := 0
-	for _, f := range strings.Split(s, " ") {
-		if f != "" {
-			parts = append(parts, part{f, at})
-		}
-		at += len([]rune(f)) + 1
-	}
-	used := make([]bool, len(parts))
-	total := 0
-	var pos []int
-	for _, w := range words {
-		best, bestScore := -1, 0
-		var bestPos []int
-		for i, p := range parts {
-			if used[i] {
-				continue
-			}
-			if sc, ps, ok := fuzzy(w, p.text); ok && (best < 0 || sc > bestScore) {
-				best, bestScore, bestPos = i, sc, ps
-			}
-		}
-		if best < 0 {
-			return 0, nil, false
-		}
-		used[best] = true
-		total += bestScore
-		for _, p := range bestPos {
-			pos = append(pos, parts[best].at+p)
-		}
-	}
-	return total, pos, true
+	m, ok := find.Name(q, s)
+	return m.Score, m.Positions, ok
 }
 
-// recentMax is how many picks the palette remembers.
 const recentMax = 8
 
 // remember puts a pick first in the recent ones.
