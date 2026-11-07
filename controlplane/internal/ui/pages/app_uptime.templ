@@ -28,7 +28,7 @@ templ AppUptime(view UptimeView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Name }}
 	@layouts.App(view.App.Name + " uptime") {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
-			@kit.Header(kit.Back{Label: view.App.Name, Href: appPath + "/addresses"}, "Uptime")
+			@kit.Header(kit.Back{Label: "Domains", Href: appPath + "/addresses"}, "Uptime")
 			<div id="app-uptime" class="flex flex-col gap-6">
 				@uptimeServerOffline(view)
 				if len(view.Uptime.Domains) == 0 {
@@ -99,12 +99,12 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 					<div data-outages>
 						@kit.List() {
 							for _, outage := range domain.Outages {
-								<div role="listitem" class={ routingRow } data-outage={ stamp(outage.StartedAt) }>
+								@kit.RowAttrs("", templ.Attributes{"data-outage": stamp(outage.StartedAt)}) {
 									<div class="min-w-0 flex-1">
 										<div class="font-medium tabular-nums" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
 										<div class="text-sm text-muted-foreground">{ outageText(outage, view.Now) }</div>
 									</div>
-								</div>
+								}
 							}
 						}
 					</div>
@@ -117,9 +117,8 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 
 // uptimeFact is a row with a number on the right and what it means.
 templ uptimeFact(label, value, note string) {
-	@kit.Row("") {
-		@kit.RowText(label, note)
-		<span class="shrink-0 text-sm tabular-nums">{ value }</span>
+	@kit.RowFact(label, note) {
+		{ value }
 	}
 }
 
@@ -150,18 +149,20 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/check" }}
 	{{ id := "uptime-" + domain.Domain }}
 	@kit.List() {
-		<form role="listitem" class={ routingFieldRow } hx-post={ action } hx-target="#app-uptime" hx-select="#app-uptime" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-uptime-path-form={ domain.Domain }>
+		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
 			@csrf.Token()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
-			@kit.Field("Path", id+"-path", "") {
-				@kit.Inline() {
-					@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"})
-					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
-						Save
+			<div class="min-w-0 flex-1 pb-2">
+				@kit.Field("Path", id+"-path", "") {
+					@kit.Inline() {
+						@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"})
+						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+							Save
+						}
 					}
 				}
-			}
-		</form>
+			</div>
+		}
 		@UptimeSwitchForm(app, domain)
 	}
 }
@@ -170,12 +171,12 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	<form id={ id + "-form" } role="listitem" class={ routingRow } hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on" } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
+	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
 		@csrf.Token()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
-		<label for={ id + "-on" } class="min-w-0 flex-1 cursor-pointer font-medium">Check every minute</label>
+		@kit.RowLabel(id+"-on", "Check every minute", "")
 		@kit.Switch(templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused})
-	</form>
+	}
 }
 
 // uptimeNote is the uptime of a domain in a few words, for its row.

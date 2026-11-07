@@ -81,8 +81,8 @@ templ ActivityRows(view ActivityView) {
 	{{ now := time.Now() }}
 	for _, event := range view.Events {
 		{{ details := event.Details() }}
-		<div role="listitem" data-event={ event.Action } class="relative flex items-start gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden">
-			<span class="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+		@kit.RowAttrs("", templ.Attributes{"data-event": event.Action}) {
+			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
 				@activityIcon(event.Action)
 			</span>
 			<div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -109,8 +109,8 @@ templ ActivityRows(view ActivityView) {
 					}
 				</p>
 			</div>
-			<span class="mt-1 shrink-0 text-xs text-muted-foreground tabular-nums">{ ago(event.CreatedAt, now) }</span>
-		</div>
+			<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ ago(event.CreatedAt, now) }</span>
+		}
 	}
 	if view.Next != "" {
 		@kit.RowButton(false, templ.Attributes{"id": "activity-more", "hx-get": ctxkeys.AppBasePath(ctx) + "/activity" + view.query(view.Next), "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "this"}) {

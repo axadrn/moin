@@ -89,7 +89,7 @@ templ SettingsHome(view SettingsHomeView) {
 			}
 			@kit.Section("moin", nil) {
 				@kit.List() {
-					<div role="listitem" class="relative flex min-h-16 flex-wrap items-center gap-3 px-5 py-3">
+					@kit.RowControl(nil) {
 						<span class="flex-1 font-medium">Appearance</span>
 						<div class="flex h-11 items-center gap-1 rounded-full bg-muted p-1" role="group" aria-label="Appearance">
 							for _, theme := range []string{"system", "light", "dark"} {
@@ -98,7 +98,7 @@ templ SettingsHome(view SettingsHomeView) {
 								</button>
 							}
 						</div>
-					</div>
+					}
 					@kit.Row("/docs") {
 						@kit.RowText("Docs", "")
 					}
@@ -107,10 +107,9 @@ templ SettingsHome(view SettingsHomeView) {
 						<span data-changelog-dot hidden class="size-2 rounded-full bg-foreground" aria-label="New"></span>
 						<span class="font-mono text-sm text-muted-foreground">{ build.Version }</span>
 					}
-					<div role="listitem" class="relative flex min-h-16 items-center gap-3 px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border">
-						<span class="flex-1 font-medium">Support</span>
-						<span class="text-sm text-muted-foreground select-all">{ cfg.SupportEmail }</span>
-					</div>
+					@kit.RowFact("Support", "") {
+						<span class="select-all">{ cfg.SupportEmail }</span>
+					}
 				}
 			}
 			if ctxkeys.IsAdmin(ctx) {
@@ -170,10 +169,10 @@ templ SettingsGitHub(installations []model.GitHubInstallation) {
 			@kit.List() {
 				for _, installation := range installations {
 					if installation.SettingsURL != "" {
-						<a href={ templ.SafeURL(installation.SettingsURL) } target="_blank" rel="noopener" role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 outline-none before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:bg-foreground/4 focus-visible:bg-foreground/4">
+						@kit.RowExternal(installation.SettingsURL) {
 							@kit.RowText(installation.Account, "")
-							<span class="text-sm text-muted-foreground">Repos on GitHub ↗</span>
-						</a>
+							<span class="text-sm text-muted-foreground">Repos on GitHub</span>
+						}
 					} else {
 						@kit.Row("") {
 							@kit.RowText(installation.Account, "")

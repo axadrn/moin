@@ -109,23 +109,5 @@ templ updateLine(attributes templ.Attributes) {
 // AgentUpdatesForm is the switch for automatic agent updates, a row of a
 // list that saves itself.
 templ AgentUpdatesForm(on bool) {
-	@switchForm("agent-updates-form", ctxkeys.AppBasePath(ctx)+"/servers/agent-updates") {
-		@switchRow("agent-updates", "Update agents automatically", "To "+build.Version+", one server at a time, never during a deploy") {
-			@savedSwitch("agent-updates", on)
-		}
-	}
-}
-
-// switchRow is a row of a list with a switch at its end (children): the
-// row is the switch's label, so a tap anywhere on it flips it.
-templ switchRow(id, name, note string) {
-	<label for={ id } role="listitem" class="relative flex min-h-16 cursor-pointer items-center gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first-of-type:before:hidden">
-		<span class="flex min-w-0 flex-1 flex-col">
-			<span class="font-medium">{ name }</span>
-			if note != "" {
-				<span class="text-sm text-muted-foreground">{ note }</span>
-			}
-		</span>
-		{ children... }
-	</label>
+	@switchForm("agent-updates-form", ctxkeys.AppBasePath(ctx)+"/servers/agent-updates", "agent-updates", "Update agents automatically", "To "+build.Version+", one server at a time, never during a deploy", on)
 }

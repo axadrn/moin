@@ -87,12 +87,7 @@ templ settingsEmailCard(user *model.User) {
 // EmailAlertsForm is the switch for the user's email alerts, a row of a
 // kit.List.
 templ EmailAlertsForm(on bool) {
-	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts") {
-		<label role="listitem" class="relative flex min-h-16 cursor-pointer items-center gap-3 px-5 py-3">
-			@kit.RowText("Email me alerts", "Downtime and failed deploys")
-			@savedSwitch("email-alerts", on)
-		</label>
-	}
+	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts", "email-alerts", "Email me alerts", "Downtime and failed deploys", on)
 }
 
 // SettingsPasswordSection is what a change of the password answers: the

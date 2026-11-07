@@ -19,22 +19,6 @@ templ envModes(appName string, text bool) {
 	</div>
 }
 
-// envRow is one env var in the list: a kit.Row that lights up under the
-// pointer, as its remove button acts on it.
-templ envRow() {
-	<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 rounded-3xl px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden hover:bg-foreground/4 hover:before:opacity-0 [&:hover+*]:before:opacity-0">
-		{ children... }
-	</div>
-}
-
-// envFormRow is the last row of the list, the one that sets an env var:
-// it keeps its line, as it does not light up.
-templ envFormRow() {
-	<div role="listitem" class="relative flex min-h-16 w-full items-center gap-3 px-5 py-3 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-border first:before:hidden">
-		{ children... }
-	</div>
-}
-
 // AppEnvText is every env var of an app as one .env text to edit. Saving
 // shows what changes first; problem is why the text was refused.
 templ AppEnvText(appName, text, problem string) {

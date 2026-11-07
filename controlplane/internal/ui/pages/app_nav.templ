@@ -177,12 +177,10 @@ templ appSection(appName, section string) {
 // PinSwitch pins an app above the others that run fine, in every list: a
 // switch in the app's settings that saves itself (DESIGN.md, Feedback).
 templ PinSwitch(app model.App) {
-	<form id="pin-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin" } hx-trigger="change" hx-swap="none">
+	@kit.RowForm(templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/pin", "hx-trigger": "change", "hx-swap": "none"}) {
 		@csrf.Token()
-		<label class="relative flex min-h-16 cursor-pointer items-center gap-3 px-5 py-3">
-			<span class="flex-1 font-medium">Pin to the top</span>
-			@kit.Switch(templ.Attributes{"name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
-		</label>
-	</form>
+		@kit.RowLabel("pin-on", "Pin to the top", "")
+		@kit.Switch(templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
+	}
 }
 

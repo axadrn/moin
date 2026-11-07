@@ -116,9 +116,8 @@ func adminCanBeFreeForever(user model.AdminUser) bool {
 
 // adminFact is a row with a word and its value, like iOS Settings, About.
 templ adminFact(label, value string) {
-	@kit.Row("") {
-		<span class="shrink-0 font-medium">{ label }</span>
-		<span class="min-w-0 flex-1 truncate text-right text-sm text-muted-foreground">{ value }</span>
+	@kit.RowFact(label, "") {
+		{ value }
 	}
 }
 
