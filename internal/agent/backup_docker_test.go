@@ -445,4 +445,68 @@ func testBackupPostgres(t *testing.T, image string) {
 		t.Fatalf("pg_restore --list: %v %s", err, list.String())
 	}
 	_, _ = io.Copy(io.Discard, &list)
+
+	// Every database of the service is backed up, not only the one
+	// POSTGRES_DB names: each its own copies, restore, undo and check.
+	sql(`CREATE DATABASE analytics;`)
+	analytics := target
+	analytics.database = "analytics"
+	other := func(script string) string {
+		t.Helper()
+		out, err := analytics.psql(test.ctx, script, nil, false)
+		if err != nil {
+			t.Fatalf("%s: %v", script, err)
+		}
+		return strings.TrimSpace(out)
+	}
+	other(`CREATE TABLE visits (id serial PRIMARY KEY, page text); INSERT INTO visits (page) VALUES ('/');`)
+	paths := []string{}
+	for _, database := range test.b.databases(test.ctx, app) {
+		paths = append(paths, database.Path)
+	}
+	if strings.Join(paths, ",") != "postgres-db,postgres-db/analytics,postgres-db/postgres" {
+		t.Fatalf("the databases of the service: %v", paths)
+	}
+	shop := test.database
+	test.database = protocol.Database{Path: "postgres-db/analytics", Kind: protocol.DatabasePostgres, Service: "db", Name: "analytics"}
+	defer func() { test.database = shop }()
+	test.b.tick(test.ctx)
+	if copies := test.copies(); len(copies) != 1 {
+		t.Fatalf("the first copy of analytics: %+v", copies)
+	}
+	if listed := test.b.list(test.ctx, protocol.BackupRequest{App: app}); len(listed.Databases) != 3 || len(listed.Databases[1].Copies) != 1 || listed.Databases[1].Database != "postgres-db/analytics" {
+		t.Fatalf("the list: %+v", listed.Databases)
+	}
+	firstVisit := test.copies()[0]
+	other(`INSERT INTO visits (page) VALUES ('/about');`)
+	test.copyNow()
+	visits := func() string { return other(`SELECT string_agg(page, ',' ORDER BY id) FROM visits;`) }
+	before := rows()
+	if state := test.restore(protocol.BackupRestore{Copy: firstVisit.ID}); state.State != protocol.RestoreDone {
+		t.Fatalf("restore analytics: %+v", state)
+	}
+	if got := visits(); got != "/" || rows() != before || !test.running() {
+		t.Fatalf("after the restore of analytics: %q, shop %q", got, rows())
+	}
+	undos, _ = test.b.engine(app, test.database).Undos(test.ctx)
+	if len(undos) != 1 {
+		t.Fatalf("undos of analytics %+v", undos)
+	}
+	if state := test.restore(protocol.BackupRestore{Undo: undos[0].ID}); state.State != protocol.RestoreDone || visits() != "/,/about" {
+		t.Fatalf("undo analytics: %+v %q", state, visits())
+	}
+	if err := test.b.engine(app, test.database).Check(test.ctx, mustCopy(t, test, firstVisit.ID)); err != nil {
+		t.Fatalf("the check of analytics: %v", err)
+	}
+}
+
+// mustCopy opens a copy of the test's database in the bucket.
+func mustCopy(t *testing.T, test *backupTest, id string) io.Reader {
+	t.Helper()
+	body, err := test.b.object(test.ctx, test.app, test.database, id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { body.Close() })
+	return body
 }

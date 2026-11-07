@@ -113,7 +113,7 @@ func (b *backups) engine(app string, database protocol.Database) engine {
 func (b *backups) state(app string, database protocol.Database) *state {
 	k := database.HostPath
 	if database.Postgres() {
-		k = app + "/" + database.Service
+		k = app + "/" + database.Service + "/" + database.Name
 	}
 	if b.states[k] == nil {
 		b.states[k] = &state{}
@@ -420,7 +420,7 @@ func (b *backups) copyBefore(ctx context.Context, app, only string) *time.Time {
 		return nil
 	}
 	id, took := newCopyID(), false
-	for _, database := range b.apps.runningDatabases(app) {
+	for _, database := range b.databases(ctx, app) {
 		if only == "" || database.Path == only {
 			err := b.copy(ctx, app, database, id)
 			if err != nil {
@@ -441,7 +441,7 @@ func (b *backups) running() map[string][]protocol.Database {
 	found := map[string][]protocol.Database{}
 	entries, _ := os.ReadDir(b.apps.dir)
 	for _, entry := range entries {
-		if databases := b.apps.runningDatabases(entry.Name()); len(databases) > 0 {
+		if databases := b.databases(context.Background(), entry.Name()); len(databases) > 0 {
 			found[entry.Name()] = databases
 		}
 	}
@@ -455,6 +455,11 @@ func (b *backups) one(app, name string) (protocol.Database, error) {
 		if database.Path == name || name == "" && len(all) == 1 {
 			return database, nil
 		}
+		// Another database of a Postgres service: postgres-db/<name>.
+		if other, ok := strings.CutPrefix(name, database.Path+"/"); ok && database.Postgres() && other != "" {
+			database.Path, database.Name = name, other
+			return database, nil
+		}
 	}
 	if name == "" && len(all) > 1 {
 		return protocol.Database{}, errors.New("the app has several databases: name the one")
@@ -465,7 +470,7 @@ func (b *backups) one(app, name string) (protocol.Database, error) {
 // list answers backup.list.
 func (b *backups) list(ctx context.Context, request protocol.BackupRequest) protocol.Backups {
 	result := protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: b.restoreStates(request.App)}
-	for _, database := range b.apps.runningDatabases(request.App) {
+	for _, database := range b.databases(ctx, request.App) {
 		if request.Database == "" || request.Database == database.Path {
 			result.Databases = append(result.Databases, b.status(ctx, request.App, database, true))
 		}

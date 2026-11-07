@@ -23,8 +23,39 @@ type postgresEngine struct {
 	database protocol.Database
 }
 
+// target is the Postgres of the engine's database: the one POSTGRES_DB
+// names, or another of the service.
 func (e *postgresEngine) target(ctx context.Context) (pgTarget, error) {
-	return e.b.apps.postgres(ctx, e.app, e.database)
+	t, err := e.b.apps.postgres(ctx, e.app, e.database)
+	if e.database.Name != "" {
+		t.database = e.database.Name
+	}
+	return t, err
+}
+
+// databases are the databases of an app's live deploy, with every database
+// of each Postgres service: postgres-db for the one POSTGRES_DB names,
+// postgres-db/<name> for each other, but the templates and what moin makes
+// for a restore or a check.
+func (b *backups) databases(ctx context.Context, app string) []protocol.Database {
+	var all []protocol.Database
+	for _, database := range b.apps.runningDatabases(app) {
+		all = append(all, database)
+		if !database.Postgres() {
+			continue
+		}
+		t, err := b.apps.postgres(ctx, app, database)
+		if err != nil {
+			continue
+		}
+		out, err := admin(ctx, t, `SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY datname;`, nil)
+		for _, name := range strings.Split(out, "\n") {
+			if err == nil && name != "" && name != t.database && !strings.HasSuffix(name, "_restore") && !strings.HasSuffix(name, "_check") && !strings.Contains(name, "_before_") {
+				all = append(all, protocol.Database{Path: database.Path + "/" + name, Kind: database.Kind, Service: database.Service, Name: name})
+			}
+		}
+	}
+	return all
 }
 
 func (e *postgresEngine) Copy(ctx context.Context, w io.Writer) error {

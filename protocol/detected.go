@@ -46,11 +46,14 @@ func (d Detected) Built() string {
 // of the app's mounts, or, with Kind "postgres", a compose service that runs
 // Postgres. Path names a SQLite file in the container; for Postgres it is
 // postgres-<service>, and HostPath is empty. Older agents send no Kind.
+// Name is a database of a Postgres service besides the one POSTGRES_DB
+// names, which backups copy too; its Path is postgres-<service>/<name>.
 type Database struct {
 	Path     string `json:"path"`
 	HostPath string `json:"host_path"`
 	Kind     string `json:"kind,omitempty"`
 	Service  string `json:"service,omitempty"`
+	Name     string `json:"name,omitempty"`
 }
 
 // DatabasePostgres is the Kind of a Postgres service.
