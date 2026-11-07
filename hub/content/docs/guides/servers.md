@@ -76,7 +76,7 @@ MCP: new_install_command
 
 ## Rename a server
 
-Same rules as a new name. Its apps stay on it. A server added before the rule keeps its old name until you rename it.
+Same rules as a new name. Its apps stay on it, and its links keep working ([Names and links](/docs/guides/names)). A server added before the rule keeps its old name until you rename it.
 
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**

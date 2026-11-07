@@ -30,6 +30,7 @@ services:
 
 ## Good to know
 
+- After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name: else `moin deploy` in a directory of the old name creates a new app.
 - Fields in `x-moin` win over the settings in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address).
 - `database` picks the database the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
 - Docker ignores `x-` blocks, so the file still works with plain `docker compose`.

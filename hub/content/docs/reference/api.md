@@ -17,6 +17,7 @@ The CLI, the terminal UI and your own scripts use this API; its OpenAPI 3.1 docu
 | Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback` |
 | Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
 | Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place |
+| IDs | answers carry the `id` of a workspace, app, server or bucket in 32 characters, the UUID without dashes, as links do. `{app}`, `{id}`, `{name}` and `{slug}` in a path, and fields that name one, take its name, its ID or a link part like `my-app-<id>` ([Names and links](/docs/guides/names)) |
 
 Session-only endpoints keep a leaked token from making new tokens, changing roles, removing people or deleting a workspace. [Where things work](/docs/reference/surfaces) shows the same per feature.
 
@@ -66,7 +67,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `GET /api/v1/workspaces` | read | the workspaces you are in |
 | `POST /api/v1/workspaces` | session | makes a workspace |
 | `GET /api/v1/workspaces/{slug}` | read | the team: who is in it, their roles, open invitations |
-| `PATCH /api/v1/workspaces/{slug}/name` | write | renames the workspace (admin) |
+| `PATCH /api/v1/workspaces/{slug}/name` | write | renames the workspace (admin); its slug follows, old links keep working |
 | `DELETE /api/v1/workspaces/{slug}?confirm=<name>` | session | deletes the workspace (owner) |
 | `POST /api/v1/workspaces/{slug}/invitations` | write | invites someone by email (admin) |
 | `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /invitations/{id}` | write | sends an invitation again; revokes it (admin) |
@@ -103,6 +104,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one |
 | `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}?confirm=<app>` | read · write | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
 | `GET /api/v1/apps/events` | read | the app list as server-sent events |
+| `PATCH /api/v1/apps/{app}` | write | renames an app: `{"name": "…"}`; links, data, backups and the instant address stay, the next restart gives the containers the name |
 | `PUT /api/v1/apps/{app}/pin` | write | `{"pinned": true}` keeps the app above the others that run fine; `false` unpins it |
 | `POST /api/v1/apps/{app}/restart` | write | starts the live deploy again with the current settings |
 | `POST /api/v1/apps/{app}/stop` · `POST /apps/{app}/start` | write | takes the app offline, its data stays; runs it again |

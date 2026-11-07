@@ -59,6 +59,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
 | Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
+| Rename an app | ✓ | ✓ `apps rename` | Opens the web. | ✓ | ✓ |
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Opens the web. | ✓ | ✓ |

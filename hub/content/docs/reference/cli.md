@@ -29,7 +29,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin team invite <email> [--admin]` | invites someone by email; `--admin` may invite others |
 | `moin team resend <email>` | sends an invitation again; only the new link works |
 | `moin team revoke <email> [--yes]` | takes an invitation back |
-| `moin team rename <name>` | renames the workspace; its links stay the same |
+| `moin team rename <name>` | renames the workspace; its old links keep working |
 | `moin activity [--app <app>] [--server <server>] [--user <email>] [--limit 30] [--cursor <cursor>]` | who deployed, restored or changed what, newest first, to the second in your time zone. `--server` includes its apps, `--limit` is at most 200, the hint at the end gives the `--cursor` for older events |
 
 ## Alerts
@@ -76,6 +76,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin apps` | lists apps |
 | `moin apps <app>` | one app: its state, server, domains, password, repo and deploys, and "N changes waiting" with the restart that applies them |
 | `moin apps add --server <server> <name>` | adds an app |
+| `moin apps rename <app> <new name>` | renames an app; its links, data, backups and instant address stay, the next restart gives its containers the name ([Names and links](/docs/guides/names)) |
 | `moin apps rm <app> [--confirm <app>]` | asks you to type its name and removes the app; its data stays on the server |
 | `moin apps pin [app]` · `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
 

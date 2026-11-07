@@ -153,6 +153,7 @@ Everything of one workspace goes into one folder named after the workspace's ID,
 | --- | --- |
 | `<folder>/` | only when you set a **Folder** on the bucket |
 | `<workspace>/` | your workspace's ID; it never changes |
+| `<app>/` | the name the app was created with; it stays when you rename the app |
 | `<app-id>/` | a new app with the same name gets a new one, so old copies never mix with new |
 | `uploads/` | your code on its way to the server (`moin deploy`) |
 | `<database>/` | one per database, its path with `~` for `/`: `data~app.db` for `/data/app.db`, `postgres-db` for the service `db`, `postgres-db~analytics` for another database in it |

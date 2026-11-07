@@ -58,6 +58,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |
 | `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
+| `rename_app` | renames an app; links, data and backups stay | write |
 | `pin_app` | pins an app, or unpins it with `pinned` false | write |
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |

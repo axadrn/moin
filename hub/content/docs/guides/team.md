@@ -83,6 +83,8 @@ MCP: revoke_invitation
 
 ## Rename the workspace
 
+Its links take the new name, and the old ones keep working ([Names and links](/docs/guides/names)).
+
 ```surfaces
 Web: **Settings**, **Team**, **Workspace name**, **Save**
 CLI: moin team rename "<workspace-name>"
