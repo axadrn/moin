@@ -104,17 +104,19 @@ func (test *backupTest) copies() []protocol.Copy {
 func (test *backupTest) restore(request protocol.BackupRestore) protocol.RestoreState {
 	test.t.Helper()
 	request.ID, request.App, request.Database = fmt.Sprintf("r%d", time.Now().UnixNano()), test.app, test.database.Path
-	err := test.b.restore(test.ctx, request)
-	if err == errCrash {
-		test.b.crash = nil
-		test.b.recover(test.ctx)
-	}
+	_ = test.b.restore(test.ctx, request)
+	return test.stateOf(request.ID)
+}
+
+// stateOf is how the restore id ended.
+func (test *backupTest) stateOf(id string) protocol.RestoreState {
+	test.t.Helper()
 	for _, state := range test.b.restoreStates(test.app) {
-		if state.ID == request.ID {
+		if state.ID == id {
 			return state
 		}
 	}
-	test.t.Fatalf("no state of the restore %s", request.ID)
+	test.t.Fatalf("no state of the restore %s", id)
 	return protocol.RestoreState{}
 }
 
@@ -275,8 +277,7 @@ func TestBackupSQLite(t *testing.T) {
 		if when == "after" {
 			want = "a,b,c"
 		}
-		test.b.crash = func(at string) bool { return at == when }
-		state := test.restore(protocol.BackupRestore{Copy: second.ID})
+		state := test.killedDuringSQLiteRestore(second.ID, when == "after")
 		if got := rows(); got != want || !test.running() || integrityCheck(test.ctx, live) != nil {
 			t.Fatalf("crash %s: %q, running %v", when, got, test.running())
 		}
@@ -446,8 +447,7 @@ func testBackupPostgres(t *testing.T, image string) {
 		if step == "after" {
 			want = "a,b"
 		}
-		test.b.crash = func(at string) bool { return at == step }
-		state := test.restore(protocol.BackupRestore{Copy: first.ID})
+		state := test.killedDuringPostgresRestore(first.ID, step == "after")
 		if got := rows(); got != want || !test.running() {
 			t.Fatalf("crash at %s: %q, running %v", step, got, test.running())
 		}
@@ -552,4 +552,71 @@ func mustCopy(t *testing.T, test *backupTest, id string) source {
 	}
 	t.Cleanup(func() { body.Close() })
 	return from
+}
+
+// killed writes down a restore as running and hands back a mark for a
+// daemon that stops now.
+func (test *backupTest) killed() restoreMark {
+	test.t.Helper()
+	mark := restoreMark{ID: fmt.Sprintf("r%d", time.Now().UnixNano()), App: test.app, Database: test.database.Path, Undo: protocol.NewCopyID(time.Now()), State: protocol.RestoreRunning}
+	if err := writeState(test.b.markFile(mark.ID), mark); err != nil {
+		test.t.Fatal(err)
+	}
+	return mark
+}
+
+// killedDuringSQLiteRestore leaves what a daemon stopped just before or
+// just after the switch leaves, and starts the daemon again.
+func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) protocol.RestoreState {
+	test.t.Helper()
+	live, built := test.database.HostPath, test.database.HostPath+".moin-restore"
+	from := mustCopy(test.t, test, copy)
+	engine := &sqliteEngine{b: test.b, app: test.app, database: test.database}
+	if err := engine.build(test.ctx, from, built); err != nil {
+		test.t.Fatal(err)
+	}
+	if _, err := test.b.apps.stopServices(test.ctx, test.app); err != nil {
+		test.t.Fatal(err)
+	}
+	if err := checkpoint(test.ctx, live); err != nil {
+		test.t.Fatal(err)
+	}
+	mark := test.killed()
+	if err := os.Link(live, undoFile(live, mark.Undo)); err != nil {
+		test.t.Fatal(err)
+	}
+	if switched {
+		if err := os.Rename(built, live); err != nil {
+			test.t.Fatal(err)
+		}
+	}
+	test.b.recover(test.ctx)
+	return test.stateOf(mark.ID)
+}
+
+// killedDuringPostgresRestore leaves what a daemon stopped just before
+// or just after the switch leaves, and starts the daemon again.
+func (test *backupTest) killedDuringPostgresRestore(copy string, switched bool) protocol.RestoreState {
+	test.t.Helper()
+	target, err := test.b.apps.postgres(test.ctx, test.app, test.database)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	built := moinName("restore", target.database)
+	from := mustCopy(test.t, test, copy)
+	if err := load(test.ctx, target, built, from.copy); err != nil {
+		test.t.Fatal(err)
+	}
+	engine := &postgresEngine{b: test.b, app: test.app, database: test.database}
+	if _, err := test.b.apps.stopServices(test.ctx, test.app, engine.others()...); err != nil {
+		test.t.Fatal(err)
+	}
+	mark := test.killed()
+	if switched {
+		if err := swap(test.ctx, target, target.database, undoName(target.database, mark.Undo), built); err != nil {
+			test.t.Fatal(err)
+		}
+	}
+	test.b.recover(test.ctx)
+	return test.stateOf(mark.ID)
 }

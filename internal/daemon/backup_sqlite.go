@@ -109,7 +109,7 @@ func fileSize(name string) int64 {
 // folded in, it links the live file as app.db.moin-before-<id>, the undo,
 // and renames the built file over it: one atomic step, the old file
 // before it, the new one after, never none.
-func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err error) {
+func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) error {
 	live := e.database.HostPath
 	aside, built := undoFile(live, id), live+".moin-restore"
 	if from.undo != "" {
@@ -118,20 +118,9 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
-		if err := room(filepath.Dir(live), from.size); err != nil {
-			return fmt.Errorf("%w; nothing changed", err)
-		}
-		removeDatabase(built)
-		defer func() {
-			if !errors.Is(err, errCrash) {
-				removeDatabase(built)
-			}
-		}()
-		if err := e.build(ctx, from, built); err != nil {
-			return fmt.Errorf("%w; nothing changed", err)
-		}
-		if err := integrityCheck(ctx, built); err != nil {
-			return fmt.Errorf("what came back failed the integrity check, nothing changed: %w", err)
+		defer removeDatabase(built)
+		if err := e.buildChecked(ctx, from, built); err != nil {
+			return err
 		}
 	}
 	info, err := os.Stat(live)
@@ -150,9 +139,6 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err
 	if err := checkpoint(ctx, live); err != nil {
 		return errors.Join(fmt.Errorf("fold the log into the database: %w; nothing changed", err), start())
 	}
-	if e.b.crash != nil && e.b.crash("before") {
-		return errCrash
-	}
 	if err := errors.Join(os.Link(live, aside), syncFile(filepath.Dir(live))); err != nil {
 		os.Remove(aside)
 		return errors.Join(fmt.Errorf("keep the undo: %w; nothing changed", err), start())
@@ -162,13 +148,25 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err
 		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
 	}
 	_ = syncFile(filepath.Dir(live))
-	if e.b.crash != nil && e.b.crash("after") {
-		return errCrash
-	}
 	// Every change starts again from the restored file.
 	_ = os.RemoveAll(litestreamState(live))
 	if err := start(); err != nil {
 		return fmt.Errorf("the restored data is in place, but %w", err)
+	}
+	return nil
+}
+
+// buildChecked builds the restored database into built and checks it.
+func (e *sqliteEngine) buildChecked(ctx context.Context, from source, built string) error {
+	if err := room(filepath.Dir(e.database.HostPath), from.size); err != nil {
+		return fmt.Errorf("%w; nothing changed", err)
+	}
+	removeDatabase(built)
+	if err := e.build(ctx, from, built); err != nil {
+		return fmt.Errorf("%w; nothing changed", err)
+	}
+	if err := integrityCheck(ctx, built); err != nil {
+		return fmt.Errorf("what came back failed the integrity check, nothing changed: %w", err)
 	}
 	return nil
 }
@@ -296,7 +294,7 @@ func (b *backups) record(ctx context.Context, app string, database protocol.Data
 		return nil
 	}
 	if generation(live) == "" {
-		if err := errors.Join(os.RemoveAll(litestreamState(live)), os.MkdirAll(litestreamState(live), 0o700), os.WriteFile(generationFile(live), []byte(protocol.NewCopyID(time.Now())), 0o600)); err != nil {
+		if err := startGeneration(live); err != nil {
 			return err
 		}
 	}
@@ -374,6 +372,17 @@ func (b *backups) pruneGenerations(ctx context.Context, app string, database pro
 func generation(live string) string {
 	body, _ := os.ReadFile(generationFile(live))
 	return strings.TrimSpace(string(body))
+}
+
+// startGeneration begins a new generation of Every change for a file.
+func startGeneration(live string) error {
+	if err := os.RemoveAll(litestreamState(live)); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(litestreamState(live), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(generationFile(live), []byte(protocol.NewCopyID(time.Now())), 0o600)
 }
 
 func generationFile(live string) string {

@@ -204,17 +204,11 @@ ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "bu
 		}
 	}
 	ctx = context.WithoutCancel(ctx)
-	if e.b.crash != nil && e.b.crash("before") {
-		return errCrash
-	}
 	if err := swap(ctx, t, live, aside, built); err != nil {
 		// A COMMIT whose answer got lost may have switched: the undo says.
 		if switched, _ := dbExists(ctx, t, aside); !switched {
 			return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
 		}
-	}
-	if e.b.crash != nil && e.b.crash("after") {
-		return errCrash
 	}
 	if err := start(); err != nil {
 		return fmt.Errorf("the restored data is in place, but %w", err)

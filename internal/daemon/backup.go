@@ -98,11 +98,8 @@ type backups struct {
 	// stores and watched are Litestream's, see backup_sqlite.go.
 	stores  map[int]*litestream.Store
 	watched map[string]watched
-	// copying takes one copy at a time, ticking one round.
-	copying, ticking sync.Mutex
-	// crash ends a restore "before" or "after" the switch as a killed
-	// daemon would, in tests.
-	crash func(when string) bool
+	// ticking lets one round run at a time.
+	ticking sync.Mutex
 }
 
 // state is what the daemon knows of one database: its newest copy, why
@@ -115,10 +112,17 @@ type state struct {
 	checkErr, reported string
 }
 
-var errCrash = errors.New("the daemon stopped here")
-
 func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups {
-	return &backups{apps: a, send: send, states: map[string]*state{}, restoring: map[string]int{}, paused: map[string]string{}, before: map[string]time.Time{}, stores: map[int]*litestream.Store{}, watched: map[string]watched{}}
+	return &backups{
+		apps:      a,
+		send:      send,
+		states:    map[string]*state{},
+		restoring: map[string]int{},
+		paused:    map[string]string{},
+		before:    map[string]time.Time{},
+		stores:    map[int]*litestream.Store{},
+		watched:   map[string]watched{},
+	}
 }
 
 func (b *backups) engine(app string, database protocol.Database) engine {
@@ -195,8 +199,6 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	if err != nil {
 		return "", err
 	}
-	b.copying.Lock()
-	defer b.copying.Unlock()
 	at, _ := protocol.CopyTime(id)
 	engine := b.engine(app, database)
 	size, err := engine.Size(ctx)
@@ -364,33 +366,39 @@ func (b *backups) tick(ctx context.Context) {
 	defer b.ticking.Unlock()
 	running := b.running()
 	for app, databases := range running {
-		schedule := b.schedule(app)
 		for _, database := range databases {
-			b.mu.Lock()
-			s, busy := *b.state(app, database), b.restoring[app] > 0
-			b.mu.Unlock()
-			if busy {
-				continue
-			}
-			var err error
-			if !database.Postgres() {
-				err = b.record(ctx, app, database, schedule)
-			}
-			// A copy from the future, after the clock jumped, is no reason
-			// to wait.
-			if due := time.Duration(schedule.Every) * time.Minute; time.Since(s.copied) >= due || s.copied.After(time.Now()) {
-				err = errors.Join(err, b.copyDue(ctx, app, database, due))
-			}
-			b.mu.Lock()
-			b.state(app, database).failed = ""
-			if err != nil {
-				b.state(app, database).failed = err.Error()
-			}
-			b.mu.Unlock()
+			b.tickDatabase(ctx, app, database)
 		}
 	}
 	b.forget(running)
 	b.report(ctx, running, false)
+}
+
+// tickDatabase does what is due for one database and notes what failed.
+func (b *backups) tickDatabase(ctx context.Context, app string, database protocol.Database) {
+	b.mu.Lock()
+	copied, busy := b.state(app, database).copied, b.restoring[app] > 0
+	b.mu.Unlock()
+	if busy {
+		return
+	}
+	schedule := b.schedule(app)
+	var err error
+	if !database.Postgres() {
+		err = b.record(ctx, app, database, schedule)
+	}
+	due := time.Duration(schedule.Every) * time.Minute
+	// A copy from the future, after the clock jumped, is no reason to wait.
+	if time.Since(copied) >= due || copied.After(time.Now()) {
+		err = errors.Join(err, b.copyDue(ctx, app, database, due))
+	}
+	failed := ""
+	if err != nil {
+		failed = err.Error()
+	}
+	b.mu.Lock()
+	b.state(app, database).failed = failed
+	b.mu.Unlock()
 }
 
 // searchDatabases looks for new databases in every app and tells the hub.
@@ -481,7 +489,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	}
 	status.Error = s.failed
 	// Copies that stopped coming are a problem too, with an alert.
-	if every := time.Duration(b.schedule(app).Every) * time.Minute; status.Error == "" && !s.copied.IsZero() && time.Since(s.copied) > max(2*every, every+time.Hour) {
+	if status.Error == "" && b.late(app, s.copied) {
 		status.Error = "the copies are late: the newest is from " + s.copied.UTC().Format("Jan 2 15:04 UTC")
 	}
 	if full {
@@ -498,6 +506,16 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		}
 	}
 	return status
+}
+
+// late says the newest copy is older than twice how often the app is
+// copied, and than one more copy may take.
+func (b *backups) late(app string, copied time.Time) bool {
+	if copied.IsZero() {
+		return false
+	}
+	every := time.Duration(b.schedule(app).Every) * time.Minute
+	return time.Since(copied) > max(2*every, every+time.Hour)
 }
 
 // checkAll restores the newest copy of every database into a throwaway
@@ -562,6 +580,24 @@ func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(st
 		return nil
 	}
 	return &at
+}
+
+// editCopyLimit is the biggest database moin copies before an edit. A
+// bigger one would keep the edit waiting; the newest scheduled copy is
+// the way back.
+const editCopyLimit = 1 << 30
+
+// copyBeforeEdit copies a database just before an edit, unless it is
+// too big for that. It returns when, nil when there is no such copy.
+func (b *backups) copyBeforeEdit(ctx context.Context, app string, database protocol.Database, logf func(string, ...any)) *time.Time {
+	if b == nil {
+		return nil
+	}
+	size, err := b.engine(app, database).Size(ctx)
+	if err != nil || size > editCopyLimit {
+		return nil
+	}
+	return b.copyBefore(ctx, app, database.Path, logf)
 }
 
 // running are the databases of every app's live deploy.
@@ -673,9 +709,6 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	b.mu.Lock()
 	b.restoring[request.App]--
 	b.mu.Unlock()
-	if errors.Is(err, errCrash) {
-		return err
-	}
 	b.finish(mark, err)
 	go b.report(context.WithoutCancel(ctx), map[string][]protocol.Database{request.App: {database}}, true)
 	return err
@@ -725,8 +758,8 @@ func (b *backups) restoreStates(app string) []protocol.RestoreState {
 // recover ends the restores a stopped daemon left running: the database
 // is whole either way, the app starts again, and the result says which
 // database it runs on. When it cannot tell, the app starts all the same,
-// and the mark stays for the next start to tell. Then it sweeps what stopped copies and checks left.
-// The daemon runs it when it starts.
+// and the mark stays for the next start to tell. Then it sweeps what
+// stopped copies and checks left. The daemon runs it when it starts.
 func (b *backups) recover(ctx context.Context) {
 	for _, mark := range b.marks() {
 		if mark.State != protocol.RestoreRunning {
