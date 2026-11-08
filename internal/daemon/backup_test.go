@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,7 +18,7 @@ import (
 func TestBackupFile(t *testing.T) {
 	for name, ours := range map[string]bool{
 		"app.db": false, "app.db-wal": false, "data.before-migration.db": false, "app.db.restore": false,
-		".moin-copy-123": true, ".moin-check-9": true, "app.db.moin-before-20261107T140000Z": true, "app.db.moin-restore": true,
+		".moin-temp-123": true, "app.db.moin-before-20261107T140000Z": true, "app.db.moin-restore": true,
 	} {
 		if backupFile(name) != ours {
 			t.Errorf("backupFile(%q) = %v", name, !ours)
@@ -100,7 +99,7 @@ func TestCopyIDs(t *testing.T) {
 }
 
 // An app without settings, or with broken ones, is copied hourly and
-// keeps its copies a week, with every change.
+// keeps its backups a week.
 func TestScheduleDefaults(t *testing.T) {
 	b := newBackups(newApps(t.TempDir(), nil), nil)
 	b.configure(protocol.BackupConfig{Bucket: nil, Schedules: map[string]protocol.Schedule{"shop": {Every: 15, Keep: 3}, "broken": {}}})
@@ -167,8 +166,8 @@ func TestRoom(t *testing.T) {
 	}
 }
 
-// Copies that stopped coming are an error the hub hears, and a stray
-// temp copy of a stopped daemon goes at the next start.
+// Postgres copies that stopped coming are an error the hub hears, and a
+// stray temp folder of a stopped daemon goes at the next start.
 func TestLateAndSweep(t *testing.T) {
 	dir := t.TempDir()
 	b := newBackups(newApps(dir, nil), nil)
@@ -179,27 +178,10 @@ func TestLateAndSweep(t *testing.T) {
 	if status := b.status(context.Background(), "shop", database, false); !strings.Contains(status.Error, "the copies are late") {
 		t.Fatalf("late: %+v", status)
 	}
-	os.MkdirAll(filepath.Join(dir, ".moin-copy-123"), 0o700)
+	os.MkdirAll(filepath.Join(dir, ".moin-temp-123"), 0o700)
 	sweepTemp(database.HostPath)
-	if exists(filepath.Join(dir, ".moin-copy-123")) {
-		t.Fatal("the stray copy stayed")
-	}
-}
-
-// A copy before a deploy that fails says so in the deploy log.
-func TestCopyBeforeSaysWhenItFails(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
-	file, _ := sqliteDatabase(t)
-	release := a.releaseDir("shop", 1)
-	os.MkdirAll(release, 0o700)
-	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
-	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
-	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
-	b := newBackups(a, nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws", AccessKey: "x", SecretKey: "y"}})
-	var logged []string
-	if at := b.copyBefore(context.Background(), "shop", "", func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }); at != nil || len(logged) != 1 || !strings.Contains(logged[0], "before the change failed") {
-		t.Fatalf("copy before: %v %v", at, logged)
+	if exists(filepath.Join(dir, ".moin-temp-123")) {
+		t.Fatal("the stray temp folder stayed")
 	}
 }
 
@@ -291,12 +273,12 @@ func TestEditsRefusedWhileARestoreWaits(t *testing.T) {
 	<-done
 }
 
-// A copy goes on as long as data moves, and stops when none comes.
+// An upload goes on as long as data moves, and stops when none comes.
 func TestStopWhenStuck(t *testing.T) {
 	ctx, stop := context.WithCancelCause(context.Background())
 	defer stop(nil)
 	reader, writer := io.Pipe()
-	body, stopWatching := stopWhenStuck(reader, 100*time.Millisecond, 100*time.Millisecond, stop)
+	body, stopWatching := stopWhenStuck(reader, 100*time.Millisecond, stop)
 	defer stopWatching()
 	go func() {
 		for range 6 {
@@ -320,16 +302,5 @@ func TestStopWhenStuck(t *testing.T) {
 	}
 	if !strings.Contains(context.Cause(ctx).Error(), "no data moved") {
 		t.Fatalf("the reason is %v", context.Cause(ctx))
-	}
-}
-
-// A big database gets longer to send its first byte: SQLite writes its
-// clean copy first.
-func TestFirstDataLimit(t *testing.T) {
-	if got := firstDataLimit(0); got != stallLimit {
-		t.Errorf("empty: %s", got)
-	}
-	if got := firstDataLimit(100 << 30); got < stallLimit+2*time.Hour {
-		t.Errorf("100 GB: %s", got)
 	}
 }

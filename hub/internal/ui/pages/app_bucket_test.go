@@ -40,13 +40,13 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	since, checked, copied := now.Add(-3*time.Hour), now.Add(-2*time.Hour), now.Add(-12*time.Minute)
 	current := service.Bucket{Name: "client-a", Bucket: "client", Folder: "workspace-1/"}
 	view := BackupsView{
-		App:     model.App{ID: "app-1", Name: "shop", BucketName: "client-a", BackupEvery: 60, BackupKeep: 7, BackupEveryChange: true},
+		App:     model.App{ID: "app-1", Name: "shop", BucketName: "client-a", BackupEvery: 60, BackupKeep: 7},
 		Bucket:  &current,
 		Buckets: []service.Bucket{{Name: "default", Default: true}, current},
 		Older:   []service.Bucket{{Name: "default"}},
 		Now:     now,
 		Databases: []service.DatabaseBackups{{
-			DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, CheckedAt: &checked, CopiedAt: &copied, Copies: []protocol.Copy{{ID: "20261103T114800Z", At: copied, Size: 2048}}},
+			DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", Kind: "postgres", CheckedAt: &checked, CopiedAt: &copied, Copies: []protocol.Copy{{ID: "20261103T114800Z", At: copied, Size: 2048}}},
 			Moments: []service.Moment{
 				{ID: "1h", Label: "1 hour ago", At: now.Add(-time.Hour), Kind: service.MomentMinute},
 				{ID: "before-v12", Label: "Before v12", At: now.Add(-26 * time.Hour), Kind: "deploy"},
@@ -64,7 +64,7 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	page := html.String()
 	for _, want := range []string{`id="app-bucket-form"`, "The default (default)", "data-bucket-older", `data-confirm-name="shop"`,
 		"Last copy 12m ago · checked 2h ago", `data-moment="1h"`, `data-moment="before-v12"`, "Nov 2, 10:00 UTC", "11:00 UTC", "Go back to",
-		"How often", "Hourly", "Keep", "7 days", "Every change", `data-every-change`, "Download a copy", "/backups/download?database=%2Fdata%2Fapp.db", "2.0 KB"} {
+		"How often", "Hourly", "Keep", "7 days", "Download a copy", "/backups/download?database=%2Fdata%2Fapp.db", "2.0 KB"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}
@@ -128,12 +128,26 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	}
 	view.Databases = view.Databases[:1]
 
-	// Postgres has no Every change; without a copy there is nothing to
-	// download.
-	view.Databases[0].Kind, view.Databases[0].Copies = "postgres", nil
+	// SQLite: every change written down, how long only, and a download
+	// without a size.
+	sqlite := view
+	sqlite.Databases = []service.DatabaseBackups{{DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, CheckedAt: &checked}}}
+	html.Reset()
+	DatabaseBackups(sqlite, "/data/app.db").Render(ctx, &html)
+	for _, want := range []string{"Every change written down · checked 2h ago", "Keep", "Download a copy"} {
+		if !strings.Contains(html.String(), want) {
+			t.Errorf("SQLite has no %q", want)
+		}
+	}
+	if strings.Contains(html.String(), "How often") {
+		t.Error("SQLite has a How often")
+	}
+
+	// Without a copy, Postgres has nothing to download.
+	view.Databases[0].Kind, view.Databases[0].Copies, view.Databases[0].Since = "postgres", nil, nil
 	html.Reset()
 	DatabaseBackups(view, "/data/app.db").Render(ctx, &html)
-	if strings.Contains(html.String(), "Every change") || strings.Contains(html.String(), "Download a copy") {
+	if strings.Contains(html.String(), "Download a copy") {
 		t.Errorf("Postgres without a copy: %s", html.String())
 	}
 }

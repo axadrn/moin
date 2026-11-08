@@ -29,7 +29,7 @@ var backupProblems = []struct {
 	{"The database is not running.", []string{"is not running"}},
 	{"The app's bucket can't be opened: check its keys under Data.", []string{"cannot be opened"}},
 	{"The copies are late.", []string{"copies are late"}},
-	{"The daily check could not restore the newest copy.", []string{"daily check failed"}},
+	{"The daily check could not restore the newest state.", []string{"daily check failed"}},
 	{"Every change is not written down.", []string{"every change"}},
 	{"moin can't back up this database.", []string{"cannot back up"}},
 	{"The daemon on the server is too old: update it.", []string{"too old for this"}},

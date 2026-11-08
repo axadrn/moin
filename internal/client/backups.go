@@ -21,12 +21,11 @@ type AppBackups struct {
 	Databases []DatabaseBackups `json:"databases"`
 }
 
-// BackupSchedule is how an app is backed up: a copy every EveryMinutes,
-// each kept KeepDays; EveryChange records every change of a SQLite file.
+// BackupSchedule is how an app is backed up: kept KeepDays, and Postgres
+// copied every EveryMinutes.
 type BackupSchedule struct {
-	EveryMinutes int  `json:"every_minutes"`
-	KeepDays     int  `json:"keep_days"`
-	EveryChange  bool `json:"every_change"`
+	EveryMinutes int `json:"every_minutes"`
+	KeepDays     int `json:"keep_days"`
 }
 
 // DatabaseBackup is how one database is backed up, as the daemon reports

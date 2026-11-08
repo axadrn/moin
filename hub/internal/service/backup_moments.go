@@ -23,10 +23,11 @@ type DatabaseBackups struct {
 }
 
 // Moment is one moment of a database to go back to: a minute a few
-// minutes or hours ago (SQLite with Every change), a copy, named "Before
-// v12" when moin took it before a change, or the state before a restore,
-// which undoes it. ID is what the CLI, the API and MCP take; Copy and
-// Undo name what a restore goes back to.
+// minutes or hours ago (SQLite), a copy (Postgres), named "Before v12"
+// when it was before a change (a plain time for SQLite), or the state
+// before a restore, which undoes it. ID is what the CLI, the API and MCP
+// take; Copy and Undo name what a restore goes back to; without both it
+// goes back to the time At.
 type Moment struct {
 	ID    string
 	Label string
@@ -36,7 +37,7 @@ type Moment struct {
 	Undo  string
 }
 
-// Kinds of a Moment, besides the kinds of a remembered copy
+// Kinds of a Moment, besides the kinds of a remembered moment
 // (model.MomentDeploy, MomentUpdate, MomentEdit).
 const (
 	MomentMinute = "minute"
@@ -55,7 +56,7 @@ var quickMoments = []struct {
 	{"1d", "Yesterday this time", 24 * time.Hour},
 }
 
-// keepFor is how long an app keeps its copies.
+// keepFor is how long an app keeps its backups.
 func keepFor(app *model.App) time.Duration {
 	if app.BackupKeep <= 0 {
 		return time.Duration(protocol.DefaultSchedule.Keep) * 24 * time.Hour
@@ -76,19 +77,26 @@ func everyChangeReach(backup protocol.DatabaseBackup, now time.Time) (since, unt
 	return since, until, true
 }
 
-// Moments are the moments a database can go back to: the quick minutes,
-// then the copies and the undos, newest first. A copy moin took before a
-// change is named after it.
+// Moments are the moments a database can go back to: the quick minutes
+// and the remembered times Every change reaches (SQLite), the copies
+// (Postgres), and the undos, newest first. A copy moin took before a
+// change is named after it, and so is a time.
 func Moments(backup protocol.DatabaseBackup, remembered []model.BackupMoment, now time.Time) []Moment {
 	moments := []Moment{}
+	later := []Moment{}
 	if since, until, ok := everyChangeReach(backup, now); ok {
 		for _, quick := range quickMoments {
 			if at := now.Add(-quick.ago); !at.Before(since) && !at.After(until) {
 				moments = append(moments, Moment{ID: quick.id, Label: quick.label, At: at, Kind: MomentMinute})
 			}
 		}
+		for _, named := range remembered {
+			if (named.Database == "" || named.Database == backup.Database) && !named.At.Before(since) && !named.At.After(until) {
+				id, label, kind := rememberedMoment(named)
+				later = append(later, Moment{ID: id, Label: label, At: named.At, Kind: kind})
+			}
+		}
 	}
-	later := []Moment{}
 	for _, copy := range backup.Copies {
 		moment := Moment{ID: copy.ID, Label: atWhen(copy.At, now), At: copy.At, Kind: MomentCopy, Copy: copy.ID}
 		for _, named := range remembered {
@@ -112,7 +120,7 @@ func Moments(backup protocol.DatabaseBackup, remembered []model.BackupMoment, no
 	return append(moments, later...)
 }
 
-// rememberedMoment names a copy moin took before a change.
+// rememberedMoment names a moment before a change.
 func rememberedMoment(moment model.BackupMoment) (id, label, kind string) {
 	switch moment.Kind {
 	case model.MomentDeploy:
@@ -180,8 +188,8 @@ func (e *AmbiguousMomentError) Error() string {
 	return "several moments are called " + e.Label + ": name one by its id, " + strings.Join(e.IDs, " or ")
 }
 
-// remember names the copy the daemon took before a change, by its ID, and
-// forgets the names of copies older than the app keeps.
+// remember names the moment before a change, by its time, and forgets the
+// names of moments older than the app keeps.
 func (s *AppService) remember(app *model.App, database, kind, detail string, at time.Time) {
 	err := s.apps.AddBackupMoment(model.BackupMoment{AppID: app.ID, Database: database, Kind: kind, Detail: detail, At: at.UTC()}, s.now().Add(-keepFor(app)-24*time.Hour))
 	if err != nil {
@@ -189,7 +197,7 @@ func (s *AppService) remember(app *model.App, database, kind, detail string, at 
 	}
 }
 
-// markUpdate says a deploy updates a catalog app to version, so the copy
+// markUpdate says a deploy updates a catalog app to version, so the moment
 // before it reads "Before the update to 3.4.1".
 func (s *AppService) markUpdate(deployID, version string) {
 	s.mu.Lock()
@@ -200,7 +208,7 @@ func (s *AppService) markUpdate(deployID, version string) {
 	s.updates[deployID] = version
 }
 
-// rememberDeploy names the copies the daemon took before a deploy.
+// rememberDeploy names the moment before a deploy.
 func (s *AppService) rememberDeploy(deployID string, done protocol.DeployDone) {
 	s.mu.Lock()
 	version, update := s.updates[deployID]

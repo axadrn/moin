@@ -13,7 +13,7 @@ import (
 // TestBackupsList shows how each database stands and the moments to go
 // back to, with the commands for both.
 func TestBackupsList(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"every_change":true,"databases":[
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"databases":[
 		{"database":"/data/app.db","copied_at":"` + time.Now().Add(-12*time.Minute).UTC().Format(time.RFC3339) + `","checked_at":"` + time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339) + `","moments":[
 			{"id":"1h","label":"1 hour ago","at":"2026-11-07T13:00:00Z","kind":"minute"},
 			{"id":"before-v12","label":"Before v12","at":"2026-11-07T09:30:00Z","kind":"deploy"}]},
@@ -22,7 +22,7 @@ func TestBackupsList(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	for _, want := range []string{"last copy 12m ago · checked 2h ago", "1h", "1 hour ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "nothing to go back to yet", "copied hourly, kept 7 days, every change of SQLite on", "moin restore shop --to <moment>", "moin backup download shop", "--every 15m|1h|1d"} {
+	for _, want := range []string{"last copy 12m ago · checked 2h ago", "1h", "1 hour ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "nothing to go back to yet", "kept 7 days, Postgres copied hourly", "moin restore shop --to <moment>", "moin backup download shop", "--every 15m|1h|1d"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("no %q in\n%s", want, stdout)
 		}
@@ -34,21 +34,21 @@ func TestBackupsList(t *testing.T) {
 	}
 }
 
-// TestBackupSchedule: --every, --keep and --every-change change only
+// TestBackupSchedule: --every and --keep change only
 // what they name; a wrong value never reaches the hub.
 func TestBackupSchedule(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"every_change":true,"databases":[]}`,
-		"PUT /api/v1/apps/shop/backups": `{"every_minutes":15,"keep_days":7,"every_change":false}`,
+		"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"databases":[]}`,
+		"PUT /api/v1/apps/shop/backups": `{"every_minutes":15,"keep_days":7}`,
 	}}
-	code, stdout, stderr := runCLI(t, api, "backups", "shop", "--every", "15m", "--every-change", "off", "--yes")
-	if code != 0 || !strings.Contains(stdout, "shop is copied every 15 minutes, each copy kept 7 days, every change off") {
+	code, stdout, stderr := runCLI(t, api, "backups", "shop", "--every", "15m")
+	if code != 0 || !strings.Contains(stdout, "shop keeps its backups 7 days; Postgres is copied every 15 minutes") {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	if body := api.body("PUT /api/v1/apps/shop/backups"); !strings.Contains(body, `"every_minutes":15`) || !strings.Contains(body, `"keep_days":7`) || !strings.Contains(body, `"every_change":false`) {
+	if body := api.body("PUT /api/v1/apps/shop/backups"); !strings.Contains(body, `"every_minutes":15`) || !strings.Contains(body, `"keep_days":7`) {
 		t.Fatalf("sent %s", body)
 	}
-	for _, wrong := range [][]string{{"--every", "5m"}, {"--keep", "2d"}, {"--every-change", "maybe"}} {
+	for _, wrong := range [][]string{{"--every", "5m"}, {"--keep", "2d"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"every_minutes":60,"keep_days":7}`}}
 		if code, _, _ := runCLI(t, api, append([]string{"backups", "shop"}, wrong...)...); code == 0 || api.seen("PUT /api/v1/apps/shop/backups") {
 			t.Errorf("%v passed", wrong)

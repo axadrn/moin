@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/protocol"
 )
@@ -312,9 +314,14 @@ func (e *postgresEngine) waitForPostgres(ctx context.Context) (pgTarget, error) 
 	return pgTarget{}, err
 }
 
-// Check loads a copy into the throwaway database moin_check_<hash> and
-// reads every row of every table, then drops it.
-func (e *postgresEngine) Check(ctx context.Context, from source) error {
+// Check loads the newest copy into the throwaway database
+// moin_check_<hash> and reads every row of every table, then drops it.
+func (e *postgresEngine) Check(ctx context.Context) error {
+	from, body, err := e.newestCopy(ctx)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
 	t, err := e.target(ctx)
 	if err != nil {
 		return err
@@ -333,6 +340,21 @@ FOR t IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('p
 	EXECUTE format('SELECT sum(length(x::text)) FROM %I.%I x', t.schemaname, t.tablename);
 END LOOP; END $$;`, nil, false)
 	return err
+}
+
+// newestCopy opens the newest copy, or says there is none (errNoState),
+// as when a newer copy came and the old one went meanwhile.
+func (e *postgresEngine) newestCopy(ctx context.Context) (source, io.Closer, error) {
+	copies, err := e.b.copies(ctx, e.app, e.database)
+	if err != nil || len(copies) == 0 {
+		return source{}, nil, errNoState
+	}
+	from, body, err := e.b.readCopy(ctx, e.app, e.database, copies[0].ID)
+	var gone *types.NoSuchKey
+	if errors.As(err, &gone) {
+		return source{}, nil, errNoState
+	}
+	return from, body, err
 }
 
 func (e *postgresEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {

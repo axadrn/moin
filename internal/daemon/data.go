@@ -275,7 +275,7 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 		if a.backups != nil && a.backups.busy(request.App) {
 			return protocol.DBResult{}, fmt.Errorf("a restore of %s runs: edit its data when it is done", request.App)
 		}
-		// A copy just before the change, so "Before your edit" is exact.
+		// The moment just before the change, so "Before your edit" is exact.
 		logf := func(format string, args ...any) { slog.Warn("backup: " + fmt.Sprintf(format, args...)) }
 		before = a.backups.copyBeforeEdit(ctx, request.App, database, logf)
 	}

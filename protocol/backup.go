@@ -10,8 +10,9 @@ import (
 // goes under <Path>/<Workspace>/, each app under <app>/<app ID>/:
 //
 //	<app>/<app ID>/uploads/                  sources of moin deploy, a day
-//	<app>/<app ID>/<database>/copies/        the copies, as long as the app keeps them
-//	<app>/<app ID>/<database>/litestream/    SQLite with Every change: every change
+//	<app>/<app ID>/downloads/                SQLite downloads, a day
+//	<app>/<app ID>/<database>/copies/        Postgres: the copies, as long as the app keeps them
+//	<app>/<app ID>/<database>/litestream/    SQLite: every change
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
 // sharing one bucket never touch each other's files. Name is the bucket's
@@ -45,17 +46,16 @@ type BackupConfig struct {
 	Paused map[string]string `json:"paused,omitempty"`
 }
 
-// Schedule is how an app is backed up: a copy every Every minutes, each
-// kept Keep days. EveryChange also records every change of a SQLite file,
-// so a restore can go back to any minute of those days.
+// Schedule is how an app is backed up: Keep is how many days back it
+// goes; Every is how often, in minutes, Postgres is copied. SQLite writes
+// down every change, so it has no Every.
 type Schedule struct {
-	Every       int  `json:"every_minutes"`
-	Keep        int  `json:"keep_days"`
-	EveryChange bool `json:"every_change"`
+	Every int `json:"every_minutes"`
+	Keep  int `json:"keep_days"`
 }
 
 // DefaultSchedule is the schedule of an app nobody set one for.
-var DefaultSchedule = Schedule{Every: 60, Keep: 7, EveryChange: true}
+var DefaultSchedule = Schedule{Every: 60, Keep: 7}
 
 // EveryMinutes is how often a word means, in minutes: 15m, 1h or 1d.
 func EveryMinutes(word string) (int, bool) {
@@ -113,12 +113,12 @@ const (
 )
 
 // DatabaseBackup is how one database is backed up. Copies are its copies
-// in the bucket, newest first; CopiedAt is the newest. Undos are the
+// in the bucket, newest first, and CopiedAt the newest: Postgres. Since
+// and Until are how far Every change reaches: SQLite. Undos are the
 // states before its restores, kept on the server: going back to one
 // undoes that restore. CheckedAt is the newest daily check: it restored
-// the newest copy into a throwaway database and read it, and CheckError
-// says why it failed. Since and Until are how far Every change reaches,
-// for SQLite with it on. Error says what keeps the backup from working.
+// the newest state into a throwaway database and read it, and CheckError
+// says why it failed. Error says what keeps the backup from working.
 // The JSON keys verified_at, drill_error, since and replicated_at stay as
 // they are: daemons of protocol version 1 send them.
 type DatabaseBackup struct {
@@ -144,10 +144,10 @@ type Copy struct {
 	Size int64     `json:"size"`
 }
 
-// BackupRestore puts one database back: to the copy Copy, to the minute
-// At (SQLite with Every change), or to the state Undo before an earlier
-// restore, which undoes that restore. The daemon builds the database
-// beside the live one, stops the app, switches in one step and starts it;
+// BackupRestore puts one database back: to the copy Copy (Postgres), to
+// the minute At (SQLite), or to the state Undo before an earlier restore,
+// which undoes that restore. The daemon builds the database beside the
+// live one, stops the app, switches in one step and starts it;
 // the live one stays as the undo of this restore.
 type BackupRestore struct {
 	ID       string     `json:"id"`
@@ -167,11 +167,14 @@ func DatabaseFolder(bucket Bucket, app, appID, database string) string {
 	return strings.Trim(path.Join(bucket.Path, bucket.Workspace, app, appID, name), "/")
 }
 
-// CopyFile is the copy id in its database's folder: a gzipped SQLite
-// file, or a pg_dump in its custom format.
-func CopyFile(id string, postgres bool) string {
-	if postgres {
-		return "copies/" + id + ".dump"
-	}
-	return "copies/" + id + ".db.gz"
+// CopyFile is the copy id in its database's folder: a pg_dump in its
+// custom format.
+func CopyFile(id string) string {
+	return "copies/" + id + ".dump"
+}
+
+// DownloadFile is the download id of a SQLite database, in the folder
+// downloads/ beside the folder of the database: a gzipped SQLite file.
+func DownloadFile(folder, id string) string {
+	return path.Dir(folder) + "/downloads/" + path.Base(folder) + "-" + id + ".db.gz"
 }

@@ -88,7 +88,7 @@ templ BackupSettings(view BackupsView) {
 	</div>
 }
 
-// AppBucketForm picks the bucket of the app. It asks first: the copies
+// AppBucketForm picks the bucket of the app. It asks first: the backups
 // start again in the other bucket.
 templ AppBucketForm(view BackupsView) {
 	<form
@@ -99,7 +99,7 @@ templ AppBucketForm(view BackupsView) {
 		hx-select="#data-backups"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
-		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
+		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its backups start again there; what is in " + view.Bucket.Name + " stays." }
 		data-confirm-action="Move"
 	>
 		@kit.CSRF()
@@ -137,8 +137,8 @@ func appBucketOptions(buckets []service.Bucket) []kit.Option {
 }
 
 // DatabaseBackups is the backup of one database: one row how it stands,
-// how often and how long, Every change for SQLite, Download a copy, then
-// the moments to go back to with Restore. A restore shows it runs in the
+// how often (Postgres) and how long, Download a copy, then the moments to
+// go back to with Restore. A restore shows it runs in the
 // first row while it does.
 templ DatabaseBackups(view BackupsView, database string) {
 	{{ backup, known := view.backupOf(database) }}
@@ -262,6 +262,9 @@ templ backupState(backup service.DatabaseBackups, known bool, database string, n
 				case backup.CopiedAt != nil:
 					@kit.Dot(kit.StateLive)
 					<span class="min-w-0 flex-1 truncate font-medium" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Last copy " + human.Ago(*backup.CopiedAt, now) + " · " + checkedText(backup, now) }</span>
+				case backup.Since != nil:
+					@kit.Dot(kit.StateLive)
+					<span class="min-w-0 flex-1 truncate font-medium" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Every change written down · " + checkedText(backup, now) }</span>
 				default:
 					@kit.Dot(kit.StateRunning)
 					@kit.RowText("Starting", "")
@@ -281,7 +284,7 @@ func checkedStamp(backup service.DatabaseBackups) string {
 	if backup.CheckedAt == nil {
 		return ""
 	}
-	return "Restored the newest copy into a throwaway database and read it " + stamp(*backup.CheckedAt)
+	return "Restored the newest state into a throwaway database and read it " + stamp(*backup.CheckedAt)
 }
 
 // momentPick is one moment to pick for a restore: what it is and when.
@@ -347,20 +350,21 @@ func lowerFirst(label string) string {
 	return strings.ToLower(label[:1]) + label[1:]
 }
 
-// backupSchedule are the rows of how often moin copies the app's
-// databases and how long it keeps each copy, and for SQLite the switch of
-// Every change. Each saves itself; they hold for every database of the
-// app.
+// backupSchedule are the rows of how long the app keeps its backups and,
+// for Postgres, how often moin copies it. Each saves itself; they hold for
+// every database of the app.
 templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database string) {
 	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/schedule" }}
 	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML"} }}
-	@kit.RowForm(form) {
-		@kit.CSRF()
-		@scheduleFields(view.App, database, "every")
-		@kit.RowLabel("backup-every", "How often", "")
-		<div class="w-44 shrink-0">
-			@kit.Select(kit.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
-		</div>
+	if backup.Kind == protocol.DatabasePostgres {
+		@kit.RowForm(form) {
+			@kit.CSRF()
+			@scheduleFields(view.App, database, "every")
+			@kit.RowLabel("backup-every", "How often", "")
+			<div class="w-44 shrink-0">
+				@kit.Select(kit.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
+			</div>
+		}
 	}
 	@kit.RowForm(form) {
 		@kit.CSRF()
@@ -370,43 +374,24 @@ templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database 
 			@kit.Select(kit.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
 		</div>
 	}
-	if backup.Kind != "postgres" {
-		@kit.RowForm(everyChangeForm(form, view.App.BackupEveryChange)) {
-			@kit.CSRF()
-			@scheduleFields(view.App, database, "every_change")
-			<input type="hidden" name="every_change_switch" value="1"/>
-			@kit.RowLabel("backup-every-change", "Every change", "")
-			@kit.Switch(templ.Attributes{"id": "backup-every-change", "name": "every_change", "value": "1", "checked": view.App.BackupEveryChange, "data-every-change": true})
-		}
-	}
 }
 
 // scheduleInFile shows the schedule compose.yml sets. Only the file changes it.
 templ scheduleInFile(view BackupsView, backup service.DatabaseBackups) {
-	@kit.Row("") {
-		@kit.RowText("How often", "from compose.yml")
-		<span class="shrink-0 text-sm text-muted-foreground" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
+	if backup.Kind == protocol.DatabasePostgres {
+		@kit.Row("") {
+			@kit.RowText("How often", "from compose.yml")
+			<span class="shrink-0 text-sm text-muted-foreground" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
+		}
 	}
 	@kit.Row("") {
 		@kit.RowText("Keep", "from compose.yml")
 		<span class="shrink-0 text-sm text-muted-foreground">{ service.KeepText(view.App.BackupKeep) }</span>
 	}
-	if backup.Kind != "postgres" {
-		@kit.Row("") {
-			@kit.RowText("Every change", "from compose.yml")
-			<span class="shrink-0 text-sm text-muted-foreground">
-				if view.App.BackupEveryChange {
-					On
-				} else {
-					Off
-				}
-			</span>
-		}
-	}
 }
 
 // scheduleFields are the settings a row does not change, so each row
-// sends all three.
+// sends both.
 templ scheduleFields(app model.App, database, except string) {
 	<input type="hidden" name="database" value={ database }/>
 	if except != "every" {
@@ -415,22 +400,6 @@ templ scheduleFields(app model.App, database, except string) {
 	if except != "keep" {
 		<input type="hidden" name="keep" value={ strconv.Itoa(app.BackupKeep) }/>
 	}
-	if except != "every_change" && app.BackupEveryChange {
-		<input type="hidden" name="every_change" value="1"/>
-	}
-}
-
-// everyChangeForm is the form of the Every change switch: turning it off
-// removes what it wrote down, so it asks first (tier 2).
-func everyChangeForm(form templ.Attributes, on bool) templ.Attributes {
-	if !on {
-		return form
-	}
-	asked := templ.Attributes{"hx-confirm": "Turn Every change off? What it wrote down goes; the copies stay.", "data-confirm-action": "Turn off"}
-	for name, value := range form {
-		asked[name] = value
-	}
-	return asked
 }
 
 func everyOptions() []kit.Option {
@@ -456,13 +425,16 @@ func upperFirst(text string) string {
 	return strings.ToUpper(text[:1]) + text[1:]
 }
 
-// backupDownload is the row that downloads the newest copy, straight from
-// the user's own bucket through a link that lasts 15 minutes.
+// backupDownload is the row that downloads the newest state, straight from
+// the user's own bucket through a link that lasts 15 minutes. SQLite makes
+// the file first, so its size is not known yet.
 templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
-	if len(backup.Copies) > 0 {
+	if len(backup.Copies) > 0 || backup.Since != nil {
 		@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+view.App.Link()+"/backups/download?database="+url.QueryEscape(database), templ.Attributes{"id": "db-download", "data-download": true}) {
 			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
-			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
+			if len(backup.Copies) > 0 {
+				<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
+			}
 		}
 	}
 }

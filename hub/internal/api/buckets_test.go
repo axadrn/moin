@@ -118,7 +118,7 @@ func TestBucketRoutes(t *testing.T) {
 			t.Fatalf("a restore with %s: %d %v", body, status, answer)
 		}
 	}
-	if status, answer := send("PUT", "/api/v1/apps/blog/backups", `{"every_minutes":15,"keep_days":3,"every_change":true}`); status != http.StatusOK || answer["every_minutes"] != float64(15) || answer["keep_days"] != float64(3) {
+	if status, answer := send("PUT", "/api/v1/apps/blog/backups", `{"every_minutes":15,"keep_days":3}`); status != http.StatusOK || answer["every_minutes"] != float64(15) || answer["keep_days"] != float64(3) {
 		t.Fatalf("set the schedule: %d %v", status, answer)
 	}
 	if status, answer := send("PUT", "/api/v1/apps/blog/backups", `{"every_minutes":5,"keep_days":3}`); status != http.StatusUnprocessableEntity || code(answer) != "validation_failed" {

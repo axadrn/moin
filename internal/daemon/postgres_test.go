@@ -57,8 +57,8 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	if !reflect.DeepEqual(found, want) {
 		t.Errorf("found %+v, want %+v", found, want)
 	}
-	if protocol.CopyFile("x", found[0].Postgres()) != "copies/x.dump" || protocol.CopyFile("x", false) != "copies/x.db.gz" {
-		t.Error("copy file endings")
+	if protocol.CopyFile("x") != "copies/x.dump" {
+		t.Error("copy file ending")
 	}
 	if len(noBackup) != 1 || noBackup[0].Path != "mysql-legacy" {
 		t.Errorf("cannot back up %+v", noBackup)

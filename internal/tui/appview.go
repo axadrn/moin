@@ -394,7 +394,7 @@ func (m model) databaseStatusLines(u ui, database client.DatabaseBackups, now ti
 	switch {
 	case database.Problem != "":
 		state = "failed"
-	case database.CopiedAt == nil:
+	case database.CopiedAt == nil && database.Since == nil:
 		state = "waiting"
 	}
 	kind := database.Kind
@@ -408,13 +408,12 @@ func (m model) databaseStatusLines(u ui, database client.DatabaseBackups, now ti
 	switch {
 	case database.Problem != "":
 		add("backup", u.bad(database.Problem))
-	case database.CopiedAt == nil:
-		add("backup", u.faint("starting"))
-	default:
+	case database.CopiedAt != nil:
 		add("last copy", u.good(human.Ago(*database.CopiedAt, now)))
-		if database.Since != nil {
-			add("every change", u.muted("back to "+database.Since.Local().Format("Jan 2 15:04")))
-		}
+	case database.Since != nil:
+		add("every change", u.good("written down")+u.muted(" back to "+database.Since.Local().Format("Jan 2 15:04")))
+	default:
+		add("backup", u.faint("starting"))
 	}
 	switch {
 	case database.CheckError != "":
@@ -763,17 +762,12 @@ func (m model) outLine(u ui, l string) string {
 	return "  " + u.faint(text)
 }
 
-// scheduleText is how often and how long, like "hourly, kept 7 days,
-// every change on".
+// scheduleText is how often and how long, like "hourly, kept 7 days".
 func scheduleText(s client.BackupSchedule) string {
 	every := map[int]string{15: "every 15 minutes", 60: "hourly", 1440: "daily"}[s.EveryMinutes]
 	kept := fmt.Sprintf("kept %d days", s.KeepDays)
 	if s.KeepDays == 1 {
 		kept = "kept 1 day"
 	}
-	change := "every change off"
-	if s.EveryChange {
-		change = "every change on"
-	}
-	return every + ", " + kept + ", " + change
+	return every + ", " + kept
 }

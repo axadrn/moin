@@ -351,7 +351,7 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 				m.say("Cannot read " + v + " as a time: use 14:01 or 2026-11-07 14:01, in UTC")
 				return m, nil
 			}
-			detail := fmt.Sprintf("The database goes back to %s UTC: that minute with Every change, else the newest copy before it. moin keeps the data of now beside it, so you can undo this. The app stops for the switch and starts again.", at.Format("Jan 2 15:04"))
+			detail := fmt.Sprintf("The database goes back to %s UTC: that minute for SQLite, the newest copy before it for Postgres. moin keeps the data of now beside it, so you can undo this. The app stops for the switch and starts again.", at.Format("Jan 2 15:04"))
 			return m.askName("Restore "+a.Name+"?", detail, a.Name, m.restoreCmd(a.Name, "", "", &at)), nil
 		}), nil
 	case "c":

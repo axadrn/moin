@@ -75,7 +75,7 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	}
 	test.bucket = &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: "moin-test", Workspace: "ws-" + app, AccessKey: "x", SecretKey: "y"}
 	_, _ = s3Client(test.bucket).CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String("moin-test")})
-	test.b.configure(protocol.BackupConfig{Bucket: test.bucket, Schedules: map[string]protocol.Schedule{app: {Every: 15, Keep: 1, EveryChange: true}}})
+	test.b.configure(protocol.BackupConfig{Bucket: test.bucket, Schedules: map[string]protocol.Schedule{app: {Every: 15, Keep: 1}}})
 	t.Cleanup(func() { test.b.configure(protocol.BackupConfig{}) })
 	return test
 }
@@ -126,11 +126,11 @@ func (test *backupTest) running() bool {
 	return len(strings.Fields(string(out))) > 0 && !strings.Contains(string(out), "exited")
 }
 
-// putBroken puts a copy that is not a database in the bucket, newest.
+// putBroken puts a Postgres copy that is not a dump in the bucket, newest.
 func (test *backupTest) putBroken() {
 	test.t.Helper()
 	_, folder, _ := test.b.where(test.app, test.database)
-	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)), test.database.Postgres())
+	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)))
 	var body bytes.Buffer
 	zipped := gzip.NewWriter(&body)
 	zipped.Write([]byte("this is not a database at all, but it is long enough to look like one"))
@@ -164,7 +164,8 @@ func TestBackupSQLite(t *testing.T) {
 	app := fmt.Sprintf("bk-sqlite-%d", time.Now().UnixNano()%1e6)
 	compose := map[string]any{"services": map[string]any{"web": map[string]any{"image": "alpine:latest", "command": []string{"sleep", "infinity"}, "init": true}}}
 	test := newBackupTest(t, app, compose, protocol.Database{Path: "/data/app.db", HostPath: live})
-	// The app opens the file for each write, as a stopped app holds none.
+	// The app opens the file for each write, as an app that opens and
+	// closes SQLite per request does.
 	open := func() *sql.DB {
 		t.Helper()
 		db, err := sql.Open("sqlite", "file:"+live+"?_pragma=journal_mode(wal)&_pragma=busy_timeout(5000)")
@@ -193,47 +194,31 @@ func TestBackupSQLite(t *testing.T) {
 	}
 	write(`CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)`)
 
-	// Copy on the schedule: the first tick takes the first copy, the
-	// next one only when its time came.
+	// Following the file: the round has Litestream write every change,
+	// and takes no copy.
 	write(`INSERT INTO notes (body) VALUES ('a'), ('b')`)
 	test.b.tick(test.ctx)
-	if copies := test.copies(); len(copies) != 1 {
-		t.Fatalf("the first copy: %+v", copies)
-	}
-	test.b.tick(test.ctx)
-	if copies := test.copies(); len(copies) != 1 {
-		t.Fatalf("a copy before its time: %+v", copies)
-	}
-	if leftovers, _ := filepath.Glob(filepath.Join(dir, ".moin-copy-*")); len(leftovers) != 0 {
-		t.Fatalf("the temp file stayed: %v", leftovers)
-	}
-	first := test.copies()[0]
-	write(`INSERT INTO notes (body) VALUES ('c')`)
-	second := test.copyNow()
-
-	// Retention: a copy older than the app keeps goes, but never the
-	// newest one.
+	waitRow(t, test, "a")
 	_, folder, _ := test.b.where(app, test.database)
-	old := time.Now().Add(-3 * day).UTC().Format(protocol.CopyIDLayout)
-	s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(folder + "/" + protocol.CopyFile(old, false)), Body: strings.NewReader("old")})
-	write(`INSERT INTO notes (body) VALUES ('d')`)
-	third := test.copyNow()
-	for _, copy := range test.copies() {
-		if copy.ID == old {
-			t.Fatal("the old copy stayed")
-		}
-	}
-	if err := test.b.prune(test.ctx, app, test.database, []protocol.Copy{{ID: old, At: time.Now().Add(-3 * day)}}); err != nil {
-		t.Fatal(err)
+	if listed := folders(test.ctx, s3Client(test.bucket), "moin-test", folder+"/"); slices.Contains(listed, folder+"/copies/") {
+		t.Fatalf("a copy of SQLite: %v", listed)
 	}
 
-	// Restore to a copy, exact, and the app runs again.
-	if state := test.restore(protocol.BackupRestore{Copy: first.ID}); state.State != protocol.RestoreDone {
-		t.Fatalf("restore to the first copy: %+v", state)
+	// Back to a minute, exact, and the app runs again.
+	write(`INSERT INTO notes (body) VALUES ('c')`)
+	waitRow(t, test, "c")
+	time.Sleep(1100 * time.Millisecond)
+	noted := time.Now().UTC()
+	time.Sleep(1100 * time.Millisecond)
+	write(`INSERT INTO notes (body) VALUES ('d'); DELETE FROM notes WHERE body = 'a'`)
+	waitRow(t, test, "d")
+	if state := test.restore(protocol.BackupRestore{At: &noted}); state.State != protocol.RestoreDone {
+		t.Fatalf("restore to a minute: %+v", state)
 	}
-	if got := rows(); got != "a,b" || !test.running() {
-		t.Fatalf("after the restore: %q, running %v", got, test.running())
+	if got := rows(); got != "a,b,c" || !test.running() {
+		t.Fatalf("after the restore to a minute: %q, running %v", got, test.running())
 	}
+
 	// Undo, exact.
 	undos, _ := test.b.engine(app, test.database).Undos(test.ctx)
 	if len(undos) != 1 {
@@ -242,30 +227,15 @@ func TestBackupSQLite(t *testing.T) {
 	if state := test.restore(protocol.BackupRestore{Undo: undos[0].ID}); state.State != protocol.RestoreDone {
 		t.Fatalf("undo: %+v", state)
 	}
-	if got := rows(); got != "a,b,c,d" {
+	if got := rows(); got != "b,c,d" {
 		t.Fatalf("after the undo: %q", got)
 	}
 
-	// Every change: back to a minute, exact.
-	time.Sleep(2 * time.Second)
-	test.b.tick(test.ctx) // Litestream follows the restored file afresh
-	write(`INSERT INTO notes (body) VALUES ('e')`)
-	waitChange(t, test, time.Now())
-	time.Sleep(1100 * time.Millisecond)
-	noted := time.Now().UTC()
-	time.Sleep(1100 * time.Millisecond)
-	write(`INSERT INTO notes (body) VALUES ('f'); DELETE FROM notes WHERE body = 'a'`)
-	waitChange(t, test, noted)
-	if state := test.restore(protocol.BackupRestore{At: &noted}); state.State != protocol.RestoreDone {
-		t.Fatalf("restore to a minute: %+v", state)
-	}
-	if got := rows(); got != "a,b,c,d,e" {
-		t.Fatalf("after the restore to a minute: %q", got)
-	}
-	// Every change starts a new generation from the restored file; the
-	// one before stays in the bucket until it is older than the app keeps.
+	// A restore starts a new generation from the restored file; the one
+	// before stays in the bucket until it is older than the app keeps.
 	test.b.tick(test.ctx)
-	_, folder, _ = test.b.where(app, test.database)
+	write(`INSERT INTO notes (body) VALUES ('e')`)
+	waitRow(t, test, "e")
 	if generations := folders(test.ctx, s3Client(test.bucket), "moin-test", folder+"/litestream/"); len(generations) != 2 {
 		t.Fatalf("generations %v", generations)
 	}
@@ -274,10 +244,7 @@ func TestBackupSQLite(t *testing.T) {
 	// database, and the result says which.
 	for _, when := range []string{"before", "after"} {
 		want := rows()
-		if when == "after" {
-			want = "a,b,c"
-		}
-		state := test.killedDuringSQLiteRestore(second.ID, when == "after")
+		state := test.killedDuringSQLiteRestore(when == "after")
 		if got := rows(); got != want || !test.running() || integrityCheck(test.ctx, live) != nil {
 			t.Fatalf("crash %s: %q, running %v", when, got, test.running())
 		}
@@ -287,90 +254,81 @@ func TestBackupSQLite(t *testing.T) {
 		if exists(live + ".moin-restore") {
 			t.Fatalf("crash %s left the restore", when)
 		}
+		test.b.tick(test.ctx)
+		write(`INSERT INTO notes (body) VALUES ('f-` + when + `')`)
+		waitRow(t, test, "f-"+when)
 	}
-	// Two copies in one second never overwrite each other.
-	at := time.Now().UTC().Truncate(time.Second)
-	one, err1 := test.b.copy(test.ctx, app, test.database, protocol.NewCopyID(at))
-	two, err2 := test.b.copy(test.ctx, app, test.database, protocol.NewCopyID(at))
-	if err1 != nil || err2 != nil || one == two {
-		t.Fatalf("two copies in one second: %s %s %v %v", one, two, err1, err2)
-	}
+
 	// No edit while a restore works on the app.
 	test.b.restoring[app]++
 	if _, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app}, SQL: `DELETE FROM notes`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
 		t.Fatalf("an edit during a restore: %v", err)
 	}
 	test.b.restoring[app]--
-	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone || rows() != "a,b,c,d" {
-		t.Fatalf("back to the third copy: %+v", state)
-	}
 
-	// The daily check passes, and fails loudly on a broken copy.
+	// The daily check passes.
 	if why := test.check(); why != "" {
 		t.Fatalf("the check failed: %s", why)
 	}
-	test.putBroken()
-	if why := test.check(); !strings.Contains(why, "the daily check failed") {
-		t.Fatalf("a broken copy passed the check: %q", why)
-	}
 
-	// Download: the copy in the bucket opens with the SQLite driver.
-	from, body, err := test.b.readCopy(test.ctx, app, test.database, third.ID)
+	// The download: the newest state, gzipped, and it opens.
+	copy, err := test.b.download(test.ctx, protocol.BackupRequest{App: app, Database: test.database.Path})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if from.size == 0 {
-		t.Fatal("the copy carries no note of its size")
-	}
-	downloaded := filepath.Join(t.TempDir(), "copy.db")
-	if err := (&sqliteEngine{}).build(test.ctx, from, downloaded); err != nil {
+	object, err := s3Client(test.bucket).GetObject(test.ctx, &s3.GetObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(protocol.DownloadFile(folder, copy.ID))})
+	if err != nil {
 		t.Fatal(err)
 	}
-	body.Close()
-	opened, _ := sql.Open("sqlite", "file:"+downloaded+"?mode=ro")
-	defer opened.Close()
-	var n int
-	if err := opened.QueryRow(`SELECT count(*) FROM notes`).Scan(&n); err != nil || n != 4 {
-		t.Fatalf("the download: %d rows, %v", n, err)
+	defer object.Body.Close()
+	zipped, err := gzip.NewReader(object.Body)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// An edit through moin takes a copy just before it: "Before your
-	// edit" is that copy.
+	downloaded := filepath.Join(t.TempDir(), "download.db")
+	body, _ := io.ReadAll(zipped)
+	os.WriteFile(downloaded, body, 0o600)
+	if err := integrityCheck(test.ctx, downloaded); err != nil {
+		t.Fatalf("the download: %v", err)
+	}
+
+	// An edit through moin remembers the moment just before it, and
+	// takes no copy.
 	time.Sleep(1100 * time.Millisecond)
 	result, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app, Database: "/data/app.db"}, SQL: `INSERT INTO notes (body) VALUES ('g')`, Write: true})
-	if err != nil || result.Before == nil || !slices.ContainsFunc(test.copies(), func(copy protocol.Copy) bool { return copy.At.Equal(*result.Before) }) {
-		t.Fatalf("the copy before an edit: %+v %v", result.Before, err)
+	if err != nil || result.Before == nil {
+		t.Fatalf("the moment before an edit: %+v %v", result.Before, err)
 	}
-	// A copy from the future, after the clock jumped, does not stop the
-	// copies: the newest real one counts (the broken copy above is a
-	// minute ahead).
-	test.b.mu.Lock()
-	test.b.state(app, test.database).lastCopy = time.Now().Add(time.Hour)
-	test.b.mu.Unlock()
+
+	// After a deploy, Litestream starts over: the next round follows the
+	// file again, on the same generation, and the history is kept.
+	waitRow(t, test, "g")
+	kept := generation(live)
+	since, _ := test.b.reach(test.ctx, app, test.database)
+	test.b.letGo(app)
+	write(`INSERT INTO notes (body) VALUES ('h')`)
 	test.b.tick(test.ctx)
-	test.b.mu.Lock()
-	copied := test.b.state(app, test.database).lastCopy
-	test.b.mu.Unlock()
-	if copied.After(time.Now()) {
-		t.Fatalf("the copies wait for one from the future: %v", copied)
+	write(`INSERT INTO notes (body) VALUES ('i')`)
+	waitRow(t, test, "h")
+	waitRow(t, test, "i")
+	if generation(live) != kept {
+		t.Fatal("following again changed the generation")
 	}
-	// Turning Every change off removes what it wrote down.
-	test.b.configure(protocol.BackupConfig{Bucket: test.bucket, Schedules: map[string]protocol.Schedule{app: {Every: 15, Keep: 1}}})
-	test.b.tick(test.ctx)
-	if since, _ := test.b.reach(test.ctx, app, test.database); since != nil || exists(litestreamState(live)) {
-		t.Fatal("Every change stayed after it was turned off")
+	if now, _ := test.b.reach(test.ctx, app, test.database); now == nil || !now.Equal(*since) {
+		t.Fatalf("the history went: %v, was %v", now, since)
 	}
 }
 
-// waitChange waits until Every change has a change after after.
-func waitChange(t *testing.T, test *backupTest, after time.Time) {
+// waitRow runs rounds until the row with this body is in the bucket.
+func waitRow(t *testing.T, test *backupTest, body string) {
 	t.Helper()
 	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
 		test.b.tick(test.ctx)
-		if _, until := test.b.reach(test.ctx, test.app, test.database); until != nil && until.After(after) {
+		if reached(test.ctx, test.b, test.app, test.database, body) {
 			return
 		}
 	}
-	t.Fatal("Every change wrote nothing down")
+	t.Fatalf("the row %s never reached the bucket", body)
 }
 
 func TestBackupPostgres(t *testing.T) {
@@ -538,7 +496,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	if state := test.restore(protocol.BackupRestore{Undo: undos[0].ID}); state.State != protocol.RestoreDone || visits() != "/,/about" {
 		t.Fatalf("undo analytics: %+v %q", state, visits())
 	}
-	if err := test.b.engine(app, test.database).Check(test.ctx, mustCopy(t, test, firstVisit.ID)); err != nil {
+	if err := test.b.engine(app, test.database).Check(test.ctx); err != nil {
 		t.Fatalf("the check of analytics: %v", err)
 	}
 }
@@ -566,18 +524,19 @@ func (test *backupTest) killed() restoreMark {
 }
 
 // killedDuringSQLiteRestore leaves what a daemon stopped just before or
-// just after the switch leaves, and starts the daemon again.
-func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) protocol.RestoreState {
+// just after the switch leaves, and starts the daemon again. It builds
+// the newest state, so the data stays the same either way.
+func (test *backupTest) killedDuringSQLiteRestore(switched bool) protocol.RestoreState {
 	test.t.Helper()
 	live, built := test.database.HostPath, test.database.HostPath+".moin-restore"
-	from := mustCopy(test.t, test, copy)
 	engine := &sqliteEngine{b: test.b, app: test.app, database: test.database}
-	if err := engine.build(test.ctx, from, built); err != nil {
+	if err := engine.restoreAt(test.ctx, time.Time{}, built); err != nil {
 		test.t.Fatal(err)
 	}
 	if _, err := test.b.apps.stopServices(test.ctx, test.app); err != nil {
 		test.t.Fatal(err)
 	}
+	test.b.unwatch(live)
 	if err := checkpoint(test.ctx, live); err != nil {
 		test.t.Fatal(err)
 	}

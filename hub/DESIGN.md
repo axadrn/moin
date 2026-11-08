@@ -318,7 +318,7 @@ notes say it under Changed.
 | restart | start the live deploy again, applying the changes that wait | apply, reload |
 | domain | a name the app answers on, the instant address included | address, route, routing (in copy) |
 | backup | a copy of an app's database in your bucket, on the schedule you pick | snapshot, dump, history, point in time |
-| restore | going back to a copy (or, SQLite with Every change, a minute); it can be undone as long as the copies are kept | rollback (that is for deploys), recover |
+| restore | going back to a minute (SQLite) or a copy (Postgres); it can be undone as long as the app keeps its backups | rollback (that is for deploys), recover |
 | check | only the daily test that the newest copy restores | drill, verification, restore check; never for uptime |
 | uptime | whether a domain answers, visited every minute | uptime check, health check (that is for deploys) |
 | bucket | the S3-compatible bucket you bring, for backups and uploads | storage, S3 (alone), object storage (in copy) |

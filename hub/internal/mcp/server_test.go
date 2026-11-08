@@ -432,10 +432,10 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	}
 	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "confirm_mismatch")
 	toolError(t, call(t, session, "restore_app", map[string]any{"app": "shop", "moment": "1h", "confirm": "blog"}), "confirm_mismatch")
-	if schedule := output[mcp.ScheduleOutput](t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 15, "keep_days": 30, "every_change": false})); schedule.EveryMinutes != 15 || schedule.KeepDays != 30 || schedule.EveryChange {
+	if schedule := output[mcp.ScheduleOutput](t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 15, "keep_days": 30})); schedule.EveryMinutes != 15 || schedule.KeepDays != 30 {
 		t.Fatalf("set_backups = %+v", schedule)
 	}
-	toolError(t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 5, "keep_days": 30, "every_change": true}), "validation_failed")
+	toolError(t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 5, "keep_days": 30}), "validation_failed")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
 	output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "1", "GONE": "1"}}))
 	replaced := output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "2", "NEW": "1"}}))

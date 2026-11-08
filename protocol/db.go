@@ -67,7 +67,7 @@ type DBResult struct {
 	Rows      [][]any  `json:"rows"`
 	Truncated bool     `json:"truncated,omitempty"`
 	Changes   int64    `json:"changes,omitempty"`
-	// Before is when the daemon took the copy just before a write, the
-	// time in its ID: the hub names it "Before your edit".
+	// Before is the moment just before a write, the time in the ID of the
+	// Postgres copy: the hub names it "Before your edit".
 	Before *time.Time `json:"before,omitempty"`
 }

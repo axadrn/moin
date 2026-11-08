@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,60 +25,21 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// sqliteEngine backs up a SQLite file. A copy is VACUUM INTO, SQLite's
-// own clean copy while the app writes, into a temp file next to the
-// database, gzipped into the bucket, the temp file deleted at once. With
-// Every change, Litestream, inside the daemon, also writes each change
-// into the bucket, so a restore can go back to any minute.
+// sqliteEngine backs up a SQLite file with Litestream, inside the daemon:
+// it writes every change into the bucket. Everything else is Litestream's
+// own restore into a file next to the database (restoreAt):
+//
+//	going back     a minute, the file becomes the database in one switch
+//	daily check    the newest state, into a throwaway file
+//	download       the newest state, gzipped into the bucket
 //
 // What moin puts next to app.db all starts with app.db.moin- or .moin-:
 // app.db.moin-restore (being built), app.db.moin-before-<id> (an undo),
-// .moin-copy-* and .moin-check-* (a copy or a check being made).
+// .moin-temp-* (a check or a download).
 type sqliteEngine struct {
 	b        *backups
 	app      string
 	database protocol.Database
-}
-
-func (e *sqliteEngine) Copy(ctx context.Context, w io.Writer) error {
-	dir, err := e.tempDir("copy", fileSize(e.database.HostPath))
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	file := filepath.Join(dir, "copy.db")
-	db, err := sql.Open("sqlite", "file:"+e.database.HostPath+"?mode=ro&_pragma=busy_timeout(5000)")
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(ctx, `VACUUM INTO '`+strings.ReplaceAll(file, `'`, `''`)+`'`)
-	db.Close()
-	if err != nil {
-		return err
-	}
-	in, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	zipped := gzip.NewWriter(w)
-	_, err = io.Copy(zipped, in)
-	return errors.Join(err, zipped.Close())
-}
-
-// tempDir is a folder next to the database for a copy or a check, once
-// the disk has room for need bytes.
-func (e *sqliteEngine) tempDir(what string, need int64) (string, error) {
-	dir := filepath.Dir(e.database.HostPath)
-	if err := room(dir, need); err != nil {
-		return "", err
-	}
-	return os.MkdirTemp(dir, "."+tempName(what+"-*"))
-}
-
-// Size is how many bytes the database file takes.
-func (e *sqliteEngine) Size(ctx context.Context) (int64, error) {
-	return fileSize(e.database.HostPath), nil
 }
 
 // spareRoom is what stays free on the disk on top of what a copy, a check
@@ -104,7 +66,7 @@ func fileSize(name string) int64 {
 	return info.Size()
 }
 
-// Restore builds app.db.moin-restore and checks it, or takes the undo
+// Restore builds app.db.moin-restore, or takes the undo
 // app.db.moin-before-<undo>. With the app stopped and the live file's log
 // folded in, it links the live file as app.db.moin-before-<id>, the undo,
 // and renames the built file over it: one atomic step, the old file
@@ -118,9 +80,10 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) erro
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
+		removeDatabase(built)
 		defer removeDatabase(built)
-		if err := e.buildChecked(ctx, from, built); err != nil {
-			return err
+		if err := e.restoreAt(ctx, from.at, built); err != nil {
+			return fmt.Errorf("%w; nothing changed", err)
 		}
 	}
 	info, err := os.Stat(live)
@@ -156,48 +119,95 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) erro
 	return nil
 }
 
-// buildChecked builds the restored database into built and checks it.
-func (e *sqliteEngine) buildChecked(ctx context.Context, from source, built string) error {
-	if err := room(filepath.Dir(e.database.HostPath), from.size); err != nil {
-		return fmt.Errorf("%w; nothing changed", err)
+func undoFile(live, id string) string { return live + ".moin-before-" + id }
+
+// restoreAt has Litestream write the database as it was at at into file,
+// the newest state when at is zero, and runs the integrity check on it.
+func (e *sqliteEngine) restoreAt(ctx context.Context, at time.Time, file string) error {
+	live := e.database.HostPath
+	if err := room(filepath.Dir(live), fileSize(live)); err != nil {
+		return err
 	}
-	removeDatabase(built)
-	if err := e.build(ctx, from, built); err != nil {
-		return fmt.Errorf("%w; nothing changed", err)
+	client, err := e.b.replica(e.app, e.database)
+	if err != nil {
+		return err
 	}
-	if err := integrityCheck(ctx, built); err != nil {
-		return fmt.Errorf("what came back failed the integrity check, nothing changed: %w", err)
+	options := litestream.NewRestoreOptions()
+	options.OutputPath, options.Timestamp = file, at
+	err = litestream.NewReplicaWithClient(nil, client).Restore(ctx, options)
+	if errors.Is(err, litestream.ErrTxNotAvailable) || errors.Is(err, litestream.ErrNoSnapshots) {
+		return fmt.Errorf("Every change of %s has nothing for that time", e.database.Path)
+	}
+	if err != nil {
+		return err
+	}
+	if err := integrityCheck(ctx, file); err != nil {
+		return fmt.Errorf("what came back failed the integrity check: %w", err)
 	}
 	return nil
 }
 
-func undoFile(live, id string) string { return live + ".moin-before-" + id }
+// restoreNewest restores the newest state into a throwaway file next to
+// the database. The second result removes the file; it is nil on an error.
+func (e *sqliteEngine) restoreNewest(ctx context.Context) (string, func(), error) {
+	dir, err := os.MkdirTemp(filepath.Dir(e.database.HostPath), "."+tempName("temp-*"))
+	if err != nil {
+		return "", nil, err
+	}
+	remove := func() { os.RemoveAll(dir) }
+	file := filepath.Join(dir, "newest.db")
+	if err := e.restoreAt(ctx, time.Time{}, file); err != nil {
+		remove()
+		return "", nil, err
+	}
+	return file, remove, nil
+}
 
-// build writes the database of a copy, or of a minute, into target.
-func (e *sqliteEngine) build(ctx context.Context, from source, target string) error {
-	if from.copy == nil {
-		client, err := e.b.replica(e.app, e.database)
-		if err != nil {
-			return err
-		}
-		options := litestream.NewRestoreOptions()
-		options.OutputPath, options.Timestamp = target, from.at
-		err = litestream.NewReplicaWithClient(nil, client).Restore(ctx, options)
-		if errors.Is(err, litestream.ErrTxNotAvailable) || errors.Is(err, litestream.ErrNoSnapshots) {
-			return fmt.Errorf("Every change of %s does not reach %s", e.database.Path, from.at.Format("Jan 2 15:04 UTC"))
-		}
-		return err
-	}
-	unzipped, err := gzip.NewReader(from.copy)
-	if err != nil {
-		return fmt.Errorf("the copy is not gzipped: %w", err)
-	}
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+// Check restores the newest state into a throwaway file, checks it and
+// deletes it.
+func (e *sqliteEngine) Check(ctx context.Context) error {
+	_, remove, err := e.restoreNewest(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(out, unzipped)
-	return errors.Join(err, out.Close())
+	remove()
+	return nil
+}
+
+// download restores the newest state of a SQLite file into a temp file,
+// gzips it into the bucket under downloads/, removes the temp file and
+// says which download it is.
+func (b *backups) download(ctx context.Context, request protocol.BackupRequest) (protocol.Copy, error) {
+	database, err := b.one(request.App, request.Database)
+	if err != nil {
+		return protocol.Copy{}, err
+	}
+	bucket, folder, err := b.where(request.App, database)
+	if err != nil {
+		return protocol.Copy{}, err
+	}
+	e := &sqliteEngine{b: b, app: request.App, database: database}
+	file, remove, err := e.restoreNewest(ctx)
+	if err != nil {
+		return protocol.Copy{}, err
+	}
+	defer remove()
+	in, err := os.Open(file)
+	if err != nil {
+		return protocol.Copy{}, err
+	}
+	defer in.Close()
+	at := time.Now().UTC()
+	id := protocol.NewCopyID(at)
+	err = upload(ctx, bucket, protocol.DownloadFile(folder, id), nil, func(ctx context.Context, w io.Writer) error {
+		zipped := gzip.NewWriter(w)
+		_, err := io.Copy(zipped, in)
+		return errors.Join(err, zipped.Close())
+	})
+	if err != nil {
+		return protocol.Copy{}, fmt.Errorf("the download of %s: %w", database.Path, err)
+	}
+	return protocol.Copy{ID: id, At: at}, nil
 }
 
 // Recover tells from the undo whether the switch happened. It also
@@ -227,21 +237,6 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 	return true, os.RemoveAll(litestreamState(live))
 }
 
-// Check unpacks a copy next to the database and runs SQLite's integrity
-// check, which reads every page.
-func (e *sqliteEngine) Check(ctx context.Context, from source) error {
-	dir, err := e.tempDir("check", from.size)
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	file := filepath.Join(dir, "check.db")
-	if err := e.build(ctx, from, file); err != nil {
-		return err
-	}
-	return integrityCheck(ctx, file)
-}
-
 func (e *sqliteEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
 	files, err := filepath.Glob(undoFile(e.database.HostPath, "*"))
 	undos := []protocol.Copy{}
@@ -260,14 +255,12 @@ func (e *sqliteEngine) Drop(ctx context.Context, id string) error {
 	return nil
 }
 
-// sweepTemp removes the copies and checks a stopped daemon left next to
-// a database.
+// sweepTemp removes the checks and downloads a stopped daemon left next
+// to a database.
 func sweepTemp(live string) {
-	for _, what := range []string{"copy", "check"} {
-		left, _ := filepath.Glob(filepath.Join(filepath.Dir(live), "."+tempName(what+"-*")))
-		for _, dir := range left {
-			_ = os.RemoveAll(dir)
-		}
+	left, _ := filepath.Glob(filepath.Join(filepath.Dir(live), "."+tempName("temp-*")))
+	for _, dir := range left {
+		_ = os.RemoveAll(dir)
 	}
 }
 
@@ -279,17 +272,13 @@ type watched struct {
 	db     *litestream.DB
 }
 
-// record has Litestream follow a file with Every change, into
-// litestream/<generation>/ next to its copies. The generation is written
-// in Litestream's folder next to the file: without that folder, as after
-// a restore, a new generation starts, and the old one in the bucket
-// ages out with the copies (prune). Nothing in the bucket is deleted
-// here, but when Every change is turned off.
-func (b *backups) record(ctx context.Context, app string, database protocol.Database, schedule protocol.Schedule) error {
+// follow has Litestream write every change of a file into
+// litestream/<generation>/ beside its folder. The generation is written in
+// Litestream's folder next to the file: without that folder, as after a
+// restore, a new generation starts, and the old one in the bucket ages
+// out (pruneGenerations). When Litestream reports trouble, it says so.
+func (b *backups) follow(ctx context.Context, app string, database protocol.Database) error {
 	live := database.HostPath
-	if !schedule.EveryChange {
-		return b.stopRecording(ctx, app, database)
-	}
 	if generation(live) == "" {
 		if err := startGeneration(live); err != nil {
 			return err
@@ -299,47 +288,30 @@ func (b *backups) record(ctx context.Context, app string, database protocol.Data
 	if err != nil {
 		return err
 	}
-	folder += "/litestream/" + generation(live)
-	want := watched{bucket: *bucket, folder: folder, keep: schedule.Keep}
+	want := watched{bucket: *bucket, folder: folder + "/litestream/" + generation(live), keep: b.schedule(app).Keep}
 	b.mu.Lock()
 	now, known := b.watched[live]
 	b.mu.Unlock()
-	if known && now.bucket == want.bucket && now.folder == want.folder && now.keep == want.keep && !lostTheLog(now, live) {
-		return recordingHealth(now)
+	if known && now.bucket == want.bucket && now.folder == want.folder && now.keep == want.keep {
+		if why := now.db.SyncDiagnostic().Error; why != "" {
+			return errors.New("writing down every change: " + why)
+		}
+		return nil
 	}
 	b.unwatch(live)
-	return b.follow(ctx, live, want)
+	return b.register(ctx, live, want)
 }
 
-// stopRecording ends Every change for a file and deletes what it wrote.
-func (b *backups) stopRecording(ctx context.Context, app string, database protocol.Database) error {
-	live := database.HostPath
-	b.unwatch(live)
-	if !exists(litestreamState(live)) {
-		return nil
+// letGo has Litestream let go of the SQLite files of an app; the next round
+// follows them again. After a deploy, Litestream starts over: the app that
+// started may have left its log different from what Litestream last read.
+// The generation stays, so the history is kept.
+func (b *backups) letGo(app string) {
+	for _, database := range b.apps.liveDatabases(app) {
+		if !database.Postgres() {
+			b.unwatch(database.HostPath)
+		}
 	}
-	client, err := b.replica(app, database)
-	if err != nil {
-		return nil
-	}
-	return errors.Join(client.DeleteAll(ctx), os.RemoveAll(litestreamState(live)))
-}
-
-// lostTheLog says Litestream looks for a log file SQLite has removed,
-// which it does after the last app closes the database. Following the
-// file again starts it over.
-func lostTheLog(now watched, live string) bool {
-	why := now.db.SyncDiagnostic().Error
-	return strings.Contains(why, "cannot verify wal state") && !exists(live+"-wal")
-}
-
-// recordingHealth says what Litestream reports about a file it follows.
-func recordingHealth(now watched) error {
-	why := now.db.SyncDiagnostic().Error
-	if why == "" {
-		return nil
-	}
-	return errors.New("writing down every change: " + why)
 }
 
 // storeFor is the Litestream store that keeps files for keep days.
@@ -358,8 +330,8 @@ func (b *backups) storeFor(ctx context.Context, keep int) (*litestream.Store, er
 	return store, nil
 }
 
-// follow has Litestream start following a file.
-func (b *backups) follow(ctx context.Context, live string, want watched) error {
+// register has Litestream start following a file.
+func (b *backups) register(ctx context.Context, live string, want watched) error {
 	store, err := b.storeFor(ctx, want.keep)
 	if err != nil {
 		return fmt.Errorf("writing down every change: %w", err)
@@ -376,6 +348,29 @@ func (b *backups) follow(ctx context.Context, live string, want watched) error {
 	b.watched[live] = want
 	b.mu.Unlock()
 	return nil
+}
+
+// pruneSQLite deletes the undos and the generations older than each app
+// keeps, but nothing of an app the hub sent no schedule for.
+func (b *backups) pruneSQLite(ctx context.Context) {
+	for app, databases := range b.running() {
+		b.mu.Lock()
+		_, scheduled := b.schedules[app]
+		b.mu.Unlock()
+		if !scheduled {
+			continue
+		}
+		before := time.Now().Add(-time.Duration(b.schedule(app).Keep) * day)
+		for _, database := range databases {
+			if database.Postgres() {
+				continue
+			}
+			err := errors.Join(b.pruneGenerations(ctx, app, database, before), b.dropUndos(ctx, app, database, before))
+			if err != nil {
+				slog.Warn("backup: delete what is older than the app keeps", "app", app, "database", database.Path, "error", err)
+			}
+		}
+	}
 }
 
 // pruneGenerations deletes the generations of Every change but the one

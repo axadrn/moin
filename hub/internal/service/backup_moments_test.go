@@ -13,9 +13,10 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestMoments: the quick minutes inside what Every change reaches, then
-// the copies and the undos, newest first; a copy moin took before a
-// change carries its name.
+// TestMoments: Postgres has its copies and the undos, newest first, and a
+// copy moin took before a change carries its name. SQLite has the quick
+// minutes inside what Every change reaches, the remembered times and the
+// undos.
 func TestMoments(t *testing.T) {
 	now := time.Date(2026, 11, 7, 14, 30, 0, 0, time.UTC)
 	since := now.Add(-2 * time.Hour)
@@ -23,7 +24,7 @@ func TestMoments(t *testing.T) {
 		return protocol.Copy{ID: at.Format(protocol.CopyIDLayout), At: at}
 	}
 	deployed, edited, other := now.Add(-10*time.Minute), now.Add(-40*time.Minute), now.Add(-5*time.Minute)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now,
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Kind: protocol.DatabasePostgres,
 		Copies: []protocol.Copy{copyAt(other), copyAt(deployed), copyAt(now.Add(-20 * time.Minute)), copyAt(edited)},
 		Undos:  []protocol.Copy{copyAt(now.Add(-28 * time.Minute))}}
 	remembered := []model.BackupMoment{
@@ -36,7 +37,6 @@ func TestMoments(t *testing.T) {
 		got = append(got, moment.ID+" "+moment.Label)
 	}
 	want := []string{
-		"1m 1 minute ago", "15m 15 minutes ago", "1h 1 hour ago",
 		"20261107T142500Z At 14:25", "before-v12 Before v12", "20261107T141000Z At 14:10", "undo-20261107T140200Z Before the restore at 14:02", "edit-2 Before your SQL change",
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
@@ -50,20 +50,37 @@ func TestMoments(t *testing.T) {
 		t.Errorf("undo: %+v %v", moment, err)
 	}
 
-	// A broken Every change reaches only to its newest change.
-	newest := now.Add(-20 * time.Minute)
-	backup.Until, backup.Error = &newest, "dial tcp: i/o timeout"
-	for _, moment := range Moments(backup, remembered, now) {
-		if moment.Kind == MomentMinute && moment.At.After(newest) {
-			t.Errorf("%s offered after the newest change", moment.ID)
-		}
-	}
-	// Without Every change (Postgres, or switched off) only the copies
-	// and the undos.
-	backup.Since = nil
-	for _, moment := range Moments(backup, remembered, now) {
+	for _, moment := range moments {
 		if moment.Kind == MomentMinute {
 			t.Errorf("a minute without Every change: %+v", moment)
+		}
+	}
+
+	// SQLite: no copies, and "before v12" is a plain time in the history.
+	sqlite := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now, Undos: backup.Undos}
+	got = []string{}
+	moments = Moments(sqlite, remembered, now)
+	for _, moment := range moments {
+		got = append(got, moment.ID+" "+moment.Label)
+	}
+	want = []string{
+		"1m 1 minute ago", "15m 15 minutes ago", "1h 1 hour ago",
+		"before-v12 Before v12", "undo-20261107T140200Z Before the restore at 14:02", "edit-2 Before your SQL change",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("sqlite moments\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if moment, err := findMoment(moments, "before-v12"); err != nil || moment.Copy != "" || moment.Undo != "" || !moment.At.Equal(deployed) {
+		t.Errorf("before v12 of SQLite: %+v %v", moment, err)
+	}
+
+	// A broken Every change reaches only to its newest change, and a
+	// remembered time older than it reaches is not offered.
+	newest := now.Add(-20 * time.Minute)
+	sqlite.Until, sqlite.Error = &newest, "dial tcp: i/o timeout"
+	for _, moment := range Moments(sqlite, remembered, now) {
+		if (moment.Kind == MomentMinute || moment.Kind == model.MomentDeploy) && moment.At.After(newest) {
+			t.Errorf("%s offered after the newest change", moment.ID)
 		}
 	}
 }
@@ -75,7 +92,7 @@ func TestBackupProblem(t *testing.T) {
 		"upload: operation error S3: PutObject, https response error StatusCode: 403, api error AccessDenied": "The bucket refuses the keys.",
 		"NoSuchBucket: The specified bucket does not exist":                                                   "The bucket does not exist.",
 		"deploy shop once more to start its backups":                                                          "Deploy the app once more to start its backups.",
-		"the daily check failed: integrity check: page 4":                                                     "The daily check could not restore the newest copy.",
+		"the daily check failed: integrity check: page 4":                                                     "The daily check could not restore the newest state.",
 		"the Postgres service db of shop is not running":                                                      "The database is not running.",
 		"write /data/x: no space left on device":                                                              "The server's disk is full.",
 		"writing down every change: database is locked":                                                       "Every change is not written down.",
@@ -94,9 +111,9 @@ func backupDaemon(t *testing.T, apps *AppService, servers *ServerService, server
 }
 
 // TestRestoreToMoments: a restore resolves the moment, by ID or label, to
-// a copy, an undo or a minute; a time goes to that minute inside Every
-// change, else to the newest copy at or before it; a moment that is not
-// there is refused before the daemon gets anything.
+// a copy, an undo or a minute; a time goes to that minute for SQLite, to
+// the newest copy at or before it for Postgres; a moment that is not there
+// is refused before the daemon gets anything.
 func TestRestoreToMoments(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
@@ -107,8 +124,9 @@ func TestRestoreToMoments(t *testing.T) {
 	since := now.Add(-3 * time.Hour)
 	copied, before := now.Add(-2*time.Hour), now.Add(-30*time.Minute)
 	backup := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, Until: &now,
-		Copies: []protocol.Copy{{ID: before.Format(protocol.CopyIDLayout), At: before}, {ID: copied.Format(protocol.CopyIDLayout), At: copied}},
-		Undos:  []protocol.Copy{{ID: "20261107T140200Z", At: now.Add(-time.Hour)}}}
+		Undos: []protocol.Copy{{ID: "20261107T140200Z", At: now.Add(-time.Hour)}}}
+	postgres := protocol.DatabaseBackup{Database: "/data/app.db", Kind: protocol.DatabasePostgres,
+		Copies: []protocol.Copy{{ID: before.Format(protocol.CopyIDLayout), At: before}, {ID: copied.Format(protocol.CopyIDLayout), At: copied}}}
 	apps.remember(app, "", model.MomentDeploy, "7", before)
 	ctx := context.Background()
 
@@ -144,8 +162,9 @@ func TestRestoreToMoments(t *testing.T) {
 	if daemon.count(protocol.TypeBackupRestore) != 0 || daemon.count(protocol.TypeBackupList) != 0 {
 		t.Fatal("a restore without the name reached the daemon")
 	}
+	// SQLite: "before v7" is a plain time in the history.
 	sent, to, err := restore(RestoreTarget{Moment: "before v7"})
-	if err != nil || sent.Copy != before.Format(protocol.CopyIDLayout) || sent.At != nil || sent.Database != "/data/app.db" || to != "Before v7" {
+	if err != nil || sent.At == nil || !sent.At.Equal(before) || sent.Copy != "" || sent.Database != "/data/app.db" || to != "Before v7" {
 		t.Fatalf("before v7: %+v %v", sent, err)
 	}
 	sent, _, err = restore(RestoreTarget{Moment: "15m"})
@@ -161,15 +180,24 @@ func TestRestoreToMoments(t *testing.T) {
 	if err != nil || sent.At == nil || !sent.At.Equal(at) {
 		t.Fatalf("a minute: %+v %v", sent, err)
 	}
-	// Before Every change reaches: the newest copy at or before it.
+	// Before Every change reaches: too far back.
 	early := now.Add(-5 * time.Hour)
 	if _, _, err := restore(RestoreTarget{At: &early}); !errors.Is(err, ErrMomentOutside) {
-		t.Fatalf("before every copy: %v", err)
+		t.Fatalf("before every change: %v", err)
 	}
-	backup.Since = nil
+	// Postgres: the moment is its copy, a time the newest copy at or
+	// before it.
+	backup = postgres
+	sent, to, err = restore(RestoreTarget{Moment: "before v7"})
+	if err != nil || sent.Copy != before.Format(protocol.CopyIDLayout) || sent.At != nil || to != "Before v7" {
+		t.Fatalf("before v7 of Postgres: %+v %v", sent, err)
+	}
 	sent, _, err = restore(RestoreTarget{At: &at})
 	if err != nil || sent.Copy != copied.Format(protocol.CopyIDLayout) || sent.At != nil {
-		t.Fatalf("a time without Every change: %+v %v", sent, err)
+		t.Fatalf("a time of Postgres: %+v %v", sent, err)
+	}
+	if _, _, err := restore(RestoreTarget{At: &early}); !errors.Is(err, ErrMomentOutside) {
+		t.Fatalf("before every copy: %v", err)
 	}
 	if _, _, err := restore(RestoreTarget{Moment: "before v99"}); !errors.Is(err, ErrMoment) {
 		t.Fatalf("a moment that is not there: %v", err)
@@ -457,9 +485,10 @@ func TestOldDaemonGetsAnUpdateAnswer(t *testing.T) {
 	}
 }
 
-// TestDownloads: a download is a signed link to the newest copy, or the
-// one named, in the app's own bucket; it expires, and an app without a
-// copy says so.
+// TestDownloads: a Postgres download is a signed link to the newest copy,
+// or the one named, in the app's own bucket; it expires, and an app
+// without a copy says so. A SQLite download has the daemon make the newest
+// state first, and takes no moment.
 func TestDownloads(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
@@ -468,7 +497,7 @@ func TestDownloads(t *testing.T) {
 	}
 	ctx := context.Background()
 	newest, older := time.Date(2026, 11, 7, 14, 2, 0, 0, time.UTC), time.Date(2026, 11, 7, 13, 2, 0, 0, time.UTC)
-	backup := protocol.DatabaseBackup{Database: "/data/app.db", Copies: []protocol.Copy{{ID: "20261107T140200Z", At: newest, Size: 42}, {ID: "20261107T130200Z", At: older, Size: 40}}}
+	backup := protocol.DatabaseBackup{Database: "/data/app.db", Kind: protocol.DatabasePostgres, Copies: []protocol.Copy{{ID: "20261107T140200Z", At: newest, Size: 42}, {ID: "20261107T130200Z", At: older, Size: 40}}}
 	answer := func(backup protocol.DatabaseBackup) {
 		daemon.mu.Lock()
 		daemon.sent = nil
@@ -480,7 +509,7 @@ func TestDownloads(t *testing.T) {
 	if err != nil || download.Copy != "20261107T140200Z" || download.Size != 42 || download.Database != "/data/app.db" {
 		t.Fatalf("newest: %+v %v", download, err)
 	}
-	key := owner.WorkspaceID + "/shop/" + app.ID + "/data~app.db/copies/20261107T140200Z.db.gz"
+	key := owner.WorkspaceID + "/shop/" + app.ID + "/data~app.db/copies/20261107T140200Z.dump"
 	if !strings.HasPrefix(download.Link, "https://s3.example.com/owner/"+key) || !strings.Contains(download.Link, "X-Amz-Expires=900") {
 		t.Fatalf("link %s", download.Link)
 	}
@@ -488,9 +517,26 @@ func TestDownloads(t *testing.T) {
 	if download, err := apps.Download(ctx, owner, "shop", "", "20261107T130200Z"); err != nil || download.Copy != "20261107T130200Z" {
 		t.Fatalf("named: %+v %v", download, err)
 	}
-	answer(protocol.DatabaseBackup{Database: "/data/app.db"})
+	answer(protocol.DatabaseBackup{Database: "/data/app.db", Kind: protocol.DatabasePostgres})
 	if _, err := apps.Download(ctx, owner, "shop", "", ""); !errors.Is(err, ErrNoCopy) {
 		t.Fatalf("no copy: %v", err)
+	}
+
+	since := newest.Add(-time.Hour)
+	sqlite := protocol.DatabaseBackup{Database: "/data/app.db", Since: &since}
+	answer(sqlite)
+	if _, err := apps.Download(ctx, owner, "shop", "", "before-v12"); !errors.Is(err, ErrDownloadNewest) {
+		t.Fatalf("a moment of SQLite: %v", err)
+	}
+	answer(sqlite)
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupDownload, protocol.TypeBackupDownloadResult, protocol.Copy{ID: "20261107T150000Z", At: newest})
+	download, err = apps.Download(ctx, owner, "shop", "", "")
+	if err != nil || download.Copy != "20261107T150000Z" {
+		t.Fatalf("SQLite: %+v %v", download, err)
+	}
+	key = owner.WorkspaceID + "/shop/" + app.ID + "/downloads/data~app.db-20261107T150000Z.db.gz"
+	if !strings.HasPrefix(download.Link, "https://s3.example.com/owner/"+key) {
+		t.Fatalf("SQLite link %s", download.Link)
 	}
 	if _, err := apps.Download(ctx, other, "shop", "", ""); err == nil {
 		t.Fatal("another workspace downloads the copy")
@@ -505,8 +551,8 @@ func TestBackupSchedule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.BackupEvery != 60 || app.BackupKeep != 7 || !app.BackupEveryChange {
-		t.Fatalf("defaults: %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
+	if app.BackupEvery != 60 || app.BackupKeep != 7 {
+		t.Fatalf("defaults: %d %d", app.BackupEvery, app.BackupKeep)
 	}
 	if _, err := apps.SetBackupSchedule(owner, "shop", protocol.Schedule{Every: 5, Keep: 7}); !errors.Is(err, ErrBackupEvery) {
 		t.Fatalf("every 5: %v", err)
@@ -518,8 +564,8 @@ func TestBackupSchedule(t *testing.T) {
 		t.Fatal(err)
 	}
 	app, _ = apps.Get(owner.WorkspaceID, "shop")
-	if app.BackupEvery != 15 || app.BackupKeep != 30 || app.BackupEveryChange {
-		t.Fatalf("stored: %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
+	if app.BackupEvery != 15 || app.BackupKeep != 30 {
+		t.Fatalf("stored: %d %d", app.BackupEvery, app.BackupKeep)
 	}
 	config, _ := apps.backupConfig(owner.WorkspaceID, app.ServerID)
 	if got := config.Schedules["shop"]; got != (protocol.Schedule{Every: 15, Keep: 30}) {

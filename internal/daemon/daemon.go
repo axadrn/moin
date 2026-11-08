@@ -354,6 +354,10 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
 			return r.backups.list(ctx, request), nil
 		})
+	case protocol.TypeBackupDownload:
+		answer(r, message, protocol.TypeBackupDownloadResult, func(request protocol.BackupRequest) (any, error) {
+			return r.backups.download(ctx, request)
+		})
 	case protocol.TypeBackupRestores:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
 			return protocol.Backups{App: request.App, Databases: []protocol.DatabaseBackup{}, Restores: r.backups.restoreStates(request.App)}, nil

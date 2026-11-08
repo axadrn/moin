@@ -93,13 +93,12 @@ type Config struct {
 	Instant        string              `json:"instant,omitempty"`
 }
 
-// ConfigBackups is the backups block of x-moin: how often, how long, and
-// whether SQLite also records every change. What it leaves out is the
+// ConfigBackups is the backups block of x-moin: how often Postgres is
+// copied and how long the app keeps its backups. What it leaves out is the
 // default.
 type ConfigBackups struct {
-	Every       string `json:"every,omitempty"`
-	Keep        string `json:"keep,omitempty"`
-	EveryChange *bool  `json:"every_change,omitempty"`
+	Every string `json:"every,omitempty"`
+	Keep  string `json:"keep,omitempty"`
 }
 
 // Schedule is the schedule the block asks for.
@@ -118,9 +117,6 @@ func (b ConfigBackups) Schedule() (Schedule, error) {
 			return schedule, fmt.Errorf("backups.keep is %q: use 1d, 3d, 7d or 30d", b.Keep)
 		}
 		schedule.Keep = days
-	}
-	if b.EveryChange != nil {
-		schedule.EveryChange = *b.EveryChange
 	}
 	return schedule, nil
 }

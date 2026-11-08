@@ -22,8 +22,8 @@ MCP: list_activity
 | 2026-11-02 14:10:12 | Ben Okafor | Web | set STRIPE_KEY in the env of my-app |
 | 2026-11-02 14:12:30 | Ben Okafor | Web | edited email of row 1182 in users of my-app |
 | 2026-11-02 14:25:44 | Ada Lovelace | MCP, token claude | ran UPDATE on users in my-app, 3 rows changed |
-| 2026-11-02 16:40:02 | Ada Lovelace | Web | set the backups of my-app to every 15 minutes, kept 30 days, every change on |
-| 2026-11-03 03:00:18 | moin | moin | checked that the newest copy of app.db of my-app restores |
+| 2026-11-02 16:40:02 | Ada Lovelace | Web | set the backups of my-app to every 15 minutes, kept 30 days |
+| 2026-11-03 03:00:18 | moin | moin | checked that the newest state of app.db of my-app restores |
 
 ## Find one change
 

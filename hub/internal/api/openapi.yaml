@@ -2658,7 +2658,7 @@ paths:
       tags: [Backups]
       operationId: setAppBackups
       summary: Set the backup schedule
-      description: How often the daemon copies the app's databases into your bucket (`every_minutes` 15, 60 or 1440), how many days it keeps each copy (`keep_days` 1, 3, 7 or 30), and `every_change`, which also records every change of a SQLite file so a restore can go back to any minute. Turning every change off removes what it wrote down; the copies stay. The daemon deletes copies older than `keep_days`, never the newest.
+      description: How many days the app keeps its backups (`keep_days` 1, 3, 7 or 30) and how often the daemon copies Postgres (`every_minutes` 15, 60 or 1440). SQLite has every change written down; it only uses `keep_days`. The daemon deletes what is older than `keep_days`, never the newest copy.
       requestBody:
         required: true
         content:
@@ -6129,19 +6129,16 @@ components:
           description: A copy from getAppBackups by id or label; the newest without one.
     BackupSchedule:
       type: object
-      required: [every_minutes, keep_days, every_change]
+      required: [every_minutes, keep_days]
       properties:
         every_minutes:
           type: integer
           enum: [15, 60, 1440]
-          description: How often the daemon copies the databases.
+          description: How often the daemon copies Postgres.
         keep_days:
           type: integer
           enum: [1, 3, 7, 30]
-          description: How many days each copy stays.
-        every_change:
-          type: boolean
-          description: Also record every change of a SQLite file, to go back to any minute.
+          description: How many days the app keeps its backups.
     Restore:
       type: object
       required: [id, app, database, to, state, started_at]
@@ -6433,7 +6430,7 @@ components:
           type: boolean
     AppBackups:
       type: object
-      required: [bucket, every_minutes, keep_days, every_change, databases]
+      required: [bucket, every_minutes, keep_days, databases]
       properties:
         bucket:
           type: string
@@ -6444,8 +6441,6 @@ components:
         keep_days:
           type: integer
           enum: [1, 3, 7, 30]
-        every_change:
-          type: boolean
         databases:
           type: array
           items:
@@ -6461,11 +6456,11 @@ components:
               copied_at:
                 type: string
                 format: date-time
-                description: The newest copy in the bucket.
+                description: Postgres only. The newest copy in the bucket.
               checked_at:
                 type: string
                 format: date-time
-                description: The newest daily check. It restored the newest copy into a throwaway database and read it.
+                description: The newest daily check. It restored the newest state into a throwaway database and read it.
               check_error:
                 type: string
                 description: Why the newest daily check failed.

@@ -15,13 +15,13 @@ import (
 func registerBackupTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("get_backups", "List backups",
-		"Lists how an app is backed up: the schedule (every_minutes, keep_days, every_change) and for every database its copies in the user's bucket, copied_at the newest, checked_at the newest daily check (check_error when it failed), problem in one short sentence when the backup does not work, and the moments a restore can go back to: for SQLite with every_change the minutes 1m, 15m, 1h and 1d ago, then the copies newest first, named before-v12 and the like when moin took one before a deploy, a data edit or a catalog update, and the state before each restore (undo-...). Needs the read scope.",
+		"Lists how an app is backed up: the schedule (every_minutes for Postgres, keep_days) and for every database checked_at the newest daily check (check_error when it failed), problem in one short sentence when the backup does not work, since and until how far SQLite goes back, for Postgres its copies in the user's bucket with copied_at the newest, and the moments a restore can go back to: for SQLite the minutes 1m, 15m, 1h and 1d ago, for Postgres the copies newest first, on both named before-v12 and the like for the moment before a deploy, a data edit or a catalog update, and the state before each restore (undo-...). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getBackups)))
 	mcpsdk.AddTool(server, newTool("set_backups", "Set the backup schedule",
-		"Sets how often moin copies the databases of an app into the user's bucket (every_minutes: 15, 60 or 1440), how many days it keeps each copy (keep_days: 1, 3, 7 or 30), and every_change, which also records every change of a SQLite file so a restore can go back to any minute; turning it off removes what it wrote down, the copies stay. Returns the schedule. Needs a token with read and write access.",
+		"Sets how many days an app keeps its backups (keep_days: 1, 3, 7 or 30) and how often moin copies its Postgres into the user's bucket (every_minutes: 15, 60 or 1440). SQLite has every change written down and only uses keep_days. Returns the schedule. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.setBackups)))
 	mcpsdk.AddTool(server, newTool("restore_app", "Restore a database",
-		"Puts a database of an app back to a moment from get_backups, by its id or label, or to a time (RFC 3339): that minute for SQLite with every_change, else the newest copy at or before it. moin builds the restored database beside the live one and switches in one step; the state before stays as long as the app keeps copies, so the restore can be undone with its undo- moment. The app stops for the switch and starts again. It runs on its own and returns its state: running; unknown when the server went offline during it, until the server is back and says how it ended; then done, or failed with error. Call it again with id until it is done or failed; when it stays unknown, tell the user to check the app once the server is back. A moment two moments share as a label needs its id. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
+		"Puts a database of an app back to a moment from get_backups, by its id or label, or to a time (RFC 3339): that minute for SQLite, for Postgres the newest copy at or before it. moin builds the restored database beside the live one and switches in one step; the state before stays as long as the app keeps its backups, so the restore can be undone with its undo- moment. The app stops for the switch and starts again. It runs on its own and returns its state: running; unknown when the server went offline during it, until the server is back and says how it ended; then done, or failed with error. Call it again with id until it is done or failed; when it stays unknown, tell the user to check the app once the server is back. A moment two moments share as a label needs its id. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.restoreApp)))
 	mcpsdk.AddTool(server, newTool("download_backup", "Download a copy",
 		"Returns link, a signed link to a copy of a database of an app in the app's own bucket, never through moin, valid 15 minutes: the newest copy, or the one moment names (a copy from get_backups). SQLite is gzipped, Postgres a pg_dump in its custom format. Needs a token with read and write access.",
@@ -33,7 +33,7 @@ type RestoreInput struct {
 	App      string  `json:"app" jsonschema:"the app name or ID"`
 	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
 	Moment   string  `json:"moment,omitempty" jsonschema:"the id or label of a moment from get_backups, like 1h, before-v12, 20261107T140000Z or undo-20261107T140200Z"`
-	At       *string `json:"at,omitempty" jsonschema:"a time instead of a moment, RFC 3339: that minute for SQLite with every_change, else the newest copy at or before it"`
+	At       *string `json:"at,omitempty" jsonschema:"a time instead of a moment, RFC 3339: that minute for SQLite, for Postgres the newest copy at or before it"`
 	Confirm  string  `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
 	ID       string  `json:"id,omitempty" jsonschema:"the id of a restore this tool started, to see how it stands; then only app is needed"`
 }
@@ -53,9 +53,8 @@ type DownloadInput struct {
 // ScheduleInput is the input of set_backups.
 type ScheduleInput struct {
 	App          string `json:"app" jsonschema:"the app name or ID"`
-	EveryMinutes int    `json:"every_minutes" jsonschema:"how often moin copies the databases: 15, 60 or 1440"`
-	KeepDays     int    `json:"keep_days" jsonschema:"how many days each copy stays: 1, 3, 7 or 30"`
-	EveryChange  bool   `json:"every_change" jsonschema:"also record every change of a SQLite file, to go back to any minute"`
+	EveryMinutes int    `json:"every_minutes" jsonschema:"how often moin copies Postgres: 15, 60 or 1440"`
+	KeepDays     int    `json:"keep_days" jsonschema:"how many days the app keeps its backups: 1, 3, 7 or 30"`
 }
 
 // ScheduleOutput is the output of set_backups.
@@ -123,7 +122,7 @@ func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreI
 }
 
 func (t moinTools) setBackups(ctx context.Context, caller Caller, input ScheduleInput) (ScheduleOutput, error) {
-	app, err := t.services.Apps.SetBackupSchedule(caller.actor(), input.App, protocol.Schedule{Every: input.EveryMinutes, Keep: input.KeepDays, EveryChange: input.EveryChange})
+	app, err := t.services.Apps.SetBackupSchedule(caller.actor(), input.App, protocol.Schedule{Every: input.EveryMinutes, Keep: input.KeepDays})
 	if err != nil {
 		return ScheduleOutput{}, err
 	}

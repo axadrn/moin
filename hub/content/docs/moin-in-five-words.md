@@ -35,7 +35,7 @@ Like hanging a new sign in the shop window. If the new sign falls down, the old 
 
 ## Backup
 
-moin copies your database into your bucket, on a schedule you pick. With SQLite it can also write down every change, so you can go back to any minute.
+moin keeps your database in your bucket. SQLite: every change is written down, so you can go back to any minute. Postgres: a copy on a schedule you pick.
 
 Like a diary of your data: turn back the pages to any day.
 

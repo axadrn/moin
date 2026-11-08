@@ -115,6 +115,10 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
 	a.ownVolumes(ctx, release)
 	err = a.startRelease(ctx, release)
+	if a.backups != nil {
+		// After a deploy, Litestream starts over: the next round follows.
+		a.backups.letGo(release.start.App)
+	}
 	if err != nil {
 		return release.detected, err
 	}
@@ -332,14 +336,14 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 	return os.WriteFile(filepath.Join(a.appDir(start.App), "current"), []byte(strconv.Itoa(start.Number)), 0o600)
 }
 
-// copyDataBefore makes a copy of each database just before the new release
-// touches the data: the hub names it "Before v12".
+// copyDataBefore remembers the moment just before the new release touches
+// the data, with a copy for Postgres: the hub names it "Before v12".
 func (a *apps) copyDataBefore(ctx context.Context, release *release) {
 	before := a.backups.copyBefore(ctx, release.start.App, "", release.logf)
 	if before == nil {
 		return
 	}
-	release.logf("copied the data before v%d", release.start.Number)
+	release.logf("noted the data before v%d", release.start.Number)
 	a.mu.Lock()
 	a.befores[release.start.DeployID] = *before
 	a.mu.Unlock()
@@ -362,8 +366,8 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	return fmt.Errorf("%w; v%d is running again", startErr, previous)
 }
 
-// afterStart notes the databases the running release has, has backups
-// follow them, and drops old releases and images.
+// afterStart notes the databases the running release has, starts a round
+// of backups for them, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
 	databases, noBackup, err := a.scanDatabases(ctx, release.composeFile)
 	if err == nil {

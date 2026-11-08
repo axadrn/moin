@@ -344,7 +344,7 @@ func (m model) restoreCmd(app, database, moment string, at *time.Time) tea.Cmd {
 	}
 }
 
-// downloadCopy opens the link to the newest copy of a database in the
+// downloadCopy opens the link to the newest state of a database in the
 // app's bucket, or shows it.
 func (m model) downloadCopy(app, database string) tea.Cmd {
 	api, ctx := m.api, m.ctx

@@ -59,18 +59,16 @@ type App struct {
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
-	// BackupEvery is how often the daemon copies the app's databases, in
-	// minutes; BackupKeep how many days it keeps each copy.
-	// BackupEveryChange also records every change of a SQLite file.
-	BackupEvery       int    `db:"backup_every"`
-	BackupKeep        int    `db:"backup_keep"`
-	BackupEveryChange bool   `db:"backup_every_change"`
-	BucketName        string `db:"bucket_name"`
-	ServerName        string `db:"server_name"`
-	WorkspaceSlug     string `db:"workspace_slug"`
-	LatestNumber      int    `db:"latest_number"`
-	LatestStatus      string `db:"latest_status"`
-	LiveNumber        int    `db:"live_number"`
+	// BackupEvery is how often the daemon copies Postgres, in minutes;
+	// BackupKeep how many days the app keeps its backups.
+	BackupEvery   int    `db:"backup_every"`
+	BackupKeep    int    `db:"backup_keep"`
+	BucketName    string `db:"bucket_name"`
+	ServerName    string `db:"server_name"`
+	WorkspaceSlug string `db:"workspace_slug"`
+	LatestNumber  int    `db:"latest_number"`
+	LatestStatus  string `db:"latest_status"`
+	LiveNumber    int    `db:"live_number"`
 }
 
 // Deploy statuses.

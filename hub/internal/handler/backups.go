@@ -31,7 +31,7 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 	h.renderDatabaseBackups(w, r)
 }
 
-// BackupDownload sends the browser to the newest copy of the database,
+// BackupDownload sends the browser to the newest state of the database,
 // in the user's own bucket, through a link that lasts 15 minutes.
 func (h *AppsHandler) BackupDownload(w http.ResponseWriter, r *http.Request) {
 	download, err := h.apps.Download(r.Context(), actor(r), r.PathValue("app"), r.FormValue("database"), "")
@@ -42,13 +42,13 @@ func (h *AppsHandler) BackupDownload(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, download.Link, http.StatusSeeOther)
 }
 
-// BackupSchedule saves how often the app's databases are copied, how long
-// each copy stays and Every change. A failed save answers the rows as
+// BackupSchedule saves how often the app's Postgres is copied and how
+// long the app keeps its backups. A failed save answers the rows as
 // stored, with why.
 func (h *AppsHandler) BackupSchedule(w http.ResponseWriter, r *http.Request) {
 	every, _ := strconv.Atoi(r.FormValue("every"))
 	keep, _ := strconv.Atoi(r.FormValue("keep"))
-	_, err := h.apps.SetBackupSchedule(actor(r), r.PathValue("app"), protocol.Schedule{Every: every, Keep: keep, EveryChange: r.FormValue("every_change") == "1"})
+	_, err := h.apps.SetBackupSchedule(actor(r), r.PathValue("app"), protocol.Schedule{Every: every, Keep: keep})
 	h.renderDatabaseBackups(w, r)
 	if err != nil {
 		answerError(w, r, "Not saved", errorMessage(err))
@@ -71,7 +71,7 @@ func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	if app.BucketName != "" {
 		bucket = app.BucketName
 	}
-	answerDone(w, r, "Uploads and backups go to "+bucket, "Its copies start again there.")
+	answerDone(w, r, "Uploads and backups go to "+bucket, "Its backups start again there.")
 }
 
 // Bucket is the buckets page.
@@ -131,7 +131,7 @@ func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their copies start again there.")
+	answerDone(w, r, name+" is the default bucket", "Apps without a bucket of their own use it now; their backups start again there.")
 }
 
 // RemoveBucket forgets a bucket nothing uses.

@@ -26,8 +26,8 @@ func TestBackupScheduleRows(t *testing.T) {
 	s := newSwitches(t)
 	form := url.Values{"every": {"15"}, "keep": {"30"}, "database": {"/data/app.db"}}
 	s.post("/app/{workspaceSlug}/apps/{app}/backups/schedule", "/app/ada/apps/blog/backups/schedule", form, s.handler.BackupSchedule)
-	if app := s.app(); app.BackupEvery != 15 || app.BackupKeep != 30 || app.BackupEveryChange {
-		t.Fatalf("stored %d %d %v", app.BackupEvery, app.BackupKeep, app.BackupEveryChange)
+	if app := s.app(); app.BackupEvery != 15 || app.BackupKeep != 30 {
+		t.Fatalf("stored %d %d", app.BackupEvery, app.BackupKeep)
 	}
 	if activity(t, s, "backup.scheduled") != 1 {
 		t.Fatal("no backup.scheduled in the activity")

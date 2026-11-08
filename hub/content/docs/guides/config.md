@@ -22,7 +22,6 @@ x-moin:
   backups:
     every: 1h                  # how often: 15m, 1h or 1d
     keep: 7d                   # how long: 1d, 3d, 7d or 30d
-    every_change: true         # SQLite also writes down every change
 
 services:
   web:
@@ -42,7 +41,7 @@ A setting in the file is locked in moin, marked **from compose.yml**. To change 
 ## Good to know
 
 - After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name. Otherwise `moin deploy` in a folder of the old name offers to make a new app.
-- `backups` counts as a whole. A part you leave out takes its default: hourly, 7 days, Every change on. A wrong value stops the deploy and says why.
+- `backups` counts as a whole. A part you leave out takes its default: hourly for Postgres, 7 days. A wrong value stops the deploy and says why.
 - Only a `Dockerfile` or a Go module? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`.
 - After every deploy the daemon reports what it found. The app page, the end of `moin deploy` and `get_app` show it.
 - Secrets never belong in the repo. Use [env vars](/docs/guides/env).

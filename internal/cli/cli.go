@@ -126,7 +126,7 @@ Data
   sql --write        Run SQL that changes data, in one transaction; DROP or DELETE asks [--yes]
 
 Backups
-  backups            The copies of each database, the moments to go back to, how often: backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d] [--every-change on|off]
+  backups            The moments of each database to go back to, how long, how often for Postgres: backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]
   restore            Go back to a copy, or a minute with every change; can be undone: restore [app] --to before-v12|1h|14:01 [--confirm <app>]
   backup download    Save a copy of a database from your bucket: backup download [app] [--db <path>] [--to <moment>] [--link]
 
@@ -280,7 +280,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "sql":
 		return sql(ctx, rest, stdin, stdout)
 	case "backups":
-		return backups(ctx, rest, stdin, stdout)
+		return backups(ctx, rest, stdout)
 	case "buckets":
 		return buckets(ctx, rest, stdin, stdout)
 	case "github":

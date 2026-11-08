@@ -48,7 +48,7 @@ const keepRestores = 7 * 24 * time.Hour
 
 // StartRestore puts a database of an app back to a moment. The daemon
 // builds the restored database beside the live one and switches in one
-// step; the state before stays as long as the app keeps copies: going
+// step; the state before stays as long as the app keeps its backups: going
 // back to it undoes the restore. It reserves the restore, checks the
 // moment, then the daemon runs the restore on its own; RestoreOf follows
 // it.
@@ -333,7 +333,7 @@ func pickDatabase(databases []DatabaseBackups, name string) (*DatabaseBackups, e
 
 // restoreRequest checks where a restore goes and says it as people read
 // it. A time goes to that minute when Every change reaches it, else to
-// the newest copy at or before it.
+// the newest copy at or before it (Postgres).
 func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target RestoreTarget) (protocol.BackupRestore, string, error) {
 	databases, err := s.backups(ctx, app)
 	if err != nil {
@@ -364,15 +364,16 @@ func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target 
 		return protocol.BackupRestore{}, "", err
 	}
 	request.Copy, request.Undo = moment.Copy, moment.Undo
-	if moment.Kind == MomentMinute {
+	if moment.Copy == "" && moment.Undo == "" {
+		at := moment.At.UTC()
 		// "1 hour ago" is an hour before the restore: the list was made a
 		// moment earlier.
 		for _, quick := range quickMoments {
 			if quick.id == moment.ID {
-				at := now.Add(-quick.ago)
-				request.At = &at
+				at = now.Add(-quick.ago)
 			}
 		}
+		request.At = &at
 	}
 	return request, moment.Label, nil
 }

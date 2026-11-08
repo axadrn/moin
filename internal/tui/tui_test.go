@@ -64,10 +64,10 @@ func (m model) withApp(name string, t tab) model {
 		{Number: 41, Status: "succeeded", Image: "ghcr.io/acme/shop:41", CreatedAt: now.Add(-26 * time.Hour)},
 	}}
 	m.app.logs = []string{"web  | GET / 200 3ms", "web  | ERROR db timeout", "web  | WARN slow query 812ms", "worker | job done"}
-	m.app.backups = &client.AppBackups{Bucket: "main", BackupSchedule: client.BackupSchedule{EveryMinutes: 60, KeepDays: 7, EveryChange: true}, Databases: []client.DatabaseBackups{
+	m.app.backups = &client.AppBackups{Bucket: "main", BackupSchedule: client.BackupSchedule{EveryMinutes: 60, KeepDays: 7}, Databases: []client.DatabaseBackups{
 		{DatabaseBackup: client.DatabaseBackup{Database: "shop.db", Kind: "sqlite", CopiedAt: ago2(12 * time.Minute), Since: ago2(6 * 24 * time.Hour), Until: ago2(3 * time.Second), CheckedAt: ago2(2 * time.Hour)},
 			Moments: []client.Moment{{ID: "1h", Label: "1 hour ago", At: now.Add(-time.Hour), Kind: "ago"}, {ID: "before-v43", Label: "Before v43", At: now.Add(-2 * time.Hour), Kind: "deploy"}}},
-		{DatabaseBackup: client.DatabaseBackup{Database: "postgres", Kind: "postgres", Error: "the daily check failed: role missing", CheckError: "the daily check failed: role missing"}, Problem: "The daily check could not restore the newest copy."},
+		{DatabaseBackup: client.DatabaseBackup{Database: "postgres", Kind: "postgres", Error: "the daily check failed: role missing", CheckError: "the daily check failed: role missing"}, Problem: "The daily check could not restore the newest state."},
 	}}
 	m.app.env = map[string]string{"DATABASE_URL": "postgres://x", "STRIPE_KEY": "sk_live_secret", "DEBUG": ""}
 	m.app.domains = []client.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}, {Domain: "www.shop.example.com", Points: false, Advice: "add an A record to 203.0.113.7"}}

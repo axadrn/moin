@@ -10,19 +10,17 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// BackupSchedule is how an app is backed up: a copy every every_minutes
-// (15, 60 or 1440), each kept keep_days (1, 3, 7 or 30); every_change
-// also records every change of a SQLite file. PUT
-// /api/v1/apps/{app}/backups takes it.
+// BackupSchedule is how an app is backed up: keep_days (1, 3, 7 or 30) is
+// how far back it goes, every_minutes (15, 60 or 1440) how often Postgres
+// is copied. PUT /api/v1/apps/{app}/backups takes it.
 type BackupSchedule struct {
-	EveryMinutes int  `json:"every_minutes"`
-	KeepDays     int  `json:"keep_days"`
-	EveryChange  bool `json:"every_change"`
+	EveryMinutes int `json:"every_minutes"`
+	KeepDays     int `json:"keep_days"`
 }
 
 // NewBackupSchedule is the JSON shape of an app's schedule.
 func NewBackupSchedule(app *model.App) BackupSchedule {
-	return BackupSchedule{EveryMinutes: app.BackupEvery, KeepDays: app.BackupKeep, EveryChange: app.BackupEveryChange}
+	return BackupSchedule{EveryMinutes: app.BackupEvery, KeepDays: app.BackupKeep}
 }
 
 // AppBackups is the answer of GET /api/v1/apps/{app}/backups: the bucket
@@ -148,7 +146,7 @@ func (h *AppsHandler) SetBackupSchedule(w http.ResponseWriter, r *http.Request) 
 	if !Decode(w, r, &request) {
 		return
 	}
-	app, err := h.apps.SetBackupSchedule(actor(r), r.PathValue("app"), protocol.Schedule{Every: request.EveryMinutes, Keep: request.KeepDays, EveryChange: request.EveryChange})
+	app, err := h.apps.SetBackupSchedule(actor(r), r.PathValue("app"), protocol.Schedule{Every: request.EveryMinutes, Keep: request.KeepDays})
 	if err != nil {
 		ServiceError(w, err)
 		return

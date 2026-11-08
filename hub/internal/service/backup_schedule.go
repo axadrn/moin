@@ -1,6 +1,7 @@
 package service
 
-// How often an app is copied and how long each copy stays.
+// How often an app's Postgres is copied and how long the app keeps its
+// backups.
 
 import (
 	"log/slog"
@@ -11,9 +12,8 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// SetBackupSchedule sets how often the daemon copies an app's databases,
-// how long it keeps each copy and whether it records every change of a
-// SQLite file, and tells the daemon.
+// SetBackupSchedule sets how often the daemon copies an app's Postgres
+// and how long the app keeps its backups, and tells the daemon.
 func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule protocol.Schedule) (*model.App, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
@@ -56,15 +56,14 @@ func (s *AppService) applyScheduleInFile(app *model.App, backups protocol.Config
 // tells the daemon.
 func (s *AppService) saveSchedule(actor Actor, app *model.App, schedule protocol.Schedule) error {
 	before := scheduleOf(app)
-	if err := s.apps.SetBackupSchedule(app.ID, schedule.Every, schedule.Keep, schedule.EveryChange); err != nil {
+	if err := s.apps.SetBackupSchedule(app.ID, schedule.Every, schedule.Keep); err != nil {
 		return err
 	}
-	app.BackupEvery, app.BackupKeep, app.BackupEveryChange = schedule.Every, schedule.Keep, schedule.EveryChange
+	app.BackupEvery, app.BackupKeep = schedule.Every, schedule.Keep
 	if before != schedule {
 		s.servers.record(actor, "backup.scheduled", "app", app.Name, map[string]string{
-			"every":        EveryText(before.Every) + " → " + EveryText(schedule.Every),
-			"keep":         KeepText(before.Keep) + " → " + KeepText(schedule.Keep),
-			"every_change": onOff(before.EveryChange) + " → " + onOff(schedule.EveryChange),
+			"every": EveryText(before.Every) + " → " + EveryText(schedule.Every),
+			"keep":  KeepText(before.Keep) + " → " + KeepText(schedule.Keep),
 		})
 	}
 	if s.servers.Online(app.ServerID) {
@@ -76,14 +75,7 @@ func (s *AppService) saveSchedule(actor Actor, app *model.App, schedule protocol
 
 // scheduleOf is the backup schedule of an app.
 func scheduleOf(app *model.App) protocol.Schedule {
-	return protocol.Schedule{Every: app.BackupEvery, Keep: app.BackupKeep, EveryChange: app.BackupEveryChange}
-}
-
-func onOff(on bool) string {
-	if on {
-		return "on"
-	}
-	return "off"
+	return protocol.Schedule{Every: app.BackupEvery, Keep: app.BackupKeep}
 }
 
 // EveryText says how often, as people read it: "every 15 minutes",

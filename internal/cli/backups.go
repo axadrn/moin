@@ -18,12 +18,11 @@ import (
 )
 
 // backups lists the backups of an app with the moments to go back to, or
-// sets how often and how long with --every, --keep and --every-change.
-func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("backups", "backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d] [--every-change on|off]").withApp().withYes()
-	every := flags.String("every", "", "how often moin copies the databases: 15m, 1h or 1d")
-	keep := flags.String("keep", "", "how long each copy stays: 1d, 3d, 7d or 30d")
-	everyChange := flags.String("every-change", "", "on or off: also record every change of a SQLite file, to go back to any minute")
+// sets how often and how long with --every and --keep.
+func backups(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("backups", "backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]").withApp()
+	every := flags.String("every", "", "how often moin copies Postgres: 15m, 1h or 1d")
+	keep := flags.String("keep", "", "how long the app keeps its backups: 1d, 3d, 7d or 30d")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -42,7 +41,7 @@ func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
-	if *every == "" && *keep == "" && *everyChange == "" {
+	if *every == "" && *keep == "" {
 		printBackups(stdout, name, list, time.Now())
 		return nil
 	}
@@ -61,25 +60,11 @@ func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		}
 		schedule.KeepDays = days
 	}
-	switch *everyChange {
-	case "":
-	case "on":
-		schedule.EveryChange = true
-	case "off":
-		if schedule.EveryChange {
-			if err := confirm(stdin, stdout, flags.yes(), "Turn Every change off for "+name+"? What it wrote down goes; the copies stay."); err != nil {
-				return err
-			}
-		}
-		schedule.EveryChange = false
-	default:
-		return fmt.Errorf("--every-change is on or off")
-	}
 	schedule, err = api.SetBackupSchedule(ctx, name, schedule)
 	if err != nil {
 		return err
 	}
-	done(stdout, "%s is copied %s, each copy kept %s, every change %s.", name, everyText(schedule.EveryMinutes), keepText(schedule.KeepDays), onOff(schedule.EveryChange))
+	done(stdout, "%s keeps its backups %s; Postgres is copied %s.", name, keepText(schedule.KeepDays), everyText(schedule.EveryMinutes))
 	return nil
 }
 
@@ -100,22 +85,15 @@ func keepText(days int) string {
 	return fmt.Sprintf("%d days", days)
 }
 
-func onOff(on bool) string {
-	if on {
-		return "on"
-	}
-	return "off"
-}
-
-// backUp is moin backup: download a copy.
+// backUp is moin backup: download a database.
 func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "download" {
-		return fmt.Errorf("usage: `%s backup download [app] [--db <path>] [--to <moment>] [--link]`. moin copies every database on its schedule: %s backups lists the copies", build.Name, build.Name)
+		return fmt.Errorf("usage: `%s backup download [app] [--db <path>] [--to <moment>] [--link]`. %s backups lists the moments", build.Name, build.Name)
 	}
 	flags := newFlags("backup download", "backup download [app] [--db <path>] [--to <moment>] [--link]").withApp()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	to := flags.String("to", "", "a copy from "+build.Name+" backups, like before-v12; the newest without it")
-	link := flags.Bool("link", false, "print the link to the copy in your bucket instead of saving it here")
+	to := flags.String("to", "", "Postgres: a copy from "+build.Name+" backups, like before-v12; the newest without it")
+	link := flags.Bool("link", false, "print the link in your bucket instead of saving it here")
 	if err := flags.parse(args[1:]); err != nil {
 		return err
 	}
@@ -152,7 +130,7 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 		os.Remove(file)
 		return err
 	}
-	done(stdout, "Saved %s (%s), the copy of %s from %s.", file, human.Size(float64(download.Size)), download.Database, download.At.UTC().Format("Jan 2 15:04 UTC"))
+	done(stdout, "Saved %s, %s from %s.", file, download.Database, download.At.UTC().Format("Jan 2 15:04 UTC"))
 	return nil
 }
 
@@ -253,10 +231,12 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 		switch {
 		case database.Problem != "":
 			fmt.Fprintln(w, "  "+style.Danger.Render(style.SymbolFailed+" "+database.Problem))
-		case database.CopiedAt == nil:
-			fmt.Fprintln(w, "  "+style.Muted.Render("starting: no copy yet"))
-		default:
+		case database.CopiedAt != nil:
 			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" last copy "+human.Ago(*database.CopiedAt, now)+" · "+checked))
+		case database.Since != nil:
+			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" every change written down · "+checked))
+		default:
+			fmt.Fprintln(w, "  "+style.Muted.Render("starting"))
 		}
 		if len(database.Moments) == 0 {
 			fmt.Fprintln(w, style.Muted.Render("  nothing to go back to yet"))
@@ -269,14 +249,10 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 		table(w, []string{"MOMENT", "GO BACK TO", "AT"}, rows)
 	}
 	fmt.Fprintln(w)
-	every := "every change of SQLite off"
-	if list.EveryChange {
-		every = "every change of SQLite on"
-	}
 	if list.Bucket != "" {
-		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket+", copied "+everyText(list.EveryMinutes)+", kept "+keepText(list.KeepDays)+", "+every))
+		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket+", kept "+keepText(list.KeepDays)+", Postgres copied "+everyText(list.EveryMinutes)))
 	}
 	hint(w, "Go back:", build.Name+" restore "+app+" --to <moment>, or a time like 14:01 UTC")
 	hint(w, "How often:", build.Name+" backups "+app+" --every 15m|1h|1d --keep 1d|3d|7d|30d")
-	hint(w, "A copy:", build.Name+" backup download "+app)
+	hint(w, "Download:", build.Name+" backup download "+app)
 }
