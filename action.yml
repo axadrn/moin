@@ -38,7 +38,7 @@ runs:
         IMAGE: ${{ inputs.image }}
         DIR: ${{ inputs.dir }}
       run: |
-        args=(deploy --dir "$DIR")
+        args=(deploy --yes --dir "$DIR")
         [ -n "$IMAGE" ] && args+=(--image "$IMAGE")
         [ -n "$APP" ] && args+=("$APP")
         "$RUNNER_TEMP/moin" "${args[@]}"

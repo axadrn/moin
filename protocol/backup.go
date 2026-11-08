@@ -57,6 +57,18 @@ type Schedule struct {
 // DefaultSchedule is the schedule of an app nobody set one for.
 var DefaultSchedule = Schedule{Every: 60, Keep: 7, EveryChange: true}
 
+// EveryMinutes is how often a word means, in minutes: 15m, 1h or 1d.
+func EveryMinutes(word string) (int, bool) {
+	minutes, ok := map[string]int{"15m": 15, "1h": 60, "1d": 24 * 60}[word]
+	return minutes, ok
+}
+
+// KeepDays is how long a word means, in days: 1d, 3d, 7d or 30d.
+func KeepDays(word string) (int, bool) {
+	days, ok := map[string]int{"1d": 1, "3d": 3, "7d": 7, "30d": 30}[word]
+	return days, ok
+}
+
 // Everies and Keeps are the choices of a Schedule: every 15 minutes,
 // hourly or daily; kept 1, 3, 7 or 30 days.
 var (

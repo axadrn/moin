@@ -590,3 +590,13 @@ func TestStartRunningApp(t *testing.T) {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
+
+// A deploy to an app that does not exist asks first: a script without
+// --yes changes nothing, so a typo makes no new app.
+func TestDeployAsksBeforeCreatingAnApp(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{}}
+	code, _, stderr := runCLI(t, api, "deploy", "--dir", t.TempDir(), "my-apps")
+	if code == 0 || !strings.Contains(stderr, "my-apps does not exist") || api.seen("POST") {
+		t.Errorf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}

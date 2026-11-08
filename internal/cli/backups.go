@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
+	"github.com/axadrn/moin/protocol"
 )
 
 // backups lists the backups of an app with the moments to go back to, or
@@ -49,13 +48,15 @@ func backups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	}
 	schedule := list.BackupSchedule
 	if *every != "" {
-		if schedule.EveryMinutes = map[string]int{"15m": 15, "1h": 60, "60m": 60, "1d": 1440, "24h": 1440}[*every]; schedule.EveryMinutes == 0 {
+		minutes, ok := protocol.EveryMinutes(*every)
+		if !ok {
 			return fmt.Errorf("--every is 15m, 1h or 1d")
 		}
+		schedule.EveryMinutes = minutes
 	}
 	if *keep != "" {
-		days, err := strconv.Atoi(strings.TrimSuffix(*keep, "d"))
-		if err != nil || !slices.Contains([]int{1, 3, 7, 30}, days) {
+		days, ok := protocol.KeepDays(*keep)
+		if !ok {
 			return fmt.Errorf("--keep is 1d, 3d, 7d or 30d")
 		}
 		schedule.KeepDays = days

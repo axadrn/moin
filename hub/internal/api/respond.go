@@ -298,6 +298,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one."},
 	{err: service.ErrMomentOutside, field: "at", message: "There is no copy that old. Pick a moment from moin backups."},
 	{err: service.ErrNoCopy, status: http.StatusConflict, code: "no_copy", message: "There is no copy yet. The first one is taken within a minute of a deploy with a bucket."},
+	{err: service.ErrScheduleInFile, status: http.StatusConflict, code: "schedule_in_file", message: "The backup schedule is set in compose.yml. Change it there and deploy."},
 	{err: service.ErrBackupEvery, field: "every_minutes", message: "Copy every 15 minutes (15), hourly (60) or daily (1440)."},
 	{err: service.ErrBackupKeep, field: "keep_days", message: "Keep each copy 1, 3, 7 or 30 days."},
 	{err: service.ErrRestoreNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such restore. moin keeps how a restore ended for a week."},

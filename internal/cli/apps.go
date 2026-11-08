@@ -243,10 +243,10 @@ func PrintApps(stdout io.Writer, list []client.App) {
 }
 
 // deploy packs the directory, uploads it and follows the deploy. An app that
-// does not exist yet is created on the server x-moin or --server names, or on
-// the only server.
-func deploy(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [app]").withApp()
+// does not exist yet is created after a question, so a typo makes no new
+// app: on the server x-moin or --server names, or on the only server.
+func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
 	dir := flags.String("dir", ".", "directory to deploy")
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
@@ -294,7 +294,10 @@ func deploy(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	_, err = api.App(ctx, name)
 	if client.IsNotFound(err) {
-		err = createApp(ctx, api, name, *server, *dir, stdout)
+		err = confirm(stdin, stdout, flags.yes(), "App "+name+" does not exist. Create it?")
+		if err == nil {
+			err = createApp(ctx, api, name, *server, *dir, stdout)
+		}
 	}
 	if err != nil {
 		return err

@@ -66,7 +66,7 @@ Apps
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
 
 Deploys
-  deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [app]
+  deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [--yes] [app]; a new app asks first
   deploy --image     Deploy a CI image with the compose file of an earlier deploy: deploy --image <image> [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Build the newest source or pull the image again, with the current env
@@ -266,7 +266,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "apps":
 		return apps(ctx, rest, stdin, stdout)
 	case "deploy":
-		return deploy(ctx, rest, stdout)
+		return deploy(ctx, rest, stdin, stdout)
 	case "deploys":
 		return deploys(ctx, rest, stdout)
 	case "rollback":

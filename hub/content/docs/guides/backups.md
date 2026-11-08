@@ -7,6 +7,8 @@ order: 3
 
 moin copies your database into your bucket on a schedule you pick, and keeps the copies as long as you say. With SQLite it can also write down every change, so you go back to any minute. Every day moin checks that a copy restores.
 
+moin backs up databases, not files. Every hour it looks for new ones. What looks like a database but cannot be backed up, like MySQL, shows in red.
+
 It backs up every SQLite and Postgres database of your apps once the workspace has a [bucket](/docs/guides/bucket#add-it): hourly, each copy kept 7 days, until you change it. Your data goes from your server to your own bucket only, never through moin. [How backups work](/docs/concepts/backups) says how.
 
 ```

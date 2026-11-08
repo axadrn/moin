@@ -1073,6 +1073,9 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 				if len(done.Detected.Domains) > 0 {
 					s.syncTunnelOf(app)
 				}
+				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
+					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
+				}
 			}
 		}
 	}

@@ -49,6 +49,7 @@ var (
 	ErrRestoreRunning  = errors.New("a restore of this app runs: wait until it is done")
 	ErrRestoreNotFound = errors.New("there is no such restore: it is older than a week, or of another app")
 	ErrNoCopy          = errors.New("there is no copy yet: the first one is taken within a minute of a deploy with a bucket")
+	ErrScheduleInFile  = errors.New("the backup schedule is set in compose.yml: change it there and deploy")
 	ErrBackupEvery     = errors.New("how often: every 15 minutes, hourly or daily")
 	ErrBackupKeep      = errors.New("keep: 1, 3, 7 or 30 days")
 )
@@ -517,9 +518,40 @@ func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule pr
 	if !slices.Contains(protocol.Keeps, schedule.Keep) {
 		return nil, ErrBackupKeep
 	}
+	if s.ScheduleInFile(app) {
+		return nil, ErrScheduleInFile
+	}
+	if err := s.saveSchedule(actor, app, schedule); err != nil {
+		return nil, err
+	}
+	return app, nil
+}
+
+// ScheduleInFile says the live deploy's compose.yml sets the backup
+// schedule. Then only the file changes it.
+func (s *AppService) ScheduleInFile(app *model.App) bool {
+	detected := s.liveDetected(app)
+	return detected != nil && detected.Config != nil && detected.Config.Backups != nil
+}
+
+// applyScheduleInFile saves the backup schedule compose.yml asks for.
+func (s *AppService) applyScheduleInFile(app *model.App, backups protocol.ConfigBackups) {
+	schedule, err := backups.Schedule()
+	if err != nil {
+		slog.Error("the backup schedule in compose.yml is wrong", "app_id", app.ID, "error", err.Error())
+		return
+	}
+	if err := s.saveSchedule(System(app.WorkspaceID), app, schedule); err != nil {
+		slog.Error("save the backup schedule failed", "app_id", app.ID, "error", err.Error())
+	}
+}
+
+// saveSchedule stores a schedule, writes the change to the activity and
+// tells the daemon.
+func (s *AppService) saveSchedule(actor Actor, app *model.App, schedule protocol.Schedule) error {
 	before := scheduleOf(app)
 	if err := s.apps.SetBackupSchedule(app.ID, schedule.Every, schedule.Keep, schedule.EveryChange); err != nil {
-		return nil, err
+		return err
 	}
 	app.BackupEvery, app.BackupKeep, app.BackupEveryChange = schedule.Every, schedule.Keep, schedule.EveryChange
 	if before != schedule {
@@ -533,7 +565,7 @@ func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule pr
 		go s.configureDaemon(app.ServerID, app.WorkspaceID)
 	}
 	s.notify(app.WorkspaceID)
-	return app, nil
+	return nil
 }
 
 // scheduleOf is the backup schedule of an app.

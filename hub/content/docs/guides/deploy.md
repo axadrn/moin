@@ -76,7 +76,7 @@ MCP: list_apps
 
 ## Create an app
 
-An empty app on a [server](/docs/guides/servers), ready for its first deploy. `moin deploy` does this by itself.
+An empty app on a [server](/docs/guides/servers), ready for its first deploy. `moin deploy` asks first and then does this by itself, so a typo makes no new app. In a script, add `--yes`.
 
 ```surfaces
 Web: **Apps**, **Add app**

@@ -82,6 +82,8 @@ type Config struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
 	Protect   bool     `json:"protect,omitempty"`
+	// Backups is the backup schedule. When it is set, the file decides.
+	Backups *ConfigBackups `json:"backups,omitempty"`
 	// ServiceDomains are domains by service, from the map form of domains:
 	// domains: {web: [my-app.example.com], api: [api.my-app.example.com]}. Ports are the ports
 	// of services moin cannot tell. Instant picks the instant address
@@ -89,6 +91,38 @@ type Config struct {
 	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
 	Ports          map[string]int      `json:"ports,omitempty"`
 	Instant        string              `json:"instant,omitempty"`
+}
+
+// ConfigBackups is the backups block of x-moin: how often, how long, and
+// whether SQLite also records every change. What it leaves out is the
+// default.
+type ConfigBackups struct {
+	Every       string `json:"every,omitempty"`
+	Keep        string `json:"keep,omitempty"`
+	EveryChange *bool  `json:"every_change,omitempty"`
+}
+
+// Schedule is the schedule the block asks for.
+func (b ConfigBackups) Schedule() (Schedule, error) {
+	schedule := DefaultSchedule
+	if b.Every != "" {
+		minutes, ok := EveryMinutes(b.Every)
+		if !ok {
+			return schedule, fmt.Errorf("backups.every is %q: use 15m, 1h or 1d", b.Every)
+		}
+		schedule.Every = minutes
+	}
+	if b.Keep != "" {
+		days, ok := KeepDays(b.Keep)
+		if !ok {
+			return schedule, fmt.Errorf("backups.keep is %q: use 1d, 3d, 7d or 30d", b.Keep)
+		}
+		schedule.Keep = days
+	}
+	if b.EveryChange != nil {
+		schedule.EveryChange = *b.EveryChange
+	}
+	return schedule, nil
 }
 
 // UnmarshalJSON reads domains as a list, for the main service, or as a map

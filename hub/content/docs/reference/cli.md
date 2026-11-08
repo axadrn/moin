@@ -84,7 +84,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy [--dir .] [--server <server>] [--detach] [app]` | deploys a directory; the first deploy creates the app. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
+| `moin deploy [--dir .] [--server <server>] [--detach] [--yes] [app]` | deploys a directory; the first deploy asks, then creates the app (`--yes` in scripts). `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
 | `moin deploy --image <image> [app]` | deploys an image built in CI as the main service, with the compose file of an earlier deploy of the repo |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |

@@ -25,6 +25,8 @@ type BackupsView struct {
 	Databases []service.DatabaseBackups
 	// Restore is the newest restore of the open database of the last day.
 	Restore *service.Restore
+	// ScheduleInFile says compose.yml sets how often and how long.
+	ScheduleInFile bool
 	// Error says why the server could not report its backups.
 	Error string
 	Now   time.Time
@@ -158,7 +160,11 @@ templ DatabaseBackups(view BackupsView, database string) {
 				@kit.List() {
 					@backupState(backup, known, database, view.Now)
 					@backupRestore(view, database)
-					@backupSchedule(view, backup, database)
+					if view.ScheduleInFile {
+						@scheduleInFile(view, backup)
+					} else {
+						@backupSchedule(view, backup, database)
+					}
 					@backupDownload(view, backup, database)
 				}
 			}
@@ -371,6 +377,30 @@ templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database 
 			<input type="hidden" name="every_change_switch" value="1"/>
 			@kit.RowLabel("backup-every-change", "Every change", "")
 			@kit.Switch(templ.Attributes{"id": "backup-every-change", "name": "every_change", "value": "1", "checked": view.App.BackupEveryChange, "data-every-change": true})
+		}
+	}
+}
+
+// scheduleInFile shows the schedule compose.yml sets. Only the file changes it.
+templ scheduleInFile(view BackupsView, backup service.DatabaseBackups) {
+	@kit.Row("") {
+		@kit.RowText("How often", "from compose.yml")
+		<span class="shrink-0 text-sm text-muted-foreground" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
+	}
+	@kit.Row("") {
+		@kit.RowText("Keep", "from compose.yml")
+		<span class="shrink-0 text-sm text-muted-foreground">{ service.KeepText(view.App.BackupKeep) }</span>
+	}
+	if backup.Kind != "postgres" {
+		@kit.Row("") {
+			@kit.RowText("Every change", "from compose.yml")
+			<span class="shrink-0 text-sm text-muted-foreground">
+				if view.App.BackupEveryChange {
+					On
+				} else {
+					Off
+				}
+			</span>
 		}
 	}
 }

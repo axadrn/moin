@@ -38,3 +38,23 @@ func TestInstantHost(t *testing.T) {
 		}
 	}
 }
+
+// The backups block of x-moin: what it leaves out is the default, and a
+// word moin does not know is an error.
+func TestConfigBackupsSchedule(t *testing.T) {
+	off := false
+	got, err := ConfigBackups{Every: "15m", Keep: "30d", EveryChange: &off}.Schedule()
+	if err != nil || got != (Schedule{Every: 15, Keep: 30, EveryChange: false}) {
+		t.Errorf("all set: %+v, %v", got, err)
+	}
+	got, err = ConfigBackups{}.Schedule()
+	if err != nil || got != DefaultSchedule {
+		t.Errorf("empty: %+v, %v", got, err)
+	}
+	if _, err := (ConfigBackups{Every: "60m"}).Schedule(); err == nil {
+		t.Error("an unknown every passed")
+	}
+	if _, err := (ConfigBackups{Keep: "2d"}).Schedule(); err == nil {
+		t.Error("an unknown keep passed")
+	}
+}

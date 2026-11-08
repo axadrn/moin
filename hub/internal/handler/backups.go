@@ -174,7 +174,7 @@ func (h *AppsHandler) renderBucket(w http.ResponseWriter, r *http.Request) {
 // report its backups: a state of the page, not of a click.
 func (h *AppsHandler) backupsView(r *http.Request, app *model.App, daemon bool, database string) (pages.BackupsView, error) {
 	workspace := ctxkeys.Workspace(r.Context())
-	view := pages.BackupsView{App: *app, Now: time.Now()}
+	view := pages.BackupsView{App: *app, ScheduleInFile: h.apps.ScheduleInFile(app), Now: time.Now()}
 	var err error
 	view.Bucket, err = h.apps.AppBucket(app)
 	if errors.Is(err, service.ErrNoBackups) {

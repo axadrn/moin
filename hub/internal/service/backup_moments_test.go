@@ -639,3 +639,36 @@ func TestBeforeLabelByID(t *testing.T) {
 		t.Fatalf("labels %v", labels)
 	}
 }
+
+// A schedule in compose.yml is saved at the deploy and locks the schedule
+// in moin. A database found later reaches the live deploy.
+func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	first, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Config: &protocol.Config{Backups: &protocol.ConfigBackups{Every: "1d", Keep: "30d"}}}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
+
+	app, err := apps.apps.ByIDOrNameForWorkspace("blog", owner.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.BackupEvery != 24*60 || app.BackupKeep != 30 {
+		t.Fatalf("the schedule in the file: every %d keep %d", app.BackupEvery, app.BackupKeep)
+	}
+	if _, err := apps.SetBackupSchedule(owner, "blog", protocol.Schedule{Every: 60, Keep: 7}); !errors.Is(err, ErrScheduleInFile) {
+		t.Fatalf("changed a schedule the file sets: %v", err)
+	}
+
+	detected.Databases = []protocol.Database{{Path: "/data/app.db", HostPath: "/x/app.db"}}
+	daemonSays(t, servers, server.ID, protocol.TypeBackupStatus, protocol.Backups{App: "blog", Databases: []protocol.DatabaseBackup{}, Restores: []protocol.RestoreState{}, Detected: &detected})
+	_, databases, err := apps.Databases(owner.WorkspaceID, "blog")
+	if err != nil || len(databases) != 1 || databases[0].Path != "/data/app.db" {
+		t.Fatalf("the database found later: %+v, %v", databases, err)
+	}
+}

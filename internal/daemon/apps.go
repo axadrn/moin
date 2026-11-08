@@ -605,6 +605,11 @@ func (a *apps) resolve(ctx context.Context, app, src string, env map[string]stri
 		if err != nil {
 			return nil, detected, fmt.Errorf("%s: %w", key, err)
 		}
+		if detected.Config.Backups != nil {
+			if _, err := detected.Config.Backups.Schedule(); err != nil {
+				return nil, detected, fmt.Errorf("%s: %w", key, err)
+			}
+		}
 	}
 	detected.Service = mainService(services, detected.Config)
 	if detected.Service == "" {
