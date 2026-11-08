@@ -14,7 +14,7 @@ import (
 templ HomeCompare() {
 	<section id="compare" class={ homeSection }>
 		<h2 class={ homeStatement }>Same job. Look at the score.</h2>
-		<p class={ homeNote }>None of these seven documents an automatic check that a copy restores. { brand.Name } runs one every day.</p>
+		<p class={ homeNote }>None of these seven documents a daily restore check. { brand.Name } runs one.</p>
 		@kit.List() {
 			for _, competitor := range Competitors {
 				@kit.Row("/compare/" + competitor.Slug) {

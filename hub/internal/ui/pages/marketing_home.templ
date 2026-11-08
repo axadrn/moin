@@ -210,12 +210,12 @@ templ HomeBackups() {
 	<section id="backups" class={ homeSection }>
 		<h2 class={ homeStatement }>Would your last backup actually restore?</h2>
 		@kit.List() {
-			@homeReason("Your own bucket.", "Your data goes from your server to your bucket, never through "+brand.Name+".", "/docs/guides/bucket")
-			@homeReason("Checked every day.", brand.Name+" restores the newest backup into a throwaway database and reads it. If that fails, an alert tells you.", "/docs/concepts/backups")
-			@homeReason("A restore can be undone.", "The database as it was stays, so you can go back to it.", "/docs/guides/backups#undo-a-restore")
+			@homeReason("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
+			@homeReason("Checked every day.", "A real restore, by itself.", "/docs/concepts/backups")
+			@homeReason("A restore can be undone.", "One step back.", "/docs/guides/backups#undo-a-restore")
 		}
 		<p class={ homeNote }>
-			{ brand.Name } checks it every day, by itself. None of the seven tools we compare documents that.
+			SQLite and Postgres, on your schedule.
 			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
 		</p>
 	</section>
@@ -227,9 +227,9 @@ templ HomeSecurity() {
 	<section id="security" class={ homeSection }>
 		<h2 class={ homeStatement }>Nobody holds a key to your server. Not even us.</h2>
 		@kit.List() {
-			@homeReason("The daemon only dials out.", "Your server keeps no port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
-			@homeReason("No SSH key.", brand.Name+" holds no key to your server.", "/docs/guides/security")
-			@homeReason("A rules file on your server.", "/etc/moin/rules says what "+brand.Name+" may do there. Only root can change it, so a break-in at "+brand.Name+" cannot.", "/docs/guides/security#rules")
+			@homeReason("The daemon only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
+			@homeReason("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
+			@homeReason("A rules file on your server.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
 		}
 	</section>
 }
