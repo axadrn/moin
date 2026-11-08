@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -443,6 +444,8 @@ func BackupProblem(raw string) string {
 		return "The daily check could not restore the newest copy."
 	case strings.Contains(text, "every change"):
 		return "Every change is not written down."
+	case strings.Contains(text, "cannot back up"):
+		return "moin can't back up this database."
 	case strings.Contains(text, "too old for this"):
 		return "The daemon on the server is too old: update it."
 	}
@@ -1051,9 +1054,27 @@ func (s *AppService) receiveBackupStatus(serverID string, backups protocol.Backu
 	if err != nil || app.ServerID != serverID {
 		return
 	}
+	if backups.Detected != nil {
+		s.storeDetected(app, *backups.Detected)
+	}
 	s.storeBackupStatus(app, backups)
 	s.applyRestoreStates(app, backups.Restores)
 	s.notify(workspaceID)
+}
+
+// storeDetected replaces what the live deploy of an app has in it.
+func (s *AppService) storeDetected(app *model.App, detected protocol.Detected) {
+	deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
+	if err != nil {
+		return
+	}
+	body, err := json.Marshal(detected)
+	if err == nil {
+		err = s.apps.SetDeployDetected(deploy.ID, string(body))
+	}
+	if err != nil {
+		slog.Error("store what the daemon found failed", "app_id", app.ID, "error", fmt.Sprint(err))
+	}
 }
 
 // storeBackupStatus stores the backup status of each database. Backups

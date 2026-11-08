@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -35,16 +36,17 @@ func TestPostgresImage(t *testing.T) {
 }
 
 // TestDatabasesFindsPostgres: a service that runs Postgres is a database,
-// keyed postgres-<service>, after the SQLite files; x-moin may name it.
+// keyed postgres-<service>, after the SQLite files; MySQL is seen and
+// cannot be backed up.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
 	composeFile := filepath.Join(dir, "compose.json")
-	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
+	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
 	if err := os.WriteFile(composeFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	a := newApps(dir, nil)
-	found, err := a.databases(context.Background(), composeFile, &protocol.Config{Database: "postgres-db"})
+	found, noBackup, err := a.databases(context.Background(), composeFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +60,8 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	if protocol.CopyFile("x", found[0].Postgres()) != "copies/x.dump" || protocol.CopyFile("x", false) != "copies/x.db.gz" {
 		t.Error("copy file endings")
 	}
-	if _, err := a.databases(context.Background(), composeFile, &protocol.Config{Database: "postgres-nope"}); err == nil {
-		t.Error("x-moin naming a missing database passed")
+	if len(noBackup) != 1 || noBackup[0].Path != "mysql-legacy" {
+		t.Errorf("cannot back up %+v", noBackup)
 	}
 }
 
@@ -195,5 +197,68 @@ func TestServiceImage(t *testing.T) {
 	}
 	if got := a.serviceImage("shop", "none"); got != "" {
 		t.Errorf("missing service = %q", got)
+	}
+}
+
+// A Postgres data folder under an image moin does not know is seen, and
+// so is a SQLite file an app creates after its deploy. What was found
+// stays when its folder is gone for a moment.
+func TestFindNewDatabases(t *testing.T) {
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	pg := filepath.Join(dir, "pg", "18", "docker")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(pg, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	release := a.releaseDir("shop", 1)
+	if err := os.MkdirAll(release, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	compose := `{"services":{"web":{"image":"web:1","volumes":[{"type":"bind","source":"` + data + `","target":"/data"}]},` +
+		`"db":{"image":"registry.example/pg:17","volumes":[{"type":"bind","source":"` + filepath.Join(dir, "pg") + `","target":"/var/lib/postgresql"}]}}}`
+	if err := os.WriteFile(filepath.Join(release, "compose.json"), []byte(compose), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(release, "detected.json"), []byte(`{"kind":"compose","databases":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, changed := a.findNewDatabases(ctx, "shop"); changed {
+		t.Fatal("nothing is there yet")
+	}
+	file := filepath.Join(data, "app.db")
+	db, err := sql.Open("sqlite", "file:"+file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE t (x)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := os.WriteFile(filepath.Join(pg, "PG_VERSION"), []byte("18"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	detected, changed := a.findNewDatabases(ctx, "shop")
+	if !changed || len(detected.Databases) != 1 || detected.Databases[0].HostPath != file {
+		t.Fatalf("the new SQLite file: %v %+v", changed, detected.Databases)
+	}
+	if len(detected.NoBackup) != 1 || detected.NoBackup[0].Path != "postgres-db" {
+		t.Fatalf("the unknown Postgres: %+v", detected.NoBackup)
+	}
+	if _, changed := a.findNewDatabases(ctx, "shop"); changed {
+		t.Fatal("the second search found something new")
+	}
+	if err := os.RemoveAll(data); err != nil {
+		t.Fatal(err)
+	}
+	if detected, _ := a.findNewDatabases(ctx, "shop"); len(detected.Databases) != 1 {
+		t.Fatalf("a folder gone for a moment ended its backups: %+v", detected.Databases)
 	}
 }

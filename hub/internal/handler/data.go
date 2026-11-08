@@ -34,7 +34,7 @@ func (h *AppsHandler) Data(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load databases failed", err)
 		return
 	}
-	view := pages.DataView{App: *app, Databases: databases, Limit: dataPageRows, Now: time.Now()}
+	view := pages.DataView{App: *app, Databases: databases, NoBackup: h.apps.NoBackup(app), Limit: dataPageRows, Now: time.Now()}
 	query := r.URL.Query()
 	database, table := query.Get("db"), query.Get("table")
 	if !slices.ContainsFunc(databases, func(d protocol.Database) bool { return d.Path == database }) {

@@ -19,7 +19,6 @@ x-moin:
   ports: {api: 5678}           # the port of each other service with domains
   protect: true                # ask for the password set in moin
   instant: sslip.io            # the instant address: sslip.io, nip.io or off
-  database: /data/app.db       # a SQLite file on a volume, or postgres-<service>
 
 services:
   web:
@@ -32,7 +31,6 @@ services:
 
 - After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name: else `moin deploy` in a directory of the old name creates a new app.
 - Fields in `x-moin` win over the settings in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address).
-- `database` picks the database the [data browser](/docs/guides/data) and the [backups](/docs/guides/backups) use when the app has several.
 - Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
 - Only a `Dockerfile` or `go.mod`, or neither? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`: it replaces the one moin would write. For a Railpack app, set the start command with the env var `RAILPACK_START_CMD` instead.
 - After every deploy the daemon reports what it detected: kind, service, port, databases and this block. The app page, the end of `moin deploy` and `get_app` show it.

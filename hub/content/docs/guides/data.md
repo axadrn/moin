@@ -82,7 +82,7 @@ moin changes data, not tables, columns or indexes: those change through the migr
 ## Good to know
 
 - **Reads cannot change anything.** A read opens the database read-only (on Postgres a `READ ONLY` transaction, one statement), so a typo cannot delete rows. Every change runs in one transaction.
-- **Which database.** moin finds every SQLite file on a volume of the live deploy, up to three folders deep, and every Postgres service, named `postgres-<service>`. With several, set `x-moin.database` in [the repo](/docs/guides/config), or `--db <path>` / `--db postgres-db` in the CLI.
+- **Which database.** moin finds every SQLite file on a volume of the live deploy, up to three folders deep, and every Postgres service, named `postgres-<service>`. With several, pick one in the list, or use `--db <path>` / `--db postgres-db` in the CLI.
 - **Rows by key.** moin edits a row by its rowid on SQLite and by its primary key on Postgres. A table without a primary key takes new rows; change them with SQL.
 - **Who may read.** Rows are your users' data: the API and MCP need a token with write access to read rows or run SQL. A read-only token sees the tables and row counts.
 - **Off on a server.** `data: off` in the [rules](/docs/guides/security#rules) refuses reading and changing data through moin there.

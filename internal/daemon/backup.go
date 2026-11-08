@@ -332,8 +332,8 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 	return errors.Join(err, undosErr)
 }
 
-// loop runs tick every minute, the daily checks, and the sweep of the
-// uploads every hour.
+// loop runs tick every minute, the daily checks, and every hour the sweep
+// of the uploads and the search for new databases.
 func (b *backups) loop(ctx context.Context) {
 	ticker, checks := time.NewTicker(time.Minute), time.NewTimer(10*time.Minute)
 	defer ticker.Stop()
@@ -345,6 +345,7 @@ func (b *backups) loop(ctx context.Context) {
 			b.tick(ctx)
 			if round%60 == 0 {
 				b.sweepUploads(ctx)
+				b.searchDatabases(ctx)
 			}
 		case <-checks.C:
 			b.checkAll(ctx)
@@ -392,6 +393,21 @@ func (b *backups) tick(ctx context.Context) {
 	b.report(ctx, running, false)
 }
 
+// searchDatabases looks for new databases in every app and tells the hub.
+func (b *backups) searchDatabases(ctx context.Context) {
+	entries, _ := os.ReadDir(b.apps.dir)
+	for _, entry := range entries {
+		app := entry.Name()
+		detected, changed := b.apps.findNewDatabases(ctx, app)
+		if changed && b.send != nil {
+			b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: []protocol.DatabaseBackup{}, Restores: b.restoreStates(app), Detected: &detected})
+		}
+	}
+	if b.on() {
+		b.report(ctx, b.running(), true)
+	}
+}
+
 // copyDue takes a copy when the newest in the bucket is older than due,
 // and deletes the old ones.
 func (b *backups) copyDue(ctx context.Context, app string, database protocol.Database, due time.Duration) error {
@@ -432,10 +448,22 @@ func (b *backups) report(ctx context.Context, running map[string][]protocol.Data
 			b.mu.Unlock()
 			statuses = append(statuses, status)
 		}
+		statuses = append(statuses, b.cannotBackUp(app)...)
 		if changed && b.send != nil {
 			b.send(protocol.TypeBackupStatus, "", protocol.Backups{App: app, Databases: statuses, Restores: b.restoreStates(app)})
 		}
 	}
+}
+
+// cannotBackUp are the statuses of what looks like a database of the app
+// but moin cannot back up. Every surface shows them as a problem.
+func (b *backups) cannotBackUp(app string) []protocol.DatabaseBackup {
+	statuses := []protocol.DatabaseBackup{}
+	detected, _ := b.apps.live(app)
+	for _, database := range detected.NoBackup {
+		statuses = append(statuses, protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind, Error: noBackupText})
+	}
+	return statuses
 }
 
 // status is how one database is backed up; full also reads the copies,
@@ -541,7 +569,8 @@ func (b *backups) running() map[string][]protocol.Database {
 	found := map[string][]protocol.Database{}
 	entries, _ := os.ReadDir(b.apps.dir)
 	for _, entry := range entries {
-		if databases := b.databases(context.Background(), entry.Name()); len(databases) > 0 {
+		databases := b.databases(context.Background(), entry.Name())
+		if len(databases) > 0 || len(b.cannotBackUp(entry.Name())) > 0 {
 			found[entry.Name()] = databases
 		}
 	}
@@ -573,6 +602,11 @@ func (b *backups) list(ctx context.Context, request protocol.BackupRequest) prot
 	for _, database := range b.databases(ctx, request.App) {
 		if request.Database == "" || request.Database == database.Path {
 			result.Databases = append(result.Databases, b.status(ctx, request.App, database, true))
+		}
+	}
+	for _, status := range b.cannotBackUp(request.App) {
+		if request.Database == "" || request.Database == status.Database {
+			result.Databases = append(result.Databases, status)
 		}
 	}
 	return result

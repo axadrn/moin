@@ -25,6 +25,8 @@ import (
 type DataView struct {
 	App       model.App
 	Databases []protocol.Database
+	// NoBackup is what looks like a database but moin cannot back up.
+	NoBackup []protocol.Database
 	// Database is the path of the open database; Table its open table.
 	Database  string
 	Table     *protocol.DBTable
@@ -86,7 +88,7 @@ func dataTitle(view DataView) string {
 templ dataListPage(view DataView) {
 	@appHeader(view.App, "data")
 	@appSection(view.App.Name, view.App.Link(), "data") {
-		if len(view.Databases) == 0 {
+		if len(view.Databases) == 0 && len(view.NoBackup) == 0 {
 			@kit.Card("", nil) {
 				@kit.Quiet() {
 					No SQLite file on a volume and no Postgres service yet.
@@ -100,6 +102,15 @@ templ dataListPage(view DataView) {
 						@kit.Row(databaseURL(ctx, view.App.Name, database.Path)) {
 							@kit.RowText(shortPath(database.Path), databaseKind(database))
 							@databaseBackupValue(view, database.Path)
+						}
+					}
+					for _, database := range view.NoBackup {
+						@kit.Row("") {
+							@kit.RowText(database.Service, databaseKind(database))
+							<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" data-no-backup>
+								@kit.Dot(kit.StateFailed)
+								moin can't back this up
+							</span>
 						}
 					}
 				}
@@ -227,10 +238,15 @@ func databaseName(database string) string {
 	return database
 }
 
-// databaseKind is SQLite or Postgres.
+// databaseKind is what a database is, for people.
 func databaseKind(database protocol.Database) string {
-	if database.Postgres() {
+	switch database.Kind {
+	case protocol.DatabasePostgres:
 		return "Postgres"
+	case "mysql":
+		return "MySQL"
+	case "mongo":
+		return "MongoDB"
 	}
 	return "SQLite"
 }

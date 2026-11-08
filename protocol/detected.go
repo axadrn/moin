@@ -29,7 +29,9 @@ type Detected struct {
 	Service        string              `json:"service"`
 	Port           int                 `json:"port"`
 	Databases      []Database          `json:"databases"`
-	Config         *Config             `json:"config,omitempty"`
+	// NoBackup is what looks like a database but moin cannot back up.
+	NoBackup []Database `json:"no_backup,omitempty"`
+	Config   *Config    `json:"config,omitempty"`
 }
 
 // Built says for people how moin built the app: the language Railpack found,
@@ -80,7 +82,6 @@ type Config struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
 	Protect   bool     `json:"protect,omitempty"`
-	Database  string   `json:"database,omitempty"`
 	// ServiceDomains are domains by service, from the map form of domains:
 	// domains: {web: [my-app.example.com], api: [api.my-app.example.com]}. Ports are the ports
 	// of services moin cannot tell. Instant picks the instant address

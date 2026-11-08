@@ -78,6 +78,9 @@ type Backups struct {
 	// last ones ended, by the ID the hub gave them. A daemon
 	// that reports restores sends a list, empty or not.
 	Restores []RestoreState `json:"restores"`
+	// Detected is set when the daemon found a new database in the live
+	// deploy, long after the deploy ended.
+	Detected *Detected `json:"detected,omitempty"`
 }
 
 // RestoreState is how a restore stands on the server: running, done or

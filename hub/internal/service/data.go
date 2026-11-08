@@ -56,6 +56,16 @@ func (s *AppService) Databases(workspaceID, idOrName string) (*model.App, []prot
 	return app, detected.Databases, nil
 }
 
+// NoBackup is what looks like a database in an app's live deploy but
+// moin cannot back up.
+func (s *AppService) NoBackup(app *model.App) []protocol.Database {
+	detected := s.liveDetected(app)
+	if detected == nil {
+		return nil
+	}
+	return detected.NoBackup
+}
+
 // Tables asks the daemon for the tables of one of the app's databases. An
 // empty database means the first one.
 func (s *AppService) Tables(ctx context.Context, workspaceID, idOrName, database string) (protocol.DBTables, error) {

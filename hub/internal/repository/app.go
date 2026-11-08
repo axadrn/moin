@@ -185,6 +185,12 @@ func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected string, at t
 	return err
 }
 
+// SetDeployDetected replaces what a deploy has in it.
+func (r *Apps) SetDeployDetected(id, detected string) error {
+	_, err := r.db.Exec(`UPDATE deploys SET detected = $1 WHERE id = $2`, detected, id)
+	return err
+}
+
 func (r *Apps) Env(appID string) (map[string]string, error) {
 	rows := []struct {
 		Key   string `db:"key"`

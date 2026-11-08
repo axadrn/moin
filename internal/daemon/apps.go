@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -328,10 +329,6 @@ func (a *apps) writeCompose(ctx context.Context, start protocol.DeployStart, con
 	if err != nil {
 		return detected, err
 	}
-	_, err = a.databases(ctx, composeFile, detected.Config)
-	if err != nil {
-		return detected, err
-	}
 	if len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != "" {
 		err = a.ensureProxy(ctx, logf)
 		if err != nil {
@@ -416,9 +413,9 @@ func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, com
 // afterStart notes the databases the running release has, has backups
 // follow them, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, app, release, composeFile string, detected protocol.Detected, logf func(string, ...any)) protocol.Detected {
-	databases, err := a.databases(ctx, composeFile, detected.Config)
+	databases, noBackup, err := a.databases(ctx, composeFile)
 	if err == nil {
-		detected.Databases = databases
+		detected.Databases, detected.NoBackup = databases, noBackup
 		saveJSON(filepath.Join(release, "detected.json"), detected)
 	}
 	for _, database := range detected.Databases {
@@ -427,6 +424,9 @@ func (a *apps) afterStart(ctx context.Context, app, release, composeFile string,
 			continue
 		}
 		logf("database %s (%s)", database.Path, database.HostPath)
+	}
+	for _, database := range detected.NoBackup {
+		logf("database %s: %s", database.Path, noBackupText)
 	}
 	if a.backups != nil {
 		go a.backups.tick(context.Background())
@@ -1072,100 +1072,152 @@ func mainPort(src string, service any, config *protocol.Config) int {
 	return 8080
 }
 
-// databases finds the SQLite files on the mounts of every service. Named
-// volumes exist only after the first start, so deploy asks again then. A
-// database that x-moin names but no mount holds fails the deploy: it would be
-// lost with the container.
-func (a *apps) databases(ctx context.Context, composeFile string, moinConfig *protocol.Config) ([]protocol.Database, error) {
-	var config map[string]any
-	body, err := os.ReadFile(composeFile)
-	if err == nil {
-		err = json.Unmarshal(body, &config)
-	}
-	if err != nil {
-		return nil, err
-	}
-	services, _ := config["services"].(map[string]any)
-	volumes, _ := config["volumes"].(map[string]any)
-	found := []protocol.Database{}
-	named := ""
-	if moinConfig != nil {
-		named = moinConfig.Database
-	}
-	namedOnMount := named == ""
-	for _, service := range services {
-		fields, _ := service.(map[string]any)
-		mounts, _ := fields["volumes"].([]any)
-		for _, item := range mounts {
-			mount, _ := item.(map[string]any)
-			source, _ := mount["source"].(string)
-			target, _ := mount["target"].(string)
-			hostPath := source
-			if mount["type"] == "volume" {
-				volume, _ := volumes[source].(map[string]any)
-				name, _ := volume["name"].(string)
-				if name == "" {
-					continue
-				}
-				mountpoint, err := a.output(ctx, "docker", "volume", "inspect", "-f", "{{.Mountpoint}}", name)
-				if err != nil {
-					// The volume does not exist before the first start.
-					continue
-				}
-				hostPath = strings.TrimSpace(mountpoint)
-			} else if mount["type"] != "bind" {
-				continue
-			}
-			if named != "" && within(target, named) {
-				namedOnMount = true
-			}
-			for _, file := range sqliteFiles(hostPath) {
-				relative, _ := filepath.Rel(hostPath, file)
-				path := filepath.Join(target, relative)
-				if !slices.ContainsFunc(found, func(d protocol.Database) bool { return d.HostPath == file }) {
-					found = append(found, protocol.Database{Path: path, HostPath: file})
-				}
-			}
-		}
-	}
-	// A service that runs Postgres is a database too, after the SQLite
-	// files, in the order of the service names.
-	names := make([]string, 0, len(services))
-	for name := range services {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	for _, name := range names {
-		fields, _ := services[name].(map[string]any)
-		image, _ := fields["image"].(string)
-		if !postgresImage(image) {
-			continue
-		}
-		found = append(found, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
-		if named == protocol.PostgresKey(name) {
-			namedOnMount = true
-		}
-	}
-	if !namedOnMount {
-		return found, fmt.Errorf("x-moin.database %s is on no volume: it would be lost on the next deploy", named)
-	}
-	return found, nil
+// composeConfig is the part of a release's compose.json that says where
+// databases can be.
+type composeConfig struct {
+	Services map[string]composeService `json:"services"`
+	Volumes  map[string]struct {
+		Name string `json:"name"`
+	} `json:"volumes"`
 }
 
-// postgresImage reports whether an image runs Postgres: the official one
-// or a known image built on it, from Docker Hub, with any tag or digest.
-func postgresImage(image string) bool {
+type composeService struct {
+	Image   string         `json:"image"`
+	Volumes []composeMount `json:"volumes"`
+}
+
+type composeMount struct {
+	Type   string `json:"type"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
+// noBackupText is what moin says about a database it cannot back up.
+const noBackupText = "moin cannot back up this database"
+
+// databases finds what a release keeps its data in. The first list is
+// what moin backs up: every SQLite file on a mounted folder and every
+// Postgres service. The second is what looks like a database but moin
+// cannot back up.
+func (a *apps) databases(ctx context.Context, composeFile string) ([]protocol.Database, []protocol.Database, error) {
+	body, err := os.ReadFile(composeFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	var config composeConfig
+	if err := json.Unmarshal(body, &config); err != nil {
+		return nil, nil, err
+	}
+	databases, noBackup := []protocol.Database{}, []protocol.Database{}
+	names := slices.Sorted(maps.Keys(config.Services))
+	for _, name := range names {
+		for _, mount := range config.Services[name].Volumes {
+			folder := a.mountFolder(ctx, config, mount)
+			if folder != "" {
+				databases = addSQLiteFiles(databases, folder, mount.Target)
+			}
+		}
+	}
+	for _, name := range names {
+		service := config.Services[name]
+		if postgresImage(service.Image) {
+			databases = append(databases, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
+			continue
+		}
+		kind := a.otherDatabase(ctx, config, service)
+		if kind != "" {
+			noBackup = append(noBackup, protocol.Database{Path: kind + "-" + name, Kind: kind, Service: name})
+		}
+	}
+	return databases, noBackup, nil
+}
+
+// mountFolder is the folder on the server behind a mount, "" when there
+// is none yet: a named volume exists only after the first start.
+func (a *apps) mountFolder(ctx context.Context, config composeConfig, mount composeMount) string {
+	switch mount.Type {
+	case "bind":
+		return mount.Source
+	case "volume":
+		name := config.Volumes[mount.Source].Name
+		if name == "" {
+			return ""
+		}
+		folder, err := a.output(ctx, "docker", "volume", "inspect", "-f", "{{.Mountpoint}}", name)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(folder)
+	}
+	return ""
+}
+
+// addSQLiteFiles adds the SQLite files under folder, once each. target is
+// where the app sees that folder.
+func addSQLiteFiles(databases []protocol.Database, folder, target string) []protocol.Database {
+	for _, file := range sqliteFiles(folder) {
+		known := slices.ContainsFunc(databases, func(d protocol.Database) bool { return d.HostPath == file })
+		if known {
+			continue
+		}
+		relative, _ := filepath.Rel(folder, file)
+		databases = append(databases, protocol.Database{Path: filepath.Join(target, relative), HostPath: file})
+	}
+	return databases
+}
+
+// otherDatabase names the kind of database a service runs when moin
+// cannot back it up, "" when it runs none of those: a known image, or a
+// Postgres data folder in a mount of an image moin does not know.
+func (a *apps) otherDatabase(ctx context.Context, config composeConfig, service composeService) string {
+	switch plainImage(service.Image) {
+	case "mysql", "mariadb":
+		return "mysql"
+	case "mongo":
+		return "mongo"
+	}
+	for _, mount := range service.Volumes {
+		if hasPostgresData(a.mountFolder(ctx, config, mount)) {
+			return "postgres"
+		}
+	}
+	return ""
+}
+
+// hasPostgresData says a Postgres keeps its data in folder, at most two
+// folders down: Postgres writes the file PG_VERSION there.
+func hasPostgresData(folder string) bool {
+	if folder == "" {
+		return false
+	}
+	for _, pattern := range []string{"PG_VERSION", "*/PG_VERSION", "*/*/PG_VERSION"} {
+		found, _ := filepath.Glob(filepath.Join(folder, pattern))
+		if len(found) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// plainImage is an image without its tag, digest and Docker Hub's prefixes.
+func plainImage(image string) string {
 	image, _, _ = strings.Cut(image, "@")
 	if slash := strings.LastIndex(image, "/"); strings.LastIndex(image, ":") > slash {
 		image = image[:strings.LastIndex(image, ":")]
 	}
 	image = strings.TrimPrefix(strings.TrimPrefix(image, "docker.io/"), "index.docker.io/")
-	image = strings.TrimPrefix(image, "library/")
-	switch image {
+	return strings.TrimPrefix(image, "library/")
+}
+
+// postgresImage reports whether an image runs Postgres: the official one
+// or a known image built on it, from Docker Hub, with any tag or digest.
+func postgresImage(image string) bool {
+	name := plainImage(image)
+	switch name {
 	case "postgres", "postgis/postgis", "pgvector/pgvector":
 		return true
 	}
-	return strings.HasPrefix(image, "timescale/timescaledb")
+	return strings.HasPrefix(name, "timescale/timescaledb")
 }
 
 // sqliteFiles returns the files under dir, three levels deep, that are
@@ -1575,16 +1627,53 @@ func (a *apps) composeFile(app string) string {
 	return filepath.Join(a.releaseDir(app, a.current(app)), "compose.json")
 }
 
-// runningDatabases are the databases of an app's live deploy.
-func (a *apps) runningDatabases(app string) []protocol.Database {
+// live is what moin found in an app's live deploy, and the file it is
+// in. The file is "" before the first deploy.
+func (a *apps) live(app string) (protocol.Detected, string) {
 	current := a.current(app)
 	if current == 0 {
-		return nil
+		return protocol.Detected{}, ""
 	}
+	file := filepath.Join(a.releaseDir(app, current), "detected.json")
 	var detected protocol.Detected
-	body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, current), "detected.json"))
+	body, _ := os.ReadFile(file)
 	_ = json.Unmarshal(body, &detected)
+	return detected, file
+}
+
+// runningDatabases are the databases of an app's live deploy.
+func (a *apps) runningDatabases(app string) []protocol.Database {
+	detected, _ := a.live(app)
 	return detected.Databases
+}
+
+// findNewDatabases looks again in an app's live deploy: an app may create
+// its SQLite file long after it started. It only adds: a folder that is
+// gone for a moment must not end the backups of what was in it. It says
+// whether something changed.
+func (a *apps) findNewDatabases(ctx context.Context, app string) (protocol.Detected, bool) {
+	detected, file := a.live(app)
+	if file == "" {
+		return detected, false
+	}
+	databases, noBackup, err := a.databases(ctx, a.composeFile(app))
+	if err != nil {
+		return detected, false
+	}
+	changed := !slices.Equal(detected.NoBackup, noBackup)
+	detected.NoBackup = noBackup
+	for _, database := range databases {
+		if !slices.Contains(detected.Databases, database) {
+			detected.Databases = append(detected.Databases, database)
+			changed = true
+		}
+	}
+	if changed {
+		if err := writeState(file, detected); err != nil {
+			return detected, false
+		}
+	}
+	return detected, changed
 }
 
 func saveJSON(path string, value any) {
