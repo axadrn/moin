@@ -2,6 +2,7 @@ package pages
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/brand"
@@ -39,11 +40,10 @@ templ Home(network model.Network, open HomeOpen) {
 					@HomeLive(network)
 				}
 				@HomeStart()
-				@HomeWays()
+				@HomeDoes()
 				@HomeBackups()
 				@HomeSecurity()
 				@HomeCompare()
-				@HomeDoes()
 				@HomeOpenSection(open)
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@HomePricing()
@@ -135,75 +135,85 @@ templ homeLiveNumber(count int, label, name string) {
 }
 
 // ---------------------------------------------------------------- start
-// HomeStart is how to begin: the four steps of Get started, each a row
-// with its command, and the real output of a first deploy.
+// homeSurface is one way to do the four steps of Get started.
+type homeSurface struct {
+	Value string
+	Label string
+	Steps [4]string
+}
+
+// homeSurfaces are the ways to do the four steps; none is the standard
+// one. Web comes first because it needs nothing installed.
+var homeSurfaces = []homeSurface{
+	{"web", "Web", [4]string{"GitHub or email", "Servers, Add server", "Settings, Bucket", "Deploys, GitHub, Deploy"}},
+	{"cli", "CLI", [4]string{"moin login", "moin servers add web-1", "moin buckets add default", "moin deploy"}},
+	{"tui", "TUI", [4]string{"moin", "w, then a", "w, then k", "D"}},
+	{"api", "API", [4]string{"An API token", "POST /api/v1/servers", "POST /api/v1/buckets", "POST /api/v1/apps/{app}/deploys"}},
+	{"mcp", "MCP", [4]string{"Connect your AI agent", "add_server", "add_bucket", "deploy_ref"}},
+}
+
+// homeStepNames are the four steps, the same on every surface.
+var homeStepNames = [4]string{"Log in", "Add a server", "Add your bucket", "Deploy"}
+
+// homeSurfaceOptions are the choices of the four steps.
+func homeSurfaceOptions() []kit.Option {
+	options := make([]kit.Option, 0, len(homeSurfaces))
+	for _, surface := range homeSurfaces {
+		options = append(options, kit.Option{Value: surface.Value, Label: surface.Label})
+	}
+	return options
+}
+
+// HomeStart is how to begin: the four steps of Get started, on the surface
+// the reader picks. The checked radio shows its part by CSS alone.
 templ HomeStart() {
 	<section id="how" class={ homeSection }>
 		<h2 class={ homeStatement }>Live in four steps.</h2>
-		<div class="grid items-start gap-4 lg:grid-cols-2">
-			@kit.List() {
-				@homeStep("1", "Log in", "moin login")
-				@homeStep("2", "Add a server", "moin servers add web-1")
-				@homeStep("3", "Add your bucket", "moin buckets add default")
-				@homeStep("4", "Deploy", "moin deploy")
-			}
-			<div class="flex flex-col overflow-x-auto rounded-4xl bg-terminal p-6 font-mono text-sm leading-7 whitespace-pre text-terminal-foreground [scrollbar-width:none]">
-				<span><span class="text-terminal-foreground/50">$ </span>moin deploy</span>
-				<span class="text-terminal-foreground/60">Created app my-app on web-1</span>
-				<span class="text-terminal-foreground/60">Deploy v1 of my-app started</span>
-				<span class="text-terminal-foreground/60">{ "  detected go, service web on port 8080" }</span>
-				<span class="text-terminal-foreground/60">{ "  v1 is live" }</span>
-				<span><span class="text-live">✓</span> moin. my-app is live at https://my-app.203-0-113-7.sslip.io</span>
+		<p class={ homeLead }>In the web, the terminal or with your AI agent. You pick.</p>
+		<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
+			<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
+				@kit.Choice("home-surface", "Where", homeSurfaceOptions(), "web")
 			</div>
+			for _, surface := range homeSurfaces {
+				<div class="hidden min-w-0" data-surface={ surface.Value }>
+					@kit.List() {
+						for index, step := range surface.Steps {
+							@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
+						}
+					}
+				</div>
+			}
 		</div>
 		<p class={ homeLead }>
-			No Dockerfile needed: Node, Bun, Python, Ruby, PHP, Go and more.
+			Deploy from your folder, GitHub or a CI image. No Dockerfile needed.
 			<a href="/docs/getting-started" class="text-foreground underline underline-offset-4">Get started</a>
 		</p>
 	</section>
 }
 
-// homeStep is one step: its number, what you do, and the command.
-templ homeStep(number, name, command string) {
+// homeStep is one step: its number, what you do, and how.
+templ homeStep(number, name, how string) {
 	@kit.Row("") {
 		<span class="w-4 shrink-0 text-sm text-muted-foreground tabular-nums">{ number }</span>
 		<div class="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
 			<span class="flex-1 font-medium">{ name }</span>
-			<code class="truncate font-mono text-sm text-muted-foreground">{ command }</code>
+			<code class="truncate font-mono text-sm text-muted-foreground">{ how }</code>
 		</div>
 	}
 }
 
-// ---------------------------------------------------------------- ways
-// HomeWays is every way to deploy as three questions; every answer is
-// shown the same, none is the standard one.
-templ HomeWays() {
-	<section id="ways" class={ homeSection }>
-		<h2 class={ homeStatement }>Every deploy, three questions.</h2>
-		@kit.List() {
-			@homeReason("Where does the code come from?", "Your folder, GitHub or a CI image.", "")
-			@homeReason("Who presses the button?", "The CLI, the terminal UI, the web, the API or MCP.", "")
-			@homeReason("Where do settings live?", "In the repo with x-moin, which wins. Otherwise in "+brand.Name+".", "")
-		}
-		<p class={ homeLead }>
-			One binary is the CLI, the terminal UI and the daemon.
-			<a href="/docs/guides/deploy" class="text-foreground underline underline-offset-4">How to deploy</a>
-		</p>
-	</section>
-}
-
 // ---------------------------------------------------------------- backups
-// HomeBackups is why the copies can be trusted, and what they do not cover.
+// HomeBackups is why the backups can be trusted.
 templ HomeBackups() {
 	<section id="backups" class={ homeSection }>
-		<h2 class={ homeStatement }>Copies that really restore.</h2>
+		<h2 class={ homeStatement }>Would your last backup actually restore?</h2>
 		@kit.List() {
 			@homeReason("Your own bucket.", "Your data goes from your server to your bucket, never through "+brand.Name+".", "/docs/guides/bucket")
-			@homeReason("Checked every day.", brand.Name+" restores the newest copy into a throwaway database and reads it. If that fails, an alert tells you.", "/docs/concepts/backups")
+			@homeReason("Checked every day.", brand.Name+" restores the newest backup into a throwaway database and reads it. If that fails, an alert tells you.", "/docs/concepts/backups")
 			@homeReason("A restore can be undone.", "The database as it was stays, so you can go back to it.", "/docs/guides/backups#undo-a-restore")
 		}
 		<p class={ homeLead }>
-			SQLite and Postgres, on your schedule. Files are not backed up.
+			{ brand.Name } checks it every day, by itself. None of the seven tools we compare documents that.
 			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
 		</p>
 	</section>
@@ -213,7 +223,7 @@ templ HomeBackups() {
 // HomeSecurity is how moin reaches a server, and what the server can refuse.
 templ HomeSecurity() {
 	<section id="security" class={ homeSection }>
-		<h2 class={ homeStatement }>Your server stays yours.</h2>
+		<h2 class={ homeStatement }>Nobody holds a key to your server. Not even us.</h2>
 		@kit.List() {
 			@homeReason("The daemon only dials out.", "Your server keeps no port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
 			@homeReason("No SSH key.", brand.Name+" holds no key to your server.", "/docs/guides/security")
@@ -236,7 +246,7 @@ templ homeReason(statement, line, href string) {
 // name, a few words, and the guide.
 templ HomeDoes() {
 	<section id="product" class={ homeSection }>
-		<h2 class={ homeStatement }>Everything an app needs.</h2>
+		<h2 class={ homeStatement }>Everything an app needs. Nothing to bolt on.</h2>
 		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
 			@kit.Section("Ship", nil) {
 				@kit.List() {
@@ -269,7 +279,7 @@ templ homeFeature(name, note, href string) {
 // same product, so the rows say what running it takes.
 templ HomePricing() {
 	<section id="pricing" class={ homeSection }>
-		<h2 class={ homeStatement }>One price. Every feature.</h2>
+		<h2 class={ homeStatement }>Your tenth server costs the same as your first.</h2>
 		@kit.Grid() {
 			<div class="flex flex-col gap-6 rounded-4xl bg-card p-6 sm:p-8" data-plan="hosted">
 				<div class="flex flex-col gap-1">
@@ -362,7 +372,7 @@ templ HomeEnd() {
 			</p>
 			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
 				<p>I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing.</p>
-				<p>Your apps are containers too. { brand.Name } ships them to your servers and keeps copies of their data in your bucket.</p>
+				<p>Your apps are containers too. { brand.Name } ships them to your servers and backs up their data to your bucket.</p>
 			</div>
 			<p class={ homeStatement, "pt-4" }>
 				Deploy anything. <span class="text-muted-foreground/60">Lose nothing.</span>

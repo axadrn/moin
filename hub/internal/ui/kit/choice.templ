@@ -21,3 +21,8 @@ templ Choice(name, label string, options []Option, checked string) {
 		}
 	</div>
 }
+
+// SurfaceShown goes on what holds a Choice of the surfaces and the parts
+// marked data-surface: it shows the part of the checked surface, one rule
+// per surface, written out so Tailwind finds them.
+const SurfaceShown = "[&:has([value=web]:checked)_[data-surface=web]]:block [&:has([value=cli]:checked)_[data-surface=cli]]:block [&:has([value=tui]:checked)_[data-surface=tui]]:block [&:has([value=api]:checked)_[data-surface=api]]:block [&:has([value=mcp]:checked)_[data-surface=mcp]]:block"

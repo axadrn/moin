@@ -18,7 +18,7 @@ type surfaceItem struct {
 // The docs page script makes every block of a page show the surface the
 // reader picked last. name is the block's own radio group.
 templ surfacesView(name string, items []surfaceItem) {
-	<div class={ "mt-6 min-w-0 overflow-hidden rounded-[18px] bg-card", surfacesShown } data-surfaces>
+	<div class={ "mt-6 min-w-0 overflow-hidden rounded-[18px] bg-card", kit.SurfaceShown } data-surfaces>
 		<div class="max-w-full overflow-x-auto px-3 pt-3 [scrollbar-width:none]">
 			@kit.Choice(name, "Where", surfaceOptions(items), items[0].Value)
 		</div>
@@ -37,10 +37,6 @@ templ surfacesView(name string, items []surfaceItem) {
 		}
 	</div>
 }
-
-// surfacesShown shows the part of the checked surface, one rule per
-// surface, written out so Tailwind finds them.
-const surfacesShown = "[&:has([value=web]:checked)_[data-surface=web]]:block [&:has([value=cli]:checked)_[data-surface=cli]]:block [&:has([value=tui]:checked)_[data-surface=tui]]:block [&:has([value=api]:checked)_[data-surface=api]]:block [&:has([value=mcp]:checked)_[data-surface=mcp]]:block"
 
 func surfaceOptions(items []surfaceItem) []kit.Option {
 	options := make([]kit.Option, 0, len(items))
