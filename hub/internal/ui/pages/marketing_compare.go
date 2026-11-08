@@ -1,248 +1,280 @@
 package pages
 
-import "github.com/axadrn/moin/hub/internal/brand"
+import (
+	"fmt"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+)
 
 // compareRead is when every competitor fact below was read at its source.
 const compareRead = "November 8, 2026"
 
-// CompareRow is one question of the comparison and the answer for this
-// product; each competitor answers the same questions, in this order, in
-// Competitor.Cells.
-type CompareRow struct {
-	Label string
-	Ours  string
+// compareMark is how a cell reads at a glance. The answer is judged by
+// what is better for you, so "No" to holding an SSH key carries a yes.
+type compareMark string
+
+const (
+	markYes     compareMark = "yes"
+	markPart    compareMark = "part"
+	markNo      compareMark = "no"
+	markUnknown compareMark = "unknown"
+	markNone    compareMark = ""
+)
+
+// counted is whether a mark takes part in the score: "not documented" and
+// the rows with nothing to judge, such as a price, do not count either way.
+func (m compareMark) counted() bool {
+	return m == markYes || m == markPart || m == markNo
 }
 
-// CompareCell is a competitor's answer to one row and the page that says so.
+// CompareCell is one answer to one row: its mark, a word or two, a line
+// under them, and the page that says so.
 type CompareCell struct {
-	Text   string
+	Mark   compareMark
+	Short  string
+	Detail string
 	Source string
 }
 
-// Competitor is one other tool: its page at /compare/<slug> and its line on
-// the home page. "Not documented" means its own docs say nothing, which is
-// weaker than "does not exist".
+func yes(short, detail, source string) CompareCell {
+	return CompareCell{markYes, short, detail, source}
+}
+
+func part(short, detail, source string) CompareCell {
+	return CompareCell{markPart, short, detail, source}
+}
+
+func no(short, detail, source string) CompareCell {
+	return CompareCell{markNo, short, detail, source}
+}
+
+func plain(short, detail, source string) CompareCell {
+	return CompareCell{markNone, short, detail, source}
+}
+
+// notDocumented is a tool whose docs say nothing, which is weaker than "it
+// does not exist": the cell counts neither for nor against it.
+func notDocumented(source string) CompareCell {
+	return CompareCell{markUnknown, "Not documented", "", source}
+}
+
+// CompareRow is one fact and the answer for this product; each competitor
+// answers the same facts, in this order, in Competitor.Cells.
+type CompareRow struct {
+	Group string
+	Label string
+	Ours  CompareCell
+}
+
+// Competitor is one other tool: its line on the home page and its page at
+// /compare/<slug>.
 type Competitor struct {
 	Slug string
 	Name string
-	// Note is the line on the home page: where the apps run.
-	Note string
-	// Lead says in a few sentences what differs.
-	Lead string
-	// Them and Us are when to pick which: Them first, because it is the
-	// honest half.
-	Them  []string
-	Us    []string
+	// Lead says calmly what differs.
+	Lead  string
 	Cells []CompareCell
 }
 
-// CompareRows are the questions every competitor answers.
+// compareGroups are the headings of the table, in order.
+var compareGroups = []string{"Security", "Your data", "Every day", "Price"}
+
+// CompareRows are the facts every competitor answers.
 var CompareRows = []CompareRow{
-	{"Where apps run", "On your servers."},
-	{"How it reaches them", "The daemon on your server dials out to the hub. " + brand.Name + " holds no SSH key."},
-	{"Open port it needs", "None. Visitors use 80 and 443, or a Cloudflare Tunnel."},
-	{"Price", "Self-hosted is free. Hosted is $29 a month per workspace."},
-	{"Source code", "AGPL-3.0, all of it."},
-	{"Database backups", "SQLite and Postgres, on your schedule, in your bucket."},
-	{"Back to any moment", "SQLite only, with Every change. Postgres goes back to a copy, made as often as every 15 minutes."},
-	{"File backups", "No. Databases only."},
-	{"Check that a copy restores", "Yes. Every day, by itself."},
-	{"MCP for AI agents", "Yes, built into the hub. It can deploy from GitHub or an image."},
+	{"Security", "Holds an SSH key to your servers", yes("No", "The daemon on your server dials out.", "")},
+	{"Security", "Port your server must open", yes("None", "None for "+brand.Name+". Visitors use 80 and 443, or a Cloudflare Tunnel.", "")},
+	{"Your data", "Keeps your code and data", yes("No", "Your server and your bucket.", "")},
+	{"Your data", "Database backups", yes("SQLite and Postgres", "On your schedule, in your own bucket: every 15 minutes, hourly or daily. SQLite also keeps every change.", "")},
+	{"Your data", "Restore tested every day", yes("Yes", "A real restore into a throwaway database, every day.", "")},
+	{"Your data", "Browse and edit live data", yes("Yes", "SQLite and Postgres. Read, edit, run SQL.", "")},
+	{"Every day", "Uptime checks", yes("Every minute", "Built in, with alerts.", "")},
+	{"Every day", "Deploy from", yes("Folder, GitHub, image", "Your folder, a GitHub push or a CI image.", "")},
+	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
+	{"Every day", "Activity log", yes("Yes", "Who did what, when, in every workspace.", "")},
+	{"Price", "Host it yourself, free", yes("Yes", "AGPL-3.0, all of it.", "")},
+	{"Price", "You pay", plain("$29 per workspace", "Unlimited servers, apps and team. $249 a year. The tenth server costs the same as the first, the whole team is included and every feature is in.", "")},
 }
 
-const notDocumented = "Not documented."
+// hasNoServer is the answer on a row about your server for a tool that runs
+// the apps on its own.
+func hasNoServer(name, source string) CompareCell {
+	return plain("You have no server", name+" runs them.", source)
+}
 
 // Competitors are the seven tools, in the order the home page lists them.
 var Competitors = []Competitor{
 	{
 		Slug: "coolify",
 		Name: "Coolify",
-		Note: "On your servers, over SSH.",
-		Lead: "Both run your apps on your own servers. Coolify connects to them over SSH. The " + brand.Name + " daemon calls out instead, and " + brand.Name + " holds no key. Coolify can also use a Cloudflare Tunnel, so no open port is not unique to " + brand.Name + ".",
-		Them: []string{
-			"You want files backed up too, not only databases.",
-			"You run MySQL, MariaDB, MongoDB or ClickHouse and want them backed up.",
-		},
-		Us: []string{
-			"You want a daily check that a copy restores.",
-			"You want no tool to hold a key to your server.",
-			"You want a rules file on the server that limits what the hub may do.",
-		},
+		Lead: "Both run your apps on your own servers. Coolify connects to them over SSH. The " + brand.Name + " daemon dials out instead, and " + brand.Name + " holds no key.",
 		Cells: []CompareCell{
-			{"On your servers. Coolify Cloud uses your servers too.", "https://coolify.io/pricing"},
-			{"Over SSH from Coolify. It can also go through a Cloudflare Tunnel.", "https://coolify.io/docs/knowledge-base/server/introduction"},
-			{"Port 22 open to Coolify, or a Cloudflare Tunnel instead.", "https://coolify.io/docs/knowledge-base/server/firewall"},
-			{"Free to host yourself. Coolify Cloud from $5 a month with 2 servers.", "https://coolify.io/pricing"},
-			{"Apache-2.0.", "https://github.com/coollabsio/coolify"},
-			{"PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse and SQLite, on a schedule, on the server and in S3 if you add it.", "https://coolify.io/docs/databases/backups"},
-			{notDocumented, "https://coolify.io/docs/databases/backups"},
-			{"Yes. Named volumes and folders, on a schedule. No restore in the dashboard.", "https://coolify.io/docs/core/persistent-storage/storage-mounts/backups"},
-			{"Not documented. Checking a copy is up to you.", "https://coolify.io/docs/databases/backups"},
-			{"Yes, built in. Can deploy with a token that allows it.", "https://coolify.io/docs/mcp/setup"},
+			no("Yes", "Coolify stores the private key and connects over SSH.", "https://coolify.io/docs/core/security/credentials/ssh-keys"),
+			part("SSH, or a Cloudflare Tunnel", "Port 22 open to Coolify, unless a tunnel carries it.", "https://coolify.io/docs/knowledge-base/server/firewall"),
+			yes("No", "Your servers, also with Coolify Cloud.", "https://coolify.io/pricing"),
+			yes("Six engines, on a schedule", "PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse and SQLite. On the server, and in S3 if you add it.", "https://coolify.io/docs/databases/backups"),
+			no("By hand", "Its docs say to restore a copy yourself and check it.", "https://coolify.io/docs/databases/backups"),
+			part("With an add-on", "CloudBeaver, as a service you add.", "https://coolify.io/docs/services/cloudbeaver"),
+			no("No", "Its docs say endpoint checks need an external system.", "https://coolify.io/docs/knowledge-base/monitoring"),
+			part("Git or an image", "A Git repository, a Dockerfile or an existing image.", "https://coolify.io/docs/applications/"),
+			part("Four ways", "Web, CLI, API and MCP.", "https://coolify.io/docs/api-reference/authorization"),
+			yes("Yes", "Kept 90 days, for admins and owners.", "https://coolify.io/docs/core/team/audit-log"),
+			yes("Yes", "Free forever. Apache-2.0.", "https://coolify.io/pricing"),
+			plain("$5 + $3 per extra server", "Coolify Cloud, 2 servers included. $29 at 10 servers, $59 at 20.", "https://coolify.io/pricing"),
 		},
 	},
 	{
 		Slug: "dokploy",
 		Name: "Dokploy",
-		Note: "On your servers, over SSH.",
-		Lead: "Both run your apps on your own servers. Dokploy connects to them over SSH with a key. The " + brand.Name + " daemon calls out instead, and " + brand.Name + " holds no key.",
-		Them: []string{
-			"You want Docker volumes backed up too, not only databases.",
-			"You run MySQL, MariaDB or MongoDB and want them backed up.",
-		},
-		Us: []string{
-			"You want a daily check that a copy restores.",
-			"You want no tool to hold a key to your server.",
-			"You want all of the code open source. Some Dokploy parts are under a source-available license.",
-		},
+		Lead: "Both run your apps on your own servers. Dokploy connects to them over SSH with a key. The " + brand.Name + " daemon dials out instead, and " + brand.Name + " holds no key.",
 		Cells: []CompareCell{
-			{"On your servers, also with Dokploy Cloud.", "https://docs.dokploy.com/docs/core/cloud"},
-			{"Over SSH, with a key pair from Dokploy.", "https://docs.dokploy.com/docs/core/remote-servers/instructions"},
-			{"SSH has to be reachable for Dokploy.", "https://docs.dokploy.com/docs/core/cloud"},
-			{"Free to host yourself. Dokploy Cloud from $4.50 a month per server.", "https://dokploy.com/pricing"},
-			{"Apache-2.0, except a proprietary part under a source-available license.", "https://github.com/Dokploy/dokploy/blob/canary/LICENSE.MD"},
-			{"PostgreSQL, MySQL, MariaDB and MongoDB, on a schedule, to S3.", "https://docs.dokploy.com/docs/core/databases/backups"},
-			{notDocumented, "https://docs.dokploy.com/docs/core/databases/backups"},
-			{"Yes. Docker named volumes, to S3.", "https://docs.dokploy.com/docs/core/volume-backups"},
-			{"Not documented. Its test button runs a backup, not a restore.", "https://docs.dokploy.com/docs/core/databases/backups"},
-			{"Yes, the @dokploy/mcp package. It can deploy.", "https://github.com/Dokploy/mcp"},
+			no("Yes", "SSH with a key pair from Dokploy.", "https://docs.dokploy.com/docs/core/remote-servers/instructions"),
+			no("SSH", "It has to reach the server over SSH.", "https://docs.dokploy.com/docs/core/cloud"),
+			yes("No", "On your servers, also with Dokploy Cloud.", "https://docs.dokploy.com/docs/core/cloud"),
+			yes("Four engines, on a schedule", "PostgreSQL, MySQL, MariaDB and MongoDB, to S3.", "https://docs.dokploy.com/docs/core/databases/backups"),
+			notDocumented("https://docs.dokploy.com/docs/core/databases/backups"),
+			notDocumented("https://docs.dokploy.com/docs/core/differences"),
+			notDocumented("https://docs.dokploy.com/docs/core/monitoring"),
+			part("Git, an image or a zip", "GitHub, GitLab, Bitbucket, Gitea, Git, Docker, or a zip you upload.", "https://docs.dokploy.com/docs/core/providers"),
+			part("Four ways", "Web, CLI, API and MCP.", "https://docs.dokploy.com/docs/api"),
+			part("Enterprise plans", "Audit logs on the Enterprise and Agency plans.", "https://docs.dokploy.com/docs/core/differences"),
+			yes("Yes", "Free to run. Apache-2.0, except a source-available part.", "https://github.com/Dokploy/dokploy/blob/canary/LICENSE.MD"),
+			plain("From $15 + $4.50 per extra server", "Dokploy Cloud Startup, 3 servers included. About $29 at 6 servers.", "https://dokploy.com/pricing"),
 		},
 	},
 	{
 		Slug: "kamal",
 		Name: "Kamal",
-		Note: "On your servers, over SSH from your laptop or CI.",
-		Lead: "Kamal is a command-line tool that runs Docker over SSH. There is nothing to sign in to and no hub to run. " + brand.Name + " has a hub, with a web UI, an API and MCP.",
-		Them: []string{
-			"You want a free command-line tool and nothing else.",
-			"You want no hub at all, only SSH and your own config.",
-		},
-		Us: []string{
-			"You want backups in the tool. Kamal documents none.",
-			"You want a web UI, a terminal UI, an API and MCP.",
-			"You want no SSH key on every laptop and CI that deploys.",
-		},
+		Lead: "Kamal is a command-line tool that runs Docker over SSH, with no hub to run. " + brand.Name + " has a hub, with a web UI, an API and MCP.",
 		Cells: []CompareCell{
-			{"On your servers.", "https://kamal-deploy.org/"},
-			{"Over SSH from where you run it, as root by default, with your SSH key.", "https://kamal-deploy.org/docs/installation/"},
-			{"SSH, port 22 by default, and 80 and 443 for its proxy. A jump host also works.", "https://kamal-deploy.org/docs/configuration/ssh/"},
-			{"Free. No paid tier found.", "https://github.com/basecamp/kamal"},
-			{"MIT.", "https://github.com/basecamp/kamal"},
-			{notDocumented, "https://github.com/basecamp/kamal-site"},
-			{notDocumented, "https://github.com/basecamp/kamal-site"},
-			{notDocumented, "https://github.com/basecamp/kamal-site"},
-			{notDocumented, "https://github.com/basecamp/kamal-site"},
-			{notDocumented, "https://github.com/basecamp/kamal-site"},
+			part("Your SSH key", "On each laptop and CI that deploys.", "https://kamal-deploy.org/docs/installation/"),
+			no("SSH", "Port 22 by default.", "https://kamal-deploy.org/docs/configuration/ssh/"),
+			yes("No", "Apps and data stay on your servers.", "https://kamal-deploy.org/"),
+			notDocumented("https://github.com/basecamp/kamal-site"),
+			notDocumented("https://github.com/basecamp/kamal-site"),
+			notDocumented("https://github.com/basecamp/kamal-site"),
+			no("Deploy check only", "The proxy stops checking once the app is up.", "https://kamal-deploy.org/docs/configuration/proxy/"),
+			part("Your laptop or CI", "kamal deploy builds your checkout and pushes it.", "https://kamal-deploy.org/docs/commands/deploy/"),
+			part("CLI only", "It is a command-line tool.", "https://kamal-deploy.org/docs/installation/"),
+			part("On each server", "kamal audit shows the latest commands.", "https://kamal-deploy.org/docs/commands/audit/"),
+			yes("Yes", "MIT.", "https://github.com/basecamp/kamal"),
+			plain("Free", "No paid tier found.", "https://github.com/basecamp/kamal"),
 		},
 	},
 	{
 		Slug: "railway",
 		Name: "Railway",
-		Note: "On Railway's servers.",
-		Lead: "Railway runs your apps on its own servers, so you have no server to look after. " + brand.Name + " runs them on servers you bring.",
-		Them: []string{
-			"You do not want to look after a server.",
-			"You want point-in-time recovery for Postgres or MySQL. " + brand.Name + " has that only for SQLite.",
-		},
-		Us: []string{
-			"You want your apps on your own servers.",
-			"You want backups in your own bucket.",
-			"You want a daily check that a copy restores.",
-		},
+		Lead: "Railway runs your apps on its own servers. " + brand.Name + " runs them on servers you bring.",
 		Cells: []CompareCell{
-			{"On Railway's servers.", "https://docs.railway.com/platform/compare-to-northflank"},
-			{"Railway runs them. You have no server to reach.", "https://docs.railway.com/platform/compare-to-northflank"},
-			{"None: you have no server.", "https://docs.railway.com/platform/compare-to-northflank"},
-			{"Hobby is $5 a month with $5 of use included. More use costs more.", "https://railway.com/pricing"},
-			{"No public source found for the platform. CLI: MIT.", "https://github.com/railwayapp/cli"},
-			{"Daily, weekly and monthly, on the Pro plan.", "https://docs.railway.com/reference/backups"},
-			{"Point-in-time recovery for Postgres and MySQL, on the Pro plan.", "https://docs.railway.com/volumes/point-in-time-recovery"},
-			{"Yes. Volume backups, on the Pro plan.", "https://docs.railway.com/reference/backups"},
-			{"Not documented. Railway describes doing it by hand.", "https://railway.com/guides/postgres-backups-restores"},
-			{"Yes, hosted by Railway. It can deploy.", "https://docs.railway.com/ai/mcp-server"},
+			hasNoServer("Railway", "https://docs.railway.com/platform/compare-to-northflank"),
+			hasNoServer("Railway", "https://docs.railway.com/platform/compare-to-northflank"),
+			no("Yes", "Everything runs on Railway's servers.", "https://docs.railway.com/platform/compare-to-northflank"),
+			part("Daily, weekly, monthly", "Volume backups, on the Pro plan.", "https://docs.railway.com/reference/backups"),
+			no("By hand", "Railway describes a manual restore drill.", "https://railway.com/guides/postgres-backups-restores"),
+			yes("Yes", "View and edit rows of its one-click databases.", "https://docs.railway.com/databases/database-view"),
+			no("Deploy check only", "It does not watch the endpoint once a deploy is live.", "https://docs.railway.com/deployments/healthchecks"),
+			yes("Folder, GitHub, image", "railway up, a GitHub push or a ready image.", "https://docs.railway.com/quick-start"),
+			part("Four ways", "Web, CLI, API and MCP.", "https://docs.railway.com/integrations/api"),
+			yes("Yes", "48 hours on Hobby, 30 days on Pro, 18 months on Enterprise.", "https://docs.railway.com/enterprise/audit-logs"),
+			no("No", "Hosted only.", "https://railway.com/pricing"),
+			plain("$5 or $20, plus use", "Hobby includes $5 of use, Pro $20. More use costs more.", "https://railway.com/pricing"),
 		},
 	},
 	{
 		Slug: "render",
 		Name: "Render",
-		Note: "On Render's servers.",
-		Lead: "Render runs your apps on its own servers, so you have no server to look after. " + brand.Name + " runs them on servers you bring.",
-		Them: []string{
-			"You do not want to look after a server.",
-			"You want point-in-time recovery for Postgres. " + brand.Name + " has that only for SQLite.",
-		},
-		Us: []string{
-			"You want your apps on your own servers.",
-			"You want backups in your own bucket.",
-			"You want a daily check that a copy restores.",
-		},
+		Lead: "Render runs your apps on its own servers. " + brand.Name + " runs them on servers you bring.",
 		Cells: []CompareCell{
-			{"On Render's servers.", "https://render.com/pricing"},
-			{"Render runs them. You have no server to reach.", "https://render.com/pricing"},
-			{"None: you have no server.", "https://render.com/pricing"},
-			{"A web service from $7 a month, Postgres from $6. Free plans with limits.", "https://render.com/pricing"},
-			{"No public source found for the platform. CLI and MCP server: Apache-2.0.", "https://github.com/render-oss/cli"},
-			{"Continuous on paid Postgres. None on the free plan.", "https://render.com/docs/postgresql-backups"},
-			{"Point-in-time recovery for Postgres: 3 days on Hobby, 7 on Pro and up.", "https://render.com/docs/postgresql-backups"},
-			{"Yes. Disks are saved every 24 hours and kept 7 days.", "https://render.com/docs/disks"},
-			{"Not documented. You check the restored database yourself.", "https://render.com/docs/postgresql-backups"},
-			{"Yes, hosted by Render. It can start deploys.", "https://render.com/docs/mcp-server"},
+			hasNoServer("Render", "https://render.com/pricing"),
+			hasNoServer("Render", "https://render.com/pricing"),
+			no("Yes", "Everything runs on Render's servers.", "https://render.com/pricing"),
+			part("Continuous, on paid Postgres", "None on the free plan.", "https://render.com/docs/postgresql-backups"),
+			notDocumented("https://render.com/docs/postgresql-backups"),
+			notDocumented("https://render.com/docs/postgresql-backups"),
+			no("No", "Render recommends a third-party monitor.", "https://render.com/docs/uptime-best-practices"),
+			part("Git or an image", "A linked Git branch or a prebuilt image.", "https://render.com/docs/deploying-an-image"),
+			yes("All five", "Web, CLI with terminal menus, API and MCP.", "https://render.com/docs/cli"),
+			part("Pro and up", "Audit logs from the Pro workspace plan.", "https://render.com/docs/audit-logs"),
+			no("No", "Hosted only.", "https://render.com/pricing"),
+			plain("From $7 a web service", "Postgres from $6. Free plans with limits.", "https://render.com/pricing"),
 		},
 	},
 	{
 		Slug: "fly",
 		Name: "Fly.io",
-		Note: "On Fly's servers.",
-		Lead: "Fly.io runs your apps as Machines in its own regions, so you have no server to look after. " + brand.Name + " runs them on servers you bring.",
-		Them: []string{
-			"You want your apps in Fly's regions and no server to look after.",
-			"You want Managed Postgres with point-in-time recovery. " + brand.Name + " has that only for SQLite.",
-		},
-		Us: []string{
-			"You want your apps on your own servers.",
-			"You want backups in your own bucket.",
-			"You want a daily check that a copy restores.",
-		},
+		Lead: "Fly.io runs your apps as Machines in its own regions. " + brand.Name + " runs them on servers you bring.",
 		Cells: []CompareCell{
-			{"On Fly's servers.", "https://docs.fly.io/about/pricing"},
-			{"Fly runs them. You have no server to reach.", "https://docs.fly.io/about/pricing"},
-			{"None: you have no server.", "https://docs.fly.io/about/pricing"},
-			{"A Machine from $2.19 a month, Managed Postgres from $38. No free tier for new accounts.", "https://docs.fly.io/about/pricing"},
-			{"No public source found for the platform. flyctl: Apache-2.0.", "https://github.com/superfly/flyctl"},
-			{"Managed Postgres, by itself, kept ten days.", "https://fly.io/mpg/"},
-			{"Point-in-time recovery for Managed Postgres, into a new cluster.", "https://docs.fly.io/flyctl/mpg-restore"},
-			{"Yes. Volumes are saved daily and kept 5 days unless you change it.", "https://docs.fly.io/volumes/snapshots"},
-			{notDocumented, "https://docs.fly.io/mpg"},
-			{"Experimental, as fly mcp server.", "https://docs.fly.io/flyctl/mcp-server/"},
+			hasNoServer("Fly.io", "https://docs.fly.io/about/pricing"),
+			hasNoServer("Fly.io", "https://docs.fly.io/about/pricing"),
+			no("Yes", "Everything runs on Fly's servers.", "https://docs.fly.io/about/pricing"),
+			part("Managed Postgres", "By itself, kept ten days.", "https://fly.io/mpg/"),
+			notDocumented("https://docs.fly.io/mpg/"),
+			notDocumented("https://docs.fly.io/mpg/"),
+			notDocumented("https://docs.fly.io/reference/health-checks/"),
+			part("Folder or image", "fly deploy takes source or an image. GitHub through Actions.", "https://docs.fly.io/flyctl/deploy/"),
+			part("Four ways", "Web, flyctl, Machines API and an experimental MCP.", "https://docs.fly.io/machines/api/"),
+			no("No", "Its security questionnaire says there is no customer-facing audit log.", "https://fly.io/legal/security-questionnaire/"),
+			no("No", "Hosted only.", "https://docs.fly.io/about/pricing"),
+			plain("From $2.19 a Machine", "Managed Postgres from $38. No free tier for new accounts.", "https://docs.fly.io/about/pricing"),
 		},
 	},
 	{
 		Slug: "heroku",
 		Name: "Heroku",
-		Note: "On Heroku's servers.",
-		Lead: "Heroku runs your apps on its own dynos, so you have no server to look after. In February 2026 it said it will focus on stability and support rather than new features. It named no end date. " + brand.Name + " runs your apps on servers you bring.",
-		Them: []string{
-			"You like git push heroku main and want no server to look after.",
-			"You want point-in-time recovery for Postgres, on a Standard plan or above. " + brand.Name + " has that only for SQLite.",
-		},
-		Us: []string{
-			"You want your apps on your own servers.",
-			"You want backups in your own bucket, wherever you like. Heroku stores its Postgres backups in the U.S.",
-			"You want a daily check that a copy restores.",
-		},
+		Lead: "Heroku runs your apps on its own dynos. In February 2026 it moved to sustaining engineering, with no new features and no end date named. " + brand.Name + " runs your apps on servers you bring.",
 		Cells: []CompareCell{
-			{"On Heroku's dynos.", "https://www.heroku.com/pricing"},
-			{"Heroku runs them. You have no server to reach.", "https://www.heroku.com/pricing"},
-			{"None: you have no server.", "https://www.heroku.com/pricing"},
-			{"Eco is $5 a month, Postgres from $5. No free plan.", "https://www.heroku.com/pricing"},
-			{"No public source found for the platform. CLI: ISC. MCP server: Apache-2.0.", "https://github.com/heroku/cli"},
-			{"Postgres, daily at a time you pick. Stored in the U.S.", "https://devcenter.heroku.com/articles/heroku-postgres-backups"},
-			{"Rollback, Heroku's point-in-time recovery for Postgres. Not on Essential plans.", "https://devcenter.heroku.com/articles/heroku-postgres-rollback"},
-			{"No: files on a dyno are gone when it restarts.", "https://devcenter.heroku.com/articles/dynos"},
-			{"Not documented. Heroku says to verify scheduled backups by hand.", "https://devcenter.heroku.com/articles/heroku-postgres-backups"},
-			{"Yes, in early development.", "https://devcenter.heroku.com/articles/heroku-mcp-server"},
+			hasNoServer("Heroku", "https://www.heroku.com/pricing"),
+			hasNoServer("Heroku", "https://www.heroku.com/pricing"),
+			no("Yes", "Everything runs on Heroku's dynos.", "https://www.heroku.com/pricing"),
+			part("Postgres, daily", "Stored in the U.S.", "https://devcenter.heroku.com/articles/heroku-postgres-backups"),
+			no("By hand", "Heroku says to verify scheduled backups yourself.", "https://devcenter.heroku.com/articles/heroku-postgres-backups"),
+			part("Queries, with Dataclips", "Saved queries on Heroku Postgres.", "https://devcenter.heroku.com/articles/dataclips"),
+			no("No", "Uptime monitoring is a third-party add-on.", "https://devcenter.heroku.com/articles/monitoring-apps"),
+			yes("Laptop, GitHub, image", "git push, GitHub deploys or its registry.", "https://devcenter.heroku.com/articles/git"),
+			part("Four ways", "Web, CLI, Platform API and MCP in early development.", "https://devcenter.heroku.com/articles/platform-api-reference"),
+			part("Per app", "Releases say who deployed or changed config.", "https://devcenter.heroku.com/articles/releases"),
+			no("No", "Hosted only.", "https://www.heroku.com/pricing"),
+			plain("Eco $5, Postgres from $5", "No free plan.", "https://www.heroku.com/pricing"),
 		},
 	},
+}
+
+// CompareScore is one tool next to this one, over the facts both answered
+// with a mark. Ours and Theirs are the full yeses of each side; Wins are
+// the facts this product has a full yes on and the tool has not.
+type CompareScore struct {
+	Facts, Wins, Ours, Theirs int
+}
+
+// Score counts the facts. A tie is no win, and a cell without a mark takes
+// no part.
+func (c Competitor) Score() CompareScore {
+	var score CompareScore
+	for i, cell := range c.Cells {
+		if !cell.Mark.counted() {
+			continue
+		}
+		ours := CompareRows[i].Ours.Mark
+		if !ours.counted() {
+			continue
+		}
+		score.Facts++
+		if ours == markYes {
+			score.Ours++
+		}
+		if cell.Mark == markYes {
+			score.Theirs++
+		}
+		if ours == markYes && cell.Mark != markYes {
+			score.Wins++
+		}
+	}
+	return score
+}
+
+// ScoreLine is the score in words, on the home page and over the table.
+func (c Competitor) ScoreLine() string {
+	score := c.Score()
+	return fmt.Sprintf("%s wins %d of %d", brand.Name, score.Wins, score.Facts)
 }
 
 // FindCompetitor is the competitor with this slug.

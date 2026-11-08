@@ -294,7 +294,18 @@ templ HomePricing() {
 				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
 			</div>
 		}
-		<p class="px-1 text-sm text-muted-foreground" data-one-price>Unlimited servers, apps and team. No tiers, no per-server fees.</p>
+		@kit.List() {
+			@kit.Row("") {
+				@compareLine("The tenth server costs the same as the first.", "A bill that does not grow with you. Coolify Cloud is $5 for 2 servers plus $3 per extra server, so it reaches $29 at 10 servers and $59 at 20. Dokploy Cloud Startup is from $15 with 3 servers plus $4.50 per extra server, so about $29 at 6 servers.")
+			}
+			@kit.Row("") {
+				@compareLine("The whole team is included.", "No per-seat fee.")
+			}
+			@kit.Row("") {
+				@compareLine("Everything is included.", "Backups with a daily check, uptime, the data browser and AI agents. No higher tier unlocks more.")
+			}
+		}
+		<p class="px-1 text-sm text-muted-foreground" data-one-price>$29 per workspace. Unlimited servers, apps and team. Hosted next to hosted: hosting { brand.Name } yourself is free. Coolify and Dokploy prices from their pricing pages, read { compareRead }.</p>
 	</section>
 }
 

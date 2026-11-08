@@ -1,46 +1,28 @@
 package pages
 
 import (
+	"fmt"
+
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
 // ---------------------------------------------------------------- home
-// HomeCompare is the comparison on the home page: a line per tool, each a
-// way to its page, next to where others are ahead.
+// HomeCompare is the comparison on the home page: the seven tools, each
+// with how many facts moin wins, each a way to its page.
 templ HomeCompare() {
 	<section id="compare" class={ homeSection }>
 		<h2 class={ homeStatement }>How it compares.</h2>
 		<p class={ homeLead }>None of these seven documents an automatic check that a copy restores. { brand.Name } runs one every day.</p>
-		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
-			@kit.Section("Compare", nil) {
-				@kit.List() {
-					for _, competitor := range Competitors {
-						@kit.Row("/compare/" + competitor.Slug) {
-							@compareLine(competitor.Name, competitor.Note)
-						}
-					}
+		@kit.List() {
+			for _, competitor := range Competitors {
+				@kit.Row("/compare/" + competitor.Slug) {
+					@compareLine(competitor.Name, competitor.ScoreLine())
 				}
 			}
-			@kit.Section("Where others are ahead", nil) {
-				@kit.List() {
-					@kit.Row("") {
-						@compareLine("Postgres to any moment", "Railway, Render, Fly Managed Postgres and Heroku offer point-in-time recovery. "+brand.Name+" has it only for SQLite.")
-					}
-					@kit.Row("") {
-						@compareLine("Files", "Coolify and Dokploy can back up files. "+brand.Name+" backs up databases only.")
-					}
-					@kit.Row("") {
-						@compareLine("No open port", "Coolify can use a Cloudflare Tunnel, so "+brand.Name+" is not the only one.")
-					}
-					@kit.Row("") {
-						@compareLine("AI agents", "Coolify, Dokploy, Railway and Render also have official MCP servers that can deploy.")
-					}
-				}
-			}
-		</div>
-		<p class="px-1 text-sm text-muted-foreground">From each tool's own docs, read { compareRead }.</p>
+		}
+		<p class="px-1 text-sm text-muted-foreground">Fact by fact, from each tool's own docs, read { compareRead }.</p>
 	</section>
 }
 
@@ -54,9 +36,10 @@ templ compareLine(name, note string) {
 }
 
 // ---------------------------------------------------------------- page
-// Compare is one tool next to this one: what differs, when to pick which,
-// and the same questions answered for both, each answer with its source.
+// Compare is one tool next to this one: what differs, the score, and the
+// same facts for both, grouped, each answer with its mark and its source.
 templ Compare(competitor Competitor) {
+	{{ score := competitor.Score() }}
 	@layouts.Home(layouts.SEOProps{
 		Title:       brand.Name + " vs " + competitor.Name,
 		Description: competitor.Lead,
@@ -65,50 +48,42 @@ templ Compare(competitor Competitor) {
 		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
 			@kit.Header(kit.Back{}, brand.Name + " or " + competitor.Name + "?")
 			<p class={ homeLead, "max-w-2xl" }>{ competitor.Lead }</p>
-			<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
-				@comparePick("Pick "+competitor.Name+" if", competitor.Them)
-				@comparePick("Pick "+brand.Name+" if", competitor.Us)
-			</div>
-			@kit.Section("Side by side", nil) {
-				@compareHeader(competitor.Name)
-				@kit.List() {
-					for i, row := range CompareRows {
-						@compareFact(row, competitor.Name, competitor.Cells[i])
+			<p class="text-2xl font-semibold tracking-tight tabular-nums">{ competitor.ScoreLine() }</p>
+			<div class="flex flex-col gap-6">
+				@compareHeader(competitor.Name, score)
+				for _, group := range compareGroups {
+					@kit.Section(group, nil) {
+						@kit.List() {
+							for i, row := range CompareRows {
+								if row.Group == group {
+									@compareFact(row, competitor.Name, competitor.Cells[i])
+								}
+							}
+						}
 					}
 				}
-			}
+			</div>
 			<p class="px-1 text-sm text-muted-foreground">
-				From { competitor.Name }'s own docs, read { compareRead }. "Not documented" means its docs say nothing, not that it cannot be done.
+				From { competitor.Name }'s own docs, read { compareRead }. A check is the better answer, a dash a part of it, a cross not. "Not documented" means its docs say nothing, not that it cannot be done, and it is not counted.
 				<a href="/#compare" class="text-foreground underline underline-offset-4">All seven</a>
 			</p>
 		</main>
 	}
 }
 
-templ comparePick(title string, reasons []string) {
-	@kit.Section(title, nil) {
-		@kit.List() {
-			for _, reason := range reasons {
-				@kit.Row("") {
-					<span class="min-w-0 flex-1 text-sm text-pretty">{ reason }</span>
-				}
-			}
-		}
-	}
-}
+// compareColumns is one row on the desktop: the fact and two answers. On a
+// phone the three stack, and each answer says whose it is.
+const compareColumns = "grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_minmax(0,3fr)] sm:gap-6"
 
-// compareColumns is one row on the desktop: the question and two answers.
-// On a phone the three stack, and each answer says whose it is.
-const compareColumns = "grid min-w-0 flex-1 gap-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_minmax(0,3fr)] sm:gap-6"
-
-// compareHeader names the two columns over the list, in line with the
-// rows; a phone has no columns to name, and every answer says whose it is.
-templ compareHeader(name string) {
+// compareHeader names the two columns over the table, each with its score,
+// in line with the rows. A phone has no columns to name, and every answer
+// says whose it is; the score over the table is there for it.
+templ compareHeader(name string, score CompareScore) {
 	<div aria-hidden="true" class="hidden px-6.5 text-sm font-medium text-muted-foreground sm:flex">
 		<div class={ compareColumns }>
 			<span></span>
-			<span>{ brand.Name }</span>
-			<span>{ name }</span>
+			<span class="flex flex-col">{ brand.Name } <span class="font-normal tabular-nums">{ fmt.Sprintf("%d of %d", score.Ours, score.Facts) }</span></span>
+			<span class="flex flex-col">{ name } <span class="font-normal tabular-nums">{ fmt.Sprintf("%d of %d", score.Theirs, score.Facts) }</span></span>
 		</div>
 	</div>
 }
@@ -116,12 +91,49 @@ templ compareHeader(name string) {
 templ compareFact(row CompareRow, name string, cell CompareCell) {
 	@kit.Row("") {
 		<div class={ compareColumns }>
-			<span class="font-medium">{ row.Label }</span>
-			<span class="text-sm text-pretty"><span class="text-muted-foreground sm:sr-only">{ brand.Name }: </span>{ row.Ours }</span>
-			<span class="text-sm text-pretty text-muted-foreground">
-				<span class="sm:sr-only">{ name }: </span>{ cell.Text }
-				<a href={ templ.SafeURL(cell.Source) } target="_blank" rel="noopener" class="whitespace-nowrap underline underline-offset-4">Source</a>
-			</span>
+			<span class="font-medium text-pretty">{ row.Label }</span>
+			@compareAnswer(brand.Name, row.Ours)
+			@compareAnswer(name, cell)
 		</div>
+	}
+}
+
+// compareAnswer is one side of a fact: its mark, its words, the line under
+// them and where it says so.
+templ compareAnswer(whose string, cell CompareCell) {
+	<div class="flex min-w-0 items-start gap-2">
+		@compareMarkIcon(cell.Mark)
+		<div class="flex min-w-0 flex-col gap-0.5 text-sm text-pretty">
+			<span><span class="text-muted-foreground sm:sr-only">{ whose }: </span><span class="font-medium">{ cell.Short }</span></span>
+			if cell.Detail != "" {
+				<span class="text-xs text-muted-foreground">{ cell.Detail }</span>
+			}
+			if cell.Source != "" {
+				<a href={ templ.SafeURL(cell.Source) } target="_blank" rel="noopener" class="w-fit text-xs text-muted-foreground underline underline-offset-4">Source</a>
+			}
+		</div>
+	</div>
+}
+
+// compareMarkIcon is a mark in the ink of the page: a filled check, a
+// dash, a cross, a question mark, or a blank that keeps the words in line.
+templ compareMarkIcon(mark compareMark) {
+	switch mark {
+		case markYes:
+			<span role="img" aria-label="Yes" class="flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+				@kit.IconCheck("size-3")
+			</span>
+		case markPart:
+			<span role="img" aria-label="Partly" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-foreground/40 text-foreground">
+				<svg aria-hidden="true" viewBox="0 0 16 16" class="size-3"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+			</span>
+		case markNo:
+			<span role="img" aria-label="No" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-muted-foreground">
+				@kit.IconX("size-3")
+			</span>
+		case markUnknown:
+			<span role="img" aria-label="Not documented" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-xs font-medium text-muted-foreground">?</span>
+		default:
+			<span aria-hidden="true" class="size-5 shrink-0"></span>
 	}
 }

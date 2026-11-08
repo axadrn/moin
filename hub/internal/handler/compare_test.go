@@ -34,16 +34,28 @@ func TestComparePagesAnswer(t *testing.T) {
 			t.Errorf("%s answers %d of %d questions", competitor.Name, len(competitor.Cells), len(pages.CompareRows))
 		}
 		for i, cell := range competitor.Cells {
-			if cell.Text == "" || !strings.HasPrefix(cell.Source, "https://") {
-				t.Errorf("%s, %s: answer %q, source %q", competitor.Name, pages.CompareRows[i].Label, cell.Text, cell.Source)
+			if cell.Short == "" || !strings.HasPrefix(cell.Source, "https://") {
+				t.Errorf("%s, %s: answer %q, source %q", competitor.Name, pages.CompareRows[i].Label, cell.Short, cell.Source)
 			}
 		}
 		response := serveCompare("/compare/" + competitor.Slug)
 		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), competitor.Name) {
 			t.Errorf("/compare/%s: status %d", competitor.Slug, response.Code)
 		}
-		if strings.Contains(response.Body.String(), "—") {
+		body := response.Body.String()
+		if strings.Contains(body, "—") {
 			t.Errorf("/compare/%s has an em dash", competitor.Slug)
+		}
+		if !strings.Contains(body, competitor.ScoreLine()) {
+			t.Errorf("/compare/%s does not say %q", competitor.Slug, competitor.ScoreLine())
+		}
+		for _, gone := range []string{"Pick " + competitor.Name, "not the only one", "Where others are ahead"} {
+			if strings.Contains(body, gone) {
+				t.Errorf("/compare/%s still says %q", competitor.Slug, gone)
+			}
+		}
+		if score := competitor.Score(); score.Facts == 0 || score.Wins > score.Facts || score.Ours != score.Facts {
+			t.Errorf("/compare/%s: score %+v", competitor.Slug, score)
 		}
 	}
 }
