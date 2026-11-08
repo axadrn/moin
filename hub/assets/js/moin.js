@@ -138,7 +138,7 @@ let asking = null;
 document.addEventListener("htmx:before:response", (event) => { asking = event.target; });
 
 const buttonOf = (source) =>
-  source?.closest("button") ||
+  source?.closest?.("button") ||
   (document.activeElement?.closest?.("button") && source?.contains(document.activeElement) ? document.activeElement.closest("button") : null) ||
   source?.querySelector?.("button[type=submit], button:not([type])");
 
@@ -148,7 +148,7 @@ const buttonOf = (source) =>
 // page: its line goes on top of the page.
 function saySaid(source, kind, text) {
   const place = source?.isConnected
-    ? source.closest("[role=listitem], li, form, header") || source
+    ? source.closest?.("[role=listitem], li, form, header") || source
     : document.querySelector("#main > *");
   if (!place) return;
   clearSaid(place);
@@ -187,7 +187,7 @@ if (feedbackBox) new MutationObserver(() => {
 
 // A new try clears the line of the last one.
 document.addEventListener("htmx:before:request", (event) => {
-  clearSaid(event.target.closest("[role=listitem], li, form, header") || event.target);
+  clearSaid(event.target.closest?.("[role=listitem], li, form, header") || event.target);
 });
 
 // A field a request failed on turns red and takes the focus; its message
