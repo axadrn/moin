@@ -168,11 +168,17 @@ func (e *postgresEngine) Restore(ctx context.Context, from source, id string) er
 		if found, err := dbExists(ctx, t, built); !found || err != nil {
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
-	} else if err := errors.Join(pgRoom(ctx, t), load(ctx, t, built, from.copy)); err != nil {
-		return fmt.Errorf("%w; nothing changed", err)
-	} else if _, err := admin(ctx, t, `SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = :'live' \gset
+	} else {
+		if err := pgRoom(ctx, t); err != nil {
+			return fmt.Errorf("%w; nothing changed", err)
+		}
+		if err := load(ctx, t, built, from.copy); err != nil {
+			return fmt.Errorf("%w; nothing changed", err)
+		}
+		if _, err := admin(ctx, t, `SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = :'live' \gset
 ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "built": built}); err != nil {
-		return fmt.Errorf("give the restored database its owner: %w; nothing changed", err)
+			return fmt.Errorf("give the restored database its owner: %w; nothing changed", err)
+		}
 	}
 	start := func() error { return nil }
 	if others := e.others(); len(others) > 0 {
@@ -248,10 +254,13 @@ func (e *postgresEngine) Check(ctx context.Context, copy io.Reader) error {
 	}
 	check := t
 	check.database = moinName("check", t.database)
-	if err := errors.Join(pgRoom(ctx, t), load(ctx, t, check.database, copy)); err != nil {
+	if err := pgRoom(ctx, t); err != nil {
 		return err
 	}
 	defer admin(context.WithoutCancel(ctx), t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": check.database})
+	if err := load(ctx, t, check.database, copy); err != nil {
+		return err
+	}
 	_, err = check.psql(ctx, `DO $$ DECLARE t record; BEGIN
 FOR t IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') LOOP
 	EXECUTE format('SELECT md5(string_agg(x::text, '''')) FROM %I.%I x', t.schemaname, t.tablename);
