@@ -9,7 +9,7 @@ All of moin is five words. Know them, and you know moin.
 
 ## App
 
-Your app is the thing you made, like a shop or a blog, that people open on the internet.
+Your app is the thing you made, like a shop or a blog. People open it on the internet.
 
 Like a little shop: it has a door, and visitors come in.
 
@@ -17,7 +17,7 @@ Like a little shop: it has a door, and visitors come in.
 
 A server is your computer on the internet. It is always on, so your app is always open.
 
-The **daemon** is the little helper moin puts on it. It only calls out to moin, like a child phoning home; it never opens the door to anyone.
+The **daemon** is the little helper moin puts on it. It only calls out to moin, like a child phoning home. It never opens the door to anyone.
 
 ## Deploy
 
@@ -27,13 +27,13 @@ Like hanging a new sign in the shop window. If the new sign falls down, the old 
 
 ## Backup
 
-moin copies your database into your bucket on the schedule you pick, and keeps the copies as long as you say. With SQLite it can also write down every change, so you go back to any minute.
+moin copies your database into your bucket, on a schedule you pick. With SQLite it can also write down every change, so you can go back to any minute.
 
 Like a diary of your data: turn back the pages to any day.
 
 ## Bucket
 
-Your bucket is your own box on the internet, where your backups and uploads go. It is yours, not ours.
+Your bucket is your own box on the internet. Your backups and uploads go there. It is yours, not ours.
 
 Like a locker you rent yourself: moin puts things in, but only you hold the key.
 

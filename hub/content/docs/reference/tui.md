@@ -5,7 +5,7 @@ group: "Reference"
 order: 4
 ---
 
-The terminal UI is moin in your terminal: run `moin` in a repo for the daily work: what runs, deploys, logs, rollbacks, backups and restores, env vars, domains, uptime, metrics and commands, all live. Setup you do once opens the web app; [Where things work](/docs/reference/surfaces) says which.
+The terminal UI is moin in your terminal. Run `moin` for the daily work, all live. Setup you do once opens the web app. [Where things work](/docs/reference/surfaces) says which.
 
 ## Start
 

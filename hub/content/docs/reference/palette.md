@@ -5,7 +5,7 @@ group: "Reference"
 order: 3
 ---
 
-The palette is a box in the middle of the screen: type what you want, press `enter`, and you are there. It is the same in the web and the terminal UI.
+The palette is a box in the middle of the screen. Type what you want. Press `enter`. You are there. It is the same in the web and the terminal UI.
 
 ```text
 ⌘K
@@ -35,7 +35,7 @@ The palette is a box in the middle of the screen: type what you want, press `ent
 - **The catalog**: an app you can install, such as ntfy or Umami (web only).
 - **The docs**, last, at most three pages (web only).
 
-On the website, signed out, the magnifier at the top right is the same box: it finds the docs and the catalog. There is no other search field anywhere.
+On the website, signed out, the magnifier at the top right is the same box. It finds the docs and the catalog.
 
 With nothing typed, it shows what goes with the page you are on first, such as the sections and actions of the app you are looking at, then **Recent**: what you picked most and latest. The web remembers that in your browser, the terminal UI its last eight picks.
 
@@ -100,9 +100,3 @@ The terminal UI has more keys on an app, such as `R` to redeploy and `P` to roll
 | `g` `l` | Alerts |
 | `g` `b` | Bucket |
 | `g` `y` | Activity |
-
-## Under the hood
-
-- The web and the terminal UI match with the same code (`internal/find`), so both find the same things in the same order. A whole word beats the start of a word, which beats a word that holds it, then the letters in order, then a typo.
-- In the web, Recent is a short list in your browser's local storage: each pick and how often, worth half as much every week. Only the order goes to the hub, with each search.
-- The terminal UI also shows the pages of the web app in the palette; `enter` opens one in your browser.

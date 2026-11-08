@@ -5,65 +5,55 @@ group: "Start"
 order: 3
 ---
 
-moin is small, it never lets anyone into your server, and it keeps your data safe. Four things make it different: a small stack you can read, a daemon that only calls out, backups you can trust, and a keyboard that reaches everything.
+moin is small. It never lets anyone into your server. It keeps your data safe.
 
 ## A small stack
 
-moin is two programs you can read, not a pile of tools.
+moin is two programs you can read. It is not a pile of tools.
 
 | Part | What it is |
 | --- | --- |
 | `moin` | One Go binary: `moin` is the terminal UI, `moin <command>` the CLI, `moin daemon` the daemon on your servers. |
 | Hub | One more Go binary from the same repo: the web app, the API and the MCP server. |
-| Web | Server-rendered HTML with templ and htmx. Tailwind is built by its standalone binary: no Node, no npm tree. |
+| Web | HTML from the server, with templ and htmx. No Node, no npm tree. |
 | Database | SQLite, in a file next to the hub. |
 
 All of it is open source under AGPL-3.0, in one repo: [github.com/axadrn/moin](https://github.com/axadrn/moin).
 
 ## The daemon only dials out
 
-The daemon on your server calls moin; moin never calls your server. Nothing on the server waits for moin, so it needs no open port for it, and moin holds no SSH key to it.
+Your server calls moin. moin never calls your server.
 
-SSH tools, like Coolify, Dokploy or Kamal: the tool holds a key to a root shell on your server, so port 22 stays open for it.
+So nothing on the server waits for moin. The server needs no open port for it. moin holds no SSH key to it.
 
-```text
-the tool
- │ holds a key
- │ to a root shell
- ▼
-┌───────────────┐
-│ your server   │
-│ port 22 open  │
-└───────────────┘
-```
-
-moin: the daemon on your server calls out. Nothing waits for moin, and moin holds no key.
+SSH tools work the other way. The tool holds a key to a root shell, and port 22 stays open.
 
 ```text
-moin
- ▲
- │ the daemon
- │ calls out
-┌┴──────────────┐
-│ your server   │
-│ daemon        │
-│ no open port  │
-└───────────────┘
+SSH tools           moin
+
+the tool            moin
+ │ holds a key       ▲
+ ▼                   │ the daemon
+┌───────────┐        │ calls out
+│ server    │      ┌─┴─────────┐
+│ port 22   │      │ server    │
+│ open      │      │ no port   │
+└───────────┘      └───────────┘
 ```
 
-moin's requests come back down the line the daemon opened, and the daemon checks each one against your rules.
+moin's requests come back down the line the daemon opened. The daemon checks each one against your rules.
 
-With the three switches of [Security](/docs/guides/security) on, the server can close almost everything:
+Three switches can close almost every other door:
 
 | Switch | What closes |
 | --- | --- |
-| Cloudflare Tunnel | Ports 80 and 443: visitors come through a connection the server opens to Cloudflare. |
-| SSH only on Tailscale | Port 22 for everyone outside your tailnet. |
+| Cloudflare Tunnel | Ports 80 and 443. Visitors come through Cloudflare. |
+| SSH only on Tailscale | Port 22, for everyone outside your tailnet. |
 | Firewall | Everything else. |
 
-What stays open to everyone is `41641/udp`, Tailscale's port for direct connections. **What the daemon set up** on the server's security page shows it.
+Only `41641/udp` stays open to everyone. It is Tailscale's port for direct connections. [Security](/docs/guides/security) shows how.
 
-A file on the server, `/etc/moin/rules`, decides what moin may do there: no data, no logs, no commands, deploys only from your repos, backups only to your bucket. Only root on the server changes it, so a break-in at moin cannot. [Rules](/docs/guides/security#rules).
+A file on the server, `/etc/moin/rules`, says what moin may do there. Only root on the server can change it, so a break-in at moin cannot. [Rules](/docs/guides/security#rules).
 
 ## How others reach your servers
 
@@ -76,26 +66,23 @@ From each project's own docs, read November 7, 2026:
 | [Kamal](https://kamal-deploy.org/docs/configuration/ssh/) | "Kamal uses SSH to connect and run commands on your hosts", as root on port 22 by default, from the machine that runs `kamal`. A proxy or jump host works. |
 | [Portainer Edge Agent](https://docs.portainer.io/advanced/edge-agent) | Dials out too: the agent polls the Portainer server and opens a tunnel to it on port 8000. |
 
-In short: with SSH-based tools, whoever runs the tool holds a key that opens a shell on your server, and the server keeps SSH reachable for it. With moin, the hub sends the daemon requests, and the daemon checks each one against your rules.
-
 ## Backups whose restores are checked
 
-moin copies your database into your own bucket on the schedule you pick, and keeps the copies as long as you say; with SQLite it can also write down every change, so you go back to any minute. A restore can be undone. Every day moin restores the newest copy into a throwaway database and reads it, and an [alert](/docs/guides/alerts) tells you when the check fails. [How backups work](/docs/concepts/backups).
+moin copies your database into your own bucket, on a schedule you pick. Every day it restores the newest copy into a throwaway database and reads it. If that fails, you get an [alert](/docs/guides/alerts). A restore can be undone. [How backups work](/docs/concepts/backups).
 
 ## Every way in
 
-Use moin the way you like: click in the web, type in the terminal, script it with the CLI or the API, or let an AI agent do it through MCP. Each one does the same work, so you never get stuck in one of them. [Where things work](/docs/reference/surfaces) lists what each one does.
+Click in the web. Type in the terminal. Script it with the CLI or the API. Or let an AI agent do it through MCP. Each one does the same work. [Where things work](/docs/reference/surfaces).
 
 ## Keyboard first
 
-One box finds everything: `⌘K` in the web, `space` in the terminal UI. Type a few letters, even with a typo, and press `enter`. `j` and `k` move through lists, `?` shows every key. [Palette and keys](/docs/reference/palette).
+One box finds everything: `⌘K` in the web, `space` in the terminal UI. A typo is fine. [Palette and keys](/docs/reference/palette).
 
 ## Under the hood
 
-- The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the daemon's connection, `x/term`, the AWS S3 SDK for your bucket, Litestream and a pure-Go SQLite for backups.
+- The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the daemon's line, `x/term`, the AWS S3 SDK for your bucket, Litestream and a pure-Go SQLite for backups.
 - Built for Linux the way a release builds it (`CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" ./cmd/moin`, Go 1.26.8), the binary is 25.8 MB for arm64 and 28.3 MB for amd64. Measured on November 7, 2026.
-- The daemon's call is one WebSocket connection from your server to the hub, kept open.
-- SQLite changes reach your bucket within about a second, Postgres changes within a minute.
+- The daemon's line is one WebSocket connection from your server to the hub.
 
 ## Next
 

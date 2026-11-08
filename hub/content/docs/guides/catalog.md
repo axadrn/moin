@@ -5,7 +5,9 @@ group: "Apps"
 order: 6
 ---
 
-The catalog is the place with open source apps you install in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx. Pick one, a version and a server; a minute later it runs, its secrets generated and its database backed up like any app's.
+The catalog is the place with open source apps you install in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx.
+
+Pick an app, a version and a server. A minute later it runs, with its secrets made for you and its database backed up.
 
 ## Install an app
 
@@ -17,11 +19,13 @@ API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, generates every secret as an encrypted env var, sets `VERSION` and deploys. No version takes the newest, no name the app's own, like `umami`. Add a [domain](/docs/guides/domains) now or later. Some apps have a first login, such as Umami's admin and `umami`; its page in the catalog says so under **First sign-in**, and `moin env --show` shows the generated passwords.
+It creates the app, makes every secret as an encrypted env var, sets `VERSION` and deploys. Without a version it takes the newest.
+
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. `moin env --show` shows the passwords it made.
 
 ## See the catalog
 
-The public catalog is at [/catalog](/catalog), one page per app: what it is, its website, source and license, its image on its registry, and its versions.
+The public catalog is at [/catalog](/catalog), one page per app.
 
 ```surfaces
 Web: **Apps**, **New app**, **Open the catalog**; or /catalog on the site
@@ -31,13 +35,11 @@ API: GET /api/v1/catalog, GET /api/v1/catalog/{slug}
 MCP: list_catalog, get_catalog_app
 ```
 
-Pick a category, and the order: newest release first, or by name. Both stay in the address, so a link shows the same list. To find one app, use the search at the top right (`⌘K` or `/`): it finds an app by its name, its category or what it does, and a typo still finds it: `nfty` finds ntfy.
-
-moin reads each app's image registry once an hour, so every version shows the hour it ships, newest first. Any of them can be installed, an older one too.
+Pick a category and an order. To find one app, use the search at the top right. moin reads each app's image registry once an hour, so every version shows the hour it ships.
 
 ## Update an app
 
-The app page says when a new version is out, such as "Umami 3.4.1 is out, released 2h ago". An update sets `VERSION` and deploys. moin takes a copy right before, so its [backups](/docs/guides/backups) offer "Before the update to 3.4.1".
+The app page says when a new version is out. An update sets `VERSION` and deploys. moin takes a copy right before, so its [backups](/docs/guides/backups) offer "Before the update to 3.4.1".
 
 ```surfaces
 Web: the app page, **Update** (or another version, **Deploy**)
@@ -47,7 +49,7 @@ API: POST /api/v1/apps/{app}/update
 MCP: update_app
 ```
 
-An older version may not undo the database migrations of a newer one: go back to "Before the update to …" instead ([restore](/docs/guides/backups#go-back)).
+An older version may not undo the database changes of a newer one. Then [go back](/docs/guides/backups#go-back) to "Before the update to …".
 
 ## Add an app
 
@@ -108,7 +110,7 @@ The rules, which a test checks:
 | Rule | |
 | --- | --- |
 | Image | on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, run as `<image>:${VERSION}` |
-| Secrets | every one a `${NAME}`, generated on install: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
+| Secrets | every one a `${NAME}`, made on install: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |
 | Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data` |
 | Versions | only tags like `1.2.3` or `v1.2.3` count, unless `versions:` sets a regular expression. A project that tags betas like versions sets `stable:` to its channel tag, such as `stable` |
@@ -118,6 +120,5 @@ Install it once on a server of your own with `moin catalog install` before you o
 
 ## Good to know
 
-- The workspace needs a [bucket](/docs/guides/bucket): the app's compose file goes to the server through it, like a deploy from the CLI.
-- A catalog app is an ordinary app: logs, metrics, uptime, domains, rollback and [backups](/docs/guides/backups) all work.
-- A self-hosted hub ships the same catalog and asks the registries itself; nothing goes through us. [How moin works](/docs/concepts/how-moin-works#the-catalog).
+- The workspace needs a [bucket](/docs/guides/bucket).
+- A catalog app is an ordinary app: logs, metrics, uptime, domains, rollback and backups all work.

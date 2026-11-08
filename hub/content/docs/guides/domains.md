@@ -5,7 +5,7 @@ group: "Apps"
 order: 2
 ---
 
-A domain is the name people type to reach your app, like `my-app.example.com`. Every app gets one right after its first deploy, its instant address; add your own when you are ready. HTTPS is always on.
+A domain is the name people type to reach your app, like `my-app.example.com`. Every app gets one right after its first deploy: its instant address. Add your own when you are ready. HTTPS is always on.
 
 ```text
 browser     opens my-app.example.com
@@ -17,15 +17,13 @@ DNS         my-app.example.com is
 server      203.0.113.7, port 443
    │
    ▼
-Traefik     HTTPS with a Let's Encrypt
-   │        certificate; finds the app
+Traefik     HTTPS, finds the app
    │        by its domain
    ▼
-app my-app  on its port, 8080 unless
-            you say so
+app my-app  on its port
 ```
 
-DNS is the phone book of the internet: it turns a name into the server's address. Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), the browser reaches Cloudflare instead, and Cloudflare passes the visit to Traefik through the tunnel.
+DNS is the phone book of the internet. It turns a name into the server's address.
 
 ## Add a domain
 
@@ -39,18 +37,22 @@ API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
 
-Then, where you bought the domain, add an **A record**: name the domain, value the server's IPv4 address. If the server has IPv6, add an **AAAA record** too. When you add a domain, moin says whether it already points at the server, or the record to set; **Check** next to the domain asks again later. Once DNS points at the server, usually after a few minutes, the domain gets HTTPS by itself. Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), moin sets the DNS for you when the domain is in your Cloudflare account.
+Then, where you bought the domain, add an **A record**: the domain as the name, the server's IPv4 address as the value. If the server has IPv6, add an **AAAA record** too.
 
-Saving never restarts the app: a change of the domains, the password or the instant address waits for the next restart, start or deploy (before the first deploy, for that one), so you can make several at once. The app page and `moin apps <app>` say how many changes wait.
+moin says whether the domain already points at the server. **Check** asks again later. Once DNS points at the server, the domain gets HTTPS by itself.
+
+Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), moin sets the DNS for you when the domain is in your Cloudflare account.
+
+A change to the domains, the password or the instant address waits for the next restart, start or deploy.
 
 ## Instant address
 
 ```text
-https://<app>.<server IPv4 with dashes>.sslip.io
+https://<app>.<ip-dashes>.sslip.io
 https://my-app.203-0-113-7.sslip.io
 ```
 
-The name carries the server's IP, so it needs no DNS, and Let's Encrypt gives it a certificate like any domain. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.
+The name carries the server's IP, so it needs no DNS. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.
 
 ```surfaces
 Web: the app, **Instant address**, **Show password**
@@ -70,7 +72,7 @@ API: PUT /api/v1/apps/{app}/instant
 MCP: set_instant
 ```
 
-The providers are `sslip.io` (the default) and `nip.io`: if one is down, switch to the other. It needs a public IPv4 and ports 80 and 443 open. A server behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel) or without a public IPv4 gets none, and moin says so: give that app a domain.
+The providers are `sslip.io` and `nip.io`. If one is down, switch to the other. The address needs a public IPv4 and ports 80 and 443 open. A server behind a tunnel gets none, and moin says so.
 
 ## Check the DNS
 
@@ -83,12 +85,10 @@ MCP: check_domains
 ```
 
 ```text
-DOMAIN          DNS            RESOLVES TO
-<domain>        ● points here  203.0.113.5
-www.<domain>    ○ set DNS
+DOMAIN       DNS           RESOLVES TO
+<domain>     ● points here 203.0.113.5
+www.<domain> ○ set DNS
 ```
-
-A domain that resolves to either address of the server points here.
 
 ## Remove a domain
 
@@ -100,11 +100,11 @@ API: PUT /api/v1/apps/{app}/domains
 MCP: set_domains
 ```
 
-The web, the CLI and the TUI ask first; `--yes` skips it. The API and MCP take the domains the app keeps. Remove the DNS record too.
+The API and MCP take the domains the app keeps. Remove the DNS record too.
 
 ## www or not
 
-Pick the main domain; the others redirect to it for good.
+Pick the main domain. The others redirect to it for good.
 
 ```surfaces
 Web: the app page, **Domains**, **Canonical**
@@ -128,7 +128,7 @@ API: PUT /api/v1/apps/{app}/protection
 MCP: set_protection
 ```
 
-The username is `moin` unless you pick one with `--user`. The CLI reads the password from stdin. To make the app public again:
+The username is `moin` unless you pick one. The CLI reads the password from stdin. To make the app public again:
 
 ```surfaces
 Web: the app page, **Domains**, **Remove password**
@@ -140,7 +140,7 @@ MCP: remove_protection
 
 ## Domains per service
 
-An app with several services, such as `web` and `api`, can give each its own domains. The main service keeps the plain ones:
+An app with several services can give each one its own domains. The main service keeps the plain ones.
 
 ```surfaces
 Web: the app page, **Domains**, the domain and its service, **Add**
@@ -150,11 +150,11 @@ API: PUT /api/v1/apps/{app}/domains with "service": "api"
 MCP: set_domains with service
 ```
 
-Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only. The password, the redirect and [uptime](/docs/guides/uptime) work per domain the same way.
+Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only.
 
 ## In the repo
 
-Keep domains next to your code, in `compose.yml`:
+Domains can live next to your code, in `compose.yml`:
 
 ```yaml
 x-moin:
@@ -176,10 +176,9 @@ x-moin:
     api: 5678
 ```
 
-Fields in `x-moin` win over the settings in moin. Once a deploy with `x-moin.domains` is live, those domains show **from compose.yml** everywhere and change only in the file; trying it in moin says so (API code `domains_from_compose`). [Config in the repo](/docs/guides/config) lists every field.
+Once a deploy with `x-moin.domains` is live, those domains show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`). [Who decides](/docs/guides/config#who-decides).
 
 ## Good to know
 
-- Each server runs one proxy, Traefik, started with the first app. It answers on ports 80 and 443, gets certificates from Let's Encrypt and sends HTTP to HTTPS.
-- A change that changes nothing, like the same domains again, says "Nothing changed"; the API answers `"unchanged": true`.
-- [Restart](/docs/guides/deploy#restart) applies every change that waits, without a build.
+- Each server runs one proxy, Traefik, started with the first app. It answers on ports 80 and 443 and gets certificates from Let's Encrypt.
+- A change that changes nothing says "Nothing changed". The API answers `"unchanged": true`.

@@ -5,7 +5,7 @@ group: "Apps"
 order: 7
 ---
 
-Your app's settings can live in your repo, next to the code, so they travel with it: an `x-moin` block in `compose.yml` at the top of your repo (`compose.yaml` and `docker-compose.yml` work too). Every field is optional.
+Your app's settings can live in your repo, next to the code. Put an `x-moin` block in `compose.yml`, at the top of your repo. Every field is optional.
 
 ```yaml
 x-moin:
@@ -31,12 +31,18 @@ services:
       - ./data:/data
 ```
 
+`x-moin` is optional. Docker ignores `x-` blocks, so the file still works with plain `docker compose`. `compose.yaml` and `docker-compose.yml` work too.
+
+## Who decides
+
+If a setting is in `x-moin`, the file decides. If it is not, moin decides. There is no switch for this.
+
+Domains and backups set in the file show locked in moin, marked **from compose.yml**. To change them, change the file and deploy. The other fields win at the next deploy too.
+
 ## Good to know
 
-- After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name: else `moin deploy` in a directory of the old name creates a new app.
-- A field set here is locked in moin: the file decides, and you change it in the file. That holds for `backups` as a whole.
-- Fields in `x-moin` win over the settings in moin, such as [domains](/docs/guides/domains#in-the-repo) and the [instant address](/docs/guides/domains#instant-address).
-- Docker ignores `x-` blocks, so the file still works with plain `docker compose`.
-- Only a `Dockerfile` or `go.mod`, or neither? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`: it replaces the one moin would write. For a Railpack app, set the start command with the env var `RAILPACK_START_CMD` instead.
-- After every deploy the daemon reports what it detected: kind, service, port, databases and this block. The app page, the end of `moin deploy` and `get_app` show it.
-- Secrets never belong in the repo: use [env vars](/docs/guides/env).
+- After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name. Otherwise `moin deploy` in a folder of the old name offers to make a new app.
+- `backups` counts as a whole. A part you leave out takes its default: hourly, 7 days, Every change on. A wrong value stops the deploy and says why.
+- Only a `Dockerfile` or a Go module? You need no file. To set a field anyway, add a `compose.yml` with a `services` part that builds a `Dockerfile`.
+- After every deploy the daemon reports what it found. The app page, the end of `moin deploy` and `get_app` show it.
+- Secrets never belong in the repo. Use [env vars](/docs/guides/env).

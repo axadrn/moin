@@ -142,7 +142,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice` |
+| `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`. `409` `domains_from_compose` when `x-moin.domains` sets them |
 | `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and password (`?show=true` with a write token); picks the provider or `off`, and `open` |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | puts a password in front of the app; takes it away |
 | `GET /api/v1/apps/{app}/uptime` | read | uptime per domain: state, 24 hours, 7 and 30 days, the last visit, the last outages |
@@ -170,7 +170,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/apps/{app}/backups` | read | the app's `every_minutes`, `keep_days` and `every_change`, and per database `copied_at`, `checked_at`, `check_error`, `problem` in one sentence when it does not work, its `copies`, its `undos`, `since` and `until` of Every change, and the `moments` to go back to |
-| `PUT /api/v1/apps/{app}/backups` | write | how often and how long, `{"every_minutes": 15, "keep_days": 30, "every_change": true}`: `every_minutes` 15, 60 or 1440, `keep_days` 1, 3, 7 or 30 |
+| `PUT /api/v1/apps/{app}/backups` | write | how often and how long, `{"every_minutes": 15, "keep_days": 30, "every_change": true}`: `every_minutes` 15, 60 or 1440, `keep_days` 1, 3, 7 or 30. `409` `schedule_in_file` when `x-moin.backups` sets them |
 | `POST /api/v1/apps/{app}/restores` | write | goes back to a moment, `{"moment": "before-v12"}` (its id or label), or a time, `{"at": "2026-11-07T14:01:00Z"}`: SQLite with Every change to that minute, else the newest copy at or before it; `database` when the app has several, and `confirm`, the app's name typed out by the user. `202` with the restore; `422` `confirm_mismatch` without the exact name; `409` `restore_running` while one runs |
 | `GET /api/v1/apps/{app}/restores/{restore}` | read | how a restore stands: `running`, `unknown` while its server is offline, then `done` or `failed` with `error`; kept a week. `POST /api/v1/apps/{app}/restore` is gone |
 | `POST /api/v1/apps/{app}/backups/download` | write | a link to a copy in the app's own bucket, `{"database": "/data/app.db", "moment": "before-v12"}`, both optional: the newest copy of the only database. `200` with `copy`, `label`, `at`, `size` and `link`, valid 15 minutes |

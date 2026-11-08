@@ -5,7 +5,7 @@ group: "Start"
 order: 5
 ---
 
-Self-hosting means you run the hub, the moin web app and API, on your own server instead of using ours. All of moin is open source under AGPL-3.0, so you get the product we host: every feature, unlimited servers, apps and teammates, no license key, no account with us.
+Self-hosting means you run the hub on your own server instead of using ours. You get the product we host: every feature, unlimited servers, apps and teammates. No license key, no account with us.
 
 ## One server
 
@@ -15,7 +15,7 @@ Point a domain at the server with an A record, then run this as root on a fresh 
 curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/hub/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
-In a few minutes it installs Docker and security updates, writes the settings to `/etc/moin-hub/env` with a new `SECRETS_KEY`, starts the hub with your account, a workspace and this server in it, installs the daemon and serves the hub on your domain with a Let's Encrypt certificate. At the end it prints a sign-in link.
+It installs Docker, writes the settings to `/etc/moin-hub/env`, starts the hub with your account and this server in it, and serves it on your domain with HTTPS. At the end it prints a sign-in link.
 
 Then point the CLI at it:
 
@@ -27,8 +27,8 @@ The rest of these docs apply as they are.
 
 ## Good to know
 
-- Keep a copy of `SECRETS_KEY`: it seals the secrets of your apps. Without it they are lost.
-- Email and a bucket can come later. Until email is set up, sign-in links go to the hub's log; `docker compose -f /opt/moin/compose.yml exec hub ./main sign-in-link` prints a new one.
+- Keep a copy of `SECRETS_KEY`. It seals the secrets of your apps. Without it they are lost.
+- Email and a bucket can come later. Until email is set up, sign-in links go to the hub's log. `docker compose -f /opt/moin/compose.yml exec hub ./main sign-in-link` prints a new one.
 - Add `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the hub's own backup, then run `sh /opt/moin/update.sh`.
 - Run the install command again any time: it keeps your settings and data.
 
@@ -45,14 +45,14 @@ The rest of these docs apply as they are.
 
 ## What is different
 
-- **Billing is off** (`BILLING=false`): no prices, no checkout, no billing page, and every workspace is unlimited.
-- **It is private.** No landing page: `APP_URL` opens the sign-in page, or your workspace when you are signed in. Sign-up is closed (see [Who signs in](#who-signs-in)); anyone else sees "This moin is private. Ask its admin for an invitation."
-- **The docs stay at `/docs`.** The terms and privacy pages of the hosted service are not there, and `ROBOTS_NOINDEX` asks search engines to stay away.
-- Everything else is the code we run: web, API, MCP, deploys, backups, data, GitHub, teams and the activity.
+- **Billing is off** (`BILLING=false`). Every workspace is unlimited.
+- **It is private.** `APP_URL` opens the sign-in page. Sign-up is closed ([Who signs in](#who-signs-in)).
+- **The docs stay at `/docs`.**
+- Everything else is the code we run.
 
 ## Two servers
 
-Once it matters, run the hub on its own small server, not next to your apps. The daemon on an app server takes ports 80 and 443, and a hub apart from them keeps working when an app server fails or is broken into: you can still restore, roll back and see what happened. It needs no SSH key to your app servers: their daemons dial out to it.
+Once it matters, run the hub on its own small server. A hub apart from your apps keeps working when an app server fails. You can still restore, roll back and see what happened.
 
 ```text
 one server          two servers
@@ -199,7 +199,7 @@ Once a day the hub asks GitHub for the newest version. When one is out, the admi
 - `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
 - **Update now** needs the updater next to the hub, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A hub set up before it gets it once with `git pull`, then `sh update.sh`.
 - `UPDATE_CHECK=false` stops the check; then update with `sh update.sh`.
-- Up to v1.0.0-beta.25 the hub was called the control plane, with its settings in `/etc/moin-controlplane` and its data in `/var/lib/moin-controlplane`. **Update now** keeps it running there. Run the install line once more (from a clone: `git pull`, then `sh hub/deploy/update.sh`): `update.sh` moves both to `/etc/moin-hub` and `/var/lib/moin-hub` and starts it as the service `hub`. Its backup now goes to the folder `hub/litestream`; a restore still finds an older one in `controlplane/litestream`.
+- A hub set up before v1.0.0-beta.26 keeps its old folders until you run the install line once more (from a clone: `git pull`, then `sh hub/deploy/update.sh`). `update.sh` moves its settings to `/etc/moin-hub` and its data to `/var/lib/moin-hub`.
 - The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
 
 ## Database backup

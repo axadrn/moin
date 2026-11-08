@@ -5,7 +5,7 @@ group: "Team"
 order: 4
 ---
 
-MCP lets an AI agent such as Claude or Cursor use moin for you: *"roll back my app and show me its logs"*. The hub is an MCP server at `/mcp`, so Claude, Cursor, VS Code and any MCP client can connect. Almost every action is a tool; [Where things work](/docs/reference/surfaces) lists what stays in the web.
+MCP lets an AI agent such as Claude or Cursor use moin for you: *"roll back my app and show me its logs"*. The hub is an MCP server at `/mcp`. Almost every action is a tool. [Where things work](/docs/reference/surfaces) lists what stays in the web.
 
 [Create an API token](/docs/guides/account#create-an-api-token), **Read and write** to change things or **Read only** to look, and put it where `pat_…` stands.
 
@@ -28,8 +28,8 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 
 ## Good to know
 
-- No login tool and no browser login: the token is all an AI agent needs.
-- A read-only token calls the read tools; changes need read and write.
+- The token is all an AI agent needs.
+- A read-only token calls the read tools. Changes need read and write.
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
 - Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.
 - Tools take the app as `app` and the server as `server`; the older `name` still works for both, for now.
@@ -79,7 +79,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
 | `get_backups` | how each database is backed up: how often, how long, Every change, the newest copy, the daily check, and the moments to go back to | read |
-| `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30) and, for SQLite, `every_change` | write |
+| `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30) and, for SQLite, `every_change`; refused when `x-moin.backups` sets them | write |
 | `restore_app` | goes back to a moment (`moment`, its id or label: a copy, `before-v12`, `undo-…`, `1h`) or a time (`at`): SQLite with Every change to that minute, else the newest copy at or before it; keeps the database before, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | write, destructive |
 | `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`; it works for 15 minutes | write |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each | read |

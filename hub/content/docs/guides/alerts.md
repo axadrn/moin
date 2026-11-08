@@ -5,7 +5,7 @@ group: "Every day"
 order: 7
 ---
 
-When something breaks, moin tells you: the owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
+When something breaks, moin tells you. The owners and admins of the workspace get a mail. Nothing to set up. Add Slack, Discord, Telegram or a webhook to tell the team where it already is.
 
 ```text
 🔴 my-app.example.com is down
@@ -17,21 +17,21 @@ Open in moin
 
 ## What sends an alert
 
-One alert per event, never one per minute, and one when it is fixed. Each links to its page in moin.
+One alert per event, and one when it is fixed.
 
 | Event | When |
 | --- | --- |
-| `uptime.down`, `uptime.up` | a site goes down, with the reason such as `HTTP 502`; back up, with how long it was down ([Uptime](/docs/guides/uptime#down-and-back-up)) |
-| `server.down`, `server.up` | a daemon has not answered for two minutes, with the apps on the server; back online |
-| `deploy.failed` | a deploy fails, with its number, the error and the version that runs now ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
-| `backup.failed`, `backup.recovered` | a copy of a database, or Every change, does not reach the bucket; and when it works again. What is in the bucket stays ([Backups](/docs/guides/backups)) |
+| `uptime.down`, `uptime.up` | a site goes down, or comes back ([Uptime](/docs/guides/uptime#down-and-back-up)) |
+| `server.down`, `server.up` | a daemon has not answered for two minutes; back online |
+| `deploy.failed` | a deploy fails ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
+| `backup.failed`, `backup.recovered` | a copy or Every change does not reach the bucket; and when it works again ([Backups](/docs/guides/backups)) |
 | `check.failed`, `check.recovered` | the daily check could not restore the newest copy; passes again |
-| `disk.full`, `disk.ok` | the data disk of a server is over 90%; under 85% again |
-| `update.available` | a newer version of a [catalog](/docs/guides/catalog) app is out, once per version |
+| `disk.full`, `disk.ok` | a server's data disk is over 90%; under 85% again |
+| `update.available` | a newer version of a [catalog](/docs/guides/catalog) app is out |
 
 ## Who gets it
 
-Every **owner** and **admin** whose **Email me alerts** is on, at the verified address of their account. On by default. Members get no mail.
+Every **owner** and **admin** whose **Email me alerts** is on. On by default.
 
 ```surfaces
 Web: **Settings**, **Account**, **Email me alerts**
@@ -40,8 +40,6 @@ TUI: opens the web: `w`, then `s`
 API: PUT /api/v1/account/email-alerts {"on": false}
 MCP: set_email_alerts
 ```
-
-It counts for you in every workspace. `GET /api/v1/account` and `whoami` return it as `email_alerts`.
 
 ## Slack, Discord, Telegram and webhooks
 
@@ -59,9 +57,9 @@ MCP: add_alert_destination
 
 | Kind | What it needs |
 | --- | --- |
-| **Slack** | an [incoming webhook](https://api.slack.com/messaging/webhooks) of the channel, `https://hooks.slack.com/services/…` |
-| **Discord** | the channel's **Edit Channel**, **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**, `https://discord.com/api/webhooks/…`; messages never ping anyone |
-| **Telegram** | a bot from [@BotFather](https://t.me/BotFather) in the chat: its token, like `123456:ABC-DEF…`, and the chat ID, like `-1001234567890` for a group or channel, or `@channelname` for a public channel |
+| **Slack** | an [incoming webhook](https://api.slack.com/messaging/webhooks) of the channel |
+| **Discord** | the channel's **Edit Channel**, **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL** |
+| **Telegram** | a bot from [@BotFather](https://t.me/BotFather) in the chat: its token and the chat ID, such as `-1001234567890` |
 | **Webhook** | any `http` or `https` URL of your own, see [Webhooks](#webhooks) |
 
 ### Send a test
@@ -74,7 +72,7 @@ API: POST /api/v1/alert-destinations/team-chat/test
 MCP: test_alert_destination
 ```
 
-moin waits up to 10 seconds. A refused test says why, such as `HTTP 404: no_service`; the API answers `424` with `alert_send_failed`.
+A refused test says why. The API answers `424` with `alert_send_failed`.
 
 ### Remove a destination
 
@@ -90,7 +88,7 @@ To change one, remove it and add it again.
 
 ## Webhooks
 
-Each alert comes as a JSON `POST`; fields that do not belong to the event are empty:
+Each alert comes as a JSON `POST`. Fields that do not belong to the event are empty:
 
 ```json
 {
@@ -106,8 +104,6 @@ Each alert comes as a JSON `POST`; fields that do not belong to the event are em
 }
 ```
 
-`event` is one of the events above, or `test`. `reason` is why a site is down or the error of a failed deploy; `since` when a site or server went down; `duration` how long, like `4m30s`.
-
 A new webhook comes with a **signing secret**, shown once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body. Check it:
 
 ```go
@@ -116,13 +112,11 @@ mac.Write(body)
 ok := hmac.Equal([]byte(r.Header.Get("X-Moin-Signature")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil))))
 ```
 
-Answer with any `2xx`; moin follows no redirects. A lost secret cannot be shown again: remove the webhook and add it again.
+Answer with any `2xx`. moin follows no redirects. A lost secret cannot be shown again: remove the webhook and add it again.
 
 ## Good to know
 
-- The team sees the destinations; only owners and admins add, test and remove them.
-- A destination that got every event keeps getting new kinds of events too.
-- Each destination gets 10 seconds per alert. One that fails is marked **failing** with the reason on every surface, once in the activity; the next alert or test that works clears it. Mails go out either way.
-- URLs and bot tokens are stored encrypted and never shown again in full, only the host and the last characters, like `hooks.slack.com/…WXYZ`. They never go in the activity.
+- Only owners and admins add, test and remove destinations.
+- A failing destination is marked **failing** with the reason. The next one that works clears it. Mails go out either way.
+- URLs and bot tokens are stored encrypted and never shown again in full.
 - The hosted hub posts only to public addresses.
-- A disk at 88% does not alert back and forth: it alerts over 90% and clears under 85%.

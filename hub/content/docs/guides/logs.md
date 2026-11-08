@@ -5,7 +5,7 @@ group: "Every day"
 order: 2
 ---
 
-Logs are what your app writes down while it runs: the last lines, from every container of the app.
+Logs are what your app writes down while it runs.
 
 ## Read the logs
 
@@ -18,12 +18,12 @@ MCP: get_logs
 ```
 
 ```text
-web-1  | 2026-10-31T09:05:32.211103972Z listening on 8080
+web-1  | 2026-10-31T09:05:32Z ready
 ```
 
-Each line starts with the service and a timestamp. `moin logs --tail 500` reads more lines.
+Each line starts with the service and a time. `moin logs --tail 500` reads more lines.
 
 ## Good to know
 
-- The daemon reads them with `docker compose logs`, so the server must be online.
+- The server must be online.
 - `logs: off` in the [rules](/docs/guides/security#rules) of a server refuses reading logs through moin there.

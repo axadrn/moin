@@ -5,7 +5,9 @@ group: "Apps"
 order: 5
 ---
 
-CI is a computer elsewhere, such as GitHub Actions, that builds your app for you. It packs the app into an image, a box ready to run, and puts it on a registry, a shelf for images; moin deploys it. The server only downloads and starts it. Good for heavy builds, build caches and many servers. Deploy the repo once with `moin deploy` first: an image deploy keeps that compose file and swaps only the image of the main service.
+CI is a computer elsewhere, such as GitHub Actions, that builds your app. It packs the app into an image, a box ready to run, and puts it on a registry, a shelf for images. Your server only downloads and starts it.
+
+Deploy the repo once with `moin deploy` first. An image deploy keeps that compose file and swaps only the image of the main service.
 
 ```text
 git push
@@ -25,7 +27,7 @@ daemon     pulls the image from
 live ✓     started and checked
 ```
 
-The deploy hook is a secret URL: when CI calls it, moin deploys the image.
+The deploy hook is a secret URL. When CI calls it, moin deploys the image.
 
 ## 1. Save a registry login
 
@@ -39,11 +41,11 @@ API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
 
-The CLI reads the token from stdin. It is stored encrypted, and the daemon gets it only for the pull, in a throwaway Docker config; nothing stays on the server.
+The CLI reads the token from stdin. It is stored encrypted. The daemon gets it only for the pull.
 
 ## 2. Create a deploy hook
 
-A secret URL that deploys an image when CI calls it. moin shows it once: store it as the CI secret `MOIN_DEPLOY_HOOK`.
+moin shows the URL once. Store it as the CI secret `MOIN_DEPLOY_HOOK`.
 
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from CI**, **New deploy hook**
@@ -53,7 +55,7 @@ API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-A new hook stops the old one, so moin asks first when there is one; `--yes` skips it.
+A new hook stops the old one, so moin asks first when there is one. `--yes` skips it.
 
 ## 3. The workflow
 
@@ -88,11 +90,13 @@ jobs:
           MOIN_DEPLOY_HOOK: ${{ secrets.MOIN_DEPLOY_HOOK }}
 ```
 
-Build for the arch of your server (`moin servers` shows it). The hook answers `202` with the deploy; follow it on the web, in the TUI or with `moin logs`.
+Build for the arch of your server. `moin servers` shows it. The hook answers `202` with the deploy.
 
 ## Or use the moin action
 
-Installs `moin` from your hub and runs `moin deploy` with a personal API token. With `image` it deploys that image; without, it puts the repo into [your bucket](/docs/guides/bucket) and your server builds it. The step waits until the deploy is live and fails the job when it fails.
+The action installs `moin` from your hub and runs `moin deploy --yes`. It needs an [API token](/docs/guides/account#create-an-api-token) with **Read and write**, saved in the repo as `MOIN_TOKEN`.
+
+With `image` it deploys that image. Without it, the repo goes through [your bucket](/docs/guides/bucket) and your server builds it. The job fails when the deploy fails.
 
 ```yaml
       - uses: axadrn/moin@main
@@ -112,11 +116,11 @@ API: POST /api/v1/apps/{app}/deploys
 MCP: deploy_image
 ```
 
-The API takes `{"image": "ghcr.io/<owner>/<image>:<tag>"}`. A redeploy of an image deploy pulls the same image again.
+The API takes `{"image": "ghcr.io/<owner>/<image>:<tag>"}`.
 
 ## Turn the deploy hook off
 
-The hook URL stops working, so CI can no longer deploy. Do it when you stop using CI or the URL leaked; a new hook can be made any time.
+The hook URL stops working, so CI can no longer deploy. Do it when you stop using CI or the URL leaked. You can make a new hook any time.
 
 ```surfaces
 Web: the app, **Deploy from CI**, **Deploy hook**, **Turn off**
@@ -125,8 +129,6 @@ TUI: on the app, `W` opens **Deploy from CI** in the web
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
 ```
-
-It works also when the plan allows no changes. `get_app` and `GET /api/v1/apps/{app}` say in `hook` whether the app has one.
 
 ## Registry logins
 
@@ -141,10 +143,8 @@ MCP: list_registries
 MCP: remove_registry
 ```
 
-The list never shows passwords. Without a login, servers can no longer pull private images from that registry.
+The list never shows passwords. Public images need no login.
 
 ## Good to know
 
-- `moin deploy --image` also works after one `moin deploy` of the repo, whose compose file it reuses.
-- Health check, the fallback to the last good deploy, `moin rollback` and env vars work the same as for a server build.
-- Public images need no registry login.
+- The fallback to the last good deploy, `moin rollback` and env vars work the same as for a server build.

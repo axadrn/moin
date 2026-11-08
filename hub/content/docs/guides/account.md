@@ -5,7 +5,9 @@ group: "Team"
 order: 3
 ---
 
-Your account is you in moin: your name, your email and how you sign in. It lives under **Settings**, **Account**, and changes on the web. `moin login` logs your computer in through the browser; CI, scripts and AI agents use a personal API token, a key of their own.
+Your account is you in moin: your name, your email and how you sign in. It lives under **Settings**, **Account**.
+
+`moin login` logs your computer in through the browser. CI, scripts and AI agents use an API token, a key of their own.
 
 ```bash
 moin login
@@ -13,7 +15,7 @@ moin login
 
 ## Log in the CLI
 
-`moin login` prints a code and opens `/device` on your hub. Sign in there, check the code is the same, pick the workspace if you have more than one, and press **Approve**. The terminal says `Logged in as` with your name. **Deny** stops it; nothing gets access.
+`moin login` prints a code and opens `/device` on your hub. Sign in there. Check the code is the same. Press **Approve**.
 
 ```surfaces
 Web: `/device`, **Approve** or **Deny**
@@ -22,19 +24,17 @@ TUI: `moin` without a login shows the code and opens the browser
 API: POST /api/v1/auth/device, then POST /api/v1/auth/device/token
 ```
 
-Only approve a code you started yourself: someone who sends you a link to `/device` wants your access.
+Only approve a code you started yourself. Someone who sends you a link to `/device` wants your access.
 
-- No browser here, as over SSH? Open the address moin prints on any other device. `--web` starts the browser login even when stdin is not a terminal.
+- No browser here? Open the address moin prints on any other device.
 - The code is good once, for ten minutes.
-- The login is a token for this computer: read and write, bound to the workspace you picked, named **CLI on <computer name>**, marked **browser login** in your API tokens.
-- It ends after 90 days without use; every use starts the 90 days again. Logging in again on the same computer replaces the last login.
-- The TUI uses the same login, and starts it itself when there is none.
-- The API answers the polls with the codes of RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token` and `invalid_grant`.
-- MCP has no login: AI agents send a personal API token, see [MCP](/docs/guides/mcp).
+- The login is a token for this computer, for one workspace.
+- It ends after 90 days without use. Every use starts the 90 days again.
+- The TUI uses the same login.
 
 ## Create an API token
 
-For CI, the GitHub Action, scripts and AI agents. Each token belongs to one workspace and can **Read only**, or **Read and write**, which the CLI needs and the form starts at. A read-only token cannot add servers, deploy, or read rows and env values.
+For CI, the GitHub Action, scripts and AI agents. Each token belongs to one workspace. It can **Read only**, or **Read and write**, which the CLI needs.
 
 ```surfaces
 Web: **Settings**, **Account**, **Tokens** tab, **Create token**
@@ -45,7 +45,7 @@ moin shows the token once. Give it to the CLI with `moin login --token <token>`,
 
 ## See your API tokens
 
-The tokens you made and the computers you logged in with `moin login`, with when each was last used and when it expires.
+The tokens you made and the computers you logged in with `moin login`.
 
 ```surfaces
 Web: **Settings**, **Account**, **Tokens** tab
@@ -54,7 +54,7 @@ API: GET /api/v1/account/tokens
 
 ## Revoke an API token
 
-Requests with it stop at once; the web asks first. Revoke a computer's **CLI on** token when you lose it. `moin logout` only forgets the token on your computer; it works until you revoke it.
+Requests with it stop at once. Revoke a computer's **CLI on** token when you lose it. `moin logout` only forgets the token on your computer.
 
 ```surfaces
 Web: **Settings**, **Account**, **Tokens** tab, **Revoke** on the token
@@ -65,18 +65,15 @@ A token cannot be renamed or get more rights: make a new one and revoke the old 
 
 ## Sign up and sign in
 
-With GitHub, with a link moin emails you, or with a password once you set one. The first sign-in asks for your name and your first workspace's name; GitHub fills both in from your profile. Someone invited gives only a name and joins that workspace.
+With GitHub, with a link moin emails you, or with a password once you set one. The first sign-in asks for your name and your first workspace's name. Someone invited gives only a name.
 
 ```surfaces
 Web: the sign-in page, **Continue with GitHub** or **Continue with email**
 API: POST /api/v1/auth/onboarding
 ```
 
-The API takes `name` and an optional `workspace_name`; without it the workspace is "<name>'s Workspace".
-
 ## Change your name
 
-The name your team sees, also in the activity.
 
 ```surfaces
 Web: **Settings**, **Account**, **Profile** tab, **Name**, **Save**
@@ -103,7 +100,6 @@ API: PATCH /api/v1/account/email
 
 ## Set, change or remove your password
 
-Without a password you sign in with email links or GitHub.
 
 ```surfaces
 Web: **Settings**, **Account**, **Security** tab, **Password**
@@ -114,7 +110,7 @@ API: POST /api/v1/account/password
 
 ## See and end sessions
 
-Every browser you are signed in with is a session. **Revoke** ends one; **Sign out everywhere** ends all, this one too, after a question.
+Every browser you are signed in with is a session. **Revoke** ends one. **Sign out everywhere** ends all.
 
 ```surfaces
 Web: **Settings**, **Account**, **Security** tab, **Sessions**
@@ -129,7 +125,7 @@ A mail when something breaks in the workspaces you own or run as admin, on by de
 
 ## Delete your account
 
-Removes your account, profile, picture, sessions and API tokens, and takes you out of every workspace. You type `DELETE` first; it cannot be undone. Servers, apps and env vars belong to the workspace and stay for your team. As the last owner of a workspace, hand it on or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first.
+Removes your account, sessions and API tokens, and takes you out of every workspace. You type `DELETE` first. It cannot be undone. Servers, apps and env vars belong to the workspace and stay for your team. As the last owner, hand it on or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first.
 
 ```surfaces
 Web: **Settings**, **Account**, **Security** tab, **Delete account**
@@ -138,7 +134,7 @@ API: DELETE /api/v1/account
 
 ## Billing
 
-On hosted moin you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. When the trial ends without a subscription, the workspace is read-only: apps and backups keep running, and you can see everything and stop and start apps, but not deploy or add servers.
+On hosted moin you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. After the trial without a subscription, the workspace is read-only. Apps and backups keep running. You cannot deploy or add servers.
 
 ```surfaces
 Web: **Settings**, **Billing**
@@ -146,8 +142,8 @@ API: GET /api/v1/workspaces/{slug}/billing
 MCP: get_billing
 ```
 
-Only the owner sees the plan and pays; buying and cancelling happen only on the web. A self-hosted hub has no billing.
+Only the owner sees the plan and pays. A self-hosted hub has no billing.
 
 ## Good to know
 
-- A token with write access can change your name, picture and email alerts, never your email, password, sessions or tokens, and it cannot delete the account. Sign in on the web for that, so a leaked token never takes over your account.
+- A token with write access can change your name, picture and email alerts. It can never change your email, password, sessions or tokens, or delete the account. So a leaked token never takes over your account.

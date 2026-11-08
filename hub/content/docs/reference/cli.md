@@ -5,7 +5,7 @@ group: "Reference"
 order: 2
 ---
 
-Every command of `moin`, by area. `moin <command> --help` shows the same on your terminal; [Where things work](/docs/reference/surfaces) compares the CLI with the web, the terminal UI, the API and MCP.
+Every command of `moin`, by area. `moin <command> --help` shows the same on your terminal. [Where things work](/docs/reference/surfaces) compares the surfaces.
 
 ## Start and account
 
@@ -84,7 +84,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy [--dir .] [--server <server>] [--detach] [--yes] [app]` | deploys a directory; the first deploy asks, then creates the app (`--yes` in scripts). `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
+| `moin deploy [--dir .] [--server <server>] [--detach] [--yes] [app]` | deploys a directory. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts). `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
 | `moin deploy --image <image> [app]` | deploys an image built in CI as the main service, with the compose file of an earlier deploy of the repo |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |
@@ -173,7 +173,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin backups [app]` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to |
-| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d --every-change on\|off` | sets how often the app is copied, how long each copy stays and, for SQLite, whether every change is written down; any one of them or all |
+| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d --every-change on\|off` | sets how often the app is copied, how long each copy stays and, for SQLite, whether every change is written down; any one of them or all. Locked when `x-moin.backups` sets them ([Who decides](/docs/guides/config#who-decides)) |
 | `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`1h`, `before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. SQLite with Every change goes to that minute, everything else to the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
 | `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a copy of a database in the current folder, straight from your bucket: the newest, or the one `--to` names; `--link` prints its 15 minute link instead |
 
@@ -209,7 +209,7 @@ These run on a server, as root.
 
 ## How commands find the app
 
-A command that works on an app takes it as an argument or as `--app`, then from `x-moin.app` in `compose.yml`, then from the name of the directory. When there is no such app, the error names it and where the name came from.
+A command that works on an app takes it as an argument or as `--app`, then from `x-moin.app` in `compose.yml`, then from the name of the directory.
 
 Flags may come before or after the arguments: `moin rollback v3 --app my-app` is `moin rollback --app my-app v3`. Every command has one name, the one on this page.
 
@@ -218,10 +218,10 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
-| Small or reversible | `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
-| Harmless | `deploy`, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
+| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Harmless | `deploy` of an app that exists, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
-`--yes` skips the question. For `servers rm`, `apps rm` and `buckets rm`, `--yes` is not enough: a script passes the name as `--confirm my-app`, and the hub checks it, as it does for the web, the API and MCP. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`, so a script never removes something by accident.
+`--yes` skips the question. For `servers rm`, `apps rm`, `buckets rm` and `restore`, `--yes` is not enough: a script passes the name as `--confirm my-app`. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`.
 
 ## Daemon updates
 

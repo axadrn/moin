@@ -45,6 +45,8 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Activity by app, server or person | ✓ | ✓ `--app`, `--server`, `--user` | Shows all of it: filter in the CLI or the web. | ✓ | ✓ |
 | Jump to anything | ✓ [palette](/docs/reference/palette), `⌘K` | Commands take the app by name. | ✓ palette: `space`, `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
 
+Domains and backups set in `x-moin` are locked on every surface: [Who decides](/docs/guides/config#who-decides).
+
 ## Setup
 
 The terminal UI opens these in your browser: `w` on the overview, or `web app` in the palette.
@@ -58,7 +60,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Cloudflare token, Tailscale key | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
 | Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
-| Create, remove an app | ✓ | ✓ `apps add`, `deploy` | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
+| Create, remove an app | ✓ | ✓ `apps add`, `deploy` asks first | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
 | Rename an app | ✓ | ✓ `apps rename` | Opens the web. | ✓ | ✓ |
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |

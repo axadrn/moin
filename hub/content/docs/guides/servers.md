@@ -5,7 +5,9 @@ group: "Servers and data"
 order: 1
 ---
 
-A server is your computer on the internet, and the daemon is the little helper on it that does the work. The daemon only calls out, so the server needs no open door for moin. Any Linux server at any provider works, amd64 or arm64, with systemd: Ubuntu and Debian are the easy choice.
+A server is your computer on the internet. The daemon is the little helper on it. It only calls out, so the server needs no open door for moin.
+
+Any Linux server with systemd works, amd64 or arm64, at any provider. Ubuntu and Debian are the easy choice.
 
 ```text
 1 moin servers add web-1
@@ -14,15 +16,11 @@ A server is your computer on the internet, and the daemon is the little helper o
   ─▶ Docker and the daemon
 3 the daemon calls moin
   ─▶ web-1 is online
-
-moin ◀──────────── daemon on web-1
-  moin's requests come back on that
-  line; nothing on web-1 waits
 ```
 
 ## Add a server
 
-Gives you one install command. Run it on the server as root within one hour.
+You get one install command. Run it on the server as root within one hour.
 
 ```surfaces
 Web: **Servers**, **Add server**
@@ -36,15 +34,15 @@ MCP: add_server
 curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 ```
 
-It installs Docker if it is missing, installs the daemon as the `moin-daemon` service and connects it.
+It installs Docker if it is missing. It installs the daemon as the `moin-daemon` service and connects it.
 
-- The name: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …, the next free number; the web fills that in.
-- Not root? Put `sudo` before `sh`. The command works once; if the install stops halfway, get [a new install command](#a-new-install-command).
+- The name: 1 to 63 lowercase letters, digits or dashes, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …
+- Not root? Put `sudo` before `sh`. The command works once. If the install stops halfway, get [a new install command](#a-new-install-command).
 - `MOIN_URL=http://127.0.0.1:8090` before `sh` makes the daemon dial that address instead of the hub's `APP_URL`, as on a server that runs the hub too ([one server](/docs/self-hosting#one-server)).
 
 ## See your servers
 
-Every server with its live status; lists update by themselves.
+Every server with its live status.
 
 ```surfaces
 Web: **Servers**
@@ -60,11 +58,11 @@ MCP: list_servers
 | **online** | the daemon is connected |
 | **offline** | the connection dropped: the daemon cannot reach moin |
 
-A server offline for two minutes, and back online, mails the owners and admins ([Alerts](/docs/guides/alerts)). The API streams changes from `GET /api/v1/servers/events`.
+A server offline for two minutes sends an [alert](/docs/guides/alerts). So does a server that comes back. The API streams changes from `GET /api/v1/servers/events`.
 
 ## A new install command
 
-The install command shows once; moin keeps only a fingerprint of its token. Lost it, or moving the daemon to another server? Get a new one. It works once within one hour; the old command and the old daemon's token stop working.
+The install command shows once. Lost it, or moving the daemon to another server? Get a new one. It works once, within one hour. The old command and the old daemon's token stop working.
 
 ```surfaces
 Web: **Servers**, open the server, **New install command**
@@ -76,7 +74,7 @@ MCP: new_install_command
 
 ## Rename a server
 
-Same rules as a new name. Its apps stay on it, and its links keep working ([Names and links](/docs/guides/names)). A server added before the rule keeps its old name until you rename it.
+The rules of a new name apply. Its apps stay on it, and its links keep working ([Names and links](/docs/guides/names)).
 
 ```surfaces
 Web: **Servers**, open the server, **Name**, **Save**
@@ -88,7 +86,9 @@ MCP: rename_server
 
 ## Updates
 
-The daemons update themselves to the version of the hub: one server at a time, never during a deploy, and your apps keep running while the daemon restarts. If a daemon does not come back, moin stops there and says so in the activity. Until then the server shows **update pending** next to its version. The hub itself: we update the hosted one; for your own see [Self-hosting](/docs/self-hosting#updates).
+The daemons update themselves to the version of the hub. One server at a time, never during a deploy. Your apps keep running while the daemon restarts.
+
+If a daemon does not come back, moin stops there and says so in the activity. The hub itself: we update the hosted one. For your own, see [Self-hosting](/docs/self-hosting#updates).
 
 ```surfaces
 Web: **Servers**, **Update daemons automatically**
@@ -98,7 +98,7 @@ API: PUT /api/v1/daemon-updates
 MCP: set_daemon_updates
 ```
 
-Update by hand; without a name the CLI updates every online server with an older daemon:
+Update by hand. Without a name the CLI updates every online server with an older daemon:
 
 ```surfaces
 Web: **Servers**, open the server, **Update daemon**
@@ -108,11 +108,11 @@ API: POST /api/v1/servers/{id}/update
 MCP: update_daemon
 ```
 
-A server with rules in `/etc/moin/rules` never updates from moin: update it on the server ([CLI reference](/docs/reference/cli#daemon-updates)).
+A server with rules in `/etc/moin/rules` never updates from moin. Update it on the server ([CLI reference](/docs/reference/cli#daemon-updates)).
 
 ## Remove a server
 
-Disconnects the daemon and makes its token stop working. It cannot be undone, so moin asks you to type the server's name: in the web dialog (with a copy button) and in the CLI. The hub checks it: a script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an AI agent as `confirm`.
+Disconnects the daemon and stops its token. It cannot be undone, so you type the server's name first. The hub checks it. A script passes it as `--confirm <name>`, the API as `?confirm=<name>`, an AI agent as `confirm`.
 
 ```surfaces
 Web: **Servers**, open the server, **Remove server**
@@ -122,10 +122,10 @@ API: DELETE /api/v1/servers/{id}
 MCP: remove_server
 ```
 
-- **Online with apps**: refused. [Remove the apps](/docs/guides/deploy#remove-an-app) first, so nothing keeps running unseen.
-- **Offline**: it goes with its apps, and every surface and the activity name them. The apps stay on the server with their data if it comes back.
+- **Online with apps**: refused. [Remove the apps](/docs/guides/deploy#remove-an-app) first.
+- **Offline**: it goes with its apps. The apps stay on the server with their data if it comes back.
 
-The daemon stays on the server. Every surface answers the command that removes it (none if the daemon never connected); run it on the server as root:
+The daemon stays on the server. Every surface gives you the command that removes it. Run it on the server as root:
 
 ```bash
 moin daemon uninstall          # the daemon goes, the apps keep running
@@ -141,8 +141,7 @@ moin daemon uninstall --apps   # the apps and their data go too, for good
 
 ## Good to know
 
-- **Disk space**: after every deploy and once a day the daemon removes images no kept deploy or container uses, images without a name, and build cache older than a week. What a rollback needs, your volumes and anything moin did not put there stay. Its log says what it freed. Over 90% full anyway, moin [alerts](/docs/guides/alerts).
-- **A new domain**: daemons and the CLI that still use an old domain of the hub move to the new one by themselves, once it answers.
+- **Disk space**: after every deploy and once a day the daemon removes images nothing uses and old build cache. What a rollback needs, your volumes and anything moin did not put there stay.
 - Next: close every port with the [Cloudflare Tunnel and the firewall](/docs/guides/security).
 
 ## Under the hood
