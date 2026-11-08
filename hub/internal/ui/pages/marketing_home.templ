@@ -171,7 +171,7 @@ func homeSurfaceOptions() []kit.Option {
 // the reader picks. The checked radio shows its part by CSS alone.
 templ HomeStart() {
 	<section id="how" class={ homeSection }>
-		<h2 class={ homeStatement }>Live in four steps.</h2>
+		<h2 class={ homeStatement }>Four steps. Live.</h2>
 		<p class={ homeNote }>In the web, the terminal or with your AI agent. You pick.</p>
 		<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
 			<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
@@ -209,7 +209,7 @@ templ homeStep(number, name, how string) {
 // HomeBackups is why the backups can be trusted.
 templ HomeBackups() {
 	<section id="backups" class={ homeSection }>
-		<h2 class={ homeStatement }>Would your last backup actually restore?</h2>
+		<h2 class={ homeStatement }>Backups that actually restore.</h2>
 		@kit.List() {
 			@homeReason("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
 			@homeReason("Checked every day.", "A real restore, by itself.", "/docs/concepts/backups")
@@ -226,7 +226,7 @@ templ HomeBackups() {
 // HomeSecurity is how moin reaches a server, and what the server can refuse.
 templ HomeSecurity() {
 	<section id="security" class={ homeSection }>
-		<h2 class={ homeStatement }>Nobody holds a key to your server. Not even us.</h2>
+		<h2 class={ homeStatement }>Your server. Your keys.</h2>
 		@kit.List() {
 			@homeReason("The daemon only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
 			@homeReason("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
@@ -246,7 +246,7 @@ templ homeReason(statement, line, href string) {
 // name, a few words, and the guide.
 templ HomeDoes() {
 	<section id="product" class={ homeSection }>
-		<h2 class={ homeStatement }>Everything an app needs. Nothing to bolt on.</h2>
+		<h2 class={ homeStatement }>Everything. Built in.</h2>
 		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
 			@kit.Section("Ship", nil) {
 				@kit.List() {
