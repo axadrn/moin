@@ -141,16 +141,17 @@ templ homeLiveNumber(count int, label, name string) {
 }
 
 // ---------------------------------------------------------------- start
-// HomeMoin says the name and where it comes from, one sentence a line.
+// HomeMoin tells where the name and the idea come from, like every other
+// section: a title and a line under it.
 templ HomeMoin() {
-	<section class={ homeSection, "items-center text-center" }>
-		<p class={ homeNote }>Moin. <span class="font-mono">/mɔɪn/</span> Hamburg for hello.</p>
-		<div class="flex max-w-4xl flex-col gap-6">
-			<p class={ homeStatement, "text-muted-foreground" }>I grew up next to one of Europe's busiest ports.</p>
-			<p class={ homeStatement, "text-muted-foreground" }>Millions of boxes. Packed once. Shipped anywhere.</p>
-			<p class={ homeStatement }>Nothing goes missing.</p>
-			<p class={ homeStatement }>Your apps are boxes too.</p>
-		</div>
+	<section class={ homeSection }>
+		<h2 class={ homeStatement }>Moin.</h2>
+		<p class={ homeNote }>
+			<span class="font-mono">/mɔɪn/</span> Hamburg for hello.
+			I grew up there, next to one of Europe's busiest ports.
+			Millions of containers. Packed once. Shipped anywhere. Nothing goes missing.
+			Your apps are containers too.
+		</p>
 	</section>
 }
 
@@ -271,9 +272,12 @@ templ HomeSecurity() {
 
 // homeTile is a small tile of a section: a few words and where to read on.
 templ homeTile(statement, line, href string) {
-	<a href={ templ.SafeURL(href) } class="flex min-h-28 min-w-0 flex-col justify-center gap-1 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
-		<span class="font-medium">{ statement }</span>
-		<span class="text-sm text-muted-foreground">{ line }</span>
+	<a href={ templ.SafeURL(href) } class="flex min-h-28 min-w-0 items-center gap-3 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
+		<span class="flex min-w-0 flex-1 flex-col gap-1">
+			<span class="font-medium">{ statement }</span>
+			<span class="text-sm text-muted-foreground">{ line }</span>
+		</span>
+		@kit.Chevron()
 	</a>
 }
 

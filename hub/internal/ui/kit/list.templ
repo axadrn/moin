@@ -49,7 +49,7 @@ templ RowAttrs(href string, attributes templ.Attributes) {
 	if href != "" {
 		<a href={ templ.SafeURL(href) } role="listitem" class={ rowClass + rowLit } { attributes... }>
 			{ children... }
-			@chevron()
+			@Chevron()
 		</a>
 	} else {
 		<div role="listitem" class={ rowClass } { attributes... }>
@@ -145,7 +145,7 @@ templ RowMore(label string) {
 	</details>
 }
 
-templ chevron() {
+templ Chevron() {
 	<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 }
 
