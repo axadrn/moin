@@ -17,8 +17,9 @@ import (
 const (
 	homeStatement = "text-4xl font-semibold tracking-tight text-balance sm:text-5xl"
 	homeLead      = "text-lg text-muted-foreground text-balance"
-	// homeNote is a line under a section, kept short enough to read.
-	homeNote = homeLead + " max-w-[46ch]"
+	// homeNote is a line under a section. Every one fills the same width
+	// and breaks at the same place, so none is balanced by itself.
+	homeNote = "text-lg text-muted-foreground text-pretty max-w-[76ch]"
 	// homeSection is the one gap between the sections, and the room a
 	// section a link jumps to keeps above itself for the floating navbar.
 	homeSection = "flex scroll-mt-24 flex-col gap-8 pt-28 sm:pt-36"
@@ -187,7 +188,7 @@ templ HomeStart() {
 			}
 		</div>
 		<p class={ homeNote }>
-			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml. From your folder, GitHub or a CI image.
+			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml.
 			<a href="/docs/getting-started" class="text-foreground underline underline-offset-4">Get started</a>
 		</p>
 	</section>
