@@ -366,6 +366,8 @@ func (b *backups) follow(ctx context.Context, live string, want watched) error {
 	}
 	want.db = litestream.NewDB(live)
 	want.db.Replica = litestream.NewReplicaWithClient(want.db, replicaClient(&want.bucket, want.folder))
+	// A bucket that lost its place starts over instead of waiting forever.
+	want.db.Replica.AutoRecoverEnabled = true
 	if err := store.RegisterDB(want.db); err != nil {
 		return fmt.Errorf("writing down every change: %w", err)
 	}

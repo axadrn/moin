@@ -112,6 +112,8 @@ func Start(ctx context.Context, bucket Bucket, file string) (stop func(), err er
 	db := litestream.NewDB(file)
 	db.SetLogger(quiet())
 	db.Replica = litestream.NewReplicaWithClient(db, bucket.client())
+	// A bucket that lost its place starts over instead of waiting forever.
+	db.Replica.AutoRecoverEnabled = true
 	if err := store.RegisterDB(db); err != nil {
 		_ = store.Close(context.Background())
 		return nil, fmt.Errorf("start the database backup: %w", err)
