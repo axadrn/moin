@@ -134,13 +134,22 @@ addEventListener("unhandledrejection", (event) => {
 // sent the request. "done" turns its button into a check for a moment,
 // "failed" and "note" put the words in a line under its form.
 let asking = null;
-// The answer goes to the element whose response it came with.
-document.addEventListener("htmx:before:response", (event) => { asking = event.target; });
+// The answer goes to the element whose response it came with. A live
+// update of the page was asked for by nobody.
+document.addEventListener("htmx:before:response", (event) => {
+  asking = event.target instanceof Element ? event.target : null;
+});
 
-const buttonOf = (source) =>
-  source?.closest?.("button") ||
-  (document.activeElement?.closest?.("button") && source?.contains(document.activeElement) ? document.activeElement.closest("button") : null) ||
-  source?.querySelector?.("button[type=submit], button:not([type])");
+// buttonOf finds the button that sent a request: the element itself, the
+// button in it that has the focus, or its submit button.
+function buttonOf(source) {
+  if (!source) return null;
+  const button = source.closest("button");
+  if (button) return button;
+  const focused = document.activeElement?.closest("button");
+  if (focused && source.contains(focused)) return focused;
+  return source.querySelector("button[type=submit], button:not([type])");
+}
 
 // saySaid puts a line in the page under what sent a request: under its
 // row, its form, or the head it sits in, never between buttons. It stays
@@ -148,7 +157,7 @@ const buttonOf = (source) =>
 // page: its line goes on top of the page.
 function saySaid(source, kind, text) {
   const place = source?.isConnected
-    ? source.closest?.("[role=listitem], li, form, header") || source
+    ? source.closest("[role=listitem], li, form, header") || source
     : document.querySelector("#main > *");
   if (!place) return;
   clearSaid(place);
@@ -187,7 +196,8 @@ if (feedbackBox) new MutationObserver(() => {
 
 // A new try clears the line of the last one.
 document.addEventListener("htmx:before:request", (event) => {
-  clearSaid(event.target.closest?.("[role=listitem], li, form, header") || event.target);
+  if (!(event.target instanceof Element)) return;
+  clearSaid(event.target.closest("[role=listitem], li, form, header") || event.target);
 });
 
 // A field a request failed on turns red and takes the focus; its message
