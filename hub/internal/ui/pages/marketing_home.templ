@@ -143,23 +143,20 @@ templ homeLiveNumber(count int, label, name string) {
 // ---------------------------------------------------------------- start
 // HomeMoin says the name and where it comes from, one sentence a line.
 templ HomeMoin() {
-	<section class={ homeSection }>
-		<div class="flex flex-col gap-3">
-			<p class={ homeStatement }>Moin.</p>
-			<p class={ homeNote }><span class="font-mono">/mɔɪn/</span> Hamburg for hello. Any hour, one word.</p>
-		</div>
-		<div class="flex flex-col gap-3">
+	<section class={ homeSection, "items-center text-center" }>
+		<p class={ homeNote }>Moin. <span class="font-mono">/mɔɪn/</span> Hamburg for hello.</p>
+		<div class="flex max-w-4xl flex-col gap-6">
 			<p class={ homeStatement, "text-muted-foreground" }>I grew up next to one of Europe's busiest ports.</p>
 			<p class={ homeStatement, "text-muted-foreground" }>Millions of boxes. Packed once. Shipped anywhere.</p>
 			<p class={ homeStatement }>Nothing goes missing.</p>
+			<p class={ homeStatement }>Your apps are boxes too.</p>
 		</div>
-		<p class={ homeStatement }>Your apps are boxes too.</p>
 	</section>
 }
 
 // homeMoment is the one big thing of a section: what you get, as you see it.
 templ homeMoment(state, big, small string) {
-	<div class="flex h-full min-w-0 flex-col justify-end gap-4 rounded-4xl bg-card p-8">
+	<div class="flex h-full min-w-0 flex-col justify-center gap-4 rounded-4xl bg-card p-8">
 		<span class="flex items-center gap-3 font-medium">
 			@kit.Dot(kit.StateLive)
 			{ state }
@@ -219,7 +216,7 @@ templ HomeStart() {
 					</div>
 				}
 			</div>
-			@homeMoment("my-app is live", "my-app.203-0-113-7.sslip.io", "HTTPS from the first deploy.")
+			@homeMoment("my-app", "It's live.", "my-app.203-0-113-7.sslip.io, with HTTPS.")
 		</div>
 		<p class={ homeNote }>
 			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml.
@@ -274,7 +271,7 @@ templ HomeSecurity() {
 
 // homeTile is a small tile of a section: a few words and where to read on.
 templ homeTile(statement, line, href string) {
-	<a href={ templ.SafeURL(href) } class="flex min-h-36 min-w-0 flex-col justify-end gap-1 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
+	<a href={ templ.SafeURL(href) } class="flex min-h-28 min-w-0 flex-col justify-center gap-1 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
 		<span class="font-medium">{ statement }</span>
 		<span class="text-sm text-muted-foreground">{ line }</span>
 	</a>
