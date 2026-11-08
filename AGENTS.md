@@ -40,3 +40,8 @@ Then check what you changed, and only that:
   browser, or the changed command in the CLI or TUI, against a local hub.
 - A release with many changes, or a change to the layout every page uses: the
   full end-to-end run in Chromium and WebKit, at phone and desktop width.
+
+Whole environments and end-to-end tests run on throwaway servers
+(`scripts/test-servers.sh`), not on the dev machine. Remove what you started.
+Commands that hit every session (`go clean -cache`, `docker system prune`,
+`docker volume prune`) only after asking.
