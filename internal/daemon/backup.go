@@ -106,8 +106,8 @@ type backups struct {
 // the last one failed, the newest daily check and what the hub heard
 // last.
 type state struct {
-	copied             time.Time
-	failed             string
+	lastCopy           time.Time
+	copyError          string
 	checkedAt          time.Time
 	checkErr, reported string
 }
@@ -193,6 +193,17 @@ func (b *backups) where(app string, database protocol.Database) (*protocol.Bucke
 	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
 }
 
+// copyKey is where a copy lives in its bucket.
+func copyKey(folder, id string, database protocol.Database) *string {
+	return aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+}
+
+// copyIDOf is the ID of a copy, from its key in the bucket.
+func copyIDOf(key string, database protocol.Database) string {
+	ending := path.Base(protocol.CopyFile("", database.Postgres()))
+	return strings.TrimSuffix(path.Base(key), ending)
+}
+
 // copy streams a copy of a database into the bucket as id.
 func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
 	bucket, folder, err := b.where(app, database)
@@ -213,7 +224,13 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	defer stopWatching()
 	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
 	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
-	_, err = uploader.Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres())), Body: body, Metadata: map[string]string{sizeNote: strconv.FormatInt(size, 10)}})
+	_, err = uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket:   aws.String(bucket.Bucket),
+		Key:      copyKey(folder, id, database),
+		Body:     body,
+		Metadata: map[string]string{sizeNote: strconv.FormatInt(size, 10)},
+	})
+	// The upload is over: this frees a writer that still waits.
 	reader.CloseWithError(errors.New("the upload ended"))
 	if cause := context.Cause(ctx); err != nil && cause != nil {
 		err = cause
@@ -222,8 +239,8 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
 	b.mu.Lock()
-	if s := b.state(app, database); at.After(s.copied) {
-		s.copied = at
+	if s := b.state(app, database); at.After(s.lastCopy) {
+		s.lastCopy = at
 	}
 	b.mu.Unlock()
 	return id, nil
@@ -275,7 +292,7 @@ func (b *backups) copies(ctx context.Context, app string, database protocol.Data
 			return nil, err
 		}
 		for _, object := range page.Contents {
-			id := strings.TrimSuffix(path.Base(aws.ToString(object.Key)), path.Base(protocol.CopyFile("", database.Postgres())))
+			id := copyIDOf(aws.ToString(object.Key), database)
 			if at, ok := protocol.CopyTime(id); ok {
 				copies = append(copies, protocol.Copy{ID: id, At: at, Size: aws.ToInt64(object.Size)})
 			}
@@ -291,7 +308,7 @@ func (b *backups) readCopy(ctx context.Context, app string, database protocol.Da
 	if err != nil {
 		return source{}, nil, err
 	}
-	key := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+	key := copyKey(folder, id, database)
 	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
 	if err != nil {
 		return source{}, nil, fmt.Errorf("the copy %s of %s: %w", id, database.Path, err)
@@ -307,7 +324,7 @@ func (b *backups) deleteCopy(ctx context.Context, app string, database protocol.
 	if err != nil {
 		return err
 	}
-	key := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+	key := copyKey(folder, id, database)
 	_, err = s3Client(bucket).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
 	return err
 }
@@ -389,9 +406,9 @@ func (b *backups) tick(ctx context.Context) {
 // tickDatabase does what is due for one database and notes what failed.
 func (b *backups) tickDatabase(ctx context.Context, app string, database protocol.Database) {
 	b.mu.Lock()
-	copied, busy := b.state(app, database).copied, b.restoring[app] > 0
+	copied := b.state(app, database).lastCopy
 	b.mu.Unlock()
-	if busy {
+	if b.busy(app) {
 		return
 	}
 	schedule := b.schedule(app)
@@ -409,7 +426,7 @@ func (b *backups) tickDatabase(ctx context.Context, app string, database protoco
 		failed = err.Error()
 	}
 	b.mu.Lock()
-	b.state(app, database).failed = failed
+	b.state(app, database).copyError = failed
 	b.mu.Unlock()
 }
 
@@ -441,7 +458,7 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 	}
 	if len(copies) > 0 && time.Since(copies[0].At) < due {
 		b.mu.Lock()
-		b.state(app, database).copied = copies[0].At
+		b.state(app, database).lastCopy = copies[0].At
 		b.mu.Unlock()
 		return nil
 	}
@@ -493,16 +510,16 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	b.mu.Lock()
 	s := *b.state(app, database)
 	b.mu.Unlock()
-	if !s.copied.IsZero() {
-		status.CopiedAt = &s.copied
+	if !s.lastCopy.IsZero() {
+		status.CopiedAt = &s.lastCopy
 	}
 	if !s.checkedAt.IsZero() {
 		status.CheckedAt, status.CheckError = &s.checkedAt, s.checkErr
 	}
-	status.Error = s.failed
+	status.Error = s.copyError
 	// Copies that stopped coming are a problem too, with an alert.
-	if status.Error == "" && b.late(app, s.copied) {
-		status.Error = "the copies are late: the newest is from " + s.copied.UTC().Format("Jan 2 15:04 UTC")
+	if status.Error == "" && b.late(app, s.lastCopy) {
+		status.Error = "the copies are late: the newest is from " + s.lastCopy.UTC().Format("Jan 2 15:04 UTC")
 	}
 	if full {
 		copies, err := b.copies(ctx, app, database)
@@ -627,7 +644,7 @@ func (b *backups) running() map[string][]protocol.Database {
 
 // one is the database a request names, or the app's only one.
 func (b *backups) one(app, name string) (protocol.Database, error) {
-	all := b.apps.runningDatabases(app)
+	all := b.apps.liveDatabases(app)
 	for _, database := range all {
 		if database.Path == name || name == "" && len(all) == 1 {
 			return database, nil
@@ -701,19 +718,9 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	b.restoring[request.App]++
 	b.mu.Unlock()
 	unlock := b.apps.lock(request.App)
-	var from source
-	switch {
-	case protocol.ValidCopyID(request.Copy):
-		var body io.Closer
-		if from, body, err = b.readCopy(ctx, request.App, database, request.Copy); err == nil {
-			defer body.Close()
-		}
-	case protocol.ValidCopyID(request.Undo):
-		from.undo = request.Undo
-	case request.At != nil && !database.Postgres():
-		from.at, from.size = request.At.UTC(), fileSize(database.HostPath)
-	default:
-		err = errors.New("pick a copy, a minute or an undo to go back to")
+	from, body, err := b.restoreSource(ctx, request, database)
+	if body != nil {
+		defer body.Close()
 	}
 	if err == nil {
 		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo)
@@ -727,6 +734,21 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	b.finish(mark, err)
 	go b.report(context.WithoutCancel(ctx), map[string][]protocol.Database{request.App: {database}}, true)
 	return err
+}
+
+// restoreSource is what a restore goes back to. Closing the second result,
+// when there is one, ends reading the copy.
+func (b *backups) restoreSource(ctx context.Context, request protocol.BackupRestore, database protocol.Database) (source, io.Closer, error) {
+	if protocol.ValidCopyID(request.Copy) {
+		return b.readCopy(ctx, request.App, database, request.Copy)
+	}
+	if protocol.ValidCopyID(request.Undo) {
+		return source{undo: request.Undo}, nil, nil
+	}
+	if request.At != nil && !database.Postgres() {
+		return source{at: request.At.UTC(), size: fileSize(database.HostPath)}, nil, nil
+	}
+	return source{}, nil, errors.New("pick a copy, a minute or an undo to go back to")
 }
 
 // finish writes down how a restore ended.
@@ -777,29 +799,38 @@ func (b *backups) restoreStates(app string) []protocol.RestoreState {
 // stopped copies and checks left. The daemon runs it when it starts.
 func (b *backups) recover(ctx context.Context) {
 	for _, mark := range b.marks() {
-		if mark.State != protocol.RestoreRunning {
-			continue
+		if mark.State == protocol.RestoreRunning {
+			b.recoverRestore(ctx, mark)
 		}
-		database, err := b.one(mark.App, mark.Database)
-		switched := false
-		if err == nil {
-			switched, err = b.engine(mark.App, database).Recover(ctx, mark)
-		}
-		// The switch is one step: whatever is live is whole, so the app
-		// starts either way.
-		start := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
-		if err != nil {
-			slog.Error("backup: how a restore the daemon stopped in ended is not known yet", "app", mark.App, "database", mark.Database, "error", err)
-			continue
-		}
-		switch {
-		case !switched:
-			err = errors.New("the daemon stopped during the restore; the data is as it was before")
-		case start != nil:
-			err = fmt.Errorf("the restored data is in place, but start the app: %w", start)
-		}
-		b.finish(mark, err)
 	}
+	b.sweepTemp()
+}
+
+// recoverRestore ends one restore a stopped daemon left running.
+func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
+	database, err := b.one(mark.App, mark.Database)
+	switched := false
+	if err == nil {
+		switched, err = b.engine(mark.App, database).Recover(ctx, mark)
+	}
+	// The switch is one step: whatever is live is whole, so the app
+	// starts either way.
+	startErr := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
+	if err != nil {
+		slog.Error("backup: how a restore the daemon stopped in ended is not known yet", "app", mark.App, "database", mark.Database, "error", err)
+		return
+	}
+	switch {
+	case !switched:
+		err = errors.New("the daemon stopped during the restore; the data is as it was before")
+	case startErr != nil:
+		err = fmt.Errorf("the restored data is in place, but start the app: %w", startErr)
+	}
+	b.finish(mark, err)
+}
+
+// sweepTemp removes what stopped copies and checks left.
+func (b *backups) sweepTemp() {
 	for _, databases := range b.running() {
 		for _, database := range databases {
 			if !database.Postgres() {

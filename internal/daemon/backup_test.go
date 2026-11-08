@@ -174,7 +174,7 @@ func TestLateAndSweep(t *testing.T) {
 	b := newBackups(newApps(dir, nil), nil)
 	database := protocol.Database{Path: "/data/app.db", HostPath: filepath.Join(dir, "app.db")}
 	b.mu.Lock()
-	b.state("shop", database).copied = time.Now().Add(-3 * time.Hour)
+	b.state("shop", database).lastCopy = time.Now().Add(-3 * time.Hour)
 	b.mu.Unlock()
 	if status := b.status(context.Background(), "shop", database, false); !strings.Contains(status.Error, "the copies are late") {
 		t.Fatalf("late: %+v", status)

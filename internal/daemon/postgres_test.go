@@ -46,7 +46,7 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := newApps(dir, nil)
-	found, noBackup, err := a.databases(context.Background(), composeFile)
+	found, noBackup, err := a.scanDatabases(context.Background(), composeFile)
 	if err != nil {
 		t.Fatal(err)
 	}

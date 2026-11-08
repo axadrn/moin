@@ -413,10 +413,13 @@ func (a *apps) startRelease(ctx context.Context, start protocol.DeployStart, com
 // afterStart notes the databases the running release has, has backups
 // follow them, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, app, release, composeFile string, detected protocol.Detected, logf func(string, ...any)) protocol.Detected {
-	databases, noBackup, err := a.databases(ctx, composeFile)
+	databases, noBackup, err := a.scanDatabases(ctx, composeFile)
 	if err == nil {
-		detected.Databases, detected.NoBackup = databases, noBackup
-		saveJSON(filepath.Join(release, "detected.json"), detected)
+		detected.Databases = databases
+		detected.NoBackup = noBackup
+		if err := writeState(filepath.Join(release, "detected.json"), detected); err != nil {
+			logf("write down the databases: %s", err)
+		}
 	}
 	for _, database := range detected.Databases {
 		if database.Postgres() {
@@ -1100,11 +1103,11 @@ type composeMount struct {
 // noBackupText is what moin says about a database it cannot back up.
 const noBackupText = "moin cannot back up this database"
 
-// databases finds what a release keeps its data in. The first list is
+// scanDatabases finds what a release keeps its data in. The first list is
 // what moin backs up: every SQLite file on a mounted folder and every
 // Postgres service. The second is what looks like a database but moin
 // cannot back up.
-func (a *apps) databases(ctx context.Context, composeFile string) ([]protocol.Database, []protocol.Database, error) {
+func (a *apps) scanDatabases(ctx context.Context, composeFile string) ([]protocol.Database, []protocol.Database, error) {
 	body, err := os.ReadFile(composeFile)
 	if err != nil {
 		return nil, nil, err
@@ -1207,10 +1210,14 @@ func hasPostgresData(folder string) bool {
 // plainImage is an image without its tag, digest and Docker Hub's prefixes.
 func plainImage(image string) string {
 	image, _, _ = strings.Cut(image, "@")
-	if slash := strings.LastIndex(image, "/"); strings.LastIndex(image, ":") > slash {
-		image = image[:strings.LastIndex(image, ":")]
+	// A colon before the last slash is a registry port, not a tag.
+	lastSlash := strings.LastIndex(image, "/")
+	lastColon := strings.LastIndex(image, ":")
+	if lastColon > lastSlash {
+		image = image[:lastColon]
 	}
-	image = strings.TrimPrefix(strings.TrimPrefix(image, "docker.io/"), "index.docker.io/")
+	image = strings.TrimPrefix(image, "docker.io/")
+	image = strings.TrimPrefix(image, "index.docker.io/")
 	return strings.TrimPrefix(image, "library/")
 }
 
@@ -1646,8 +1653,8 @@ func (a *apps) live(app string) (protocol.Detected, string) {
 	return detected, file
 }
 
-// runningDatabases are the databases of an app's live deploy.
-func (a *apps) runningDatabases(app string) []protocol.Database {
+// liveDatabases are the databases of an app's live deploy.
+func (a *apps) liveDatabases(app string) []protocol.Database {
 	detected, _ := a.live(app)
 	return detected.Databases
 }
@@ -1661,7 +1668,7 @@ func (a *apps) findNewDatabases(ctx context.Context, app string) (protocol.Detec
 	if file == "" {
 		return detected, false
 	}
-	databases, noBackup, err := a.databases(ctx, a.composeFile(app))
+	databases, noBackup, err := a.scanDatabases(ctx, a.composeFile(app))
 	if err != nil {
 		return detected, false
 	}

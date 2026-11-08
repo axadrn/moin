@@ -55,8 +55,8 @@ var quickMoments = []struct {
 	{"1d", "Yesterday this time", 24 * time.Hour},
 }
 
-// keepDays is how long an app keeps its copies.
-func keepDays(app *model.App) time.Duration {
+// keepFor is how long an app keeps its copies.
+func keepFor(app *model.App) time.Duration {
 	if app.BackupKeep <= 0 {
 		return time.Duration(protocol.DefaultSchedule.Keep) * 24 * time.Hour
 	}
@@ -183,7 +183,7 @@ func (e *AmbiguousMomentError) Error() string {
 // remember names the copy the daemon took before a change, by its ID, and
 // forgets the names of copies older than the app keeps.
 func (s *AppService) remember(app *model.App, database, kind, detail string, at time.Time) {
-	err := s.apps.AddBackupMoment(model.BackupMoment{AppID: app.ID, Database: database, Kind: kind, Detail: detail, At: at.UTC()}, s.now().Add(-keepDays(app)-24*time.Hour))
+	err := s.apps.AddBackupMoment(model.BackupMoment{AppID: app.ID, Database: database, Kind: kind, Detail: detail, At: at.UTC()}, s.now().Add(-keepFor(app)-24*time.Hour))
 	if err != nil {
 		slog.Error("remember a moment failed", "app_id", app.ID, "kind", kind, "error", err)
 	}

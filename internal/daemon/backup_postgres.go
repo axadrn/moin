@@ -43,7 +43,7 @@ func (e *postgresEngine) target(ctx context.Context) (pgTarget, error) {
 // (moin_…).
 func (b *backups) databases(ctx context.Context, app string) []protocol.Database {
 	var all []protocol.Database
-	for _, database := range b.apps.runningDatabases(app) {
+	for _, database := range b.apps.liveDatabases(app) {
 		all = append(all, database)
 		if !database.Postgres() {
 			continue
@@ -53,8 +53,11 @@ func (b *backups) databases(ctx context.Context, app string) []protocol.Database
 			continue
 		}
 		out, err := admin(ctx, t, `SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY datname;`, nil)
+		if err != nil {
+			continue
+		}
 		for _, name := range strings.Split(out, "\n") {
-			if err == nil && name != "" && name != t.database && !strings.HasPrefix(name, "moin_") {
+			if name != "" && name != t.database && !strings.HasPrefix(name, "moin_") {
 				all = append(all, protocol.Database{Path: database.Path + "/" + name, Kind: database.Kind, Service: database.Service, Name: name})
 			}
 		}
@@ -276,24 +279,37 @@ func (e *postgresEngine) others() []string {
 // minutes: there means the switch happened, as both renames are one
 // transaction.
 func (e *postgresEngine) Recover(ctx context.Context, mark restoreMark) (bool, error) {
-	t, err := e.target(ctx)
-	if err == nil {
-		_, err = admin(ctx, t, `SELECT 1;`, nil)
-	}
-	for try := 0; err != nil && try < 60; try++ {
-		time.Sleep(2 * time.Second)
-		if t, err = e.target(ctx); err == nil {
-			_, err = admin(ctx, t, `SELECT 1;`, nil)
-		}
-	}
+	t, err := e.waitForPostgres(ctx)
 	if err != nil {
 		return false, err
 	}
 	switched, err := dbExists(ctx, t, undoName(t.database, mark.Undo))
-	if err == nil && !switched && mark.From == "" {
+	if err != nil {
+		return false, err
+	}
+	if !switched && mark.From == "" {
 		_, err = admin(ctx, t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": moinName("restore", t.database)})
 	}
 	return switched, err
+}
+
+// waitForPostgres waits up to two minutes for the Postgres to answer.
+func (e *postgresEngine) waitForPostgres(ctx context.Context) (pgTarget, error) {
+	var err error
+	for try := 0; try <= 60; try++ {
+		if try > 0 {
+			time.Sleep(2 * time.Second)
+		}
+		var t pgTarget
+		t, err = e.target(ctx)
+		if err != nil {
+			continue
+		}
+		if _, err = admin(ctx, t, `SELECT 1;`, nil); err == nil {
+			return t, nil
+		}
+	}
+	return pgTarget{}, err
 }
 
 // Check loads a copy into the throwaway database moin_check_<hash> and
@@ -331,9 +347,9 @@ func (e *postgresEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
 		name, size, _ := strings.Cut(line, " ")
 		id := strings.ToUpper(strings.TrimSuffix(strings.TrimPrefix(name, "moin_before_"), "_"+hash))
 		if at, ok := protocol.CopyTime(id); ok {
-			var bytes int64
-			fmt.Sscan(size, &bytes)
-			undos = append(undos, protocol.Copy{ID: id, At: at, Size: bytes})
+			var sizeBytes int64
+			fmt.Sscan(size, &sizeBytes)
+			undos = append(undos, protocol.Copy{ID: id, At: at, Size: sizeBytes})
 		}
 	}
 	return undos, err

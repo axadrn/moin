@@ -344,11 +344,11 @@ func TestBackupSQLite(t *testing.T) {
 	// copies: the newest real one counts (the broken copy above is a
 	// minute ahead).
 	test.b.mu.Lock()
-	test.b.state(app, test.database).copied = time.Now().Add(time.Hour)
+	test.b.state(app, test.database).lastCopy = time.Now().Add(time.Hour)
 	test.b.mu.Unlock()
 	test.b.tick(test.ctx)
 	test.b.mu.Lock()
-	copied := test.b.state(app, test.database).copied
+	copied := test.b.state(app, test.database).lastCopy
 	test.b.mu.Unlock()
 	if copied.After(time.Now()) {
 		t.Fatalf("the copies wait for one from the future: %v", copied)

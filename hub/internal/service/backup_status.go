@@ -14,37 +14,40 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// BackupProblem says in one short sentence why a backup does not work,
-// from what the daemon and its tools said. "" when it works.
+// backupProblems are the short sentences for what the daemon and its
+// tools said. The first row with a matching phrase wins.
+var backupProblems = []struct {
+	sentence string
+	phrases  []string
+}{
+	{"Deploy the app once more to start its backups.", []string{"once more to start its backups"}},
+	{"The copy stopped: no data moved.", []string{"no data moved"}},
+	{"The server's disk is full.", []string{"no space left"}},
+	{"The bucket does not exist.", []string{"nosuchbucket", "bucket does not exist", "specified bucket does not exist"}},
+	{"The bucket refuses the keys.", []string{"accessdenied", "access denied", "invalidaccesskeyid", "signaturedoesnotmatch", "forbidden", "statuscode: 403"}},
+	{"The bucket can't be reached.", []string{"no such host", "connection refused", "i/o timeout", "dial tcp", "deadline exceeded", "tls:", "x509", "connection reset"}},
+	{"The database is not running.", []string{"is not running"}},
+	{"The app's bucket can't be opened: check its keys under Data.", []string{"cannot be opened"}},
+	{"The copies are late.", []string{"copies are late"}},
+	{"The daily check could not restore the newest copy.", []string{"daily check failed"}},
+	{"Every change is not written down.", []string{"every change"}},
+	{"moin can't back up this database.", []string{"cannot back up"}},
+	{"The daemon on the server is too old: update it.", []string{"too old for this"}},
+}
+
+// BackupProblem says in one short sentence why a backup does not work.
+// It is "" when it works.
 func BackupProblem(raw string) string {
-	text := strings.ToLower(raw)
-	switch {
-	case raw == "":
+	if raw == "" {
 		return ""
-	case strings.Contains(text, "once more to start its backups"):
-		return "Deploy the app once more to start its backups."
-	case strings.Contains(text, "no space left"):
-		return "The server's disk is full."
-	case strings.Contains(text, "nosuchbucket") || strings.Contains(text, "bucket does not exist") || strings.Contains(text, "specified bucket does not exist"):
-		return "The bucket does not exist."
-	case strings.Contains(text, "accessdenied") || strings.Contains(text, "access denied") || strings.Contains(text, "invalidaccesskeyid") || strings.Contains(text, "signaturedoesnotmatch") || strings.Contains(text, "forbidden") || strings.Contains(text, "statuscode: 403"):
-		return "The bucket refuses the keys."
-	case strings.Contains(text, "no such host") || strings.Contains(text, "connection refused") || strings.Contains(text, "i/o timeout") || strings.Contains(text, "dial tcp") || strings.Contains(text, "deadline exceeded") || strings.Contains(text, "tls:") || strings.Contains(text, "x509") || strings.Contains(text, "connection reset"):
-		return "The bucket can't be reached."
-	case strings.Contains(text, "is not running"):
-		return "The database is not running."
-	case strings.Contains(text, "cannot be opened"):
-		return "The app's bucket can't be opened: check its keys under Data."
-	case strings.Contains(text, "copies are late"):
-		return "The copies are late."
-	case strings.Contains(text, "daily check failed"):
-		return "The daily check could not restore the newest copy."
-	case strings.Contains(text, "every change"):
-		return "Every change is not written down."
-	case strings.Contains(text, "cannot back up"):
-		return "moin can't back up this database."
-	case strings.Contains(text, "too old for this"):
-		return "The daemon on the server is too old: update it."
+	}
+	text := strings.ToLower(raw)
+	for _, problem := range backupProblems {
+		for _, phrase := range problem.phrases {
+			if strings.Contains(text, phrase) {
+				return problem.sentence
+			}
+		}
 	}
 	return "The backup does not work."
 }
@@ -74,7 +77,7 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	s.storeBackupStatus(app, backups)
 	s.applyRestoreStates(app, backups.Restores)
 	now := s.now().UTC()
-	remembered, err := s.apps.BackupMoments(app.ID, now.Add(-keepDays(app)-24*time.Hour))
+	remembered, err := s.apps.BackupMoments(app.ID, now.Add(-keepFor(app)-24*time.Hour))
 	if err != nil {
 		return nil, err
 	}

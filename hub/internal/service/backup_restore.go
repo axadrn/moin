@@ -140,28 +140,8 @@ func (s *AppService) reserveRestore(app *model.App, database string) (*Restore, 
 // endRestore stores how a restore stands after the daemon said so. A
 // restore that ended stays ended: a late word changes nothing.
 func (s *AppService) endRestore(actor Actor, app *model.App, id string, state protocol.RestoreState) {
-	s.restoreMu.Lock()
-	restore, err := s.apps.Restore(id)
-	if err != nil || !restore.Active() || restore.AppID != app.ID {
-		s.restoreMu.Unlock()
-		return
-	}
-	if state.State == RestoreRunning && restore.State == RestoreRunning {
-		s.restoreMu.Unlock()
-		return
-	}
-	restore.State, restore.Error = state.State, clipText(state.Error, 2000)
-	if state.State == RestoreDone || state.State == RestoreFailed {
-		finished := s.now().UTC()
-		if state.FinishedAt != nil {
-			finished = state.FinishedAt.UTC()
-		}
-		restore.FinishedAt = &finished
-	}
-	err = s.apps.SetRestore(*restore)
-	s.restoreMu.Unlock()
-	if err != nil {
-		slog.Error("store how a restore stands failed", "id", id, "error", err)
+	restore, changed := s.storeRestoreState(app, id, state)
+	if !changed {
 		return
 	}
 	if state.State == RestoreDone {
@@ -169,6 +149,34 @@ func (s *AppService) endRestore(actor Actor, app *model.App, id string, state pr
 		s.servers.record(actor, "backup.restored", "app", app.Name, map[string]string{"database": restore.Database, "to": restore.To})
 	}
 	s.notify(app.WorkspaceID)
+}
+
+// storeRestoreState writes down how a restore stands and says whether
+// that changed anything.
+func (s *AppService) storeRestoreState(app *model.App, id string, state protocol.RestoreState) (*Restore, bool) {
+	s.restoreMu.Lock()
+	defer s.restoreMu.Unlock()
+	restore, err := s.apps.Restore(id)
+	if err != nil || !restore.Active() || restore.AppID != app.ID {
+		return nil, false
+	}
+	if state.State == RestoreRunning && restore.State == RestoreRunning {
+		return nil, false
+	}
+	restore.State = state.State
+	restore.Error = clipText(state.Error, 2000)
+	if state.State == RestoreDone || state.State == RestoreFailed {
+		finished := s.now().UTC()
+		if state.FinishedAt != nil {
+			finished = state.FinishedAt.UTC()
+		}
+		restore.FinishedAt = &finished
+	}
+	if err := s.apps.SetRestore(*restore); err != nil {
+		slog.Error("store how a restore stands failed", "id", id, "error", err)
+		return nil, false
+	}
+	return restore, true
 }
 
 // applyRestoreStates takes what a daemon says of the restores of an app:
