@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +50,9 @@ type engine interface {
 	// whether it had switched, from what is there.
 	Recover(ctx context.Context, mark restoreMark) (switched bool, err error)
 	// Check restores a copy into a throwaway database and reads it all.
-	Check(ctx context.Context, copy io.Reader) error
+	Check(ctx context.Context, from source) error
+	// Size is how many bytes the live database takes.
+	Size(ctx context.Context) (int64, error)
 	// Undos are the states before restores, newest first; Drop removes one.
 	Undos(ctx context.Context) ([]protocol.Copy, error)
 	Drop(ctx context.Context, id string) error
@@ -57,17 +60,23 @@ type engine interface {
 
 // source is what a restore goes back to: a copy from the bucket, a
 // minute (SQLite with Every change) or the undo of an earlier restore.
+// size is how much room building it takes.
 type source struct {
 	copy io.Reader
 	at   time.Time
 	undo string
+	size int64
 }
 
 const (
 	day = 24 * time.Hour
-	// copyTimeout ends a copy that hangs: it holds up every other copy,
-	// and the deploys and edits that wait for theirs.
-	copyTimeout = time.Hour
+	// stallLimit stops a copy when no data has moved for this long. A big
+	// database may take hours, as long as it keeps moving. A copy that
+	// hangs would hold up every other copy.
+	stallLimit = 30 * time.Minute
+	// sizeNote is the name of the note on each copy that says how many
+	// bytes its database took. A restore needs that much room.
+	sizeNote = "database-size"
 )
 
 // backups runs the schedule of every database on the server.
@@ -189,14 +198,24 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	b.copying.Lock()
 	defer b.copying.Unlock()
 	at, _ := protocol.CopyTime(id)
-	ctx, cancel := context.WithTimeout(ctx, copyTimeout)
-	defer cancel()
+	engine := b.engine(app, database)
+	size, err := engine.Size(ctx)
+	if err != nil {
+		return "", fmt.Errorf("copy %s: %w", database.Path, err)
+	}
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
 	reader, writer := io.Pipe()
-	go func() { writer.CloseWithError(b.engine(app, database).Copy(ctx, writer)) }()
+	go func() { writer.CloseWithError(engine.Copy(ctx, writer)) }()
+	body, stopWatching := stopWhenStuck(reader, stallLimit, stop)
+	defer stopWatching()
 	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
 	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
-	_, err = uploader.Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres())), Body: reader})
+	_, err = uploader.Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres())), Body: body, Metadata: map[string]string{sizeNote: strconv.FormatInt(size, 10)}})
 	reader.CloseWithError(errors.New("the upload ended"))
+	if cause := context.Cause(ctx); err != nil && cause != nil {
+		err = cause
+	}
 	if err != nil {
 		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
@@ -206,6 +225,30 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	}
 	b.mu.Unlock()
 	return id, nil
+}
+
+// watchedReader is a reader that restarts a timer each time data comes.
+type watchedReader struct {
+	reader io.Reader
+	timer  *time.Timer
+	limit  time.Duration
+}
+
+func (w watchedReader) Read(p []byte) (int, error) {
+	n, err := w.reader.Read(p)
+	if n > 0 {
+		w.timer.Reset(w.limit)
+	}
+	return n, err
+}
+
+// stopWhenStuck calls stop when no data has come from reader for limit.
+// The second result ends the watching.
+func stopWhenStuck(reader io.Reader, limit time.Duration, stop context.CancelCauseFunc) (io.Reader, func()) {
+	timer := time.AfterFunc(limit, func() {
+		stop(fmt.Errorf("no data moved for %s", limit))
+	})
+	return watchedReader{reader: reader, timer: timer, limit: limit}, func() { timer.Stop() }
 }
 
 // copies are the copies of a database in the bucket, newest first.
@@ -232,22 +275,31 @@ func (b *backups) copies(ctx context.Context, app string, database protocol.Data
 	return copies, nil
 }
 
-// object reads or deletes the copy id of a database in the bucket.
-func (b *backups) object(ctx context.Context, app string, database protocol.Database, id string, remove bool) (io.ReadCloser, error) {
+// readCopy opens a copy in the bucket. The caller closes it.
+func (b *backups) readCopy(ctx context.Context, app string, database protocol.Database, id string) (source, io.Closer, error) {
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
-		return nil, err
+		return source{}, nil, err
 	}
-	name := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
-	if remove {
-		_, err := s3Client(bucket).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: name})
-		return nil, err
-	}
-	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: name})
+	key := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
 	if err != nil {
-		return nil, fmt.Errorf("the copy %s of %s: %w", id, database.Path, err)
+		return source{}, nil, fmt.Errorf("the copy %s of %s: %w", id, database.Path, err)
 	}
-	return object.Body, nil
+	// No note means no number: only the spare room is checked.
+	size, _ := strconv.ParseInt(object.Metadata[sizeNote], 10, 64)
+	return source{copy: object.Body, size: size}, object.Body, nil
+}
+
+// deleteCopy deletes a copy in the bucket.
+func (b *backups) deleteCopy(ctx context.Context, app string, database protocol.Database, id string) error {
+	bucket, folder, err := b.where(app, database)
+	if err != nil {
+		return err
+	}
+	key := aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
+	_, err = s3Client(bucket).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
+	return err
 }
 
 // prune deletes the copies and undos older than the app keeps them,
@@ -264,8 +316,7 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 	var err error
 	for index, copy := range copies {
 		if index > 0 && copy.At.Before(before) {
-			_, deleteErr := b.object(ctx, app, database, copy.ID, true)
-			err = errors.Join(err, deleteErr)
+			err = errors.Join(err, b.deleteCopy(ctx, app, database, copy.ID))
 		}
 	}
 	if !database.Postgres() {
@@ -402,7 +453,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	}
 	status.Error = s.failed
 	// Copies that stopped coming are a problem too, with an alert.
-	if every := time.Duration(b.schedule(app).Every) * time.Minute; status.Error == "" && !s.copied.IsZero() && time.Since(s.copied) > max(2*every, every+copyTimeout) {
+	if every := time.Duration(b.schedule(app).Every) * time.Minute; status.Error == "" && !s.copied.IsZero() && time.Since(s.copied) > max(2*every, every+time.Hour) {
 		status.Error = "the copies are late: the newest is from " + s.copied.UTC().Format("Jan 2 15:04 UTC")
 	}
 	if full {
@@ -431,14 +482,14 @@ func (b *backups) checkAll(ctx context.Context) {
 			if err != nil || len(copies) == 0 {
 				continue
 			}
-			body, err := b.object(ctx, app, database, copies[0].ID, false)
+			from, body, err := b.readCopy(ctx, app, database, copies[0].ID)
 			var gone *types.NoSuchKey
 			if errors.As(err, &gone) {
 				// A newer copy came and the old one went meanwhile.
 				continue
 			}
 			if err == nil {
-				err = b.engine(app, database).Check(ctx, body)
+				err = b.engine(app, database).Check(ctx, from)
 				body.Close()
 			}
 			b.mu.Lock()
@@ -571,15 +622,14 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	var from source
 	switch {
 	case protocol.ValidCopyID(request.Copy):
-		var body io.ReadCloser
-		if body, err = b.object(ctx, request.App, database, request.Copy, false); err == nil {
+		var body io.Closer
+		if from, body, err = b.readCopy(ctx, request.App, database, request.Copy); err == nil {
 			defer body.Close()
-			from.copy = body
 		}
 	case protocol.ValidCopyID(request.Undo):
 		from.undo = request.Undo
 	case request.At != nil && !database.Postgres():
-		from.at = request.At.UTC()
+		from.at, from.size = request.At.UTC(), fileSize(database.HostPath)
 	default:
 		err = errors.New("pick a copy, a minute or an undo to go back to")
 	}

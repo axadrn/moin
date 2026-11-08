@@ -40,7 +40,7 @@ type sqliteEngine struct {
 }
 
 func (e *sqliteEngine) Copy(ctx context.Context, w io.Writer) error {
-	dir, err := e.tempDir("copy")
+	dir, err := e.tempDir("copy", fileSize(e.database.HostPath))
 	if err != nil {
 		return err
 	}
@@ -66,23 +66,32 @@ func (e *sqliteEngine) Copy(ctx context.Context, w io.Writer) error {
 }
 
 // tempDir is a folder next to the database for a copy or a check, once
-// the disk has room for one more database.
-func (e *sqliteEngine) tempDir(what string) (string, error) {
+// the disk has room for need bytes.
+func (e *sqliteEngine) tempDir(what string, need int64) (string, error) {
 	dir := filepath.Dir(e.database.HostPath)
-	if err := room(dir, fileSize(e.database.HostPath)); err != nil {
+	if err := room(dir, need); err != nil {
 		return "", err
 	}
 	return os.MkdirTemp(dir, "."+tempName(what+"-*"))
 }
 
-// room says when the disk of dir has less free than need, plus 512 MB.
+// Size is how many bytes the database file takes.
+func (e *sqliteEngine) Size(ctx context.Context) (int64, error) {
+	return fileSize(e.database.HostPath), nil
+}
+
+// spareRoom is what stays free on the disk on top of what a copy, a check
+// or a restore needs.
+const spareRoom = 512 << 20
+
+// room says when the disk of dir has less free than need plus spareRoom.
 func room(dir string, need int64) error {
 	var stat syscall.Statfs_t
 	if syscall.Statfs(dir, &stat) != nil {
 		return nil
 	}
-	if free := int64(stat.Bavail) * int64(stat.Bsize); free < need+512<<20 {
-		return fmt.Errorf("the server's disk has %s free and this needs %s: free some space", human.Size(float64(free)), human.Size(float64(need+512<<20)))
+	if free := int64(stat.Bavail) * int64(stat.Bsize); free < need+spareRoom {
+		return fmt.Errorf("the server's disk has %s free and this needs %s: free some space", human.Size(float64(free)), human.Size(float64(need+spareRoom)))
 	}
 	return nil
 }
@@ -109,7 +118,7 @@ func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) (err
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
-		if err := room(filepath.Dir(live), fileSize(live)); err != nil {
+		if err := room(filepath.Dir(live), from.size); err != nil {
 			return fmt.Errorf("%w; nothing changed", err)
 		}
 		removeDatabase(built)
@@ -221,14 +230,14 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 
 // Check unpacks a copy next to the database and runs SQLite's integrity
 // check, which reads every page.
-func (e *sqliteEngine) Check(ctx context.Context, copy io.Reader) error {
-	dir, err := e.tempDir("check")
+func (e *sqliteEngine) Check(ctx context.Context, from source) error {
+	dir, err := e.tempDir("check", from.size)
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "check.db")
-	if err := e.build(ctx, source{copy: copy}, file); err != nil {
+	if err := e.build(ctx, from, file); err != nil {
 		return err
 	}
 	return integrityCheck(ctx, file)

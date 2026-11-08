@@ -314,12 +314,15 @@ func TestBackupSQLite(t *testing.T) {
 	}
 
 	// Download: the copy in the bucket opens with the SQLite driver.
-	body, err := test.b.object(test.ctx, app, test.database, third.ID, false)
+	from, body, err := test.b.readCopy(test.ctx, app, test.database, third.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if from.size == 0 {
+		t.Fatal("the copy carries no note of its size")
+	}
 	downloaded := filepath.Join(t.TempDir(), "copy.db")
-	if err := (&sqliteEngine{}).build(test.ctx, source{copy: body}, downloaded); err != nil {
+	if err := (&sqliteEngine{}).build(test.ctx, from, downloaded); err != nil {
 		t.Fatal(err)
 	}
 	body.Close()
@@ -471,12 +474,15 @@ func testBackupPostgres(t *testing.T, image string) {
 	}
 
 	// Download: the copy in the bucket lists with pg_restore.
-	body, err := test.b.object(test.ctx, app, database, second.ID, false)
+	from, body, err := test.b.readCopy(test.ctx, app, database, second.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if from.size == 0 {
+		t.Fatal("the copy carries no note of its size")
+	}
 	var list bytes.Buffer
-	err = target.exec(test.ctx, body, &list, "pg_restore", "--list")
+	err = target.exec(test.ctx, from.copy, &list, "pg_restore", "--list")
 	body.Close()
 	if err != nil || !strings.Contains(list.String(), "TABLE public notes") {
 		t.Fatalf("pg_restore --list: %v %s", err, list.String())
@@ -538,12 +544,12 @@ func testBackupPostgres(t *testing.T, image string) {
 }
 
 // mustCopy opens a copy of the test's database in the bucket.
-func mustCopy(t *testing.T, test *backupTest, id string) io.Reader {
+func mustCopy(t *testing.T, test *backupTest, id string) source {
 	t.Helper()
-	body, err := test.b.object(test.ctx, test.app, test.database, id, false)
+	from, body, err := test.b.readCopy(test.ctx, test.app, test.database, id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { body.Close() })
-	return body
+	return from
 }

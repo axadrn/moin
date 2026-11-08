@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,4 +289,36 @@ func TestEditsRefusedWhileARestoreWaits(t *testing.T) {
 	}
 	unlock()
 	<-done
+}
+
+// A copy goes on as long as data moves, and stops when none comes.
+func TestStopWhenStuck(t *testing.T) {
+	ctx, stop := context.WithCancelCause(context.Background())
+	defer stop(nil)
+	reader, writer := io.Pipe()
+	body, stopWatching := stopWhenStuck(reader, 100*time.Millisecond, stop)
+	defer stopWatching()
+	go func() {
+		for range 6 {
+			writer.Write([]byte("x"))
+			time.Sleep(40 * time.Millisecond)
+		}
+	}()
+	buffer := make([]byte, 1)
+	for range 6 {
+		if _, err := body.Read(buffer); err != nil {
+			t.Fatal(err)
+		}
+		if ctx.Err() != nil {
+			t.Fatal("stopped while data was moving")
+		}
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("no data came and nothing stopped")
+	}
+	if !strings.Contains(context.Cause(ctx).Error(), "no data moved") {
+		t.Fatalf("the reason is %v", context.Cause(ctx))
+	}
 }

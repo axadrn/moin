@@ -127,26 +127,43 @@ func undoName(database, id string) string {
 	return strings.Replace(moinName("before", database), "_before_", "_before_"+strings.ToLower(id)+"_", 1)
 }
 
-// pgRoom says when the volume of the Postgres has less free than the
-// database takes, plus 512 MB: a restore or a check builds one more.
-func pgRoom(ctx context.Context, t pgTarget) error {
-	out, err := admin(ctx, t, `SELECT pg_database_size(:'db') || ' ' || current_setting('data_directory');`, map[string]string{"db": t.database})
-	need, dir, _ := strings.Cut(out, " ")
-	var df bytes.Buffer
-	if err == nil {
-		err = t.exec(ctx, nil, &df, "df", "-Pk", dir)
+// Size is how many bytes the database takes.
+func (e *postgresEngine) Size(ctx context.Context) (int64, error) {
+	t, err := e.target(ctx)
+	if err != nil {
+		return 0, err
 	}
-	var size, free int64
-	fields := strings.Fields(df.String())
-	if _, scanErr := fmt.Sscan(need, &size); err == nil && (scanErr != nil || len(fields) < 10) {
-		err = errors.New("df said nothing")
+	out, err := admin(ctx, t, `SELECT pg_database_size(:'db');`, map[string]string{"db": t.database})
+	if err != nil {
+		return 0, fmt.Errorf("see how big the database is: %w", err)
 	}
+	var size int64
+	if _, err := fmt.Sscan(out, &size); err != nil {
+		return 0, fmt.Errorf("see how big the database is: %w", err)
+	}
+	return size, nil
+}
+
+// pgRoom says when the volume of the Postgres has less free than need
+// plus spareRoom: a restore or a check builds one more database.
+func pgRoom(ctx context.Context, t pgTarget, need int64) error {
+	dir, err := admin(ctx, t, `SELECT current_setting('data_directory');`, nil)
 	if err != nil {
 		return fmt.Errorf("see how much room the Postgres has: %w", err)
 	}
-	fmt.Sscan(fields[len(fields)-3], &free)
-	if free*1024 < size+512<<20 {
-		return fmt.Errorf("the volume of the Postgres has %s free and this needs %s: free some space", human.Size(float64(free*1024)), human.Size(float64(size+512<<20)))
+	var df bytes.Buffer
+	if err := t.exec(ctx, nil, &df, "df", "-Pk", dir); err != nil {
+		return fmt.Errorf("see how much room the Postgres has: %w", err)
+	}
+	fields := strings.Fields(df.String())
+	if len(fields) < 10 {
+		return errors.New("see how much room the Postgres has: df said nothing")
+	}
+	var freeKB int64
+	fmt.Sscan(fields[len(fields)-3], &freeKB)
+	free := freeKB * 1024
+	if free < need+spareRoom {
+		return fmt.Errorf("the volume of the Postgres has %s free and this needs %s: free some space", human.Size(float64(free)), human.Size(float64(need+spareRoom)))
 	}
 	return nil
 }
@@ -169,7 +186,7 @@ func (e *postgresEngine) Restore(ctx context.Context, from source, id string) er
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
-		if err := pgRoom(ctx, t); err != nil {
+		if err := pgRoom(ctx, t, from.size); err != nil {
 			return fmt.Errorf("%w; nothing changed", err)
 		}
 		if err := load(ctx, t, built, from.copy); err != nil {
@@ -247,18 +264,18 @@ func (e *postgresEngine) Recover(ctx context.Context, mark restoreMark) (bool, e
 
 // Check loads a copy into the throwaway database moin_check_<hash> and
 // reads every row of every table, then drops it.
-func (e *postgresEngine) Check(ctx context.Context, copy io.Reader) error {
+func (e *postgresEngine) Check(ctx context.Context, from source) error {
 	t, err := e.target(ctx)
 	if err != nil {
 		return err
 	}
 	check := t
 	check.database = moinName("check", t.database)
-	if err := pgRoom(ctx, t); err != nil {
+	if err := pgRoom(ctx, t, from.size); err != nil {
 		return err
 	}
 	defer admin(context.WithoutCancel(ctx), t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": check.database})
-	if err := load(ctx, t, check.database, copy); err != nil {
+	if err := load(ctx, t, check.database, from.copy); err != nil {
 		return err
 	}
 	_, err = check.psql(ctx, `DO $$ DECLARE t record; BEGIN
