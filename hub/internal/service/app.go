@@ -47,6 +47,8 @@ var (
 	ErrRegistryLogin  = errors.New("registry username and password are required")
 	ErrDomain         = errors.New("domains must be host names like my-app.example.com")
 	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
+	ErrInstantInFile  = errors.New("the instant address is set in compose.yml: change it there and deploy")
+	ErrProtectInFile  = errors.New("the password is required by compose.yml: change it there and deploy")
 	ErrComposeDomains = errors.New("the domains of this app come from x-moin.domains in compose.yml")
 	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
 	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
@@ -565,6 +567,9 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 	if err != nil {
 		return false, err
 	}
+	if password == "" && s.FileConfig(app).Protect {
+		return false, ErrProtectInFile
+	}
 	protect := ""
 	if password != "" {
 		username = strings.TrimSpace(username)
@@ -652,6 +657,16 @@ func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 		return nil
 	}
 	return Detected(*deploy)
+}
+
+// FileConfig is the x-moin block of the live deploy, empty when there is
+// none. A setting in it is locked in moin: the file decides.
+func (s *AppService) FileConfig(app *model.App) protocol.Config {
+	detected := s.liveDetected(app)
+	if detected == nil || detected.Config == nil {
+		return protocol.Config{}
+	}
+	return *detected.Config
 }
 
 // composeDomains are the domains x-moin.domains sets for the main service in

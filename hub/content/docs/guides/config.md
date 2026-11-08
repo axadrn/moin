@@ -37,7 +37,7 @@ services:
 
 If a setting is in `x-moin`, the file decides. If it is not, moin decides. There is no switch for this.
 
-Domains and backups set in the file show locked in moin, marked **from compose.yml**. To change them, change the file and deploy. The other fields win at the next deploy too.
+A setting in the file is locked in moin, marked **from compose.yml**. To change it, change the file and deploy.
 
 ## Good to know
 

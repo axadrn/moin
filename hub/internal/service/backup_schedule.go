@@ -37,8 +37,7 @@ func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule pr
 // ScheduleInFile says the live deploy's compose.yml sets the backup
 // schedule. Then only the file changes it.
 func (s *AppService) ScheduleInFile(app *model.App) bool {
-	detected := s.liveDetected(app)
-	return detected != nil && detected.Config != nil && detected.Config.Backups != nil
+	return s.FileConfig(app).Backups != nil
 }
 
 // applyScheduleInFile saves the backup schedule compose.yml asks for.

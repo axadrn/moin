@@ -195,6 +195,9 @@ func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bo
 	if provider != "off" && !slices.Contains(protocol.InstantProviders, provider) {
 		return false, ErrInstantProvider
 	}
+	if provider != app.Instant && s.FileConfig(app).Instant != "" {
+		return false, ErrInstantInFile
+	}
 	isOpen := app.InstantOpen
 	if open != nil {
 		isOpen = *open

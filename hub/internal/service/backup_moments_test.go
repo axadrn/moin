@@ -672,3 +672,30 @@ func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
 		t.Fatalf("the database found later: %+v, %v", databases, err)
 	}
 }
+
+// A setting in compose.yml is locked: the instant address, and the
+// password compose.yml requires. A new password is still fine.
+func TestFileLocksInstantAndPassword(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.SetProtection(owner, "blog", "moin", "a-long-password"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Config: &protocol.Config{Protect: true, Instant: "nip.io"}}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
+	if _, err := apps.SetInstant(owner, "blog", "off", nil); !errors.Is(err, ErrInstantInFile) {
+		t.Fatalf("instant: %v", err)
+	}
+	if _, err := apps.SetProtection(owner, "blog", "", ""); !errors.Is(err, ErrProtectInFile) {
+		t.Fatalf("remove the password: %v", err)
+	}
+	if _, err := apps.SetProtection(owner, "blog", "moin", "another-long-password"); err != nil {
+		t.Fatalf("a new password: %v", err)
+	}
+}

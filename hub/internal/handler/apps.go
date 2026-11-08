@@ -685,7 +685,7 @@ func (h *AppsHandler) domainsView(r *http.Request, check string) (pages.DomainsV
 	if err != nil {
 		return pages.DomainsView{}, err
 	}
-	view := pages.DomainsView{App: *app, Checks: checks, Instant: instant}
+	view := pages.DomainsView{App: *app, Checks: checks, Instant: instant, File: h.apps.FileConfig(app)}
 	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
 		view.Server = *server
 	}

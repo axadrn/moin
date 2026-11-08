@@ -32,11 +32,18 @@ type SitemapService struct {
 	legal bool
 	// catalog are the slugs of the catalog apps, each a page under /catalog.
 	catalog []string
+	// compare are the slugs of the tools with a page under /compare.
+	compare []string
 }
 
 // AddCatalog lists a page for each catalog app.
 func (s *SitemapService) AddCatalog(slugs []string) {
 	s.catalog = slugs
+}
+
+// AddCompare lists a page for each compared tool.
+func (s *SitemapService) AddCompare(slugs []string) {
+	s.compare = slugs
 }
 
 func NewSitemapService(
@@ -73,6 +80,9 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 	}
 	for _, slug := range s.catalog {
 		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/catalog/" + slug, LastMod: today, ChangeFreq: "daily", Priority: "0.7"})
+	}
+	for _, slug := range s.compare {
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/compare/" + slug, LastMod: today, ChangeFreq: "monthly", Priority: "0.6"})
 	}
 	if s.legal {
 		for _, path := range legalRoutes {
