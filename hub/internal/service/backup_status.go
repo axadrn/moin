@@ -80,7 +80,7 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	}
 	databases := make([]DatabaseBackups, 0, len(backups.Databases))
 	for _, backup := range backups.Databases {
-		problem := BackupProblem(backup.Error)
+		problem := BackupProblem(restingError(app, backup.Error))
 		if problem == "" && late(app, backup.CopiedAt, now) {
 			problem = "The copies are late."
 		}
@@ -94,10 +94,16 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 // coming.
 func late(app *model.App, copiedAt *time.Time, now time.Time) bool {
 	every := time.Duration(scheduleOf(app).Every) * time.Minute
-	if every <= 0 {
-		every = time.Duration(protocol.DefaultSchedule.Every) * time.Minute
-	}
 	return !app.Stopped && copiedAt != nil && now.Sub(*copiedAt) > max(2*every, every+time.Hour)
+}
+
+// restingError drops the complaints about a database whose app the user
+// stopped: it is meant to rest.
+func restingError(app *model.App, raw string) string {
+	if app.Stopped && (strings.Contains(raw, "is not running") || strings.Contains(raw, "copies are late")) {
+		return ""
+	}
+	return raw
 }
 
 // BackupStatus is what the daemon last reported about the app's databases.
@@ -164,13 +170,9 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			Since:      database.Since,
 			Until:      database.Until,
 			CheckedAt:  database.CheckedAt,
-			Error:      clipText(database.Error, 2000),
+			Error:      clipText(restingError(app, database.Error), 2000),
 			CheckError: clipText(database.CheckError, 2000),
 			UpdatedAt:  s.now().UTC(),
-		}
-		if app.Stopped && (strings.Contains(status.Error, "is not running") || strings.Contains(status.Error, "copies are late")) {
-			// The user stopped the app: its database is meant to rest.
-			status.Error = ""
 		}
 		if database.CheckedAt == nil {
 			// No check since the daemon started: the last one still stands.

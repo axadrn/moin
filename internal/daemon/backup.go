@@ -209,7 +209,7 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	defer stop(nil)
 	reader, writer := io.Pipe()
 	go func() { writer.CloseWithError(engine.Copy(ctx, writer)) }()
-	body, stopWatching := stopWhenStuck(reader, stallLimit, stop)
+	body, stopWatching := stopWhenStuck(reader, firstDataLimit(size), stallLimit, stop)
 	defer stopWatching()
 	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
 	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
@@ -244,11 +244,19 @@ func (w watchedReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// stopWhenStuck calls stop when no data has come from reader for limit.
-// The second result ends the watching.
-func stopWhenStuck(reader io.Reader, limit time.Duration, stop context.CancelCauseFunc) (io.Reader, func()) {
-	timer := time.AfterFunc(limit, func() {
-		stop(fmt.Errorf("no data moved for %s", limit))
+// firstDataLimit is how long a copy may take to send its first byte.
+// SQLite writes its whole clean copy first, which takes longer the bigger
+// the database is: we allow 10 MB a second on top of stallLimit.
+func firstDataLimit(size int64) time.Duration {
+	return stallLimit + time.Duration(size/(10<<20))*time.Second
+}
+
+// stopWhenStuck calls stop when no data has come from reader: first for
+// the first byte, then limit between one byte and the next. The second
+// result ends the watching.
+func stopWhenStuck(reader io.Reader, first, limit time.Duration, stop context.CancelCauseFunc) (io.Reader, func()) {
+	timer := time.AfterFunc(first, func() {
+		stop(errors.New("no data moved for too long"))
 	})
 	return watchedReader{reader: reader, timer: timer, limit: limit}, func() { timer.Stop() }
 }
@@ -334,24 +342,28 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 	return errors.Join(err, undosErr)
 }
 
-// loop runs tick every minute, the daily checks, and every hour the sweep
-// of the uploads and the search for new databases.
+// loop starts the work of the backups: the copies every minute, the daily
+// checks, and every hour the sweep of the uploads and the search for new
+// databases. Each runs on its own, so a copy that takes hours holds up
+// nothing else.
 func (b *backups) loop(ctx context.Context) {
-	ticker, checks := time.NewTicker(time.Minute), time.NewTimer(10*time.Minute)
-	defer ticker.Stop()
-	for round := 0; ; round++ {
+	minute := time.NewTicker(time.Minute)
+	defer minute.Stop()
+	hourly := time.NewTimer(time.Minute)
+	daily := time.NewTimer(10 * time.Minute)
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			b.tick(ctx)
-			if round%60 == 0 {
-				b.sweepUploads(ctx)
-				b.searchDatabases(ctx)
-			}
-		case <-checks.C:
-			b.checkAll(ctx)
-			checks.Reset(day)
+		case <-minute.C:
+			go b.tick(ctx)
+		case <-hourly.C:
+			go b.sweepUploads(ctx)
+			go b.searchDatabases(ctx)
+			hourly.Reset(time.Hour)
+		case <-daily.C:
+			go b.checkAll(ctx)
+			daily.Reset(day)
 		}
 	}
 }
@@ -688,7 +700,7 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	b.mu.Lock()
 	b.restoring[request.App]++
 	b.mu.Unlock()
-	defer b.apps.lock(request.App)()
+	unlock := b.apps.lock(request.App)
 	var from source
 	switch {
 	case protocol.ValidCopyID(request.Copy):
@@ -706,6 +718,9 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 	if err == nil {
 		err = b.engine(request.App, database).Restore(ctx, from, mark.Undo)
 	}
+	// In this order: an edit that waited for the lock still sees the
+	// restore and is refused.
+	unlock()
 	b.mu.Lock()
 	b.restoring[request.App]--
 	b.mu.Unlock()

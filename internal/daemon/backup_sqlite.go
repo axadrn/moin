@@ -200,30 +200,31 @@ func (e *sqliteEngine) build(ctx context.Context, from source, target string) er
 	return errors.Join(err, out.Close())
 }
 
-// Recover tells from the undo: a second name of the live file means the
-// switch never happened, and it goes; another file means it did.
+// Recover tells from the undo whether the switch happened. It also
+// removes what was half built.
 func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, error) {
 	live := e.database.HostPath
 	aside := undoFile(live, mark.Undo)
-	liveInfo, err1 := os.Stat(live)
-	asideInfo, err2 := os.Stat(aside)
-	switched := err1 == nil && err2 == nil && !os.SameFile(liveInfo, asideInfo)
-	switch {
-	case err1 != nil && err2 == nil:
-		// No live file: the undo is the only one, it goes back.
-		if err := os.Rename(aside, live); err != nil {
-			return false, err
-		}
-	case !switched && err2 == nil:
-		os.Remove(aside)
-	}
 	if mark.From == "" {
-		removeDatabase(live + ".moin-restore")
+		defer removeDatabase(live + ".moin-restore")
 	}
-	if switched {
-		return true, os.RemoveAll(litestreamState(live))
+	asideInfo, err := os.Stat(aside)
+	if err != nil {
+		// No undo: the switch never began.
+		return false, nil
 	}
-	return false, nil
+	liveInfo, err := os.Stat(live)
+	if err != nil {
+		// No live file: the undo is the only one, it goes back.
+		return false, os.Rename(aside, live)
+	}
+	if os.SameFile(liveInfo, asideInfo) {
+		// A second name of the live file: the switch never happened.
+		os.Remove(aside)
+		return false, nil
+	}
+	// Another file: the switch happened.
+	return true, os.RemoveAll(litestreamState(live))
 }
 
 // Check unpacks a copy next to the database and runs SQLite's integrity
@@ -287,11 +288,7 @@ type watched struct {
 func (b *backups) record(ctx context.Context, app string, database protocol.Database, schedule protocol.Schedule) error {
 	live := database.HostPath
 	if !schedule.EveryChange {
-		b.unwatch(live)
-		if client, err := b.replica(app, database); err == nil && exists(litestreamState(live)) {
-			return errors.Join(client.DeleteAll(ctx), os.RemoveAll(litestreamState(live)))
-		}
-		return nil
+		return b.stopRecording(ctx, app, database)
 	}
 	if generation(live) == "" {
 		if err := startGeneration(live); err != nil {
@@ -303,36 +300,70 @@ func (b *backups) record(ctx context.Context, app string, database protocol.Data
 		return err
 	}
 	folder += "/litestream/" + generation(live)
+	want := watched{bucket: *bucket, folder: folder, keep: schedule.Keep}
 	b.mu.Lock()
-	old, known := b.watched[live]
+	now, known := b.watched[live]
 	b.mu.Unlock()
-	if known && old.bucket == *bucket && old.folder == folder && old.keep == schedule.Keep {
-		if why := old.db.SyncDiagnostic().Error; why != "" {
-			return errors.New("writing down every change: " + why)
-		}
-		return nil
+	if known && now.bucket == want.bucket && now.folder == want.folder && now.keep == want.keep {
+		return recordingHealth(now)
 	}
 	b.unwatch(live)
-	b.mu.Lock()
-	store := b.stores[schedule.Keep]
-	if store == nil {
-		store = litestream.NewStore(nil, litestream.DefaultCompactionLevels)
-		store.SnapshotRetention = time.Duration(schedule.Keep) * day
-		err = store.Open(ctx)
-		b.stores[schedule.Keep] = store
+	return b.follow(ctx, live, want)
+}
+
+// stopRecording ends Every change for a file and deletes what it wrote.
+func (b *backups) stopRecording(ctx context.Context, app string, database protocol.Database) error {
+	live := database.HostPath
+	b.unwatch(live)
+	if !exists(litestreamState(live)) {
+		return nil
 	}
-	b.mu.Unlock()
-	db := litestream.NewDB(live)
-	db.Replica = litestream.NewReplicaWithClient(db, replicaClient(bucket, folder))
-	if err == nil {
-		err = store.RegisterDB(db)
-	}
+	client, err := b.replica(app, database)
 	if err != nil {
+		return nil
+	}
+	return errors.Join(client.DeleteAll(ctx), os.RemoveAll(litestreamState(live)))
+}
+
+// recordingHealth says what Litestream reports about a file it follows.
+func recordingHealth(now watched) error {
+	why := now.db.SyncDiagnostic().Error
+	if why == "" {
+		return nil
+	}
+	return errors.New("writing down every change: " + why)
+}
+
+// storeFor is the Litestream store that keeps files for keep days.
+func (b *backups) storeFor(ctx context.Context, keep int) (*litestream.Store, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if store := b.stores[keep]; store != nil {
+		return store, nil
+	}
+	store := litestream.NewStore(nil, litestream.DefaultCompactionLevels)
+	store.SnapshotRetention = time.Duration(keep) * day
+	if err := store.Open(ctx); err != nil {
+		return nil, err
+	}
+	b.stores[keep] = store
+	return store, nil
+}
+
+// follow has Litestream start following a file.
+func (b *backups) follow(ctx context.Context, live string, want watched) error {
+	store, err := b.storeFor(ctx, want.keep)
+	if err != nil {
+		return fmt.Errorf("writing down every change: %w", err)
+	}
+	want.db = litestream.NewDB(live)
+	want.db.Replica = litestream.NewReplicaWithClient(want.db, replicaClient(&want.bucket, want.folder))
+	if err := store.RegisterDB(want.db); err != nil {
 		return fmt.Errorf("writing down every change: %w", err)
 	}
 	matchOwner(live)
 	b.mu.Lock()
-	b.watched[live] = watched{bucket: *bucket, folder: folder, keep: schedule.Keep, db: db}
+	b.watched[live] = want
 	b.mu.Unlock()
 	return nil
 }

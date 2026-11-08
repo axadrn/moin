@@ -296,7 +296,7 @@ func TestStopWhenStuck(t *testing.T) {
 	ctx, stop := context.WithCancelCause(context.Background())
 	defer stop(nil)
 	reader, writer := io.Pipe()
-	body, stopWatching := stopWhenStuck(reader, 100*time.Millisecond, stop)
+	body, stopWatching := stopWhenStuck(reader, 100*time.Millisecond, 100*time.Millisecond, stop)
 	defer stopWatching()
 	go func() {
 		for range 6 {
@@ -320,5 +320,16 @@ func TestStopWhenStuck(t *testing.T) {
 	}
 	if !strings.Contains(context.Cause(ctx).Error(), "no data moved") {
 		t.Fatalf("the reason is %v", context.Cause(ctx))
+	}
+}
+
+// A big database gets longer to send its first byte: SQLite writes its
+// clean copy first.
+func TestFirstDataLimit(t *testing.T) {
+	if got := firstDataLimit(0); got != stallLimit {
+		t.Errorf("empty: %s", got)
+	}
+	if got := firstDataLimit(100 << 30); got < stallLimit+2*time.Hour {
+		t.Errorf("100 GB: %s", got)
 	}
 }

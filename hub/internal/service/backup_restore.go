@@ -67,8 +67,11 @@ func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName str
 	if err != nil {
 		return nil, err
 	}
+	// From here on it waits for the daemon, which does not know it yet.
+	s.setWaiting(restore.ID, true)
 	request, label, err := s.restoreRequest(ctx, app, target)
 	if err != nil {
+		s.setWaiting(restore.ID, false)
 		if deleteErr := s.apps.DeleteRestore(restore.ID); deleteErr != nil {
 			slog.Error("forget a restore that never started", "id", restore.ID, "error", deleteErr)
 		}
@@ -80,19 +83,11 @@ func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName str
 		return nil, err
 	}
 	s.notify(app.WorkspaceID)
-	s.mu.Lock()
-	if s.waiting == nil {
-		s.waiting = map[string]bool{}
-	}
-	s.waiting[restore.ID] = true
-	s.mu.Unlock()
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), restoreTimeout)
 		defer cancel()
 		err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupRestore, request, nil)
-		s.mu.Lock()
-		delete(s.waiting, restore.ID)
-		s.mu.Unlock()
+		s.setWaiting(restore.ID, false)
 		switch {
 		case errors.Is(err, ErrDaemonGone) || errors.Is(err, context.DeadlineExceeded):
 			// The daemon goes on with it: it tells how it ended when it is
@@ -104,8 +99,21 @@ func (s *AppService) StartRestore(ctx context.Context, actor Actor, idOrName str
 			s.endRestore(actor, app, restore.ID, protocol.RestoreState{State: RestoreDone})
 		}
 	}()
-	copied := *restore
-	return &copied, nil
+	return restore, nil
+}
+
+// setWaiting notes that the hub waits for a restore's answer, or no more.
+func (s *AppService) setWaiting(id string, waiting bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.waiting == nil {
+		s.waiting = map[string]bool{}
+	}
+	if waiting {
+		s.waiting[id] = true
+	} else {
+		delete(s.waiting, id)
+	}
 }
 
 // reserveRestore stores a new restore of an app unless one may still run:
@@ -215,7 +223,7 @@ func (s *AppService) reconcileRestores(serverID string) {
 			err = s.servers.Request(ctx, serverID, protocol.TypeBackupList, protocol.BackupRequest{App: app.Folder}, &backups)
 		}
 		cancel()
-		if err != nil && len(backups.Restores) == 0 {
+		if err != nil {
 			slog.Warn("ask how a restore stands failed", "id", restore.ID, "error", err)
 			continue
 		}

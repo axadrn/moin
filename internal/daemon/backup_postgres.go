@@ -174,46 +174,86 @@ func pgRoom(ctx context.Context, t pgTarget, need int64) error {
 // moin_before_<id>_<hash>, the undo, and the built one in: never none.
 // Settings and grants of the database itself (ALTER DATABASE … SET,
 // GRANT … ON DATABASE) are not in a copy.
-func (e *postgresEngine) Restore(ctx context.Context, from source, id string) error {
+func (e *postgresEngine) Restore(ctx context.Context, from source, keepAs string) error {
 	t, err := e.target(ctx)
 	if err != nil {
 		return err
 	}
-	live, built, aside := t.database, moinName("restore", t.database), undoName(t.database, id)
+	live := t.database
+	aside := undoName(live, keepAs)
+	var incoming string
 	if from.undo != "" {
-		built = undoName(live, from.undo)
-		if found, err := dbExists(ctx, t, built); !found || err != nil {
+		incoming = undoName(live, from.undo)
+		found, err := dbExists(ctx, t, incoming)
+		if err != nil {
+			return fmt.Errorf("look for the state before the restore: %w; nothing changed", err)
+		}
+		if !found {
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
-		if err := pgRoom(ctx, t, from.size); err != nil {
+		incoming = moinName("restore", live)
+		// After the switch this name is gone and the drop does nothing.
+		defer e.drop(ctx, t, incoming)
+		if err := e.build(ctx, t, from, incoming); err != nil {
 			return fmt.Errorf("%w; nothing changed", err)
-		}
-		if err := load(ctx, t, built, from.copy); err != nil {
-			return fmt.Errorf("%w; nothing changed", err)
-		}
-		if _, err := admin(ctx, t, `SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = :'live' \gset
-ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": live, "built": built}); err != nil {
-			return fmt.Errorf("give the restored database its owner: %w; nothing changed", err)
 		}
 	}
+	// An app that is only its database has no other service to stop.
 	start := func() error { return nil }
 	if others := e.others(); len(others) > 0 {
-		if start, err = e.b.apps.stopServices(ctx, e.app, others...); err != nil {
+		start, err = e.b.apps.stopServices(ctx, e.app, others...)
+		if err != nil {
 			return err
 		}
 	}
 	ctx = context.WithoutCancel(ctx)
-	if err := swap(ctx, t, live, aside, built); err != nil {
-		// A COMMIT whose answer got lost may have switched: the undo says.
-		if switched, _ := dbExists(ctx, t, aside); !switched {
-			return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
-		}
+	if err := e.switchIn(ctx, t, live, aside, incoming); err != nil {
+		return errors.Join(err, start())
 	}
 	if err := start(); err != nil {
 		return fmt.Errorf("the restored data is in place, but %w", err)
 	}
 	return nil
+}
+
+// build loads a copy into the database name, with the owner of the live
+// one, once the volume has room.
+func (e *postgresEngine) build(ctx context.Context, t pgTarget, from source, name string) error {
+	if err := pgRoom(ctx, t, from.size); err != nil {
+		return err
+	}
+	if err := load(ctx, t, name, from.copy); err != nil {
+		return err
+	}
+	_, err := admin(ctx, t, `SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = :'live' \gset
+ALTER DATABASE :"built" OWNER TO :"owner";`, map[string]string{"live": t.database, "built": name})
+	if err != nil {
+		return fmt.Errorf("give the restored database its owner: %w", err)
+	}
+	return nil
+}
+
+// drop removes a database moin made, even when the restore was cancelled.
+func (e *postgresEngine) drop(ctx context.Context, t pgTarget, name string) {
+	_, _ = admin(context.WithoutCancel(ctx), t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": name})
+}
+
+// switchIn makes incoming the live database. When the answer to the switch
+// gets lost it may have happened anyway: the undo says.
+func (e *postgresEngine) switchIn(ctx context.Context, t pgTarget, live, aside, incoming string) error {
+	err := swap(ctx, t, live, aside, incoming)
+	if err == nil {
+		return nil
+	}
+	switched, lookErr := dbExists(ctx, t, aside)
+	if lookErr != nil {
+		return fmt.Errorf("moin cannot tell whether the restore switched (%w): look at the app's data", err)
+	}
+	if switched {
+		return nil
+	}
+	return fmt.Errorf("switch: %w; nothing changed", err)
 }
 
 // others are the app's services but the database, which keeps running.
@@ -274,7 +314,7 @@ func (e *postgresEngine) Check(ctx context.Context, from source) error {
 	}
 	_, err = check.psql(ctx, `DO $$ DECLARE t record; BEGIN
 FOR t IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') LOOP
-	EXECUTE format('SELECT md5(string_agg(x::text, '''')) FROM %I.%I x', t.schemaname, t.tablename);
+	EXECUTE format('SELECT sum(length(x::text)) FROM %I.%I x', t.schemaname, t.tablename);
 END LOOP; END $$;`, nil, false)
 	return err
 }
