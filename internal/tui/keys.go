@@ -124,16 +124,17 @@ func (m model) viewKey(s string) (tea.Model, tea.Cmd) {
 		}
 	case vWeb:
 		pages := m.webPages()
+		// A page's letter first: k and g open pages here.
+		for _, p := range pages {
+			if p.key == s {
+				return m.browse(p.path)
+			}
+		}
 		if d := move(s); d != 0 {
 			return m.cursor("web", len(pages), d), nil
 		}
 		if s == "enter" && len(pages) > 0 {
 			return m.browse(pages[m.at("web", len(pages))].path)
-		}
-		for _, p := range pages {
-			if p.key == s {
-				return m.browse(p.path)
-			}
 		}
 	}
 	return m, nil

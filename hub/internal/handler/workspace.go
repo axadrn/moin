@@ -82,8 +82,14 @@ func (h *WorkspaceHandler) ActivityPage(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
+	slugBefore := ctxkeys.Workspace(r.Context()).Slug
 	if err := h.workspaces.UpdateName(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), r.FormValue("name"), service.RequestSource(r.Context())); err != nil {
 		h.handleError(w, r, "Name not saved", err)
+		return
+	}
+	// A new name is a new address: the page moves there.
+	if ctxkeys.Workspace(r.Context()).Slug != slugBefore && isAction(r) {
+		w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/workspace")
 		return
 	}
 	h.renderWorkspaceAction(w, r, "Workspace name saved", "The sidebar and emails show the new name.")

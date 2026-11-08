@@ -279,7 +279,7 @@ templ homeFeature(name, note, href string) {
 // same product, so the rows say what running it takes.
 templ HomePricing() {
 	<section id="pricing" class={ homeSection }>
-		<h2 class={ homeStatement }>Your tenth server costs the same as your first.</h2>
+		<h2 class={ homeStatement }>One price. Every feature.</h2>
 		@kit.Grid() {
 			<div class="flex flex-col gap-6 rounded-4xl bg-card p-6 sm:p-8" data-plan="hosted">
 				<div class="flex flex-col gap-1">
@@ -326,11 +326,11 @@ templ HomeQuestions() {
 	<section id="questions" class={ homeSection }>
 		<h2 class={ homeStatement }>Good questions.</h2>
 		@kit.List() {
-			@homeQuestion("Is "+brand.Name+" open source?", "Yes, all of it, under AGPL-3.0. You can host it yourself for free.")
-			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running: they are on your servers. The daemon connects again by itself. Until then you cannot deploy.")
-			@homeQuestion("Can you see my data?", "Only what you open, passed through to you and never stored. data: off and logs: off in /etc/moin/rules close even that. Your env vars are sealed in the hub.")
-			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it on your server if it is missing. You need no Dockerfile either.")
-			@homeQuestion("Which servers?", "Any Linux server you can log in to as root, amd64 or arm64, with systemd, at any provider.")
+			@homeQuestion("Is "+brand.Name+" open source?", "Yes. AGPL-3.0, free to host yourself.")
+			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
+			@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
+			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")
+			@homeQuestion("Which servers?", "Any Linux server with root access, at any provider.")
 		}
 		<p class={ homeNote }>
 			<a href="/docs/faq" class="text-foreground underline underline-offset-4">All questions</a>

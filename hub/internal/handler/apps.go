@@ -166,7 +166,9 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, deploys, err := h.apps.Deploys(workspace.ID, r.PathValue("app"), 20)
 	if errors.Is(err, repository.ErrAppNotFound) {
-		w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/apps")
+		// Renamed or removed while this page was open: the part stays. A
+		// rename brings this page its new address by itself.
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if err != nil {
@@ -272,7 +274,7 @@ func (h *AppsHandler) RenameApp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Replace-Url", ctxkeys.AppBasePath(r.Context())+"/apps/"+renamed.Link()+"/settings")
 	h.appPage(w, r, "settings")
 	if renamed.Name != before.Name {
-		answerDone(w, r, before.Name+" renamed", "It is "+renamed.Name+" now and its links keep working. The next restart gives its containers the name.")
+		answerDone(w, r, before.Name+" renamed", "It is "+renamed.Name+" now and its links follow. The next restart gives its containers the name.")
 	}
 }
 

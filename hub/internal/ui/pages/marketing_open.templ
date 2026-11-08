@@ -40,8 +40,7 @@ templ HomeOpenSection(open HomeOpen) {
 					@kit.RowText(homeVersions(open.Releases), "Since "+open.Since.Format("January 2, 2006"))
 				}
 				@kit.Row("/changelog") {
-					@kit.RowText(open.Latest.Version, homeInShort(open.Latest.InShort))
-					<span class="shrink-0 text-sm text-muted-foreground max-sm:hidden">{ open.Latest.Date.Format("January 2") }</span>
+					@kit.RowText(open.Latest.Version, open.Latest.Date.Format("January 2"))
 				}
 			}
 		</section>

@@ -484,6 +484,13 @@ func TestWebPagesOpenTheBrowser(t *testing.T) {
 			t.Error("a self-hosted hub has no billing")
 		}
 	}
+	// A page's letter opens it, also k and g, which move the cursor elsewhere.
+	web := fixture(120, 40)
+	web.cur.v = vWeb
+	press(web, "k")
+	if !strings.HasSuffix(opened[len(opened)-1], "/bucket") {
+		t.Errorf("k opens Buckets, got %v", opened)
+	}
 	press(fixture(120, 40).withApp("shop", tDeploys), "W")
 	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop" {
 		t.Errorf("W opens the app in the web, got %v", opened)
