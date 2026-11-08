@@ -21,6 +21,11 @@ import (
 // where to come back to.
 func (h *AppsHandler) GitHubInstall(w http.ResponseWriter, r *http.Request) {
 	link, err := h.apps.GitHubConnectURL(actor(r))
+	if errors.Is(err, service.ErrGitHubOff) {
+		// A hub without a GitHub App: how to set one up.
+		http.Redirect(w, r, "/docs/self-hosting#your-own-github-app", http.StatusSeeOther)
+		return
+	}
 	if err != nil {
 		renderError(w, "github connect link failed", err)
 		return
