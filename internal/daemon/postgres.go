@@ -500,87 +500,128 @@ func pgChanges(out string) int64 {
 // A backslash outside a literal is refused: psql would run it as a command,
 // such as \! for a shell.
 func pgScan(sql string, mark func(index int, char byte)) error {
-	for i := 0; i < len(sql); i++ {
-		char := sql[i]
+	index := 0
+	for index < len(sql) {
+		char := sql[index]
+		var err error
 		switch {
 		case char == '\'':
-			escapes := i > 0 && (sql[i-1] == 'E' || sql[i-1] == 'e') && (i < 2 || !isWord(sql[i-2]))
-			i++
-			for ; i < len(sql); i++ {
-				if escapes && sql[i] == '\\' {
-					i++
-					continue
-				}
-				if sql[i] == '\'' {
-					if i+1 < len(sql) && sql[i+1] == '\'' {
-						i++
-						continue
-					}
-					break
-				}
-			}
-			if i >= len(sql) {
-				return errors.New("the SQL has a string that does not end")
-			}
+			index, err = skipString(sql, index)
 		case char == '"':
-			i++
-			for ; i < len(sql); i++ {
-				if sql[i] == '"' {
-					if i+1 < len(sql) && sql[i+1] == '"' {
-						i++
-						continue
-					}
-					break
-				}
-			}
-			if i >= len(sql) {
-				return errors.New("the SQL has a quoted name that does not end")
-			}
-		case char == '$' && (i == 0 || !isWord(sql[i-1])):
-			tag := dollarTag(sql[i:])
-			if tag == "" {
-				continue
-			}
-			end := strings.Index(sql[i+len(tag):], tag)
-			if end < 0 {
-				return errors.New("the SQL has a dollar quote that does not end")
-			}
-			i += len(tag) + end + len(tag) - 1
-		case char == '-' && i+1 < len(sql) && sql[i+1] == '-':
-			end := strings.IndexByte(sql[i:], '\n')
-			if end < 0 {
-				end = len(sql) - i
-			}
-			if strings.Contains(sql[i:i+end], `\`) {
-				return errors.New(`backslash commands are not allowed`)
-			}
-			i += end
-		case char == '/' && i+1 < len(sql) && sql[i+1] == '*':
-			depth := 1
-			j := i + 2
-			for ; j < len(sql) && depth > 0; j++ {
-				switch {
-				case sql[j] == '\\':
-					return errors.New(`backslash commands are not allowed`)
-				case sql[j] == '/' && j+1 < len(sql) && sql[j+1] == '*':
-					depth++
-					j++
-				case sql[j] == '*' && j+1 < len(sql) && sql[j+1] == '/':
-					depth--
-					j++
-				}
-			}
-			if depth > 0 {
-				return errors.New("the SQL has a comment that does not end")
-			}
-			i = j - 1
+			index, err = skipQuotedName(sql, index)
+		case char == '$' && (index == 0 || !isWord(sql[index-1])):
+			index, err = skipDollarQuote(sql, index)
+		case strings.HasPrefix(sql[index:], "--"):
+			index, err = skipLineComment(sql, index)
+		case strings.HasPrefix(sql[index:], "/*"):
+			index, err = skipBlockComment(sql, index)
 		case char == '\\':
-			return errors.New(`backslash commands are not allowed`)
+			return errBackslashCommand
 		case char == '?' || char == ';':
-			mark(i, char)
+			mark(index, char)
+			index++
+		default:
+			index++
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+var errBackslashCommand = errors.New(`backslash commands are not allowed`)
+
+// skipString returns the index after the string literal that starts at
+// start. A doubled quote stays inside it. In a string with an E prefix a
+// backslash also keeps the next character inside it.
+func skipString(sql string, start int) (int, error) {
+	escapes := start > 0 && (sql[start-1] == 'E' || sql[start-1] == 'e') && (start < 2 || !isWord(sql[start-2]))
+	index := start + 1
+	for index < len(sql) {
+		switch {
+		case escapes && sql[index] == '\\':
+			index += 2
+		case strings.HasPrefix(sql[index:], "''"):
+			index += 2
+		case sql[index] == '\'':
+			return index + 1, nil
+		default:
+			index++
+		}
+	}
+	return 0, errors.New("the SQL has a string that does not end")
+}
+
+// skipQuotedName returns the index after the "quoted name" that starts at
+// start. A doubled quote stays inside it.
+func skipQuotedName(sql string, start int) (int, error) {
+	index := start + 1
+	for index < len(sql) {
+		switch {
+		case strings.HasPrefix(sql[index:], `""`):
+			index += 2
+		case sql[index] == '"':
+			return index + 1, nil
+		default:
+			index++
+		}
+	}
+	return 0, errors.New("the SQL has a quoted name that does not end")
+}
+
+// skipDollarQuote returns the index after the $tag$ quote that starts at
+// start. A $ that starts no tag is one plain character.
+func skipDollarQuote(sql string, start int) (int, error) {
+	tag := dollarTag(sql[start:])
+	if tag == "" {
+		return start + 1, nil
+	}
+	body := start + len(tag)
+	end := strings.Index(sql[body:], tag)
+	if end < 0 {
+		return 0, errors.New("the SQL has a dollar quote that does not end")
+	}
+	return body + end + len(tag), nil
+}
+
+// skipLineComment returns the index after the -- comment that starts at
+// start, which ends at the end of its line. A backslash in it is refused.
+func skipLineComment(sql string, start int) (int, error) {
+	length := strings.IndexByte(sql[start:], '\n')
+	if length < 0 {
+		length = len(sql) - start
+	}
+	comment := sql[start : start+length]
+	if strings.Contains(comment, `\`) {
+		return 0, errBackslashCommand
+	}
+	return start + length + 1, nil
+}
+
+// skipBlockComment returns the index after the /* comment that starts at
+// start. Comments nest in Postgres. A backslash in one is refused.
+func skipBlockComment(sql string, start int) (int, error) {
+	depth := 1
+	index := start + 2
+	for index < len(sql) && depth > 0 {
+		switch {
+		case sql[index] == '\\':
+			return 0, errBackslashCommand
+		case strings.HasPrefix(sql[index:], "/*"):
+			depth++
+			index += 2
+		case strings.HasPrefix(sql[index:], "*/"):
+			depth--
+			index += 2
+		default:
+			index++
+		}
+	}
+	if depth > 0 {
+		return 0, errors.New("the SQL has a comment that does not end")
+	}
+	return index, nil
 }
 
 func isWord(char byte) bool {

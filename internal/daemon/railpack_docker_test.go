@@ -42,8 +42,8 @@ func TestRailpackDocker(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			release := t.TempDir()
-			src := filepath.Join(release, "src")
+			releaseDir := t.TempDir()
+			src := filepath.Join(releaseDir, "src")
 			os.MkdirAll(src, 0o755)
 			for file, body := range files {
 				os.WriteFile(filepath.Join(src, file), []byte(body), 0o644)
@@ -59,9 +59,9 @@ func TestRailpackDocker(t *testing.T) {
 				t.Fatalf("detected = %+v", detected)
 			}
 			t.Logf("Railpack: %s", detected.Builder)
-			composeFile := filepath.Join(release, "compose.json")
+			composeFile := filepath.Join(releaseDir, "compose.json")
 			start := protocol.DeployStart{App: app, Number: 1, Env: env}
-			err = finish(config, start, detected, nil, composeFile)
+			err = finish(&release{start: start, config: config, detected: detected, composeFile: composeFile})
 			if err != nil {
 				t.Fatal(err)
 			}

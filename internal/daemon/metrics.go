@@ -341,80 +341,35 @@ type dockerStats struct {
 	} `json:"networks"`
 }
 
-// containers adds up the running containers of every app. One stats call
-// per container, a few at a time; one-shot answers at once instead of
-// waiting a second for a second reading.
+// containers adds up the running containers of every app.
 func (s *sampler) containers(ctx context.Context, seconds float64, first bool, memoryTotal uint64) ([]protocol.AppMetrics, error) {
-	filters := url.QueryEscape(`{"label":["com.docker.compose.project"]}`)
-	var running []dockerContainer
-	err := s.dockerGet(ctx, "/containers/json?filters="+filters, &running)
+	samples, err := s.fetchStats(ctx)
 	if err != nil {
 		return nil, err
 	}
-	type result struct {
-		app   string
-		id    string
-		stats dockerStats
-		err   error
-	}
-	results := make([]result, len(running))
-	limit := make(chan struct{}, 4)
-	var wait sync.WaitGroup
-	for index, container := range running {
-		app, ok := container.Labels[labelApp], true
-		if app == "" {
-			app, ok = appOfProject(container.Labels["com.docker.compose.project"])
-		}
-		if !ok || !appIDPattern.MatchString(app) {
-			results[index].err = errors.New("not a moin app")
-			continue
-		}
-		wait.Go(func() {
-			limit <- struct{}{}
-			defer func() { <-limit }()
-			var stats dockerStats
-			err := s.dockerGet(ctx, "/containers/"+url.PathEscape(container.ID)+"/stats?stream=false&one-shot=true", &stats)
-			results[index] = result{app: app, id: container.ID, stats: stats, err: err}
-		})
-	}
-	wait.Wait()
 	byApp := map[string]*protocol.AppMetrics{}
 	order := []string{}
 	unlimited := map[string]bool{}
 	seen := map[string]containerCounters{}
-	for _, result := range results {
-		if result.err != nil {
+	for _, sample := range samples {
+		if sample.err != nil {
 			continue
 		}
-		metrics := byApp[result.app]
+		metrics := byApp[sample.app]
 		if metrics == nil {
-			metrics = &protocol.AppMetrics{App: result.app}
-			byApp[result.app] = metrics
-			order = append(order, result.app)
+			metrics = &protocol.AppMetrics{App: sample.app}
+			byApp[sample.app] = metrics
+			order = append(order, sample.app)
 		}
-		counters := containerCounters{cpu: result.stats.CPU.Usage.Total, system: result.stats.CPU.System}
-		for _, network := range result.stats.Networks {
-			counters.rx += network.Rx
-			counters.tx += network.Tx
+		counters := countersOf(sample.stats)
+		seen[sample.id] = counters
+		addToApp(metrics, sample.stats)
+		if hasNoMemoryLimit(sample.stats, memoryTotal) {
+			unlimited[sample.app] = true
 		}
-		seen[result.id] = counters
-		metrics.Containers++
-		metrics.MemoryUsed += containerMemory(result.stats)
-		limit := result.stats.Memory.Limit
-		if limit == 0 || (memoryTotal > 0 && limit >= memoryTotal) {
-			unlimited[result.app] = true
-		}
-		metrics.MemoryLimit += limit
-		before, ok := s.apps[result.id]
-		if first || !ok {
-			continue
-		}
-		if counters.system > before.system && counters.cpu >= before.cpu {
-			metrics.CPU += 100 * float64(counters.cpu-before.cpu) / float64(counters.system-before.system)
-		}
-		if seconds > 0 {
-			metrics.NetRx += rate(before.rx, counters.rx, seconds)
-			metrics.NetTx += rate(before.tx, counters.tx, seconds)
+		before, ok := s.apps[sample.id]
+		if ok && !first {
+			addRates(metrics, before, counters, seconds)
 		}
 	}
 	s.apps = seen
@@ -428,6 +383,94 @@ func (s *sampler) containers(ctx context.Context, seconds float64, first bool, m
 		apps = append(apps, *metrics)
 	}
 	return apps, nil
+}
+
+// containerSample is one stats call for one container.
+type containerSample struct {
+	app   string
+	id    string
+	stats dockerStats
+	err   error
+}
+
+// fetchStats gets the stats of every running container of an app. One stats
+// call per container, a few at a time; one-shot answers at once instead of
+// waiting a second for a second reading.
+func (s *sampler) fetchStats(ctx context.Context) ([]containerSample, error) {
+	filters := url.QueryEscape(`{"label":["com.docker.compose.project"]}`)
+	var running []dockerContainer
+	err := s.dockerGet(ctx, "/containers/json?filters="+filters, &running)
+	if err != nil {
+		return nil, err
+	}
+	samples := make([]containerSample, len(running))
+	slots := make(chan struct{}, 4)
+	var wait sync.WaitGroup
+	for index, container := range running {
+		app, ok := appOfContainer(container)
+		if !ok {
+			samples[index].err = errors.New("not a moin app")
+			continue
+		}
+		wait.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			var stats dockerStats
+			err := s.dockerGet(ctx, "/containers/"+url.PathEscape(container.ID)+"/stats?stream=false&one-shot=true", &stats)
+			samples[index] = containerSample{app: app, id: container.ID, stats: stats, err: err}
+		})
+	}
+	wait.Wait()
+	return samples, nil
+}
+
+// appOfContainer is the app a container belongs to: the one on its label,
+// or the one its compose project names.
+func appOfContainer(container dockerContainer) (string, bool) {
+	app := container.Labels[labelApp]
+	if app == "" {
+		var ok bool
+		app, ok = appOfProject(container.Labels["com.docker.compose.project"])
+		if !ok {
+			return "", false
+		}
+	}
+	return app, appIDPattern.MatchString(app)
+}
+
+// countersOf is what a container has counted since it started.
+func countersOf(stats dockerStats) containerCounters {
+	counters := containerCounters{cpu: stats.CPU.Usage.Total, system: stats.CPU.System}
+	for _, network := range stats.Networks {
+		counters.rx += network.Rx
+		counters.tx += network.Tx
+	}
+	return counters
+}
+
+// addToApp adds a container's memory to its app.
+func addToApp(metrics *protocol.AppMetrics, stats dockerStats) {
+	metrics.Containers++
+	metrics.MemoryUsed += containerMemory(stats)
+	metrics.MemoryLimit += stats.Memory.Limit
+}
+
+// hasNoMemoryLimit reports whether a container may use all the memory of
+// the server.
+func hasNoMemoryLimit(stats dockerStats, memoryTotal uint64) bool {
+	memoryLimit := stats.Memory.Limit
+	return memoryLimit == 0 || (memoryTotal > 0 && memoryLimit >= memoryTotal)
+}
+
+// addRates adds what a container did since the last sample to its app.
+func addRates(metrics *protocol.AppMetrics, before, counters containerCounters, seconds float64) {
+	if counters.system > before.system && counters.cpu >= before.cpu {
+		metrics.CPU += 100 * float64(counters.cpu-before.cpu) / float64(counters.system-before.system)
+	}
+	if seconds > 0 {
+		metrics.NetRx += rate(before.rx, counters.rx, seconds)
+		metrics.NetTx += rate(before.tx, counters.tx, seconds)
+	}
 }
 
 // containerMemory is the memory a container uses without the page cache it

@@ -127,6 +127,45 @@ AND d = NULL /* ? */ LIMIT :'p3' OFFSET :'p4'`
 	}
 }
 
+// TestPgScanTokens: every kind of token pgScan skips, with the ? marks it
+// leaves outside them, and what makes it refuse.
+func TestPgScanTokens(t *testing.T) {
+	for _, test := range []struct {
+		sql   string
+		marks int
+		err   string
+	}{
+		{`'it''s ?' ?`, 1, ""},
+		{`E'a\'?' ?`, 1, ""},
+		{`xE'a\' ?`, 1, ""},
+		{`'\' ?`, 1, ""},
+		{`E'open\`, 0, "the SQL has a string that does not end"},
+		{`"a""?b" ?`, 1, ""},
+		{`$q$ ? $q$ ?`, 1, ""},
+		{`$$ ? $$ ?`, 1, ""},
+		{`$1 ?`, 1, ""},
+		{`a$$ ? b`, 1, ""},
+		{`$1$ ?`, 1, ""},
+		{`-- ?`, 0, ""},
+		{"-- ?\n?", 1, ""},
+		{`/* ? /* ? */ ? */ ?`, 1, ""},
+		{`/* /* */`, 0, "the SQL has a comment that does not end"},
+		{`/* \ */`, 0, "backslash commands are not allowed"},
+		{`-- \`, 0, "backslash commands are not allowed"},
+		{`SELECT 1 \`, 0, "backslash commands are not allowed"},
+	} {
+		marks := 0
+		err := pgScan(test.sql, func(int, byte) { marks++ })
+		got := ""
+		if err != nil {
+			got = err.Error()
+		}
+		if marks != test.marks || got != test.err {
+			t.Errorf("pgScan(%q): %d marks, error %q; want %d, %q", test.sql, marks, got, test.marks, test.err)
+		}
+	}
+}
+
 func TestPgMultiple(t *testing.T) {
 	for sql, want := range map[string]bool{
 		`SELECT 1`:                    false,

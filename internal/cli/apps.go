@@ -31,133 +31,171 @@ func apiClient() (*client.Client, error) {
 	return client.New(config)
 }
 
+// appsCall is one run of a subcommand of apps.
+type appsCall struct {
+	command string
+	args    []string
+	stdin   io.Reader
+	stdout  io.Writer
+	api     *client.Client
+	apiErr  error
+}
+
+// parse reads the flags, then checks the login: help works without one.
+func (call appsCall) parse(flags *flagSet) error {
+	err := flags.parse(call.args)
+	if err != nil {
+		return err
+	}
+	return call.apiErr
+}
+
+// appsCommands are the subcommands of apps. Any other first argument is an
+// app to show.
+var appsCommands = map[string]func(context.Context, appsCall) error{
+	"":       appsList,
+	"add":    appsAdd,
+	"pin":    appsPin,
+	"unpin":  appsPin,
+	"rename": appsRename,
+	"rm":     appsRemove,
+}
+
 func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := ""
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		command, args = args[0], args[1:]
 	}
-	// Help works without a login.
 	api, apiErr := apiClient()
-	switch command {
-	case "":
-		flags := newFlags("apps", "apps")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		list, err := api.Apps(ctx)
-		if err != nil {
-			return err
-		}
-		PrintApps(stdout, list)
-		return nil
-	case "add":
-		flags := newFlags("apps add", "apps add --server <server> <name>")
-		server := flags.String("server", "", "server name or ID")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 1 || *server == "" {
-			return flags.wrong()
-		}
-		app, err := api.AddApp(ctx, flags.Arg(0), *server)
-		if err != nil {
-			return err
-		}
-		done(stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
-		hint(stdout, "Deploy it with", build.Name+" deploy "+app.Name)
-		return nil
-	case "pin", "unpin":
-		pinned := command == "pin"
-		flags := newFlags("apps "+command, "apps "+command+" [app]").withApp()
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() > 1 {
-			return flags.wrong()
-		}
-		name, err := flags.app(flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		app, err := api.SetPinned(ctx, name, pinned)
-		if err != nil {
-			return err
-		}
-		if app.Pinned {
-			done(stdout, "Pinned %s. Lists show it above the apps that run fine", style.Bold.Render(app.Name))
-		} else {
-			done(stdout, "Unpinned %s", style.Bold.Render(app.Name))
-		}
-		return nil
-	case "rename":
-		flags := newFlags("apps rename", "apps rename <app> <new name>")
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() != 2 {
-			return flags.wrong()
-		}
-		renamed, err := api.RenameApp(ctx, flags.Arg(0), flags.Arg(1))
-		if err != nil {
-			return err
-		}
-		done(stdout, "Renamed %s to %s. Its links, data and backups stay", flags.Arg(0), style.Bold.Render(renamed.Name))
-		hint(stdout, "Its containers take the name on the next restart:", build.Name+" restart "+renamed.Name)
-		hint(stdout, "In its repo, set x-moin.app: "+renamed.Name+" in compose.yml for", build.Name+" deploy")
-		return nil
-	case "rm":
-		flags := newFlags("apps rm", "apps rm <app> [--confirm <app>]").withApp().withConfirm()
-		if err := flags.parse(args); err != nil {
-			return err
-		}
-		if apiErr != nil {
-			return apiErr
-		}
-		if flags.NArg() > 1 || (flags.NArg() == 0 && *flags.appFlag == "") {
-			return flags.wrong()
-		}
-		name, err := flags.app(flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name), name)
-		if err != nil {
-			return err
-		}
-		err = api.RemoveApp(ctx, name, typed)
-		if err != nil {
-			return err
-		}
-		done(stdout, "Removed %s. Its data stays on the server", style.Bold.Render(name))
-		return nil
+	call := appsCall{command: command, args: args, stdin: stdin, stdout: stdout, api: api, apiErr: apiErr}
+	subcommand, known := appsCommands[command]
+	if known {
+		return subcommand(ctx, call)
 	}
-	// apps my-app shows one app, the way people try it after apps.
-	if len(args) > 0 {
-		return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+command, build.Name)
+	return appsShow(ctx, call)
+}
+
+func appsList(ctx context.Context, call appsCall) error {
+	flags := newFlags("apps", "apps")
+	err := call.parse(flags)
+	if err != nil {
+		return err
 	}
-	if apiErr != nil {
-		return apiErr
+	list, err := call.api.Apps(ctx)
+	if err != nil {
+		return err
 	}
-	detail, err := api.App(ctx, command)
+	PrintApps(call.stdout, list)
+	return nil
+}
+
+func appsAdd(ctx context.Context, call appsCall) error {
+	flags := newFlags("apps add", "apps add --server <server> <name>")
+	server := flags.String("server", "", "server name or ID")
+	err := call.parse(flags)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 1 || *server == "" {
+		return flags.wrong()
+	}
+	app, err := call.api.AddApp(ctx, flags.Arg(0), *server)
+	if err != nil {
+		return err
+	}
+	done(call.stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
+	hint(call.stdout, "Deploy it with", build.Name+" deploy "+app.Name)
+	return nil
+}
+
+// appsPin runs both pin and unpin.
+func appsPin(ctx context.Context, call appsCall) error {
+	pinned := call.command == "pin"
+	flags := newFlags("apps "+call.command, "apps "+call.command+" [app]").withApp()
+	err := call.parse(flags)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	app, err := call.api.SetPinned(ctx, name, pinned)
+	if err != nil {
+		return err
+	}
+	if app.Pinned {
+		done(call.stdout, "Pinned %s. Lists show it above the apps that run fine", style.Bold.Render(app.Name))
+	} else {
+		done(call.stdout, "Unpinned %s", style.Bold.Render(app.Name))
+	}
+	return nil
+}
+
+func appsRename(ctx context.Context, call appsCall) error {
+	flags := newFlags("apps rename", "apps rename <app> <new name>")
+	err := call.parse(flags)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 2 {
+		return flags.wrong()
+	}
+	renamed, err := call.api.RenameApp(ctx, flags.Arg(0), flags.Arg(1))
+	if err != nil {
+		return err
+	}
+	done(call.stdout, "Renamed %s to %s. Its links, data and backups stay", flags.Arg(0), style.Bold.Render(renamed.Name))
+	hint(call.stdout, "Its containers take the name on the next restart:", build.Name+" restart "+renamed.Name)
+	hint(call.stdout, "In its repo, set x-moin.app: "+renamed.Name+" in compose.yml for", build.Name+" deploy")
+	return nil
+}
+
+func appsRemove(ctx context.Context, call appsCall) error {
+	flags := newFlags("apps rm", "apps rm <app> [--confirm <app>]").withApp().withConfirm()
+	err := call.parse(flags)
+	if err != nil {
+		return err
+	}
+	if flags.NArg() > 1 || (flags.NArg() == 0 && *flags.appFlag == "") {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	question := fmt.Sprintf("Remove app %s? Its containers and images go; its data stays on the server.", name)
+	typed, err := typeName(call.stdin, call.stdout, flags.confirmed(), question, name)
+	if err != nil {
+		return err
+	}
+	err = call.api.RemoveApp(ctx, name, typed)
+	if err != nil {
+		return err
+	}
+	done(call.stdout, "Removed %s. Its data stays on the server", style.Bold.Render(name))
+	return nil
+}
+
+// appsShow shows one app: apps my-app, the way people try it after apps.
+func appsShow(ctx context.Context, call appsCall) error {
+	if len(call.args) > 0 {
+		return fmt.Errorf("unknown command %q. Run `%s help`", "apps "+call.command, build.Name)
+	}
+	if call.apiErr != nil {
+		return call.apiErr
+	}
+	detail, err := call.api.App(ctx, call.command)
 	if client.IsNotFound(err) {
-		return fmt.Errorf("no app or command %q. Run `%s apps` for your apps, `%s help` for the commands", command, build.Name, build.Name)
+		return fmt.Errorf("no app or command %q. Run `%s apps` for your apps, `%s help` for the commands", call.command, build.Name, build.Name)
 	}
 	if err != nil {
 		return err
 	}
-	printApp(stdout, detail, time.Now())
+	printApp(call.stdout, detail, time.Now())
 	return nil
 }
 

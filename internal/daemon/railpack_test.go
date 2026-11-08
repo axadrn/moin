@@ -98,7 +98,7 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 	file := t.TempDir() + "/compose.json"
 	start := protocol.DeployStart{App: "shop", Number: 3, Env: map[string]string{"TOKEN": "abc"}}
 	for kind, wantSecrets := range map[string]bool{"railpack": true, "dockerfile": false} {
-		err := finish(base, start, protocol.Detected{Kind: kind, Service: "web", Port: 8080}, nil, file)
+		err := finish(&release{start: start, config: base, detected: protocol.Detected{Kind: kind, Service: "web", Port: 8080}, composeFile: file})
 		if err != nil {
 			t.Fatal(err)
 		}

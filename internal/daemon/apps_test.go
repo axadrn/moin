@@ -173,7 +173,7 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "compose.json")
 	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc", Env: map[string]string{"KEY": "a$b"}}
 	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "moin-blog-worker:3", "redis": "redis:7"}
-	err := finish(base, start, protocol.Detected{Service: "web"}, running, file)
+	err := finish(&release{start: start, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,11 +224,11 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 	var lines []string
 	logf := func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) }
 	a := &apps{}
-	if err := a.rebuildMissing(context.Background(), base, running, "web", false, logf); err != nil {
+	if err := a.rebuildMissing(context.Background(), &release{config: base, running: running, detected: protocol.Detected{Service: "web"}, logf: logf}); err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(t.TempDir(), "compose.json")
-	if err := finish(base, protocol.DeployStart{App: "blog", Number: 5}, protocol.Detected{Service: "web"}, running, file); err != nil {
+	if err := finish(&release{start: protocol.DeployStart{App: "blog", Number: 5}, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file}); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(file)
@@ -250,7 +250,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 	}
 
 	gone := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": filepath.Join(source, "gone")}}}}
-	err := a.rebuildMissing(context.Background(), gone, map[string]string{"web": "moin-blog-web:3"}, "web", false, logf)
+	err := a.rebuildMissing(context.Background(), &release{config: gone, running: map[string]string{"web": "moin-blog-web:3"}, detected: protocol.Detected{Service: "web"}, logf: logf})
 	if err == nil || !strings.Contains(err.Error(), "deploy again with moin deploy") {
 		t.Fatalf("err = %v", err)
 	}
@@ -266,7 +266,7 @@ func TestRouterLabels(t *testing.T) {
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, "blog", project("blog"), detected.Domains, detected.Canonical, detected.Port, "me:$2y$05$abc", "", "")
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port, protect: "me:$2y$05$abc"})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])

@@ -5,6 +5,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/human"
@@ -296,90 +297,153 @@ func (m model) logsTab(u ui, w, h int) string {
 }
 
 func (m model) backupsTab(u ui, w, h int) string {
-	b := m.app.backups
-	if b == nil {
+	backups := m.app.backups
+	if backups == nil {
 		return u.panel("Backups", "", loading(u), w, h, true)
 	}
-	if len(b.Databases) == 0 {
+	if len(backups.Databases) == 0 {
 		return u.panel("Backups", "", []string{"", u.muted(m.app.name + " has no database moin backs up."), u.faint("moin finds SQLite files and Postgres in compose.yml on deploy.")}, w, h, true)
 	}
-	now := m.now()
-	wide := w >= 100
-	lw := w
-	if wide {
-		lw = w*44/100 - 1
-	}
-	liw := inner(lw)
-	var st []string
-	for i, d := range b.Databases {
-		if i > 0 {
-			st = append(st, "")
-		}
-		word := "on"
-		switch {
-		case d.Problem != "":
-			word = "failed"
-		case d.CopiedAt == nil:
-			word = "waiting"
-		}
-		kind := d.Kind
-		if kind == "" {
-			kind = "database"
-		}
-		st = append(st, u.dot(word, word != "on" || m.frame%4 != 3)+" "+u.strong(d.Database)+"  "+u.muted(kind))
-		kv := func(k, v string) { st = append(st, "  "+padR(u.muted(k), 16)+truncate(v, liw-18)) }
-		switch {
-		case d.Problem != "":
-			kv("backup", u.bad(d.Problem))
-		case d.CopiedAt == nil:
-			kv("backup", u.faint("starting"))
-		default:
-			kv("last copy", u.good(human.Ago(*d.CopiedAt, now)))
-			if d.Since != nil {
-				kv("every change", u.muted("back to "+d.Since.Local().Format("Jan 2 15:04")))
-			}
-		}
-		switch {
-		case d.CheckError != "":
-			kv("daily check", u.bad("failed"))
-		case d.CheckedAt != nil:
-			kv("daily check", u.good("passed")+u.muted(" "+human.Ago(*d.CheckedAt, now)))
-		default:
-			kv("daily check", u.faint("not yet"))
-		}
-	}
-	if b.Bucket != "" {
-		st = append(st, "", "  "+padR(u.muted("bucket"), 16)+u.text(b.Bucket))
-		st = append(st, "  "+padR(u.muted("schedule"), 16)+u.text(scheduleText(b.BackupSchedule))+u.faint("  w: change it on the web"))
-	}
-	st = append(st, "  "+padR(u.muted("a copy"), 16)+u.faint("c downloads the newest"))
+	statusWidth := backupStatusWidth(w)
+	statusLines := m.backupStatusLines(u, backups, inner(statusWidth))
+	layout := newBackupsLayout(w, h, statusWidth, len(statusLines))
 	moments := m.moments()
-	sw := w
-	if wide {
-		sw = w - lw - 2
+	rows := m.momentRows(u, moments, inner(layout.momentsWidth), layout.visibleMoments)
+	momentCount := u.faint(fmt.Sprint(len(moments)))
+	statusPanel := u.panel("Backup", "", statusLines, layout.statusWidth, layout.statusHeight, false)
+	momentsPanel := u.panel("Go back to", momentCount, rows, layout.momentsWidth, layout.momentsHeight, true)
+	if layout.wide {
+		return hjoin(2, statusPanel, momentsPanel)
 	}
-	siw := inner(sw)
-	sb := []string{u.row([]cell{u.head("go back to", max(10, siw-28), false), u.head("at", 14, false), u.head("database", 0, false)}, siw, false)}
-	// narrow, the status takes at most half and the moments the rest
-	stH := min(len(st)+chrome, max(chrome+2, h/2))
-	n := h - chrome - 1
-	if !wide {
-		n = max(1, h-stH-1-chrome-1)
+	return vjoin(statusPanel, "", momentsPanel)
+}
+
+// backupsWideFrom is the width from which the two panels of the Backups tab
+// stand side by side.
+const backupsWideFrom = 100
+
+// backupsLayout is where the Backups tab puts its two panels.
+type backupsLayout struct {
+	wide          bool
+	statusWidth   int
+	statusHeight  int
+	momentsWidth  int
+	momentsHeight int
+	// visibleMoments is how many moments fit under the table head.
+	visibleMoments int
+}
+
+// backupStatusWidth is the width of the status panel.
+func backupStatusWidth(width int) int {
+	if width >= backupsWideFrom {
+		return width*44/100 - 1
 	}
-	at := m.at("moments", len(moments))
-	start := max(0, min(at-n+1, len(moments)-n))
-	for i := start; i < len(moments) && i < start+n; i++ {
-		mo := moments[i]
-		sb = append(sb, u.row([]cell{{u.text(mo.Label), max(10, siw-28), false}, {u.muted(mo.At.Local().Format("Jan 2 15:04")), 14, false}, {u.muted(mo.db), 0, false}}, siw, i == at))
+	return width
+}
+
+// newBackupsLayout places the panels. Wide, they stand side by side. Narrow,
+// the status takes at most half and the moments the rest.
+func newBackupsLayout(width, height, statusWidth, statusLines int) backupsLayout {
+	if width >= backupsWideFrom {
+		return backupsLayout{
+			wide:           true,
+			statusWidth:    statusWidth,
+			statusHeight:   height,
+			momentsWidth:   width - statusWidth - 2,
+			momentsHeight:  height,
+			visibleMoments: height - chrome - 1,
+		}
+	}
+	statusHeight := min(statusLines+chrome, max(chrome+2, height/2))
+	return backupsLayout{
+		statusWidth:    statusWidth,
+		statusHeight:   statusHeight,
+		momentsWidth:   width,
+		momentsHeight:  max(chrome+1, height-statusHeight-1),
+		visibleMoments: max(1, height-statusHeight-1-chrome-1),
+	}
+}
+
+// backupStatusLines is the body of the status panel: every database, then
+// where the copies go.
+func (m model) backupStatusLines(u ui, backups *client.AppBackups, innerWidth int) []string {
+	now := m.now()
+	var lines []string
+	for index, database := range backups.Databases {
+		if index > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, m.databaseStatusLines(u, database, now, innerWidth)...)
+	}
+	if backups.Bucket != "" {
+		lines = append(lines, "", backupField(u, "bucket", u.text(backups.Bucket)))
+		lines = append(lines, backupField(u, "schedule", u.text(scheduleText(backups.BackupSchedule))+u.faint("  w: change it on the web")))
+	}
+	lines = append(lines, backupField(u, "a copy", u.faint("c downloads the newest")))
+	return lines
+}
+
+// backupField is one line of the status panel: a name and its value.
+func backupField(u ui, name, value string) string {
+	return "  " + padR(u.muted(name), 16) + value
+}
+
+// databaseStatusLines says how the backups of one database are doing.
+func (m model) databaseStatusLines(u ui, database client.DatabaseBackups, now time.Time, innerWidth int) []string {
+	state := "on"
+	switch {
+	case database.Problem != "":
+		state = "failed"
+	case database.CopiedAt == nil:
+		state = "waiting"
+	}
+	kind := database.Kind
+	if kind == "" {
+		kind = "database"
+	}
+	lines := []string{u.dot(state, state != "on" || m.frame%4 != 3) + " " + u.strong(database.Database) + "  " + u.muted(kind)}
+	add := func(name, value string) {
+		lines = append(lines, backupField(u, name, truncate(value, innerWidth-18)))
+	}
+	switch {
+	case database.Problem != "":
+		add("backup", u.bad(database.Problem))
+	case database.CopiedAt == nil:
+		add("backup", u.faint("starting"))
+	default:
+		add("last copy", u.good(human.Ago(*database.CopiedAt, now)))
+		if database.Since != nil {
+			add("every change", u.muted("back to "+database.Since.Local().Format("Jan 2 15:04")))
+		}
+	}
+	switch {
+	case database.CheckError != "":
+		add("daily check", u.bad("failed"))
+	case database.CheckedAt != nil:
+		add("daily check", u.good("passed")+u.muted(" "+human.Ago(*database.CheckedAt, now)))
+	default:
+		add("daily check", u.faint("not yet"))
+	}
+	return lines
+}
+
+// momentRows is the table of moments to go back to, scrolled so the
+// selected one shows.
+func (m model) momentRows(u ui, moments []moment, innerWidth, visible int) []string {
+	labelWidth := max(10, innerWidth-28)
+	head := []cell{u.head("go back to", labelWidth, false), u.head("at", 14, false), u.head("database", 0, false)}
+	rows := []string{u.row(head, innerWidth, false)}
+	selected := m.at("moments", len(moments))
+	first := max(0, min(selected-visible+1, len(moments)-visible))
+	for index := first; index < len(moments) && index < first+visible; index++ {
+		item := moments[index]
+		cells := []cell{{u.text(item.Label), labelWidth, false}, {u.muted(item.At.Local().Format("Jan 2 15:04")), 14, false}, {u.muted(item.db), 0, false}}
+		rows = append(rows, u.row(cells, innerWidth, index == selected))
 	}
 	if len(moments) == 0 {
-		sb = append(sb, "", u.muted("Nothing to go back to yet."))
+		rows = append(rows, "", u.muted("Nothing to go back to yet."))
 	}
-	momentsP := u.panel("Go back to", u.faint(fmt.Sprint(len(moments))), sb, sw, h, true)
-	if !wide {
-		return vjoin(u.panel("Backup", "", st, w, stH, false), "", u.panel("Go back to", u.faint(fmt.Sprint(len(moments))), sb, w, max(chrome+1, h-stH-1), true))
-	}
-	return hjoin(2, u.panel("Backup", "", st, lw, h, false), momentsP)
+	return rows
 }
 
 func (m model) envTab(u ui, w, h int) string {

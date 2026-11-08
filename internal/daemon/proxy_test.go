@@ -31,7 +31,7 @@ func TestProxyFlags(t *testing.T) {
 // never asked for a new domain. The router sets none.
 func TestRoutersLeaveTLSToTheEntrypoint(t *testing.T) {
 	service := map[string]any{}
-	addRouters(map[string]any{}, service, "shop", project("shop"), []string{"shop.example.com"}, "", 8080, "", "", "")
+	addRouters(map[string]any{}, service, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.com"}, port: 8080})
 	labels, _ := service["labels"].(map[string]any)
 	if len(labels) == 0 {
 		t.Fatalf("no labels: %v", service)

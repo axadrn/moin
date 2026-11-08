@@ -60,7 +60,7 @@ func TestRouteInstant(t *testing.T) {
 func TestDomainsByService(t *testing.T) {
 	config := map[string]any{}
 	web := map[string]any{}
-	addRouters(config, web, "shop", project("shop"), []string{"shop.example.net"}, "", 3000, "", "shop.203-0-113-7.sslip.io", "moin:$2y$05$abc")
+	addRouters(config, web, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io", instantProtect: "moin:$2y$05$abc"})
 	labels := web["labels"].(map[string]any)
 	for key, want := range map[string]string{
 		"traefik.http.routers.moin-shop.rule":                             "Host(`shop.example.net`)",
@@ -79,13 +79,13 @@ func TestDomainsByService(t *testing.T) {
 	}
 	// An app with only its instant address has no router for domains.
 	only := map[string]any{}
-	addRouters(config, only, "idea", project("idea"), nil, "", 8080, "", "idea.203-0-113-7.sslip.io", "")
+	addRouters(config, only, routes{app: "idea", router: project("idea"), port: 8080, instant: "idea.203-0-113-7.sslip.io"})
 	labels = only["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" || labels["traefik.http.routers.moin-idea-instant.middlewares"] != nil {
 		t.Errorf("instant only: %v", labels)
 	}
 	api := map[string]any{}
-	addRouters(config, api, "shop", serviceRouter("shop", "api"), []string{"api.shop.example.net"}, "", 9000, "me:$2y$05$x", "", "")
+	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000, protect: "me:$2y$05$x"})
 	labels = api["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" || labels["traefik.http.routers.moin-shop-svc-api.middlewares"] != "moin-shop-svc-api-auth" {
 		t.Errorf("api labels: %v", labels)
