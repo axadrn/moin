@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/human"
-	"github.com/axadrn/moin/internal/link"
 )
 
 // AddedServer is the one-time install command of a server just added.
@@ -84,7 +83,7 @@ templ ServerAdded(added AddedServer) {
 	<div
 		id="server-added"
 		hx-swap-oob="true"
-		hx-get={ ctxkeys.AppBasePath(ctx) + "/servers/" + link.To(added.Name, added.ID) + "/install" }
+		hx-get={ ctxkeys.AppBasePath(ctx) + "/servers/" + added.Name + "/install" }
 		hx-trigger="servers from:body"
 		hx-swap="outerHTML"
 		data-server-added={ added.Name }
@@ -108,7 +107,7 @@ templ ServerAdded(added AddedServer) {
 templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
 		@kit.List() {
-			@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/new") {
+			@kit.Row(ctxkeys.AppBasePath(ctx) + "/new-app") {
 				@kit.Dot(kit.StateLive)
 				@kit.RowText(name+" is online", "Deploy an app to it")
 			}
@@ -143,7 +142,7 @@ templ ServerList(servers []model.Server) {
 	<div
 		id="server-list"
 		hx-swap-oob="true"
-		hx-get={ basePath + "/servers/list" }
+		hx-get={ basePath + "/server-list" }
 		hx-trigger="servers from:body"
 		hx-swap="none"
 	>

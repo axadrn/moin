@@ -33,7 +33,7 @@ func TestSettingsHome(t *testing.T) {
 		return output.String()
 	}
 	owner := render(model.WorkspaceRoleOwner, false)
-	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace-workspace2/settings"`, "/workspaces/new", "/settings/github", "acme", "/billing", "/settings/account", `hx-post="/auth/logout"`} {
+	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace/settings"`, "/workspaces/new", "/settings/github", "acme", "/billing", "/settings/account", `hx-post="/auth/logout"`} {
 		if !strings.Contains(owner, want) {
 			t.Fatalf("settings lack %s", want)
 		}

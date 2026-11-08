@@ -329,10 +329,10 @@ notes say it under Changed.
 | changelog | what changed in each version of moin | what's new, release notes (in the app) |
 | activity | who did what, when | audit log, history |
 
-Every thing has a name you give it and an ID that never changes. A link
-is `<name>-<id>`, the ID being the UUID without dashes (32 characters);
-only the ID counts, so a renamed thing keeps every old link. Workspaces,
-apps, servers and buckets can all be renamed. On a server, an app's
+Every thing has a name you give it and an ID that never changes (the
+UUID without dashes, 32 characters). A link is made of names. After a
+rename, links inside moin follow; an old bookmark shows "not found".
+Workspaces, apps, servers and buckets can all be renamed. On a server, an app's
 containers carry its current name (`my-app-web-1`) and its volumes a
 fixed one (`moin-<id>-<volume>`), so a rename never loses data. Examples
 everywhere: the app `my-app` (a second one `blog`), the workspace `acme`,

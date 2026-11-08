@@ -154,7 +154,7 @@ func TestAlertDestinationsGetTheExactMessages(t *testing.T) {
 	at := time.Date(2026, 11, 3, 14, 5, 0, 0, time.UTC)
 	f.alerts.Send(owner.WorkspaceID, "uptime.down", "shop", map[string]string{"domain": "shop.example.com", "reason": "HTTP 502"}, at)
 
-	link := "https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop/uptime"
+	link := "https://moin.example.com/app/owner-workspace/apps/shop/uptime"
 	if got, want := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body), map[string]any{
 		"text": "*🔴 shop.example.com is down*\nApp: shop\nSince: 2026-11-03 14:05 UTC\nReason: HTTP 502\n<" + link + "|Open in moin>",
 	}; !reflect.DeepEqual(got, want) {
@@ -200,14 +200,14 @@ func TestAlertDestinationsGetTheExactMessages(t *testing.T) {
 		t.Errorf("slack up = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "server.down", "web-1", map[string]string{"since": "2026-11-03 14:00 UTC"}, at)
-	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"server.down","workspace":"owner-workspace","app":"","server":"web-1","domain":"","reason":"","since":"2026-11-03T14:00:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/servers"}` {
+	if body := string(f.chat.last(t, "/hook").body); body != `{"event":"server.down","workspace":"owner-workspace","app":"","server":"web-1","domain":"","reason":"","since":"2026-11-03T14:00:00Z","duration":"","url":"https://moin.example.com/app/owner-workspace/servers"}` {
 		t.Errorf("webhook server.down = %s", body)
 	}
-	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Server web-1 is offline</b>\nIts daemon has not answered since 2026-11-03 14:00 UTC.\nApps on it: shop.\n<a href=\"https://moin.example.com/app/owner-workspace-workspaceowner/servers\">Open in moin</a>" {
+	if text := decoded(t, f.chat.last(t, "/telegram/bot"+telegramToken+"/sendMessage").body)["text"]; text != "<b>🔴 Server web-1 is offline</b>\nIts daemon has not answered since 2026-11-03 14:00 UTC.\nApps on it: shop.\n<a href=\"https://moin.example.com/app/owner-workspace/servers\">Open in moin</a>" {
 		t.Errorf("telegram server.down = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "deploy.failed", "shop", map[string]string{"number": "4", "error": "build <x> & *y*_z"}, at)
-	app := "https://moin.example.com/app/owner-workspace-workspaceowner/apps/shop-appshop"
+	app := "https://moin.example.com/app/owner-workspace/apps/shop"
 	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Deploy of shop failed*\nDeploy v4 of shop failed.\nError: build &lt;x&gt; &amp; *y*_z\nThe app has no live version yet.\n<"+app+"|Open in moin>" {
 		t.Errorf("slack deploy.failed = %q", text)
 	}
@@ -335,7 +335,7 @@ func TestAlertDestinationRules(t *testing.T) {
 		t.Fatalf("test: %+v, %v", tested, err)
 	}
 	sent := f.chat.last(t, "/hook/token123")
-	if body := string(sent.body); body != `{"event":"test","workspace":"owner-workspace","app":"","server":"","domain":"","reason":"","since":"","duration":"","url":"https://moin.example.com/app/owner-workspace-workspaceowner/alerts"}` {
+	if body := string(sent.body); body != `{"event":"test","workspace":"owner-workspace","app":"","server":"","domain":"","reason":"","since":"","duration":"","url":"https://moin.example.com/app/owner-workspace/alerts"}` {
 		t.Errorf("test body = %s", body)
 	}
 	if sent.header.Get("X-Moin-Signature") != Signature(signingSecret, sent.body) {

@@ -488,17 +488,6 @@ func TestWebPagesOpenTheBrowser(t *testing.T) {
 	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop" {
 		t.Errorf("W opens the app in the web, got %v", opened)
 	}
-	// Links carry the IDs the hub sends, so they keep working after a
-	// rename.
-	withIDs := fixture(120, 40)
-	withIDs.ws.id = "0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b"
-	for index := range withIDs.apps {
-		withIDs.apps[index].ID = "11111111222233334444555555555555"
-	}
-	press(withIDs.withApp("shop", tDeploys), "W")
-	if opened[len(opened)-1] != "https://moin.example/app/acme-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b/apps/shop-11111111222233334444555555555555" {
-		t.Errorf("W opens the app's link, got %v", opened)
-	}
 }
 
 func TestLoginShowsTheCodeThenConnects(t *testing.T) {

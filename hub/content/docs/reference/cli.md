@@ -29,7 +29,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin team invite <email> [--admin]` | invites someone by email; `--admin` may invite others |
 | `moin team resend <email>` | sends an invitation again; only the new link works |
 | `moin team revoke <email> [--yes]` | takes an invitation back |
-| `moin team rename <name>` | renames the workspace; its old links keep working |
+| `moin team rename <name>` | renames the workspace; its links follow the new name |
 | `moin activity [--app <app>] [--server <server>] [--user <email>] [--limit 30] [--cursor <cursor>]` | who deployed, restored or changed what, newest first, to the second in your time zone. `--server` includes its apps, `--limit` is at most 200, the hint at the end gives the `--cursor` for older events |
 
 ## Alerts

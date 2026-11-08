@@ -67,7 +67,7 @@ templ CatalogInApp(view CatalogView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Catalog") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "New app", Href: basePath + "/apps/new"}, "Catalog")
+			@kit.Header(kit.Back{Label: "New app", Href: basePath + "/new-app"}, "Catalog")
 			@catalogBody(view)
 		}
 	}

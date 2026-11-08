@@ -7,7 +7,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
-	"github.com/axadrn/moin/internal/link"
 )
 
 // BucketView is the buckets page: the workspace's own S3-compatible
@@ -36,7 +35,7 @@ templ Bucket(view BucketView) {
 // bucketPanel is one bucket: where it is and which apps use it, then
 // changing it, making it the default and removing it.
 templ bucketPanel(bucket service.Bucket) {
-	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket/" + link.To(bucket.Name, bucket.ID) }}
+	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket/" + bucket.Name }}
 	<div data-bucket={ bucket.Name }>
 		@kit.Section(bucket.Name, bucketBadge(bucket.Default)) {
 			@kit.List() {

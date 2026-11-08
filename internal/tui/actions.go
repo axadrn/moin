@@ -6,7 +6,6 @@ package tui
 import (
 	"errors"
 	"github.com/axadrn/moin/internal/client"
-	"github.com/axadrn/moin/internal/link"
 	"slices"
 	"sort"
 	"strings"
@@ -127,7 +126,7 @@ func (m model) lastApp() string {
 func (m model) browse(path string) (tea.Model, tea.Cmd) {
 	base := m.url + "/app"
 	if m.ws.slug != "" || m.ws.id != "" {
-		base += "/" + link.To(m.ws.slug, m.ws.id)
+		base += "/" + m.ws.slug
 	}
 	return m.browseURL(base + path)
 }
@@ -136,7 +135,7 @@ func (m model) browse(path string) (tea.Model, tea.Cmd) {
 func (m model) appLink(name string) string {
 	for _, app := range m.apps {
 		if app.Name == name {
-			return link.To(app.Name, app.ID)
+			return app.Name
 		}
 	}
 	return name

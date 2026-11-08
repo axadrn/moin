@@ -20,11 +20,11 @@ func TestRenameApp(t *testing.T) {
 	if len(created.ID) != 32 || len(created.ServerID) != 32 || created.ServerID != server.Server.ID {
 		t.Fatalf("IDs = %q on %q, server %q", created.ID, created.ServerID, server.Server.ID)
 	}
-	renamed := output[mcp.RenamedApp](t, call(t, session, "rename_app", map[string]any{"app": "blog-" + created.ID, "name": "journal"}))
+	renamed := output[mcp.RenamedApp](t, call(t, session, "rename_app", map[string]any{"app": created.ID, "name": "journal"}))
 	if renamed.ID != created.ID || renamed.Name != "journal" {
 		t.Fatalf("rename_app = %+v", renamed)
 	}
-	for _, ref := range []string{"journal", created.ID, "blog-" + created.ID} {
+	for _, ref := range []string{"journal", created.ID} {
 		if got := output[mcp.AppDetail](t, call(t, session, "get_app", map[string]any{"app": ref})); got.App.ID != created.ID {
 			t.Fatalf("get_app %s = %+v", ref, got.App)
 		}

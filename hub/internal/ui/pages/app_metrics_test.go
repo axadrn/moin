@@ -23,11 +23,11 @@ func TestAppMetricsShowsChartsAndDeploys(t *testing.T) {
 		Deploys: []model.MetricsDeploy{{Number: 12, FinishedAt: at}},
 	}}
 	var html strings.Builder
-	if err := AppMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/metrics"), &html); err != nil {
+	if err := AppMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/metrics"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-metrics-chart="app-cpu"`, `data-metrics-chart="app-memory"`, `data-metrics-chart="app-network"`, "12%", "300 MB", "of 512 MB", "Containers", "v12 went live", `hx-trigger="every 15s"`, `name="range" value="30d"`, `href="/app/tiny-rocket-co-workspace1/apps/shop"`} {
+	for _, want := range []string{`data-metrics-chart="app-cpu"`, `data-metrics-chart="app-memory"`, `data-metrics-chart="app-network"`, "12%", "300 MB", "of 512 MB", "Containers", "v12 went live", `hx-trigger="every 15s"`, `name="range" value="30d"`, `href="/app/tiny-rocket-co/apps/shop"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}
@@ -36,7 +36,7 @@ func TestAppMetricsShowsChartsAndDeploys(t *testing.T) {
 	// Longer ranges do not refresh, and no points is an empty state.
 	view.Metrics.Range, view.Metrics.Points, view.Metrics.Now = service.MetricsRanges[2], nil, nil
 	html.Reset()
-	if err := AppMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/metrics"), &html); err != nil {
+	if err := AppMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/metrics"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if page := html.String(); strings.Contains(page, "every 15s") || !strings.Contains(page, "No metrics yet") {
@@ -53,11 +53,11 @@ func TestServerMetricsListsAppsByMemory(t *testing.T) {
 		Apps:   []service.AppMetricsNow{{Name: "shop", Now: &service.MetricsNow{CPU: 5, MemoryUsed: 300 << 20}}, {Name: "blog"}},
 	}}
 	var html strings.Builder
-	if err := ServerMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/servers/s1/metrics"), &html); err != nil {
+	if err := ServerMetricsPage(view).Render(projectPageContext("/app/tiny-rocket-co/servers/s1/metrics"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{`data-metrics-chart="server-disk"`, "1.0 GB of 4.0 GB", "25% used", "4 cores, load 0.50", `data-app-metrics-row="shop"`, "not running", "/servers/web-1-s1/security"} {
+	for _, want := range []string{`data-metrics-chart="server-disk"`, "1.0 GB of 4.0 GB", "25% used", "4 cores, load 0.50", `data-app-metrics-row="shop"`, "not running", "/servers/web-1/security"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
 		}

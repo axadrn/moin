@@ -72,12 +72,12 @@ func TestRenameAppInTheWeb(t *testing.T) {
 	open := func(ref string) int {
 		return s.request("GET", "/app/{workspaceSlug}/apps/{app}/settings", base+"/apps/"+ref+"/settings", nil, s.handler.AppSection("settings")).Code
 	}
-	for _, ref := range []string{renamed.Link(), app.Link(), link.To("whatever", app.ID), "journal", link.ID(app.ID)} {
+	for _, ref := range []string{renamed.Link(), "journal", link.ID(app.ID)} {
 		if code := open(ref); code != http.StatusOK {
 			t.Errorf("%s = %d, want the page", ref, code)
 		}
 	}
-	for _, ref := range []string{"blog", link.To("journal", "00000000-0000-4000-8000-000000000000"), "journal-12345", "journal-" + link.ID(app.ID)[:31]} {
+	for _, ref := range []string{"blog", "journal-" + link.ID(app.ID), "journal-12345"} {
 		if code := open(ref); code != http.StatusNotFound {
 			t.Errorf("%s = %d, want 404", ref, code)
 		}

@@ -77,8 +77,7 @@ func (r *Workspaces) ByID(id string) (*model.Workspace, error) {
 	return workspace, nil
 }
 
-// BySlugForUser finds a workspace of the user by a link to it
-// (<slug>-<id>), its ID or its slug.
+// BySlugForUser finds a workspace of the user by its slug or its ID.
 func (r *Workspaces) BySlugForUser(slug, userID string) (*model.Workspace, error) {
 	workspace := &model.Workspace{}
 	err := r.db.Get(workspace, `

@@ -18,7 +18,7 @@ func TestBucketsPage(t *testing.T) {
 		{Name: "client-a", Bucket: "client", Folder: "workspace-1/", Apps: []string{"shop"}},
 	}}
 	var html strings.Builder
-	if err := Bucket(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/bucket"), &html); err != nil {
+	if err := Bucket(view).Render(projectPageContext("/app/tiny-rocket-co/bucket"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
@@ -54,7 +54,7 @@ func TestBackupsPickTheBucket(t *testing.T) {
 		}},
 	}
 	var html strings.Builder
-	ctx := projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/data")
+	ctx := projectPageContext("/app/tiny-rocket-co/apps/shop/data")
 	if err := BackupSettings(view).Render(ctx, &html); err != nil {
 		t.Fatal(err)
 	}

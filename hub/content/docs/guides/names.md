@@ -1,28 +1,27 @@
 ---
 title: "Names and links"
-description: "Rename apps, servers, buckets and the workspace; links keep working"
+description: "Rename apps, servers, buckets and the workspace"
 group: "Apps"
 order: 8
 ---
 
-Everything has a name you give it and an ID that never changes: the workspace, every app, server and bucket. A link carries both. The name is for you. The ID is for moin.
+Everything has a name you give it: the workspace, every app, server and bucket. A link is made of those names.
 
 ```text
-/app/acme-0f8e…/apps/my-app-6f1c…
-     └──┘ └───┘      └────┘ └───┘
-     name  ID         name   ID
+/app/acme/apps/my-app
+     └──┘      └────┘
+   workspace    app
 ```
 
-Only the ID counts. Rename `my-app` to `blog` and every old link still opens it.
+Rename `my-app` to `blog` and its link becomes `/app/acme/apps/blog`. Every link inside moin follows by itself. An old bookmark shows "not found".
 
 ## The ID
 
-The ID is 32 characters, the same in links, the API (`id`), the CLI, the TUI and MCP. Wherever you name a thing, its name, its ID or a whole link part works:
+Everything also has an ID of 32 characters that never changes. The API (`id`), the CLI, the TUI and MCP show it. Wherever you name a thing, its name or its ID works:
 
 ```text
 moin deploy my-app
 moin deploy 6f1c2a3b…
-moin deploy my-app-6f1c2a3b…
 ```
 
 ## Rename an app
@@ -54,4 +53,4 @@ Set `x-moin.app: blog` after the rename. Otherwise `moin deploy` in a folder cal
 | A bucket | **Settings**, **Bucket**, **Change** | `moin buckets edit default --name archive` | `edit_bucket` |
 | The workspace | **Settings**, **Team**, **Workspace name** | `moin team rename "Acme Inc"` | `rename_workspace` |
 
-A renamed workspace links with its new name too. The old links keep working.
+A renamed workspace links with its new name too. Old bookmarks show "not found".

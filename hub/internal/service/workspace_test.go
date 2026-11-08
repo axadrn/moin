@@ -173,7 +173,7 @@ func TestWorkspaceServiceRoleBoundaries(t *testing.T) {
 	if err := workspaces.UpdateName(globexMember, globex, "Initech", Source{}); err != nil || globex.Slug != "initech" {
 		t.Fatalf("rename = %v, slug %q", err, globex.Slug)
 	}
-	for _, ref := range []string{"globex-" + strings.ReplaceAll(globex.ID, "-", ""), "initech", globex.ID} {
+	for _, ref := range []string{"initech", globex.ID} {
 		if found, _, err := workspaces.BySlugForUser(ref, owner.User.ID); err != nil || found.ID != globex.ID {
 			t.Fatalf("workspace by %q = %+v, %v", ref, found, err)
 		}

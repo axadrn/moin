@@ -83,7 +83,7 @@ MCP: revoke_invitation
 
 ## Rename the workspace
 
-Its old links keep working ([Names and links](/docs/guides/names)).
+Its links follow the new name ([Names and links](/docs/guides/names)).
 
 ```surfaces
 Web: **Settings**, **Team**, **Workspace name**, **Save**

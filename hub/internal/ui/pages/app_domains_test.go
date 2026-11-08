@@ -13,7 +13,7 @@ import (
 func TestDomainsMarkComposeDomains(t *testing.T) {
 	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true, FromCompose: true}}}
 	var html strings.Builder
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
@@ -26,7 +26,7 @@ func TestDomainsMarkComposeDomains(t *testing.T) {
 
 	view.Checks[0].FromCompose = false
 	html.Reset()
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html.String(), "Remove shop.example.com") || !strings.Contains(html.String(), "data-add-domain") {
@@ -43,7 +43,7 @@ func TestDomainsInstantAndServices(t *testing.T) {
 		Instant: service.Instant{Provider: "sslip.io", Host: "shop.203-0-113-7.sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "moin"},
 	}
 	var html strings.Builder
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
@@ -61,7 +61,7 @@ func TestDomainsInstantAndServices(t *testing.T) {
 
 	view.Instant = service.Instant{Provider: "sslip.io", Reason: "The server runs behind a Cloudflare Tunnel."}
 	html.Reset()
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html.String(), "data-instant-reason") || strings.Contains(html.String(), "data-instant-url") {
@@ -78,7 +78,7 @@ func TestDomainsShowTheCheck(t *testing.T) {
 		{Domain: "old.shop.example.com"},
 	}}
 	var html strings.Builder
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop"), &html); err != nil {
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()

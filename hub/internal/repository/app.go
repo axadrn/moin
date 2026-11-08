@@ -11,7 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// idOf is the ID a link, an ID or a UUID names, or "" for a plain name,
+// idOf is the UUID an ID names, or "" for a plain name,
 // which matches no ID.
 func idOf(ref string) string {
 	id, _ := link.Parse(ref)
@@ -82,8 +82,8 @@ func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	return app, nil
 }
 
-// ByIDOrNameForWorkspace finds an app of the workspace by a link to it
-// (<name>-<id>), its ID or its name.
+// ByIDOrNameForWorkspace finds an app of the workspace by its ID or its
+// name.
 func (r *Apps) ByIDOrNameForWorkspace(idOrName, workspaceID string) (*model.App, error) {
 	return r.get(appSelect+` WHERE a.workspace_id = $1 AND (a.id = $2 OR a.name = $3) ORDER BY a.id = $2 DESC LIMIT 1`, workspaceID, idOf(idOrName), idOrName)
 }

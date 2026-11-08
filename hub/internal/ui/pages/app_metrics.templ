@@ -10,7 +10,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
-	"github.com/axadrn/moin/internal/link"
 )
 
 // AppMetricsPage is the metrics of an app, a page under it ("‹ my-app"):
@@ -233,7 +232,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 					}
 				}
 				for _, app := range apps {
-					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+link.To(app.Name, app.ID)+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
+					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
 						if now := app.Now; now != nil {
 							@kit.RowText(app.Name, "CPU "+percentText(now.CPU)+" · network "+rateText(now.NetRx+now.NetTx))
 							<span class="shrink-0 font-medium tabular-nums">{ human.Size(float64(now.MemoryUsed)) }</span>

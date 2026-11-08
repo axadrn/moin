@@ -43,7 +43,7 @@ func TestRenameApp(t *testing.T) {
 	if _, err := apps.Rename(other, "blog", "journal"); !errors.Is(err, repository.ErrAppNotFound) {
 		t.Fatalf("another workspace renamed it: err = %v", err)
 	}
-	renamed, err := apps.Rename(owner, link.To("blog", app.ID), "journal")
+	renamed, err := apps.Rename(owner, app.ID, "journal")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,15 +51,15 @@ func TestRenameApp(t *testing.T) {
 		t.Fatalf("renamed = %s %s %s", renamed.ID, renamed.Name, renamed.Folder)
 	}
 
-	// Name, ID, UUID and links with any name find it; the old name and an
-	// unknown ID do not.
-	for _, ref := range []string{"journal", app.ID, link.ID(app.ID), link.To("journal", app.ID), link.To("blog", app.ID), link.To("anything-else", app.ID)} {
+	// Name, ID and UUID find it; the old name, an old link and an unknown
+	// ID do not.
+	for _, ref := range []string{"journal", app.ID, link.ID(app.ID)} {
 		got, err := apps.Get(owner.WorkspaceID, ref)
 		if err != nil || got.ID != app.ID {
 			t.Fatalf("Get(%q) = %v, %v", ref, got, err)
 		}
 	}
-	for _, ref := range []string{"blog", link.To("journal", "00000000-0000-0000-0000-000000000000"), "journal-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5"} {
+	for _, ref := range []string{"blog", "journal-" + link.ID(app.ID), "00000000000000000000000000000000", "journal-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5"} {
 		if _, err := apps.Get(owner.WorkspaceID, ref); !errors.Is(err, repository.ErrAppNotFound) {
 			t.Fatalf("Get(%q): err = %v, want ErrAppNotFound", ref, err)
 		}
@@ -139,23 +139,23 @@ func TestBucketAndServerByLink(t *testing.T) {
 	if err := apps.apps.CreateBucket(model.Bucket{ID: id, WorkspaceID: owner.WorkspaceID, Name: "client-a", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "a", AccessKey: "k", SecretKey: "s"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, ref := range []string{"client-a", id, link.ID(id), link.To("client-a", id), link.To("old-name", id)} {
+	for _, ref := range []string{"client-a", id, link.ID(id)} {
 		if bucket, err := apps.Bucket(owner.WorkspaceID, ref); err != nil || bucket.ID != id {
 			t.Fatalf("bucket %q = %v, %v", ref, bucket, err)
 		}
 	}
-	if _, err := apps.Bucket(owner.WorkspaceID, link.To("client-a", "00000000-0000-4000-8000-000000000000")); !errors.Is(err, repository.ErrBucketNotFound) {
+	if _, err := apps.Bucket(owner.WorkspaceID, "00000000-0000-4000-8000-000000000000"); !errors.Is(err, repository.ErrBucketNotFound) {
 		t.Fatalf("unknown ID: err = %v", err)
 	}
-	if _, err := apps.Bucket(other.WorkspaceID, link.To("client-a", id)); !errors.Is(err, repository.ErrBucketNotFound) {
+	if _, err := apps.Bucket(other.WorkspaceID, id); !errors.Is(err, repository.ErrBucketNotFound) {
 		t.Fatalf("another workspace found it: err = %v", err)
 	}
-	for _, ref := range []string{"web-1", server.ID, link.To("web-9", server.ID)} {
+	for _, ref := range []string{"web-1", server.ID} {
 		if got, err := servers.Get(owner.WorkspaceID, ref); err != nil || got.ID != server.ID {
 			t.Fatalf("server %q = %v, %v", ref, got, err)
 		}
 	}
-	if _, err := servers.Get(other.WorkspaceID, link.To("web-1", server.ID)); !errors.Is(err, repository.ErrServerNotFound) {
+	if _, err := servers.Get(other.WorkspaceID, server.ID); !errors.Is(err, repository.ErrServerNotFound) {
 		t.Fatalf("another workspace found the server: err = %v", err)
 	}
 }

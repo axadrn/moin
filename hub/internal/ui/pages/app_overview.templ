@@ -196,7 +196,7 @@ func ifElse(ok bool, yes, no string) string {
 
 // overviewNewApp is the action next to the apps: start a new one.
 templ overviewNewApp(basePath string) {
-	<a href={ templ.SafeURL(basePath + "/apps/new") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
+	<a href={ templ.SafeURL(basePath + "/new-app") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
 }
 
 // overviewStart is the first visit: no server yet.

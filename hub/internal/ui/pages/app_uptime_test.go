@@ -23,7 +23,7 @@ func TestUptimeShowsEveryDomain(t *testing.T) {
 		},
 	}}
 	var html strings.Builder
-	if err := AppUptime(view).Render(projectPageContext("/app/tiny-rocket-co-workspace1/apps/shop/uptime"), &html); err != nil {
+	if err := AppUptime(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/uptime"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()

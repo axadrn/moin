@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/moin/internal/find"
-	"github.com/axadrn/moin/internal/link"
 )
 
 // picker is the open palette: what is typed and the row picked.
@@ -106,7 +105,7 @@ func (m model) serverEntries(name string) []entry {
 	return []entry{
 		{"action", "update the daemon on " + name, "", "u", func(m model) (tea.Model, tea.Cmd) { return m.confirmDaemonUpdate(sv) }},
 		{"web", "security of " + name, "firewall, ports, the proxy", "W", func(m model) (tea.Model, tea.Cmd) {
-			return m.browse("/servers/" + link.To(sv.Name, sv.ID) + "/security")
+			return m.browse("/servers/" + sv.Name + "/security")
 		}},
 	}
 }

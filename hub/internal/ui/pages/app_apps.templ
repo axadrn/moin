@@ -23,14 +23,14 @@ templ Apps(apps []model.App, servers []model.Server) {
 		@panelPage() {
 			@kit.Header(kit.Back{Label: "Overview", Href: basePath + "/overview"}, "Apps") {
 				<div class="sm:ml-auto">
-					@kit.Button(kit.Primary, basePath+"/apps/new", nil) {
+					@kit.Button(kit.Primary, basePath+"/new-app", nil) {
 						New app
 					}
 				</div>
 			}
 			if len(apps) == 0 {
 				@kit.List() {
-					@kit.Row(basePath + "/apps/new") {
+					@kit.Row(basePath + "/new-app") {
 						@kit.RowText("No apps yet", "Start one from your folder, GitHub or the catalog.")
 					}
 				}

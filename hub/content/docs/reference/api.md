@@ -67,7 +67,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `GET /api/v1/workspaces` | read | the workspaces you are in |
 | `POST /api/v1/workspaces` | session | makes a workspace |
 | `GET /api/v1/workspaces/{slug}` | read | the team: who is in it, their roles, open invitations |
-| `PATCH /api/v1/workspaces/{slug}/name` | write | renames the workspace (admin); its slug follows, old links keep working |
+| `PATCH /api/v1/workspaces/{slug}/name` | write | renames the workspace (admin); its slug follows |
 | `DELETE /api/v1/workspaces/{slug}?confirm=<name>` | session | deletes the workspace (owner) |
 | `POST /api/v1/workspaces/{slug}/invitations` | write | invites someone by email (admin) |
 | `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /invitations/{id}` | write | sends an invitation again; revokes it (admin) |

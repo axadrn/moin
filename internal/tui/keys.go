@@ -13,7 +13,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/axadrn/moin/internal/client"
-	"github.com/axadrn/moin/internal/link"
 )
 
 func (m model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -595,7 +594,7 @@ func (m model) serverKey(s string) (tea.Model, tea.Cmd) {
 			return m.openApp(apps[m.at("serverapps", len(apps))].Name, tDeploys)
 		}
 	case "W":
-		return m.browse("/servers/" + link.To(sv.Name, sv.ID) + "/security")
+		return m.browse("/servers/" + sv.Name + "/security")
 	}
 	return m, nil
 }
