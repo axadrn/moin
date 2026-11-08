@@ -134,10 +134,11 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
 	mux.HandleFunc("GET /catalog/{slug}/install", middleware.RequireAuth(catalogPages.Start))
-	// The legal pages describe the hosted service; a self-hosted hub
-	// answers them with not found.
+	// The legal pages describe the hosted service, and the comparisons sit
+	// under its home page; a self-hosted hub answers them with not found.
 	if app.Cfg.Billing {
 		mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+		mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	}
 }
 

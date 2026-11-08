@@ -1,0 +1,127 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// ---------------------------------------------------------------- home
+// HomeCompare is the comparison on the home page: a line per tool, each a
+// way to its page, next to where others are ahead.
+templ HomeCompare() {
+	<section id="compare" class={ homeSection }>
+		<h2 class={ homeStatement }>How it compares.</h2>
+		<p class={ homeLead }>None of these seven documents an automatic check that a copy restores. { brand.Name } runs one every day.</p>
+		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
+			@kit.Section("Compare", nil) {
+				@kit.List() {
+					for _, competitor := range Competitors {
+						@kit.Row("/compare/" + competitor.Slug) {
+							@compareLine(competitor.Name, competitor.Note)
+						}
+					}
+				}
+			}
+			@kit.Section("Where others are ahead", nil) {
+				@kit.List() {
+					@kit.Row("") {
+						@compareLine("Postgres to any moment", "Railway, Render, Fly Managed Postgres and Heroku offer point-in-time recovery. "+brand.Name+" has it only for SQLite.")
+					}
+					@kit.Row("") {
+						@compareLine("Files", "Coolify and Dokploy can back up files. "+brand.Name+" backs up databases only.")
+					}
+					@kit.Row("") {
+						@compareLine("No open port", "Coolify can use a Cloudflare Tunnel, so "+brand.Name+" is not the only one.")
+					}
+					@kit.Row("") {
+						@compareLine("AI agents", "Coolify, Dokploy, Railway and Render also have official MCP servers that can deploy.")
+					}
+				}
+			}
+		</div>
+		<p class="px-1 text-sm text-muted-foreground">From each tool's own docs, read { compareRead }.</p>
+	</section>
+}
+
+// compareLine is the words of a row: unlike kit.RowText they wrap, so a
+// sentence is never cut on a phone.
+templ compareLine(name, note string) {
+	<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+		<span class="font-medium">{ name }</span>
+		<span class="text-sm text-pretty text-muted-foreground">{ note }</span>
+	</div>
+}
+
+// ---------------------------------------------------------------- page
+// Compare is one tool next to this one: what differs, when to pick which,
+// and the same questions answered for both, each answer with its source.
+templ Compare(competitor Competitor) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       brand.Name + " vs " + competitor.Name,
+		Description: competitor.Lead,
+		Path:        "/compare/" + competitor.Slug,
+	}) {
+		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@kit.Header(kit.Back{}, brand.Name + " or " + competitor.Name + "?")
+			<p class={ homeLead, "max-w-2xl" }>{ competitor.Lead }</p>
+			<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
+				@comparePick("Pick "+competitor.Name+" if", competitor.Them)
+				@comparePick("Pick "+brand.Name+" if", competitor.Us)
+			</div>
+			@kit.Section("Side by side", nil) {
+				@compareHeader(competitor.Name)
+				@kit.List() {
+					for i, row := range CompareRows {
+						@compareFact(row, competitor.Name, competitor.Cells[i])
+					}
+				}
+			}
+			<p class="px-1 text-sm text-muted-foreground">
+				From { competitor.Name }'s own docs, read { compareRead }. "Not documented" means its docs say nothing, not that it cannot be done.
+				<a href="/#compare" class="text-foreground underline underline-offset-4">All seven</a>
+			</p>
+		</main>
+	}
+}
+
+templ comparePick(title string, reasons []string) {
+	@kit.Section(title, nil) {
+		@kit.List() {
+			for _, reason := range reasons {
+				@kit.Row("") {
+					<span class="min-w-0 flex-1 text-sm text-pretty">{ reason }</span>
+				}
+			}
+		}
+	}
+}
+
+// compareColumns is one row on the desktop: the question and two answers.
+// On a phone the three stack, and each answer says whose it is.
+const compareColumns = "grid min-w-0 flex-1 gap-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_minmax(0,3fr)] sm:gap-6"
+
+// compareHeader names the two columns over the list, in line with the
+// rows; a phone has no columns to name, and every answer says whose it is.
+templ compareHeader(name string) {
+	<div aria-hidden="true" class="hidden px-6.5 text-sm font-medium text-muted-foreground sm:flex">
+		<div class={ compareColumns }>
+			<span></span>
+			<span>{ brand.Name }</span>
+			<span>{ name }</span>
+		</div>
+	</div>
+}
+
+templ compareFact(row CompareRow, name string, cell CompareCell) {
+	@kit.Row("") {
+		<div class={ compareColumns }>
+			<span class="font-medium">{ row.Label }</span>
+			<span class="text-sm text-pretty"><span class="text-muted-foreground sm:sr-only">{ brand.Name }: </span>{ row.Ours }</span>
+			<span class="text-sm text-pretty text-muted-foreground">
+				<span class="sm:sr-only">{ name }: </span>{ cell.Text }
+				<a href={ templ.SafeURL(cell.Source) } target="_blank" rel="noopener" class="whitespace-nowrap underline underline-offset-4">Source</a>
+			</span>
+		</div>
+	}
+}

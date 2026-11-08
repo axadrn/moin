@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/hub/internal/ui/pages"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,9 @@ func NewSEOHandler(
 			slugs = append(slugs, entry.Slug)
 		}
 		sitemap.AddCatalog(slugs)
+	}
+	if legal {
+		sitemap.AddCompare(pages.CompareSlugs())
 	}
 	return &SEOHandler{
 		sitemapService: sitemap,

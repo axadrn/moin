@@ -22,9 +22,10 @@ const (
 )
 
 // Home is the landing page: the promise over the container wall, how to
-// start, what makes moin different, what it does, and the way in. Short:
-// every row links to the docs for the rest. open is what the changelog
-// says about how moin ships.
+// start, the three questions of a deploy, backups, security, how it compares,
+// what it does, the questions people ask and the way in. Short: every row
+// links to the docs for the rest. open is what the changelog says about how
+// moin ships.
 templ Home(network model.Network, open HomeOpen) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
@@ -38,12 +39,16 @@ templ Home(network model.Network, open HomeOpen) {
 					@HomeLive(network)
 				}
 				@HomeStart()
-				@HomeDifferent()
+				@HomeWays()
+				@HomeBackups()
+				@HomeSecurity()
+				@HomeCompare()
 				@HomeDoes()
 				@HomeOpenSection(open)
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@HomePricing()
 				}
+				@HomeQuestions()
 				@HomeEnd()
 			</div>
 		</main>
@@ -169,17 +174,50 @@ templ homeStep(number, name, command string) {
 	}
 }
 
-// ---------------------------------------------------------------- different
-// HomeDifferent is what makes moin different, one line each, every line a
-// way into Why moin.
-templ HomeDifferent() {
-	<section id="different" class={ homeSection }>
-		<h2 class={ homeStatement }>Different where it counts.</h2>
+// ---------------------------------------------------------------- ways
+// HomeWays is every way to deploy as three questions; every answer is
+// shown the same, none is the standard one.
+templ HomeWays() {
+	<section id="ways" class={ homeSection }>
+		<h2 class={ homeStatement }>Every deploy, three questions.</h2>
 		@kit.List() {
-			@homeReason("One binary.", "CLI, terminal UI and daemon: one Go binary.", "/docs/why-moin#a-small-stack")
-			@homeReason("The daemon only dials out.", "Your server keeps no port open for moin.", "/docs/why-moin#the-daemon-only-dials-out")
-			@homeReason("Restores are checked.", "Every day, from your own bucket.", "/docs/why-moin#backups-whose-restores-are-checked")
-			@homeReason("Every way in.", "Web, terminal, CLI, API and AI agents all do the same.", "/docs/why-moin#every-way-in")
+			@homeReason("Where does the code come from?", "Your folder, GitHub or a CI image.", "")
+			@homeReason("Who presses the button?", "The CLI, the terminal UI, the web, the API or MCP.", "")
+			@homeReason("Where do settings live?", "In the repo with x-moin, which wins. Otherwise in "+brand.Name+".", "")
+		}
+		<p class={ homeLead }>
+			One binary is the CLI, the terminal UI and the daemon.
+			<a href="/docs/guides/deploy" class="text-foreground underline underline-offset-4">How to deploy</a>
+		</p>
+	</section>
+}
+
+// ---------------------------------------------------------------- backups
+// HomeBackups is why the copies can be trusted, and what they do not cover.
+templ HomeBackups() {
+	<section id="backups" class={ homeSection }>
+		<h2 class={ homeStatement }>Copies that really restore.</h2>
+		@kit.List() {
+			@homeReason("Your own bucket.", "Your data goes from your server to your bucket, never through "+brand.Name+".", "/docs/guides/bucket")
+			@homeReason("Checked every day.", brand.Name+" restores the newest copy into a throwaway database and reads it. If that fails, an alert tells you.", "/docs/concepts/backups")
+			@homeReason("A restore can be undone.", "The database as it was stays, so you can go back to it.", "/docs/guides/backups#undo-a-restore")
+		}
+		<p class={ homeLead }>
+			SQLite and Postgres, on your schedule. Files are not backed up.
+			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
+		</p>
+	</section>
+}
+
+// ---------------------------------------------------------------- security
+// HomeSecurity is how moin reaches a server, and what the server can refuse.
+templ HomeSecurity() {
+	<section id="security" class={ homeSection }>
+		<h2 class={ homeStatement }>Your server stays yours.</h2>
+		@kit.List() {
+			@homeReason("The daemon only dials out.", "Your server keeps no port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
+			@homeReason("No SSH key.", brand.Name+" holds no key to your server.", "/docs/guides/security")
+			@homeReason("A rules file on your server.", "/etc/moin/rules says what "+brand.Name+" may do there. Only root can change it, so a break-in at "+brand.Name+" cannot.", "/docs/guides/security#rules")
 		}
 	</section>
 }
@@ -199,7 +237,7 @@ templ homeReason(statement, line, href string) {
 templ HomeDoes() {
 	<section id="product" class={ homeSection }>
 		<h2 class={ homeStatement }>Everything an app needs.</h2>
-		<div class="grid items-start gap-8 md:grid-cols-2">
+		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
 			@kit.Section("Ship", nil) {
 				@kit.List() {
 					@homeFeature("Deploy", "Any repo, a compose.yml or an image", "/docs/guides/deploy")
@@ -210,7 +248,7 @@ templ HomeDoes() {
 			}
 			@kit.Section("Keep", nil) {
 				@kit.List() {
-					@homeFeature("Backups", "On your schedule, in your bucket", "/docs/guides/backups")
+					@homeFeature("Backups", "Restore, undo, download", "/docs/guides/backups")
 					@homeFeature("Data", "Browse, edit, run SQL", "/docs/guides/data")
 					@homeFeature("Uptime and alerts", "Mail, Slack, Discord, Telegram", "/docs/guides/alerts")
 					@homeFeature("AI agents", "Claude, Cursor, any MCP client", "/docs/guides/mcp")
@@ -269,6 +307,33 @@ templ homePlanRows(rows ...string) {
 			</li>
 		}
 	</ul>
+}
+
+// ---------------------------------------------------------------- questions
+// HomeQuestions are the five questions people ask first; the rest is in the
+// FAQ.
+templ HomeQuestions() {
+	<section id="questions" class={ homeSection }>
+		<h2 class={ homeStatement }>Good questions.</h2>
+		@kit.List() {
+			@homeQuestion("Is "+brand.Name+" open source?", "Yes, all of it, under AGPL-3.0. You can host it yourself for free.")
+			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running: they are on your servers. The daemon connects again by itself. Until then you cannot deploy.")
+			@homeQuestion("Can you see my data?", "Only what you open, passed through to you and never stored. data: off and logs: off in /etc/moin/rules close even that. Your env vars are sealed in the hub.")
+			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it on your server if it is missing. You need no Dockerfile either.")
+			@homeQuestion("Which servers?", "Any Linux server you can log in to as root, amd64 or arm64, with systemd, at any provider.")
+		}
+		<p class={ homeLead }>
+			<a href="/docs/faq" class="text-foreground underline underline-offset-4">All questions</a>
+		</p>
+	</section>
+}
+
+templ homeQuestion(question, answer string) {
+	@kit.RowMore(question) {
+		@kit.Row("") {
+			<span class="min-w-0 flex-1 text-sm text-pretty text-muted-foreground">{ answer }</span>
+		}
+	}
 }
 
 // ---------------------------------------------------------------- end
