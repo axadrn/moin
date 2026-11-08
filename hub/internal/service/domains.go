@@ -144,7 +144,11 @@ func (s *AppService) Instant(workspaceID, idOrName string, show bool, token *mod
 	if err != nil {
 		return Instant{}, err
 	}
-	instant := Instant{Provider: app.Instant, Open: app.InstantOpen}
+	provider := app.Instant
+	if inFile := s.FileConfig(app).Instant; inFile != "" {
+		provider = inFile
+	}
+	instant := Instant{Provider: provider, Open: app.InstantOpen}
 	host := app.InstantHost
 	if app.LiveNumber == 0 {
 		host = s.instantHost(app, server)
@@ -152,7 +156,7 @@ func (s *AppService) Instant(workspaceID, idOrName string, show bool, token *mod
 	switch {
 	case host != "":
 		instant.Host, instant.URL = host, "https://"+host
-	case app.Instant == "off" || app.Instant == "":
+	case provider == "off" || provider == "":
 		instant.Reason = "Off."
 	case server.Tunnel:
 		instant.Reason = "The server is behind a Cloudflare Tunnel: an instant address needs ports 80 and 443 open."
@@ -189,14 +193,14 @@ func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bo
 		return false, err
 	}
 	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider != "" && s.FileConfig(app).Instant != "" {
+		return false, ErrInstantInFile
+	}
 	if provider == "" {
 		provider = app.Instant
 	}
 	if provider != "off" && !slices.Contains(protocol.InstantProviders, provider) {
 		return false, ErrInstantProvider
-	}
-	if provider != app.Instant && s.FileConfig(app).Instant != "" {
-		return false, ErrInstantInFile
 	}
 	isOpen := app.InstantOpen
 	if open != nil {
@@ -243,7 +247,8 @@ func (s *AppService) fillInstant(app *model.App, domains *protocol.Domains) erro
 	if err != nil {
 		return err
 	}
-	if app.Instant == "off" || server.Tunnel {
+	// Also when it is off here: x-moin.instant in compose.yml may turn it on.
+	if server.Tunnel {
 		return nil
 	}
 	domains.Instant = app.Instant

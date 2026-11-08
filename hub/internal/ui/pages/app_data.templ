@@ -65,9 +65,9 @@ templ AppData(view DataView) {
 			}
 		}
 		@dataScripts()
-		if view.Database == "" {
-			// The app's changes come as the event "apps": the head reloads on
-			// it.
+		if view.Table == nil {
+			// The app's changes come as the event "apps": the head and a
+			// running restore reload on it.
 			@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link())
 		}
 	}

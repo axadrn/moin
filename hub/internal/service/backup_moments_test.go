@@ -692,6 +692,13 @@ func TestFileLocksInstantAndPassword(t *testing.T) {
 	if _, err := apps.SetInstant(owner, "blog", "off", nil); !errors.Is(err, ErrInstantInFile) {
 		t.Fatalf("instant: %v", err)
 	}
+	if _, err := apps.SetInstant(owner, "blog", "sslip.io", nil); !errors.Is(err, ErrInstantInFile) {
+		t.Fatalf("instant, the provider moin has stored: %v", err)
+	}
+	instant, err := apps.Instant(owner.WorkspaceID, "blog", false, nil)
+	if err != nil || instant.Provider != "nip.io" {
+		t.Fatalf("the provider shown: %q, %v", instant.Provider, err)
+	}
 	if _, err := apps.SetProtection(owner, "blog", "", ""); !errors.Is(err, ErrProtectInFile) {
 		t.Fatalf("remove the password: %v", err)
 	}

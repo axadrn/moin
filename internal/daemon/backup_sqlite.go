@@ -304,7 +304,7 @@ func (b *backups) record(ctx context.Context, app string, database protocol.Data
 	b.mu.Lock()
 	now, known := b.watched[live]
 	b.mu.Unlock()
-	if known && now.bucket == want.bucket && now.folder == want.folder && now.keep == want.keep {
+	if known && now.bucket == want.bucket && now.folder == want.folder && now.keep == want.keep && !lostTheLog(now, live) {
 		return recordingHealth(now)
 	}
 	b.unwatch(live)
@@ -323,6 +323,14 @@ func (b *backups) stopRecording(ctx context.Context, app string, database protoc
 		return nil
 	}
 	return errors.Join(client.DeleteAll(ctx), os.RemoveAll(litestreamState(live)))
+}
+
+// lostTheLog says Litestream looks for a log file SQLite has removed,
+// which it does after the last app closes the database. Following the
+// file again starts it over.
+func lostTheLog(now watched, live string) bool {
+	why := now.db.SyncDiagnostic().Error
+	return strings.Contains(why, "cannot verify wal state") && !exists(live+"-wal")
 }
 
 // recordingHealth says what Litestream reports about a file it follows.
