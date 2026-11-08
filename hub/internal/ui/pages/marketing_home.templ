@@ -17,6 +17,8 @@ import (
 const (
 	homeStatement = "text-4xl font-semibold tracking-tight text-balance sm:text-5xl"
 	homeLead      = "text-lg text-muted-foreground text-balance"
+	// homeNumber is a big number: the live counts, a price, a score.
+	homeNumber = "text-3xl font-semibold tracking-tight tabular-nums"
 	// homeNote is a line under a section. Every one fills the same width
 	// and breaks at the same place, so none is balanced by itself.
 	homeNote = "text-lg text-muted-foreground text-pretty max-w-[76ch]"
@@ -42,6 +44,7 @@ templ Home(network model.Network, open HomeOpen) {
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
+				@HomeMoin()
 				@HomeStart()
 				@HomeDoes()
 				@HomeBackups()
@@ -86,7 +89,7 @@ templ HomeHero() {
 			<div class="flex flex-col items-center gap-6">
 				<h1 class="font-display text-[12vw] leading-[0.95] tracking-[-0.06em] sm:text-[clamp(3rem,5.4vw,5.75rem)] sm:tracking-[-0.05em]">
 					<span class="block">Deploy <br class="sm:hidden"/>anything.</span>
-					<span class="block text-muted-foreground/60">Lose nothing.</span>
+					<span class="block text-muted-foreground">Lose nothing.</span>
 				</h1>
 				<p class={ homeLead, "max-w-[34ch] max-sm:hidden" }>Your apps on your servers. Backups on your schedule, checked every day.</p>
 			</div>
@@ -132,12 +135,40 @@ templ HomeLive(network model.Network) {
 templ homeLiveNumber(count int, label, name string) {
 	<div class="flex flex-col gap-1 rounded-4xl bg-card p-6" data-live-number={ name }>
 		<dt class="sr-only">{ label }</dt>
-		<dd class="text-2xl font-semibold tracking-tight tabular-nums">{ liveCount(count) }</dd>
+		<dd class={ homeNumber }>{ liveCount(count) }</dd>
 		<dd class="text-sm text-muted-foreground">{ label }</dd>
 	</div>
 }
 
 // ---------------------------------------------------------------- start
+// HomeMoin says the name and where it comes from, one sentence a line.
+templ HomeMoin() {
+	<section class={ homeSection }>
+		<div class="flex flex-col gap-3">
+			<p class={ homeStatement }>Moin.</p>
+			<p class={ homeNote }><span class="font-mono">/mɔɪn/</span> Hamburg for hello. Any hour, one word.</p>
+		</div>
+		<div class="flex flex-col gap-3">
+			<p class={ homeStatement, "text-muted-foreground" }>I grew up next to one of Europe's busiest ports.</p>
+			<p class={ homeStatement, "text-muted-foreground" }>Millions of boxes. Packed once. Shipped anywhere.</p>
+			<p class={ homeStatement }>Nothing goes missing.</p>
+		</div>
+		<p class={ homeStatement }>Your apps are boxes too.</p>
+	</section>
+}
+
+// homeMoment is the one big thing of a section: what you get, as you see it.
+templ homeMoment(state, big, small string) {
+	<div class="flex h-full min-w-0 flex-col justify-end gap-4 rounded-4xl bg-card p-8">
+		<span class="flex items-center gap-3 font-medium">
+			@kit.Dot(kit.StateLive)
+			{ state }
+		</span>
+		<p class={ homeStatement, "break-words" }>{ big }</p>
+		<p class="text-sm text-muted-foreground">{ small }</p>
+	</div>
+}
+
 // homeSurface is one way to do the four steps of Get started.
 type homeSurface struct {
 	Value string
@@ -173,19 +204,22 @@ templ HomeStart() {
 	<section id="how" class={ homeSection }>
 		<h2 class={ homeStatement }>Four steps. Live.</h2>
 		<p class={ homeNote }>In the web, the terminal or with your AI agent. You pick.</p>
-		<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
-			<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
-				@kit.Choice("home-surface", "Where", homeSurfaceOptions(), "web")
-			</div>
-			for _, surface := range homeSurfaces {
-				<div class="hidden min-w-0" data-surface={ surface.Value }>
-					@kit.List() {
-						for index, step := range surface.Steps {
-							@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
-						}
-					}
+		<div class="grid items-stretch gap-4 lg:grid-cols-2">
+			<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
+				<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
+					@kit.Choice("home-surface", "Where", homeSurfaceOptions(), "web")
 				</div>
-			}
+				for _, surface := range homeSurfaces {
+					<div class="hidden min-w-0" data-surface={ surface.Value }>
+						@kit.List() {
+							for index, step := range surface.Steps {
+								@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
+							}
+						}
+					</div>
+				}
+			</div>
+			@homeMoment("my-app is live", "my-app.203-0-113-7.sslip.io", "HTTPS from the first deploy.")
 		</div>
 		<p class={ homeNote }>
 			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml.
@@ -210,11 +244,14 @@ templ homeStep(number, name, how string) {
 templ HomeBackups() {
 	<section id="backups" class={ homeSection }>
 		<h2 class={ homeStatement }>Backups that actually restore.</h2>
-		@kit.List() {
-			@homeReason("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
-			@homeReason("Checked every day.", "A real restore, by itself.", "/docs/concepts/backups")
-			@homeReason("A restore can be undone.", "One step back.", "/docs/guides/backups#undo-a-restore")
-		}
+		<div class="grid gap-4 md:grid-cols-3 md:grid-rows-3">
+			<div class="md:col-span-2 md:row-span-3">
+				@homeMoment("my-app", "Checked today.", "A real restore, by itself. Every day.")
+			</div>
+			@homeTile("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
+			@homeTile("Download anytime.", "One file.", "/docs/guides/backups#download-a-copy")
+			@homeTile("Undo a restore.", "One step back.", "/docs/guides/backups#undo-a-restore")
+		</div>
 		<p class={ homeNote }>
 			SQLite and Postgres, on your schedule.
 			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
@@ -227,18 +264,20 @@ templ HomeBackups() {
 templ HomeSecurity() {
 	<section id="security" class={ homeSection }>
 		<h2 class={ homeStatement }>Your server. Your keys.</h2>
-		@kit.List() {
-			@homeReason("The daemon only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
-			@homeReason("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
-			@homeReason("A rules file on your server.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
-		}
+		<div class="grid gap-4 md:grid-cols-3">
+			@homeTile("Only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
+			@homeTile("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
+			@homeTile("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
+		</div>
 	</section>
 }
 
-templ homeReason(statement, line, href string) {
-	@kit.Row(href) {
-		@compareLine(statement, line)
-	}
+// homeTile is a small tile of a section: a few words and where to read on.
+templ homeTile(statement, line, href string) {
+	<a href={ templ.SafeURL(href) } class="flex min-h-36 min-w-0 flex-col justify-end gap-1 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
+		<span class="font-medium">{ statement }</span>
+		<span class="text-sm text-muted-foreground">{ line }</span>
+	</a>
 }
 
 // ---------------------------------------------------------------- does
@@ -281,10 +320,10 @@ templ HomePricing() {
 	<section id="pricing" class={ homeSection }>
 		<h2 class={ homeStatement }>One price. Every feature.</h2>
 		@kit.Grid() {
-			<div class="flex flex-col gap-6 rounded-4xl bg-card p-6 sm:p-8" data-plan="hosted">
+			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="hosted">
 				<div class="flex flex-col gap-1">
-					<span class="text-base font-medium">Hosted</span>
-					<span class="flex items-baseline gap-2"><span class="text-3xl font-semibold tracking-tight tabular-nums">$29</span><span class="text-sm text-muted-foreground">a month per workspace</span></span>
+					<span class="font-medium">Hosted</span>
+					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$29</span><span class="text-sm text-muted-foreground">a month per workspace</span></span>
 					<span class="text-sm text-muted-foreground" data-yearly-deal>Or $249 a year. 30 days free, no card.</span>
 				</div>
 				@kit.Button(kit.Primary, "/auth", nil) {
@@ -292,10 +331,10 @@ templ HomePricing() {
 				}
 				@homePlanRows("Ready in minutes", "We run and update it", "GitHub and email set up", "Support by email")
 			</div>
-			<div class="flex flex-col gap-6 rounded-4xl bg-card p-6 sm:p-8" data-plan="self-hosted">
+			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="self-hosted">
 				<div class="flex flex-col gap-1">
-					<span class="text-base font-medium">Self-hosted</span>
-					<span class="flex items-baseline gap-2"><span class="text-3xl font-semibold tracking-tight tabular-nums">$0</span><span class="text-sm text-muted-foreground">forever</span></span>
+					<span class="font-medium">Self-hosted</span>
+					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$0</span><span class="text-sm text-muted-foreground">forever</span></span>
 					<span class="text-sm text-muted-foreground">Your own moin hub, on your server. Open source.</span>
 				</div>
 				@kit.Button(kit.Secondary, "/docs/self-hosting", nil) {
@@ -354,17 +393,10 @@ templ homeQuestion(question, answer string) {
 // "Lose nothing".
 templ HomeEnd() {
 	<section id="start" class={ homeSection, "items-start" }>
-		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8 sm:p-14">
+		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8">
 			@kit.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
-			<p class="text-lg text-muted-foreground sm:text-xl">
-				<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
-			</p>
-			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
-				<p>I grew up in Hamburg, next to one of Europe's busiest container ports. Millions of boxes a year, packed once, shipped anywhere, and nothing goes missing.</p>
-				<p>Your apps are containers too. { brand.Name } ships them to your servers and backs up their data to your bucket.</p>
-			</div>
 			<p class={ homeStatement, "pt-4" }>
-				Deploy anything. <span class="text-muted-foreground/60">Lose nothing.</span>
+				Deploy anything. <span class="text-muted-foreground">Lose nothing.</span>
 			</p>
 			<div class="flex flex-wrap gap-2">
 				@homePrimary()

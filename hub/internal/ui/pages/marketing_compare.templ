@@ -48,7 +48,7 @@ templ Compare(competitor Competitor) {
 		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
 			@kit.Header(kit.Back{}, brand.Name + " or " + competitor.Name + "?")
 			<p class={ homeLead, "max-w-2xl" }>{ competitor.Lead }</p>
-			<p class="text-2xl font-semibold tracking-tight tabular-nums">{ competitor.ScoreLine() }</p>
+			<p class={ homeNumber }>{ competitor.ScoreLine() }</p>
 			<div class="flex flex-col gap-6">
 				@compareHeader(competitor.Name, score)
 				for _, group := range compareGroups {
