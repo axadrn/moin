@@ -7,7 +7,11 @@ order: 1
 
 Moin. Hamburg for hello.
 
-I grew up in Hamburg, next to one of Europe's busiest ports. Millions of containers. Packed once. Shipped anywhere. Nothing goes missing. Your apps are containers too.
+I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports.
+
+Millions of containers. Packed once. Shipped anywhere. Nothing goes missing.
+
+Your apps are containers too. So I built moin, and named it after home.
 
 All of moin is five words. Know them, and you know moin.
 

@@ -44,7 +44,6 @@ templ Home(network model.Network, open HomeOpen) {
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
-				@HomeMoin()
 				@HomeStart()
 				@HomeDoes()
 				@HomeBackups()
@@ -141,20 +140,6 @@ templ homeLiveNumber(count int, label, name string) {
 }
 
 // ---------------------------------------------------------------- start
-// HomeMoin tells where the name and the idea come from, like every other
-// section: a title and a line under it.
-templ HomeMoin() {
-	<section class={ homeSection }>
-		<h2 class={ homeStatement }>Moin.</h2>
-		<p class={ homeNote }>
-			<span class="font-mono">/mɔɪn/</span> Hamburg for hello.
-			I grew up there, next to one of Europe's busiest ports.
-			Millions of containers. Packed once. Shipped anywhere. Nothing goes missing.
-			Your apps are containers too.
-		</p>
-	</section>
-}
-
 // homeMoment is the one big thing of a section: what you get, as you see it.
 templ homeMoment(state, big, small string) {
 	<div class="flex h-full min-w-0 flex-col justify-center gap-4 rounded-4xl bg-card p-8">
@@ -394,8 +379,16 @@ templ homeQuestion(question, answer string) {
 // "Lose nothing".
 templ HomeEnd() {
 	<section id="start" class={ homeSection, "items-start" }>
-		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8">
+		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8 sm:p-14">
 			@kit.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
+			<p class="text-lg text-muted-foreground sm:text-xl">
+				<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
+			</p>
+			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
+				<p>I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports.</p>
+				<p>Millions of containers. Packed once. Shipped anywhere. Nothing goes missing.</p>
+				<p>Your apps are containers too. So I built { brand.Name }, and named it after home.</p>
+			</div>
 			<p class={ homeStatement, "pt-4" }>
 				Deploy anything. <span class="text-muted-foreground">Lose nothing.</span>
 			</p>
