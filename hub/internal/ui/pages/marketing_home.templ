@@ -17,6 +17,8 @@ import (
 const (
 	homeStatement = "text-4xl font-semibold tracking-tight text-balance sm:text-5xl"
 	homeLead      = "text-lg text-muted-foreground text-balance"
+	// homeNote is a line under a section, kept short enough to read.
+	homeNote = homeLead + " max-w-[46ch]"
 	// homeSection is the one gap between the sections, and the room a
 	// section a link jumps to keeps above itself for the floating navbar.
 	homeSection = "flex scroll-mt-24 flex-col gap-8 pt-28 sm:pt-36"
@@ -169,7 +171,7 @@ func homeSurfaceOptions() []kit.Option {
 templ HomeStart() {
 	<section id="how" class={ homeSection }>
 		<h2 class={ homeStatement }>Live in four steps.</h2>
-		<p class={ homeLead }>In the web, the terminal or with your AI agent. You pick.</p>
+		<p class={ homeNote }>In the web, the terminal or with your AI agent. You pick.</p>
 		<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
 			<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
 				@kit.Choice("home-surface", "Where", homeSurfaceOptions(), "web")
@@ -184,7 +186,7 @@ templ HomeStart() {
 				</div>
 			}
 		</div>
-		<p class={ homeLead }>
+		<p class={ homeNote }>
 			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml. From your folder, GitHub or a CI image.
 			<a href="/docs/getting-started" class="text-foreground underline underline-offset-4">Get started</a>
 		</p>
@@ -212,7 +214,7 @@ templ HomeBackups() {
 			@homeReason("Checked every day.", brand.Name+" restores the newest backup into a throwaway database and reads it. If that fails, an alert tells you.", "/docs/concepts/backups")
 			@homeReason("A restore can be undone.", "The database as it was stays, so you can go back to it.", "/docs/guides/backups#undo-a-restore")
 		}
-		<p class={ homeLead }>
+		<p class={ homeNote }>
 			{ brand.Name } checks it every day, by itself. None of the seven tools we compare documents that.
 			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
 		</p>
@@ -304,7 +306,7 @@ templ HomePricing() {
 				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
 			</div>
 		}
-		<p class={ homeLead } data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
+		<p class={ homeNote } data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
 	</section>
 }
 
@@ -332,7 +334,7 @@ templ HomeQuestions() {
 			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it on your server if it is missing. You need no Dockerfile either.")
 			@homeQuestion("Which servers?", "Any Linux server you can log in to as root, amd64 or arm64, with systemd, at any provider.")
 		}
-		<p class={ homeLead }>
+		<p class={ homeNote }>
 			<a href="/docs/faq" class="text-foreground underline underline-offset-4">All questions</a>
 		</p>
 	</section>
