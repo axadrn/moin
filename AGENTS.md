@@ -21,11 +21,15 @@ addresses, personal details.
 - `gofmt` clean, `go vet ./...` clean.
 - Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
+- An issue is closed by writing `Fixes #N` exactly once, where the work gets finished: in the last commit for a small change directly on `main`, in the PR description for anything with several commits. Earlier commits may mention `#N` without "Fixes".
 - Push, deploy, release. A push to `main` runs no workflow; test locally first. The Deploy workflow ships: tests, the box, for a tag the GitHub release from `hub/content/changelog.md`, then the hosted hub updates itself through Tailscale. Deploy for typos, docs and design: Actions, Deploy, Run workflow. Release for a feature or a fix: its notes in the changelog, then the tag `v…`.
+- Small releases: one finished thing is one tag. `main` is always releasable; only unfinished work stays on a branch.
 - Release notes follow one format, the same in moin, goilerplate and shadcn-templ, so the eye finds things fast. The same text is the GitHub release and the newest section of `hub/content/changelog.md` (`## v…`, the date like `November 3, 2026`, then the notes), which `/changelog` shows and a test checks:
   - First line: `**In short:**` and one sentence, what is new and why to update.
-  - Then these sections in this order, empty ones left out: `### New` (what you can do now), `### Changed` (what behaves differently, everything that could surprise), `### Fixed` (what was broken and works now), `### Removed` (what is gone, and what to use instead), `### Upgrade` (always there: how to update, the exact command, one line).
+  - Then these sections in this order, empty ones left out: `### New` (what you can do now), `### Changed` (what behaves differently, everything that could surprise), `### Fixed` (what was broken and works now), `### Removed` (what is gone, and what to use instead), `### Upgrade` (always there: how to update, the exact command; one line, or a short numbered list when it needs several steps).
+  - Plain words a developer who has never seen moin's internals knows. Short sentences, one idea each: what the reader gets or has to do. No internal names, no backstory.
   - One bullet per thing: `- **Name**: one sentence of what the user gets.` Commands in backticks. What the user sees, never internals or commit hashes.
+  - A bullet that has an issue ends with `(#N)`. No issue is created just for a note. Example: `- **Deploy every push**: The switch shows what is saved. (#49)`
   - A big turning point may add a short `### Why` under the first line. Longer stories go in a blog post or the docs, linked.
 
 ## Test
