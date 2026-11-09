@@ -253,8 +253,8 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-theme-set]");
   if (!button) return;
   try {
-    if (button.dataset.themeSet === "system") localStorage.removeItem("theme");
-    else localStorage.setItem("theme", button.dataset.themeSet);
+    if (button.dataset.themeSet === "system") localStorage.removeItem("kit-mode");
+    else localStorage.setItem("kit-mode", button.dataset.themeSet);
   } catch {}
   window.themeUtils?.applyTheme();
   markTheme();

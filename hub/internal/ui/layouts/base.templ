@@ -134,9 +134,14 @@ templ themeScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(function() {
 			window.themeUtils = window.themeUtils || {};
+			// One choice for moin and the kit. Browsers that chose before keep it.
+			if (localStorage.getItem('theme')) {
+				localStorage.setItem('kit-mode', localStorage.getItem('theme'));
+				localStorage.removeItem('theme');
+			}
 			const media = window.matchMedia('(prefers-color-scheme: dark)');
 			window.themeUtils.getThemePreference = function() {
-				return localStorage.getItem('theme') || 'system';
+				return localStorage.getItem('kit-mode') || 'system';
 			};
 			window.themeUtils.applyTheme = function() {
 				const preference = window.themeUtils.getThemePreference();
@@ -147,7 +152,7 @@ templ themeScript() {
 			window.themeUtils.cycleTheme = function() {
 				const current = window.themeUtils.getThemePreference();
 				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
-				localStorage.setItem('theme', next);
+				localStorage.setItem('kit-mode', next);
 				window.themeUtils.applyTheme();
 			};
 			window.themeUtils.applyTheme();

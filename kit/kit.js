@@ -48,28 +48,11 @@
     root.classList.contains("dark") ||
     (!root.classList.contains("light") && matchMedia("(prefers-color-scheme: dark)").matches);
 
-  // Theme: tokens saved by the editor, on every page.
-  function applyTheme() {
-    let theme = {};
-    try {
-      theme = JSON.parse(read("kit-theme")) || {};
-    } catch {}
-    for (const name of [...root.style]) {
-      if (name.startsWith("--")) root.style.removeProperty(name);
-    }
-    if (theme.radius) root.style.setProperty("--radius", theme.radius);
-    for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
-    for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
-      root.style.setProperty(name, `light-dark(${light}, ${dark})`);
-    }
-  }
-
-  window.kit = { applyMode, setMode, applyTheme, read, write };
+  window.kit = { applyMode, setMode, read, write };
   // Nothing chosen here means system, which needs no class: the page keeps
   // what it has, so a site with its own switch can use the kit.
   if (read("kit-mode")) applyMode();
   else markMode("system");
-  applyTheme();
 
   document.addEventListener("change", (event) => {
     if (event.target.matches?.("input[data-mode-set]")) setMode(event.target.value);

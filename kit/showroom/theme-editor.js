@@ -2,6 +2,26 @@
 // so the editor only sets them on the page and writes them out to copy.
 
 (() => {
+  const root = document.documentElement;
+
+  // The theme you are trying stays on while you walk through the showroom.
+  // Only here: a site that uses the kit has its own values.
+  function applyTheme() {
+    let theme = {};
+    try {
+      theme = JSON.parse(kit.read("kit-theme")) || {};
+    } catch {}
+    for (const name of [...root.style]) {
+      if (name.startsWith("--")) root.style.removeProperty(name);
+    }
+    if (theme.radius) root.style.setProperty("--radius", theme.radius);
+    for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
+    for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
+      root.style.setProperty(name, `light-dark(${light}, ${dark})`);
+    }
+  }
+  applyTheme();
+
   const COLORS = [
     ["--background", "Ground"],
     ["--foreground", "Text"],
@@ -425,7 +445,7 @@
     save(theme, keepInputs) {
       theme.vars = varsOf(theme);
       kit.write("kit-theme", JSON.stringify(theme));
-      kit.applyTheme();
+      applyTheme();
       this.refresh(keepInputs);
     }
 
