@@ -191,7 +191,7 @@ templ appHomeSection(view AppPageView) {
 			for _, section := range appSections[1:] {
 				@kit.Row(appPath + section.Path) {
 					@kit.RowText(section.Label, "")
-					<span class="truncate text-sm text-muted-foreground">{ appSectionValue(app, view.Deploys, section.ID) }</span>
+					<span class="truncate text-sm text-muted-foreground">{ appSectionValue(app, section.ID) }</span>
 				}
 			}
 		}
@@ -230,13 +230,8 @@ templ appHomeSection(view AppPageView) {
 
 // appSectionValue is what a section holds, in a word, for the list on a
 // phone.
-func appSectionValue(app model.App, deploys []api.Deploy, id string) string {
+func appSectionValue(app model.App, id string) string {
 	switch id {
-	case "deploys":
-		if len(deploys) == 0 {
-			return "none yet"
-		}
-		return fmt.Sprintf("%d", len(deploys))
 	case "domains":
 		domains := appDomains(app)
 		if len(domains) == 0 {
@@ -396,12 +391,12 @@ templ loadLogsButton(appPath string) {
 }
 
 // AppDetail is the state and the buttons of an app, for the reload on every
-// change the app event stream reports. On the Deploys section (in empty) it
-// brings the facts and the deploys too, and follows a running deploy.
-templ AppDetail(app model.App, deploys []api.Deploy, selected int, follow bool, shown int, in string) {
+// change the app event stream reports. For the Deploys section (withDeploys)
+// it brings the deploys too, and follows a running deploy.
+templ AppDetail(app model.App, deploys []api.Deploy, selected int, follow bool, shown int, withDeploys bool) {
 	@appStateLine(app)
 	@appActions(app)
-	if in == "" || in == "deploys" {
+	if withDeploys {
 		@appDeploys(app, deploys, selected, follow)
 		// Following the newest deploy, a new one takes the log.
 		if follow && len(deploys) > 0 && deploys[0].Number != shown {

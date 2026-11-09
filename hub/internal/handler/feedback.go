@@ -80,6 +80,16 @@ func invalid(w http.ResponseWriter, detail map[string]string) {
 	w.Header().Set("HX-Reswap", "none")
 }
 
+// startDownload sends the moin:download event moin.js handles.
+func startDownload(w http.ResponseWriter, link string) {
+	event, err := json.Marshal(map[string]map[string]string{"moin:download": {"link": link}})
+	if err != nil {
+		slog.Error("encode download failed", "error", err)
+		return
+	}
+	w.Header().Set("HX-Trigger", asciiJSON(event))
+}
+
 // asciiJSON writes every rune beyond ASCII as \uXXXX: a header carries
 // only ASCII safely, so "…" would arrive as "â€¦". JSON.parse in the
 // browser reads the escapes back.

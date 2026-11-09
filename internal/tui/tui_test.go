@@ -155,3 +155,17 @@ func TestKeyMsgNames(t *testing.T) {
 		}
 	}
 }
+
+func TestNothingToGoBackToNeedsABucketMoinCanReach(t *testing.T) {
+	const nothing = "Nothing to go back to yet."
+	m := fixture(120, 40)
+	u := ui{p: m.pal}
+	m.app.backups = &client.AppBackups{Databases: []client.DatabaseBackups{{}}}
+	if rows := strings.Join(m.momentRows(u, nil, 60, 5), "\n"); !strings.Contains(rows, nothing) {
+		t.Errorf("no copies and no problem should say %q, got:\n%s", nothing, rows)
+	}
+	m.app.backups.Databases[0].Problem = "The bucket can't be reached."
+	if rows := strings.Join(m.momentRows(u, nil, 60, 5), "\n"); strings.Contains(rows, nothing) {
+		t.Errorf("a bucket moin cannot reach proves nothing, got:\n%s", rows)
+	}
+}

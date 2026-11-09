@@ -199,39 +199,42 @@ var backupScript = templ.NewOnceHandle()
 // with Restore; page is the database the page is about.
 templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, page, title string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
-	@kit.Section(title, nil) {
-		<form
-			class="flex flex-col gap-2"
-			hx-post={ appPath + "/backups/restore" }
-			hx-target="#db-backups"
-			hx-swap="outerHTML"
-			hx-disable="find button[type='submit']"
-			hx-confirm={ "Restore " + databaseName(database) + " to the moment you picked? It replaces the data there now. moin keeps the data of now beside it, so you can undo this; the app stops for a moment." }
-			data-confirm-name={ view.App.Name }
-			data-confirm-action="Restore"
-			data-restore
-		>
-			@kit.CSRF()
-			<input type="hidden" name="database" value={ database }/>
-			<input type="hidden" name="page" value={ page }/>
-			@kit.List() {
-				if len(backup.Moments) == 0 {
-					@kit.Row("") {
-						<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
+	// When the bucket cannot be reached, nobody knows there is nothing.
+	if len(backup.Moments) > 0 || backup.Problem == "" {
+		@kit.Section(title, nil) {
+			<form
+				class="flex flex-col gap-2"
+				hx-post={ appPath + "/backups/restore" }
+				hx-target="#db-backups"
+				hx-swap="outerHTML"
+				hx-disable="find button[type='submit']"
+				hx-confirm={ "Restore " + databaseName(database) + " to the moment you picked? It replaces the data there now. moin keeps the data of now beside it, so you can undo this; the app stops for a moment." }
+				data-confirm-name={ view.App.Name }
+				data-confirm-action="Restore"
+				data-restore
+			>
+				@kit.CSRF()
+				<input type="hidden" name="database" value={ database }/>
+				<input type="hidden" name="page" value={ page }/>
+				@kit.List() {
+					if len(backup.Moments) == 0 {
+						@kit.Row("") {
+							<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
+						}
+					}
+					for _, moment := range backup.Moments {
+						@momentPick(moment, view.Now)
 					}
 				}
-				for _, moment := range backup.Moments {
-					@momentPick(moment, view.Now)
+				if len(backup.Moments) > 0 {
+					<div class="flex justify-end">
+						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
+							Restore
+						}
+					</div>
 				}
-			}
-			if len(backup.Moments) > 0 {
-				<div class="flex justify-end">
-					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
-						Restore
-					}
-				</div>
-			}
-		</form>
+			</form>
+		}
 	}
 }
 
@@ -422,7 +425,7 @@ func upperFirst(text string) string {
 // the user's own bucket through a link that lasts 15 minutes.
 templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
 	if len(backup.Copies) > 0 {
-		@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+view.App.Link()+"/backups/download?database="+url.QueryEscape(database), templ.Attributes{"id": "db-download", "data-download": true}) {
+		@kit.RowButton(false, templ.Attributes{"id": "db-download", "data-download": true, "hx-get": ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/download?database=" + url.QueryEscape(database), "hx-swap": "none", "hx-disable": "this"}) {
 			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
 			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
 		}

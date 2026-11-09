@@ -200,6 +200,12 @@ document.addEventListener("htmx:before:request", (event) => {
   clearSaid(event.target.closest("[role=listitem], li, form, header") || event.target);
 });
 
+// The hub answers a download with a link: the browser fetches the file and
+// the page stays.
+document.addEventListener("moin:download", (event) => {
+  location.href = event.detail.link;
+});
+
 // A field a request failed on turns red and takes the focus; its message
 // replaces the hint under it, or goes in a line under its form when it has
 // none. Changing the field clears it again.

@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -437,7 +438,9 @@ func (m model) momentRows(u ui, moments []moment, innerWidth, visible int) []str
 		cells := []cell{{u.text(item.Label), labelWidth, false}, {u.muted(item.At.Local().Format("Jan 2 15:04")), 14, false}, {u.muted(item.db), 0, false}}
 		rows = append(rows, u.row(cells, innerWidth, index == selected))
 	}
-	if len(moments) == 0 {
+	// When the bucket cannot be reached, nobody knows there is nothing.
+	unknown := slices.ContainsFunc(m.app.backups.Databases, func(database client.DatabaseBackups) bool { return database.Problem != "" })
+	if len(moments) == 0 && !unknown {
 		rows = append(rows, "", u.muted("Nothing to go back to yet."))
 	}
 	return rows

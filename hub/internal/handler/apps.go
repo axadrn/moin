@@ -158,10 +158,12 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 	render(w, r, pages.AppPage(view))
 }
 
-// Detail answers the header and deploys of an app, for the reload after a
-// change. n is the deploy whose log shows (0 the newest); shown, when the
-// page follows the newest, the one it shows now, so a new deploy takes the
-// log. An app removed meanwhile sends the page to the list.
+// Detail answers the state and the buttons of an app, after a change. The
+// Deploys section also asks for its list and log with n, the deploy whose
+// log shows (0 the newest), and shown, when the page follows the newest,
+// the one it shows now, so a new deploy takes the log. An action asks for
+// neither: its change reaches the list and the log as an event, like any
+// other change. An app removed meanwhile sends the page to the list.
 func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	app, deploys, err := h.apps.Deploys(workspace.ID, r.PathValue("app"), 20)
@@ -175,34 +177,34 @@ func (h *AppsHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "load app failed", err)
 		return
 	}
-	selected, _ := strconv.Atoi(r.URL.Query().Get("n"))
-	shown, err := strconv.Atoi(r.URL.Query().Get("shown"))
+	query := r.URL.Query()
+	selected, _ := strconv.Atoi(query.Get("n"))
+	shown, err := strconv.Atoi(query.Get("shown"))
 	follow := selected == 0 && err == nil
-	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber), selected, follow, shown, r.URL.Query().Get("in")))
+	render(w, r, pages.AppDetail(*app, api.NewDeploys(deploys, app.LiveNumber), selected, follow, shown, query.Has("n")))
 }
 
-// Rollback starts the release of an earlier deploy again. The page follows
-// the new running deploy on its own.
+// Rollback starts the release of an earlier deploy again and goes to the
+// Deploys section, whose log follows the new deploy.
 func (h *AppsHandler) Rollback(w http.ResponseWriter, r *http.Request) {
 	number, _ := strconv.Atoi(r.FormValue("number"))
-	deploy, err := h.apps.Rollback(actor(r), r.PathValue("app"), number)
+	_, err := h.apps.Rollback(actor(r), r.PathValue("app"), number)
 	if err != nil {
 		failed(w, r, "Rollback not started", err, nil)
 		return
 	}
-	h.Detail(w, r)
-	answerDone(w, r, "Rollback started", fmt.Sprintf("v%d starts v%d again.", deploy.Number, number))
+	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+r.PathValue("app")+"/deploys", http.StatusSeeOther)
 }
 
 // Redeploy builds the newest source again. The page follows the new deploy.
 func (h *AppsHandler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	deploy, err := h.apps.Redeploy(actor(r), r.PathValue("app"))
 	if err != nil {
-		failed(w, r, "Redeploy not started", err, nil)
+		failed(w, r, "Deploy not started", err, nil)
 		return
 	}
 	h.Detail(w, r)
-	answerDone(w, r, "Redeploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
+	answerDone(w, r, "Deploy started", fmt.Sprintf("v%d builds the newest source.", deploy.Number))
 }
 
 // Restart starts the live deploy again with the env and domains as they

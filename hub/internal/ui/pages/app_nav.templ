@@ -168,7 +168,7 @@ templ appSection(appName, appLink, section string) {
 		@appTabs(appName, appLink, section)
 		if section != "deploys" {
 			// The Deploys section reloads through its list (appDeploys).
-			<div hidden hx-get={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/detail?in=" + section } hx-trigger="apps from:body" hx-swap="none"></div>
+			<div hidden hx-get={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/detail" } hx-trigger="apps from:body" hx-swap="none"></div>
 		}
 		{ children... }
 	</div>

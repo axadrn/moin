@@ -31,15 +31,16 @@ func (h *AppsHandler) BackupRestore(w http.ResponseWriter, r *http.Request) {
 	h.renderDatabaseBackups(w, r)
 }
 
-// BackupDownload sends the browser to the newest copy of the database,
-// in the user's own bucket, through a link that lasts 15 minutes.
+// BackupDownload gives the page a link to the newest copy of the database,
+// in the user's own bucket, that lasts 15 minutes. The page stays and the
+// browser fetches the file. Without a link, the page says why under the row.
 func (h *AppsHandler) BackupDownload(w http.ResponseWriter, r *http.Request) {
 	download, err := h.apps.Download(r.Context(), actor(r), r.PathValue("app"), r.FormValue("database"), "")
 	if err != nil {
-		http.Error(w, errorMessage(err), http.StatusConflict)
+		answerFailed(w, r, "Not downloaded", errorMessage(err))
 		return
 	}
-	http.Redirect(w, r, download.Link, http.StatusSeeOther)
+	startDownload(w, download.Link)
 }
 
 // BackupSchedule saves how often the app's databases are copied, how long
