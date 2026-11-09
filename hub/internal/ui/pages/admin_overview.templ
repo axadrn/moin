@@ -40,6 +40,16 @@ templ AdminOverview(data *model.AdminOverview) {
 				@kit.Row("/admin/activity") {
 					@kit.RowText("Activity", "")
 				}
+				@kit.RowButton(false, templ.Attributes{
+					"hx-post":             "/admin/offers/claim",
+					"hx-swap":             "none",
+					"hx-disable":          "this",
+					"hx-confirm":          "Apply every open offer to the account with that address?",
+					"data-confirm-name":   "offers",
+					"data-confirm-action": "Apply offers",
+				}) {
+					<span class="font-medium">Apply open offers</span>
+				}
 				@kit.Row("/admin/old-domain") {
 					@kit.RowText("Old domain", "")
 				}

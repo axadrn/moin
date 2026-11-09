@@ -192,6 +192,9 @@ func New(cfg *config.Config) (*App, error) {
 	adminService.UseOldDomain(oldDomain)
 	if cfg.Billing {
 		adminService.UsePlans(subscriptions, activity)
+		offers := service.NewOfferService(repository.NewOffers(database), adminEvents)
+		workspaceService.UseOffers(offers)
+		adminService.UseOffers(offers)
 	}
 	application := &App{
 		Cfg: cfg, DB: database, HistoryDB: history, AuthService: auth, UserService: userService,

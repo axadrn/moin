@@ -358,6 +358,8 @@ func adminRoutes(mux *http.ServeMux, app *app.App) {
 	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 	mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
+	mux.HandleFunc("POST /admin/users/{userID}/offer", adminRoute(admin.ApplyOffer))
+	mux.HandleFunc("POST /admin/offers/claim", adminRoute(admin.ClaimOffers))
 	mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
 }
 

@@ -67,6 +67,10 @@ type AdminActivityEvent struct {
 
 func AdminActivityActionLabel(action string) string {
 	switch action {
+	case "admin.offer_applied":
+		return "Offer applied"
+	case "admin.offers_claimed":
+		return "Open offers applied"
 	case "admin.impersonation_started":
 		return "Impersonation started"
 	case "admin.impersonation_stopped":

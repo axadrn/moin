@@ -83,12 +83,13 @@ func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceLink, planID, i
 			"plan_id":             planID,
 			"checkout_attempt_id": attemptID,
 		}},
-		AllowPromotionCodes: stripe.Bool(true),
-		ExpiresAt:           stripe.Int64(checkoutExpiresAt.Unix()),
+		ExpiresAt: stripe.Int64(checkoutExpiresAt.Unix()),
 		ManagedPayments: &stripe.CheckoutSessionManagedPaymentsParams{
 			Enabled: stripe.Bool(true),
 		},
 	}
+
+	setCheckoutDiscount(params, sub)
 
 	sess, err := checkoutsession.New(params)
 	if err != nil {
@@ -107,6 +108,16 @@ func (s *StripeProvider) CreateCheckoutURL(workspaceID, workspaceLink, planID, i
 
 	slog.Info("stripe checkout created", "workspace_id", workspaceID, "plan_id", planID, "session_id", sess.ID)
 	return sess.URL, nil
+}
+
+// setCheckoutDiscount sets the coupon of the subscription, or lets the buyer
+// type a promotion code: Stripe refuses both together.
+func setCheckoutDiscount(params *stripe.CheckoutSessionParams, sub *model.Subscription) {
+	if sub.CouponID != nil && *sub.CouponID != "" {
+		params.Discounts = []*stripe.CheckoutSessionDiscountParams{{Coupon: sub.CouponID}}
+		return
+	}
+	params.AllowPromotionCodes = stripe.Bool(true)
 }
 
 func (s *StripeProvider) BillingManagementURL(workspaceID, workspaceLink string) (string, error) {
