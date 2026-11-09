@@ -7,7 +7,7 @@ description: What shipped in moin, newest first.
 
 November 9, 2026
 
-**In short:** a new web app, calm and fast like a native one, and backups you can explain in a minute: copies on your schedule in your own bucket, checked every day.
+**In short:** a new web app and backups you can explain in a minute, so update, but stop apps that use SQLite first.
 
 ### New
 - **A new web app**: grouped lists, one tab bar per app, pages that load whole and fast, light and dark, built from moin's own parts.
@@ -28,7 +28,7 @@ November 9, 2026
 - **Pin apps**: pinned apps come first.
 
 ### Changed
-- **The agent is now the daemon, and the control plane the hub**: in every command, page and file. An update moves a server by itself and leaves its apps running.
+- **The agent is now the daemon, and the control plane the hub**: in every command, page and file. An update moves a server by itself.
 - **`moin deploy` asks before it creates an app**, so a typo makes no new one. Scripts pass `--yes`.
 - **A setting in compose.yml is locked in moin**: domains, backups, the instant address and a required password show **from compose.yml** and change only there.
 - **Saving never restarts an app**: a changed env var, domain or password waits, and the app head says how many wait.
@@ -48,13 +48,13 @@ November 9, 2026
 - **Backup alerts**: a stopped app no longer raises them.
 
 ### Removed
-- **Every change for SQLite**: going back to any minute is gone, because it could damage the live database of apps that open SQLite for each request. Pick every 15 minutes for the closest backups; the old `litestream/` folders stay in your bucket and moin no longer reads them, so you can delete them.
+- **Every change for SQLite**: going back to any minute is gone, because it could damage the live database of apps that open SQLite for each request. Pick every 15 minutes for the closest backups.
 - **`x-moin.database`**: every database is backed up anyway; pick one in the list or with `--db`.
 - **Aliases in the CLI**: `ls`, `list`, `remove`, `unset`, `moin app` and `registry add`. Use the one name each command has now.
 - **`moin agent`**: it is `moin daemon`.
 
 ### Upgrade
-Self-hosted: **Update now**, or `sh update.sh`, then `moin servers update`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
+Stop apps that use SQLite first with `moin stop`: the old backup process can damage a database that is being written when it exits. Self-hosted: **Update now**, or `sh update.sh`, and the servers follow by themselves. Then `moin start`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Copies from before this update stay in your bucket, but moin no longer lists them, so delete nothing.
 
 ## v1.0.0-beta.25
 
