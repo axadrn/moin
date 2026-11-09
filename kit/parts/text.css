@@ -48,4 +48,12 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  /* A link in a line of text. */
+  .kit-link {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+  .kit-link:hover { color: var(--foreground); }
 }

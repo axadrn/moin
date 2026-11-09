@@ -44,6 +44,7 @@ func TestPartsPrintTheKitsHTML(t *testing.T) {
 		{"code-command", Command(CommandProps{Text: "moin deploy my-app"}), ""},
 		{"tabs", Tabs(TabsProps{Label: "Sections", Tabs: []Tab{{Label: "App", Href: "#kit", Active: true}, {Label: "Deploys", Href: "#kit"}, {Label: "Domains", Href: "#kit"}, {Label: "Logs", Href: "#kit"}}}), ""},
 		{"tabs-quiet", Tabs(TabsProps{Label: "Sections", Quiet: true, Tabs: []Tab{{Label: "App", Href: "#kit", Active: true}, {Label: "Deploys", Href: "#kit"}, {Label: "Domains", Href: "#kit"}, {Label: "Logs", Href: "#kit"}}}), ""},
+		{"bar-floating", BarLinks(BarLinksProps{Label: "Acme", Links: []BarLink{{Label: "Docs", Href: "#kit"}, {Label: "Pricing", Href: "#kit", Current: true}}}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "On", Checked: true}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "Cannot change", Disabled: true}), ""},
 	}

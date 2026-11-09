@@ -14,22 +14,20 @@ import (
 templ AppBar() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ user := ctxkeys.User(ctx) }}
-	<header id="app-bar" class="kit-bar" data-app-base={ basePath }>
-		<div class="kit-page kit-bar-inner">
-			<a href={ templ.SafeURL(basePath + "/overview") } class="kit-row" aria-label="Home">
-				@kit.Wordmark("text-xl leading-none")
+	@parts.Bar(parts.BarProps{ID: "app-bar", Attrs: templ.Attributes{"data-app-base": basePath}}) {
+		<a href={ templ.SafeURL(basePath + "/overview") } class="kit-row" aria-label="Home">
+			@parts.Wordmark(parts.WordmarkProps{})
+		</a>
+		<span class="kit-fill"></span>
+		@parts.Button(parts.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"aria-label": "Search", "aria-keyshortcuts": "Meta+K /", "data-open-palette": true}}) {
+			<i class="kit-icon kit-icon-search"></i>
+		}
+		if user != nil {
+			<a href={ templ.SafeURL(basePath + "/settings") } class="kit-row" aria-label="Settings">
+				@UserAvatar(user)
 			</a>
-			<span class="kit-fill"></span>
-			@parts.Button(parts.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"aria-label": "Search", "aria-keyshortcuts": "Meta+K /", "data-open-palette": true}}) {
-				<i class="kit-icon kit-icon-search"></i>
-			}
-			if user != nil {
-				<a href={ templ.SafeURL(basePath + "/settings") } class="kit-row" aria-label="Settings">
-					@UserAvatar(user)
-				</a>
-			}
-		</div>
-	</header>
+		}
+	}
 	@palette(basePath)
 }
 
