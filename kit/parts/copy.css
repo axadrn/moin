@@ -6,7 +6,7 @@
     min-width: 0;
     align-items: center;
     gap: var(--space-2);
-    padding-inline: var(--space-5) var(--scroll-edge);
+    padding-inline: var(--space-5) max(var(--scroll-edge), var(--space-1));
     border-radius: var(--radius-press);
     background: var(--muted);
   }
