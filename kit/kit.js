@@ -29,6 +29,10 @@
     if (mode !== "system") root.classList.add(mode);
     // Inline, so no other stylesheet on the page can pin the scheme.
     root.style.colorScheme = mode === "system" ? root.dataset.theme || "light dark" : mode;
+    markMode(mode);
+  }
+
+  function markMode(mode) {
     document.querySelectorAll("[data-mode-set]").forEach((input) => {
       if (input.matches("input")) input.checked = input.value === mode;
       else input.setAttribute("aria-pressed", String(input.dataset.modeSet === mode));
@@ -61,7 +65,10 @@
   }
 
   window.kit = { applyMode, setMode, applyTheme, read, write };
-  applyMode();
+  // Nothing chosen here means system, which needs no class: the page keeps
+  // what it has, so a site with its own switch can use the kit.
+  if (read("kit-mode")) applyMode();
+  else markMode("system");
   applyTheme();
 
   document.addEventListener("change", (event) => {

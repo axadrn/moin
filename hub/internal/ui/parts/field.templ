@@ -1,0 +1,181 @@
+package parts
+
+import "github.com/axadrn/moin/hub/internal/ctxkeys"
+
+// FieldProps is a Field: the label over the control with the id For, and a
+// line under it. Error takes the place of Hint.
+type FieldProps struct {
+	Label string
+	For   string
+	Hint  string
+	Error string
+}
+
+// Field puts a label over its control and a line under it. The line is
+// there from the start, so a message only changes text and nothing moves.
+// moin.js writes a server's answer into it (data-field-hint).
+templ Field(p FieldProps) {
+	<div class="kit-field">
+		if p.Label != "" {
+			<label for={ p.For }>{ p.Label }</label>
+		}
+		{ children... }
+		<p id={ p.For + "-hint" } class="kit-hint" data-field-hint={ p.For } data-hint={ p.Hint } data-invalid?={ p.Error != "" } aria-live="polite">
+			if p.Error != "" {
+				{ p.Error }
+			} else {
+				{ p.Hint }
+			}
+		</p>
+	</div>
+}
+
+// InputProps is an Input. Attrs carry the rest: autocomplete, required, htmx.
+type InputProps struct {
+	ID          string
+	Name        string
+	Type        string
+	Value       string
+	Placeholder string
+	Attrs       templ.Attributes
+}
+
+// Input is a text field, as high as a button.
+templ Input(p InputProps) {
+	<input
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		class="kit-input"
+		if p.Type != "" {
+			type={ p.Type }
+		}
+		if p.Name != "" {
+			name={ p.Name }
+		}
+		if p.Value != "" {
+			value={ p.Value }
+		}
+		if p.Placeholder != "" {
+			placeholder={ p.Placeholder }
+		}
+		{ p.Attrs... }
+	/>
+}
+
+// SwitchProps is a Switch. Label names it when no words stand next to it.
+type SwitchProps struct {
+	ID       string
+	Name     string
+	Value    string
+	Label    string
+	Checked  bool
+	Disabled bool
+	Attrs    templ.Attributes
+}
+
+// Switch is on or off and counts at once. autocomplete off keeps a browser
+// from restoring a state that is not the stored one after a reload.
+templ Switch(p SwitchProps) {
+	<span class="kit-switch">
+		<input
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			type="checkbox"
+			role="switch"
+			autocomplete="off"
+			if p.Name != "" {
+				name={ p.Name }
+			}
+			if p.Value != "" {
+				value={ p.Value }
+			}
+			if p.Label != "" {
+				aria-label={ p.Label }
+			}
+			checked?={ p.Checked }
+			disabled?={ p.Disabled }
+			{ p.Attrs... }
+		/>
+		<span></span>
+	</span>
+}
+
+// CSRF is the hidden token every form that changes something sends.
+templ CSRF() {
+	<input type="hidden" name="csrf_token" value={ ctxkeys.CSRFToken(ctx) }/>
+}
+
+// Option is one choice of a Select or a Choice. Attrs go on its radio.
+type Option struct {
+	Value string
+	Label string
+	Attrs templ.Attributes
+}
+
+// SelectProps is a Select: its id, the form field, what it picks for screen
+// readers, the options and the one picked.
+type SelectProps struct {
+	ID       string
+	Name     string
+	Label    string
+	Options  []Option
+	Value    string
+	Disabled bool
+}
+
+// Select picks one of a list inside a form. The checked radio is the value
+// the form sends, so hx-trigger "change" works. kit.js writes the pick into
+// the button.
+templ Select(p SelectProps) {
+	<div class="kit-select">
+		<button type="button" id={ p.ID } popovertarget={ p.ID + "-list" } aria-label={ p.Label } disabled?={ p.Disabled } { anchor("anchor-name", p.ID)... }>
+			<span class="kit-truncate" data-select-label>{ pickedLabel(p) }</span>
+		</button>
+		<div popover id={ p.ID + "-list" } role="radiogroup" aria-label={ p.Label } { anchor("position-anchor", p.ID)... }>
+			for _, option := range p.Options {
+				<label class="kit-option">
+					<input type="radio" name={ p.Name } value={ option.Value } checked?={ option.Value == p.Value } { option.Attrs... }/>
+					<span>{ option.Label }</span>
+				</label>
+			}
+		</div>
+	</div>
+}
+
+// anchor ties the list of a Select to its button. templ would drop the
+// property as unknown from a plain style attribute.
+func anchor(property, id string) templ.Attributes {
+	return templ.Attributes{"style": property + ":--" + id}
+}
+
+func pickedLabel(p SelectProps) string {
+	for _, option := range p.Options {
+		if option.Value == p.Value {
+			return option.Label
+		}
+	}
+	if len(p.Options) > 0 {
+		return p.Options[0].Label
+	}
+	return ""
+}
+
+// ChoiceProps is a Choice: the form field, what it picks for screen readers,
+// the options and the checked one.
+type ChoiceProps struct {
+	Name    string
+	Label   string
+	Options []Option
+	Checked string
+}
+
+// Choice is "one of these" side by side, inside a form.
+templ Choice(p ChoiceProps) {
+	<div class="kit-choice" role="radiogroup" aria-label={ p.Label }>
+		for _, option := range p.Options {
+			<label><input type="radio" name={ p.Name } value={ option.Value } checked?={ option.Value == p.Checked } autocomplete="off" { option.Attrs... }/>{ option.Label }</label>
+		}
+	</div>
+}

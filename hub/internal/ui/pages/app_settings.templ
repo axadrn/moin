@@ -5,7 +5,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/parts"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -18,18 +18,18 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
 	@layouts.App("Account · Settings") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, "Account")
-			@kit.Segmented("account-tabs", "Account", []kit.Segment{
+			@parts.Header(parts.HeaderProps{Back: parts.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, Title: "Account"})
+			@parts.Tabs(parts.TabsProps{ID: "account-tabs", Label: "Account", Tabs: []parts.Tab{
 				{Label: "Profile", Href: settingsPath, Active: activeTab == "profile"},
 				{Label: "Security", Href: settingsPath + "?tab=security", Active: activeTab == "security"},
 				{Label: "Tokens", Href: settingsPath + "?tab=tokens", Active: activeTab == "tokens"},
-			})
+			}})
 			switch activeTab {
 				case "security":
 					if passwordRemoved {
-						@kit.Quiet() {
+						<p class="kit-small kit-muted">
 							Password removed.
-						}
+						</p>
 					}
 					@settingsPasswordCard()
 					@SettingsSessionsSection(sessions, currentSessionID)
@@ -42,7 +42,7 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 					@SettingsAvatarSection(user)
 					@settingsNameCard(user)
 					@settingsEmailCard(user)
-					@kit.List() {
+					@parts.List() {
 						@EmailAlertsForm(user.EmailAlerts)
 					}
 			}
@@ -52,16 +52,16 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 
 // settingsNameCard is the name your team sees.
 templ settingsNameCard(user *model.User) {
-	@kit.Card("Name", nil) {
+	@parts.Card(parts.CardProps{Title: "Name"}) {
 		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/profile/name" } hx-swap="none" hx-disable="find button[type='submit']">
-			@kit.CSRF()
-			<label for="name" class="sr-only">Name</label>
-			@kit.Inline() {
-				@kit.Input(templ.Attributes{"id": "name", "name": "name", "type": "text", "value": user.Name, "placeholder": "Your name", "autocomplete": "name", "maxlength": "100"})
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			@parts.CSRF()
+			<label for="name" class="kit-sr-only">Name</label>
+			<div class="kit-row" data-gap="2" data-phone="stack">
+				@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "name", "name": "name", "type": "text", "value": user.Name, "placeholder": "Your name", "autocomplete": "name", "maxlength": "100"}})
+				@parts.Button(parts.ButtonProps{Type: "submit"}) {
 					Save
 				}
-			}
+			</div>
 		</form>
 	}
 }
@@ -69,22 +69,22 @@ templ settingsNameCard(user *model.User) {
 // settingsEmailCard changes the address; the change applies once the link
 // sent there is opened.
 templ settingsEmailCard(user *model.User) {
-	@kit.Card("Email", nil) {
+	@parts.Card(parts.CardProps{Title: "Email"}) {
 		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/account/email" } hx-swap="none" hx-disable="find button[type='submit']">
-			@kit.CSRF()
-			<label for="email" class="sr-only">Email</label>
-			@kit.Inline() {
-				@kit.Input(templ.Attributes{"id": "email", "name": "email", "type": "email", "value": user.Email, "placeholder": "you@example.com", "autocomplete": "email"})
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			@parts.CSRF()
+			<label for="email" class="kit-sr-only">Email</label>
+			<div class="kit-row" data-gap="2" data-phone="stack">
+				@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "email", "name": "email", "type": "email", "value": user.Email, "placeholder": "you@example.com", "autocomplete": "email"}})
+				@parts.Button(parts.ButtonProps{Type: "submit"}) {
 					Save
 				}
-			}
+			</div>
 		</form>
 	}
 }
 
 // EmailAlertsForm is the switch for the user's email alerts, a row of a
-// kit.List.
+// parts.List.
 templ EmailAlertsForm(on bool) {
 	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts", "email-alerts", "Email me alerts", "Downtime and failed deploys", on)
 }
@@ -104,40 +104,40 @@ templ settingsPasswordCard() {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="password-form" hx-swap-oob="true">
-		@kit.Card("Password", nil) {
+		@parts.Card(parts.CardProps{Title: "Password"}) {
 			if user.HasPassword() {
-				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password" } hx-swap="none" hx-disable="find button[type='submit']">
-					@kit.CSRF()
-					<div class="grid items-start gap-4 md:grid-cols-3">
+				<form class="kit-stack" data-gap="4" hx-post={ basePath + "/account/password" } hx-swap="none" hx-disable="find button[type='submit']">
+					@parts.CSRF()
+					<div class="kit-grid" data-cols="3">
 						@formField("Current password", "current_password", "", "") {
-							@kit.Input(templ.Attributes{"id": "current_password", "aria-describedby": "current_password-hint", "name": "current_password", "type": "password", "autocomplete": "current-password"})
+							@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "current_password", "aria-describedby": "current_password-hint", "name": "current_password", "type": "password", "autocomplete": "current-password"}})
 						}
 						@formField("New password", "new_password", "At least 12 characters.", "") {
-							@kit.Input(templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"})
+							@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
 						}
 						@formField("Repeat it", "confirm_password", "", "") {
-							@kit.Input(templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"})
+							@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"}})
 						}
 					</div>
-					<div class="flex justify-end">
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+					<div class="kit-row" data-end>
+						@parts.Button(parts.ButtonProps{Kind: parts.Primary, Type: "submit"}) {
 							Change password
 						}
 					</div>
 				</form>
 			} else {
-				<form class="flex flex-col gap-4" hx-post={ basePath + "/account/password/set" } hx-swap="none" hx-disable="find button[type='submit']">
-					@kit.CSRF()
-					<div class="grid items-start gap-4 md:grid-cols-2">
+				<form class="kit-stack" data-gap="4" hx-post={ basePath + "/account/password/set" } hx-swap="none" hx-disable="find button[type='submit']">
+					@parts.CSRF()
+					<div class="kit-grid" data-cols="2">
 						@formField("New password", "new_password", "At least 12 characters.", "") {
-							@kit.Input(templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"})
+							@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
 						}
 						@formField("Repeat it", "confirm_password", "", "") {
-							@kit.Input(templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"})
+							@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"}})
 						}
 					</div>
-					<div class="flex justify-end">
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+					<div class="kit-row" data-end>
+						@parts.Button(parts.ButtonProps{Kind: parts.Primary, Type: "submit"}) {
 							Set password
 						}
 					</div>
@@ -153,17 +153,19 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
 	<div id="settings-sessions" hx-swap-oob="true">
-		@kit.Section("Sessions", nil) {
-			@kit.List() {
+		<section class="kit-section">
+			<div class="kit-section-head">
+				<h2>Sessions</h2>
+			</div>
+			@parts.List() {
 				for _, session := range sessions {
-					@kit.Row("") {
-						@kit.RowText(session.DisplayName(), sessionNote(session, currentSessionID, now))
-						@kit.Button(kit.Secondary, "", templ.Attributes{
+					@parts.Item(parts.ItemProps{Name: session.DisplayName(), Note: sessionNote(session, currentSessionID, now)}) {
+						@parts.Button(parts.ButtonProps{Attrs: templ.Attributes{
 							"type":       "button",
 							"hx-delete":  basePath + "/settings/sessions/" + session.ID,
 							"hx-swap":    "none",
 							"hx-disable": "this",
-						}) {
+						}}) {
 							if session.ID == currentSessionID {
 								Sign out
 							} else {
@@ -172,16 +174,14 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 						}
 					}
 				}
-				@kit.RowButton(true, templ.Attributes{
+				@parts.Item(parts.ItemProps{Button: true, Danger: true, Name: "Sign out everywhere", Attrs: templ.Attributes{
 					"hx-delete":  basePath + "/settings/sessions",
 					"hx-swap":    "none",
 					"hx-disable": "this",
 					"hx-confirm": "Sign out everywhere? Every session ends, this one too.",
-				}) {
-					<span class="font-medium">Sign out everywhere</span>
-				}
+				}})
 			}
-		}
+		</section>
 	</div>
 }
 
@@ -200,20 +200,16 @@ templ settingsAccountDanger() {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="account-danger" hx-swap-oob="true">
-		@kit.List() {
+		@parts.List() {
 			if user.HasPassword() {
-				@kit.RowButton(true, templ.Attributes{
+				@parts.Item(parts.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
 					"hx-delete":  basePath + "/account/password",
 					"hx-swap":    "none",
 					"hx-disable": "this",
 					"hx-confirm": "Remove your password? You then sign in with email links.",
-				}) {
-					<span class="font-medium">Remove password</span>
-				}
+				}})
 			}
-			@kit.RowButton(true, kit.OpenDialog("delete-account-dialog")) {
-				<span class="font-medium">Delete account</span>
-			}
+			@parts.Item(parts.ItemProps{Button: true, Danger: true, Name: "Delete account", Attrs: parts.OpenDialog("delete-account-dialog")})
 		}
 		@deleteAccountDialog()
 	</div>
@@ -223,23 +219,23 @@ templ settingsAccountDanger() {
 // first): the server checks the typed DELETE.
 templ deleteAccountDialog() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@kit.Dialog("delete-account-dialog", "Delete your account?", "Your account, picture, sessions and API tokens are deleted. This cannot be undone.") {
+	@parts.Dialog(parts.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, sessions and API tokens are deleted. This cannot be undone."}) {
 		<form
 			id="delete-account-form"
-			class="flex flex-col gap-5"
+			class="kit-stack" style="--gap:1.25rem"
 			hx-delete={ basePath + "/account" }
 			hx-swap="none"
 			hx-disable="find button[type='submit']"
 		>
-			@kit.CSRF()
+			@parts.CSRF()
 			@formField("Type DELETE to confirm", "delete-confirmation", "", "") {
-				@kit.Input(templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "data-delete-confirmation": true})
+				@parts.Input(parts.InputProps{Attrs: templ.Attributes{"id": "delete-confirmation", "aria-describedby": "delete-confirmation-hint", "name": "delete_confirmation", "type": "text", "placeholder": "DELETE", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "data-delete-confirmation": true}})
 			}
-			@kit.DialogButtons() {
-				@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
+			@parts.DialogButtons() {
+				@parts.Button(parts.ButtonProps{Attrs: parts.CloseDialog()}) {
 					Cancel
 				}
-				@kit.Button(kit.Danger, "", templ.Attributes{"type": "submit", "disabled": true, "data-delete-submit": true}) {
+				@parts.Button(parts.ButtonProps{Kind: parts.Danger, Type: "submit", Attrs: templ.Attributes{"disabled": true, "data-delete-submit": true}}) {
 					Delete my account
 				}
 			}

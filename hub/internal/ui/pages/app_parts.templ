@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/parts"
 	"github.com/axadrn/moin/internal/human"
 )
 
@@ -16,7 +17,7 @@ templ panelPage(attrs ...templ.Attributes) {
 	if len(attrs) > 0 {
 		{{ a = attrs[0] }}
 	}
-	<div class={ kit.Page, "flex flex-col gap-6 pt-6 pb-20" } { a... }>
+	<div class="kit-page kit-content" { a... }>
 		{ children... }
 	</div>
 }
@@ -126,10 +127,9 @@ templ copyButton(value, target, label string) {
 // click cannot overtake the first; its id keeps the focus on it when the
 // answer swaps the row.
 templ switchForm(id, action, switchID, name, note string, on bool) {
-	@kit.RowForm(templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-		@kit.CSRF()
-		@kit.RowLabel(switchID, name, note)
-		@kit.Switch(templ.Attributes{"id": switchID, "name": "on", "value": "1", "checked": on})
+	@parts.Item(parts.ItemProps{Form: true, For: switchID, Name: name, Note: note, Attrs: templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+		@parts.CSRF()
+		@parts.Switch(parts.SwitchProps{ID: switchID, Name: "on", Value: "1", Checked: on})
 	}
 }
 

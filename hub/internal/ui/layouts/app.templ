@@ -1,7 +1,6 @@
 package layouts
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 )
 
@@ -41,7 +40,7 @@ templ AppShell(p AppProps) {
 			<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
 		}
 		<div id="main">
-			<div class={ kit.Page, "pt-4 empty:hidden" }>
+			<div class="kit-page pt-4 empty:hidden">
 				@AppTrialCard()
 			</div>
 			{ children... }

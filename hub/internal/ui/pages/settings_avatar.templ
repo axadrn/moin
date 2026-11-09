@@ -3,15 +3,15 @@ package pages
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/parts"
 )
 
 // SettingsAvatarSection is your picture: Upload picks an image and saves it
 // at once, Remove shows only while there is one. A change answers both of
 // its parts by fragment.
 templ SettingsAvatarSection(user *model.User) {
-	@kit.Card("Picture", nil) {
-		<div class="flex items-center gap-4">
+	@parts.Card(parts.CardProps{Title: "Picture"}) {
+		<div class="kit-row" data-gap="4">
 			@SettingsAvatarDisplay(user)
 			@SettingsAvatarForm(user.AvatarURL != "")
 		</div>
@@ -32,7 +32,7 @@ templ SettingsAvatarSection(user *model.User) {
 templ SettingsAvatarDisplay(user *model.User) {
 	@templ.Fragment("settings-avatar-display") {
 		<div id="settings-avatar" hx-swap-oob="true">
-			@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-16")
+			@parts.Avatar(parts.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials(), Large: true})
 		</div>
 	}
 }
@@ -44,7 +44,7 @@ templ SettingsAvatarForm(hasAvatar bool) {
 		<form
 			id="avatar-upload-form"
 			enctype="multipart/form-data"
-			class="flex flex-wrap items-center gap-2"
+			class="kit-row" data-wrap data-gap="2"
 			hx-swap-oob="true"
 			hx-post={ basePath + "/account/avatar" }
 			hx-trigger="change"
@@ -52,19 +52,19 @@ templ SettingsAvatarForm(hasAvatar bool) {
 			hx-swap="none"
 			hx-disable="find button"
 		>
-			@kit.CSRF()
-			<input type="file" id="avatar" name="avatar" accept="image/jpeg,image/jpg,image/png,image/webp" class="sr-only" tabindex="-1" aria-label="Picture"/>
-			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button", "data-pick-file": "avatar"}) {
+			@parts.CSRF()
+			<input type="file" id="avatar" name="avatar" accept="image/jpeg,image/jpg,image/png,image/webp" class="kit-sr-only" tabindex="-1" aria-label="Picture"/>
+			@parts.Button(parts.ButtonProps{Attrs: templ.Attributes{"data-pick-file": "avatar"}}) {
 				Upload
 			}
 			if hasAvatar {
-				@kit.Button(kit.Secondary, "", templ.Attributes{
+				@parts.Button(parts.ButtonProps{Attrs: templ.Attributes{
 					"type":       "button",
 					"hx-delete":  basePath + "/account/avatar",
 					"hx-swap":    "none",
 					"hx-disable": "this",
 					"hx-confirm": "Remove your picture? Your initials show instead.",
-				}) {
+				}}) {
 					Remove
 				}
 			}

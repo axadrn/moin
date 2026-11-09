@@ -167,7 +167,7 @@ function buttonOf(source) {
 // page: its line goes on top of the page.
 function saySaid(source, kind, text) {
   const place = source?.isConnected
-    ? source.closest("[role=listitem], li, form, header") || source
+    ? source.closest("[role=listitem], .kit-item, li, form, header") || source
     : document.querySelector("#main > *");
   if (!place) return;
   clearSaid(place);
@@ -207,7 +207,7 @@ if (feedbackBox) new MutationObserver(() => {
 // A new try clears the line of the last one.
 document.addEventListener("htmx:before:request", (event) => {
   if (!(event.target instanceof Element)) return;
-  clearSaid(event.target.closest("[role=listitem], li, form, header") || event.target);
+  clearSaid(event.target.closest("[role=listitem], .kit-item, li, form, header") || event.target);
 });
 
 // The hub answers a download with a link: the browser fetches the file and
@@ -226,8 +226,8 @@ document.addEventListener("moin:invalid", (event) => {
   const hint = document.querySelector(`[data-field-hint="${CSS.escape(id)}"]`);
   const error = hint?.querySelector("[data-hint-error]");
   field.setAttribute("aria-invalid", "true");
-  if (message && error) {
-    error.textContent = message;
+  if (message && hint) {
+    (error || hint).textContent = message;
     hint.dataset.invalid = "";
   } else if (message) {
     saySaid(field, "failed", message);
@@ -235,14 +235,19 @@ document.addEventListener("moin:invalid", (event) => {
   field.focus();
   field.addEventListener("input", () => {
     field.removeAttribute("aria-invalid");
-    if (hint) delete hint.dataset.invalid;
+    if (!hint) return;
+    delete hint.dataset.invalid;
+    if (!error) hint.textContent = hint.dataset.hint ?? "";
   }, { once: true });
 });
 
 // Appearance in Settings: System, Light or Dark, kept in this browser.
 const markTheme = () => {
   const theme = window.themeUtils?.getThemePreference() || "system";
-  document.querySelectorAll("[data-theme-set]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.themeSet === theme)));
+  document.querySelectorAll("[data-theme-set]").forEach((choice) => {
+    if (choice.matches("input")) choice.checked = choice.dataset.themeSet === theme;
+    else choice.setAttribute("aria-pressed", String(choice.dataset.themeSet === theme));
+  });
 };
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-theme-set]");

@@ -5,7 +5,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/parts"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 )
@@ -29,109 +29,85 @@ templ SettingsHome(view SettingsHomeView) {
 	{{ cfg := ctxkeys.RenderConfig(ctx) }}
 	@layouts.App("Settings") {
 		@panelPage() {
-			@kit.Header(kit.Back{}, "Settings")
-			@kit.Section(workspace.Name, nil) {
-				@kit.List() {
-					@kit.Row(base + "/workspace") {
-						@kit.RowText("Team", "")
-					}
+			@parts.Header(parts.HeaderProps{Title: "Settings"})
+			<section class="kit-section">
+				<div class="kit-section-head">
+					<h2>{ workspace.Name }</h2>
+				</div>
+				@parts.List() {
+					@parts.Item(parts.ItemProps{Href: base + "/workspace", Name: "Team"})
 					if view.GitHub {
-						@kit.Row(base + "/settings/github") {
-							@kit.RowText("GitHub", "")
-							<span class="truncate text-sm text-muted-foreground">{ gitHubValue(view.GitHubAccounts) }</span>
-						}
+						@parts.Item(parts.ItemProps{Href: base + "/settings/github", Name: "GitHub", Value: gitHubValue(view.GitHubAccounts)})
 					}
-					@kit.Row(base + "/alerts") {
-						@kit.RowText("Alerts", "")
-					}
-					@kit.Row(base + "/bucket") {
-						@kit.RowText("Bucket", "")
-					}
-					@kit.Row(base + "/activity") {
-						@kit.RowText("Activity", "")
-					}
+					@parts.Item(parts.ItemProps{Href: base + "/alerts", Name: "Alerts"})
+					@parts.Item(parts.ItemProps{Href: base + "/bucket", Name: "Bucket"})
+					@parts.Item(parts.ItemProps{Href: base + "/activity", Name: "Activity"})
 					if member != nil && member.Can(model.WorkspacePermissionManageBilling) && cfg.Billing {
-						@kit.Row(base + "/billing") {
-							@kit.RowText("Billing", "")
-						}
+						@parts.Item(parts.ItemProps{Href: base + "/billing", Name: "Billing"})
 					}
 				}
-			}
-			@kit.Section("Workspaces", nil) {
-				@kit.List() {
+			</section>
+			<section class="kit-section">
+				<div class="kit-section-head">
+					<h2>Workspaces</h2>
+				</div>
+				@parts.List() {
 					for _, item := range ctxkeys.Workspaces(ctx) {
 						if item.ID == workspace.ID {
 							// The open one is no place to go: a check where
 							// the others have their chevron.
-							@kit.Row("") {
-								@workspaceRowText(item)
-								<svg aria-label="Open now" viewBox="0 0 16 16" class="size-4 shrink-0"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+							@parts.Item(parts.ItemProps{Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)}) {
+								<svg aria-label="Open now" viewBox="0 0 16 16" width="16" height="16"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 							}
 						} else {
-							@kit.Row(item.Path() + "/settings") {
-								@workspaceRowText(item)
-							}
+							@parts.Item(parts.ItemProps{Href: item.Path() + "/settings", Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)})
 						}
 					}
-					@kit.Row("/workspaces/new") {
-						@kit.RowText("New workspace", "")
-					}
+					@parts.Item(parts.ItemProps{Href: "/workspaces/new", Name: "New workspace"})
 				}
-			}
-			@kit.Section("You", nil) {
-				@kit.List() {
-					@kit.Row(base + "/settings/account") {
-						@kit.Avatar(user.AvatarURL, user.Name, user.Initials(), "size-9")
-						@kit.RowText(user.Name, user.Email)
-					}
+			</section>
+			<section class="kit-section">
+				<div class="kit-section-head">
+					<h2>You</h2>
+				</div>
+				@parts.List() {
+					@parts.Item(parts.ItemProps{Href: base + "/settings/account", Name: user.Name, Note: user.Email, Lead: parts.Avatar(parts.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})})
 				}
-			}
-			@kit.Section("moin", nil) {
-				@kit.List() {
-					@kit.RowControl(nil) {
-						<span class="flex-1 font-medium">Appearance</span>
-						<div class="flex h-11 items-center gap-1 rounded-full bg-muted p-1" role="group" aria-label="Appearance">
-							for _, theme := range []string{"system", "light", "dark"} {
-								<button type="button" data-theme-set={ theme } aria-pressed="false" class="h-full rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm">
-									{ strings.ToUpper(theme[:1]) + theme[1:] }
-								</button>
-							}
-						</div>
+			</section>
+			<section class="kit-section">
+				<div class="kit-section-head">
+					<h2>moin</h2>
+				</div>
+				@parts.List() {
+					@parts.Item(parts.ItemProps{Name: "Appearance"}) {
+						@parts.Choice(parts.ChoiceProps{Name: "appearance", Label: "Appearance", Options: []parts.Option{
+							{Value: "system", Label: "System", Attrs: templ.Attributes{"data-theme-set": "system"}},
+							{Value: "light", Label: "Light", Attrs: templ.Attributes{"data-theme-set": "light"}},
+							{Value: "dark", Label: "Dark", Attrs: templ.Attributes{"data-theme-set": "dark"}},
+						}})
 					}
-					@kit.Row("/docs") {
-						@kit.RowText("Docs", "")
+					@parts.Item(parts.ItemProps{Href: "/docs", Name: "Docs"})
+					@parts.Item(parts.ItemProps{Href: "/changelog", Name: "Changelog", Value: build.Version, Attrs: templ.Attributes{"data-changelog": build.Version}}) {
+						@parts.Dot(parts.DotProps{State: parts.StateLive, Attrs: templ.Attributes{"data-changelog-dot": true, "hidden": true, "aria-label": "New"}})
 					}
-					@kit.Row("/changelog") {
-						<div class="min-w-0 flex-1 font-medium" data-changelog={ build.Version }>Changelog</div>
-						<span data-changelog-dot hidden class="size-2 rounded-full bg-foreground" aria-label="New"></span>
-						<span class="font-mono text-sm text-muted-foreground">{ build.Version }</span>
-					}
-					@kit.RowFact("Support", "") {
-						<span class="select-all">{ cfg.SupportEmail }</span>
-					}
+					@parts.Item(parts.ItemProps{Name: "Support", Value: cfg.SupportEmail})
 				}
-			}
+			</section>
 			if ctxkeys.IsAdmin(ctx) {
-				@kit.List() {
-					@kit.Row("/admin") {
-						@kit.RowText("Admin", "")
-					}
+				@parts.List() {
+					@parts.Item(parts.ItemProps{Href: "/admin", Name: "Admin"})
 				}
 			}
-			@kit.List() {
-				@kit.RowButton(true, templ.Attributes{"hx-post": "/auth/logout", "hx-swap": "none", "data-logout": "true"}) {
-					<span class="font-medium">Sign out</span>
-				}
+			@parts.List() {
+				@parts.Item(parts.ItemProps{Button: true, Danger: true, Name: "Sign out", Attrs: templ.Attributes{"hx-post": "/auth/logout", "hx-swap": "none", "data-logout": "true"}})
 			}
 		}
 	}
 }
 
-// workspaceRowText is a workspace in the list: its initial, its name, and
-// your role in it under the name.
-templ workspaceRowText(item model.WorkspaceMembership) {
-	<span data-lead class="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">{ model.Initial(item.Name) }</span>
-	@kit.RowText(item.Name, model.WorkspaceRoleLabel(item.Role))
+// workspaceLead is the initial of a workspace in the list.
+templ workspaceLead(item model.WorkspaceMembership) {
+	@parts.Avatar(parts.AvatarProps{Name: item.Name, Initials: model.Initial(item.Name)})
 }
 
 // gitHubValue is what the GitHub row says: the accounts, or Connect.
@@ -149,23 +125,18 @@ templ SettingsGitHub(installations []model.GitHubInstallation) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("GitHub · Settings") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Settings", Href: base + "/settings"}, "GitHub")
-			@kit.List() {
+			@parts.Header(parts.HeaderProps{Back: parts.Back{Label: "Settings", Href: base + "/settings"}, Title: "GitHub"})
+			@parts.List() {
 				for _, installation := range installations {
 					if installation.SettingsURL != "" {
-						@kit.RowExternal(installation.SettingsURL) {
-							@kit.RowText(installation.Account, "")
-							<span class="text-sm text-muted-foreground">Repos on GitHub</span>
+						@parts.Item(parts.ItemProps{Href: installation.SettingsURL, External: true, Name: installation.Account}) {
+							<span class="kit-small kit-muted">Repos on GitHub</span>
 						}
 					} else {
-						@kit.Row("") {
-							@kit.RowText(installation.Account, "")
-						}
+						@parts.Item(parts.ItemProps{Name: installation.Account})
 					}
 				}
-				@kit.Row(base + "/github/install?next=" + base + "/settings/github") {
-					@kit.RowText(gitHubConnectLabel(installations), "")
-				}
+				@parts.Item(parts.ItemProps{Href: base + "/github/install?next=" + base + "/settings/github", Name: gitHubConnectLabel(installations)})
 			}
 		}
 	}

@@ -14,6 +14,11 @@
     font-weight: 600;
     user-select: none;
   }
+  .kit-avatar[data-size] {
+    width: 4rem;
+    height: 4rem;
+    font-size: 1.25rem;
+  }
   /* A picture in place of the initials. */
   .kit-avatar > img {
     width: 100%;

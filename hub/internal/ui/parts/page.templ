@@ -1,0 +1,153 @@
+package parts
+
+// Back is the page one step up. A page at the top has none.
+type Back struct {
+	Label string
+	Href  string
+}
+
+// HeaderProps is a Header: the way back, the title, a line under it such as
+// a status. Children are the actions.
+type HeaderProps struct {
+	Back  Back
+	Title string
+	Line  templ.Component
+}
+
+// Header is the head of every page, the same on every page so a title never
+// moves.
+templ Header(p HeaderProps) {
+	<header class="kit-header">
+		<div class="kit-header-back">
+			if p.Back.Href != "" {
+				<a href={ templ.SafeURL(p.Back.Href) } class="kit-back" data-back>{ p.Back.Label }</a>
+			}
+		</div>
+		<div class="kit-header-main">
+			<h1 class="kit-title">{ p.Title }</h1>
+			if p.Line != nil {
+				<p class="kit-header-line">
+					@p.Line
+				</p>
+			}
+			if templ.GetChildren(ctx) != nil {
+				<div class="kit-header-actions">
+					{ children... }
+				</div>
+			}
+		</div>
+	</header>
+}
+
+// Tab is one link of Tabs.
+type Tab struct {
+	Label  string
+	Href   string
+	Active bool
+}
+
+// TabsProps is Tabs. Label names them for screen readers.
+type TabsProps struct {
+	ID    string
+	Label string
+	Tabs  []Tab
+	Quiet bool
+}
+
+// Tabs are the parts of one page, each a plain link, so the address says
+// which one is open and the back button works.
+templ Tabs(p TabsProps) {
+	<nav
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		class="kit-tabs"
+		data-quiet?={ p.Quiet }
+		aria-label={ p.Label }
+	>
+		for _, tab := range p.Tabs {
+			<a
+				href={ templ.SafeURL(tab.Href) }
+				class="kit-tab"
+				if tab.Active {
+					aria-current="page"
+				}
+			>{ tab.Label }</a>
+		}
+	</nav>
+}
+
+// CommandProps is a Command.
+type CommandProps struct {
+	Text string
+}
+
+// Command is a terminal command to copy.
+templ Command(p CommandProps) {
+	<div class="kit-command">
+		<code>{ p.Text }</code>
+		<button type="button" class="kit-copy" data-copy={ p.Text } aria-label="Copy the command">
+			<i class="kit-icon kit-icon-copy"></i>
+		</button>
+	</div>
+}
+
+// DialogProps is a Dialog: a title and a line under it. A script can fill
+// both (data-dialog-title, data-dialog-note).
+type DialogProps struct {
+	ID    string
+	Title string
+	Note  string
+}
+
+// Dialog is a question that floats over the page. A button with
+// data-open-dialog and its id opens it.
+templ Dialog(p DialogProps) {
+	<dialog id={ p.ID } class="kit-dialog" data-dialog aria-labelledby={ p.ID + "-title" }>
+		<div class="kit-stack" style="--gap:1.25rem">
+			<div class="kit-stack" data-gap="1">
+				<h2 id={ p.ID + "-title" } class="kit-heading" data-dialog-title>{ p.Title }</h2>
+				<p class="kit-text kit-muted" data-dialog-note>{ p.Note }</p>
+			</div>
+			{ children... }
+		</div>
+	</dialog>
+}
+
+// OpenDialog are the attributes of a button that opens the Dialog id.
+func OpenDialog(id string) templ.Attributes {
+	return templ.Attributes{"data-open-dialog": id, "aria-haspopup": "dialog"}
+}
+
+// CloseDialog are the attributes of a button that closes its Dialog.
+func CloseDialog() templ.Attributes {
+	return templ.Attributes{"data-close-dialog": true}
+}
+
+// DialogButtons are the buttons at the end of a Dialog.
+templ DialogButtons() {
+	<div class="kit-dialog-buttons">
+		{ children... }
+	</div>
+}
+
+// AvatarProps is an Avatar: a picture, or the initials without one. Name is
+// who it shows.
+type AvatarProps struct {
+	URL      string
+	Name     string
+	Initials string
+	Large    bool
+}
+
+// Avatar is a person.
+templ Avatar(p AvatarProps) {
+	<span class="kit-avatar" data-size?={ p.Large }>
+		if p.URL != "" {
+			<img src={ p.URL } alt=""/>
+		} else {
+			<span aria-hidden="true">{ p.Initials }</span>
+		}
+		<span class="kit-sr-only">{ p.Name }</span>
+	</span>
+}

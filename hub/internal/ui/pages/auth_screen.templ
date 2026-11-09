@@ -4,6 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/parts"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -103,16 +104,9 @@ templ factRow(name, value string) {
 // from the start, empty without a hint, so a message only swaps text and
 // nothing moves. The control points at it with aria-describedby id-hint.
 templ formField(label, id, hint, err string) {
-	<div class="flex flex-col gap-2">
-		if label != "" {
-			<label for={ id } class="px-1 text-sm font-medium">{ label }</label>
-		}
+	@parts.Field(parts.FieldProps{Label: label, For: id, Hint: hint, Error: err}) {
 		{ children... }
-		<p id={ id + "-hint" } class="group/hint min-h-5 px-1 text-sm text-muted-foreground" data-field-hint={ id } data-invalid?={ err != "" } aria-live="polite">
-			<span class="group-data-invalid/hint:hidden">{ hint }</span>
-			<span data-hint-error class="hidden text-failed group-data-invalid/hint:inline">{ err }</span>
-		</p>
-	</div>
+	}
 }
 
 // ariaInvalid is the aria-invalid of a field with this message.

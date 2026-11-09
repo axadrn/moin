@@ -1,19 +1,21 @@
 package kit
 
+import "github.com/axadrn/moin/hub/internal/ui/parts"
+
 // State is one of the states every status in moin shows as (DESIGN.md,
 // Status): live ● (online, the live deploy), running ◐ (deploying), waiting
 // ○ in the running color (a daemon that never connected), done ✓ muted (a
 // deploy that succeeded but is no longer live), failed ✗ (failed, offline)
 // and idle ○ (new, unknown).
-type State string
+type State = parts.State
 
 const (
-	StateLive    State = "live"
-	StateRunning State = "running"
-	StateWaiting State = "waiting"
-	StateDone    State = "done"
-	StateFailed  State = "failed"
-	StateIdle    State = "idle"
+	StateLive    = parts.StateLive
+	StateRunning = parts.StateRunning
+	StateWaiting = parts.StateWaiting
+	StateDone    = parts.StateDone
+	StateFailed  = parts.StateFailed
+	StateIdle    = parts.StateIdle
 )
 
 // Status is a state's dot and its word (children), in a line of text: a

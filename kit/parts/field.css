@@ -93,6 +93,7 @@
     font-weight: 500;
   }
   .kit-hint {
+    min-height: 1.25rem;
     padding-inline: var(--space-5);
     font-size: 0.875rem;
     line-height: 1.25rem;
