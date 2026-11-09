@@ -3,6 +3,59 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.26
+
+November 9, 2026
+
+**In short:** a new web app, calm and fast like a native one, and backups you can explain in a minute: copies on your schedule in your own bucket, checked every day.
+
+### New
+- **A new web app**: grouped lists, one tab bar per app, pages that load whole and fast, light and dark, built from moin's own parts.
+- **One search everywhere**: `⌘K` or `/` opens the same box in the web and the terminal UI.
+- **Backups on your schedule**: every SQLite and Postgres database is copied to your own bucket every 15 minutes, hourly or daily, and each copy stays 1, 3, 7 or 30 days.
+- **A daily check**: moin restores the newest copy into a throwaway database and reads all of it.
+- **Undo a restore**: a restore keeps the database as it was, and one step puts it back.
+- **Download a copy**: the full database as one file, on the web, with `moin backup download` and in the terminal UI.
+- **New databases are found by themselves**: every hour moin looks again, so a SQLite file created long after a deploy gets backed up.
+- **Red when moin can't back something up**: MySQL, MongoDB or a Postgres in an unknown image show in red instead of looking safe.
+- **`backups` in x-moin**: set `every` and `keep` in `compose.yml`.
+- **What happens when**: a page that says what moin does when a server restarts, a bucket is gone or a copy is broken, tried on real servers.
+- **Rename an app**: in its Settings, with `moin apps rename` and through the API. Its data and backups stay.
+- **Short links**: `/app/acme/apps/my-app`, plain names you can read. Links inside moin follow a rename; an old bookmark shows "not found".
+- **Compare moin**: a page each at `/compare/<name>` shows moin next to Coolify, Dokploy, Kamal, Railway, Render, Fly.io and Heroku, fact by fact.
+- **Charts of your own**: server and app metrics drawn by the server.
+- **The catalog has its own place**: `/catalog`, each app with its logo, its source and its versions.
+- **Pin apps**: pinned apps come first.
+
+### Changed
+- **The agent is now the daemon, and the control plane the hub**: in every command, page and file. An update moves a server by itself and leaves its apps running.
+- **`moin deploy` asks before it creates an app**, so a typo makes no new one. Scripts pass `--yes`.
+- **A setting in compose.yml is locked in moin**: domains, backups, the instant address and a required password show **from compose.yml** and change only there.
+- **Saving never restarts an app**: a changed env var, domain or password waits, and the app head says how many wait.
+- **Restores never change your data in place**: moin builds the restored database beside the live one and switches in one step.
+- **A big database gets the time it needs**: a copy runs as long as data moves.
+- **A database over 1 GB gets no extra copy before each data edit**: the newest scheduled copy is the way back. Deploys still take a copy first.
+- **One word per thing**: the web, CLI, terminal UI, API and MCP say the same words, and old names are gone with no aliases and no redirects.
+- **The docs**: short pages in plain words, and one overview of every way to deploy.
+
+### Fixed
+- **A bucket that is gone**: the backup list says so within seconds, and `moin deploy` names the bucket instead of the hub.
+- **A restart in the middle of a deploy**: the app comes back by itself and the deploy ends as soon as the server is back, instead of blocking the app for 30 minutes.
+- **A failed daily check**: the backup shows red everywhere, instead of green next to a broken copy.
+- **A full disk no longer starts a restore**: the room is checked against the size noted on the copy.
+- **A lost connection during a restore**: moin says it cannot tell, instead of "nothing changed".
+- **A broken bucket**: it pauses only its own app, not the others on the server.
+- **Backup alerts**: a stopped app no longer raises them.
+
+### Removed
+- **Every change for SQLite**: going back to any minute is gone, because it could damage the live database of apps that open SQLite for each request. Pick every 15 minutes for the closest backups; the old `litestream/` folders stay in your bucket and moin no longer reads them, so you can delete them.
+- **`x-moin.database`**: every database is backed up anyway; pick one in the list or with `--db`.
+- **Aliases in the CLI**: `ls`, `list`, `remove`, `unset`, `moin app` and `registry add`. Use the one name each command has now.
+- **`moin agent`**: it is `moin daemon`.
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`, then `moin servers update`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
+
 ## v1.0.0-beta.25
 
 November 5, 2026
