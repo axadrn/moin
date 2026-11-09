@@ -39,11 +39,9 @@ templ Navbar() {
 	@parts.Bar(parts.BarProps{Float: true}) {
 		<a href="/" class="kit-row" data-gap="2" aria-label={ brand.Name + " home, beta" }>
 			@parts.Wordmark(parts.WordmarkProps{})
-			<span class="kit-hidden-phone">
-				@parts.Badge(parts.BadgeProps{}) {
-					Beta
-				}
-			</span>
+			@parts.Badge(parts.BadgeProps{Class: "kit-hidden-phone"}) {
+				Beta
+			}
 		</a>
 		@parts.BarLinks(parts.BarLinksProps{Label: "Main", Links: navLinks(ctxkeys.RenderConfig(ctx).Billing, ctxkeys.URLPath(ctx))})
 		<span class="kit-fill"></span>

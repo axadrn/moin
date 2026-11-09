@@ -212,12 +212,14 @@ templ BarLinks(p BarLinksProps) {
 	</nav>
 }
 
-// BadgeProps is a Badge.
-type BadgeProps struct{}
+// BadgeProps is a Badge. Class adds a layout class, like kit-hidden-phone.
+type BadgeProps struct {
+	Class string
+}
 
 // Badge is a quiet word next to a name.
 templ Badge(p BadgeProps) {
-	<span class="kit-badge">
+	<span class={ "kit-badge", p.Class }>
 		{ children... }
 	</span>
 }

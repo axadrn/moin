@@ -43,6 +43,8 @@
     box-shadow: var(--shadow-float);
     overflow-y: auto;
   }
+  /* As wide as its button, wider only for an option that needs it. */
+  .kit-select > [popover] { min-width: max-content; }
   .kit-menu {
     right: anchor(right);
     left: auto;

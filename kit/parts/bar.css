@@ -53,7 +53,10 @@
     align-items: center;
     margin-inline-start: var(--space-3);
   }
-  .kit-bar-links > a { color: var(--muted-foreground); }
+  .kit-bar-links > a {
+    padding-inline: var(--space-4);
+    color: var(--muted-foreground);
+  }
   .kit-bar-links > a[aria-current] { color: var(--foreground); }
   @media (min-width: 48rem) {
     .kit-bar-links { display: flex; }
