@@ -273,6 +273,7 @@ addEventListener("hashchange", (event) => {
   followed = false;
 });
 show();
+delete document.documentElement.dataset.opening;
 
 // A demo button that did its job.
 document.addEventListener("kit:confirmed", (event) => event.target.closest("[data-gone]")?.remove());

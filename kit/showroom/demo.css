@@ -109,6 +109,8 @@ body::before {
 
 /* The wordmark, drawn: Satoshi Black as a shape, so no font file is needed.
    The word inside stays for screen readers. */
+[data-opening] :is(#demo-tabs, [data-pane]) { visibility: hidden; }
+
 .demo-wordmark {
   display: inline-block;
   flex: none;
