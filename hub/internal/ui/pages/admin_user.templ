@@ -72,7 +72,7 @@ templ AdminUserFacts(user *model.AdminUser) {
 // A paying workspace is not made free forever, so it has no button.
 templ AdminUserPlan(user *model.AdminUser) {
 	{{ on := user.Plan != model.AdminPlanFreeForever }}
-	<div id="admin-user-plan" hx-swap-oob="true">
+	<div id="admin-user-plan" class="grid gap-3" hx-swap-oob="true">
 		@kit.List() {
 			@adminFact("Plan", adminPlanLabel(*user))
 			if user.Plan != model.AdminPlanPaying {
@@ -86,6 +86,19 @@ templ AdminUserPlan(user *model.AdminUser) {
 					</span>
 				}
 			}
+		}
+		if user.Plan != model.AdminPlanPaying {
+			<form hx-post={ "/admin/users/" + user.ID + "/offer" } hx-swap="none" hx-disable="find button[type='submit']">
+				@kit.CSRF()
+				@kit.Field("Apply an offer", "admin-offer-email", "The address the offer waits for.") {
+					@kit.Inline() {
+						@kit.Input(templ.Attributes{"id": "admin-offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off"})
+						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+							Apply
+						}
+					}
+				}
+			</form>
 		}
 	</div>
 }

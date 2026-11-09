@@ -25,6 +25,9 @@ var (
 	// ErrNoWorkspace means the user created no workspace that could be free
 	// forever.
 	ErrNoWorkspace = errors.New("this user has no workspace of their own")
+	// ErrNoOffer means the address has no open offer, or the workspace pays
+	// or is free forever.
+	ErrNoOffer = errors.New("no open offer for this address, or this workspace pays or is free forever")
 	// ErrPaying means the workspace pays through the payment provider:
 	// cancel the subscription before making it free forever.
 	ErrPaying = errors.New("this workspace pays for its plan: cancel the subscription before making it free forever")
@@ -40,6 +43,7 @@ type AdminService struct {
 	// subscriptions and activity, when set, show and change who is free
 	// forever.
 	subscriptions *repository.Subscriptions
+	offers        *OfferService
 	activity      *repository.Activity
 	// oldDomain counts what still arrives on old domains.
 	oldDomain *OldDomainService
@@ -55,6 +59,11 @@ func NewAdminService(repo *repository.Admin, users *repository.Users, auth *Auth
 
 // UsePlans shows the plan of every user and lets admins make them free
 // forever. Without billing there are no plans to show.
+// UseOffers lets an operator apply offers. The hosted hub sets it.
+func (s *AdminService) UseOffers(offers *OfferService) {
+	s.offers = offers
+}
+
 func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activity *repository.Activity) {
 	s.subscriptions = subscriptions
 	s.activity = activity
@@ -284,6 +293,55 @@ func (s *AdminService) SetForeverFree(actor *model.User, actorSession *model.Ses
 		"from": before.PlanID, "to": subscription.PlanID, "status_from": before.Status, "status": subscription.Status, "provider": build.Name,
 	})
 	return s.recordAdminAction(actor.ID, action, "workspace", workspace.ID)
+}
+
+// ApplyOffer gives the first workspace a user created the open offer of
+// email, for someone who signed up with a different address.
+func (s *AdminService) ApplyOffer(actor *model.User, actorSession *model.Session, targetUserID, email string) error {
+	if !s.IsAdmin(actor, actorSession) {
+		return ErrAdminPermission
+	}
+	if s.offers == nil {
+		return ErrNoWorkspace
+	}
+	if _, err := s.users.ByID(targetUserID); err != nil {
+		return err
+	}
+	workspace, err := s.repository.FirstWorkspace(targetUserID)
+	if err != nil {
+		return err
+	}
+	if workspace == nil {
+		return ErrNoWorkspace
+	}
+	applied, err := s.offers.Apply(email, workspace.ID)
+	if err != nil {
+		return err
+	}
+	if !applied {
+		return ErrNoOffer
+	}
+	return s.recordAdminAction(actor.ID, "admin.offer_applied", "workspace", workspace.ID)
+}
+
+// ClaimOffers applies every open offer to the account with that address and
+// answers how many it applied. It runs only when an operator starts it.
+// confirm is the word offers, typed out.
+func (s *AdminService) ClaimOffers(actor *model.User, actorSession *model.Session, confirm string) (int, error) {
+	if !s.IsAdmin(actor, actorSession) {
+		return 0, ErrAdminPermission
+	}
+	if err := confirmed(confirm, "offers"); err != nil {
+		return 0, err
+	}
+	if s.offers == nil {
+		return 0, nil
+	}
+	claimed, err := s.offers.ClaimOpen()
+	if err != nil {
+		return 0, err
+	}
+	return claimed, s.recordAdminAction(actor.ID, "admin.offers_claimed", "offers", "open")
 }
 
 func (s *AdminService) recordAdminAction(actorUserID, action, targetType, targetID string) error {

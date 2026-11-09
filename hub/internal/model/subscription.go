@@ -26,6 +26,7 @@ type Subscription struct {
 	CheckoutExpiresAt             *time.Time `db:"checkout_expires_at"`
 	CheckoutPendingUntil          *time.Time `db:"checkout_pending_until"`
 	CurrentPeriodEnd              *time.Time `db:"current_period_end"`
+	CouponID                      *string    `db:"coupon_id"`
 	Amount                        *int       `db:"amount"`
 	Currency                      string     `db:"currency"`
 	Interval                      *string    `db:"interval"`
@@ -99,6 +100,17 @@ func (s *Subscription) MakeForeverFree(now time.Time) {
 	s.PlanID = SubscriptionPlanPro
 	s.Status = SubscriptionStatusActive
 	s.CurrentPeriodEnd = nil
+	s.UpdatedAt = now
+}
+
+// StartOffer gives the workspace the paid plan for days, and a coupon for
+// when it starts to pay.
+func (s *Subscription) StartOffer(days int, couponID string, now time.Time) {
+	end := now.AddDate(0, 0, days)
+	s.PlanID = SubscriptionPlanPro
+	s.Status = SubscriptionStatusTrialing
+	s.CurrentPeriodEnd = &end
+	s.CouponID = &couponID
 	s.UpdatedAt = now
 }
 
