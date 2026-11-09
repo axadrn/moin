@@ -29,7 +29,7 @@ Yes: 47 open source apps from the [catalog](/docs/guides/catalog), in one click.
 
 ## What happens when a deploy fails?
 
-The previous deploy starts again. The failed one says why. `moin deploys v4` shows its log.
+The previous deploy starts again. The failed one says why. `moin deploys v4` shows its log. The same happens when the server restarts during a deploy, as soon as it is back.
 
 ## Where is my data?
 

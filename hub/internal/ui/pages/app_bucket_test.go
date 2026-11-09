@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestBucketsPage(t *testing.T) {
 // to and offers the newest copy.
 func TestBackupsPickTheBucket(t *testing.T) {
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
-	since, checked, copied := now.Add(-3*time.Hour), now.Add(-2*time.Hour), now.Add(-12*time.Minute)
+	checked, copied := now.Add(-2*time.Hour), now.Add(-12*time.Minute)
 	current := service.Bucket{Name: "client-a", Bucket: "client", Folder: "workspace-1/"}
 	view := BackupsView{
 		App:     model.App{ID: "app-1", Name: "shop", BucketName: "client-a", BackupEvery: 60, BackupKeep: 7},
@@ -46,9 +47,8 @@ func TestBackupsPickTheBucket(t *testing.T) {
 		Older:   []service.Bucket{{Name: "default"}},
 		Now:     now,
 		Databases: []service.DatabaseBackups{{
-			DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", Kind: "postgres", CheckedAt: &checked, CopiedAt: &copied, Copies: []protocol.Copy{{ID: "20261103T114800Z", At: copied, Size: 2048}}},
+			DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", CheckedAt: &checked, CopiedAt: &copied, Copies: []protocol.Copy{{ID: "20261103T114800Z", At: copied, Size: 2048}}},
 			Moments: []service.Moment{
-				{ID: "1h", Label: "1 hour ago", At: now.Add(-time.Hour), Kind: service.MomentMinute},
 				{ID: "before-v12", Label: "Before v12", At: now.Add(-26 * time.Hour), Kind: "deploy"},
 			},
 		}},
@@ -63,7 +63,7 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	}
 	page := html.String()
 	for _, want := range []string{`id="app-bucket-form"`, "The default (default)", "data-bucket-older", `data-confirm-name="shop"`,
-		"Last copy 12m ago · checked 2h ago", `data-moment="1h"`, `data-moment="before-v12"`, "Nov 2, 10:00 UTC", "11:00 UTC", "Go back to",
+		"Last copy 12m ago · checked 2h ago", `data-moment="before-v12"`, "Nov 2, 10:00 UTC", "Go back to",
 		"How often", "Hourly", "Keep", "7 days", "Download a copy", "/backups/download?database=%2Fdata%2Fapp.db", "2.0 KB"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %q", want)
@@ -128,26 +128,27 @@ func TestBackupsPickTheBucket(t *testing.T) {
 	}
 	view.Databases = view.Databases[:1]
 
-	// SQLite: every change written down, how long only, and a download
-	// without a size.
-	sqlite := view
-	sqlite.Databases = []service.DatabaseBackups{{DatabaseBackup: protocol.DatabaseBackup{Database: "/data/app.db", Since: &since, CheckedAt: &checked}}}
-	html.Reset()
-	DatabaseBackups(sqlite, "/data/app.db").Render(ctx, &html)
-	for _, want := range []string{"Every change written down · checked 2h ago", "Keep", "Download a copy"} {
-		if !strings.Contains(html.String(), want) {
-			t.Errorf("SQLite has no %q", want)
-		}
-	}
-	if strings.Contains(html.String(), "How often") {
-		t.Error("SQLite has a How often")
-	}
-
-	// Without a copy, Postgres has nothing to download.
-	view.Databases[0].Kind, view.Databases[0].Copies, view.Databases[0].Since = "postgres", nil, nil
+	// Without a copy there is nothing to download.
+	view.Databases[0].Kind, view.Databases[0].Copies = "postgres", nil
 	html.Reset()
 	DatabaseBackups(view, "/data/app.db").Render(ctx, &html)
 	if strings.Contains(html.String(), "Download a copy") {
 		t.Errorf("Postgres without a copy: %s", html.String())
+	}
+}
+
+// The data page never says "Backed up" about a copy that failed its
+// daily check.
+func TestAFailedCheckIsNotBackedUp(t *testing.T) {
+	now := time.Now().UTC()
+	view := DataView{Backups: BackupsView{Bucket: &service.Bucket{}}, Status: []model.BackupStatus{
+		{Database: "/data/app.db", CopiedAt: &now, CheckError: "the daily check failed: checksum"},
+	}}
+	var html strings.Builder
+	if err := databaseBackupValue(view, "/data/app.db").Render(context.Background(), &html); err != nil {
+		t.Fatal(err)
+	}
+	if page := html.String(); !strings.Contains(page, "Check failed") || strings.Contains(page, "Backed up") {
+		t.Errorf("a failed check: %s", page)
 	}
 }

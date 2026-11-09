@@ -21,8 +21,8 @@ type AppBackups struct {
 	Databases []DatabaseBackups `json:"databases"`
 }
 
-// BackupSchedule is how an app is backed up: kept KeepDays, and Postgres
-// copied every EveryMinutes.
+// BackupSchedule is how an app is backed up: a copy every EveryMinutes,
+// each kept KeepDays.
 type BackupSchedule struct {
 	EveryMinutes int `json:"every_minutes"`
 	KeepDays     int `json:"keep_days"`
@@ -36,8 +36,6 @@ type DatabaseBackup struct {
 	CopiedAt   *time.Time      `json:"copied_at,omitempty"`
 	CheckedAt  *time.Time      `json:"checked_at,omitempty"`
 	CheckError string          `json:"check_error,omitempty"`
-	Since      *time.Time      `json:"since,omitempty"`
-	Until      *time.Time      `json:"until,omitempty"`
 	Copies     []protocol.Copy `json:"copies"`
 	Undos      []protocol.Copy `json:"undos"`
 	Error      string          `json:"error,omitempty"`
@@ -166,8 +164,7 @@ func (c *Client) SetBackupSchedule(ctx context.Context, app string, schedule Bac
 }
 
 // Restore puts a database back to a moment from Backups, by its ID or
-// label, or to a time: that minute with Every change, else the newest
-// copy at or before it.
+// label, or to a time: the newest copy at or before it.
 // It waits until the daemon is done: a restore runs on its own on the
 // hub, as a big database takes a while.
 // confirm is the app's name as the user typed it; the hub
@@ -274,7 +271,7 @@ func (c *Client) FetchCopy(ctx context.Context, link string, out io.Writer) erro
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("download the copy: %w", err)
+		return fmt.Errorf("cannot reach your bucket: %v", errors.Unwrap(err))
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {

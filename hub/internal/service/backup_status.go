@@ -3,6 +3,7 @@ package service
 // How backups stand: what the daemon says, and what the hub tells people.
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,8 +30,7 @@ var backupProblems = []struct {
 	{"The database is not running.", []string{"is not running"}},
 	{"The app's bucket can't be opened: check its keys under Data.", []string{"cannot be opened"}},
 	{"The copies are late.", []string{"copies are late"}},
-	{"The daily check could not restore the newest state.", []string{"daily check failed"}},
-	{"Every change is not written down.", []string{"every change"}},
+	{"The daily check could not restore the newest copy.", []string{"daily check failed"}},
 	{"moin can't back up this database.", []string{"cannot back up"}},
 	{"The daemon on the server is too old: update it.", []string{"too old for this"}},
 }
@@ -83,6 +83,8 @@ func (s *AppService) backups(ctx context.Context, app *model.App) ([]DatabaseBac
 	}
 	databases := make([]DatabaseBackups, 0, len(backups.Databases))
 	for _, backup := range backups.Databases {
+		// A copy that fails its daily check is no backup.
+		backup.Error = cmp.Or(backup.Error, backup.CheckError)
 		problem := BackupProblem(restingError(app, backup.Error))
 		if problem == "" && late(app, backup.CopiedAt, now) {
 			problem = "The copies are late."
@@ -170,8 +172,6 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			AppID:      appID,
 			Database:   database.Database,
 			CopiedAt:   database.CopiedAt,
-			Since:      database.Since,
-			Until:      database.Until,
 			CheckedAt:  database.CheckedAt,
 			Error:      clipText(restingError(app, database.Error), 2000),
 			CheckError: clipText(database.CheckError, 2000),

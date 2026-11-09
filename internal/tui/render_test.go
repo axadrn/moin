@@ -136,7 +136,7 @@ func TestAppTabsShowTheirData(t *testing.T) {
 	cases := map[tab][]string{
 		tDeploys: {"v43", "live", "Checkout shows the shipping cost", "v42", "failed", "Deploy", "4f9ac21"},
 		tLogs:    {"GET / 200 3ms", "ERROR db timeout", "live", "4 lines"},
-		tBackups: {"shop.db", "passed", "postgres", "The daily check could not", "Go back to", "1 hour ago", "Before v43", "c downloads the newest", "last copy", "hourly, kept 7 days"},
+		tBackups: {"shop.db", "passed", "postgres", "The daily check could not", "Go back to", "Before v43", "c downloads the newest", "last copy", "hourly, kept 7 days"},
 		tEnv:     {"DATABASE_URL", "STRIPE_KEY", "••••••••", "values hidden"},
 		tDomains: {"shop.example.com", "★", "points", "not yet", "add an A record", "instant address", "shop-acme.moin.app"},
 		tUptime:  {"shop.example.com", "100%", "99.98%", "200 in 41 ms", "Last outages", "502 Bad Gateway"},

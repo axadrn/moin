@@ -167,6 +167,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	// switch is one step, so the database is whole; the app runs again
 	// and the result says which database it runs on.
 	daemon.backups.recover(ctx)
+	daemon.apps.recoverDeploys(ctx)
 	// On a stop, a deploy or a restore that runs gets a moment to end
 	// before backups stop; one that does not is ended by the next start.
 	defer func() {
@@ -353,10 +354,6 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeBackupList:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
 			return r.backups.list(ctx, request), nil
-		})
-	case protocol.TypeBackupDownload:
-		answer(r, message, protocol.TypeBackupDownloadResult, func(request protocol.BackupRequest) (any, error) {
-			return r.backups.download(ctx, request)
 		})
 	case protocol.TypeBackupRestores:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {

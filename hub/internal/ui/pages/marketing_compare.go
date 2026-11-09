@@ -84,7 +84,7 @@ var CompareRows = []CompareRow{
 	{"Security", "Holds an SSH key to your servers", yes("No", "The daemon on your server dials out.", "")},
 	{"Security", "Port your server must open", yes("None", "None for "+brand.Name+". Visitors use 80 and 443, or a Cloudflare Tunnel.", "")},
 	{"Your data", "Keeps your code and data", yes("No", "Your server and your bucket.", "")},
-	{"Your data", "Database backups", yes("SQLite and Postgres", "In your own bucket. SQLite: every change, back to any minute. Postgres: a copy every 15 minutes, hourly or daily.", "")},
+	{"Your data", "Database backups", yes("SQLite and Postgres", "On your schedule, in your own bucket: every 15 minutes, hourly or daily.", "")},
 	{"Your data", "Restore tested every day", yes("Yes", "A real restore into a throwaway database, every day.", "")},
 	{"Your data", "Browse and edit live data", yes("Yes", "SQLite and Postgres. Read, edit, run SQL.", "")},
 	{"Every day", "Uptime checks", yes("Every minute", "Built in, with alerts.", "")},

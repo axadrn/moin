@@ -182,9 +182,6 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
-	if a.backups != nil {
-		a.backups.forget(a.backups.running())
-	}
 	return nil
 }
 

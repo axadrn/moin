@@ -45,7 +45,7 @@ The first five are in [moin in five words](/docs/moin-in-five-words). The rest:
 | **restart** | starts the live deploy again, so the changes that wait take effect |
 | **domain** | the name people type to reach your app, such as `my-app.example.com`, always with HTTPS |
 | **env vars** | the settings and secrets of an app, kept encrypted |
-| **restore** | going back to a minute for SQLite, to a copy for Postgres. It can be undone |
+| **restore** | going back to a copy. It can be undone |
 | **health check** | after a deploy, moin checks that the app starts and stays up |
 | **catalog** | the place with apps you install in one click |
 | **API token** | a key for the CLI, scripts and AI agents, for one workspace |
@@ -118,7 +118,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 2. Reads the compose file and the [x-moin block](/docs/guides/config).
 3. Tags the built images, sets the env vars and `restart: unless-stopped`.
 4. Builds.
-5. Copies Postgres and remembers the time for SQLite, so **Before v12** can bring your data back. The first deploy has none yet.
+5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
 6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
 7. Calls the health path, if x-moin sets one, until it answers below 500.
 8. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.

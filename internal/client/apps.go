@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -140,7 +141,7 @@ func (c *Client) Deploy(ctx context.Context, app string, source []byte) (Deploy,
 	request.ContentLength = int64(len(source))
 	response, err := c.http.Do(request)
 	if err != nil {
-		return Deploy{}, fmt.Errorf("upload to your bucket: %w", err)
+		return Deploy{}, fmt.Errorf("cannot reach your bucket: %v", errors.Unwrap(err))
 	}
 	response.Body.Close()
 	if response.StatusCode >= 300 {

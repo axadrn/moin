@@ -12,9 +12,8 @@ import (
 // Version is the protocol version the daemon reports in Hello. Bump it when a
 // message changes in a way an older peer cannot read. Version 2 brought
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
-// which was called the agent before (legacy.go); version 4 SQLite backed up
-// by Litestream alone: no copies, always every change, and the download.
-const Version = 4
+// which was called the agent before (legacy.go).
+const Version = 3
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
@@ -23,10 +22,6 @@ func Needs(messageType MessageType) int {
 	switch messageType {
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2
-	case TypeBackupConfig, TypeBackupDownload:
-		// An older daemon reads a schedule without every_change as off and
-		// deletes what Litestream wrote.
-		return 4
 	}
 	return 1
 }
@@ -87,7 +82,7 @@ const (
 	// The daemon answers with TypeBackupsResult.
 	TypeBackupList    MessageType = "backup.list"
 	TypeBackupsResult MessageType = "backups.result"
-	// TypeBackupRestore puts a database back to a copy, a minute or the
+	// TypeBackupRestore puts a database back to a copy or the
 	// state before an earlier restore (BackupRestore). The daemon answers
 	// with TypeOK or TypeError.
 	TypeBackupRestore MessageType = "backup.restore"
@@ -96,11 +91,6 @@ const (
 	// has no bucket or is gone. The daemon answers with TypeBackupsResult,
 	// whose Restores is the answer and Databases empty.
 	TypeBackupRestores MessageType = "backup.restores"
-	// TypeBackupDownload has the daemon make a download of the newest state
-	// of a SQLite database in the bucket (BackupRequest). It answers with
-	// TypeBackupDownloadResult, a Copy with the download's ID.
-	TypeBackupDownload       MessageType = "backup.download"
-	TypeBackupDownloadResult MessageType = "backup.download.result"
 	// TypeBackupStatus is how the backups of an app stand (Backups), sent by
 	// the daemon after a daily check or a restore, or when a backup breaks
 	// or works again.

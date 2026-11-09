@@ -10,9 +10,9 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// BackupSchedule is how an app is backed up: keep_days (1, 3, 7 or 30) is
-// how far back it goes, every_minutes (15, 60 or 1440) how often Postgres
-// is copied. PUT /api/v1/apps/{app}/backups takes it.
+// BackupSchedule is how an app is backed up: a copy every every_minutes
+// (15, 60 or 1440), each kept keep_days (1, 3, 7 or 30). PUT
+// /api/v1/apps/{app}/backups takes it.
 type BackupSchedule struct {
 	EveryMinutes int `json:"every_minutes"`
 	KeepDays     int `json:"keep_days"`
@@ -32,16 +32,13 @@ type AppBackups struct {
 }
 
 // DatabaseBackup is how one database is backed up, as the daemon reports
-// it: protocol.DatabaseBackup under the API's own names. since and until
-// are how far Every change reaches.
+// it: protocol.DatabaseBackup under the API's own names.
 type DatabaseBackup struct {
 	Database   string          `json:"database"`
 	Kind       string          `json:"kind,omitempty"`
 	CopiedAt   *time.Time      `json:"copied_at,omitempty"`
 	CheckedAt  *time.Time      `json:"checked_at,omitempty"`
 	CheckError string          `json:"check_error,omitempty"`
-	Since      *time.Time      `json:"since,omitempty"`
-	Until      *time.Time      `json:"until,omitempty"`
 	Copies     []protocol.Copy `json:"copies"`
 	Undos      []protocol.Copy `json:"undos"`
 	Error      string          `json:"error,omitempty"`
@@ -49,7 +46,7 @@ type DatabaseBackup struct {
 
 // DatabaseBackups is the backup of one database: what the daemon reports,
 // problem as one short sentence when it does not work, and the moments a
-// restore can go back to, the quick minutes first, then the copies and
+// restore can go back to, the copies and
 // the undos, newest first.
 type DatabaseBackups struct {
 	DatabaseBackup
@@ -76,7 +73,7 @@ func NewAppBackups(apps *service.AppService, app *model.App, databases []service
 		backup := database.DatabaseBackup
 		shown := DatabaseBackups{DatabaseBackup: DatabaseBackup{
 			Database: backup.Database, Kind: backup.Kind, CopiedAt: backup.CopiedAt, CheckedAt: backup.CheckedAt, CheckError: backup.CheckError,
-			Since: backup.Since, Until: backup.Until, Copies: backup.Copies, Undos: backup.Undos, Error: backup.Error,
+			Copies: backup.Copies, Undos: backup.Undos, Error: backup.Error,
 		}, Problem: database.Problem, Moments: []Moment{}}
 		if shown.Copies == nil {
 			shown.Copies = []protocol.Copy{}

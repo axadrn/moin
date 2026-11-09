@@ -394,7 +394,7 @@ func (m model) databaseStatusLines(u ui, database client.DatabaseBackups, now ti
 	switch {
 	case database.Problem != "":
 		state = "failed"
-	case database.CopiedAt == nil && database.Since == nil:
+	case database.CopiedAt == nil:
 		state = "waiting"
 	}
 	kind := database.Kind
@@ -408,12 +408,10 @@ func (m model) databaseStatusLines(u ui, database client.DatabaseBackups, now ti
 	switch {
 	case database.Problem != "":
 		add("backup", u.bad(database.Problem))
-	case database.CopiedAt != nil:
-		add("last copy", u.good(human.Ago(*database.CopiedAt, now)))
-	case database.Since != nil:
-		add("every change", u.good("written down")+u.muted(" back to "+database.Since.Local().Format("Jan 2 15:04")))
-	default:
+	case database.CopiedAt == nil:
 		add("backup", u.faint("starting"))
+	default:
+		add("last copy", u.good(human.Ago(*database.CopiedAt, now)))
 	}
 	switch {
 	case database.CheckError != "":

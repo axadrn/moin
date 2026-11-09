@@ -113,7 +113,7 @@ func TestBucketRoutes(t *testing.T) {
 		t.Fatalf("a restore without a moment: %d %v", status, answer)
 	}
 	// The app's name, typed out, is required: 422 confirm_mismatch.
-	for _, body := range []string{`{"moment":"1h"}`, `{"moment":"1h","confirm":"shop"}`} {
+	for _, body := range []string{`{"moment":"before-v12"}`, `{"moment":"before-v12","confirm":"shop"}`} {
 		if status, answer := send("POST", "/api/v1/apps/blog/restores", body); status != http.StatusUnprocessableEntity || code(answer) != "confirm_mismatch" {
 			t.Fatalf("a restore with %s: %d %v", body, status, answer)
 		}

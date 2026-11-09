@@ -45,11 +45,11 @@ func TestBackupChanges(t *testing.T) {
 		{"breaks", ok, true, broken, "backup.failed", "The bucket refuses the keys."},
 		{"still broken: no second alert", broken, true, broken, "", ""},
 		{"works again", broken, true, ok, "backup.recovered", ""},
-		{"restore check fails, backups fine", ok, true, checkBad, "check.failed", "The daily check could not restore the newest state."},
+		{"restore check fails, backups fine", ok, true, checkBad, "check.failed", "The daily check could not restore the newest copy."},
 		{"restore check still failing", checkBad, true, checkBad, "", ""},
 		{"daemon restarted, no check yet", checkBad, true, restarted, "", ""},
 		{"restore check passes again", checkBad, true, checkGood, "check.recovered,backup.checked", ""},
-		{"old daemon: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: x"}, "backup.failed,backup.checked", "The daily check could not restore the newest state."},
+		{"old daemon: check failure counts as backup failure", ok, true, model.BackupStatus{Database: "data/app.db", CheckedAt: &day2, Error: "the daily check failed: x"}, "backup.failed,backup.checked", "The daily check could not restore the newest copy."},
 	} {
 		changes := backupChanges(test.previous, test.known, test.now)
 		if got := actions(changes); got != test.want {
@@ -161,7 +161,7 @@ func TestBackupAndDiskAlertsReachEveryDestination(t *testing.T) {
 		t.Errorf("slack backup.recovered = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "check.failed", "shop", map[string]string{"database": "data/app.db", "error": "restore check failed: integrity check"}, at)
-	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Daily check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore check failed: integrity check\nThe daily check could not restore the newest state. Download it and look: moin backup download shop\n<"+backups+"|Open in moin>" {
+	if text := decoded(t, f.chat.last(t, "/slack/T0/B0/XXXX").body)["text"]; text != "*🔴 Daily check of shop failed*\nDatabase: data/app.db, app shop.\nError: restore check failed: integrity check\nThe daily check could not restore the newest copy. Download it and look: moin backup download shop\n<"+backups+"|Open in moin>" {
 		t.Errorf("slack check.failed = %q", text)
 	}
 	f.alerts.Send(owner.WorkspaceID, "check.recovered", "shop", map[string]string{"database": "data/app.db"}, at)

@@ -146,8 +146,8 @@ func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol
 	defer closeDB()
 
 	result := protocol.DBTables{Database: database.Path, Tables: []protocol.DBTable{}}
-	// Litestream keeps its own _litestream_seq and _litestream_lock tables
-	// in the database; they are not the app's.
+	// Older versions of moin left Litestream's _litestream_seq and
+	// _litestream_lock tables in the database; they are not the app's.
 	rows, err := db.QueryContext(ctx, `SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\_litestream\_%' ESCAPE '\' ORDER BY name`)
 	if err != nil {
 		return result, err
@@ -275,7 +275,7 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 		if a.backups != nil && a.backups.busy(request.App) {
 			return protocol.DBResult{}, fmt.Errorf("a restore of %s runs: edit its data when it is done", request.App)
 		}
-		// The moment just before the change, so "Before your edit" is exact.
+		// A copy just before the change, so "Before your edit" is exact.
 		logf := func(format string, args ...any) { slog.Warn("backup: " + fmt.Sprintf(format, args...)) }
 		before = a.backups.copyBeforeEdit(ctx, request.App, database, logf)
 	}

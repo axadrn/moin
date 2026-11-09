@@ -91,9 +91,9 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | Logs | `p` | pauses and resumes; the logs load every three seconds |
 | Logs | `↑` `↓` · `G` | scrolls back; follows the end again |
 | Backups | `enter` | goes back to the picked moment once you typed the app's name; **Before the restore at …** undoes a restore |
-| Backups | `t` | goes back to a time you type, in UTC, like `14:01`, then the app's name: SQLite to that minute, Postgres to the newest copy at or before it |
-| Backups | `c` | downloads the newest state: it opens the 15 minute link to your bucket in the browser |
-| Backups | `w` | how long and how often are set on the web; the tab shows them with the daily check |
+| Backups | `t` | goes back to a time you type, in UTC, like `14:01`, then the app's name: the newest copy at or before it |
+| Backups | `c` | downloads the newest copy: it opens the 15 minute link to your bucket in the browser |
+| Backups | `w` | how often and how long are set on the web; the tab shows them with the last copy and the daily check |
 | Env | `a` · `enter` | sets `KEY=value`; edits the picked one |
 | Env | `x` | removes the picked one, after `y` |
 | Env | `v` | shows or hides the values |

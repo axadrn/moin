@@ -80,7 +80,7 @@ One box finds everything: `⌘K` in the web, `space` in the terminal UI. A typo 
 
 ## Under the hood
 
-- The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the daemon's line, `x/term`, the AWS S3 SDK for your bucket, Litestream and a pure-Go SQLite for backups.
+- The `moin` binary is Go's standard library plus a few modules: Bubble Tea and Lip Gloss for the terminal UI, `coder/websocket` for the daemon's line, `x/term`, the AWS S3 SDK for your bucket and a pure-Go SQLite for backups. The hub also uses Litestream for its own database.
 - Built for Linux the way a release builds it (`CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" ./cmd/moin`, Go 1.26.8), the binary is 25.8 MB for arm64 and 28.3 MB for amd64. Measured on November 7, 2026.
 - The daemon's line is one WebSocket connection from your server to the hub.
 

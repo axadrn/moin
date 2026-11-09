@@ -329,8 +329,8 @@ func (r *Apps) SetCatalog(appID, slug string) error {
 }
 
 // SetStopped marks the app as stopped by its owner, or as running again.
-// SetBackupSchedule sets how often an app's Postgres is copied and how
-// long the app keeps its backups.
+// SetBackupSchedule sets how often an app is copied, how long each copy
+// stays.
 func (r *Apps) SetBackupSchedule(appID string, every, keep int) error {
 	_, err := r.db.Exec(`UPDATE apps SET backup_every = $1, backup_keep = $2 WHERE id = $3`, every, keep, appID)
 	return err
@@ -426,12 +426,12 @@ func (r *Apps) BackupStatus(appID string) ([]model.BackupStatus, error) {
 
 func (r *Apps) SetBackupStatus(status model.BackupStatus) error {
 	_, err := r.db.Exec(`
-		INSERT INTO backup_status (app_id, database, since, replicated_at, checked_at, error, updated_at, check_error, copied_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (app_id, database) DO UPDATE SET since = COALESCE(excluded.since, backup_status.since), replicated_at = COALESCE(excluded.replicated_at, backup_status.replicated_at),
+		INSERT INTO backup_status (app_id, database, checked_at, error, updated_at, check_error, copied_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (app_id, database) DO UPDATE SET
 			checked_at = COALESCE(excluded.checked_at, backup_status.checked_at), error = excluded.error, updated_at = excluded.updated_at,
 			check_error = excluded.check_error, copied_at = COALESCE(excluded.copied_at, backup_status.copied_at)
-	`, status.AppID, status.Database, status.Since, status.Until, status.CheckedAt, status.Error, status.UpdatedAt, status.CheckError, status.CopiedAt)
+	`, status.AppID, status.Database, status.CheckedAt, status.Error, status.UpdatedAt, status.CheckError, status.CopiedAt)
 	return err
 }
 

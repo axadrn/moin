@@ -93,9 +93,8 @@ type Config struct {
 	Instant        string              `json:"instant,omitempty"`
 }
 
-// ConfigBackups is the backups block of x-moin: how often Postgres is
-// copied and how long the app keeps its backups. What it leaves out is the
-// default.
+// ConfigBackups is the backups block of x-moin: how often and how long.
+// What it leaves out is the default.
 type ConfigBackups struct {
 	Every string `json:"every,omitempty"`
 	Keep  string `json:"keep,omitempty"`

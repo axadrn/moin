@@ -143,7 +143,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin catalog` | the [catalog](/docs/guides/catalog), each app with its newest version |
 | `moin catalog <app>` | one catalog app with every version |
 | `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's |
-| `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the moment before it |
+| `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the copy before it |
 
 ## Env vars
 
@@ -172,10 +172,10 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin backups [app]` | how each database is backed up: how long, how often for Postgres, the daily check, and the moments to go back to |
-| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d` | sets how long the app keeps its backups and how often Postgres is copied; either or both. Locked when `x-moin.backups` sets them ([Who decides](/docs/guides/config#who-decides)) |
-| `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`1h`, `before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. SQLite goes to that minute, Postgres to the newest copy at or before it. Keeps the database before, so it can be undone as long as the app keeps its backups, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
-| `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a database in the current folder, straight from your bucket: the newest state, or for Postgres the copy `--to` names; `--link` prints its 15 minute link instead |
+| `moin backups [app]` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to |
+| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d` | sets how often the app is copied and how long each copy stays; one of them or both. Locked when `x-moin.backups` sets them ([Who decides](/docs/guides/config#who-decides)) |
+| `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. A time takes the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
+| `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a copy of a database in the current folder, straight from your bucket: the newest, or the one `--to` names; `--link` prints its 15 minute link instead |
 
 ## Bucket
 
@@ -186,7 +186,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
 | `moin buckets default <name>` | makes a bucket the default for apps without one of their own |
 | `moin buckets rm <name> [--confirm <name>]` | asks you to type its name and removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
-| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; its backups start again there |
+| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; the copies start again there |
 
 | Flag | Takes |
 | --- | --- |

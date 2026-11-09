@@ -175,7 +175,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		}
 	}
 	// A restore asks for the name; without a terminal it wants --confirm.
-	if code, _, stderr := runCLI(t, &fakeAPI{}, "restore", "--app", "shop", "--to", "1h"); code != 1 || !strings.Contains(stderr, "--confirm shop") {
+	if code, _, stderr := runCLI(t, &fakeAPI{}, "restore", "--app", "shop", "--to", "before-v12"); code != 1 || !strings.Contains(stderr, "--confirm shop") {
 		t.Errorf("restore: code %d, stderr %q", code, stderr)
 	}
 	for _, args := range [][]string{

@@ -20,20 +20,27 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/benbjohnson/litestream"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/axadrn/moin/protocol"
 )
 
-// A backup is a way back for a database, in the user's own bucket; data
-// goes from the server to the bucket, never through the hub. One engine
-// per kind of database, with the same verbs:
+// A backup is a copy of a database in the user's own bucket, taken here
+// on the server on the app's schedule and kept as long as the app says;
+// every day moin checks that the newest one restores. Data goes from the
+// server to the bucket, never through the hub. One engine per
+// kind of database, with the same verbs:
 //
-//	SQLite    Litestream writes every change down (backup_sqlite.go)
-//	Postgres  pg_dump copies it on the schedule (backup_postgres.go)
+//	database ── Copy ───▶ bucket <database>/copies/<id>
+//	copy ────── Check ──▶ a throwaway database, read through
+//	copy ────── Restore ▶ built beside the live one, one switch,
+//	                      the live one kept as the undo
 //
-// Every day moin checks that the newest state restores.
+// backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
+// pg_dump.
 type engine interface {
+	// Copy writes a full copy of the live database to w.
+	Copy(ctx context.Context, w io.Writer) error
 	// Restore builds the database beside the live one, stops the app,
 	// switches in one atomic step, the live one kept as the undo id, and
 	// starts the app. There is never a moment without a live database.
@@ -41,29 +48,28 @@ type engine interface {
 	// Recover tidies after a restore the daemon stopped in and says
 	// whether it had switched, from what is there.
 	Recover(ctx context.Context, mark restoreMark) (switched bool, err error)
-	// Check restores the newest state into a throwaway database and reads
-	// it all.
-	Check(ctx context.Context) error
+	// Check restores a copy into a throwaway database and reads it all.
+	Check(ctx context.Context, from source) error
+	// Size is how many bytes the live database takes.
+	Size(ctx context.Context) (int64, error)
 	// Undos are the states before restores, newest first; Drop removes one.
 	Undos(ctx context.Context) ([]protocol.Copy, error)
 	Drop(ctx context.Context, id string) error
 }
 
-// source is what a restore goes back to: a copy from the bucket (Postgres,
-// with size the room building it takes), a minute (SQLite) or the undo of
-// an earlier restore.
+// source is what a restore goes back to: a copy from the bucket or the
+// undo of an earlier restore. size is how much room building it takes.
 type source struct {
 	copy io.Reader
-	at   time.Time
 	undo string
 	size int64
 }
 
 const (
 	day = 24 * time.Hour
-	// stallLimit stops an upload when no data has moved for this long. A
-	// big database may take hours, as long as it keeps moving. An upload
-	// that hangs would hold up every other one.
+	// stallLimit stops a copy when no data has moved for this long. A big
+	// database may take hours, as long as it keeps moving. A copy that
+	// hangs would hold up every other copy.
 	stallLimit = 30 * time.Minute
 	// sizeNote is the name of the note on each copy that says how many
 	// bytes its database took. A restore needs that much room.
@@ -84,18 +90,15 @@ type backups struct {
 	// paused the apps the hub cannot open the bucket of, with why.
 	restoring map[string]int
 	paused    map[string]string
-	// before is the newest moment before a change of each app.
+	// before is when the newest copy before a change of each app was.
 	before map[string]time.Time
-	// stores and watched are Litestream's, see backup_sqlite.go.
-	stores  map[int]*litestream.Store
-	watched map[string]watched
 	// ticking lets one round run at a time.
 	ticking sync.Mutex
 }
 
-// state is what the daemon knows of one database: its newest copy
-// (Postgres), why its backup fails, the newest daily check and what the
-// hub heard last.
+// state is what the daemon knows of one database: its newest copy, why
+// the last one failed, the newest daily check and what the hub heard
+// last.
 type state struct {
 	lastCopy           time.Time
 	copyError          string
@@ -111,8 +114,6 @@ func newBackups(a *apps, send func(protocol.MessageType, string, any)) *backups 
 		restoring: map[string]int{},
 		paused:    map[string]string{},
 		before:    map[string]time.Time{},
-		stores:    map[int]*litestream.Store{},
-		watched:   map[string]watched{},
 	}
 }
 
@@ -142,9 +143,6 @@ func (b *backups) configure(config protocol.BackupConfig) {
 	b.mu.Lock()
 	b.bucket, b.buckets, b.schedules, b.paused = bucket, config.AppBuckets, config.Schedules, config.Paused
 	b.mu.Unlock()
-	if bucket == nil {
-		b.forget(nil)
-	}
 }
 
 func (b *backups) on() bool {
@@ -184,30 +182,49 @@ func (b *backups) where(app string, database protocol.Database) (*protocol.Bucke
 	return bucket, protocol.DatabaseFolder(*bucket, app, id, database.Path), nil
 }
 
-// copyKey is where a Postgres copy lives in its bucket.
-func copyKey(folder, id string) *string {
-	return aws.String(folder + "/" + protocol.CopyFile(id))
+// copyKey is where a copy lives in its bucket.
+func copyKey(folder, id string, database protocol.Database) *string {
+	return aws.String(folder + "/" + protocol.CopyFile(id, database.Postgres()))
 }
 
-// copyIDOf is the ID of a Postgres copy, from its key in the bucket.
-func copyIDOf(key string) string {
-	return strings.TrimSuffix(path.Base(key), path.Base(protocol.CopyFile("")))
+// copyIDOf is the ID of a copy, from its key in the bucket.
+func copyIDOf(key string, database protocol.Database) string {
+	ending := path.Base(protocol.CopyFile("", database.Postgres()))
+	return strings.TrimSuffix(path.Base(key), ending)
 }
 
-// copy streams a Postgres copy into the bucket as id.
+// copy streams a copy of a database into the bucket as id.
 func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
 		return "", err
 	}
 	at, _ := protocol.CopyTime(id)
-	engine := &postgresEngine{b: b, app: app, database: database}
+	engine := b.engine(app, database)
 	size, err := engine.Size(ctx)
 	if err != nil {
 		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
-	note := map[string]string{sizeNote: strconv.FormatInt(size, 10)}
-	if err := upload(ctx, bucket, *copyKey(folder, id), note, engine.Copy); err != nil {
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	reader, writer := io.Pipe()
+	go func() { writer.CloseWithError(engine.Copy(ctx, writer)) }()
+	body, stopWatching := stopWhenStuck(reader, firstDataLimit(size), stallLimit, stop)
+	defer stopWatching()
+	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
+	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
+	_, err = uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket:   aws.String(bucket.Bucket),
+		Key:      copyKey(folder, id, database),
+		Body:     body,
+		Metadata: map[string]string{sizeNote: strconv.FormatInt(size, 10)},
+	})
+	// The upload is over: this frees a writer that still waits.
+	reader.CloseWithError(errors.New("the upload ended"))
+	if cause := context.Cause(ctx); err != nil && cause != nil {
+		err = cause
+	}
+	if err != nil {
 		return "", fmt.Errorf("copy %s: %w", database.Path, err)
 	}
 	b.mu.Lock()
@@ -216,26 +233,6 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 	}
 	b.mu.Unlock()
 	return id, nil
-}
-
-// upload streams what write writes into the bucket at key, with notes on
-// the object, and stops when no data moves.
-func upload(ctx context.Context, bucket *protocol.Bucket, key string, notes map[string]string, write func(context.Context, io.Writer) error) error {
-	ctx, stop := context.WithCancelCause(ctx)
-	defer stop(nil)
-	reader, writer := io.Pipe()
-	go func() { writer.CloseWithError(write(ctx, writer)) }()
-	body, stopWatching := stopWhenStuck(reader, stallLimit, stop)
-	defer stopWatching()
-	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
-	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
-	_, err := uploader.Upload(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key), Body: body, Metadata: notes})
-	// The upload is over: this frees a writer that still waits.
-	reader.CloseWithError(errors.New("the upload ended"))
-	if cause := context.Cause(ctx); err != nil && cause != nil {
-		err = cause
-	}
-	return err
 }
 
 // watchedReader is a reader that restarts a timer each time data comes.
@@ -253,17 +250,32 @@ func (w watchedReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// stopWhenStuck calls stop when no data has come from reader for limit.
-// The second result ends the watching.
-func stopWhenStuck(reader io.Reader, limit time.Duration, stop context.CancelCauseFunc) (io.Reader, func()) {
-	timer := time.AfterFunc(limit, func() {
+// firstDataLimit is how long a copy may take to send its first byte.
+// SQLite writes its whole clean copy first, which takes longer the bigger
+// the database is: we allow 10 MB a second on top of stallLimit.
+func firstDataLimit(size int64) time.Duration {
+	return stallLimit + time.Duration(size/(10<<20))*time.Second
+}
+
+// stopWhenStuck calls stop when no data has come from reader: first for
+// the first byte, then limit between one byte and the next. The second
+// result ends the watching.
+func stopWhenStuck(reader io.Reader, first, limit time.Duration, stop context.CancelCauseFunc) (io.Reader, func()) {
+	timer := time.AfterFunc(first, func() {
 		stop(errors.New("no data moved for too long"))
 	})
 	return watchedReader{reader: reader, timer: timer, limit: limit}, func() { timer.Stop() }
 }
 
+// listWait is how long a bucket gets to say which copies it has. One
+// that is there answers in a moment, and the hub has to answer a page
+// within 30 seconds.
+const listWait = 8 * time.Second
+
 // copies are the copies of a database in the bucket, newest first.
 func (b *backups) copies(ctx context.Context, app string, database protocol.Database) ([]protocol.Copy, error) {
+	ctx, cancel := context.WithTimeout(ctx, listWait)
+	defer cancel()
 	bucket, folder, err := b.where(app, database)
 	if err != nil {
 		return nil, err
@@ -276,7 +288,7 @@ func (b *backups) copies(ctx context.Context, app string, database protocol.Data
 			return nil, err
 		}
 		for _, object := range page.Contents {
-			id := copyIDOf(aws.ToString(object.Key))
+			id := copyIDOf(aws.ToString(object.Key), database)
 			if at, ok := protocol.CopyTime(id); ok {
 				copies = append(copies, protocol.Copy{ID: id, At: at, Size: aws.ToInt64(object.Size)})
 			}
@@ -292,7 +304,7 @@ func (b *backups) readCopy(ctx context.Context, app string, database protocol.Da
 	if err != nil {
 		return source{}, nil, err
 	}
-	key := copyKey(folder, id)
+	key := copyKey(folder, id, database)
 	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
 	if err != nil {
 		return source{}, nil, fmt.Errorf("the copy %s of %s: %w", id, database.Path, err)
@@ -308,14 +320,14 @@ func (b *backups) deleteCopy(ctx context.Context, app string, database protocol.
 	if err != nil {
 		return err
 	}
-	key := copyKey(folder, id)
+	key := copyKey(folder, id, database)
 	_, err = s3Client(bucket).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
 	return err
 }
 
-// prune deletes the Postgres copies and undos older than the app keeps
-// them, counted from the newest copy, never that one, and nothing of an
-// app the hub sent no schedule for.
+// prune deletes the copies and undos older than the app keeps them,
+// counted from the newest copy, never that one, and nothing of an app
+// the hub sent no schedule for.
 func (b *backups) prune(ctx context.Context, app string, database protocol.Database, copies []protocol.Copy) error {
 	b.mu.Lock()
 	_, scheduled := b.schedules[app]
@@ -330,25 +342,20 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 			err = errors.Join(err, b.deleteCopy(ctx, app, database, copy.ID))
 		}
 	}
-	return errors.Join(err, b.dropUndos(ctx, app, database, before))
-}
-
-// dropUndos deletes the undos older than before.
-func (b *backups) dropUndos(ctx context.Context, app string, database protocol.Database, before time.Time) error {
 	e := b.engine(app, database)
-	undos, err := e.Undos(ctx)
+	undos, undosErr := e.Undos(ctx)
 	for _, undo := range undos {
 		if undo.At.Before(before) {
 			err = errors.Join(err, e.Drop(ctx, undo.ID))
 		}
 	}
-	return err
+	return errors.Join(err, undosErr)
 }
 
-// loop starts the work of the backups: the round every minute, the daily
-// checks, and every hour the sweep of the bucket, the search for new
-// databases and what SQLite no longer keeps. Each runs on its own, so a
-// copy that takes hours holds up nothing else.
+// loop starts the work of the backups: the copies every minute, the daily
+// checks, and every hour the sweep of the uploads and the search for new
+// databases. Each runs on its own, so a copy that takes hours holds up
+// nothing else.
 func (b *backups) loop(ctx context.Context) {
 	minute := time.NewTicker(time.Minute)
 	defer minute.Stop()
@@ -361,9 +368,8 @@ func (b *backups) loop(ctx context.Context) {
 		case <-minute.C:
 			go b.tick(ctx)
 		case <-hourly.C:
-			go b.sweepBucket(ctx)
+			go b.sweepUploads(ctx)
 			go b.searchDatabases(ctx)
-			go b.pruneSQLite(ctx)
 			hourly.Reset(time.Hour)
 		case <-daily.C:
 			go b.checkAll(ctx)
@@ -372,8 +378,8 @@ func (b *backups) loop(ctx context.Context) {
 	}
 }
 
-// tick has Litestream follow the SQLite files, takes the Postgres copies
-// that are due and deletes the old ones, and reports what changed.
+// tick takes the copies that are due, deletes the old ones and reports
+// what changed.
 func (b *backups) tick(ctx context.Context) {
 	if !b.on() || !b.ticking.TryLock() {
 		return
@@ -385,20 +391,22 @@ func (b *backups) tick(ctx context.Context) {
 			b.tickDatabase(ctx, app, database)
 		}
 	}
-	b.forget(running)
 	b.report(ctx, running, false)
 }
 
 // tickDatabase does what is due for one database and notes what failed.
 func (b *backups) tickDatabase(ctx context.Context, app string, database protocol.Database) {
+	b.mu.Lock()
+	copied := b.state(app, database).lastCopy
+	b.mu.Unlock()
 	if b.busy(app) {
 		return
 	}
 	var err error
-	if database.Postgres() {
-		err = b.copyIfDue(ctx, app, database)
-	} else {
-		err = b.follow(ctx, app, database)
+	due := time.Duration(b.schedule(app).Every) * time.Minute
+	// A copy from the future, after the clock jumped, is no reason to wait.
+	if time.Since(copied) >= due || copied.After(time.Now()) {
+		err = b.copyDue(ctx, app, database, due)
 	}
 	failed := ""
 	if err != nil {
@@ -407,19 +415,6 @@ func (b *backups) tickDatabase(ctx context.Context, app string, database protoco
 	b.mu.Lock()
 	b.state(app, database).copyError = failed
 	b.mu.Unlock()
-}
-
-// copyIfDue takes a Postgres copy when its time came.
-func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.Database) error {
-	b.mu.Lock()
-	copied := b.state(app, database).lastCopy
-	b.mu.Unlock()
-	due := time.Duration(b.schedule(app).Every) * time.Minute
-	// A copy from the future, after the clock jumped, is no reason to wait.
-	if time.Since(copied) >= due || copied.After(time.Now()) {
-		return b.copyDue(ctx, app, database, due)
-	}
-	return nil
 }
 
 // searchDatabases looks for new databases in every app and tells the hub.
@@ -437,7 +432,7 @@ func (b *backups) searchDatabases(ctx context.Context) {
 	}
 }
 
-// copyDue takes a Postgres copy when the newest in the bucket is older than due,
+// copyDue takes a copy when the newest in the bucket is older than due,
 // and deletes the old ones.
 func (b *backups) copyDue(ctx context.Context, app string, database protocol.Database, due time.Duration) error {
 	copies, err := b.copies(ctx, app, database)
@@ -495,8 +490,8 @@ func (b *backups) cannotBackUp(app string) []protocol.DatabaseBackup {
 	return statuses
 }
 
-// status is how one database is backed up; full also reads the undos and
-// the copies (Postgres), or how far Every change reaches (SQLite).
+// status is how one database is backed up; full also reads the copies
+// and the undos.
 func (b *backups) status(ctx context.Context, app string, database protocol.Database, full bool) protocol.DatabaseBackup {
 	status := protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind}
 	b.mu.Lock()
@@ -513,10 +508,7 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	if status.Error == "" && b.late(app, s.lastCopy) {
 		status.Error = "the copies are late: the newest is from " + s.lastCopy.UTC().Format("Jan 2 15:04 UTC")
 	}
-	if !full {
-		return status
-	}
-	if database.Postgres() {
+	if full {
 		copies, err := b.copies(ctx, app, database)
 		if err != nil && status.Error == "" {
 			status.Error = err.Error()
@@ -524,10 +516,8 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		if status.Copies = copies; len(copies) > 0 {
 			status.CopiedAt = &copies[0].At
 		}
-	} else {
-		status.Since, status.Until = b.reach(ctx, app, database)
+		status.Undos, _ = b.engine(app, database).Undos(ctx)
 	}
-	status.Undos, _ = b.engine(app, database).Undos(ctx)
 	return status
 }
 
@@ -541,21 +531,25 @@ func (b *backups) late(app string, copied time.Time) bool {
 	return time.Since(copied) > max(2*every, every+time.Hour)
 }
 
-// errNoState says a database has nothing to check yet.
-var errNoState = errors.New("nothing to check yet")
-
-// checkAll restores the newest state of every database into a throwaway
+// checkAll restores the newest copy of every database into a throwaway
 // one and reads it.
 func (b *backups) checkAll(ctx context.Context) {
 	running := b.running()
 	for app, databases := range running {
 		for _, database := range databases {
-			if _, _, err := b.where(app, database); err != nil {
+			copies, err := b.copies(ctx, app, database)
+			if err != nil || len(copies) == 0 {
 				continue
 			}
-			err := b.engine(app, database).Check(ctx)
-			if errors.Is(err, errNoState) {
+			from, body, err := b.readCopy(ctx, app, database, copies[0].ID)
+			var gone *types.NoSuchKey
+			if errors.As(err, &gone) {
+				// A newer copy came and the old one went meanwhile.
 				continue
+			}
+			if err == nil {
+				err = b.engine(app, database).Check(ctx, from)
+				body.Close()
 			}
 			b.mu.Lock()
 			s := b.state(app, database)
@@ -570,11 +564,9 @@ func (b *backups) checkAll(ctx context.Context) {
 	b.report(ctx, running, true)
 }
 
-// copyBefore remembers the moment just before a deploy or an edit of the
-// app's databases, or of the one named: SQLite can go back to that moment
-// as it is, Postgres gets a copy. It returns when, the time in the copies'
-// IDs; nil without backups or when no moment could be kept. logf says when
-// a copy failed.
+// copyBefore copies the app's databases, or the one named, just before a
+// deploy or an edit, and returns when: the time in the copies' IDs; nil
+// without backups or when none worked. logf says when one failed.
 func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(string, ...any)) *time.Time {
 	if b == nil || !b.on() {
 		return nil
@@ -589,18 +581,13 @@ func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(st
 	b.mu.Unlock()
 	time.Sleep(time.Until(at))
 	for _, database := range b.databases(ctx, app) {
-		if only != "" && database.Path != only {
-			continue
+		if only == "" || database.Path == only {
+			_, err := b.copy(ctx, app, database, protocol.BeforeCopyID(at))
+			if err != nil {
+				logf("the copy of %s before the change failed: %s", database.Path, err)
+			}
+			took = took || err == nil
 		}
-		if !database.Postgres() {
-			took = true
-			continue
-		}
-		_, err := b.copy(ctx, app, database, protocol.BeforeCopyID(at))
-		if err != nil {
-			logf("the copy of %s before the change failed: %s", database.Path, err)
-		}
-		took = took || err == nil
 	}
 	if !took {
 		return nil
@@ -608,22 +595,20 @@ func (b *backups) copyBefore(ctx context.Context, app, only string, logf func(st
 	return &at
 }
 
-// editCopyLimit is the biggest Postgres database moin copies before an
-// edit. A bigger one would keep the edit waiting; the newest scheduled
-// copy is the way back.
+// editCopyLimit is the biggest database moin copies before an edit. A
+// bigger one would keep the edit waiting; the newest scheduled copy is
+// the way back.
 const editCopyLimit = 1 << 30
 
-// copyBeforeEdit remembers the moment just before an edit. A Postgres
-// database too big to copy has none; it returns nil then.
+// copyBeforeEdit copies a database just before an edit, unless it is
+// too big for that. It returns when, nil when there is no such copy.
 func (b *backups) copyBeforeEdit(ctx context.Context, app string, database protocol.Database, logf func(string, ...any)) *time.Time {
 	if b == nil {
 		return nil
 	}
-	if database.Postgres() {
-		size, err := (&postgresEngine{b: b, app: app, database: database}).Size(ctx)
-		if err != nil || size > editCopyLimit {
-			return nil
-		}
+	size, err := b.engine(app, database).Size(ctx)
+	if err != nil || size > editCopyLimit {
+		return nil
 	}
 	return b.copyBefore(ctx, app, database.Path, logf)
 }
@@ -738,16 +723,13 @@ func (b *backups) restore(ctx context.Context, request protocol.BackupRestore) e
 // restoreSource is what a restore goes back to. Closing the second result,
 // when there is one, ends reading the copy.
 func (b *backups) restoreSource(ctx context.Context, request protocol.BackupRestore, database protocol.Database) (source, io.Closer, error) {
-	if protocol.ValidCopyID(request.Copy) && database.Postgres() {
+	if protocol.ValidCopyID(request.Copy) {
 		return b.readCopy(ctx, request.App, database, request.Copy)
 	}
 	if protocol.ValidCopyID(request.Undo) {
 		return source{undo: request.Undo}, nil, nil
 	}
-	if request.At != nil && !database.Postgres() {
-		return source{at: request.At.UTC()}, nil, nil
-	}
-	return source{}, nil, errors.New("pick a copy, a minute or an undo to go back to")
+	return source{}, nil, errors.New("pick a copy or an undo to go back to")
 }
 
 // finish writes down how a restore ended.
@@ -795,7 +777,7 @@ func (b *backups) restoreStates(app string) []protocol.RestoreState {
 // is whole either way, the app starts again, and the result says which
 // database it runs on. When it cannot tell, the app starts all the same,
 // and the mark stays for the next start to tell. Then it sweeps what
-// stopped checks and downloads left. The daemon runs it when it starts.
+// stopped copies and checks left. The daemon runs it when it starts.
 func (b *backups) recover(ctx context.Context) {
 	for _, mark := range b.marks() {
 		if mark.State == protocol.RestoreRunning {
@@ -828,7 +810,7 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 	b.finish(mark, err)
 }
 
-// sweepTemp removes what stopped checks and downloads left.
+// sweepTemp removes what stopped copies and checks left.
 func (b *backups) sweepTemp() {
 	for _, databases := range b.running() {
 		for _, database := range databases {

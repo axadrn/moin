@@ -1,6 +1,6 @@
 package service
 
-// Downloading a database.
+// Downloading a copy.
 
 import (
 	"context"
@@ -11,13 +11,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/protocol"
 )
 
-// Download is a database to download, straight from the app's own
-// bucket, never through the hub: Link is a signed link to it there, valid
-// 15 minutes.
+// Download is a copy of a database to download, straight from the app's
+// own bucket, never through the hub: Link is a signed link to
+// it there, valid 15 minutes.
 type Download struct {
 	App      string
 	Database string
@@ -30,9 +29,8 @@ type Download struct {
 
 const downloadLinkLife = 15 * time.Minute
 
-// Download signs a link to a database: for Postgres the newest copy, or
-// the one moment names; for SQLite the daemon makes a download of the
-// newest state first.
+// Download signs a link to a copy of a database: the newest, or the one
+// moment names.
 func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, database, moment string) (*Download, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
@@ -46,37 +44,6 @@ func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, databa
 	if err != nil {
 		return nil, err
 	}
-	bucket, err := s.openAppBucket(app)
-	if err != nil {
-		return nil, err
-	}
-	folder := protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database)
-	var download *Download
-	var key string
-	if backup.Kind == protocol.DatabasePostgres {
-		download, key, err = newestCopy(backup, folder, moment)
-	} else {
-		download, key, err = s.newestState(ctx, app, backup, folder, moment)
-	}
-	if err != nil {
-		return nil, err
-	}
-	name := app.Name + "-" + path.Base(folder) + "-" + path.Base(key)
-	link, err := s3.NewPresignClient(bucketClient(*bucket)).PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:                     aws.String(bucket.Bucket),
-		Key:                        aws.String(key),
-		ResponseContentDisposition: aws.String(`attachment; filename="` + name + `"`),
-	}, s3.WithPresignExpires(downloadLinkLife))
-	if err != nil {
-		return nil, err
-	}
-	s.servers.record(actor, "backup.downloaded", "app", app.Name, map[string]string{"database": backup.Database, "copy": download.Label})
-	download.App, download.Database, download.Link = app.Name, backup.Database, link.URL
-	return download, nil
-}
-
-// newestCopy is the Postgres copy a download links to and its key.
-func newestCopy(backup *DatabaseBackups, folder, moment string) (*Download, string, error) {
 	var copy *Moment
 	for index, found := range backup.Moments {
 		if found.Copy != "" && (moment == "" || strings.EqualFold(found.ID, moment) || strings.EqualFold(found.Label, moment)) {
@@ -85,10 +52,24 @@ func newestCopy(backup *DatabaseBackups, folder, moment string) (*Download, stri
 		}
 	}
 	if copy == nil && moment != "" {
-		return nil, "", ErrMoment
+		return nil, backup.missing(ErrMoment)
 	}
 	if copy == nil {
-		return nil, "", ErrNoCopy
+		return nil, backup.missing(ErrNoCopy)
+	}
+	bucket, err := s.openAppBucket(app)
+	if err != nil {
+		return nil, err
+	}
+	key := protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database) + "/" + protocol.CopyFile(copy.Copy, backup.Kind == protocol.DatabasePostgres)
+	name := app.Name + "-" + path.Base(protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database)) + "-" + path.Base(key)
+	link, err := s3.NewPresignClient(bucketClient(*bucket)).PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(bucket.Bucket),
+		Key:                        aws.String(key),
+		ResponseContentDisposition: aws.String(`attachment; filename="` + name + `"`),
+	}, s3.WithPresignExpires(downloadLinkLife))
+	if err != nil {
+		return nil, err
 	}
 	var size int64
 	for _, found := range backup.Copies {
@@ -96,26 +77,8 @@ func newestCopy(backup *DatabaseBackups, folder, moment string) (*Download, stri
 			size = found.Size
 		}
 	}
-	return &Download{Copy: copy.Copy, Label: copy.Label, At: copy.At, Size: size}, folder + "/" + protocol.CopyFile(copy.Copy), nil
-}
-
-// newestState has the daemon put the newest state of a SQLite database in
-// the bucket and says which download it is and its key.
-func (s *AppService) newestState(ctx context.Context, app *model.App, backup *DatabaseBackups, folder, moment string) (*Download, string, error) {
-	if moment != "" {
-		return nil, "", ErrDownloadNewest
-	}
-	ctx, cancel := context.WithTimeout(ctx, backupTimeout)
-	defer cancel()
-	var made protocol.Copy
-	err := s.servers.Request(ctx, app.ServerID, protocol.TypeBackupDownload, protocol.BackupRequest{App: app.Folder, Database: backup.Database}, &made)
-	if err != nil {
-		return nil, "", err
-	}
-	if !protocol.ValidCopyID(made.ID) {
-		return nil, "", errors.New("the daemon named no download")
-	}
-	return &Download{Copy: made.ID, Label: "The newest state", At: made.At}, protocol.DownloadFile(folder, made.ID), nil
+	s.servers.record(actor, "backup.downloaded", "app", app.Name, map[string]string{"database": backup.Database, "copy": copy.Label})
+	return &Download{App: app.Name, Database: backup.Database, Copy: copy.Copy, Label: copy.Label, At: copy.At, Size: size, Link: link.URL}, nil
 }
 
 // errorText is an error as people read it.

@@ -66,6 +66,48 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
 	a.send(protocol.TypeDeployDone, "", done)
 }
 
+// deployNote is the file "deploying" in an app's folder, there from the
+// start of a deploy to its end. A daemon that finds one when it starts
+// died during that deploy.
+type deployNote struct {
+	ID     string `json:"id"`
+	Number int    `json:"number"`
+}
+
+func (a *apps) noteFile(app string) string { return filepath.Join(a.appDir(app), "deploying") }
+
+// recoverDeploys ends the deploys a stopped daemon left running. The
+// daemon runs it when it starts.
+func (a *apps) recoverDeploys(ctx context.Context) {
+	notes, _ := filepath.Glob(a.noteFile("*"))
+	for _, file := range notes {
+		var note deployNote
+		if body, err := os.ReadFile(file); err == nil && json.Unmarshal(body, &note) == nil {
+			a.send(protocol.TypeDeployDone, "", a.endDeploy(ctx, filepath.Base(filepath.Dir(file)), note))
+		}
+		os.Remove(file)
+	}
+}
+
+// endDeploy says how a deploy the daemon died in ended. If it got as far
+// as being the current version, it worked. If not, the current version
+// starts again, as after any failed deploy.
+func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) protocol.DeployDone {
+	done := protocol.DeployDone{DeployID: note.ID}
+	current := a.current(app)
+	if current == note.Number {
+		done.OK = true
+		done.Detected, _ = a.live(app)
+		return done
+	}
+	a.markFailed(app, note.Number)
+	done.Error = "the daemon stopped during this deploy"
+	if current > 0 && a.compose(ctx, app, a.composeFile(app), func(string, ...any) {}, "up", "-d", "--remove-orphans") == nil {
+		done.Error += fmt.Sprintf("; v%d is running again", current)
+	}
+	return done
+}
+
 // release is one deploy on its way to running. Every step of the deploy
 // reads from it and writes down what it found.
 type release struct {
@@ -100,6 +142,11 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
 	}
 	defer a.lock(start.App)()
+	note := a.noteFile(start.App)
+	if err := writeState(note, deployNote{ID: start.DeployID, Number: start.Number}); err != nil {
+		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)
+	}
+	defer os.Remove(note)
 	release, err := a.newRelease(start, logf)
 	if err != nil {
 		return protocol.Detected{}, err
@@ -115,10 +162,6 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
 	a.ownVolumes(ctx, release)
 	err = a.startRelease(ctx, release)
-	if a.backups != nil {
-		// After a deploy, Litestream starts over: the next round follows.
-		a.backups.letGo(release.start.App)
-	}
 	if err != nil {
 		return release.detected, err
 	}
@@ -336,14 +379,14 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 	return os.WriteFile(filepath.Join(a.appDir(start.App), "current"), []byte(strconv.Itoa(start.Number)), 0o600)
 }
 
-// copyDataBefore remembers the moment just before the new release touches
-// the data, with a copy for Postgres: the hub names it "Before v12".
+// copyDataBefore makes a copy of each database just before the new release
+// touches the data: the hub names it "Before v12".
 func (a *apps) copyDataBefore(ctx context.Context, release *release) {
 	before := a.backups.copyBefore(ctx, release.start.App, "", release.logf)
 	if before == nil {
 		return
 	}
-	release.logf("noted the data before v%d", release.start.Number)
+	release.logf("copied the data before v%d", release.start.Number)
 	a.mu.Lock()
 	a.befores[release.start.DeployID] = *before
 	a.mu.Unlock()
@@ -366,8 +409,8 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	return fmt.Errorf("%w; v%d is running again", startErr, previous)
 }
 
-// afterStart notes the databases the running release has, starts a round
-// of backups for them, and drops old releases and images.
+// afterStart notes the databases the running release has, has backups
+// follow them, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
 	databases, noBackup, err := a.scanDatabases(ctx, release.composeFile)
 	if err == nil {

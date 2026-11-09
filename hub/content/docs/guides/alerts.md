@@ -24,8 +24,8 @@ One alert per event, and one when it is fixed.
 | `uptime.down`, `uptime.up` | a site goes down, or comes back ([Uptime](/docs/guides/uptime#down-and-back-up)) |
 | `server.down`, `server.up` | a daemon has not answered for two minutes; back online |
 | `deploy.failed` | a deploy fails ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
-| `backup.failed`, `backup.recovered` | a Postgres copy or a change of SQLite does not reach the bucket; and when it works again ([Backups](/docs/guides/backups)) |
-| `check.failed`, `check.recovered` | the daily check could not restore the newest state; passes again |
+| `backup.failed`, `backup.recovered` | a copy does not reach the bucket; and when it works again ([Backups](/docs/guides/backups)) |
+| `check.failed`, `check.recovered` | the daily check could not restore the newest copy; passes again |
 | `disk.full`, `disk.ok` | a server's data disk is over 90%; under 85% again |
 | `update.available` | a newer version of a [catalog](/docs/guides/catalog) app is out |
 

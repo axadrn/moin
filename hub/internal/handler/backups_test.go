@@ -11,7 +11,7 @@ import (
 // never skip the question.
 func TestRestoreNeedsTheTypedName(t *testing.T) {
 	s := newSwitches(t)
-	form := url.Values{"moment": {"1h"}, "database": {"/data/app.db"}}
+	form := url.Values{"moment": {"before-v12"}, "database": {"/data/app.db"}}
 	body := s.post("/app/{workspaceSlug}/apps/{app}/backups/restore", "/app/ada/apps/blog/backups/restore", form, s.handler.BackupRestore)
 	if !strings.Contains(body, "Type the name") {
 		t.Fatalf("a restore without the name: %s", body)

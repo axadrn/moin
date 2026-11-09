@@ -15,19 +15,18 @@ import (
 func TestBackupsList(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"databases":[
 		{"database":"/data/app.db","copied_at":"` + time.Now().Add(-12*time.Minute).UTC().Format(time.RFC3339) + `","checked_at":"` + time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339) + `","moments":[
-			{"id":"1h","label":"1 hour ago","at":"2026-11-07T13:00:00Z","kind":"minute"},
 			{"id":"before-v12","label":"Before v12","at":"2026-11-07T09:30:00Z","kind":"deploy"}]},
 		{"database":"postgres-db","kind":"postgres","error":"dial tcp: i/o timeout","problem":"The bucket can't be reached.","moments":[]}]}`}}
 	code, stdout, stderr := runCLI(t, api, "backups", "shop")
 	if code != 0 {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	for _, want := range []string{"last copy 12m ago · checked 2h ago", "1h", "1 hour ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "nothing to go back to yet", "kept 7 days, Postgres copied hourly", "moin restore shop --to <moment>", "moin backup download shop", "--every 15m|1h|1d"} {
+	for _, want := range []string{"last copy 12m ago · checked 2h ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "copied hourly, kept 7 days", "moin restore shop --to <moment>", "moin backup download shop", "--every 15m|1h|1d"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("no %q in\n%s", want, stdout)
 		}
 	}
-	for _, gone := range []string{"snapshot", "point in time", "dial tcp"} {
+	for _, gone := range []string{"snapshot", "point in time", "dial tcp", "nothing to go back to"} {
 		if strings.Contains(strings.ToLower(stdout), gone) {
 			t.Errorf("still says %q", gone)
 		}
@@ -42,7 +41,7 @@ func TestBackupSchedule(t *testing.T) {
 		"PUT /api/v1/apps/shop/backups": `{"every_minutes":15,"keep_days":7}`,
 	}}
 	code, stdout, stderr := runCLI(t, api, "backups", "shop", "--every", "15m")
-	if code != 0 || !strings.Contains(stdout, "shop keeps its backups 7 days; Postgres is copied every 15 minutes") {
+	if code != 0 || !strings.Contains(stdout, "shop is copied every 15 minutes, each copy kept 7 days") {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if body := api.body("PUT /api/v1/apps/shop/backups"); !strings.Contains(body, `"every_minutes":15`) || !strings.Contains(body, `"keep_days":7`) {
@@ -61,10 +60,10 @@ func TestBackupSchedule(t *testing.T) {
 func TestRestoreNeedsAMoment(t *testing.T) {
 	api := &fakeAPI{}
 	code, _, stderr := runCLI(t, api, "restore", "shop", "--confirm", "shop")
-	if code == 0 || !strings.Contains(stderr, "--to 1h") || len(api.requests) > 0 {
+	if code == 0 || !strings.Contains(stderr, "--to before-v12") || len(api.requests) > 0 {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
-	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "1h")
+	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "before-v12")
 	if code == 0 || !strings.Contains(stderr, "--confirm shop") || len(api.requests) > 0 {
 		t.Fatalf("without --confirm: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
@@ -120,10 +119,10 @@ func TestBackupDownload(t *testing.T) {
 // the CLI follows it until it is done, and says why it failed.
 func TestRestoreWaitsForTheDaemon(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
-		"POST /api/v1/apps/shop/restores":   `{"id":"r1","state":"running","to":"1 hour ago"}`,
-		"GET /api/v1/apps/shop/restores/r1": `{"id":"r1","state":"failed","to":"1 hour ago","error":"swap the data: disk full. The copy from before is undo-20261107T140200Z"}`,
+		"POST /api/v1/apps/shop/restores":   `{"id":"r1","state":"running","to":"Before v12"}`,
+		"GET /api/v1/apps/shop/restores/r1": `{"id":"r1","state":"failed","to":"Before v12","error":"swap the data: disk full. The copy from before is undo-20261107T140200Z"}`,
 	}}
-	code, _, stderr := runCLI(t, api, "restore", "shop", "--to", "1h", "--confirm", "shop")
+	code, _, stderr := runCLI(t, api, "restore", "shop", "--to", "before-v12", "--confirm", "shop")
 	if code == 0 || !strings.Contains(stderr, "disk full") || !strings.Contains(api.body("POST /api/v1/apps/shop/restores"), `"confirm":"shop"`) || !strings.Contains(stderr, "undo-20261107T140200Z") || !api.seen("GET /api/v1/apps/shop/restores/r1") {
 		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}

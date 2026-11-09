@@ -92,6 +92,9 @@ live ✓      v3 is live
 build fails: v2 never stopped.
 start or check fails: v2 starts
 again, v3 is marked failed.
+the server restarts or the daemon
+dies halfway: the same, as soon as
+the daemon is back.
 ```
 
 Step by step: [What a deploy does](/docs/concepts/how-moin-works#what-a-deploy-does).

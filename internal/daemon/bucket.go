@@ -54,9 +54,9 @@ func (r *runner) backupConfig(message protocol.Message, rules *protocol.Rules) {
 	r.send(protocol.TypeOK, message.RequestID, nil)
 }
 
-// sweepBucket deletes the sources of moin deploy in <app>/<app ID>/uploads/
-// and the SQLite downloads in <app>/<app ID>/downloads/ after a day.
-func (b *backups) sweepBucket(ctx context.Context) {
+// sweepUploads deletes what moin deploy left in <app>/<app ID>/uploads/
+// after a day.
+func (b *backups) sweepUploads(ctx context.Context) {
 	b.mu.Lock()
 	buckets := slices.Collect(maps.Values(b.buckets))
 	if b.bucket != nil {
@@ -67,23 +67,16 @@ func (b *backups) sweepBucket(ctx context.Context) {
 		client := s3Client(bucket)
 		for _, app := range folders(ctx, client, bucket.Bucket, strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace)+"/", "/")) {
 			for _, id := range folders(ctx, client, bucket.Bucket, app) {
-				for _, folder := range []string{"uploads/", "downloads/"} {
-					deleteOlderThanADay(ctx, client, bucket.Bucket, id+folder)
+				list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(id + "uploads/")})
+				if err != nil {
+					continue
+				}
+				for _, object := range list.Contents {
+					if object.LastModified != nil && time.Since(*object.LastModified) > day {
+						_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: object.Key})
+					}
 				}
 			}
-		}
-	}
-}
-
-// deleteOlderThanADay deletes the objects under prefix older than a day.
-func deleteOlderThanADay(ctx context.Context, client *s3.Client, bucket, prefix string) {
-	list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(prefix)})
-	if err != nil {
-		return
-	}
-	for _, object := range list.Contents {
-		if object.LastModified != nil && time.Since(*object.LastModified) > day {
-			_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: object.Key})
 		}
 	}
 }

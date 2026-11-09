@@ -21,8 +21,8 @@ import (
 // sets how often and how long with --every and --keep.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("backups", "backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]").withApp()
-	every := flags.String("every", "", "how often moin copies Postgres: 15m, 1h or 1d")
-	keep := flags.String("keep", "", "how long the app keeps its backups: 1d, 3d, 7d or 30d")
+	every := flags.String("every", "", "how often moin copies the databases: 15m, 1h or 1d")
+	keep := flags.String("keep", "", "how long each copy stays: 1d, 3d, 7d or 30d")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	done(stdout, "%s keeps its backups %s; Postgres is copied %s.", name, keepText(schedule.KeepDays), everyText(schedule.EveryMinutes))
+	done(stdout, "%s is copied %s, each copy kept %s.", name, everyText(schedule.EveryMinutes), keepText(schedule.KeepDays))
 	return nil
 }
 
@@ -85,15 +85,22 @@ func keepText(days int) string {
 	return fmt.Sprintf("%d days", days)
 }
 
-// backUp is moin backup: download a database.
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
+}
+
+// backUp is moin backup: download a copy.
 func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "download" {
-		return fmt.Errorf("usage: `%s backup download [app] [--db <path>] [--to <moment>] [--link]`. %s backups lists the moments", build.Name, build.Name)
+		return fmt.Errorf("usage: `%s backup download [app] [--db <path>] [--to <moment>] [--link]`. moin copies every database on its schedule: %s backups lists the copies", build.Name, build.Name)
 	}
 	flags := newFlags("backup download", "backup download [app] [--db <path>] [--to <moment>] [--link]").withApp()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	to := flags.String("to", "", "Postgres: a copy from "+build.Name+" backups, like before-v12; the newest without it")
-	link := flags.Bool("link", false, "print the link in your bucket instead of saving it here")
+	to := flags.String("to", "", "a copy from "+build.Name+" backups, like before-v12; the newest without it")
+	link := flags.Bool("link", false, "print the link to the copy in your bucket instead of saving it here")
 	if err := flags.parse(args[1:]); err != nil {
 		return err
 	}
@@ -130,7 +137,7 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 		os.Remove(file)
 		return err
 	}
-	done(stdout, "Saved %s, %s from %s.", file, download.Database, download.At.UTC().Format("Jan 2 15:04 UTC"))
+	done(stdout, "Saved %s (%s), the copy of %s from %s.", file, human.Size(float64(download.Size)), download.Database, download.At.UTC().Format("Jan 2 15:04 UTC"))
 	return nil
 }
 
@@ -152,7 +159,7 @@ func copyName(app, link string) string {
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("restore", `restore [app] --to <moment> [--db <path>] [--confirm <app>]`).withApp().withConfirm()
 	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	to := flags.String("to", "", `a moment from `+build.Name+` backups, like before-v12 or 1h, or a time in UTC, like 14:01 or "2026-11-07 14:01"`)
+	to := flags.String("to", "", `a moment from `+build.Name+` backups, like before-v12, or a time in UTC, like 14:01 or "2026-11-07 14:01"`)
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -160,7 +167,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return flags.wrong()
 	}
 	if strings.TrimSpace(*to) == "" {
-		return fmt.Errorf("name the moment to go back to: %s restore <app> --to 1h. %s backups lists them", build.Name, build.Name)
+		return fmt.Errorf("name the moment to go back to: %s restore <app> --to before-v12. %s backups lists them", build.Name, build.Name)
 	}
 	name, err := flags.app(flags.Arg(0))
 	if err != nil {
@@ -231,15 +238,15 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 		switch {
 		case database.Problem != "":
 			fmt.Fprintln(w, "  "+style.Danger.Render(style.SymbolFailed+" "+database.Problem))
-		case database.CopiedAt != nil:
-			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" last copy "+human.Ago(*database.CopiedAt, now)+" · "+checked))
-		case database.Since != nil:
-			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" every change written down · "+checked))
+		case database.CopiedAt == nil:
+			fmt.Fprintln(w, "  "+style.Muted.Render("starting: no copy yet"))
 		default:
-			fmt.Fprintln(w, "  "+style.Muted.Render("starting"))
+			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" last copy "+human.Ago(*database.CopiedAt, now)+" · "+checked))
 		}
 		if len(database.Moments) == 0 {
-			fmt.Fprintln(w, style.Muted.Render("  nothing to go back to yet"))
+			if database.Problem == "" {
+				fmt.Fprintln(w, style.Muted.Render("  nothing to go back to yet"))
+			}
 			continue
 		}
 		rows := [][]string{}
@@ -250,9 +257,9 @@ func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time
 	}
 	fmt.Fprintln(w)
 	if list.Bucket != "" {
-		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket+", kept "+keepText(list.KeepDays)+", Postgres copied "+everyText(list.EveryMinutes)))
+		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket+", copied "+everyText(list.EveryMinutes)+", kept "+keepText(list.KeepDays)))
 	}
 	hint(w, "Go back:", build.Name+" restore "+app+" --to <moment>, or a time like 14:01 UTC")
 	hint(w, "How often:", build.Name+" backups "+app+" --every 15m|1h|1d --keep 1d|3d|7d|30d")
-	hint(w, "Download:", build.Name+" backup download "+app)
+	hint(w, "A copy:", build.Name+" backup download "+app)
 }

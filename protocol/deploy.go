@@ -100,8 +100,8 @@ type DeployDone struct {
 	OK       bool     `json:"ok"`
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
-	// Before is the moment just before the new release touched the data,
-	// the time in the IDs of the Postgres copies: the hub names it
-	// "Before v12".
+	// Before is when the daemon took the copies just before the new
+	// release started over an older one, the time in their IDs: the hub
+	// names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
 }

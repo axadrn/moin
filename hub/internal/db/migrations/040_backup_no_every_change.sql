@@ -1,5 +1,5 @@
 -- +goose Up
--- SQLite always writes down every change now: there is no switch.
+-- SQLite is copied on a schedule like Postgres: there is no Every change.
 ALTER TABLE apps DROP COLUMN backup_every_change;
 
 -- +goose Down

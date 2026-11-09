@@ -48,7 +48,7 @@ const keepRestores = 7 * 24 * time.Hour
 
 // StartRestore puts a database of an app back to a moment. The daemon
 // builds the restored database beside the live one and switches in one
-// step; the state before stays as long as the app keeps its backups: going
+// step; the state before stays as long as the app keeps copies: going
 // back to it undoes the restore. It reserves the restore, checks the
 // moment, then the daemon runs the restore on its own; RestoreOf follows
 // it.
@@ -331,9 +331,17 @@ func pickDatabase(databases []DatabaseBackups, name string) (*DatabaseBackups, e
 	return nil, ErrNoDatabase
 }
 
+// missing is why a copy was not found: the problem when the copies could
+// not be read, and notFound when they were and it is not there.
+func (d DatabaseBackups) missing(notFound error) error {
+	if len(d.Copies) == 0 && d.Problem != "" {
+		return &DaemonError{Message: d.Problem}
+	}
+	return notFound
+}
+
 // restoreRequest checks where a restore goes and says it as people read
-// it. A time goes to that minute when Every change reaches it, else to
-// the newest copy at or before it (Postgres).
+// it. A time goes to the newest copy at or before it.
 func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target RestoreTarget) (protocol.BackupRestore, string, error) {
 	databases, err := s.backups(ctx, app)
 	if err != nil {
@@ -344,36 +352,20 @@ func (s *AppService) restoreRequest(ctx context.Context, app *model.App, target 
 		return protocol.BackupRestore{}, "", err
 	}
 	request := protocol.BackupRestore{App: app.Folder, Database: backup.Database}
-	now := s.now().UTC()
 	if target.At != nil {
 		at := target.At.UTC()
-		if since, until, ok := everyChangeReach(backup.DatabaseBackup, now.Add(time.Minute)); ok && !at.Before(since) && !at.After(until) {
-			request.At = &at
-			return request, at.Format("Jan 2 15:04 UTC"), nil
-		}
 		for _, moment := range backup.Moments {
 			if moment.Copy != "" && !moment.At.After(at) {
 				request.Copy = moment.Copy
 				return request, moment.Label, nil
 			}
 		}
-		return protocol.BackupRestore{}, "", ErrMomentOutside
+		return protocol.BackupRestore{}, "", backup.missing(ErrMomentOutside)
 	}
 	moment, err := findMoment(backup.Moments, target.Moment)
 	if err != nil {
-		return protocol.BackupRestore{}, "", err
+		return protocol.BackupRestore{}, "", backup.missing(err)
 	}
 	request.Copy, request.Undo = moment.Copy, moment.Undo
-	if moment.Copy == "" && moment.Undo == "" {
-		at := moment.At.UTC()
-		// "1 hour ago" is an hour before the restore: the list was made a
-		// moment earlier.
-		for _, quick := range quickMoments {
-			if quick.id == moment.ID {
-				at = now.Add(-quick.ago)
-			}
-		}
-		request.At = &at
-	}
 	return request, moment.Label, nil
 }

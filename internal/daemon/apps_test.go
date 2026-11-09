@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -310,6 +311,51 @@ func TestStartKeepsTheCrashInTheDeployLog(t *testing.T) {
 	}
 	if !slices.Contains(lines, "web-1  | panic: boom") {
 		t.Fatalf("deploy log = %q, want the crash", lines)
+	}
+}
+
+// A daemon that died during a deploy tells the hub how it ended when it
+// starts, and only starts the app if the new version never became current.
+func TestDeployTheDaemonDiedIn(t *testing.T) {
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakeCommand(t, "docker", "echo \"$*\" >> "+calls+"\n")
+
+	for _, test := range []struct {
+		name        string
+		current     int
+		wantOK      bool
+		wantError   string
+		wantStarted string
+	}{
+		{"the new version never became current", 12, false, "the daemon stopped during this deploy; v12 is running again", "releases/12/compose.json --progress plain up -d --remove-orphans"},
+		{"the new version is already current", 13, true, "", ""},
+		{"the very first deploy", 0, false, "the daemon stopped during this deploy", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			os.Remove(calls)
+			var sent []protocol.DeployDone
+			a := &apps{dir: t.TempDir(), send: func(_ protocol.MessageType, _ string, data any) { sent = append(sent, data.(protocol.DeployDone)) }}
+			if err := writeState(a.noteFile("blog"), deployNote{ID: "d1", Number: 13}); err != nil {
+				t.Fatal(err)
+			}
+			if test.current > 0 {
+				if err := os.WriteFile(filepath.Join(a.appDir("blog"), "current"), []byte(strconv.Itoa(test.current)), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			a.recoverDeploys(context.Background())
+			if len(sent) != 1 || sent[0].DeployID != "d1" || sent[0].OK != test.wantOK || sent[0].Error != test.wantError {
+				t.Fatalf("told the hub %+v", sent)
+			}
+			if exists(a.noteFile("blog")) {
+				t.Error("the note is still there")
+			}
+			body, _ := os.ReadFile(calls)
+			started := string(body)
+			if test.wantStarted == "" && started != "" || test.wantStarted != "" && !strings.Contains(started, test.wantStarted) {
+				t.Errorf("docker was asked: %q", started)
+			}
+		})
 	}
 }
 

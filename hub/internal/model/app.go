@@ -59,8 +59,8 @@ type App struct {
 	// BucketID is the bucket the app's uploads and backups go to; nil
 	// uses the workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
-	// BackupEvery is how often the daemon copies Postgres, in minutes;
-	// BackupKeep how many days the app keeps its backups.
+	// BackupEvery is how often the daemon copies the app's databases, in
+	// minutes; BackupKeep how many days it keeps each copy.
 	BackupEvery   int    `db:"backup_every"`
 	BackupKeep    int    `db:"backup_keep"`
 	BucketName    string `db:"bucket_name"`
@@ -149,14 +149,11 @@ type Bucket struct {
 }
 
 // BackupStatus is what the daemon last reported about one database:
-// its newest copy, how far Every change reaches (Since, Until) and the
-// newest daily check.
+// its newest copy and the newest daily check.
 type BackupStatus struct {
 	AppID     string     `db:"app_id"`
 	Database  string     `db:"database"`
 	CopiedAt  *time.Time `db:"copied_at"`
-	Since     *time.Time `db:"since"`
-	Until     *time.Time `db:"replicated_at"`
 	CheckedAt *time.Time `db:"checked_at"`
 	Error     string     `db:"error"`
 	UpdatedAt time.Time  `db:"updated_at"`

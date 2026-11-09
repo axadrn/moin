@@ -1,7 +1,6 @@
 package service
 
-// How often an app's Postgres is copied and how long the app keeps its
-// backups.
+// How often an app is copied and how long each copy stays.
 
 import (
 	"log/slog"
@@ -12,8 +11,8 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// SetBackupSchedule sets how often the daemon copies an app's Postgres
-// and how long the app keeps its backups, and tells the daemon.
+// SetBackupSchedule sets how often the daemon copies an app's databases,
+// how long it keeps each copy, and tells the daemon.
 func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule protocol.Schedule) (*model.App, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {

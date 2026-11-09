@@ -131,8 +131,13 @@ templ databaseBackupValue(view DataView, database string) {
 			@kit.Dot(kit.StateFailed)
 			Backup fails
 		</span>
-	} else if known && backup.Since != nil {
-		<span class="shrink-0 text-sm text-muted-foreground" title={ "Back to " + stamp(*backup.Since) }>Backed up</span>
+	} else if known && backup.CheckError != "" {
+		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.CheckError) }>
+			@kit.Dot(kit.StateFailed)
+			Check failed
+		</span>
+	} else if known && backup.CopiedAt != nil {
+		<span class="shrink-0 text-sm text-muted-foreground" title={ "Newest copy " + stamp(*backup.CopiedAt) }>Backed up</span>
 	}
 }
 

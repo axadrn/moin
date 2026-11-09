@@ -204,7 +204,7 @@ Once a day the hub asks GitHub for the newest version. When one is out, the admi
 
 ## Database backup
 
-Like Every change of your apps' SQLite files, the hub's SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `hub/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
+The hub's own SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `hub/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
 
 | File | What is in it | Backup |
 | --- | --- | --- |

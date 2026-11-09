@@ -186,7 +186,7 @@ func (s *AlertService) checkFailedMessage(e alertEvent) alertMessage {
 		Lines: []string{
 			"Database: " + e.details["database"] + ", app " + e.target + ".",
 			"Error: " + orDash(reason),
-			"The daily check could not restore the newest state. Download it and look: moin backup download " + e.target,
+			"The daily check could not restore the newest copy. Download it and look: moin backup download " + e.target,
 		},
 		URL:     e.base + "/apps/" + e.app + "/data",
 		Payload: alertPayload{App: e.target, Server: s.serverOf(e.workspaceID, e.target), Reason: reason},

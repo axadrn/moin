@@ -72,7 +72,7 @@ tags:
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
-    description: The backup of every SQLite and Postgres database, in your own S3-compatible bucket only, never through the hub. moin writes down every change and keeps it 7 days; a restore goes back to any minute and can be undone for 7 days; every day moin checks that going back works; a full copy downloads with a short-lived link into your bucket.
+    description: The backup of every SQLite and Postgres database, in your own S3-compatible bucket only, never through the hub. moin copies each database on the app's schedule, every 15 minutes, hourly or daily, and before each deploy; a restore goes back to a copy and can be undone; every day moin checks that the newest copy restores; a full copy downloads with a short-lived link into your bucket.
   - name: Uptime
     description: The hub visits every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: Alerts
@@ -2627,7 +2627,7 @@ paths:
       tags: [Backups]
       operationId: getAppBackups
       summary: List backups
-      description: How the app is backed up (how often, how long, every change) and for every database its copies in your bucket, the states before restores, the newest daily check and the moments a restore can go back to. For SQLite with every change the quick minutes come first (1 minute, 15 minutes, 1 hour ago, yesterday this time), then the copies and the undos, newest first; a copy moin took before a deploy, a data edit or a catalog update is named after it, like "Before v12". Read from the server and the bucket.
+      description: How the app is backed up (how often, how long) and for every database its copies in your bucket, the states before restores, the newest daily check and the moments a restore can go back to. The copies and the undos come newest first; a copy moin took before a deploy, a data edit or a catalog update is named after it, like "Before v12". Read from the server and the bucket.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -2658,7 +2658,7 @@ paths:
       tags: [Backups]
       operationId: setAppBackups
       summary: Set the backup schedule
-      description: How many days the app keeps its backups (`keep_days` 1, 3, 7 or 30) and how often the daemon copies Postgres (`every_minutes` 15, 60 or 1440). SQLite has every change written down; it only uses `keep_days`. The daemon deletes what is older than `keep_days`, never the newest copy.
+      description: How often the daemon copies the app's databases into your bucket (`every_minutes` 15, 60 or 1440), and how many days it keeps each copy (`keep_days` 1, 3, 7 or 30). The daemon deletes copies older than `keep_days`, never the newest.
       requestBody:
         required: true
         content:
@@ -2841,7 +2841,7 @@ paths:
       tags: [Backups]
       operationId: restoreApp
       summary: Restore a database
-      description: Puts a database back to a moment from getAppBackups, by its id or label, or to a time, that minute for SQLite with every change, else the newest copy at or before it. moin checks the moment, answers 202 and the daemon runs the restore on its own; follow it with getRestore until `state` is `done` or `failed`. The daemon builds the restored database beside the live one while the app runs, then stops the app, switches in one step and starts the app again, also when something failed. The state before stays on the server as long as the app keeps copies, so the restore can be undone: a restore to an `undo-` moment switches back to it. `state` is `unknown` while the server is offline during the restore; moin asks it every minute once it is back. A label two moments share needs the moment's id.
+      description: Puts a database back to a moment from getAppBackups, by its id or label, or to a time, the newest copy at or before it. moin checks the moment, answers 202 and the daemon runs the restore on its own; follow it with getRestore until `state` is `done` or `failed`. The daemon builds the restored database beside the live one while the app runs, then stops the app, switches in one step and starts the app again, also when something failed. The state before stays on the server as long as the app keeps copies, so the restore can be undone: a restore to an `undo-` moment switches back to it. `state` is `unknown` while the server is offline during the restore; moin asks it every minute once it is back. A label two moments share needs the moment's id.
       requestBody:
         required: true
         content:
@@ -6110,11 +6110,11 @@ components:
           description: The database's path in the container; needed when the app has several.
         moment:
           type: string
-          description: The id or the label of a moment from getAppBackups, like `1h`, `before-v12`, `20261107T140000Z`, `Before your SQL change` or `undo-20261107T140200Z`.
+          description: The id or the label of a moment from getAppBackups, like `before-v12`, `20261107T140000Z`, `Before your SQL change` or `undo-20261107T140200Z`.
         at:
           type: string
           format: date-time
-          description: A time instead of a moment, that minute for SQLite with every change, else the newest copy at or before it.
+          description: A time instead of a moment: the newest copy at or before it.
         confirm:
           type: string
           description: The app's name, typed out by the user. A restore replaces the live data; without the exact name it answers 422 `confirm_mismatch`.
@@ -6134,11 +6134,11 @@ components:
         every_minutes:
           type: integer
           enum: [15, 60, 1440]
-          description: How often the daemon copies Postgres.
+          description: How often the daemon copies the databases.
         keep_days:
           type: integer
           enum: [1, 3, 7, 30]
-          description: How many days the app keeps its backups.
+          description: How many days each copy stays.
     Restore:
       type: object
       required: [id, app, database, to, state, started_at]
@@ -6151,7 +6151,7 @@ components:
           type: string
         to:
           type: string
-          description: The moment it goes back to, as people read it, like "1 hour ago" or "Jan 2 15:04 UTC".
+          description: The moment it goes back to, as people read it, like "At 14:00" or "Before v12".
         state:
           type: string
           enum: [running, unknown, done, failed]
@@ -6456,22 +6456,14 @@ components:
               copied_at:
                 type: string
                 format: date-time
-                description: Postgres only. The newest copy in the bucket.
+                description: The newest copy in the bucket.
               checked_at:
                 type: string
                 format: date-time
-                description: The newest daily check. It restored the newest state into a throwaway database and read it.
+                description: The newest daily check. It restored the newest copy into a throwaway database and read it.
               check_error:
                 type: string
                 description: Why the newest daily check failed.
-              since:
-                type: string
-                format: date-time
-                description: How far back every change reaches, SQLite with every change on.
-              until:
-                type: string
-                format: date-time
-                description: The newest change every change wrote down.
               copies:
                 type: array
                 description: The copies in the bucket, newest first.
@@ -6518,7 +6510,7 @@ components:
                       description: What restoreApp takes, like 1h, before-v12, edit-37, 20261107T140000Z or undo-20261107T140200Z.
                     label:
                       type: string
-                      description: Like "1 hour ago", "At 14:00", "Before v12", "Before your SQL change", "Before the restore at 14:02".
+                      description: Like "At 14:00", "Before v12", "Before your SQL change", "Before the restore at 14:02".
                     at:
                       type: string
                       format: date-time

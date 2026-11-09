@@ -431,7 +431,7 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 		t.Fatalf("removed a server that never connected = %+v", removed)
 	}
 	toolError(t, call(t, session, "remove_app", map[string]any{"app": "shop", "confirm": "blog"}), "confirm_mismatch")
-	toolError(t, call(t, session, "restore_app", map[string]any{"app": "shop", "moment": "1h", "confirm": "blog"}), "confirm_mismatch")
+	toolError(t, call(t, session, "restore_app", map[string]any{"app": "shop", "moment": "before-v12", "confirm": "blog"}), "confirm_mismatch")
 	if schedule := output[mcp.ScheduleOutput](t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 15, "keep_days": 30})); schedule.EveryMinutes != 15 || schedule.KeepDays != 30 {
 		t.Fatalf("set_backups = %+v", schedule)
 	}

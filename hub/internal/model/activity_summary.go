@@ -178,13 +178,13 @@ var backupSummaries = map[string]summarize{
 		return "backs up " + d["database"] + " of " + target + " again"
 	},
 	"backup.checked": func(target string, d map[string]string) string {
-		return "checked that the newest state of " + d["database"] + " of " + target + " restores"
+		return "checked that the newest copy of " + d["database"] + " of " + target + " restores"
 	},
 	"check.failed": func(target string, d map[string]string) string {
-		return "could not restore the newest state of " + d["database"] + " of " + target + " in the daily check"
+		return "could not restore the newest copy of " + d["database"] + " of " + target + " in the daily check"
 	},
 	"check.recovered": func(target string, d map[string]string) string {
-		return "restores the newest state of " + d["database"] + " of " + target + " in the daily check again"
+		return "restores the newest copy of " + d["database"] + " of " + target + " in the daily check again"
 	},
 	"data.sql": sqlSummary,
 	"data.cell_updated": func(target string, d map[string]string) string {

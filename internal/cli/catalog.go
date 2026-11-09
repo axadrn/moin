@@ -67,7 +67,7 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 	case "postgres":
 		fmt.Fprintln(stdout, "Its Postgres: copied into your bucket hourly, checked every day.")
 	case "sqlite":
-		fmt.Fprintln(stdout, "Its SQLite: every change written to your bucket, checked every day.")
+		fmt.Fprintln(stdout, "Its SQLite: copied into your bucket hourly, checked every day.")
 	default:
 		if entry.DatabaseNote != "" {
 			fmt.Fprintln(stdout, entry.DatabaseNote)
