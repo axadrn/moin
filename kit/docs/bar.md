@@ -1,6 +1,6 @@
 # Bar
 
-The same on every page.
+The top of every page. Flat in an app, floating on a public site.
 
 Styles: `parts/button.css`, `parts/bar.css`, `parts/avatar.css`.
 
