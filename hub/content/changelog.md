@@ -54,7 +54,7 @@ November 9, 2026
 - **`moin agent`**: it is `moin daemon`.
 
 ### Upgrade
-Stop apps that use SQLite first with `moin stop`: the old backup process can damage a database that is being written when it exits. Self-hosted: **Update now**, or `sh update.sh`, and the servers follow by themselves. Then `moin start`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Copies from before this update stay in your bucket, but moin no longer lists them, so delete nothing.
+Stop apps that use SQLite first with `moin stop`: the old backup process can damage a database that is being written when it exits. Self-hosted: **Update now**, or `sh update.sh`, and the servers follow by themselves. With a Cloudflare Tunnel, change its service from `http://controlplane:8090` to `http://hub:8090` right after the update, and a path under `/run/moin-controlplane/` kept in 1Password becomes `/run/moin-hub/`. Then `moin start`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Copies from before this update stay in your bucket, but moin no longer lists them, so delete nothing.
 
 ## v1.0.0-beta.25
 
