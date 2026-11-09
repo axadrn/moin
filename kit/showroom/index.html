@@ -154,6 +154,16 @@
   --font-sans: "Inter", system-ui, sans-serif;
 }</pre></div>
       </div>
+      <div class="kit-stack" data-gap="2">
+        <div class="kit-section-head"><h2>Light and dark</h2></div>
+        <p class="kit-text kit-muted">It follows the system by itself, with no script. Each color in foundation.css holds its light and its dark value.</p>
+        <p class="kit-text kit-muted">To let people choose, add a button. The choice is kept in the browser. Load kit.js in the head without defer, so a saved choice is there before the first paint.</p>
+        <div class="kit-code"><pre tabindex="0">&lt;script src="kit/kit.js"&gt;&lt;/script&gt;
+
+&lt;button type="button" class="kit-button" data-mode-toggle&gt;Light or dark&lt;/button&gt;</pre></div>
+        <p class="kit-text kit-muted">For one mode only, set the class yourself.</p>
+        <div class="kit-code"><pre tabindex="0">&lt;html class="dark"&gt;</pre></div>
+      </div>
     </div>
 
     <div class="kit-stack" data-gap="4" data-pane="rooms" hidden>

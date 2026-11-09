@@ -49,6 +49,10 @@ that folder.
 A theme is a list of CSS variables. Each color is one line with its light and
 its dark value. The editor in the showroom writes that list.
 
+Light and dark follow the system with no script. To let people choose, load
+`kit.js` in the head without `defer` and add a button with `data-mode-toggle`.
+For one mode only, put `class="dark"` or `class="light"` on `<html>`.
+
 The kit ships no fonts and uses
 the system's. Pick another font in the theme editor and Copy theme writes out
 how to add it: `<link rel="preload">`, `@font-face` with `font-display:
