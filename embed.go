@@ -3,8 +3,8 @@ package moin
 
 import "embed"
 
-// Kit is what a page needs of the kit folder. The hub serves it under
-// /assets/kit/, and its docs, examples and showroom stay out of the binary.
+// Kit is the kit folder. The hub serves what pages need under /assets/kit/
+// and the whole folder, with its showroom, under /kit/.
 //
-//go:embed kit/*.css kit/kit.js kit/parts kit/icons
+//go:embed kit
 var Kit embed.FS

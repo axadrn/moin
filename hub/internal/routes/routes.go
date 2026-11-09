@@ -128,6 +128,10 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	assetHandler := assetHandler(app)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
 	mux.Handle("GET /assets/kit/", http.StripPrefix("/assets/kit/", middleware.Gzip(kitHandler(app))))
+	mux.Handle("GET /kit/", http.StripPrefix("/kit/", middleware.Gzip(kitHandler(app))))
+	mux.HandleFunc("GET /kit", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/kit/showroom/", http.StatusFound)
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	// Browsers, link previews and analytics ask for /favicon.ico at the root.
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {

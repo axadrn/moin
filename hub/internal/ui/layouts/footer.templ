@@ -30,6 +30,7 @@ templ Footer() {
 				</div>
 				@footerColumn("Product") {
 					@footerLink("/catalog", "Catalog")
+					@footerLink("/kit", "Kit")
 					if ctxkeys.RenderConfig(ctx).Billing {
 						@footerLink("/#pricing", "Pricing")
 					}
