@@ -61,9 +61,8 @@ Tailwind: `font-display` (Geist 800, tight), `bg-brand text-brand-foreground`, `
 `bg-live/12`, `text-running`, `text-failed`, `bg-terminal`. Numbers
 `tabular-nums`.
 
-**Logo.** The wordmark `moin.` in Satoshi Black (`font-wordmark`, only
-there), lowercase, with Satoshi's own round full stop, round like the dot
-on the i. `blocks.Wordmark` on the page;
+**Logo.** The wordmark `moin.`, drawn as a shape: lowercase, with a round full
+stop, round like the dot on the i. `kit.Wordmark` on the page;
 `assets/img/logo.svg`, the favicon (`m.` white on a black tile) and the OG
 image are the same shapes. The story behind the name is Why moin in the FAQ.
 

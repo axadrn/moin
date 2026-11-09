@@ -12,13 +12,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Satoshi";
-  src: url("/assets/fonts/satoshi/satoshi-black.woff2") format("woff2");
-  font-weight: 900;
-  font-display: swap;
-}
-
 @import "tailwindcss";
 @import "./tw-animate.css";
 @import "./typeset.css";
@@ -197,13 +190,6 @@
   font-family: var(--font-heading);
   font-weight: 800;
   letter-spacing: -0.03em;
-}
-
-/* The wordmark only: Satoshi Black, tight. Nothing else uses this face. */
-@utility font-wordmark {
-  font-family: "Satoshi", var(--font-heading);
-  font-weight: 900;
-  letter-spacing: -0.04em;
 }
 
 @layer base {
