@@ -122,6 +122,16 @@ addEventListener("pageshow", (event) => {
   if (event.persisted) location.reload();
 });
 
+// A switch shows what is stored. A refused change is answered with
+// HX-Reswap: none and a failed request with nothing, so no new switch comes:
+// put this one back.
+document.addEventListener("htmx:finally:request", (event) => {
+  const { sourceElement: source, response } = event.detail.ctx;
+  if (response && response.raw.headers.get("HX-Reswap") !== "none") return;
+  const box = source.matches("input[role=switch]") ? source : source.querySelector("input[role=switch]");
+  if (box?.isConnected) box.checked = !box.checked;
+});
+
 // hx-sse 4.0.0 aborts a stream it closes on purpose (hx-sse:close, a page
 // left) and leaves that abort unhandled. It is not an error: keep it out of
 // the console.

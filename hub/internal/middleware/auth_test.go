@@ -293,6 +293,9 @@ func TestWithWorkspaceLoadsWorkspaceAndRejectsCrossTenantAccess(t *testing.T) {
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("member status = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store: the back button must not show an old page", got)
+	}
 
 	crossTenant := httptest.NewRequest(http.MethodGet, "/app/"+bob.Workspace.Slug+"/overview", nil)
 	crossTenant.SetPathValue("workspaceSlug", bob.Workspace.Slug)
