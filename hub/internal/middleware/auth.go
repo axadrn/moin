@@ -164,6 +164,9 @@ func withWorkspaceOf(slugOf func(*http.Request) string, workspaceService *servic
 				renderAuthError(w, r, http.StatusInternalServerError, "Workspaces unavailable", "Your workspaces could not be loaded. Please try again.")
 				return
 			}
+			// A page of a workspace shows what is stored now, also after
+			// the back button.
+			w.Header().Set("Cache-Control", "no-store")
 			ctx := ctxkeys.WithWorkspace(r.Context(), workspace)
 			ctx = ctxkeys.WithWorkspaceMember(ctx, member)
 			ctx = ctxkeys.WithWorkspaces(ctx, workspaces)
