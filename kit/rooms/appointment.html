@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appointment</title>
+  <link rel="stylesheet" href="../kit.css">
+  <script src="../kit.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="kit-bar">
+    <div class="kit-page kit-bar-inner">
+      <a href="#" class="kit-row" data-gap="2" aria-label="Home">
+        <span class="kit-heading">Acme</span>
+      </a>
+      <span class="kit-fill"></span>
+      <button type="button" class="kit-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="kit-icon kit-icon-theme"></i>
+      </button>
+      <span class="kit-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="kit-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="kit-page kit-content">
+      <!-- Title -->
+      <header class="kit-header">
+        <div class="kit-header-main">
+          <h1 class="kit-title">Book a call</h1>
+          <p class="kit-header-line kit-muted">30 minutes with Ada Lovelace</p>
+        </div>
+      </header>
+      <!-- Day and time -->
+      <div class="kit-grid" data-cols="1-2">
+        <div class="kit-card">
+          <kit-calendar min="2026-11-09" value="2026-11-16"></kit-calendar>
+        </div>
+        <form class="kit-section">
+          <div class="kit-section-head">
+            <h2>Free times</h2>
+          </div>
+          <div class="kit-list">
+            <label class="kit-item">
+              <input type="radio" name="slot">
+              <span class="kit-item-text">
+                <span class="kit-item-name">09:00</span>
+              </span>
+              <i class="kit-item-check"></i>
+            </label>
+            <label class="kit-item">
+              <input type="radio" name="slot" checked>
+              <span class="kit-item-text">
+                <span class="kit-item-name">10:30</span>
+              </span>
+              <i class="kit-item-check"></i>
+            </label>
+            <label class="kit-item">
+              <input type="radio" name="slot">
+              <span class="kit-item-text">
+                <span class="kit-item-name">13:00</span>
+              </span>
+              <i class="kit-item-check"></i>
+            </label>
+            <label class="kit-item">
+              <input type="radio" name="slot">
+              <span class="kit-item-text">
+                <span class="kit-item-name">15:30</span>
+              </span>
+              <i class="kit-item-check"></i>
+            </label>
+          </div>
+        </form>
+      </div>
+      <!-- Actions -->
+      <div class="kit-row">
+        <button type="button" class="kit-button kit-end" data-kind="primary">Book</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

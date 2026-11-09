@@ -1,0 +1,35 @@
+@layer kit-parts {
+  /* Steps of one job: done, this one, still to come. */
+  .kit-steps {
+    display: flex;
+    gap: var(--space-3);
+    counter-reset: step;
+  }
+  .kit-steps > li {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    counter-increment: step;
+  }
+  .kit-steps > li::before {
+    content: counter(step);
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: var(--radius-full);
+    background: var(--muted);
+    font-weight: 500;
+  }
+  .kit-steps > li:is([aria-current], [data-done]) { color: var(--foreground); }
+  .kit-steps > li:is([aria-current], [data-done])::before {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .kit-steps > li[data-done]::before { content: "✓"; }
+}

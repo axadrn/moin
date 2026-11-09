@@ -1,0 +1,51 @@
+@layer kit-parts {
+  /* Text: five sizes and a few ways to say more. */
+  .kit-title {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+  }
+  .kit-number {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-heading {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 500;
+  }
+  .kit-text {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .kit-small {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .kit-muted { color: var(--muted-foreground); }
+  .kit-strong { font-weight: 500; }
+  .kit-mono { font-family: var(--font-mono); }
+  .kit-digits { font-variant-numeric: tabular-nums; }
+  .kit-center { text-align: center; }
+  .kit-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

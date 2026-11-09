@@ -1,0 +1,33 @@
+@layer kit-parts {
+  /* Where you are, and the way up. */
+  .kit-breadcrumb > ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+  }
+  .kit-breadcrumb li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .kit-breadcrumb li + li::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    -webkit-mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+  }
+  .kit-breadcrumb a { outline: none; }
+  .kit-breadcrumb a:hover { color: var(--foreground); }
+  .kit-breadcrumb a:focus-visible {
+    border-radius: var(--radius);
+    box-shadow: var(--focus);
+  }
+  .kit-breadcrumb [aria-current] { color: var(--foreground); }
+}

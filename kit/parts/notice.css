@@ -1,0 +1,9 @@
+@layer kit-parts {
+  /* A line in the page that says what failed, under what sent it. */
+  .kit-message {
+    padding: var(--space-2) var(--space-5);
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+  }
+  .kit-message[data-state="failed"] { color: var(--failed-text); }
+}

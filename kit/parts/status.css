@@ -1,0 +1,73 @@
+@layer kit-parts {
+  /* State: a dot, a word, a pill. */
+  .kit-dot {
+    display: inline-block;
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--idle);
+  }
+  .kit-dot[data-state="live"] {
+    background: var(--live);
+    animation: kit-breathe 2.4s ease-out infinite;
+  }
+  .kit-dot[data-state="running"] {
+    background: var(--running);
+    animation: kit-blink 1.2s ease-in-out infinite;
+  }
+  .kit-dot[data-state="failed"] { background: var(--failed); }
+  .kit-dot[data-state="waiting"] {
+    background: none;
+    border: 1.5px solid var(--running);
+  }
+  .kit-dot[data-state="idle"] {
+    background: none;
+    border: 1.5px solid var(--muted-foreground);
+  }
+  .kit-dot[data-state="done"] {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+
+  .kit-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+  }
+  /* The dot's own place, wide enough for the ring of a live one. */
+  .kit-status > .kit-dot { margin-inline: var(--space-1); }
+  .kit-status[data-state="failed"] { color: var(--failed-text); }
+  .kit-status:is([data-state="idle"], [data-state="done"]) { color: var(--muted-foreground); }
+
+  .kit-chip {
+    --tint: var(--idle);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+    height: 1.75rem;
+    padding-inline: 0.625rem var(--space-3);
+    border-radius: var(--radius-small);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .kit-chip:is([data-state="live"], [data-state="running"], [data-state="waiting"], [data-state="failed"]) {
+    background: color-mix(in oklab, var(--tint) 16%, transparent);
+    color: color-mix(in oklab, var(--tint), var(--foreground) 40%);
+  }
+  .kit-chip[data-state="live"] { --tint: var(--live); }
+  .kit-chip:is([data-state="running"], [data-state="waiting"]) { --tint: var(--running); }
+  .kit-chip[data-state="failed"] { --tint: var(--failed); }
+}

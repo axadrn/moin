@@ -1,0 +1,9 @@
+@layer kit-parts {
+  /* A one-time code: one input, wide apart. */
+  .kit-input.kit-otp {
+    max-width: 16rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.5em;
+    text-align: center;
+  }
+}

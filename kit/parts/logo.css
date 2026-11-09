@@ -1,0 +1,16 @@
+@layer kit-parts {
+  /* The logo of something, in front of its name. */
+  .kit-logo {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 28%;
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+}

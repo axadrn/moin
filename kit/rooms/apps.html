@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apps</title>
+  <link rel="stylesheet" href="../kit.css">
+  <script src="../kit.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="kit-bar">
+    <div class="kit-page kit-bar-inner">
+      <a href="#" class="kit-row" data-gap="2" aria-label="Home">
+        <span class="kit-heading">Acme</span>
+      </a>
+      <span class="kit-fill"></span>
+      <button type="button" class="kit-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="kit-icon kit-icon-theme"></i>
+      </button>
+      <span class="kit-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="kit-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="kit-page kit-content">
+      <!-- Title -->
+      <header class="kit-header">
+        <div class="kit-header-back">
+          <a href="#overview" class="kit-back">Overview</a>
+        </div>
+        <div class="kit-header-main">
+          <h1 class="kit-title">Apps</h1>
+          <div class="kit-header-actions">
+            <a href="#catalog" class="kit-button" data-kind="primary">New app</a>
+          </div>
+        </div>
+      </header>
+      <!-- Search -->
+      <input class="kit-input" type="search" placeholder="Find an app" aria-label="Find an app">
+      <!-- List -->
+      <div class="kit-list">
+        <a href="#app" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">my-app</div>
+            <div class="kit-item-note">web-1 · my-app.example.com</div>
+          </div>
+          <span class="kit-status" title="Live">
+            <i class="kit-dot" data-state="live"></i>
+            <span class="kit-sr-only">Live</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+        <a href="#deploys" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">blog</div>
+            <div class="kit-item-note">web-2 · v12 still runs</div>
+          </div>
+          <span class="kit-chip" data-state="failed">
+            <i class="kit-dot" data-state="failed"></i>
+            <span>v13 failed</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+        <a href="#app" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">docs</div>
+            <div class="kit-item-note">web-1</div>
+          </div>
+          <span class="kit-chip" data-state="running">
+            <i class="kit-dot" data-state="running"></i>
+            <span>Deploying v8</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+        <a href="#app" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">shop</div>
+            <div class="kit-item-note">web-3 · shop.example.com</div>
+          </div>
+          <span class="kit-status" title="Live">
+            <i class="kit-dot" data-state="live"></i>
+            <span class="kit-sr-only">Live</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+        <a href="#app" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">analytics</div>
+            <div class="kit-item-note">web-3</div>
+          </div>
+          <span class="kit-chip" data-state="idle">
+            <i class="kit-dot" data-state="idle"></i>
+            <span>Stopped</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+        <a href="#app" class="kit-item">
+          <div class="kit-item-text">
+            <div class="kit-item-name">playground</div>
+            <div class="kit-item-note">web-1</div>
+          </div>
+          <span class="kit-chip" data-state="idle">
+            <i class="kit-dot" data-state="idle"></i>
+            <span>New</span>
+          </span>
+          <i class="kit-chevron"></i>
+        </a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

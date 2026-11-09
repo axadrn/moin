@@ -1,0 +1,107 @@
+<div class="kit-stack" data-gap="4">
+  <div class="kit-field">
+    <label for="demo-domain">Domain</label>
+    <div class="kit-row" data-gap="2" data-phone="stack">
+      <input id="demo-domain" class="kit-input" placeholder="my-app.example.com">
+      <button type="button" class="kit-button" data-kind="primary">Add</button>
+    </div>
+  </div>
+  <div class="kit-field">
+    <label for="demo-wrong">Wrong</label>
+    <input id="demo-wrong" class="kit-input" value="my-app" aria-invalid="true">
+    <p class="kit-hint" data-invalid>Not a domain.</p>
+  </div>
+  <div class="kit-field">
+    <label for="demo-branch">Branch</label>
+    <div class="kit-select">
+      <button type="button" id="demo-branch" popovertarget="demo-branch-list" aria-label="Branch" style="anchor-name:--demo-branch">
+        <span class="kit-truncate" data-select-label>main</span>
+      </button>
+      <div popover id="demo-branch-list" role="radiogroup" aria-label="Branch" style="position-anchor:--demo-branch">
+        <label class="kit-option">
+          <input type="radio" name="branch" value="main" checked>
+          <span>main</span>
+        </label>
+        <label class="kit-option">
+          <input type="radio" name="branch" value="next">
+          <span>next</span>
+        </label>
+        <label class="kit-option">
+          <input type="radio" name="branch" value="staging">
+          <span>staging</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  <div class="kit-field">
+    <label for="demo-range">Range</label>
+    <input id="demo-range" class="kit-range" type="range">
+  </div>
+  <div class="kit-field">
+    <label for="demo-find">With an icon</label>
+    <div class="kit-input-icon">
+      <i class="kit-icon kit-icon-search"></i>
+      <input id="demo-find" class="kit-input" type="search" placeholder="Search apps">
+    </div>
+  </div>
+  <div class="kit-field">
+    <label for="demo-file">File</label>
+    <input id="demo-file" class="kit-file" type="file">
+  </div>
+  <div class="kit-field">
+    <label for="demo-number">Number</label>
+    <input id="demo-number" class="kit-input" type="number" value="3" min="1">
+  </div>
+  <div class="kit-field">
+    <label for="demo-otp">One-time code</label>
+    <input id="demo-otp" class="kit-input kit-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+  </div>
+  <div class="kit-field">
+    <label for="demo-server">Server, with icons</label>
+    <div class="kit-select">
+      <button type="button" id="demo-server" popovertarget="demo-server-list" aria-label="Server" style="anchor-name:--demo-server">
+        <span class="kit-truncate" data-select-label><i class="kit-icon kit-icon-server" data-size="s"></i><span>web-1</span></span>
+      </button>
+      <div popover id="demo-server-list" role="radiogroup" aria-label="Server" style="position-anchor:--demo-server">
+        <label class="kit-option">
+          <input type="radio" name="server" value="web-1" checked>
+          <i class="kit-icon kit-icon-server" data-size="s"></i>
+          <span>web-1</span>
+        </label>
+        <label class="kit-option">
+          <input type="radio" name="server" value="web-2">
+          <i class="kit-icon kit-icon-server" data-size="s"></i>
+          <span>web-2</span>
+        </label>
+        <label class="kit-option">
+          <input type="radio" name="server" value="web-3">
+          <i class="kit-icon kit-icon-server-off" data-size="s"></i>
+          <span>web-3</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  <div class="kit-field">
+    <label for="demo-tell">Tell me about, several at once</label>
+    <div class="kit-select">
+      <button type="button" id="demo-tell" popovertarget="demo-tell-list" aria-label="Tell me about" style="anchor-name:--demo-tell">
+        <span class="kit-truncate" data-select-label>2 selected</span>
+      </button>
+      <div popover id="demo-tell-list" role="group" aria-label="Tell me about" style="position-anchor:--demo-tell">
+        <label class="kit-option">
+          <input type="checkbox" name="tell" value="deploys" checked>
+          <span>Deploys</span>
+        </label>
+        <label class="kit-option">
+          <input type="checkbox" name="tell" value="backups" checked>
+          <span>Backups</span>
+        </label>
+        <label class="kit-option">
+          <input type="checkbox" name="tell" value="uptime">
+          <span>Uptime</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  <textarea class="kit-textarea" rows="3" placeholder="KEY=value" aria-label="Environment"></textarea>
+</div>

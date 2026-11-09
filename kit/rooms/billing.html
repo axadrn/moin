@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Billing</title>
+  <link rel="stylesheet" href="../kit.css">
+  <script src="../kit.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="kit-bar">
+    <div class="kit-page kit-bar-inner">
+      <a href="#" class="kit-row" data-gap="2" aria-label="Home">
+        <span class="kit-heading">Acme</span>
+      </a>
+      <span class="kit-fill"></span>
+      <button type="button" class="kit-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="kit-icon kit-icon-theme"></i>
+      </button>
+      <span class="kit-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="kit-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="kit-page kit-content">
+      <!-- Title -->
+      <header class="kit-header">
+        <div class="kit-header-main">
+          <h1 class="kit-title">Billing</h1>
+        </div>
+      </header>
+      <!-- Team plan -->
+      <section class="kit-card">
+        <div class="kit-card-head">
+          <div class="kit-stack" data-gap="1">
+            <h2 class="kit-heading">Team plan</h2>
+            <p class="kit-small kit-muted">Renews on December 1</p>
+          </div>
+          <span class="kit-number">$48</span>
+        </div>
+        <div class="kit-stack" data-gap="2">
+          <div class="kit-row" data-between>
+            <span class="kit-text">Seats</span>
+            <span class="kit-text kit-digits">3 of 5</span>
+          </div>
+          <div class="kit-meter" style="--value:60%">
+            <span></span>
+          </div>
+        </div>
+        <div class="kit-card-foot">
+          <button type="button" class="kit-button">Change plan</button>
+        </div>
+      </section>
+      <!-- Invoices -->
+      <div class="kit-section">
+        <div class="kit-section-head">
+          <h2>Invoices</h2>
+        </div>
+        <div class="kit-list">
+          <a href="#billing" class="kit-item">
+            <div class="kit-item-text">
+              <div class="kit-item-name">November 2026</div>
+            </div>
+            <span class="kit-item-value">$48.00</span>
+            <i class="kit-chevron"></i>
+          </a>
+          <a href="#billing" class="kit-item">
+            <div class="kit-item-text">
+              <div class="kit-item-name">October 2026</div>
+            </div>
+            <span class="kit-item-value">$48.00</span>
+            <i class="kit-chevron"></i>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

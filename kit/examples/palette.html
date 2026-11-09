@@ -1,0 +1,16 @@
+<div class="kit-card">
+  <div class="kit-row" data-wrap data-gap="3">
+    <button type="button" class="kit-button" data-open-palette>Open the palette</button>
+    <span class="kit-text kit-muted">Or press ⌘K, ctrl+K or /.</span>
+  </div>
+</div>
+<dialog id="kit-palette" class="kit-palette" aria-label="Search">
+  <div class="kit-palette-box">
+    <div class="kit-input-icon">
+      <label for="kit-search" class="kit-sr-only">Search or run a command</label>
+      <i class="kit-icon kit-icon-search"></i>
+      <input id="kit-search" class="kit-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search, or type: deploy my-app">
+    </div>
+    <div class="kit-palette-list" role="radiogroup" aria-label="Results" id="kit-results"></div>
+  </div>
+</dialog>

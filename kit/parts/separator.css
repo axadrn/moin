@@ -1,0 +1,14 @@
+@layer kit-parts {
+  /* A thin line between two things that belong apart. */
+  .kit-separator {
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background: var(--border);
+  }
+  .kit-separator[aria-orientation="vertical"] {
+    width: 1px;
+    height: auto;
+    align-self: stretch;
+  }
+}

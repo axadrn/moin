@@ -1,0 +1,33 @@
+@layer kit-parts {
+  /* Radio: a real radio, for where no item holds it. In an item a check mark
+     is enough, because the whole item is what you press. */
+  .kit-radio {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .kit-radio > input {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--foreground) 15%, transparent);
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+    transition: background-color var(--fast) var(--ease);
+  }
+  .kit-radio > input:checked { background: var(--foreground); }
+  .kit-radio > input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .kit-radio > span {
+    position: absolute;
+    inset: 0.375rem;
+    border-radius: var(--radius-full);
+    background: var(--background);
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .kit-radio > input:checked + span { visibility: visible; }
+}

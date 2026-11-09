@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight</title>
+  <link rel="stylesheet" href="../kit.css">
+  <script src="../kit.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="kit-bar">
+    <div class="kit-page kit-bar-inner">
+      <a href="#" class="kit-row" data-gap="2" aria-label="Home">
+        <span class="kit-heading">Acme</span>
+      </a>
+      <span class="kit-fill"></span>
+      <button type="button" class="kit-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="kit-icon kit-icon-theme"></i>
+      </button>
+      <span class="kit-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="kit-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="kit-page kit-content">
+      <!-- Title -->
+      <header class="kit-header">
+        <div class="kit-header-main">
+          <h1 class="kit-title">Book a flight</h1>
+        </div>
+      </header>
+      <!-- From, To -->
+      <div class="kit-grid" data-cols="2">
+        <div class="kit-field">
+          <label for="flight-from">From</label>
+          <input id="flight-from" class="kit-input" value="Berlin">
+        </div>
+        <div class="kit-field">
+          <label for="flight-to">To</label>
+          <input id="flight-to" class="kit-input" value="Lisbon">
+        </div>
+      </div>
+      <!-- Depart, Return -->
+      <div class="kit-list">
+        <details class="kit-expand" name="flight-date" open>
+          <summary>
+            <span class="kit-fill kit-truncate">Depart</span>
+            <span class="kit-item-value" data-date>Nov 20, 2026</span>
+            <i class="kit-chevron"></i>
+          </summary>
+          <div>
+            <div class="kit-item">
+              <kit-calendar min="2026-11-09" value="2026-11-20"></kit-calendar>
+            </div>
+          </div>
+        </details>
+        <details class="kit-expand" name="flight-date">
+          <summary>
+            <span class="kit-fill kit-truncate">Return</span>
+            <span class="kit-item-value" data-date>One way</span>
+            <i class="kit-chevron"></i>
+          </summary>
+          <div>
+            <div class="kit-item">
+              <kit-calendar min="2026-11-20"></kit-calendar>
+            </div>
+          </div>
+        </details>
+      </div>
+      <!-- Flights -->
+      <form class="kit-section">
+        <div class="kit-section-head">
+          <h2>Flights</h2>
+        </div>
+        <div class="kit-list">
+          <label class="kit-item">
+            <input type="radio" name="flight" checked>
+            <span class="kit-item-text">
+              <span class="kit-item-name">08:15 to 11:40</span>
+              <span class="kit-item-note">Direct · 4 h 25 min</span>
+            </span>
+            <span class="kit-item-value">$142</span>
+            <i class="kit-item-check"></i>
+          </label>
+          <label class="kit-item">
+            <input type="radio" name="flight">
+            <span class="kit-item-text">
+              <span class="kit-item-name">13:05 to 16:30</span>
+              <span class="kit-item-note">Direct · 4 h 25 min</span>
+            </span>
+            <span class="kit-item-value">$168</span>
+            <i class="kit-item-check"></i>
+          </label>
+          <label class="kit-item">
+            <input type="radio" name="flight">
+            <span class="kit-item-text">
+              <span class="kit-item-name">17:50 to 23:10</span>
+              <span class="kit-item-note">1 stop · 6 h 20 min</span>
+            </span>
+            <span class="kit-item-value">$119</span>
+            <i class="kit-item-check"></i>
+          </label>
+        </div>
+      </form>
+      <!-- Actions -->
+      <div class="kit-row">
+        <button type="button" class="kit-button kit-end" data-kind="primary">Continue</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

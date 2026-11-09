@@ -1,0 +1,20 @@
+@layer kit-parts {
+  /* The bar: the same on every page, a line only once the page scrolls. */
+  .kit-bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 40;
+    background: color-mix(in oklab, var(--background) 85%, transparent);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    animation: kit-bar-line linear both;
+    animation-timeline: scroll();
+    animation-range: 0 1.5rem;
+  }
+  .kit-bar-inner {
+    display: flex;
+    height: 4rem;
+    align-items: center;
+    gap: var(--space-1);
+  }
+}

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploys and log</title>
+  <link rel="stylesheet" href="../kit.css">
+  <script src="../kit.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="kit-bar">
+    <div class="kit-page kit-bar-inner">
+      <a href="#" class="kit-row" data-gap="2" aria-label="Home">
+        <span class="kit-heading">Acme</span>
+      </a>
+      <span class="kit-fill"></span>
+      <button type="button" class="kit-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="kit-icon kit-icon-theme"></i>
+      </button>
+      <span class="kit-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="kit-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="kit-page kit-content">
+      <!-- Title -->
+      <header class="kit-header">
+        <div class="kit-header-back">
+          <a href="#apps" class="kit-back">Apps</a>
+        </div>
+        <div class="kit-header-main">
+          <h1 class="kit-title">blog</h1>
+          <p class="kit-header-line">
+            <i class="kit-dot" data-state="failed"></i>
+            <span>v13 failed · v12 still live</span>
+          </p>
+          <div class="kit-header-actions">
+            <button type="button" class="kit-button">Restart</button>
+            <button type="button" class="kit-button" data-kind="primary">Deploy</button>
+          </div>
+        </div>
+      </header>
+      <!-- Desktop only -->
+      <div class="kit-hidden-phone">
+        <nav class="kit-tabs" aria-label="blog">
+          <a href="#app" class="kit-tab">App</a>
+          <a href="#deploys" class="kit-tab" aria-current="page">Deploys</a>
+          <a href="#domains" class="kit-tab">Domains</a>
+          <a href="#app" class="kit-tab">Logs</a>
+          <a href="#data" class="kit-tab">Data</a>
+          <a href="#app-settings" class="kit-tab">Settings</a>
+        </nav>
+      </div>
+      <!-- Cards -->
+      <div class="kit-grid">
+        <div class="kit-list">
+          <a href="#deploys" class="kit-item" aria-current="true">
+            <div class="kit-item-text">
+              <div class="kit-item-name">v13</div>
+              <div class="kit-item-note">Fix the feed · 4m ago</div>
+            </div>
+            <span class="kit-status" data-state="failed"><i class="kit-dot" data-state="failed"></i>failed</span>
+            <i class="kit-chevron"></i>
+          </a>
+          <a href="#deploys" class="kit-item">
+            <div class="kit-item-text">
+              <div class="kit-item-name">v12</div>
+              <div class="kit-item-note">New header · 2d ago</div>
+            </div>
+            <span class="kit-status" data-state="live"><i class="kit-dot" data-state="live"></i>live</span>
+            <i class="kit-chevron"></i>
+          </a>
+          <a href="#deploys" class="kit-item">
+            <div class="kit-item-text">
+              <div class="kit-item-name">v11</div>
+              <div class="kit-item-note">Faster images · 5d ago</div>
+            </div>
+            <span class="kit-status" data-state="done"><i class="kit-dot" data-state="done"></i>succeeded</span>
+            <i class="kit-chevron"></i>
+          </a>
+          <a href="#deploys" class="kit-item">
+            <div class="kit-item-text">
+              <div class="kit-item-name">v10</div>
+              <div class="kit-item-note">Update Go · 12d ago</div>
+            </div>
+            <span class="kit-status" data-state="done"><i class="kit-dot" data-state="done"></i>succeeded</span>
+            <i class="kit-chevron"></i>
+          </a>
+        </div>
+        <section class="kit-card" data-flush>
+          <div class="kit-card-head">
+            <h2 class="kit-heading">Log</h2>
+            <div class="kit-row" data-gap="2">
+              <span class="kit-small kit-digits kit-muted">v13</span>
+              <span class="kit-chip" data-state="failed">
+                <i class="kit-dot" data-state="failed"></i>
+                <span>failed</span>
+              </span>
+              <button type="button" class="kit-copy" data-copy-target="#log" data-copy aria-label="Copy the log">
+                <i class="kit-icon kit-icon-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="kit-log" id="log" tabindex="0" aria-label="Deploy log">
+            <div data-kind="step">
+              <span>Cloning 8c41f2a</span>
+            </div>
+            <div data-kind="ok">
+              <span>Cloned in 2s</span>
+            </div>
+            <div data-kind="step">
+              <span>Building the image</span>
+            </div>
+            <div data-kind="out">
+              <span>#1 [internal] load build definition</span>
+            </div>
+            <div data-kind="out">
+              <span>#2 [build 1/4] FROM golang:1.26</span>
+            </div>
+            <div data-kind="out">
+              <span>#3 [build 2/4] RUN go build ./...</span>
+            </div>
+            <div data-kind="ok">
+              <span>Built in 48s</span>
+            </div>
+            <div data-kind="step">
+              <span>Starting v13</span>
+            </div>
+            <div data-kind="out">
+              <span>health check on :8080, try 1 of 5</span>
+            </div>
+            <div data-kind="out">
+              <span>health check on :8080, try 5 of 5</span>
+            </div>
+            <div data-kind="err">
+              <span>v13 did not answer on :8080</span>
+            </div>
+            <div data-kind="step">
+              <span>v12 keeps running</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,203 @@
+/* Floor 1, the foundation: every value the kit knows, in one place. Only
+   this file holds colors, sizes and motion. Each color is one line with its
+   light and its dark value, so a theme is this list and nothing else.
+   Nothing here is a class. */
+
+@layer kit-foundation, kit-layout, kit-parts;
+
+@layer kit-foundation {
+  :root {
+    color-scheme: light dark;
+
+    /* Type */
+    /* The system's fonts: nothing to load, nothing that flickers. */
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --weight-title: 600;
+    --tracking-title: -0.025em;
+
+    /* Size: everything is in rem, so this one number scales the whole kit. */
+    --scale: 1;
+    font-size: calc(100% * var(--scale));
+
+    /* Space: five steps do almost everything, 20 and 32 are the rare ones. */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    /* Shape: one number. Every corner is that number times a step. */
+    --radius: 0.5rem;
+    --radius-small: calc(var(--radius) * 1.75);
+    --radius-medium: calc(var(--radius) * 2.2);
+    --radius-large: calc(var(--radius) * 2.6);
+    --radius-full: 9999px;
+    /* What you press: a capsule at 0.5rem, square at 0. */
+    --radius-press: calc(var(--radius) * var(--press-size));
+    /* The gap around anything lit inside a group. */
+    --inset: 0.1875rem;
+    /* How far a scrollbar stays from the edge of a round box: what the
+       biggest corner cuts off. */
+    --scroll-edge: calc(var(--radius-large) * 0.3);
+
+    /* Density: one number for how tight the kit sits. Everything you press
+       is this high, rows and cards follow. */
+    --density: 1;
+    --press-size: calc(2.75 * var(--density));
+    --press: calc(var(--press-size) * 1rem);
+    --row: calc(4rem * var(--density));
+    --pad: calc(1.5rem * var(--density));
+
+    /* Motion */
+    --fast: 120ms;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+
+    /* Focus */
+    --focus: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+
+    /* Depth */
+    --shadow-low: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
+    --shadow-float: 0 25px 50px -12px rgb(0 0 0 / 25%);
+
+    /* Ground and text */
+    --background: light-dark(#f2f2f7, #000000);
+    --foreground: light-dark(#000000, #ffffff);
+    --card: light-dark(#ffffff, #1c1c1e);
+    --card-foreground: light-dark(#000000, #ffffff);
+    --popover: light-dark(#ffffff, #2c2c2e);
+    --popover-foreground: light-dark(#000000, #ffffff);
+    --muted: light-dark(#e5e5ea, #2c2c2e);
+    --muted-foreground: light-dark(#636366, #98989f);
+    --border: light-dark(rgb(0 0 0 / 8%), rgb(255 255 255 / 16%));
+
+    /* Ink: the brand is black on light and white on dark. */
+    --primary: light-dark(oklch(0.16 0 0), oklch(0.96 0 0));
+    --primary-foreground: light-dark(oklch(0.99 0 0), oklch(0.13 0 0));
+    --ring: light-dark(oklch(0.16 0 0 / 40%), oklch(0.97 0 0 / 40%));
+
+    /* Status: the only color there is. */
+    --live: light-dark(oklch(0.66 0.17 150), oklch(0.74 0.17 150));
+    --running: light-dark(oklch(0.64 0.15 70), oklch(0.82 0.15 80));
+    --failed: light-dark(oklch(0.6 0.22 25), oklch(0.68 0.2 25));
+    --idle: light-dark(oklch(0.6 0 0), oklch(0.55 0 0));
+    /* A status as words: pulled toward the text color, so it stays readable. */
+    --live-text: color-mix(in oklab, var(--live), var(--foreground) 34%);
+    --failed-text: color-mix(in oklab, var(--failed), var(--foreground) 30%);
+
+    /* Logs and commands */
+    --terminal: light-dark(oklch(0.16 0 0), #2c2c2e);
+    --terminal-foreground: light-dark(oklch(0.9 0 0), oklch(0.88 0 0));
+    /* What a highlighter marks in code. */
+    --code-keyword: #fc5fa3;
+    --code-string: #fc6a5d;
+    --code-comment: #7f8c98;
+    --code-function: #67b7a4;
+    --code-number: #d0bf69;
+
+    /* Charts: one color and its shades. Ink by default. */
+    --chart-base: var(--foreground);
+    --chart-1: var(--chart-base);
+    --chart-2: color-mix(in oklab, var(--chart-base) 72%, var(--card));
+    --chart-3: color-mix(in oklab, var(--chart-base) 50%, var(--card));
+    --chart-4: color-mix(in oklab, var(--chart-base) 30%, var(--card));
+    --chart-5: color-mix(in oklab, var(--chart-base) 16%, var(--card));
+
+    /* Menus: a select's list and the palette. */
+    --menu: var(--popover);
+    --menu-foreground: var(--popover-foreground);
+    --menu-lit: color-mix(in oklab, currentColor 8%, transparent);
+    --menu-blur: none;
+
+    /* Overlays */
+    --muted-raised: light-dark(#e5e5ea, #3a3a3c);
+    --knob: #ffffff;
+    --dim: rgb(0 0 0 / 30%);
+  }
+
+  /* Hidden stays hidden, whatever display a part sets. */
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Nothing set follows the system. A class or data-theme picks one. */
+  :root.light,
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root.dark,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
+  }
+
+  /* Every scrollbar: thin, in the color of the text, on nothing. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent;
+  }
+
+  html {
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+  }
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :where(h1, h2, h3, p, ul, ol, figure, pre) {
+    margin: 0;
+    padding: 0;
+    font: inherit;
+  }
+  :where(ul, ol) {
+    list-style: none;
+  }
+  :where(a) {
+    color: inherit;
+    text-decoration: none;
+  }
+  :where(button, input, textarea, select) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+  :where(button) {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+@keyframes kit-spin {
+  to {
+    rotate: 360deg;
+  }
+}
