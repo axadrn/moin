@@ -61,7 +61,7 @@ templ Select(p SelectProps) {
 			role="listbox"
 			aria-label={ p.Label }
 			class="m-0 max-h-72 flex-col gap-0.5 overflow-y-auto rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-2xl open:flex"
-			style={ templ.SafeCSS("inset: auto; position-anchor: --" + p.ID + "; top: anchor(bottom); left: anchor(left); width: anchor-size(width); min-width: 12rem; margin-top: 8px") }
+			style={ templ.SafeCSS("inset: auto; position-anchor: --" + p.ID + "; top: anchor(bottom); left: anchor(left); width: anchor-size(width); min-width: max-content; margin-top: 8px") }
 		>
 			for _, o := range p.Options {
 				<label class={ OptionClass, "cursor-pointer has-checked:font-medium has-focus:bg-foreground/8" }>
