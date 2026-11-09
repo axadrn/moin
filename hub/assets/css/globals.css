@@ -1,3 +1,7 @@
+/* Tailwind and the kit side by side while pages move to the kit: resets
+   first, then the kit, then what is left of Tailwind on top. */
+@layer theme, base, kit-foundation, kit-layout, kit-parts, components, utilities;
+
 @font-face {
   font-family: "Geist";
   src: url("/assets/fonts/geist/geist-variable.woff2") format("woff2-variations");

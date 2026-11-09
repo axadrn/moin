@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/axadrn/moin"
 	"github.com/axadrn/moin/hub/assets"
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/app"
@@ -82,6 +83,19 @@ func SetupRoutes(app *app.App) http.Handler {
 	)
 }
 
+// kitHandler serves the kit: from the folder at the top of the repo in
+// development, else from the binary.
+func kitHandler(app *app.App) http.Handler {
+	if app.Cfg.IsDevelopment() {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			http.FileServer(http.Dir("../kit")).ServeHTTP(w, r)
+		})
+	}
+	kit, _ := fs.Sub(moin.Kit, "kit")
+	return http.FileServer(http.FS(kit))
+}
+
 // assetHandler serves the files under assets: from disk in development,
 // without caching, else from the binary, hashed scripts and fonts cached
 // for a year.
@@ -113,6 +127,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	docs := handler.NewDocsHandler(app.DocsService)
 	assetHandler := assetHandler(app)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
+	mux.Handle("GET /assets/kit/", http.StripPrefix("/assets/kit/", middleware.Gzip(kitHandler(app))))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	// Browsers, link previews and analytics ask for /favicon.ico at the root.
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
