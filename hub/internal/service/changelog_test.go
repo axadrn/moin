@@ -59,6 +59,32 @@ func TestChangelogFormat(t *testing.T) {
 	}
 }
 
+// TestChangelogLinksIssues: only a "(#N)" at the end of a list item becomes
+// a link, and the real changelog has them.
+func TestChangelogLinksIssues(t *testing.T) {
+	dir := t.TempDir()
+	source := "---\ntitle: Changelog\n---\n\n- **Done**: shipped. (#49)\n- **Middle**: see (#7) here.\n- **Bare**: see #8\n\nNot a list item (#9)\n"
+	if err := os.WriteFile(filepath.Join(dir, "changelog.md"), []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	html, err := Changelog(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `shipped. (<a href="https://github.com/axadrn/moin/issues/49">#49</a>)</li>`; !strings.Contains(html, want) {
+		t.Errorf("no link to the issue in %s", html)
+	}
+	for _, text := range []string{"(#7) here", "see #8", "list item (#9)"} {
+		if !strings.Contains(html, text) {
+			t.Errorf("%q should stay plain in %s", text, html)
+		}
+	}
+	page, err := Changelog(filepath.Join("..", "..", "content"))
+	if err != nil || !strings.Contains(page, `(<a href="https://github.com/axadrn/moin/issues/17">#17</a>)</li>`) {
+		t.Errorf("the changelog links no #17: %v", err)
+	}
+}
+
 // TestChangelogReleases: the feed reads every version with its date and
 // its In short line, newest first.
 func TestChangelogReleases(t *testing.T) {

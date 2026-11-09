@@ -6,19 +6,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/githubstars"
 	"github.com/axadrn/moin/hub/internal/markdown"
 )
 
+// issueAtEnd is a "(#N)" that ends a list item of the changelog.
+var issueAtEnd = regexp.MustCompile(`(?m)^(- .*) \(#(\d+)\)$`)
+
 // Changelog renders <contentDir>/changelog.md, the release notes of every
-// version, newest first. The GitHub release of a version has the same text.
+// version, newest first. The GitHub release of a version has the same text,
+// so the file keeps a plain "(#N)", which GitHub links by itself, and this
+// page links it here.
 func Changelog(contentDir string) (string, error) {
 	source, err := os.ReadFile(filepath.Join(contentDir, "changelog.md"))
 	if err != nil {
 		return "", fmt.Errorf("read changelog: %w", err)
 	}
+	source = issueAtEnd.ReplaceAll(source, []byte("$1 ([#$2](https://github.com/"+githubstars.Repo+"/issues/$2))"))
 	html, _, err := markdown.NewParser().ParseWithFrontmatter(source)
 	if err != nil {
 		return "", fmt.Errorf("render changelog: %w", err)
