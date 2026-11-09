@@ -109,6 +109,18 @@ body::before {
 
 /* The wordmark, drawn: Satoshi Black as a shape, so no font file is needed.
    The word inside stays for screen readers. */
+/* The way to the rest of moin. On a phone the wordmark goes home. */
+.demo-site {
+  display: none;
+  align-items: center;
+  margin-inline-start: var(--space-2);
+}
+.demo-site > a { color: var(--muted-foreground); }
+.demo-site > a[aria-current] { color: var(--foreground); }
+@media (min-width: 48rem) {
+  .demo-site { display: flex; }
+}
+
 .demo-wordmark {
   display: inline-block;
   flex: none;

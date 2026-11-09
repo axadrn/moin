@@ -21,17 +21,17 @@ type SiteHit struct {
 }
 
 // FindSite is the one search of the public site, behind the magnifier of
-// the navbar: an app whose name matches first, then the docs, then the
-// apps found by their category or one sentence. It matches like the
+// the navbar: an app whose name matches first, then the parts and rooms of
+// the kit, then the docs, then the apps found by their category or one sentence. It matches like the
 // palette (find.Name), so a typo still finds. Without a query it is the
 // first steps and the catalog.
-func FindSite(groups []model.DocGroup, apps []CatalogEntryView, query string, limit int) []SiteHit {
+func FindSite(groups []model.DocGroup, apps []CatalogEntryView, kit []SiteHit, query string, limit int) []SiteHit {
 	if strings.TrimSpace(query) == "" {
 		var out []SiteHit
 		if len(groups) > 0 {
 			out = FindDocs(groups[:1], "", 0)
 		}
-		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"})
+		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"}, SiteHit{Title: "Kit", Where: "The UI kit moin runs on", Href: "/kit"})
 	}
 	var named, other []SiteHit
 	for _, app := range FilterCatalog(apps, "", query, SortName) {
@@ -42,7 +42,13 @@ func FindSite(groups []model.DocGroup, apps []CatalogEntryView, query string, li
 			other = append(other, hit)
 		}
 	}
-	out := append(named, FindDocs(groups, query, limit)...)
+	out := named
+	for _, hit := range kit {
+		if _, ok := find.Name(query, hit.Title); ok {
+			out = append(out, hit)
+		}
+	}
+	out = append(out, FindDocs(groups, query, limit)...)
 	out = append(out, other...)
 	return out[:min(len(out), limit)]
 }
