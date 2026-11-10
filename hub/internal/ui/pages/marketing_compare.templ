@@ -105,7 +105,7 @@ templ compareAnswer(whose string, cell CompareCell) {
 	<div class="moin-row" data-gap="2" data-top>
 		@compareMarkIcon(cell.Mark)
 		<div class="moin-stack moin-text" style="--gap:2px">
-			<span><span class="moin-muted moin-sr-tablet">{ whose }: </span><span class="moin-strong">{ cell.Short }</span></span>
+			<span><span class="moin-muted moin-only-phone">{ whose }: </span><span class="moin-strong">{ cell.Short }</span></span>
 			if cell.Detail != "" {
 				<span class="moin-small moin-muted">{ cell.Detail }</span>
 			}

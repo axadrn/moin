@@ -86,6 +86,12 @@
     .moin-log[data-meta] div { grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr); }
   }
 
+  /* Plain output in one pre, with its own line breaks. */
+  pre.moin-log {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   /* Lines that keep the newest in view while you are at the bottom and stay
      put when you scroll up. --tail is how high it grows; data-top keeps few
      lines at the top; data-hold keeps the place of lines still to come. */
@@ -103,6 +109,8 @@
     max-height: none;
     overflow: visible;
   }
+  /* Safari paints nothing in a reversed box while lines skip their drawing. */
+  .moin-tail .moin-log div { content-visibility: visible; }
   .moin-tail[data-top] { justify-content: safe flex-end; }
   .moin-tail[data-hold] { height: 20rem; }
   @media (min-width: 40rem) {

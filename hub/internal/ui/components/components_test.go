@@ -21,6 +21,9 @@ func flat(html string) string {
 	return strings.TrimSpace(between.ReplaceAllString(strings.Join(strings.Fields(html), " "), "><"))
 }
 
+// exampleLogo is the logo in the example of the app icon.
+const exampleLogo = "/assets/ui/icons/package.svg"
+
 func text(words string) templ.Component {
 	return templ.Raw(words)
 }
@@ -73,6 +76,11 @@ func TestComponentsPrintTheExamples(t *testing.T) {
 		{"switch-on-its-own", Switch(SwitchProps{Label: "On", Checked: true}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "Cannot change", Disabled: true}), ""},
 		{"line-chart-with-marks", Chart(exampleChart()), ""},
+		{"app-icon", AppIcon(AppIconProps{Logo: exampleLogo}), ""},
+		{"app-icon", AppIcon(AppIconProps{Initial: "A"}), ""},
+		{"app-icon", AppIcon(AppIconProps{Logo: exampleLogo, Large: true}), ""},
+		{"app-icon", AppIcon(AppIconProps{Initial: "A", Large: true}), ""},
+		{"expand-quiet", Expand(ExpandProps{Name: "Show details", Quiet: true}), `<p class="moin-text">Words that were not worth a place on the page, until you asked.</p>`},
 	}
 	for _, test := range tests {
 		file, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "ui", "examples", test.example+".html"))

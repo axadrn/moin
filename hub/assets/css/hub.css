@@ -1,5 +1,6 @@
-/* The hub's own CSS, on top of moin UI: its fonts, the look of the hero, and
-   what htmx needs. Everything else is moin UI. */
+/* The hub's own CSS, on top of moin UI: its fonts, the spinner of a running
+   htmx request, the feedback of hub.js, and the art of the home page.
+   Everything else is moin UI. */
 @font-face {
   font-family: "Geist";
   src: url("/assets/fonts/geist/geist-variable.woff2") format("woff2-variations");
@@ -18,23 +19,6 @@
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
-}
-
-::selection {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-/* The scrollbar always has its place, so a page that gets shorter or longer
-   never shifts sideways. A modal dialog keeps the page still. */
-html {
-  scrollbar-gutter: stable;
-}
-html:has(dialog:modal) {
-  overflow: hidden;
-}
-body {
-  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
 :is(button.htmx-request, form.htmx-request button[type="submit"]) {
@@ -67,70 +51,6 @@ body {
     transform: rotate(360deg);
   }
 }
-
-/* app */
-/* The running symbol turns (the landing page uses it too). */
-.hub-turn {
-  animation: hub-spin 1.6s linear infinite;
-  transform-origin: center;
-}
-
-/* Status dots: live breathes, running blinks. */
-.hub-dot-live {
-  animation: hub-breathe 2.4s ease-out infinite;
-}
-.hub-dot-run {
-  animation: hub-blink 1.2s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hub-turn,
-  .hub-dot-live,
-  .hub-dot-run {
-    animation: none;
-  }
-}
-
-
-@keyframes hub-breathe {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 7px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-@keyframes hub-blink {
-  50% {
-    opacity: 0.35;
-  }
-}
-
-/* landing */
-/* A live dot breathes. */
-.lp-pulse {
-  animation: lp-pulse 2.4s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-pulse {
-    animation: none;
-  }
-}
-
-
-@keyframes lp-pulse {
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in oklab, var(--live) 18%, transparent);
-  }
-}
-
-/* Every link loads a whole page, with no fade: the browser keeps the old
-   page on screen until the new one is painted, so there is no flash, and a
-   fade would show both pages at once (a ghost on Back). */
 
 /* Feedback (DESIGN.md): a button that did its job shows a check in place of
    its label for a moment, at the same size; a line in the page under its
@@ -167,22 +87,6 @@ header + [data-said] {
   color: var(--failed);
 }
 
-
-/* The bar shows a line under it only once the page scrolls under it. */
-.hub-bar {
-  animation: hub-bar-line linear both;
-  animation-timeline: scroll();
-  animation-range: 0 1.5rem;
-}
-
-@keyframes hub-bar-line {
-  from {
-    box-shadow: 0 1px 0 transparent;
-  }
-  to {
-    box-shadow: 0 1px 0 var(--border);
-  }
-}
 
 /* The wall of containers on the home page. */
 .hub-harbor {

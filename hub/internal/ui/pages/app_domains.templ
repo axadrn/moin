@@ -188,7 +188,8 @@ templ instantSection(view DomainsView, domainsPath string) {
 						if !instant.Open && !instant.OwnPassword {
 							if instant.Password != "" {
 								@components.Item(components.ItemProps{}) {
-									<span class="moin-fill moin-truncate moin-mono moin-text moin-all" data-instant-password>{ instant.Password }</span>
+									<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instant.Password }</span>
+									@copyButton(instant.Password, "", "Copy the password")
 								}
 							} else {
 								@components.Item(components.ItemProps{Button: true, Name: "Show password", Attrs: templ.Attributes{"hx-get": domainsPath + "/detail?show=true", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}})

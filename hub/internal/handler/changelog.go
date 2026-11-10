@@ -16,14 +16,14 @@ import (
 // request, so a new release shows without a restart in development.
 func Changelog(files fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		html, err := service.Changelog(files)
+		releases, err := service.ChangelogReleases(files)
 		if err != nil {
 			slog.Error("changelog failed", "error", err)
 			w.WriteHeader(http.StatusNotFound)
 			render(w, r, pages.NotFound())
 			return
 		}
-		render(w, r, pages.Changelog(html))
+		render(w, r, pages.Changelog(releases))
 	}
 }
 
@@ -58,14 +58,13 @@ func ChangelogFeed(files fs.FS, appURL, name string) http.HandlerFunc {
 		}
 		feed := rss{Version: "2.0", Channel: channel{Title: name + " changelog", Link: base + "/changelog", Description: "What shipped in " + name + ", newest first."}}
 		for _, release := range releases {
-			anchor := strings.NewReplacer(".", "").Replace(release.Version)
 			date := release.Date
 			if date.IsZero() {
 				date = time.Now()
 			}
 			feed.Channel.Items = append(feed.Channel.Items, item{
 				Title:       release.Version,
-				Link:        base + "/changelog#" + anchor,
+				Link:        base + "/changelog#" + release.Anchor(),
 				GUID:        base + "/changelog#" + release.Version,
 				PubDate:     date.UTC().Format(time.RFC1123Z),
 				Description: release.InShort,

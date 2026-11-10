@@ -47,3 +47,12 @@
   }
   a.moin-card[data-ink]:hover { background: color-mix(in oklab, var(--foreground), var(--background) 12%); }
 }
+
+@layer moin-components {
+  /* A list in a card is part of the card: no box of its own. Its words line
+     up with the card's, and the light of an item reaches past them. */
+  .moin-card > .moin-list {
+    margin-inline: calc(-1 * (var(--item-edge) + var(--inset)));
+    background: none;
+  }
+}

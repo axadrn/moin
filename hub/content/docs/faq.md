@@ -45,7 +45,7 @@ Only what you open, passed through to you and never stored. `data: off` and `log
 
 ## Where are my env vars?
 
-In the hub, sealed with AES-256-GCM, and handed to your server with each deploy. [Roadmap](/docs/roadmap) says what comes next.
+In the hub, sealed with AES-256-GCM, and handed to your server with each deploy. [Roadmap](/roadmap) says what comes next.
 
 ## What is a workspace?
 

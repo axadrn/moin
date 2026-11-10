@@ -127,10 +127,7 @@ func (surfacesTransformer) Transform(doc *ast.Document, reader text.Reader, _ pa
 	}
 }
 
-type surfacesRenderer struct {
-	// inline renders the markdown of a Web or TUI line.
-	inline goldmark.Markdown
-}
+type surfacesRenderer struct{}
 
 func (r surfacesRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(kindSurfaces, func(w util.BufWriter, _ []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -145,7 +142,7 @@ func (r surfacesRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer)
 				item.Text = strings.Join(e.lines, "\n")
 			} else {
 				for _, line := range e.lines {
-					item.HTML = append(item.HTML, r.inlineHTML(line))
+					item.HTML = append(item.HTML, Inline(line))
 				}
 			}
 			items = append(items, item)
@@ -154,10 +151,13 @@ func (r surfacesRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer)
 	})
 }
 
-// inlineHTML is the markdown of one line without its paragraph.
-func (r surfacesRenderer) inlineHTML(line string) string {
+// inline renders one line of markdown, with nothing else switched on.
+var inline = goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Typographer))
+
+// Inline is the markdown of one line as HTML, without its paragraph.
+func Inline(line string) string {
 	var buf bytes.Buffer
-	if err := r.inline.Convert([]byte(line), &buf); err != nil {
+	if err := inline.Convert([]byte(line), &buf); err != nil {
 		return ""
 	}
 	html := strings.TrimSpace(buf.String())
@@ -170,8 +170,7 @@ type surfacesExtension struct{}
 
 func (surfacesExtension) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(parser.WithASTTransformers(util.Prioritized(surfacesTransformer{}, 100)))
-	inline := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Typographer))
-	m.Renderer().AddOptions(renderer.WithNodeRenderers(util.Prioritized(surfacesRenderer{inline: inline}, 100)))
+	m.Renderer().AddOptions(renderer.WithNodeRenderers(util.Prioritized(surfacesRenderer{}, 100)))
 }
 
 // PlainSurfaces turns every surfaces block of a markdown source into a list,

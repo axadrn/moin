@@ -142,11 +142,11 @@ func appBucketOptions(buckets []service.Bucket) []components.Option {
 
 // DatabaseBackups is the backup of one database: one row how it stands,
 // how often and how long, Download a copy, then
-// the moments to go back to with Restore. A restore shows it runs in the
-// first row while it does.
+// the moments to go back to with Restore. The Restore button shows the
+// request runs; the row of the restore (backupRestore) takes over from there.
 templ DatabaseBackups(view BackupsView, database string) {
 	{{ backup, known := view.backupOf(database) }}
-	<div id="db-backups" class="moin-stack" data-gap="6" data-busy-scope data-database-backup={ database }>
+	<div id="db-backups" class="moin-stack" data-gap="6" data-database-backup={ database }>
 		if view.Bucket == nil {
 			<section class="moin-section">
 				<div class="moin-section-head">
@@ -232,7 +232,6 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				data-confirm-name={ view.App.Name }
 				data-confirm-action="Restore"
 				data-restore
-				data-busy-from
 			>
 				@components.CSRF()
 				<input type="hidden" name="database" value={ database }/>
@@ -261,14 +260,10 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 
 // backupState is the first row of a database's backup: backed up and when
 // it was last checked, or why it does not work in one sentence with the
-// details under it. While a restore runs, it says so.
+// details under it.
 templ backupState(backup service.DatabaseBackups, known bool, database string, now time.Time) {
 	@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-backup-state": true}}) {
-		<div class="moin-row moin-fill" data-gap="3" data-show-busy role="status">
-			@components.Dot(components.DotProps{State: components.StateRunning})
-			<span class="moin-item-name">Restoring { databaseName(database) }</span>
-		</div>
-		<div class="moin-row moin-fill" data-gap="3" data-hide-busy>
+		<div class="moin-row moin-fill" data-gap="3">
 			switch  {
 				case !known:
 					@components.Dot(components.DotProps{State: components.StateRunning})
@@ -277,10 +272,11 @@ templ backupState(backup service.DatabaseBackups, known bool, database string, n
 					@components.Dot(components.DotProps{State: components.StateFailed})
 					<div class="moin-fill">
 						<div class="moin-strong moin-failed" data-backup-problem>{ backup.Problem }</div>
-						<details class="moin-details moin-text moin-muted">
-							<summary>Show details</summary>
-							<p class="moin-mono moin-small moin-break" data-backup-error>{ backup.Error }</p>
-						</details>
+						<div class="moin-text">
+							@components.Expand(components.ExpandProps{Name: "Show details", Quiet: true}) {
+								<p class="moin-mono moin-small moin-break" data-backup-error>{ backup.Error }</p>
+							}
+						</div>
 					</div>
 				case backup.CopiedAt != nil:
 					@components.Dot(components.DotProps{State: components.StateLive})
@@ -348,10 +344,11 @@ templ backupRestore(view BackupsView, database string) {
 				} else {
 					<div class="moin-strong moin-failed">The restore to { lowerFirst(restore.To) } failed</div>
 				}
-				<details class="moin-details moin-small moin-muted">
-					<summary>Show details</summary>
-					<p class="moin-mono moin-small moin-break">{ restore.Error }</p>
-				</details>
+				<div class="moin-small">
+					@components.Expand(components.ExpandProps{Name: "Show details", Quiet: true}) {
+						<p class="moin-mono moin-small moin-break">{ restore.Error }</p>
+					}
+				</div>
 			</div>
 		}
 	} else if restore != nil && restore.FinishedAt != nil && view.Now.Sub(*restore.FinishedAt) < time.Hour {

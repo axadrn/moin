@@ -63,3 +63,11 @@ date-picker
 ```example
 item-with-menu
 ```
+
+## Quiet expand
+
+`data-quiet` on a `moin-expand` makes it a few words that open more words under them. No line and no light, in the size of the text around it. The chevron says it opens. `open` starts it open.
+
+```example
+expand-quiet
+```

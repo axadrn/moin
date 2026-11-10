@@ -66,28 +66,13 @@
     .moin-statement { font-size: 3rem; line-height: 1; }
     .moin-lead[data-large] { font-size: 1.25rem; }
   }
-  /* Shown on a phone; from a tablet up only for screen readers. */
-  @media (min-width: 40rem) {
-    .moin-sr-tablet {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-  }
   /* The plain text color inside a quiet line, and the colors of a state. */
   .moin-foreground { color: var(--foreground); }
   .moin-live { color: var(--live-text); }
   .moin-running { color: var(--running); }
   .moin-failed { color: var(--failed-text); }
-  /* Long words break instead of pushing the box wider; wrap keeps the line
-     breaks of a text. */
+  /* Long words break instead of pushing the box wider. */
   .moin-break { overflow-wrap: anywhere; }
-  .moin-wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
-  /* One click takes all of it, for something to copy. */
-  .moin-all { user-select: all; }
   .moin-truncate {
     overflow: hidden;
     text-overflow: ellipsis;

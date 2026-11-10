@@ -1,0 +1,50 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// Roadmap is docs/roadmap.md as cards: one per heading, its list a timeline.
+templ Roadmap(roadmap service.Roadmap) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       roadmap.Title,
+		Description: roadmap.Description,
+		Path:        "/roadmap",
+	}) {
+		<main class="moin-page moin-content">
+			@components.Header(components.HeaderProps{Title: roadmap.Title})
+			if roadmap.Intro != "" {
+				<div class="moin-lead">
+					@components.Prose(components.ProseProps{HTML: roadmap.Intro})
+				</div>
+			}
+			<div class="moin-columns">
+				for _, section := range roadmap.Sections {
+					@components.Card(components.CardProps{Title: section.Title}) {
+						if section.Intro != "" {
+							<div class="moin-text moin-muted">
+								@components.Prose(components.ProseProps{HTML: section.Intro})
+							</div>
+						}
+						<ol class="moin-timeline">
+							for _, entry := range section.Entries {
+								<li>
+									if entry.Name != "" {
+										<span class="moin-strong">{ entry.Name }</span>
+									}
+									if entry.Text != "" {
+										<div class="moin-text moin-muted">
+											@components.Prose(components.ProseProps{HTML: entry.Text})
+										</div>
+									}
+								</li>
+							}
+						</ol>
+					}
+				}
+			</div>
+		</main>
+	}
+}

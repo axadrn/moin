@@ -351,14 +351,17 @@ templ TextArea(p TextAreaProps) {
 	</textarea>
 }
 
-// ExpandProps is an item that opens what is under it in place.
+// ExpandProps is an item that opens what is under it in place. Quiet is a
+// few words that open more words, in the size of the text around them.
 type ExpandProps struct {
-	Name string
+	Name  string
+	Quiet bool
+	Open  bool
 }
 
 // Expand holds items as children, a native details.
 templ Expand(p ExpandProps) {
-	<details class="moin-expand">
+	<details class="moin-expand" data-quiet?={ p.Quiet } open?={ p.Open }>
 		<summary>
 			<span class="moin-item-name">{ p.Name }</span>
 			<i class="moin-chevron"></i>

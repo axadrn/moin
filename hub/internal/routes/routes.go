@@ -148,6 +148,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /ui.md", ui.Show)
 	mux.HandleFunc("GET /ui/", ui.Show)
 	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.CatalogService).Search)
+	mux.HandleFunc("GET /roadmap", handler.Roadmap(app.Texts))
 	mux.HandleFunc("GET /changelog", handler.Changelog(app.Texts))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(app.Texts, app.Cfg.AppURL, build.Name))
 	mux.HandleFunc("GET /catalog", catalogPages.List)

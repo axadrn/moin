@@ -57,6 +57,22 @@ func (p *Parser) Parse(source []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ParseParts renders pieces of markdown that end up on one page: a heading
+// ID is used once across all of them.
+func (p *Parser) ParseParts(sources [][]byte) ([][]byte, error) {
+	ids := parser.NewContext().IDs()
+	parts := make([][]byte, 0, len(sources))
+	for _, source := range sources {
+		var buf bytes.Buffer
+		err := p.md.Convert(source, &buf, parser.WithContext(parser.NewContext(parser.WithIDs(ids))))
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, buf.Bytes())
+	}
+	return parts, nil
+}
+
 func (p *Parser) ParseWithFrontmatter(source []byte) (content []byte, meta map[string]any, err error) {
 	context := parser.NewContext()
 	var buf bytes.Buffer

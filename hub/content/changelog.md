@@ -3,6 +3,30 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.27
+
+November 10, 2026
+
+**In short:** moin has a new face. Our own UI. No Tailwind. Yours to copy.
+
+### New
+- **moin UI**: Our own UI kit. Native HTML, CSS and JS. No build step. Copy it into your project. See `/ui`.
+- **moin next**: What grows next to deploys. Highly experimental. See `/next`.
+- **A real roadmap**: Now. Soon. Later. All on one page at `/roadmap`.
+- **Search finds moin UI**: Components and blocks show up in the site search.
+
+### Changed
+- **Every page is new**: Rebuilt on moin UI. Softer corners. No more pills. One look everywhere.
+- **The home page reads faster**: Fewer sections. One bento for what moin does.
+- **The changelog is a timeline**: Each version in one line. The notes one click away.
+
+### Fixed
+- **Switches tell the truth**: A change that is refused or fails goes back to what is saved. The back button shows the real state too. (#49)
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`.
+
 ## v1.0.0-beta.26
 
 November 9, 2026

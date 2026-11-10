@@ -8,7 +8,7 @@ templ AppShortcuts() {
 	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="moin-dialog">
 		<div class="moin-stack" style="--gap:1.25rem">
 			<h2 id="app-shortcuts-title" class="moin-heading">Keys</h2>
-			<dl class="moin-grid moin-text" data-cols="auto-1" data-gap="3">
+			<dl class="moin-stack moin-text" data-gap="3">
 				@shortcut([]string{"⌘", "K"}, "The palette: find and do anything")
 				@shortcut([]string{"/"}, "The same")
 				@shortcut([]string{"Ctrl", "J"}, "In the palette: down (Ctrl K up)")
@@ -32,10 +32,12 @@ templ AppShortcuts() {
 }
 
 templ shortcut(keys []string, label string) {
-	<dt class="moin-row" data-gap="1">
-		for _, key := range keys {
-			<kbd class="moin-kbd">{ key }</kbd>
-		}
-	</dt>
-	<dd class="moin-muted">{ label }</dd>
+	<div class="moin-row" data-gap="3">
+		<dt class="moin-row moin-width" data-fixed data-gap="1" style="--width:8.5rem">
+			for _, key := range keys {
+				<kbd class="moin-kbd">{ key }</kbd>
+			}
+		</dt>
+		<dd class="moin-fill moin-muted">{ label }</dd>
+	</div>
 }

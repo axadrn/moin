@@ -94,9 +94,9 @@ templ HomeNext() {
 	@components.Card(components.CardProps{Attrs: templ.Attributes{"id": "next", "data-gap": "6", "style": "--pad:2rem"}}) {
 		<h2 class="moin-statement">What grows next.</h2>
 		<p class="moin-text moin-muted">Deploying stays the core. Everything else moves in. Tasks. Docs. Chat. Mail.</p>
-		@components.List(templ.Attributes{"style": "--card:transparent"}) {
+		@components.List() {
 			@components.Item(components.ItemProps{Href: "/next", Name: brand.Name + " next", Note: "Highly experimental"})
-			@components.Item(components.ItemProps{Href: "/docs/roadmap", Name: "The roadmap", Note: "Deploys first"})
+			@components.Item(components.ItemProps{Href: "/roadmap", Name: "The roadmap", Note: "Deploys first"})
 		}
 	}
 }

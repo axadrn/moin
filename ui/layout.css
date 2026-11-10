@@ -30,7 +30,6 @@
   .moin-row[data-between] { justify-content: space-between; }
   .moin-row[data-end] { justify-content: flex-end; }
   .moin-row[data-top] { align-items: flex-start; }
-  .moin-row[data-bottom] { align-items: flex-end; }
 
   /* Next to each other from a tablet up, under each other on a phone. */
   @media (max-width: 39.99rem) {
@@ -79,7 +78,6 @@
 
   /* Groups of different length, two columns from a tablet up: each column
      fills up, so no holes stay. */
-  .moin-columns > * { break-inside: avoid; margin-block-end: var(--space-6); }
   @media (min-width: 48rem) {
     .moin-columns { columns: 2; column-gap: var(--space-6); }
   }
@@ -174,12 +172,11 @@
   .moin-stack[data-center] { align-items: center; }
   /* As wide as text reads well, or --width. On a moin-page it stays centered. */
   .moin-narrow { max-width: var(--width, 42rem); }
-  /* A narrow column and two wide ones, one under the other on a phone. */
+  /* A label and two answers, one under the other on a phone. Rows in a list
+     keep the same columns, so they line up. */
   @media (min-width: 40rem) {
     .moin-grid[data-cols="2-3-3"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 3fr); }
   }
-  /* A column as wide as it needs, the rest beside it: a key and what it does. */
-  .moin-grid[data-cols="auto-1"] { grid-template-columns: auto minmax(0, 1fr); }
   /* The sentence under the title of a page in the middle belongs to it. */
   .moin-centered > div > * > .moin-title + p { margin-block-start: calc(var(--space-4) * -1); }
 
@@ -214,15 +211,13 @@
     .moin-hero > :last-child { height: 44svh; }
   }
 
-  /* A statement of a landing page with room above it. A link that jumps to
-     one stops under the floating bar. */
+  /* A statement of a landing page with room above it. */
   .moin-band {
     --band: 7rem;
     display: flex;
     flex-direction: column;
     gap: var(--space-8);
     padding-block-start: var(--band);
-    scroll-margin-block-start: 6rem;
   }
   .moin-band:last-child { padding-block-end: var(--band); }
   @media (min-width: 40rem) {
@@ -258,12 +253,8 @@
   /* What is empty takes no room. */
   .moin-hide-empty:empty { display: none; }
 
-  /* One place with two faces while a request runs: inside data-busy-scope,
-     while a data-busy-from element sends, data-show-busy shows and
-     data-hide-busy goes. */
-  [data-show-busy] { display: none; }
-  [data-busy-scope]:has([data-busy-from].htmx-request) [data-show-busy] { display: flex; }
-  [data-busy-scope]:has([data-busy-from].htmx-request) [data-hide-busy] { display: none; }
+  /* A link to a place on the page stops under the floating bar, or --jump. */
+  :target { scroll-margin-block-start: var(--jump, 6rem); }
 
   /* A box that only holds an id: what is in it counts as being in its place. */
   .moin-contents { display: contents; }
@@ -275,4 +266,18 @@
      data-way="first", with no script. */
   [data-either]:not(:has(input[data-other]:checked)) [data-way="other"],
   [data-either]:has(input[data-other]:checked) [data-way="first"] { display: none; }
+}
+
+/* A group of moin-columns is one box on its own line, past the display of
+   whatever it is, a card too. So a column break never carries its margin to
+   the top of the next column, in any engine. */
+@layer moin-components {
+  .moin-columns.moin-columns > * {
+    display: inline-flex;
+    flex-direction: column;
+    width: 100%;
+    vertical-align: top;
+    break-inside: avoid;
+    margin-block-end: var(--space-6);
+  }
 }

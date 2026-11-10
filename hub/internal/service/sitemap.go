@@ -23,6 +23,7 @@ var publicRoutes = []struct {
 	{"/ui/layout", "0.7", "weekly"},
 	{"/ui/blocks", "0.7", "weekly"},
 	{"/catalog", "0.8", "daily"},
+	{"/roadmap", "0.6", "weekly"},
 	{"/changelog", "0.6", "weekly"},
 	{"/auth", "0.3", "monthly"},
 }
@@ -110,6 +111,10 @@ func (s *SitemapService) docsURLs() []model.SitemapURL {
 	today := time.Now().Format("2006-01-02")
 	var urls []model.SitemapURL
 	for _, page := range s.docsService.FlatDocsList() {
+		// The roadmap's own page is /roadmap, in publicRoutes.
+		if page.Slug == "roadmap" {
+			continue
+		}
 		priority := "0.6"
 		if strings.Count(page.Slug, "/") == 0 {
 			priority = "0.8"

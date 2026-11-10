@@ -29,6 +29,12 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 	markdown := strings.HasSuffix(r.URL.Path, ".md")
 	slug := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, ".md"), "/docs"), "/")
 
+	// The roadmap has a page of its own; its Markdown stays here.
+	if slug == "roadmap" && !markdown {
+		http.Redirect(w, r, "/roadmap", http.StatusMovedPermanently)
+		return
+	}
+
 	if _, err := h.docsService.DocsTree(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Docs unavailable", "The docs could not be loaded. Try again."))

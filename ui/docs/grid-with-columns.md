@@ -13,3 +13,11 @@ Styles: `components/item.css`, `components/card.css`.
 grid-with-columns
 resize
 ```
+
+## The whole width
+
+`data-wide` on one part of a grid takes the whole width.
+
+```example
+grid-with-a-wide-part
+```

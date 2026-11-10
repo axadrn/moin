@@ -13,3 +13,5 @@ Needs `moin.js`: palette.
 ```example
 palette
 ```
+
+`moin-palette-group` names a group of options, starting where their text starts. It does nothing by itself and takes no selection.

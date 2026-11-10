@@ -1,13 +1,14 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Changelog is every version of moin, newest first, in the release notes
-// format: In short, then New, Changed, Fixed, Removed and Upgrade.
-templ Changelog(html string) {
+// Changelog is every version of moin, newest first: its In short, and the
+// full notes one click away. The newest starts open.
+templ Changelog(releases []service.Release) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Changelog",
 		Description: "What changed in moin, newest first.",
@@ -19,9 +20,26 @@ templ Changelog(html string) {
 					RSS
 				}
 			}
-			<article class="moin-narrow">
-				@components.Prose(components.ProseProps{HTML: html})
-			</article>
+			@components.Card(components.CardProps{}) {
+				<ol class="moin-timeline">
+					for i, release := range releases {
+						<li id={ release.Anchor() }>
+							<span class="moin-strong">{ release.Version }</span>
+							<span class="moin-small moin-muted">{ release.Date.Format("January 2, 2006") }</span>
+							<div class="moin-text moin-muted">
+								@components.Prose(components.ProseProps{HTML: release.InShortHTML})
+							</div>
+							<div class="moin-text">
+								@components.Expand(components.ExpandProps{Name: "Full notes", Quiet: true, Open: i == 0}) {
+									<div class="moin-foreground">
+										@components.Prose(components.ProseProps{HTML: release.Notes})
+									</div>
+								}
+							</div>
+						</li>
+					}
+				</ol>
+			}
 		</main>
 	}
 }

@@ -15,11 +15,14 @@
     padding: var(--space-8) var(--space-6);
   }
   .moin-preview-stage > * { max-width: 100%; }
-  .moin-preview-stage > :is(.moin-list, .moin-card, .moin-grid, .moin-stack, .moin-field, .moin-code, .moin-command, .moin-alert, .moin-prose, .moin-steps, .moin-timeline, .moin-scroll, .moin-empty, .moin-history, .moin-footer, form, section, header, nav:not(.moin-tabs, .moin-breadcrumb, .moin-row), moin-calendar, moin-chart) { width: 100%; }
+  .moin-preview-stage > :is(.moin-list, .moin-card, .moin-grid, .moin-columns, .moin-stack, .moin-field, .moin-code, .moin-command, .moin-alert, .moin-prose, .moin-steps, .moin-timeline, .moin-scroll, .moin-empty, .moin-history, .moin-footer, form, section, header, nav:not(.moin-tabs, .moin-breadcrumb, .moin-row), moin-calendar, moin-chart) { width: 100%; }
 
   /* What fills a whole page stays in the flow here. */
   .moin-preview-stage .moin-bar { position: static; }
   .moin-preview-stage .moin-centered { min-height: 0; }
+  .moin-preview-stage .moin-hero { --bar: 0rem; min-height: 0; }
+  .moin-preview-stage .moin-hero > :last-child { height: 8rem; }
+  .moin-preview-stage .moin-band { --band: 2rem; }
 
   /* Pull the corner to watch it answer. */
   .moin-preview-stage[data-resize] {

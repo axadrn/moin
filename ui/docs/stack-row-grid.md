@@ -12,3 +12,5 @@ Styles: `components/item.css`, `components/card.css`, `components/badge.css`.
 ```example
 layout
 ```
+
+`data-baseline` lines a row up on the baseline of its words. `data-top` holds it at the top.
