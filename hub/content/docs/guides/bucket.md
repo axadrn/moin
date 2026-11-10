@@ -1,11 +1,11 @@
 ---
 title: "Bucket"
-description: "Your code and your backups in your own S3-compatible bucket, never with us"
+description: "Your code and your backups in your own S3-compatible bucket. Never with us."
 group: "Servers and data"
 order: 5
 ---
 
-Your bucket is your own box on the internet. Your backups and uploads go there, and only there. Never to us. moin only signs short-lived links into it.
+Your bucket is your own box on the internet. Your backups and uploads go there. Only there. Never to us. moin only signs short-lived links into it.
 
 Any S3-compatible bucket works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. One bucket serves every app.
 

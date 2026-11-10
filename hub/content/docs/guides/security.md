@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "No open port, SSH only on your tailnet, everything else dropped, and rules only root can change"
+description: "No open port. SSH only on your tailnet. Everything else dropped. Rules only root can change."
 group: "Servers and data"
 order: 2
 ---

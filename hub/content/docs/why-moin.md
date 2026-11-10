@@ -1,6 +1,6 @@
 ---
 title: "Why moin"
-description: "Small stack, a daemon that only dials out, backups whose restores are checked"
+description: "Small stack. A daemon that only dials out. Backups whose restores are checked."
 group: "Start"
 order: 3
 ---

@@ -1,6 +1,6 @@
 ---
 title: "How backups work"
-description: "Copies on your schedule in your own bucket, a daily check, and what lives where"
+description: "Copies on your schedule. In your own bucket. A daily check. What lives where."
 group: "Servers and data"
 order: 4
 ---

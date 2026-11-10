@@ -1,6 +1,6 @@
 ---
 title: "Alerts"
-description: "A mail, Slack, Discord, Telegram or a webhook when a site goes down, a server goes offline, a deploy fails, backups stop or a disk fills up"
+description: "A site goes down. A server goes offline. A deploy fails. Backups stop. A disk fills up. moin tells you by mail, Slack, Discord, Telegram or a webhook."
 group: "Every day"
 order: 7
 ---

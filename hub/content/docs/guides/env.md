@@ -5,7 +5,7 @@ group: "Apps"
 order: 3
 ---
 
-Env vars are the settings and secrets your app reads when it starts, such as `DATABASE_URL` or an API key. moin keeps them encrypted and gives them to your app on the next restart, start or deploy.
+Env vars are the settings and secrets your app reads when it starts. `DATABASE_URL` or an API key, for example. moin keeps them encrypted. Your app gets them on the next restart, start or deploy.
 
 ```text
 moin env set KEY=value

@@ -1,6 +1,6 @@
 ---
 title: "moin in five words"
-description: "App, server, deploy, backup, bucket: the five words of moin"
+description: "App. Server. Deploy. Backup. Bucket. The five words of moin."
 group: "Start"
 order: 1
 ---

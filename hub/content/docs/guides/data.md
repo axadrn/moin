@@ -1,6 +1,6 @@
 ---
 title: "Data"
-description: "Browse, edit and query the database of an app, SQLite or Postgres"
+description: "Browse, edit and query the database of an app. SQLite or Postgres."
 group: "Every day"
 order: 4
 ---

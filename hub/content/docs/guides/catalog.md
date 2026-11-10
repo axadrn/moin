@@ -1,11 +1,11 @@
 ---
 title: "Catalog"
-description: "Open source apps on your own server in one click, with every version and a way back from each update"
+description: "Open source apps on your own server in one click. Every version. A way back from each update."
 group: "Apps"
 order: 6
 ---
 
-The catalog is the place with open source apps you install in one click, such as Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx.
+The catalog holds open source apps you install in one click. For example Umami, n8n, Open WebUI, Grafana, Nextcloud, Vaultwarden, Outline and Paperless-ngx.
 
 Pick an app, a version and a server. A minute later it runs, with its secrets made for you and its database backed up.
 

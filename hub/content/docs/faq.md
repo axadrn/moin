@@ -1,6 +1,6 @@
 ---
 title: "FAQ"
-description: "Common questions, short answers"
+description: "Common questions. Short answers."
 group: "Reference"
 order: 6
 ---

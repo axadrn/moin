@@ -1,11 +1,11 @@
 ---
 title: "Build in CI"
-description: "Build images in GitHub Actions or any CI and deploy them with a hook"
+description: "Build images in GitHub Actions or any CI. Deploy them with a hook."
 group: "Apps"
 order: 5
 ---
 
-CI is a computer elsewhere, such as GitHub Actions, that builds your app. It packs the app into an image, a box ready to run, and puts it on a registry, a shelf for images. Your server only downloads and starts it.
+CI is a computer elsewhere that builds your app. GitHub Actions, for example. It packs the app into an image, a box ready to run. It puts the image on a registry, a shelf for images. Your server only downloads and starts it.
 
 Deploy the repo once with `moin deploy` first. An image deploy keeps that compose file and swaps only the image of the main service.
 

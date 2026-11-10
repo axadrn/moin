@@ -1,11 +1,11 @@
 ---
 title: "Overview"
-description: "Whether everything is OK, at a glance, and the search to jump anywhere"
+description: "Is everything OK? See it at a glance. Search to jump anywhere."
 group: "Every day"
 order: 1
 ---
 
-The Overview answers one question: is everything OK? It says **All good.**, or lists the few things that need you, each with a link to fix it.
+The Overview answers one question: is everything OK? It says **All good.** Or it lists the few things that need you, each with a link to fix it.
 
 ```surfaces
 Web: **Overview**, the first page of a workspace, or `g` then `o`
