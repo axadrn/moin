@@ -246,7 +246,7 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 					@components.Item(components.ItemProps{Name: "No apps on this server yet"})
 				}
 				for _, app := range apps {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", Name: app.Name, Note: appMetricsNote(app), Attrs: templ.Attributes{"data-app-metrics-row": app.Name}}) {
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/metrics", Name: app.Name, Note: appMetricsNote(app), Attrs: templ.Attributes{"data-app-metrics-row": app.Name}}) {
 						if now := app.Now; now != nil {
 							<span class="moin-strong moin-digits">{ human.Size(float64(now.MemoryUsed)) }</span>
 						} else {

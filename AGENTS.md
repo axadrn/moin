@@ -19,7 +19,7 @@ addresses, personal details.
 - Words: one thing, one word, in every layer, from the list in `hub/DESIGN.md` (Words): hub, daemon, server, app, deploy, backup, check, uptime, AI agent. Not "node", "host" or "control plane".
 - Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
-- `gofmt` clean, `go vet ./...` clean.
+- Formatted (`cd hub && task fmt`, a test checks it), `go vet ./...` clean.
 - Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
 - An issue is closed by writing `Fixes #N` exactly once, where the work gets finished: in the last commit for a small change directly on `main`, in the PR description for anything with several commits. Earlier commits may mention `#N` without "Fixes".

@@ -68,13 +68,13 @@ templ ServerSecurity(view SecurityView) {
 						@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
 					}
 					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove server", Attrs: templ.Attributes{
-						"hx-delete":          basePath + "/servers/" + server.Link(),
-						"hx-swap":            "none",
-						"hx-disable":         "this",
-						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
-						"data-confirm-name":  server.Name,
+						"hx-delete":           basePath + "/servers/" + server.Link(),
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
+						"data-confirm-name":   server.Name,
 						"data-confirm-action": "Remove server",
-						"data-remove-server": server.Name,
+						"data-remove-server":  server.Name,
 					}})
 				}
 			</div>

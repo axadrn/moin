@@ -43,7 +43,8 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 		</section>
 		@components.Card(components.CardProps{Title: "New registry login"}) {
 			<form
-				class="moin-stack" data-gap="4"
+				class="moin-stack"
+				data-gap="4"
 				hx-post={ basePath + "/settings/registries" }
 				hx-target="#settings-registries"
 				hx-swap="outerHTML"

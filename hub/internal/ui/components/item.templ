@@ -8,7 +8,6 @@ templ List() {
 }
 
 // ItemProps is one Item of a List. What it does decides what it is:
-//
 //   - Href: it opens a page, the whole item is a link with a chevron.
 //     External opens another site in a new tab.
 //   - Button: it does something on this page. Danger makes its words red.
@@ -37,7 +36,7 @@ type ItemProps struct {
 }
 
 templ Item(p ItemProps) {
-	switch {
+	switch  {
 		case p.Href != "" && p.External:
 			<a href={ templ.SafeURL(p.Href) } target="_blank" rel="noopener" class="moin-item" { p.Attrs... }>
 				@itemText(p)

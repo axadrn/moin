@@ -24,15 +24,29 @@ type ButtonProps struct {
 
 templ Button(p ButtonProps) {
 	if p.Href != "" {
-		<a href={ templ.SafeURL(p.Href) } class="moin-button" if p.Kind != "" {
-	data-kind={ string(p.Kind) }
-} data-icon?={ p.Icon } data-quiet?={ p.Quiet } { p.Attrs... }>
+		<a
+			href={ templ.SafeURL(p.Href) }
+			class="moin-button"
+			if p.Kind != "" {
+				data-kind={ string(p.Kind) }
+			}
+			data-icon?={ p.Icon }
+			data-quiet?={ p.Quiet }
+			{ p.Attrs... }
+		>
 			{ children... }
 		</a>
 	} else {
-		<button type={ buttonType(p.Type) } class="moin-button" if p.Kind != "" {
-	data-kind={ string(p.Kind) }
-} data-icon?={ p.Icon } data-quiet?={ p.Quiet } { p.Attrs... }>
+		<button
+			type={ buttonType(p.Type) }
+			class="moin-button"
+			if p.Kind != "" {
+				data-kind={ string(p.Kind) }
+			}
+			data-icon?={ p.Icon }
+			data-quiet?={ p.Quiet }
+			{ p.Attrs... }
+		>
 			{ children... }
 		</button>
 	}

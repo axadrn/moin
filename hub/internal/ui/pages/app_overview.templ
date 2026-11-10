@@ -69,7 +69,7 @@ templ Overview(view OverviewView) {
 						</div>
 						@components.List() {
 							for _, update := range view.Status.Updates {
-								@components.Item(components.ItemProps{Href: basePath + "/apps/" + update.Link, Name: update.App, Note: update.Name+" "+update.Version+" → "+update.Latest})
+								@components.Item(components.ItemProps{Href: basePath + "/apps/" + update.Link, Name: update.App, Note: update.Name + " " + update.Version + " → " + update.Latest})
 							}
 						}
 					</section>

@@ -91,7 +91,7 @@ templ ServerAdded(added AddedServer) {
 		hx-swap="outerHTML"
 		data-server-added={ added.Name }
 	>
-		@components.Card(components.CardProps{Title: "Install the daemon on "+added.Name}) {
+		@components.Card(components.CardProps{Title: "Install the daemon on " + added.Name}) {
 			<p class="moin-small moin-muted">
 				Run it on the server as root. It works once, for an hour.
 			</p>
@@ -125,7 +125,7 @@ templ ServerGone() {
 // installed, with the command that removes it there.
 templ serverRemoved(removed RemovedServer) {
 	<div data-server-removed={ removed.Name }>
-		@components.Card(components.CardProps{Title: removed.Name+" is removed"}) {
+		@components.Card(components.CardProps{Title: removed.Name + " is removed"}) {
 			<p class="moin-small moin-muted">
 				Run this on the server as root to remove its daemon. Its apps keep running; --apps removes them too.
 			</p>

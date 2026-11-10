@@ -44,7 +44,9 @@ templ SettingsAvatarForm(hasAvatar bool) {
 		<form
 			id="avatar-upload-form"
 			enctype="multipart/form-data"
-			class="moin-row" data-wrap data-gap="2"
+			class="moin-row"
+			data-wrap
+			data-gap="2"
 			hx-swap-oob="true"
 			hx-post={ basePath + "/account/avatar" }
 			hx-trigger="change"

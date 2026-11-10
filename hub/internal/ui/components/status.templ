@@ -20,7 +20,9 @@ type StatusProps struct {
 
 // Status is a state's dot and its word, in a line of text.
 templ Status(p StatusProps) {
-	<span class="moin-status" data-state={ string(p.State) } { p.Attrs... }><i class="moin-dot" data-state={ string(p.State) }></i>{ children... }</span>
+	<span class="moin-status" data-state={ string(p.State) } { p.Attrs... }>
+		<i class="moin-dot" data-state={ string(p.State) }></i>{ children... }
+	</span>
 }
 
 // ChipProps is a Chip: the state, and its word as children.

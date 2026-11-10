@@ -23,6 +23,20 @@ moin UI uses the system's fonts, so there is nothing to load. Pick another one a
 }
 ```
 
+## Corners
+
+One number, `--radius`, sets them all. Every step is a multiple of it, so at `0` everything is square.
+
+| Token | Value | Used by |
+| --- | --- | --- |
+| `--radius-sm` | `--radius` x 0.5 | Tiny things: check, key, inline code, chart bars |
+| `--radius-md` | `--radius` x 1.5 | What you press: buttons, fields, selects |
+| `--radius-lg` | `--radius` x 2 | What holds it: cards, lists, code blocks, dialogs |
+| `--radius-bar` | `--radius` x 4 | The floating bar: a pill, square at `0` |
+| `--radius-full` | `9999px` | Round things: badge, avatar |
+
+Something inside a box takes the box's corner minus the gap between them: `max(0px, calc(var(--radius-lg) - var(--inset)))`. The curves then run side by side.
+
 ## Light and dark
 
 It follows the system by itself, with no script. Each color in `theme.css` holds its light and its dark value.

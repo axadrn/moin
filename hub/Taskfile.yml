@@ -11,6 +11,15 @@ tasks:
     cmds:
       - go tool templ generate --watch --log-level=warn --cmd="go run ./cmd/server" --proxy="http://localhost:{{.APP_PORT}}" --proxyport="{{.DEV_PORT}}" --proxybind="0.0.0.0" --open-browser="{{.OPEN_BROWSER}}"
 
+  fmt:
+    desc: Format every .go and .templ file
+    dir: ..
+    cmds:
+      - git ls-files --cached --others --exclude-standard "*.go" | grep -v _templ.go | xargs gofmt -w
+      # Twice: the first pass can leave what only the second settles.
+      - go tool templ fmt hub
+      - go tool templ fmt hub
+
   tailwind:
     desc: Watch Tailwind CSS changes
     cmds:

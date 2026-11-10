@@ -38,7 +38,8 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 		if oob {
 			hx-swap-oob="true"
 		}
-		class="moin-stack" data-gap="4"
+		class="moin-stack"
+		data-gap="4"
 		hx-post={ ctxkeys.AppBasePath(ctx) + "/settings/api-tokens" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"

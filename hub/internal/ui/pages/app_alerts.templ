@@ -38,7 +38,7 @@ templ Alerts(view AlertsView) {
 			<div id="alerts" class="moin-stack" data-gap="6">
 				if view.SigningSecret != "" && view.Created != nil {
 					<div data-signing-secret>
-						@components.Card(components.CardProps{Title: "Signing secret of "+view.Created.Name}) {
+						@components.Card(components.CardProps{Title: "Signing secret of " + view.Created.Name}) {
 							<p class="moin-small moin-muted">
 								Shown this once. Every post carries <code class="moin-mono moin-foreground">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret.
 							</p>

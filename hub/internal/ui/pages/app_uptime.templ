@@ -156,7 +156,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 			@components.CSRF()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
 			<div class="moin-fill">
-				@components.Field(components.FieldProps{Label: "Path", For: id+"-path"}) {
+				@components.Field(components.FieldProps{Label: "Path", For: id + "-path"}) {
 					<div class="moin-row" data-gap="2" data-phone="stack">
 						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"}})
 						@components.Button(components.ButtonProps{Type: "submit"}) {
@@ -174,7 +174,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@components.Item(components.ItemProps{Form: true, For: id+"-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+	@components.Item(components.ItemProps{Form: true, For: id + "-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
 		@components.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
 		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused}})

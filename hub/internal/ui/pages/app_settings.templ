@@ -222,7 +222,8 @@ templ deleteAccountDialog() {
 	@components.Dialog(components.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, sessions and API tokens are deleted. This cannot be undone."}) {
 		<form
 			id="delete-account-form"
-			class="moin-stack" style="--gap:1.25rem"
+			class="moin-stack"
+			style="--gap:1.25rem"
 			hx-delete={ basePath + "/account" }
 			hx-swap="none"
 			hx-disable="find button[type='submit']"
