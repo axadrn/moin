@@ -44,41 +44,43 @@
         <div class="moin-section-head">
           <h2>App</h2>
         </div>
-        <div class="moin-list">
-          <a href="#app-settings" class="moin-item">
-            <div class="moin-item-text">
-              <div class="moin-item-name">Name</div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#app-settings" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Name</div>
+              </div>
+              <span class="moin-item-value">my-app</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#app-settings" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Repository</div>
+              </div>
+              <span class="moin-item-value">acme/my-app</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <div class="moin-item" data-control>
+              <label for="pin" class="moin-item-text">
+                <span class="moin-item-name">Pin to the top</span>
+              </label>
+              <span class="moin-switch">
+                <input id="pin" type="checkbox" role="switch" autocomplete="off" checked>
+                <span></span>
+              </span>
             </div>
-            <span class="moin-item-value">my-app</span>
-            <i class="moin-chevron"></i>
-          </a>
-          <a href="#app-settings" class="moin-item">
-            <div class="moin-item-text">
-              <div class="moin-item-name">Repository</div>
+            <div class="moin-item" data-control>
+              <label for="auto" class="moin-item-text">
+                <span class="moin-item-name">Deploy on push</span>
+                <span class="moin-item-note">main</span>
+              </label>
+              <span class="moin-switch">
+                <input id="auto" type="checkbox" role="switch" autocomplete="off">
+                <span></span>
+              </span>
             </div>
-            <span class="moin-item-value">acme/my-app</span>
-            <i class="moin-chevron"></i>
-          </a>
-          <div class="moin-item" data-control>
-            <label for="pin" class="moin-item-text">
-              <span class="moin-item-name">Pin to the top</span>
-            </label>
-            <span class="moin-switch">
-              <input id="pin" type="checkbox" role="switch" autocomplete="off" checked>
-              <span></span>
-            </span>
           </div>
-          <div class="moin-item" data-control>
-            <label for="auto" class="moin-item-text">
-              <span class="moin-item-name">Deploy on push</span>
-              <span class="moin-item-note">main</span>
-            </label>
-            <span class="moin-switch">
-              <input id="auto" type="checkbox" role="switch" autocomplete="off">
-              <span></span>
-            </span>
-          </div>
-        </div>
+        </section>
       </div>
       <!-- Environment -->
       <div class="moin-section">
@@ -101,14 +103,16 @@
         </form>
       </div>
       <!-- List -->
-      <div class="moin-list">
-        <button type="button" class="moin-item" data-danger data-confirm="Stop my-app? It goes offline until you start it.">
-          <span class="moin-strong">Stop</span>
-        </button>
-        <button type="button" class="moin-item" data-danger data-confirm="Remove my-app? Its data goes too. This cannot be undone." data-confirm-name="my-app">
-          <span class="moin-strong">Remove</span>
-        </button>
-      </div>
+      <section class="moin-card">
+        <div class="moin-list">
+          <button type="button" class="moin-item" data-danger data-confirm="Stop my-app? It goes offline until you start it.">
+            <span class="moin-strong">Stop</span>
+          </button>
+          <button type="button" class="moin-item" data-danger data-confirm="Remove my-app? Its data goes too. This cannot be undone." data-confirm-name="my-app">
+            <span class="moin-strong">Remove</span>
+          </button>
+        </div>
+      </section>
     </section>
   </main>
 </body>

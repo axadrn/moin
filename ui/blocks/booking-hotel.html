@@ -34,20 +34,22 @@
         </div>
       </header>
       <!-- Dates -->
-      <div class="moin-list">
-        <details class="moin-expand" open>
-          <summary>
-            <span class="moin-fill moin-truncate">Dates</span>
-            <span class="moin-item-value" data-date>Nov 20 – Nov 23</span>
-            <i class="moin-chevron"></i>
-          </summary>
-          <div>
-            <div class="moin-item">
-              <moin-calendar range months="2" min="2026-11-09" value="2026-11-20,2026-11-23"></moin-calendar>
+      <section class="moin-card">
+        <div class="moin-list">
+          <details class="moin-expand" open>
+            <summary>
+              <span class="moin-fill moin-truncate">Dates</span>
+              <span class="moin-item-value" data-date>Nov 20 – Nov 23</span>
+              <i class="moin-chevron"></i>
+            </summary>
+            <div>
+              <div class="moin-item">
+                <moin-calendar range months="2" min="2026-11-09" value="2026-11-20,2026-11-23"></moin-calendar>
+              </div>
             </div>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
+      </section>
       <!-- Guests -->
       <div class="moin-field">
         <label for="hotel-guests">Guests</label>
@@ -80,35 +82,37 @@
         <div class="moin-section-head">
           <h2>Room</h2>
         </div>
-        <div class="moin-list">
-          <label class="moin-item">
-            <input type="radio" name="room">
-            <span class="moin-item-text">
-              <span class="moin-item-name">Courtyard room</span>
-              <span class="moin-item-note">Queen bed · Free cancellation</span>
-            </span>
-            <span class="moin-item-value">$142 a night</span>
-            <i class="moin-item-check"></i>
-          </label>
-          <label class="moin-item">
-            <input type="radio" name="room" checked>
-            <span class="moin-item-text">
-              <span class="moin-item-name">River room</span>
-              <span class="moin-item-note">King bed · Free cancellation</span>
-            </span>
-            <span class="moin-item-value">$186 a night</span>
-            <i class="moin-item-check"></i>
-          </label>
-          <label class="moin-item">
-            <input type="radio" name="room">
-            <span class="moin-item-text">
-              <span class="moin-item-name">Roof suite</span>
-              <span class="moin-item-note">King bed · Terrace</span>
-            </span>
-            <span class="moin-item-value">$264 a night</span>
-            <i class="moin-item-check"></i>
-          </label>
-        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <label class="moin-item">
+              <input type="radio" name="room">
+              <span class="moin-item-text">
+                <span class="moin-item-name">Courtyard room</span>
+                <span class="moin-item-note">Queen bed · Free cancellation</span>
+              </span>
+              <span class="moin-item-value">$142 a night</span>
+              <i class="moin-item-check"></i>
+            </label>
+            <label class="moin-item">
+              <input type="radio" name="room" checked>
+              <span class="moin-item-text">
+                <span class="moin-item-name">River room</span>
+                <span class="moin-item-note">King bed · Free cancellation</span>
+              </span>
+              <span class="moin-item-value">$186 a night</span>
+              <i class="moin-item-check"></i>
+            </label>
+            <label class="moin-item">
+              <input type="radio" name="room">
+              <span class="moin-item-text">
+                <span class="moin-item-name">Roof suite</span>
+                <span class="moin-item-note">King bed · Terrace</span>
+              </span>
+              <span class="moin-item-value">$264 a night</span>
+              <i class="moin-item-check"></i>
+            </label>
+          </div>
+        </section>
       </form>
       <!-- Actions -->
       <div class="moin-row">

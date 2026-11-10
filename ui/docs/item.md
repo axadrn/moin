@@ -5,7 +5,7 @@ group: "Lists"
 order: 1
 ---
 
-One thing on one line, in a list.
+One thing on one line, in a list. A list is only rows, the Card is the surface.
 
 Styles: `components/switch.css`, `components/item.css`, `components/avatar.css`, `components/logo.css`, `components/bubble.css`, `components/calendar.css`.
 Needs `moin.js`: calendar, confirm.
@@ -14,6 +14,14 @@ Needs `moin.js`: calendar, confirm.
 
 ```example
 item-opens
+```
+
+## A list on its own
+
+Without a card, a list has nothing under it. Use this when it sits on a surface already.
+
+```example
+item-list-on-its-own
 ```
 
 ## With something in front

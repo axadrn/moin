@@ -44,66 +44,70 @@
         </div>
       </div>
       <!-- Depart, Return -->
-      <div class="moin-list">
-        <details class="moin-expand" name="flight-date" open>
-          <summary>
-            <span class="moin-fill moin-truncate">Depart</span>
-            <span class="moin-item-value" data-date>Nov 20, 2026</span>
-            <i class="moin-chevron"></i>
-          </summary>
-          <div>
-            <div class="moin-item">
-              <moin-calendar min="2026-11-09" value="2026-11-20"></moin-calendar>
+      <section class="moin-card">
+        <div class="moin-list">
+          <details class="moin-expand" name="flight-date" open>
+            <summary>
+              <span class="moin-fill moin-truncate">Depart</span>
+              <span class="moin-item-value" data-date>Nov 20, 2026</span>
+              <i class="moin-chevron"></i>
+            </summary>
+            <div>
+              <div class="moin-item">
+                <moin-calendar min="2026-11-09" value="2026-11-20"></moin-calendar>
+              </div>
             </div>
-          </div>
-        </details>
-        <details class="moin-expand" name="flight-date">
-          <summary>
-            <span class="moin-fill moin-truncate">Return</span>
-            <span class="moin-item-value" data-date>One way</span>
-            <i class="moin-chevron"></i>
-          </summary>
-          <div>
-            <div class="moin-item">
-              <moin-calendar min="2026-11-20"></moin-calendar>
+          </details>
+          <details class="moin-expand" name="flight-date">
+            <summary>
+              <span class="moin-fill moin-truncate">Return</span>
+              <span class="moin-item-value" data-date>One way</span>
+              <i class="moin-chevron"></i>
+            </summary>
+            <div>
+              <div class="moin-item">
+                <moin-calendar min="2026-11-20"></moin-calendar>
+              </div>
             </div>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
+      </section>
       <!-- Flights -->
       <form class="moin-section">
         <div class="moin-section-head">
           <h2>Flights</h2>
         </div>
-        <div class="moin-list">
-          <label class="moin-item">
-            <input type="radio" name="flight" checked>
-            <span class="moin-item-text">
-              <span class="moin-item-name">08:15 to 11:40</span>
-              <span class="moin-item-note">Direct · 4 h 25 min</span>
-            </span>
-            <span class="moin-item-value">$142</span>
-            <i class="moin-item-check"></i>
-          </label>
-          <label class="moin-item">
-            <input type="radio" name="flight">
-            <span class="moin-item-text">
-              <span class="moin-item-name">13:05 to 16:30</span>
-              <span class="moin-item-note">Direct · 4 h 25 min</span>
-            </span>
-            <span class="moin-item-value">$168</span>
-            <i class="moin-item-check"></i>
-          </label>
-          <label class="moin-item">
-            <input type="radio" name="flight">
-            <span class="moin-item-text">
-              <span class="moin-item-name">17:50 to 23:10</span>
-              <span class="moin-item-note">1 stop · 6 h 20 min</span>
-            </span>
-            <span class="moin-item-value">$119</span>
-            <i class="moin-item-check"></i>
-          </label>
-        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <label class="moin-item">
+              <input type="radio" name="flight" checked>
+              <span class="moin-item-text">
+                <span class="moin-item-name">08:15 to 11:40</span>
+                <span class="moin-item-note">Direct · 4 h 25 min</span>
+              </span>
+              <span class="moin-item-value">$142</span>
+              <i class="moin-item-check"></i>
+            </label>
+            <label class="moin-item">
+              <input type="radio" name="flight">
+              <span class="moin-item-text">
+                <span class="moin-item-name">13:05 to 16:30</span>
+                <span class="moin-item-note">Direct · 4 h 25 min</span>
+              </span>
+              <span class="moin-item-value">$168</span>
+              <i class="moin-item-check"></i>
+            </label>
+            <label class="moin-item">
+              <input type="radio" name="flight">
+              <span class="moin-item-text">
+                <span class="moin-item-name">17:50 to 23:10</span>
+                <span class="moin-item-note">1 stop · 6 h 20 min</span>
+              </span>
+              <span class="moin-item-value">$119</span>
+              <i class="moin-item-check"></i>
+            </label>
+          </div>
+        </section>
       </form>
       <!-- Actions -->
       <div class="moin-row">

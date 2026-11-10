@@ -36,30 +36,32 @@
         </div>
       </header>
       <!-- List -->
-      <div class="moin-list">
-        <a href="#metrics" class="moin-item">
-          <div class="moin-item-text">
-            <div class="moin-item-name">my-app.example.com</div>
-            <div class="moin-item-note">99.98% · 182 ms</div>
-          </div>
-          <span class="moin-chip" data-state="live">
-            <i class="moin-dot" data-state="live"></i>
-            <span>Up</span>
-          </span>
-          <i class="moin-chevron"></i>
-        </a>
-        <a href="#metrics" class="moin-item">
-          <div class="moin-item-text">
-            <div class="moin-item-name">www.example.com</div>
-            <div class="moin-item-note">Waiting for its DNS record</div>
-          </div>
-          <span class="moin-chip" data-state="waiting">
-            <i class="moin-dot" data-state="waiting"></i>
-            <span>Waiting</span>
-          </span>
-          <i class="moin-chevron"></i>
-        </a>
-      </div>
+      <section class="moin-card">
+        <div class="moin-list">
+          <a href="#metrics" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">my-app.example.com</div>
+              <div class="moin-item-note">99.98% · 182 ms</div>
+            </div>
+            <span class="moin-chip" data-state="live">
+              <i class="moin-dot" data-state="live"></i>
+              <span>Up</span>
+            </span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#metrics" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">www.example.com</div>
+              <div class="moin-item-note">Waiting for its DNS record</div>
+            </div>
+            <span class="moin-chip" data-state="waiting">
+              <i class="moin-dot" data-state="waiting"></i>
+              <span>Waiting</span>
+            </span>
+            <i class="moin-chevron"></i>
+          </a>
+        </div>
+      </section>
       <!-- Uptime, 30 days -->
       <section class="moin-card">
         <div class="moin-row" data-between>
@@ -120,18 +122,20 @@
         </form>
       </div>
       <!-- List -->
-      <div class="moin-list">
-        <div class="moin-item" data-control>
-          <label for="instant" class="moin-item-text">
-            <span class="moin-item-name">Instant HTTPS address</span>
-            <span class="moin-item-note">my-app.203-0-113-9.nip.io</span>
-          </label>
-          <span class="moin-switch">
-            <input id="instant" type="checkbox" role="switch" autocomplete="off" checked>
-            <span></span>
-          </span>
+      <section class="moin-card">
+        <div class="moin-list">
+          <div class="moin-item" data-control>
+            <label for="instant" class="moin-item-text">
+              <span class="moin-item-name">Instant HTTPS address</span>
+              <span class="moin-item-note">my-app.203-0-113-9.nip.io</span>
+            </label>
+            <span class="moin-switch">
+              <input id="instant" type="checkbox" role="switch" autocomplete="off" checked>
+              <span></span>
+            </span>
+          </div>
         </div>
-      </div>
+      </section>
     </section>
   </main>
 </body>

@@ -39,9 +39,11 @@ templ Overview(view OverviewView) {
 						<div class="moin-section-head">
 							<h2>Needs you</h2>
 						</div>
-						@components.List() {
-							for _, issue := range view.Status.Issues {
-								@components.Item(components.ItemProps{Href: basePath + issue.Path, Name: issue.Target, Note: issue.Detail, Lead: overviewIssueLead(issue.Kind)})
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, issue := range view.Status.Issues {
+									@components.Item(components.ItemProps{Href: basePath + issue.Path, Name: issue.Target, Note: issue.Detail, Lead: overviewIssueLead(issue.Kind)})
+								}
 							}
 						}
 					</section>
@@ -67,19 +69,23 @@ templ Overview(view OverviewView) {
 						<div class="moin-section-head">
 							<h2>Updates</h2>
 						</div>
-						@components.List() {
-							for _, update := range view.Status.Updates {
-								@components.Item(components.ItemProps{Href: basePath + "/apps/" + update.Link, Name: update.App, Note: update.Name + " " + update.Version + " → " + update.Latest})
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, update := range view.Status.Updates {
+									@components.Item(components.ItemProps{Href: basePath + "/apps/" + update.Link, Name: update.App, Note: update.Name + " " + update.Version + " → " + update.Latest})
+								}
 							}
 						}
 					</section>
 				}
-				@components.List() {
-					@components.Item(components.ItemProps{Href: basePath + "/apps", Name: "All apps"}) {
-						<span class="moin-muted moin-digits">{ strconv.Itoa(view.Apps) }</span>
-					}
-					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "All servers", Note: serversLine(view.Servers, now)}) {
-						<span class="moin-muted moin-digits">{ strconv.Itoa(len(view.Servers)) }</span>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: basePath + "/apps", Name: "All apps"}) {
+							<span class="moin-muted moin-digits">{ strconv.Itoa(view.Apps) }</span>
+						}
+						@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "All servers", Note: serversLine(view.Servers, now)}) {
+							<span class="moin-muted moin-digits">{ strconv.Itoa(len(view.Servers)) }</span>
+						}
 					}
 				}
 			}
@@ -91,10 +97,12 @@ templ Overview(view OverviewView) {
 // something is off, and their state mark.
 templ appRows(apps []model.App, servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.List() {
-		for _, app := range apps {
-			@components.Item(components.ItemProps{Href: basePath + "/apps/" + app.Link(), Name: app.Name, Note: appNote(app, serverOnline(servers, app.ServerID))}) {
-				@appState(app)
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			for _, app := range apps {
+				@components.Item(components.ItemProps{Href: basePath + "/apps/" + app.Link(), Name: app.Name, Note: appNote(app, serverOnline(servers, app.ServerID))}) {
+					@appState(app)
+				}
 			}
 		}
 	}
@@ -202,8 +210,10 @@ templ overviewNewApp(basePath string) {
 
 // overviewStart is the first visit: no server yet.
 templ overviewStart(basePath string) {
-	@components.List() {
-		@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect your first server", Note: "Any Linux box you own. One command, no open port.", Lead: overviewStartLead()})
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect your first server", Note: "Any Linux box you own. One command, no open port.", Lead: overviewStartLead()})
+		}
 	}
 }
 

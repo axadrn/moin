@@ -1,17 +1,11 @@
 @layer moin-components {
-  /* A list: items on one card, a thin line between them, inset like iOS. */
+  /* A list is only rows, with a thin line between them. A card is the
+     surface under them. */
   .moin-list {
-    --item-edge: calc(var(--space-5) + var(--inset));
+    --item-edge: var(--space-5);
     display: flex;
     flex-direction: column;
-    padding: var(--inset);
-    border-radius: var(--radius-lg);
-    background: var(--card);
-    color: var(--card-foreground);
   }
-
-  /* In a grid a list is as tall as its items, not as its neighbor. */
-  .moin-grid > .moin-list { align-self: start; }
 
   .moin-item {
     position: relative;
@@ -40,30 +34,17 @@
   .moin-item:first-child::before { display: none; }
   .moin-item:has(> [data-lead])::before { left: calc(var(--item-edge) + 3rem); }
   /* The light of an item: the same gap on every side, so two lit items never
-     touch and its curve runs parallel to the group's. */
+     touch. Its corners are the card's minus the two gaps, all four the same. */
   .moin-item::after {
     content: "";
     position: absolute;
     inset: var(--inset);
     z-index: -1;
-    border-radius: var(--lit-top) var(--lit-top) var(--lit-bottom) var(--lit-bottom);
+    border-radius: var(--lit);
   }
-  /* Corners that touch the group follow its curve: the group's minus the
-     two gaps. All others are the small step, so an item stays a row. */
   .moin-item,
   .moin-expand > summary {
     --lit: max(0px, calc(var(--radius-lg) - 2 * var(--inset)));
-    --lit-top: var(--radius-sm);
-    --lit-bottom: var(--radius-sm);
-  }
-  .moin-list > .moin-item:first-child,
-  .moin-list > .moin-expand:first-child > summary {
-    --lit-top: var(--lit);
-  }
-  .moin-list > .moin-item:last-child,
-  .moin-list > .moin-expand:last-child:not([open]) > summary,
-  .moin-list > .moin-expand[open]:last-child > div > .moin-item:last-child {
-    --lit-bottom: var(--lit);
   }
   .moin-item[data-control] { flex-wrap: wrap; }
   .moin-item[data-control] > .moin-select { flex: none; width: var(--select-width, 9rem); }

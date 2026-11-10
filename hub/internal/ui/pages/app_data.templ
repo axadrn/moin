@@ -100,16 +100,18 @@ templ dataListPage(view DataView) {
 				<div class="moin-section-head">
 					<h2>Databases</h2>
 				</div>
-				@components.List() {
-					for _, database := range view.Databases {
-						@components.Item(components.ItemProps{Href: databaseURL(ctx, view.App.Name, database.Path), Name: shortPath(database.Path), Note: databaseKind(database)}) {
-							@databaseBackupValue(view, database.Path)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, database := range view.Databases {
+							@components.Item(components.ItemProps{Href: databaseURL(ctx, view.App.Name, database.Path), Name: shortPath(database.Path), Note: databaseKind(database)}) {
+								@databaseBackupValue(view, database.Path)
+							}
 						}
-					}
-					for _, database := range view.NoBackup {
-						@components.Item(components.ItemProps{Name: database.Service, Note: databaseKind(database)}) {
-							@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"data-no-backup": true}}) {
-								moin can't back this up
+						for _, database := range view.NoBackup {
+							@components.Item(components.ItemProps{Name: database.Service, Note: databaseKind(database)}) {
+								@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"data-no-backup": true}}) {
+									moin can't back this up
+								}
 							}
 						}
 					}
@@ -167,16 +169,18 @@ templ dataDatabasePage(view DataView) {
 						</p>
 					}
 				} else {
-					@components.List() {
-						for _, table := range view.Tables {
-							@components.Item(components.ItemProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, 0), Name: table.Name, Note: tableKind(table)}) {
-								<span class="moin-item-value" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							for _, table := range view.Tables {
+								@components.Item(components.ItemProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, 0), Name: table.Name, Note: tableKind(table)}) {
+									<span class="moin-item-value" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
+								}
 							}
-						}
-						if view.Migration != nil {
-							@components.Item(components.ItemProps{}) {
-								<span class="moin-fill moin-strong" data-migration>Migrations</span>
-								<span class="moin-truncate moin-text moin-muted" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="moin-mono">{ view.Migration.Version }</span></span>
+							if view.Migration != nil {
+								@components.Item(components.ItemProps{}) {
+									<span class="moin-fill moin-strong" data-migration>Migrations</span>
+									<span class="moin-truncate moin-text moin-muted" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="moin-mono">{ view.Migration.Version }</span></span>
+								}
 							}
 						}
 					}
@@ -385,10 +389,12 @@ templ dataSchema(table protocol.DBTable) {
 		<div class="moin-section-head">
 			<h2>Columns</h2>
 		</div>
-		@components.List() {
-			for _, column := range table.Columns {
-				@components.Item(components.ItemProps{Name: column.Name, Note: columnNote(column), Attrs: templ.Attributes{"data-schema-column": column.Name}}) {
-					<span class="moin-item-value moin-mono">{ columnType(column) }</span>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, column := range table.Columns {
+					@components.Item(components.ItemProps{Name: column.Name, Note: columnNote(column), Attrs: templ.Attributes{"data-schema-column": column.Name}}) {
+						<span class="moin-item-value moin-mono">{ columnType(column) }</span>
+					}
 				}
 			}
 		}

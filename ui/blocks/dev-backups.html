@@ -63,48 +63,50 @@
           <h2>Restore a copy</h2>
         </div>
         <form class="moin-stack" data-gap="3">
-          <div class="moin-list">
-            <label class="moin-item">
-              <input type="radio" name="copy">
-              <span class="moin-item-text">
-                <span class="moin-item-name">Nov 8, 09:00 UTC</span>
-                <span class="moin-item-note">Hourly · 2.1 MB</span>
-              </span>
-              <i class="moin-item-check"></i>
-            </label>
-            <label class="moin-item">
-              <input type="radio" name="copy" checked>
-              <span class="moin-item-text">
-                <span class="moin-item-name">Nov 8, 08:00 UTC</span>
-                <span class="moin-item-note">Hourly · 2.0 MB</span>
-              </span>
-              <i class="moin-item-check"></i>
-            </label>
-            <label class="moin-item">
-              <input type="radio" name="copy">
-              <span class="moin-item-text">
-                <span class="moin-item-name">Nov 7, 23:12 UTC</span>
-                <span class="moin-item-note">By hand · 1.9 MB</span>
-              </span>
-              <i class="moin-item-check"></i>
-            </label>
-            <details class="moin-expand">
-              <summary>
-                <span class="moin-fill moin-truncate">45 more</span>
-                <i class="moin-chevron"></i>
-              </summary>
-              <div>
-                <label class="moin-item">
-                  <input type="radio" name="copy">
-                  <span class="moin-item-text">
-                    <span class="moin-item-name">Nov 7, 22:00 UTC</span>
-                    <span class="moin-item-note">Hourly · 1.9 MB</span>
-                  </span>
-                  <i class="moin-item-check"></i>
-                </label>
-              </div>
-            </details>
-          </div>
+          <section class="moin-card">
+            <div class="moin-list">
+              <label class="moin-item">
+                <input type="radio" name="copy">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 8, 09:00 UTC</span>
+                  <span class="moin-item-note">Hourly · 2.1 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="copy" checked>
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 8, 08:00 UTC</span>
+                  <span class="moin-item-note">Hourly · 2.0 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="copy">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 7, 23:12 UTC</span>
+                  <span class="moin-item-note">By hand · 1.9 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <details class="moin-expand">
+                <summary>
+                  <span class="moin-fill moin-truncate">45 more</span>
+                  <i class="moin-chevron"></i>
+                </summary>
+                <div>
+                  <label class="moin-item">
+                    <input type="radio" name="copy">
+                    <span class="moin-item-text">
+                      <span class="moin-item-name">Nov 7, 22:00 UTC</span>
+                      <span class="moin-item-note">Hourly · 1.9 MB</span>
+                    </span>
+                    <i class="moin-item-check"></i>
+                  </label>
+                </div>
+              </details>
+            </div>
+          </section>
           <div class="moin-row" data-end>
             <button type="button" class="moin-button" data-kind="danger" data-confirm="Restore over the live data? The data of the last 2 hours goes away." data-confirm-name="postgres-db">Restore</button>
           </div>
@@ -115,42 +117,44 @@
         <div class="moin-section-head">
           <h2>Schedule</h2>
         </div>
-        <div class="moin-list">
-          <div class="moin-item" data-control>
-            <label for="every" class="moin-item-text">
-              <span class="moin-item-name">Back up</span>
-            </label>
-            <div class="moin-select">
-              <button type="button" id="every" popovertarget="every-list" aria-label="Back up" style="anchor-name:--every">
-                <span class="moin-truncate" data-select-label>Every hour</span>
-              </button>
-              <div popover id="every-list" role="radiogroup" aria-label="Back up" style="position-anchor:--every">
-                <label class="moin-option">
-                  <input type="radio" name="every" checked>
-                  <span>Every hour</span>
-                </label>
-                <label class="moin-option">
-                  <input type="radio" name="every">
-                  <span>Every day</span>
-                </label>
-                <label class="moin-option">
-                  <input type="radio" name="every">
-                  <span>Every week</span>
-                </label>
+        <section class="moin-card">
+          <div class="moin-list">
+            <div class="moin-item" data-control>
+              <label for="every" class="moin-item-text">
+                <span class="moin-item-name">Back up</span>
+              </label>
+              <div class="moin-select">
+                <button type="button" id="every" popovertarget="every-list" aria-label="Back up" style="anchor-name:--every">
+                  <span class="moin-truncate" data-select-label>Every hour</span>
+                </button>
+                <div popover id="every-list" role="radiogroup" aria-label="Back up" style="position-anchor:--every">
+                  <label class="moin-option">
+                    <input type="radio" name="every" checked>
+                    <span>Every hour</span>
+                  </label>
+                  <label class="moin-option">
+                    <input type="radio" name="every">
+                    <span>Every day</span>
+                  </label>
+                  <label class="moin-option">
+                    <input type="radio" name="every">
+                    <span>Every week</span>
+                  </label>
+                </div>
               </div>
             </div>
+            <div class="moin-item" data-control>
+              <label for="check" class="moin-item-text">
+                <span class="moin-item-name">Daily check</span>
+                <span class="moin-item-note">Restores the newest copy to see that it works</span>
+              </label>
+              <span class="moin-switch">
+                <input id="check" type="checkbox" role="switch" autocomplete="off" checked>
+                <span></span>
+              </span>
+            </div>
           </div>
-          <div class="moin-item" data-control>
-            <label for="check" class="moin-item-text">
-              <span class="moin-item-name">Daily check</span>
-              <span class="moin-item-note">Restores the newest copy to see that it works</span>
-            </label>
-            <span class="moin-switch">
-              <input id="check" type="checkbox" role="switch" autocomplete="off" checked>
-              <span></span>
-            </span>
-          </div>
-        </div>
+        </section>
       </div>
     </section>
   </main>

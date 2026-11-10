@@ -29,12 +29,14 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 	} else {
 		@authScreen(seo, "Join "+invitation.WorkspaceName) {
 			@authStack() {
-				@components.List() {
-					@factRow("From", invitation.InviterName)
-					@factRow("Role", model.WorkspaceRoleLabel(invitation.Role))
-					@factRow("For", invitation.Email)
-					if user != nil && !strings.EqualFold(user.Email, invitation.Email) {
-						@factRow("You", user.Email)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@factRow("From", invitation.InviterName)
+						@factRow("Role", model.WorkspaceRoleLabel(invitation.Role))
+						@factRow("For", invitation.Email)
+						if user != nil && !strings.EqualFold(user.Email, invitation.Email) {
+							@factRow("You", user.Email)
+						}
 					}
 				}
 				if user != nil {

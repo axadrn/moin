@@ -54,11 +54,13 @@ templ Activity(view ActivityView) {
 			}
 			<div id="activity-list">
 				if len(view.Events) == 0 {
-					@components.List() {
-						if view.filtered() {
-							@components.Item(components.ItemProps{Name: "Nothing matches", Note: "No change of the team matches this filter"})
-						} else {
-							@components.Item(components.ItemProps{Name: "Nothing happened yet", Note: "Deploys, restores and every other change show up here"})
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							if view.filtered() {
+								@components.Item(components.ItemProps{Name: "Nothing matches", Note: "No change of the team matches this filter"})
+							} else {
+								@components.Item(components.ItemProps{Name: "Nothing happened yet", Note: "Deploys, restores and every other change show up here"})
+							}
 						}
 					}
 				} else {
@@ -66,8 +68,10 @@ templ Activity(view ActivityView) {
 						<div class="moin-section-head">
 							<h2>Newest first, in UTC</h2>
 						</div>
-						@components.List(templ.Attributes{"role": "list", "data-activity": true}) {
-							@ActivityRows(view)
+						@components.Card(components.CardProps{}) {
+							@components.List(templ.Attributes{"role": "list", "data-activity": true}) {
+								@ActivityRows(view)
+							}
 						}
 					</section>
 				}

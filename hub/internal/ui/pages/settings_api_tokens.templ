@@ -73,28 +73,30 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 templ APITokenList(view APITokensView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="api-token-list" hx-swap-oob="true">
-		@components.List() {
-			if len(view.Tokens) == 0 {
-				@components.Item(components.ItemProps{}) {
-					<p class="moin-small moin-muted">No tokens yet.</p>
-				}
-			}
-			for _, token := range view.Tokens {
-				@components.Item(components.ItemProps{Name: token.Name, Note: apiTokenNote(token, view), Attrs: templ.Attributes{"data-api-token-row": token.ID}}) {
-					if token.IsExpired(view.Now) {
-						@components.Status(components.StatusProps{State: components.StateFailed}) {
-							expired
-						}
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if len(view.Tokens) == 0 {
+					@components.Item(components.ItemProps{}) {
+						<p class="moin-small moin-muted">No tokens yet.</p>
 					}
-					@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-						"type":       "button",
-						"aria-label": "Revoke " + token.Name,
-						"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
-					}}) {
-						Revoke
+				}
+				for _, token := range view.Tokens {
+					@components.Item(components.ItemProps{Name: token.Name, Note: apiTokenNote(token, view), Attrs: templ.Attributes{"data-api-token-row": token.ID}}) {
+						if token.IsExpired(view.Now) {
+							@components.Status(components.StatusProps{State: components.StateFailed}) {
+								expired
+							}
+						}
+						@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+							"type":       "button",
+							"aria-label": "Revoke " + token.Name,
+							"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
+						}}) {
+							Revoke
+						}
 					}
 				}
 			}

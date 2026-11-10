@@ -29,7 +29,7 @@
     position: absolute;
     inset: var(--inset);
     z-index: -1;
-    border-radius: var(--lit-top) var(--lit-top) var(--lit-bottom) var(--lit-bottom);
+    border-radius: var(--lit);
   }
   .moin-expand > summary:is(:hover, :focus-visible)::after {
     background: color-mix(in oklab, var(--foreground) 4%, transparent);

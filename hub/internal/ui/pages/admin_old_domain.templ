@@ -16,29 +16,35 @@ templ AdminOldDomain(report *model.OldDomain) {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: "Old domain"})
 			if len(report.Hosts) == 0 {
-				@components.List() {
-					@components.Item(components.ItemProps{Name: "No old domain is set", Note: "Put it in OLD_URLS."})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Name: "No old domain is set", Note: "Put it in OLD_URLS."})
+					}
 				}
 			} else {
-				@components.List() {
-					@adminFact("Domain", strings.Join(report.Hosts, ", "))
-					@adminFact("Can it go?", oldDomainVerdict(report))
-					@adminFact("Requests", strconv.Itoa(report.Total)+" in "+strconv.Itoa(report.Days)+" days")
-					@adminFact("Last request", oldDomainLast(report))
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@adminFact("Domain", strings.Join(report.Hosts, ", "))
+						@adminFact("Can it go?", oldDomainVerdict(report))
+						@adminFact("Requests", strconv.Itoa(report.Total)+" in "+strconv.Itoa(report.Days)+" days")
+						@adminFact("Last request", oldDomainLast(report))
+					}
 				}
 				if len(report.Rows) > 0 {
 					<section class="moin-section">
 						<div class="moin-section-head">
 							<h2>By day</h2>
 						</div>
-						@components.List() {
-							for _, row := range report.Rows {
-								@components.Item(components.ItemProps{}) {
-									<div class="moin-item-text">
-										<div class="moin-item-name moin-digits">{ row.Day }</div>
-										<div class="moin-item-note"><span class="moin-mono">{ row.Host }</span> · { row.Kind }</div>
-									</div>
-									<span class="moin-item-value">{ strconv.Itoa(row.Requests) }</span>
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, row := range report.Rows {
+									@components.Item(components.ItemProps{}) {
+										<div class="moin-item-text">
+											<div class="moin-item-name moin-digits">{ row.Day }</div>
+											<div class="moin-item-note"><span class="moin-mono">{ row.Host }</span> · { row.Kind }</div>
+										</div>
+										<span class="moin-item-value">{ strconv.Itoa(row.Requests) }</span>
+									}
 								}
 							}
 						}

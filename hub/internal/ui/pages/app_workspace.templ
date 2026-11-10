@@ -61,35 +61,37 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				<h2>In the team</h2>
 				@seatCount(seatText(len(members), seatLimit))
 			</div>
-			@components.List() {
-				for _, member := range members {
-					@components.Item(components.ItemProps{Name: member.Name, Note: member.Email, Lead: components.Avatar(components.AvatarProps{Name: member.Name, Initials: model.Initial(member.Name + member.Email)}), Attrs: templ.Attributes{"data-member": member.ID, "data-control": true}}) {
-						if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
-							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
-								<form
-									action={ templ.SafeURL(basePath + "/workspace/members/" + member.ID + "/role") }
-									method="POST"
-									class="moin-width"
-									data-fixed
-									style="--width:9rem"
-									hx-post={ basePath + "/workspace/members/" + member.ID + "/role" }
-									hx-trigger="change"
-									hx-swap="none"
-								>
-									@components.CSRF()
-									@components.Select(components.SelectProps{ID: "role-" + member.ID, Name: "role", Label: "Role of " + member.Name, Options: roleOptions(viewer.Can(model.WorkspacePermissionManageOwners)), Value: member.Role})
-								</form>
-								@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
-									"hx-post":    basePath + "/workspace/members/" + member.ID + "/remove",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-									"hx-confirm": "Remove " + member.Name + " from " + workspace.Name + "?",
-								}}) {
-									Remove
-								}
-							</div>
-						} else {
-							<span class="moin-text moin-muted">{ model.WorkspaceRoleLabel(member.Role) }</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, member := range members {
+						@components.Item(components.ItemProps{Name: member.Name, Note: member.Email, Lead: components.Avatar(components.AvatarProps{Name: member.Name, Initials: model.Initial(member.Name + member.Email)}), Attrs: templ.Attributes{"data-member": member.ID, "data-control": true}}) {
+							if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
+								<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+									<form
+										action={ templ.SafeURL(basePath + "/workspace/members/" + member.ID + "/role") }
+										method="POST"
+										class="moin-width"
+										data-fixed
+										style="--width:9rem"
+										hx-post={ basePath + "/workspace/members/" + member.ID + "/role" }
+										hx-trigger="change"
+										hx-swap="none"
+									>
+										@components.CSRF()
+										@components.Select(components.SelectProps{ID: "role-" + member.ID, Name: "role", Label: "Role of " + member.Name, Options: roleOptions(viewer.Can(model.WorkspacePermissionManageOwners)), Value: member.Role})
+									</form>
+									@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/members/" + member.ID + "/remove",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+										"hx-confirm": "Remove " + member.Name + " from " + workspace.Name + "?",
+									}}) {
+										Remove
+									}
+								</div>
+							} else {
+								<span class="moin-text moin-muted">{ model.WorkspaceRoleLabel(member.Role) }</span>
+							}
 						}
 					}
 				}
@@ -100,26 +102,28 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				<div class="moin-section-head">
 					<h2>Invitations</h2>
 				</div>
-				@components.List() {
-					for _, invitation := range invitations {
-						@components.Item(components.ItemProps{Name: invitation.Email, Note: model.WorkspaceRoleLabel(invitation.Role) + " · expires " + invitation.ExpiresAt.Local().Format("Jan 2, 2006"), Attrs: templ.Attributes{"data-invitation": invitation.Email, "data-control": true}}) {
-							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
-								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-									"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/resend",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-								}}) {
-									Resend
-								}
-								@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
-									"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/revoke",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-									"hx-confirm": "Revoke the invitation of " + invitation.Email + "? The link in the email stops working.",
-								}}) {
-									Revoke
-								}
-							</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, invitation := range invitations {
+							@components.Item(components.ItemProps{Name: invitation.Email, Note: model.WorkspaceRoleLabel(invitation.Role) + " · expires " + invitation.ExpiresAt.Local().Format("Jan 2, 2006"), Attrs: templ.Attributes{"data-invitation": invitation.Email, "data-control": true}}) {
+								<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+									@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/resend",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+									}}) {
+										Resend
+									}
+									@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/revoke",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+										"hx-confirm": "Revoke the invitation of " + invitation.Email + "? The link in the email stops working.",
+									}}) {
+										Revoke
+									}
+								</div>
+							}
 						}
 					}
 				}
@@ -145,23 +149,25 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				</form>
 			}
 		}
-		@components.List() {
-			@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Leave workspace", Attrs: templ.Attributes{
-				"hx-post":             basePath + "/workspace/leave",
-				"hx-swap":             "none",
-				"hx-disable":          "this",
-				"hx-confirm":          "Leave " + workspace.Name + "? You lose access to it. A sole Owner hands ownership to someone else first.",
-				"data-confirm-action": "Leave workspace",
-			}})
-			if viewer.Can(model.WorkspacePermissionDeleteWorkspace) {
-				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete workspace", Attrs: templ.Attributes{
-					"hx-post":             basePath + "/workspace/delete",
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Leave workspace", Attrs: templ.Attributes{
+					"hx-post":             basePath + "/workspace/leave",
 					"hx-swap":             "none",
 					"hx-disable":          "this",
-					"hx-confirm":          "Delete " + workspace.Name + " for good? Its team, invitations and activity go with it. A paid subscription must be cancelled and run out first.",
-					"data-confirm-name":   workspace.Name,
-					"data-confirm-action": "Delete permanently",
+					"hx-confirm":          "Leave " + workspace.Name + "? You lose access to it. A sole Owner hands ownership to someone else first.",
+					"data-confirm-action": "Leave workspace",
 				}})
+				if viewer.Can(model.WorkspacePermissionDeleteWorkspace) {
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete workspace", Attrs: templ.Attributes{
+						"hx-post":             basePath + "/workspace/delete",
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          "Delete " + workspace.Name + " for good? Its team, invitations and activity go with it. A paid subscription must be cancelled and run out first.",
+						"data-confirm-name":   workspace.Name,
+						"data-confirm-action": "Delete permanently",
+					}})
+				}
 			}
 		}
 	}

@@ -54,10 +54,12 @@ templ Compare(competitor Competitor) {
 						<div class="moin-section-head">
 							<h2>{ group }</h2>
 						</div>
-						@components.List() {
-							for i, row := range CompareRows {
-								if row.Group == group {
-									@compareFact(row, competitor.Name, competitor.Cells[i])
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for i, row := range CompareRows {
+									if row.Group == group {
+										@compareFact(row, competitor.Name, competitor.Cells[i])
+									}
 								}
 							}
 						}
@@ -77,7 +79,7 @@ templ Compare(competitor Competitor) {
 // says whose it is; the score over the table is there for it.
 templ compareHeader(name string, score CompareScore) {
 	<div aria-hidden="true" class="moin-hidden-phone">
-		@components.List(templ.Attributes{"style": "--card:transparent"}) {
+		@components.List(templ.Attributes{"style": "--item-edge:var(--pad)"}) {
 			@components.Item(components.ItemProps{}) {
 				<div class="moin-grid moin-fill moin-text moin-muted" data-cols="2-3-3">
 					<span></span>

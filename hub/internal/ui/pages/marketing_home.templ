@@ -186,9 +186,11 @@ templ HomeStart() {
 				@components.Choice(components.ChoiceProps{Name: "home-surface", Label: "Where", Options: homeSurfaceOptions(), Checked: "web"})
 				for _, surface := range homeSurfaces {
 					<div data-surface={ surface.Value }>
-						@components.List() {
-							for index, step := range surface.Steps {
-								@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for index, step := range surface.Steps {
+									@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
+								}
 							}
 						}
 					</div>
@@ -223,12 +225,14 @@ templ homeStep(number, name, how string) {
 // homeTile is a small tile of a section: a few words and where to read on.
 templ homeTile(statement, line, href string) {
 	<div style="--row:7rem">
-		@components.List() {
-			@components.Item(components.ItemProps{Href: href}) {
-				<span class="moin-stack moin-fill" data-gap="1">
-					<span class="moin-strong">{ statement }</span>
-					<span class="moin-small moin-muted">{ line }</span>
-				</span>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Href: href}) {
+					<span class="moin-stack moin-fill" data-gap="1">
+						<span class="moin-strong">{ statement }</span>
+						<span class="moin-small moin-muted">{ line }</span>
+					</span>
+				}
 			}
 		}
 	</div>
@@ -337,12 +341,14 @@ templ homePlanRows(rows ...string) {
 templ HomeQuestions() {
 	<section id="questions" class="moin-band">
 		<h2 class="moin-statement">Good questions.</h2>
-		@components.List() {
-			@homeQuestion("Is "+brand.Name+" open source?", "Yes. And free to host yourself.")
-			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
-			@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
-			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")
-			@homeQuestion("Which servers?", "Any Linux server with root access. Any provider.")
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@homeQuestion("Is "+brand.Name+" open source?", "Yes. And free to host yourself.")
+				@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
+				@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
+				@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")
+				@homeQuestion("Which servers?", "Any Linux server with root access. Any provider.")
+			}
 		}
 		<p class="moin-lead">
 			<a href="/docs/faq" class="moin-link moin-foreground">All questions</a>

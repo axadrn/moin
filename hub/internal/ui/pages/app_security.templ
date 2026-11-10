@@ -51,31 +51,35 @@ templ ServerSecurity(view SecurityView) {
 						</div>
 					</form>
 				}
-				@components.List() {
-					if server.Online && daemonOutdated(server) {
-						@components.Item(components.ItemProps{Button: true, Name: "Update daemon", Note: server.DaemonVersion + " → " + build.Version, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if server.Online && daemonOutdated(server) {
+							@components.Item(components.ItemProps{Button: true, Name: "Update daemon", Note: server.DaemonVersion + " → " + build.Version, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}})
+						}
+						@components.Item(components.ItemProps{Button: true, Name: "New install command", Note: "The old one stops working", Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}})
 					}
-					@components.Item(components.ItemProps{Button: true, Name: "New install command", Note: "The old one stops working", Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}})
 				}
 				// The new command shows here, out of band, until its daemon
 				// used it.
 				<div id="server-added" class="moin-hide-empty"></div>
-				@components.List() {
-					if view.Integrations.Cloudflare {
-						@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if view.Integrations.Cloudflare {
+							@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
+						}
+						if view.Integrations.Tailscale {
+							@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
+						}
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove server", Attrs: templ.Attributes{
+							"hx-delete":           basePath + "/servers/" + server.Link(),
+							"hx-swap":             "none",
+							"hx-disable":          "this",
+							"hx-confirm":          ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
+							"data-confirm-name":   server.Name,
+							"data-confirm-action": "Remove server",
+							"data-remove-server":  server.Name,
+						}})
 					}
-					if view.Integrations.Tailscale {
-						@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
-					}
-					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove server", Attrs: templ.Attributes{
-						"hx-delete":           basePath + "/servers/" + server.Link(),
-						"hx-swap":             "none",
-						"hx-disable":          "this",
-						"hx-confirm":          ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
-						"data-confirm-name":   server.Name,
-						"data-confirm-action": "Remove server",
-						"data-remove-server":  server.Name,
-					}})
 				}
 			</div>
 			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
@@ -100,10 +104,12 @@ templ securityState(view SecurityView, securityPath string) {
 				<div class="moin-section-head">
 					<h2>Access</h2>
 				</div>
-				@components.List() {
-					@securityToggle("tunnel", "Cloudflare Tunnel", "Ports 80 and 443 close, Cloudflare serves HTTPS", view.Server.Tunnel, !view.Integrations.Cloudflare, "Needs a Cloudflare API token, below")
-					@securityToggle("ssh_tailscale", "SSH only on Tailscale", "SSH answers only on your tailnet", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Needs a Tailscale auth key, below")
-					@securityToggle("firewall", "Firewall", "Drops every connection the server does not need", view.Server.Firewall, false, "")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@securityToggle("tunnel", "Cloudflare Tunnel", "Ports 80 and 443 close, Cloudflare serves HTTPS", view.Server.Tunnel, !view.Integrations.Cloudflare, "Needs a Cloudflare API token, below")
+						@securityToggle("ssh_tailscale", "SSH only on Tailscale", "SSH answers only on your tailnet", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Needs a Tailscale auth key, below")
+						@securityToggle("firewall", "Firewall", "Drops every connection the server does not need", view.Server.Firewall, false, "")
+					}
 				}
 			</section>
 			<div class="moin-row" data-end>
@@ -118,13 +124,15 @@ templ securityState(view SecurityView, securityPath string) {
 					<h2>What the daemon set up</h2>
 				</div>
 				<div data-security-report>
-					@components.List() {
-						@securityFact("Traffic", "", proxyText(report.Proxy))
-						@securityFact("Open to everyone", portsNote(report.Firewall), portsText(*report, view.Server.SSHTailscale))
-						@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
-						for _, problem := range report.Problems {
-							@components.Item(components.ItemProps{}) {
-								<div class="moin-fill moin-text moin-running">{ problem }</div>
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							@securityFact("Traffic", "", proxyText(report.Proxy))
+							@securityFact("Open to everyone", portsNote(report.Firewall), portsText(*report, view.Server.SSHTailscale))
+							@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
+							for _, problem := range report.Problems {
+								@components.Item(components.ItemProps{}) {
+									<div class="moin-fill moin-text moin-running">{ problem }</div>
+								}
 							}
 						}
 					}
@@ -296,12 +304,14 @@ templ serverRules(server model.Server) {
 		</div>
 		<div data-rules-panel>
 			if len(rules.Lines()) == 0 {
-				@components.List() {
-					@components.Item(components.ItemProps{}) {
-						<div class="moin-fill">
-							<div class="moin-strong">None</div>
-							<div class="moin-small moin-muted">moin may do everything here. Write <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
-						</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{}) {
+							<div class="moin-fill">
+								<div class="moin-strong">None</div>
+								<div class="moin-small moin-muted">moin may do everything here. Write <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
+							</div>
+						}
 					}
 				}
 			} else {

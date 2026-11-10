@@ -1,6 +1,7 @@
 package components
 
-// List is a group of items on one card. Attrs go on the list.
+// List is a group of items: only rows, a Card is the surface. Attrs go on
+// the list.
 templ List(attrs ...templ.Attributes) {
 	<div class="moin-list" { joinAttrs(attrs)... }>
 		{ children... }

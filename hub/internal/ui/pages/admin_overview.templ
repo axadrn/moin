@@ -39,17 +39,19 @@ templ AdminOverview(data *model.AdminOverview) {
 					})
 				</section>
 			}
-			@components.List() {
-				@components.Item(components.ItemProps{Href: "/admin/activity", Name: "Activity"})
-				@components.Item(components.ItemProps{Button: true, Name: "Apply open offers", Attrs: templ.Attributes{
-					"hx-post":             "/admin/offers/claim",
-					"hx-swap":             "none",
-					"hx-disable":          "this",
-					"hx-confirm":          "Apply every open offer to the account with that address?",
-					"data-confirm-name":   "offers",
-					"data-confirm-action": "Apply offers",
-				}})
-				@components.Item(components.ItemProps{Href: "/admin/old-domain", Name: "Old domain"})
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Href: "/admin/activity", Name: "Activity"})
+					@components.Item(components.ItemProps{Button: true, Name: "Apply open offers", Attrs: templ.Attributes{
+						"hx-post":             "/admin/offers/claim",
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          "Apply every open offer to the account with that address?",
+						"data-confirm-name":   "offers",
+						"data-confirm-action": "Apply offers",
+					}})
+					@components.Item(components.ItemProps{Href: "/admin/old-domain", Name: "Old domain"})
+				}
 			}
 			@adminUsers(data.Users)
 		}
@@ -72,12 +74,14 @@ templ adminUsers(users model.AdminUserPage) {
 				}
 			</div>
 		</form>
-		@components.List() {
-			for _, user := range users.Users {
-				@components.Item(components.ItemProps{Href: "/admin/users/" + user.ID, Name: adminUserName(user), Note: adminUserNote(user), Value: adminUserValue(user)})
-			}
-			if len(users.Users) == 0 {
-				@components.Item(components.ItemProps{Name: adminNoUsers(users.Query)})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, user := range users.Users {
+					@components.Item(components.ItemProps{Href: "/admin/users/" + user.ID, Name: adminUserName(user), Note: adminUserNote(user), Value: adminUserValue(user)})
+				}
+				if len(users.Users) == 0 {
+					@components.Item(components.ItemProps{Name: adminNoUsers(users.Query)})
+				}
 			}
 		}
 		if users.TotalPages > 1 {
@@ -105,16 +109,18 @@ templ AdminActivity(events []model.AdminActivityEvent) {
 	@layouts.Admin("Activity · Admin") {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: "Activity"})
-			@components.List() {
-				for _, event := range events {
-					@components.Item(components.ItemProps{Href: adminEventHref(event), Name: model.AdminActivityActionLabel(event.Action), Note: adminEventNote(event)}) {
-						<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="moin-text moin-muted moin-digits">
-							{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
-						</time>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, event := range events {
+						@components.Item(components.ItemProps{Href: adminEventHref(event), Name: model.AdminActivityActionLabel(event.Action), Note: adminEventNote(event)}) {
+							<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="moin-text moin-muted moin-digits">
+								{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
+							</time>
+						}
 					}
-				}
-				if len(events) == 0 {
-					@components.Item(components.ItemProps{Name: "No operator activity yet"})
+					if len(events) == 0 {
+						@components.Item(components.ItemProps{Name: "No operator activity yet"})
+					}
 				}
 			}
 			<p class="moin-small moin-muted">

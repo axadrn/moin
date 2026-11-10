@@ -151,8 +151,9 @@ Rules every page follows:
   Props struct in `internal/ui/components`, printing exactly its example in
   `ui/examples`. Nothing comes from a UI library: a page that needs something
   new adds it to moin UI, with its docs and example.
-- **One list, a few kinds of row.** Every group of rows is a `components.List`;
-  a page never draws a row of its own. Only what does something lights up,
+- **One list, a few kinds of row.** Every group of rows is a `components.List`.
+  A list is only rows; the `components.Card` it sits in is the surface. A page
+  never draws a row of its own. Only what does something lights up,
   and the lines next to a lit row give way so the light fills the gap:
 
   | Row | `components.Item` | Looks |

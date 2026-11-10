@@ -83,8 +83,10 @@ templ CatalogInstall(view CatalogInstallView) {
 		@panelPage() {
 			@catalogHead(components.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry)
 			if len(view.Servers) == 0 {
-				@components.List() {
-					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers"})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers"})
+					}
 				}
 			} else {
 				@components.Card(components.CardProps{}) {
@@ -163,9 +165,11 @@ templ CatalogResults(view CatalogView) {
 				<div class="moin-section-head">
 					<h2>{ appCount(len(view.Apps)) }</h2>
 				</div>
-				@components.List() {
-					for _, app := range view.Apps {
-						@components.Item(components.ItemProps{Href: view.Base + "/" + app.Entry.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Entry.Name, Initial: model.Initial(app.Entry.Name), Logo: catalogLogo(app.Entry)}), Name: app.Entry.Name, Note: app.Entry.Pitch})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, app := range view.Apps {
+							@components.Item(components.ItemProps{Href: view.Base + "/" + app.Entry.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Entry.Name, Initial: model.Initial(app.Entry.Name), Logo: catalogLogo(app.Entry)}), Name: app.Entry.Name, Note: app.Entry.Pitch})
+						}
 					}
 				}
 			</section>
@@ -202,15 +206,17 @@ templ catalogFacts(view CatalogEntryView) {
 		<div class="moin-section-head">
 			<h2>Links</h2>
 		</div>
-		@components.List() {
-			if entry.Website != "" {
-				@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
-			}
-			if entry.Source != "" {
-				@catalogLink("Source", entry.License, "https://"+entry.Source, false)
-			}
-			if entry.Image != "" {
-				@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if entry.Website != "" {
+					@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
+				}
+				if entry.Source != "" {
+					@catalogLink("Source", entry.License, "https://"+entry.Source, false)
+				}
+				if entry.Image != "" {
+					@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+				}
 			}
 		}
 	</section>
@@ -219,9 +225,11 @@ templ catalogFacts(view CatalogEntryView) {
 			<div class="moin-section-head">
 				<h2>First sign-in</h2>
 			</div>
-			@components.List() {
-				@components.Item(components.ItemProps{}) {
-					<p class="moin-fill moin-text" data-catalog-login>{ entry.Login }</p>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{}) {
+						<p class="moin-fill moin-text" data-catalog-login>{ entry.Login }</p>
+					}
 				}
 			}
 		</section>
@@ -247,14 +255,16 @@ templ catalogVersions(versions []catalog.Version) {
 			<h2>Versions</h2>
 		</div>
 		<div class="moin-stack" data-gap="2" data-catalog-versions>
-			@components.List() {
-				if len(versions) == 0 {
-					@components.Item(components.ItemProps{Name: "Not known yet", Note: "The registry has not answered. Try again in a minute."})
-				}
-				for _, version := range shownVersions(versions, 8) {
-					@components.Item(components.ItemProps{}) {
-						<span class="moin-fill moin-truncate moin-mono moin-text">{ version.Tag }</span>
-						<span class="moin-text moin-muted">{ released(version, now) }</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(versions) == 0 {
+						@components.Item(components.ItemProps{Name: "Not known yet", Note: "The registry has not answered. Try again in a minute."})
+					}
+					for _, version := range shownVersions(versions, 8) {
+						@components.Item(components.ItemProps{}) {
+							<span class="moin-fill moin-truncate moin-mono moin-text">{ version.Tag }</span>
+							<span class="moin-text moin-muted">{ released(version, now) }</span>
+						}
 					}
 				}
 			}

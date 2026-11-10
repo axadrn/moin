@@ -62,26 +62,28 @@ templ BackupSettings(view BackupsView) {
 			<div class="moin-section-head">
 				<h2>Backups</h2>
 			</div>
-			@components.List() {
-				if view.Bucket == nil {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
-						<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
-					}
-				} else {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Name: "Bucket"}) {
-						<span class="moin-item-value" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
-					}
-					@components.Item(components.ItemProps{Name: "Folder"}) {
-						<span class="moin-item-value moin-mono" data-bucket-folder>{ view.Bucket.AppFolder(&view.App) }</span>
-					}
-					if len(view.Older) > 0 {
-						@components.Item(components.ItemProps{Name: "Left"}) {
-							<span class="moin-item-value" data-bucket-older>{ olderNames(view.Older) }</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if view.Bucket == nil {
+						@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
+							<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
 						}
-					}
-					if len(view.Buckets) > 1 {
-						@bucketDisclosure("Use another bucket") {
-							@AppBucketForm(view)
+					} else {
+						@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Name: "Bucket"}) {
+							<span class="moin-item-value" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
+						}
+						@components.Item(components.ItemProps{Name: "Folder"}) {
+							<span class="moin-item-value moin-mono" data-bucket-folder>{ view.Bucket.AppFolder(&view.App) }</span>
+						}
+						if len(view.Older) > 0 {
+							@components.Item(components.ItemProps{Name: "Left"}) {
+								<span class="moin-item-value" data-bucket-older>{ olderNames(view.Older) }</span>
+							}
+						}
+						if len(view.Buckets) > 1 {
+							@bucketDisclosure("Use another bucket") {
+								@AppBucketForm(view)
+							}
 						}
 					}
 				}
@@ -152,9 +154,11 @@ templ DatabaseBackups(view BackupsView, database string) {
 				<div class="moin-section-head">
 					<h2>Backups</h2>
 				</div>
-				@components.List() {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
-						<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
+							<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
+						}
 					}
 				}
 			</section>
@@ -170,15 +174,17 @@ templ DatabaseBackups(view BackupsView, database string) {
 				<div class="moin-section-head">
 					<h2>Backups</h2>
 				</div>
-				@components.List() {
-					@backupState(backup, known, database, view.Now)
-					@backupRestore(view, database)
-					if view.ScheduleInFile {
-						@scheduleInFile(view, backup)
-					} else {
-						@backupSchedule(view, backup, database)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@backupState(backup, known, database, view.Now)
+						@backupRestore(view, database)
+						if view.ScheduleInFile {
+							@scheduleInFile(view, backup)
+						} else {
+							@backupSchedule(view, backup, database)
+						}
+						@backupDownload(view, backup, database)
 					}
-					@backupDownload(view, backup, database)
 				}
 			</section>
 			@backupGoBack(view, backup, database, database, "Go back to")
@@ -187,9 +193,11 @@ templ DatabaseBackups(view BackupsView, database string) {
 					<div class="moin-section-head">
 						<h2>{ databaseName(other.Database) }</h2>
 					</div>
-					@components.List() {
-						@backupState(other, true, other.Database, view.Now)
-						@backupDownload(view, other, other.Database)
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							@backupState(other, true, other.Database, view.Now)
+							@backupDownload(view, other, other.Database)
+						}
 					}
 				</section>
 				@backupGoBack(view, other, other.Database, database, "Go back to · "+databaseName(other.Database))
@@ -236,14 +244,16 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				@components.CSRF()
 				<input type="hidden" name="database" value={ database }/>
 				<input type="hidden" name="page" value={ page }/>
-				@components.List() {
-					if len(backup.Moments) == 0 {
-						@components.Item(components.ItemProps{}) {
-							<p class="moin-fill moin-text moin-muted">Nothing to go back to yet.</p>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if len(backup.Moments) == 0 {
+							@components.Item(components.ItemProps{}) {
+								<p class="moin-fill moin-text moin-muted">Nothing to go back to yet.</p>
+							}
 						}
-					}
-					for _, moment := range backup.Moments {
-						@momentPick(moment, view.Now)
+						for _, moment := range backup.Moments {
+							@momentPick(moment, view.Now)
+						}
 					}
 				}
 				if len(backup.Moments) > 0 {

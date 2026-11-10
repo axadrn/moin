@@ -55,10 +55,12 @@ templ AppUptimeBody(view UptimeView) {
 				<h2>Uptime</h2>
 			</div>
 			@uptimeServerOffline(view)
-			@components.List() {
-				for _, domain := range view.Uptime.Domains {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/uptime", Name: domain.Domain, Note: uptimeNote(domain)}) {
-						@uptimeState(domain)
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, domain := range view.Uptime.Domains {
+						@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/uptime", Name: domain.Domain, Note: uptimeNote(domain)}) {
+							@uptimeState(domain)
+						}
 					}
 				}
 			}
@@ -87,28 +89,32 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 				@uptimeState(domain)
 			</div>
 			<div class="moin-stack" data-gap="4">
-				@components.List() {
-					@uptimeFact("Last 24 hours", orNone(percent(domain.Uptime24h)), averageNote(domain))
-					@uptimeFact("Last 7 days", orNone(percent(domain.Uptime7d)), "")
-					@uptimeFact("Last 30 days", orNone(percent(domain.Uptime30d)), "")
-					@uptimeFact("Last visit", orNone(lastVisit(domain)), lastVisitNote(domain, view.Now))
-					@uptimeFact("Certificate", certText(domain, view.Now), certNote(domain))
-					if domain.Since != nil {
-						@uptimeFact(sinceLabel(domain), sinceText(domain, view.Now), sinceNote(domain))
-					}
-					if len(domain.Outages) == 0 {
-						@uptimeFact("Outages", "None in 90 days", "")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@uptimeFact("Last 24 hours", orNone(percent(domain.Uptime24h)), averageNote(domain))
+						@uptimeFact("Last 7 days", orNone(percent(domain.Uptime7d)), "")
+						@uptimeFact("Last 30 days", orNone(percent(domain.Uptime30d)), "")
+						@uptimeFact("Last visit", orNone(lastVisit(domain)), lastVisitNote(domain, view.Now))
+						@uptimeFact("Certificate", certText(domain, view.Now), certNote(domain))
+						if domain.Since != nil {
+							@uptimeFact(sinceLabel(domain), sinceText(domain, view.Now), sinceNote(domain))
+						}
+						if len(domain.Outages) == 0 {
+							@uptimeFact("Outages", "None in 90 days", "")
+						}
 					}
 				}
 				if len(domain.Outages) > 0 {
 					<div data-outages>
-						@components.List() {
-							for _, outage := range domain.Outages {
-								@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-outage": stamp(outage.StartedAt)}}) {
-									<div class="moin-fill">
-										<div class="moin-strong moin-digits" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
-										<div class="moin-small moin-muted">{ outageText(outage, view.Now) }</div>
-									</div>
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, outage := range domain.Outages {
+									@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-outage": stamp(outage.StartedAt)}}) {
+										<div class="moin-fill">
+											<div class="moin-strong moin-digits" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
+											<div class="moin-small moin-muted">{ outageText(outage, view.Now) }</div>
+										</div>
+									}
 								}
 							}
 						}
@@ -151,22 +157,24 @@ templ uptimeState(domain service.UptimeDomain) {
 templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/path" }}
 	{{ id := "uptime-" + domain.Domain }}
-	@components.List() {
-		@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}}) {
-			@components.CSRF()
-			<input type="hidden" name="domain" value={ domain.Domain }/>
-			<div class="moin-fill">
-				@components.Field(components.FieldProps{Label: "Path", For: id + "-path"}) {
-					<div class="moin-row" data-gap="2" data-phone="stack">
-						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"}})
-						@components.Button(components.ButtonProps{Type: "submit"}) {
-							Save
-						}
-					</div>
-				}
-			</div>
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}}) {
+				@components.CSRF()
+				<input type="hidden" name="domain" value={ domain.Domain }/>
+				<div class="moin-fill">
+					@components.Field(components.FieldProps{Label: "Path", For: id + "-path"}) {
+						<div class="moin-row" data-gap="2" data-phone="stack">
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"}})
+							@components.Button(components.ButtonProps{Type: "submit"}) {
+								Save
+							}
+						</div>
+					}
+				</div>
+			}
+			@UptimeSwitchForm(app, domain)
 		}
-		@UptimeSwitchForm(app, domain)
 	}
 }
 

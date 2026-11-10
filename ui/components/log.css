@@ -13,9 +13,6 @@
   }
   /* Every div is one line, in a fold too. data-n sets its number. */
   .moin-log div {
-    /* The browser only draws the lines you can see. */
-    content-visibility: auto;
-    contain-intrinsic-block-size: auto 1.85em;
     counter-increment: line;
     display: grid;
     grid-template-columns: 2.25rem minmax(0, 1fr);
@@ -109,8 +106,6 @@
     max-height: none;
     overflow: visible;
   }
-  /* Safari paints nothing in a reversed box while lines skip their drawing. */
-  .moin-tail .moin-log div { content-visibility: visible; }
   .moin-tail[data-top] { justify-content: safe flex-end; }
   .moin-tail[data-hold] { height: 20rem; }
   @media (min-width: 40rem) {

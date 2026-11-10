@@ -89,9 +89,11 @@ templ uiPages(title string, pages []*model.DocPage) {
 		if title != "" {
 			<div class="moin-section-head"><h2>{ title }</h2></div>
 		}
-		@components.List() {
-			for _, page := range pages {
-				@components.Item(components.ItemProps{Href: uiURL(page), Name: page.Title})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, page := range pages {
+					@components.Item(components.ItemProps{Href: uiURL(page), Name: page.Title})
+				}
 			}
 		}
 	</div>
@@ -115,8 +117,10 @@ templ UIDoc(page *model.DocPage, next *model.DocPage) {
 		@components.Header(components.HeaderProps{Back: uiBack(page), Title: page.Title})
 		@uiProse(page)
 		if next != nil {
-			@components.List() {
-				@components.Item(components.ItemProps{Href: uiURL(next), Name: "Next: " + next.Title})
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Href: uiURL(next), Name: "Next: " + next.Title})
+				}
 			}
 		}
 		<p class="moin-small moin-muted"><a href={ templ.SafeURL(uiURL(page) + ".md") } class="moin-link">This page as Markdown</a></p>
@@ -143,9 +147,11 @@ templ UIBlocks(groups []model.UIBlockGroup) {
 			for _, group := range groups {
 				<div class="moin-section">
 					<div class="moin-section-head"><h2>{ group.Title }</h2></div>
-					@components.List() {
-						for _, block := range group.Blocks {
-							@components.Item(components.ItemProps{Href: "/ui/blocks/" + block.Slug, Name: block.Title})
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							for _, block := range group.Blocks {
+								@components.Item(components.ItemProps{Href: "/ui/blocks/" + block.Slug, Name: block.Title})
+							}
 						}
 					}
 				</div>

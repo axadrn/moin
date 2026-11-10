@@ -131,9 +131,11 @@ templ SearchPage(query string, hits []SiteHit) {
 			if strings.TrimSpace(query) != "" && len(hits) == 0 {
 				<p class="moin-text moin-muted">Nothing found for “{ query }”.</p>
 			} else {
-				@components.List() {
-					for _, hit := range hits {
-						@components.Item(components.ItemProps{Href: hit.Href, Name: hit.Title, Note: hit.Where})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, hit := range hits {
+							@components.Item(components.ItemProps{Href: hit.Href, Name: hit.Title, Note: hit.Where})
+						}
 					}
 				}
 			}

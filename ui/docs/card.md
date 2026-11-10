@@ -16,7 +16,7 @@ card
 
 ## A list in a card
 
-A `moin-list` right inside a card has no box of its own. It is part of the card. Its words line up with the card's, and the light of an item reaches past them.
+A list is only rows, the Card is the surface. A `moin-list` right inside a card runs almost to its edge. Its words line up with the card's, and the light of an item sits the same distance from the card on every side.
 
 ```example
 card-with-a-list

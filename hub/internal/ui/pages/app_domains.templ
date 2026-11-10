@@ -32,19 +32,21 @@ templ AppDomains(view DomainsView) {
 			<div class="moin-section-head">
 				<h2>Domains</h2>
 			</div>
-			@components.List() {
-				for _, check := range view.Checks {
-					@domainRow(check, view.App.Name, domainsPath)
-				}
-				if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
-					@canonicalRow(options, view.App.Canonical, domainsPath)
-				}
-				if fromCompose(view.Checks) {
-					@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
-						<p class="moin-fill moin-text moin-muted">Change them in compose.yml (<span class="moin-mono">x-moin.domains</span>) and deploy.</p>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, check := range view.Checks {
+						@domainRow(check, view.App.Name, domainsPath)
 					}
-				} else {
-					@addDomainRow(domainsPath)
+					if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
+						@canonicalRow(options, view.App.Canonical, domainsPath)
+					}
+					if fromCompose(view.Checks) {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
+							<p class="moin-fill moin-text moin-muted">Change them in compose.yml (<span class="moin-mono">x-moin.domains</span>) and deploy.</p>
+						}
+					} else {
+						@addDomainRow(domainsPath)
+					}
 				}
 			}
 		</section>
@@ -153,46 +155,48 @@ templ instantSection(view DomainsView, domainsPath string) {
 			<h2>Instant address</h2>
 		</div>
 		<div data-instant>
-			@components.List() {
-				@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
-					@components.CSRF()
-					<input type="hidden" name="switch" value="1"/>
-					<div class="moin-fill">
-						if instant.URL != "" {
-							<a href={ templ.SafeURL(instant.URL) } target="_blank" rel="noopener" class="moin-item-name moin-link" data-quiet data-instant-url>{ instant.Host }</a>
-						} else if on {
-							<div class="moin-small moin-muted" data-instant-reason>{ instant.Reason }</div>
-						} else {
-							<div class="moin-strong moin-muted" data-instant-reason>Off</div>
-						}
-					</div>
-					if view.File.Instant == "" {
-						@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
-					} else {
-						<span class="moin-item-value" data-instant-in-file>from compose.yml</span>
-					}
-				}
-				if on {
-					if view.File.Instant == "" {
-						@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
-							@components.CSRF()
-							@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
-						}
-					}
-					if instant.URL != "" {
-						@components.Item(components.ItemProps{Form: true, For: "instant-password-on", Name: "Password", Note: instantSignIn(instant), Attrs: templ.Attributes{"hx-post": domainsPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
-							@components.CSRF()
-							<input type="hidden" name="password" value="1"/>
-							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open}})
-						}
-						if !instant.Open && !instant.OwnPassword {
-							if instant.Password != "" {
-								@components.Item(components.ItemProps{}) {
-									<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instant.Password }</span>
-									@copyButton(instant.Password, "", "Copy the password")
-								}
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+						@components.CSRF()
+						<input type="hidden" name="switch" value="1"/>
+						<div class="moin-fill">
+							if instant.URL != "" {
+								<a href={ templ.SafeURL(instant.URL) } target="_blank" rel="noopener" class="moin-item-name moin-link" data-quiet data-instant-url>{ instant.Host }</a>
+							} else if on {
+								<div class="moin-small moin-muted" data-instant-reason>{ instant.Reason }</div>
 							} else {
-								@components.Item(components.ItemProps{Button: true, Name: "Show password", Attrs: templ.Attributes{"hx-get": domainsPath + "/detail?show=true", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}})
+								<div class="moin-strong moin-muted" data-instant-reason>Off</div>
+							}
+						</div>
+						if view.File.Instant == "" {
+							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
+						} else {
+							<span class="moin-item-value" data-instant-in-file>from compose.yml</span>
+						}
+					}
+					if on {
+						if view.File.Instant == "" {
+							@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
+								@components.CSRF()
+								@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
+							}
+						}
+						if instant.URL != "" {
+							@components.Item(components.ItemProps{Form: true, For: "instant-password-on", Name: "Password", Note: instantSignIn(instant), Attrs: templ.Attributes{"hx-post": domainsPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+								@components.CSRF()
+								<input type="hidden" name="password" value="1"/>
+								@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open}})
+							}
+							if !instant.Open && !instant.OwnPassword {
+								if instant.Password != "" {
+									@components.Item(components.ItemProps{}) {
+										<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instant.Password }</span>
+										@copyButton(instant.Password, "", "Copy the password")
+									}
+								} else {
+									@components.Item(components.ItemProps{Button: true, Name: "Show password", Attrs: templ.Attributes{"hx-get": domainsPath + "/detail?show=true", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}})
+								}
 							}
 						}
 					}
@@ -210,45 +214,49 @@ templ passwordSection(app model.App, domainsPath string, required bool) {
 			<h2>Password</h2>
 		</div>
 		if app.Protect != "" {
-			@components.List() {
-				@components.Item(components.ItemProps{Name: "Sign in as " + protectUser(app)}) {
-					<span class="moin-small moin-muted" data-protected>On</span>
-				}
-				if required {
-					@components.Item(components.ItemProps{}) {
-						<p class="moin-fill moin-text moin-muted" data-protect-in-file>Required by compose.yml.</p>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Name: "Sign in as " + protectUser(app)}) {
+						<span class="moin-small moin-muted" data-protected>On</span>
 					}
-				} else {
-					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-						"hx-post":        domainsPath + "/unprotect",
-						"hx-target":      "#app-domains",
-						"hx-swap":        "outerHTML",
-						"hx-disable":     "this",
-						"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
-						"data-unprotect": true,
-					}})
+					if required {
+						@components.Item(components.ItemProps{}) {
+							<p class="moin-fill moin-text moin-muted" data-protect-in-file>Required by compose.yml.</p>
+						}
+					} else {
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
+							"hx-post":        domainsPath + "/unprotect",
+							"hx-target":      "#app-domains",
+							"hx-swap":        "outerHTML",
+							"hx-disable":     "this",
+							"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
+							"data-unprotect": true,
+						}})
+					}
 				}
 			}
 		} else {
-			@components.List() {
-				@components.Expand(components.ExpandProps{Name: "Ask for a password"}) {
-					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "protect-form", "hx-post": domainsPath + "/protect", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
-						@components.CSRF()
-						<div class="moin-stack moin-fill" data-gap="4">
-							<div class="moin-grid">
-								@components.Field(components.FieldProps{Label: "Username", For: "protect-user"}) {
-									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": "moin", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
-								}
-								@components.Field(components.FieldProps{Label: "Password", For: "protect-password"}) {
-									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-password", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
-								}
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Expand(components.ExpandProps{Name: "Ask for a password"}) {
+						@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "protect-form", "hx-post": domainsPath + "/protect", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
+							@components.CSRF()
+							<div class="moin-stack moin-fill" data-gap="4">
+								<div class="moin-grid">
+									@components.Field(components.FieldProps{Label: "Username", For: "protect-user"}) {
+										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": "moin", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+									}
+									@components.Field(components.FieldProps{Label: "Password", For: "protect-password"}) {
+										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-password", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
+									}
+								</div>
+								<div class="moin-row" data-end>
+									@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-protect": true}}) {
+										Set password
+									}
+								</div>
 							</div>
-							<div class="moin-row" data-end>
-								@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-protect": true}}) {
-									Set password
-								}
-							</div>
-						</div>
+						}
 					}
 				}
 			}

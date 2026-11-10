@@ -27,8 +27,10 @@ templ Apps(apps []model.App, servers []model.Server) {
 				}
 			}
 			if len(apps) == 0 {
-				@components.List() {
-					@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from your folder, GitHub or the catalog."})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from your folder, GitHub or the catalog."})
+					}
 				}
 			} else {
 				@appRows(apps, servers)
@@ -45,8 +47,10 @@ templ NewApp(servers []model.Server) {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Apps", Href: basePath + "/apps"}, Title: "New app"})
 			if len(servers) == 0 {
-				@components.List() {
-					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers. One command, no open port."})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers. One command, no open port."})
+					}
 				}
 			} else {
 				@components.Card(components.CardProps{Title: "From your folder"}) {
@@ -180,9 +184,11 @@ templ appHomeSection(view AppPageView) {
 		@CatalogUpdate(*view.Catalog)
 	}
 	<div class="moin-only-phone">
-		@components.List() {
-			for _, section := range appSections[1:] {
-				@components.Item(components.ItemProps{Href: appPath + section.Path, Name: section.Label, Value: appSectionValue(app, section.ID)})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, section := range appSections[1:] {
+					@components.Item(components.ItemProps{Href: appPath + section.Path, Name: section.Label, Value: appSectionValue(app, section.ID)})
+				}
 			}
 		}
 	</div>
@@ -191,25 +197,29 @@ templ appHomeSection(view AppPageView) {
 			<div class="moin-section-head">
 				<h2>Domains</h2>
 			</div>
-			@components.List() {
-				for _, domain := range appDomains(app) {
-					@components.Item(components.ItemProps{Href: "https://" + domain, External: true, Name: domain})
-				}
-				if len(appDomains(app)) == 0 {
-					@components.Item(components.ItemProps{Name: "No domain yet"}) {
-						@components.Button(components.ButtonProps{Href: appPath + "/domains"}) {
-							Add a domain
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, domain := range appDomains(app) {
+						@components.Item(components.ItemProps{Href: "https://" + domain, External: true, Name: domain})
+					}
+					if len(appDomains(app)) == 0 {
+						@components.Item(components.ItemProps{Name: "No domain yet"}) {
+							@components.Button(components.ButtonProps{Href: appPath + "/domains"}) {
+								Add a domain
+							}
 						}
 					}
 				}
 			}
 		</section>
 	</div>
-	@components.List() {
-		@components.Item(components.ItemProps{Href: appPath + "/metrics", Name: "Metrics"})
-		if app.Catalog != "" {
-			// Its page in the catalog: what it is, its links, newer versions.
-			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/catalog/" + app.Catalog, Name: "In the catalog", Note: app.Catalog})
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Href: appPath + "/metrics", Name: "Metrics"})
+			if app.Catalog != "" {
+				// Its page in the catalog: what it is, its links, newer versions.
+				@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/catalog/" + app.Catalog, Name: "In the catalog", Note: app.Catalog})
+			}
 		}
 	}
 }
@@ -321,30 +331,34 @@ templ appSettingsSection(app model.App, envKeys []string) {
 		</form>
 	}
 	@AppEnv(app.Link(), envKeys, nil)
-	@components.List() {
-		@PinSwitch(app)
-	}
-	@components.List() {
-		if app.LiveNumber > 0 && !app.Stopped {
-			@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
-				"hx-post":    appPath + "/stop",
-				"hx-swap":    "none",
-				"hx-disable": "this",
-				"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
-				"data-stop":  true,
-			}}) {
-				<span class="moin-strong">Stop { app.Name }</span>
-			}
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@PinSwitch(app)
 		}
-		@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
-			"hx-delete":         appPath,
-			"hx-swap":           "none",
-			"hx-disable":        "this",
-			"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
-			"data-confirm-name": app.Name,
-			"data-remove-app":   true,
-		}}) {
-			<span class="moin-strong">Remove { app.Name }</span>
+	}
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			if app.LiveNumber > 0 && !app.Stopped {
+				@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
+					"hx-post":    appPath + "/stop",
+					"hx-swap":    "none",
+					"hx-disable": "this",
+					"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
+					"data-stop":  true,
+				}}) {
+					<span class="moin-strong">Stop { app.Name }</span>
+				}
+			}
+			@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
+				"hx-delete":         appPath,
+				"hx-swap":           "none",
+				"hx-disable":        "this",
+				"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
+				"data-confirm-name": app.Name,
+				"data-remove-app":   true,
+			}}) {
+				<span class="moin-strong">Remove { app.Name }</span>
+			}
 		}
 	}
 }
@@ -428,16 +442,14 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 		hx-swap="none"
 		data-latest-number={ strconv.Itoa(app.LatestNumber) }
 		data-latest-status={ app.LatestStatus }
-		class="moin-list"
+		class="moin-card"
 		aria-label="Deploys"
 	>
 		if len(deploys) == 0 {
-			@components.Card(components.CardProps{}) {
-				<p class="moin-strong">No deploys yet</p>
-				@components.Command(components.CommandProps{Text: "moin deploy " + app.Name})
-			}
+			<p class="moin-strong">No deploys yet</p>
+			@components.Command(components.CommandProps{Text: "moin deploy " + app.Name})
 		} else {
-			<div role="list">
+			<div class="moin-list" role="list">
 				for _, deploy := range deploys[:min(len(deploys), deploysShown)] {
 					@deployRow(app, deploys, deploy, selected)
 				}
@@ -586,54 +598,56 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 				<h2>Environment</h2>
 				@envModes(appLink, false)
 			</div>
-			@components.List() {
-				if len(keys) == 0 {
-					@components.Item(components.ItemProps{Name: "No env vars yet"})
-				}
-				for _, key := range keys {
-					@components.Item(components.ItemProps{}) {
-						<span data-env={ key } class="moin-item-text moin-truncate moin-mono moin-text" title={ key }>{ key }</span>
-						<span class="moin-item-value moin-mono">
-							if value, ok := values[key]; ok {
-								<span data-env-value class="moin-foreground">{ value }</span>
-							} else {
-								<span aria-label="hidden">••••••</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(keys) == 0 {
+						@components.Item(components.ItemProps{Name: "No env vars yet"})
+					}
+					for _, key := range keys {
+						@components.Item(components.ItemProps{}) {
+							<span data-env={ key } class="moin-item-text moin-truncate moin-mono moin-text" title={ key }>{ key }</span>
+							<span class="moin-item-value moin-mono">
+								if value, ok := values[key]; ok {
+									<span data-env-value class="moin-foreground">{ value }</span>
+								} else {
+									<span aria-label="hidden">••••••</span>
+								}
+							</span>
+							@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{
+								"aria-label":          "Remove " + key,
+								"title":               "Remove " + key,
+								"hx-delete":           envPath + "/" + key,
+								"hx-target":           "#app-env",
+								"hx-swap":             "outerHTML",
+								"hx-disable":          "this",
+								"hx-confirm":          "Remove " + key + "? The next deploy or restart drops it.",
+								"data-confirm-action": "Remove",
+							}}) {
+								@components.Icon("x")
 							}
-						</span>
-						@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{
-							"aria-label":          "Remove " + key,
-							"title":               "Remove " + key,
-							"hx-delete":           envPath + "/" + key,
-							"hx-target":           "#app-env",
-							"hx-swap":             "outerHTML",
-							"hx-disable":          "this",
-							"hx-confirm":          "Remove " + key + "? The next deploy or restart drops it.",
-							"data-confirm-action": "Remove",
-						}}) {
-							@components.Icon("x")
 						}
 					}
-				}
-				if len(keys) > 0 {
-					if len(values) == 0 {
-						@components.Item(components.ItemProps{Button: true, Name: "Show values", Attrs: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}})
-					} else {
-						@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
+					if len(keys) > 0 {
+						if len(values) == 0 {
+							@components.Item(components.ItemProps{Button: true, Name: "Show values", Attrs: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}})
+						} else {
+							@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
+						}
 					}
-				}
-				@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}}) {
-					<div class="moin-row moin-fill" data-gap="2" data-phone="stack">
-						@components.CSRF()
-						<label for="env-key" class="moin-sr-only">Name</label>
-						<div class="moin-width" style="--width:14rem">
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true}})
+					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}}) {
+						<div class="moin-row moin-fill" data-gap="2" data-phone="stack">
+							@components.CSRF()
+							<label for="env-key" class="moin-sr-only">Name</label>
+							<div class="moin-width" style="--width:14rem">
+								@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true}})
+							</div>
+							<label for="env-value" class="moin-sr-only">Value</label>
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"}})
+							@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+								Set
+							}
 						</div>
-						<label for="env-value" class="moin-sr-only">Value</label>
-						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"}})
-						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-							Set
-						}
-					</div>
+					}
 				}
 			}
 		</section>

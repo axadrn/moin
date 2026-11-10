@@ -16,26 +16,28 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 			<div class="moin-section-head">
 				<h2>Registries</h2>
 			</div>
-			@components.List() {
-				if len(logins) == 0 {
-					@components.Item(components.ItemProps{}) {
-						<p class="moin-small moin-muted">No registry logins yet.</p>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(logins) == 0 {
+						@components.Item(components.ItemProps{}) {
+							<p class="moin-small moin-muted">No registry logins yet.</p>
+						}
 					}
-				}
-				for _, login := range logins {
-					@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-registry": login.Host, "data-control": true}}) {
-						<div class="moin-fill">
-							<div class="moin-truncate moin-mono moin-strong">{ login.Host }</div>
-							<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username }</div>
-						</div>
-						@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-							"hx-delete":  basePath + "/settings/registries/" + login.Host,
-							"hx-target":  "#settings-registries",
-							"hx-swap":    "outerHTML",
-							"hx-disable": "this",
-							"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
-						}}) {
-							Remove
+					for _, login := range logins {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-registry": login.Host, "data-control": true}}) {
+							<div class="moin-fill">
+								<div class="moin-truncate moin-mono moin-strong">{ login.Host }</div>
+								<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username }</div>
+							</div>
+							@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+								"hx-delete":  basePath + "/settings/registries/" + login.Host,
+								"hx-target":  "#settings-registries",
+								"hx-swap":    "outerHTML",
+								"hx-disable": "this",
+								"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
+							}}) {
+								Remove
+							}
 						}
 					}
 				}

@@ -42,8 +42,10 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 					@SettingsAvatarSection(user)
 					@settingsNameCard(user)
 					@settingsEmailCard(user)
-					@components.List() {
-						@EmailAlertsForm(user.EmailAlerts)
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							@EmailAlertsForm(user.EmailAlerts)
+						}
 					}
 			}
 		}
@@ -157,29 +159,31 @@ templ SettingsSessionsSection(sessions []model.Session, currentSessionID string)
 			<div class="moin-section-head">
 				<h2>Sessions</h2>
 			</div>
-			@components.List() {
-				for _, session := range sessions {
-					@components.Item(components.ItemProps{Name: session.DisplayName(), Note: sessionNote(session, currentSessionID, now)}) {
-						@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-							"type":       "button",
-							"hx-delete":  basePath + "/settings/sessions/" + session.ID,
-							"hx-swap":    "none",
-							"hx-disable": "this",
-						}}) {
-							if session.ID == currentSessionID {
-								Sign out
-							} else {
-								Revoke
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, session := range sessions {
+						@components.Item(components.ItemProps{Name: session.DisplayName(), Note: sessionNote(session, currentSessionID, now)}) {
+							@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+								"type":       "button",
+								"hx-delete":  basePath + "/settings/sessions/" + session.ID,
+								"hx-swap":    "none",
+								"hx-disable": "this",
+							}}) {
+								if session.ID == currentSessionID {
+									Sign out
+								} else {
+									Revoke
+								}
 							}
 						}
 					}
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Sign out everywhere", Attrs: templ.Attributes{
+						"hx-delete":  basePath + "/settings/sessions",
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Sign out everywhere? Every session ends, this one too.",
+					}})
 				}
-				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Sign out everywhere", Attrs: templ.Attributes{
-					"hx-delete":  basePath + "/settings/sessions",
-					"hx-swap":    "none",
-					"hx-disable": "this",
-					"hx-confirm": "Sign out everywhere? Every session ends, this one too.",
-				}})
 			}
 		</section>
 	</div>
@@ -200,16 +204,18 @@ templ settingsAccountDanger() {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="account-danger" hx-swap-oob="true">
-		@components.List() {
-			if user.HasPassword() {
-				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-					"hx-delete":  basePath + "/account/password",
-					"hx-swap":    "none",
-					"hx-disable": "this",
-					"hx-confirm": "Remove your password? You then sign in with email links.",
-				}})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if user.HasPassword() {
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
+						"hx-delete":  basePath + "/account/password",
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Remove your password? You then sign in with email links.",
+					}})
+				}
+				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete account", Attrs: components.OpenDialog("delete-account-dialog")})
 			}
-			@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete account", Attrs: components.OpenDialog("delete-account-dialog")})
 		}
 		@deleteAccountDialog()
 	</div>

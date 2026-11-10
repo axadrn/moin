@@ -35,12 +35,14 @@ templ Billing() {
 // state, what it costs and the date that matters, and Manage when Stripe
 // keeps the details.
 templ billingCurrent(subscription *model.Subscription, basePath string) {
-	@components.List() {
-		@components.Item(components.ItemProps{Name: planName(subscription.PlanID), Note: billingLine(subscription)}) {
-			@billingStatus(subscription)
-			if subscription.ProviderCustomerID != nil {
-				@components.Button(components.ButtonProps{Href: basePath + "/billing/manage"}) {
-					Manage
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Name: planName(subscription.PlanID), Note: billingLine(subscription)}) {
+				@billingStatus(subscription)
+				if subscription.ProviderCustomerID != nil {
+					@components.Button(components.ButtonProps{Href: basePath + "/billing/manage"}) {
+						Manage
+					}
 				}
 			}
 		}

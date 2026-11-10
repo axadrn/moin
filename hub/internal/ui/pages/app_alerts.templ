@@ -54,8 +54,10 @@ templ Alerts(view AlertsView) {
 					<div class="moin-section-head">
 						<h2>Email</h2>
 					</div>
-					@components.List() {
-						@components.Item(components.ItemProps{Href: basePath + "/settings/account", Name: "Owners and admins", Note: "Each turns it off for themselves"})
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							@components.Item(components.ItemProps{Href: basePath + "/settings/account", Name: "Owners and admins", Note: "Each turns it off for themselves"})
+						}
 					}
 				</section>
 			</div>
@@ -74,55 +76,57 @@ templ alertDestinations(view AlertsView) {
 			<h2>Destinations</h2>
 		</div>
 		<div data-alert-destinations>
-			@components.List() {
-				if len(view.Destinations) == 0 {
-					@components.Item(components.ItemProps{Name: "None yet", Note: "Alerts go by mail only"})
-				}
-				for _, destination := range view.Destinations {
-					@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-alert-destination": destination.Name, "data-control": true}}) {
-						<div class="moin-fill moin-stack" data-gap="1">
-							<div>
-								<div class="moin-row" data-gap="2">
-									<span class="moin-truncate moin-strong">{ destination.Name }</span>
-									<span class="moin-text moin-muted">{ model.AlertKindLabel(destination.Kind) }</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(view.Destinations) == 0 {
+						@components.Item(components.ItemProps{Name: "None yet", Note: "Alerts go by mail only"})
+					}
+					for _, destination := range view.Destinations {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-alert-destination": destination.Name, "data-control": true}}) {
+							<div class="moin-fill moin-stack" data-gap="1">
+								<div>
+									<div class="moin-row" data-gap="2">
+										<span class="moin-truncate moin-strong">{ destination.Name }</span>
+										<span class="moin-text moin-muted">{ model.AlertKindLabel(destination.Kind) }</span>
+									</div>
+									<div class="moin-truncate moin-text moin-muted">
+										<span class="moin-mono">{ destination.Hint }</span>
+										{ " · " + alertEventsText(destination) }
+										if destination.FailingSince == nil && destination.LastSentAt != nil {
+											<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + human.Ago(*destination.LastSentAt, now) }</span>
+										}
+									</div>
 								</div>
-								<div class="moin-truncate moin-text moin-muted">
-									<span class="moin-mono">{ destination.Hint }</span>
-									{ " · " + alertEventsText(destination) }
-									if destination.FailingSince == nil && destination.LastSentAt != nil {
-										<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + human.Ago(*destination.LastSentAt, now) }</span>
+								if destination.FailingSince != nil {
+									<div class="moin-row moin-text moin-failed" data-gap="2" data-alert-failing>
+										@components.Dot(components.DotProps{State: components.StateFailed})
+										<span class="moin-truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
+									</div>
+								}
+							</div>
+							if manage {
+								<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+									@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+										"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
+										"hx-target":  "#alerts",
+										"hx-select":  "#alerts",
+										"hx-swap":    "outerHTML",
+										"hx-disable": "this",
+									}}) {
+										Send test
+									}
+									@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
+										"hx-delete":  basePath + "/alerts/destinations/" + destination.Name,
+										"hx-target":  "#alerts",
+										"hx-select":  "#alerts",
+										"hx-swap":    "outerHTML",
+										"hx-disable": "this",
+										"hx-confirm": "Remove " + destination.Name + "? Its alerts stop.",
+									}}) {
+										Remove
 									}
 								</div>
-							</div>
-							if destination.FailingSince != nil {
-								<div class="moin-row moin-text moin-failed" data-gap="2" data-alert-failing>
-									@components.Dot(components.DotProps{State: components.StateFailed})
-									<span class="moin-truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
-								</div>
 							}
-						</div>
-						if manage {
-							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
-								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-									"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
-									"hx-target":  "#alerts",
-									"hx-select":  "#alerts",
-									"hx-swap":    "outerHTML",
-									"hx-disable": "this",
-								}}) {
-									Send test
-								}
-								@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
-									"hx-delete":  basePath + "/alerts/destinations/" + destination.Name,
-									"hx-target":  "#alerts",
-									"hx-select":  "#alerts",
-									"hx-swap":    "outerHTML",
-									"hx-disable": "this",
-									"hx-confirm": "Remove " + destination.Name + "? Its alerts stop.",
-								}}) {
-									Remove
-								}
-							</div>
 						}
 					}
 				}

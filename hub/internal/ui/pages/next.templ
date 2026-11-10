@@ -18,13 +18,15 @@ templ Next() {
 			</div>
 			<section class="moin-section">
 				<div class="moin-section-head"><h2>Moving in</h2></div>
-				@components.List() {
-					@components.Item(components.ItemProps{Name: "Tasks and roadmaps"})
-					@components.Item(components.ItemProps{Name: "Docs"})
-					@components.Item(components.ItemProps{Name: "Chat"})
-					@components.Item(components.ItemProps{Name: "Mail"})
-					@components.Item(components.ItemProps{Name: "Analytics"})
-					@components.Item(components.ItemProps{Name: "And many more"})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Name: "Tasks and roadmaps"})
+						@components.Item(components.ItemProps{Name: "Docs"})
+						@components.Item(components.ItemProps{Name: "Chat"})
+						@components.Item(components.ItemProps{Name: "Mail"})
+						@components.Item(components.ItemProps{Name: "Analytics"})
+						@components.Item(components.ItemProps{Name: "And many more"})
+					}
 				}
 			</section>
 			<div class="moin-stack" data-gap="6">

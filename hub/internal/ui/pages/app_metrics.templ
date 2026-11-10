@@ -41,16 +41,18 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 				<h2>Now</h2>
 			</div>
 			<div data-metrics-now>
-				@components.List() {
-					if now := m.Now; now != nil {
-						@serverStat("CPU", "of the whole server", percentText(now.CPU))
-						@serverStat("Memory", appLimitNote(now), human.Size(float64(now.MemoryUsed)))
-						@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
-						@serverStat("Containers", "", strconv.Itoa(now.Containers))
-					} else {
-						@serverStat("CPU", "No sample in the last two minutes", "")
-						@serverStat("Memory", "", "")
-						@serverStat("Network", "", "")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if now := m.Now; now != nil {
+							@serverStat("CPU", "of the whole server", percentText(now.CPU))
+							@serverStat("Memory", appLimitNote(now), human.Size(float64(now.MemoryUsed)))
+							@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
+							@serverStat("Containers", "", strconv.Itoa(now.Containers))
+						} else {
+							@serverStat("CPU", "No sample in the last two minutes", "")
+							@serverStat("Memory", "", "")
+							@serverStat("Network", "", "")
+						}
 					}
 				}
 			</div>
@@ -124,17 +126,19 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 				<h2>Now</h2>
 			</div>
 			<div data-metrics-now>
-				@components.List() {
-					if now := m.Now; now != nil {
-						@serverStat("CPU", cpuNote(now), percentText(now.CPU))
-						@serverStat("Memory", shareOf(now.MemoryUsed, now.MemoryTotal), usedOf(now.MemoryUsed, now.MemoryTotal))
-						@serverStat("Disk", shareOf(now.DiskUsed, now.DiskTotal), usedOf(now.DiskUsed, now.DiskTotal))
-						@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
-					} else {
-						@serverStat("CPU", "No sample in the last two minutes", "")
-						@serverStat("Memory", "", "")
-						@serverStat("Disk", "", "")
-						@serverStat("Network", "", "")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if now := m.Now; now != nil {
+							@serverStat("CPU", cpuNote(now), percentText(now.CPU))
+							@serverStat("Memory", shareOf(now.MemoryUsed, now.MemoryTotal), usedOf(now.MemoryUsed, now.MemoryTotal))
+							@serverStat("Disk", shareOf(now.DiskUsed, now.DiskTotal), usedOf(now.DiskUsed, now.DiskTotal))
+							@serverStat("Network", rateText(now.NetTx)+" out", rateText(now.NetRx)+" in")
+						} else {
+							@serverStat("CPU", "No sample in the last two minutes", "")
+							@serverStat("Memory", "", "")
+							@serverStat("Disk", "", "")
+							@serverStat("Network", "", "")
+						}
 					}
 				}
 			</div>
@@ -241,16 +245,18 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 			<h2>Apps</h2>
 		</div>
 		<div data-server-apps-metrics>
-			@components.List() {
-				if len(apps) == 0 {
-					@components.Item(components.ItemProps{Name: "No apps on this server yet"})
-				}
-				for _, app := range apps {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/metrics", Name: app.Name, Note: appMetricsNote(app), Attrs: templ.Attributes{"data-app-metrics-row": app.Name}}) {
-						if now := app.Now; now != nil {
-							<span class="moin-strong moin-digits">{ human.Size(float64(now.MemoryUsed)) }</span>
-						} else {
-							<span class="moin-text moin-muted">not running</span>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(apps) == 0 {
+						@components.Item(components.ItemProps{Name: "No apps on this server yet"})
+					}
+					for _, app := range apps {
+						@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + app.Name + "/metrics", Name: app.Name, Note: appMetricsNote(app), Attrs: templ.Attributes{"data-app-metrics-row": app.Name}}) {
+							if now := app.Now; now != nil {
+								<span class="moin-strong moin-digits">{ human.Size(float64(now.MemoryUsed)) }</span>
+							} else {
+								<span class="moin-text moin-muted">not running</span>
+							}
 						}
 					}
 				}

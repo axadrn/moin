@@ -49,10 +49,19 @@
 }
 
 @layer moin-components {
-  /* A list in a card is part of the card: no box of its own. Its words line
-     up with the card's, and the light of an item reaches past them. */
+  /* A list in a card runs to --inset from the card's edge. The light of an
+     item then sits the same distance from the card on every side, and the
+     words line up with the card's own. */
   .moin-card > .moin-list {
-    margin-inline: calc(-1 * (var(--item-edge) + var(--inset)));
-    background: none;
+    --item-edge: calc(var(--pad) - var(--inset));
+    margin-inline: calc(var(--inset) - var(--pad));
   }
+  .moin-card > .moin-list:first-child { margin-block-start: calc(var(--inset) - var(--pad)); }
+  .moin-card > .moin-list:last-child { margin-block-end: calc(var(--inset) - var(--pad)); }
+  /* A flush card has no padding at the sides to run past. */
+  .moin-card[data-flush] > .moin-list { margin-inline: var(--inset); }
+
+  /* In a grid a card with only a list is as tall as its rows, not as its
+     neighbor. */
+  .moin-grid > .moin-card:has(> .moin-list:only-child) { align-self: start; }
 }

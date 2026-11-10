@@ -66,12 +66,14 @@ templ Device(view DeviceView) {
 						<p class="moin-text moin-muted">Approve only if your terminal shows this code.</p>
 					</div>
 				}
-				@components.List() {
-					@factRow("You", ctxkeys.User(ctx).Email)
-					if len(view.Workspaces) == 1 {
-						@factRow("Workspace", view.Workspaces[0].Name)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@factRow("You", ctxkeys.User(ctx).Email)
+						if len(view.Workspaces) == 1 {
+							@factRow("Workspace", view.Workspaces[0].Name)
+						}
+						@factRow("Access", "Read and write")
 					}
-					@factRow("Access", "Read and write")
 				}
 				if len(view.Workspaces) > 1 {
 					@formField("Workspace", "device-workspace", "", view.WorkspaceError) {

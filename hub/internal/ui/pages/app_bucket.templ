@@ -42,46 +42,48 @@ templ bucketPanel(bucket service.Bucket) {
 				<h2>{ bucket.Name }</h2>
 				@bucketBadge(bucket.Default)
 			</div>
-			@components.List() {
-				@bucketFact("Used by", bucketUsedBy(bucket), false, nil)
-				@bucketFact("Bucket", bucket.Bucket, true, templ.Attributes{"data-bucket": true})
-				if bucket.Folder != "" {
-					@bucketFact("Folder", bucket.Folder, true, templ.Attributes{"data-bucket-folder": true})
-				}
-				@bucketFact("Endpoint", orAWS(bucket.Endpoint), true, nil)
-				@bucketFact("Access key", bucket.AccessKey, true, nil)
-				if len(bucket.Older) > 0 {
-					@components.Item(components.ItemProps{}) {
-						<div class="moin-item-text" data-bucket-older>
-							<div class="moin-strong">Left by</div>
-							<div class="moin-small moin-muted">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
-						</div>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@bucketFact("Used by", bucketUsedBy(bucket), false, nil)
+					@bucketFact("Bucket", bucket.Bucket, true, templ.Attributes{"data-bucket": true})
+					if bucket.Folder != "" {
+						@bucketFact("Folder", bucket.Folder, true, templ.Attributes{"data-bucket-folder": true})
 					}
-				}
-				@bucketDisclosure("Change") {
-					@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
-				}
-				if !bucket.Default {
-					@components.Item(components.ItemProps{Button: true, Name: "Make default", Attrs: templ.Attributes{
-						"hx-post":           bucketPath + "/default",
-						"hx-target":         "#bucket",
-						"hx-select":         "#bucket",
-						"hx-swap":           "outerHTML",
-						"hx-disable":        "this",
-						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
-						"data-make-default": bucket.Name,
+					@bucketFact("Endpoint", orAWS(bucket.Endpoint), true, nil)
+					@bucketFact("Access key", bucket.AccessKey, true, nil)
+					if len(bucket.Older) > 0 {
+						@components.Item(components.ItemProps{}) {
+							<div class="moin-item-text" data-bucket-older>
+								<div class="moin-strong">Left by</div>
+								<div class="moin-small moin-muted">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
+							</div>
+						}
+					}
+					@bucketDisclosure("Change") {
+						@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
+					}
+					if !bucket.Default {
+						@components.Item(components.ItemProps{Button: true, Name: "Make default", Attrs: templ.Attributes{
+							"hx-post":           bucketPath + "/default",
+							"hx-target":         "#bucket",
+							"hx-select":         "#bucket",
+							"hx-swap":           "outerHTML",
+							"hx-disable":        "this",
+							"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
+							"data-make-default": bucket.Name,
+						}})
+					}
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove", Attrs: templ.Attributes{
+						"hx-post":            bucketPath + "/remove",
+						"hx-target":          "#bucket",
+						"hx-select":          "#bucket",
+						"hx-swap":            "outerHTML",
+						"hx-disable":         "this",
+						"hx-confirm":         "Remove the bucket " + bucket.Name + " from moin? What is in it stays there.",
+						"data-confirm-name":  bucket.Name,
+						"data-remove-bucket": bucket.Name,
 					}})
 				}
-				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove", Attrs: templ.Attributes{
-					"hx-post":            bucketPath + "/remove",
-					"hx-target":          "#bucket",
-					"hx-select":          "#bucket",
-					"hx-swap":            "outerHTML",
-					"hx-disable":         "this",
-					"hx-confirm":         "Remove the bucket " + bucket.Name + " from moin? What is in it stays there.",
-					"data-confirm-name":  bucket.Name,
-					"data-remove-bucket": bucket.Name,
-				}})
 			}
 		</section>
 	</div>
@@ -117,9 +119,11 @@ templ bucketAdd(first bool) {
 				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: "default"}, true)
 			}
 		} else {
-			@components.List() {
-				@bucketDisclosure("Another bucket") {
-					@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true)
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@bucketDisclosure("Another bucket") {
+						@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true)
+					}
 				}
 			}
 		}

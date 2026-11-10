@@ -47,8 +47,10 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 				<div class="moin-section-head">
 					<h2>Daemons</h2>
 				</div>
-				@components.List() {
-					@DaemonUpdatesForm(autoUpdate)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@DaemonUpdatesForm(autoUpdate)
+					}
 				}
 			</section>
 			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
@@ -109,8 +111,10 @@ templ ServerAdded(added AddedServer) {
 // the server just added has connected.
 templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
-		@components.List() {
-			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/new-app", Name: name + " is online", Note: "Deploy an app to it", Lead: components.Dot(components.DotProps{State: components.StateLive})})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/new-app", Name: name + " is online", Note: "Deploy an app to it", Lead: components.Dot(components.DotProps{State: components.StateLive})})
+			}
 		}
 	</div>
 }
@@ -146,13 +150,15 @@ templ ServerList(servers []model.Server) {
 		hx-trigger="servers from:body"
 		hx-swap="none"
 	>
-		@components.List() {
-			if len(servers) == 0 {
-				@components.Item(components.ItemProps{Name: "No servers yet", Note: "Add one, then run its install command on it."})
-			}
-			for _, server := range servers {
-				@components.Item(components.ItemProps{Href: basePath + "/servers/" + server.Link() + "/security", Name: server.Name, Note: serverNote(server, now)}) {
-					@serverState(server)
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if len(servers) == 0 {
+					@components.Item(components.ItemProps{Name: "No servers yet", Note: "Add one, then run its install command on it."})
+				}
+				for _, server := range servers {
+					@components.Item(components.ItemProps{Href: basePath + "/servers/" + server.Link() + "/security", Name: server.Name, Note: serverNote(server, now)}) {
+						@serverState(server)
+					}
 				}
 			}
 		}

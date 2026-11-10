@@ -33,13 +33,15 @@ templ AdminUser(user *model.AdminUser) {
 				@AdminUserPlan(user)
 			}
 			if !self {
-				@components.List() {
-					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Attrs: templ.Attributes{
-						"hx-post":    "/admin/users/" + user.ID + "/sessions/revoke",
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"hx-confirm": "Revoke every session of " + user.Email + "? They are signed out everywhere, and their API tokens stop working.",
-					}})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Attrs: templ.Attributes{
+							"hx-post":    "/admin/users/" + user.ID + "/sessions/revoke",
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"hx-confirm": "Revoke every session of " + user.Email + "? They are signed out everywhere, and their API tokens stop working.",
+						}})
+					}
 				}
 			}
 		}
@@ -50,15 +52,17 @@ templ AdminUser(user *model.AdminUser) {
 // changed them.
 templ AdminUserFacts(user *model.AdminUser) {
 	<div id="admin-user-facts" hx-swap-oob="true">
-		@components.List() {
-			@adminFact("Email", user.Email)
-			@adminFact("Verified", adminYesNo(user.EmailVerifiedAt != nil))
-			if user.IsAdmin {
-				@adminFact("Role", "Operator")
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@adminFact("Email", user.Email)
+				@adminFact("Verified", adminYesNo(user.EmailVerifiedAt != nil))
+				if user.IsAdmin {
+					@adminFact("Role", "Operator")
+				}
+				@adminFact("Joined", user.CreatedAt.UTC().Format("Jan 2, 2006"))
+				@adminFact("Workspaces", strconv.Itoa(user.WorkspaceCount))
+				@adminFact("Sessions", strconv.Itoa(user.ActiveSessionCount))
 			}
-			@adminFact("Joined", user.CreatedAt.UTC().Format("Jan 2, 2006"))
-			@adminFact("Workspaces", strconv.Itoa(user.WorkspaceCount))
-			@adminFact("Sessions", strconv.Itoa(user.ActiveSessionCount))
 		}
 	</div>
 }
@@ -69,17 +73,19 @@ templ AdminUserFacts(user *model.AdminUser) {
 templ AdminUserPlan(user *model.AdminUser) {
 	{{ on := user.Plan != model.AdminPlanFreeForever }}
 	<div id="admin-user-plan" class="moin-stack" data-gap="3" hx-swap-oob="true">
-		@components.List() {
-			@adminFact("Plan", adminPlanLabel(*user))
-			if user.Plan != model.AdminPlanPaying {
-				@components.Item(components.ItemProps{Button: true, Attrs: adminForeverFreeAttributes(user, on)}) {
-					<span class="moin-strong">
-						if on {
-							Make free forever
-						} else {
-							End free forever
-						}
-					</span>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@adminFact("Plan", adminPlanLabel(*user))
+				if user.Plan != model.AdminPlanPaying {
+					@components.Item(components.ItemProps{Button: true, Attrs: adminForeverFreeAttributes(user, on)}) {
+						<span class="moin-strong">
+							if on {
+								Make free forever
+							} else {
+								End free forever
+							}
+						</span>
+					}
 				}
 			}
 		}
