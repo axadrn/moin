@@ -11,7 +11,7 @@ import (
 // other title sits.
 templ Admin(title string) {
 	@Base(SEOProps{Title: title, Description: "Operator administration", Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
-		<header id="app-bar" class="moin-bar sticky top-0 z-40 bg-background/85 backdrop-blur-xl">
+		<header id="app-bar" class="hub-bar sticky top-0 z-40 bg-background/85 backdrop-blur-xl">
 			<div class={ kit.Page, "flex h-16 items-center gap-1" }>
 				<a href="/app" class="mr-3 flex shrink-0 items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label="Overview">
 					@kit.Wordmark("text-xl leading-none")

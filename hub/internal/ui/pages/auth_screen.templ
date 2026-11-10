@@ -4,7 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
-	"github.com/axadrn/moin/hub/internal/ui/parts"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -104,7 +104,7 @@ templ factRow(name, value string) {
 // from the start, empty without a hint, so a message only swaps text and
 // nothing moves. The control points at it with aria-describedby id-hint.
 templ formField(label, id, hint, err string) {
-	@parts.Field(parts.FieldProps{Label: label, For: id, Hint: hint, Error: err}) {
+	@components.Field(components.FieldProps{Label: label, For: id, Hint: hint, Error: err}) {
 		{ children... }
 	}
 }

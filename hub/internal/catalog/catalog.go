@@ -9,9 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/url"
-	"os"
-	"path/filepath"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -87,9 +87,9 @@ func (e Entry) NeedsURL() bool {
 	return strings.Contains(string(e.Compose), "${"+URLVar+"}") || strings.Contains(string(e.Compose), "${"+DomainVar+"}")
 }
 
-// Load reads every entry under dir, sorted by name.
-func Load(dir string) ([]Entry, error) {
-	folders, err := os.ReadDir(dir)
+// Load reads every entry under catalog/, sorted by name.
+func Load(files fs.FS) ([]Entry, error) {
+	folders, err := fs.ReadDir(files, "catalog")
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func Load(dir string) ([]Entry, error) {
 		if !folder.IsDir() {
 			continue
 		}
-		entry, err := loadEntry(parser, filepath.Join(dir, folder.Name()), folder.Name())
+		entry, err := loadEntry(parser, files, path.Join("catalog", folder.Name()), folder.Name())
 		if err != nil {
 			return nil, fmt.Errorf("catalog %s: %w", folder.Name(), err)
 		}
@@ -109,11 +109,11 @@ func Load(dir string) ([]Entry, error) {
 	return entries, nil
 }
 
-func loadEntry(parser *markdown.Parser, dir, slug string) (Entry, error) {
+func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, error) {
 	if !slugPattern.MatchString(slug) {
 		return Entry{}, errors.New("the folder name is not a slug: lowercase letters, digits and dashes")
 	}
-	source, err := os.ReadFile(filepath.Join(dir, "app.md"))
+	source, err := fs.ReadFile(files, path.Join(dir, "app.md"))
 	if err != nil {
 		return Entry{}, err
 	}
@@ -146,13 +146,13 @@ func loadEntry(parser *markdown.Parser, dir, slug string) (Entry, error) {
 			return Entry{}, fmt.Errorf("versions: %w", err)
 		}
 	}
-	entry.Compose, err = os.ReadFile(filepath.Join(dir, "compose.yml"))
+	entry.Compose, err = fs.ReadFile(files, path.Join(dir, "compose.yml"))
 	if err != nil {
 		return Entry{}, err
 	}
 	for _, logo := range []struct{ file, kind string }{{"logo.svg", "image/svg+xml"}, {"logo.png", "image/png"}} {
-		body, err := os.ReadFile(filepath.Join(dir, logo.file))
-		if errors.Is(err, os.ErrNotExist) {
+		body, err := fs.ReadFile(files, path.Join(dir, logo.file))
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {

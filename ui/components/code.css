@@ -1,0 +1,40 @@
+@layer moin-components {
+  /* Code to read and copy. */
+  .moin-code {
+    /* On this box, quiet text and hovers follow its own text color. */
+    --foreground: var(--terminal-foreground);
+    --muted-foreground: color-mix(in oklab, var(--terminal-foreground) 65%, transparent);
+    position: relative;
+    min-width: 0;
+    /* Always a box, also on a card of the same color. */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-medium);
+    background: var(--terminal);
+    color: var(--terminal-foreground);
+  }
+  .moin-code > pre {
+    max-height: 28rem;
+    padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    font-variant-ligatures: none;
+    white-space: pre;
+    tab-size: 2;
+  }
+  .moin-code > .moin-copy {
+    position: absolute;
+    /* Off the corner also when the theme has no radius. */
+    top: max(var(--scroll-edge), var(--space-1));
+    right: max(var(--scroll-edge), var(--space-1));
+    background: var(--terminal);
+  }
+  .moin-code > .moin-copy:hover { background: color-mix(in oklab, var(--foreground) 12%, var(--terminal)); }
+  /* Code a highlighter marked. Chroma, Pygments and Rouge write these names. */
+  .moin-code :is(.k, .kc, .kd, .kn, .kp, .kr, .kt) { color: var(--code-keyword); }
+  .moin-code :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sx) { color: var(--code-string); }
+  .moin-code :is(.c, .c1, .ch, .cm, .cp, .cs) { color: var(--code-comment); }
+  .moin-code :is(.nf, .fm, .nb) { color: var(--code-function); }
+  .moin-code :is(.m, .mb, .mf, .mh, .mi, .mo) { color: var(--code-number); }
+}

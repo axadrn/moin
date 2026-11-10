@@ -553,13 +553,13 @@ templ AppLogs(lines []string, message string) {
 		} else if len(lines) == 0 {
 			<p class="px-6 text-sm text-muted-foreground">No log lines yet.</p>
 		} else {
-			<div class="moin-term moin-term-lines">
+			<div class="hub-term hub-term-lines">
 				for _, line := range lines {
 					{{ entry := parseLogLine(line) }}
-					<div class="moin-term-line moin-term-log">
+					<div class="hub-term-line hub-term-log">
 						if entry.Service != "" {
-							<span class="moin-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
-							<span class="moin-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
+							<span class="hub-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
+							<span class="hub-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
 						}
 						<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
 					</div>

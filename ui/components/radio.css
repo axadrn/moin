@@ -1,0 +1,33 @@
+@layer moin-components {
+  /* Radio: a real radio, for where no item holds it. In an item a check mark
+     is enough, because the whole item is what you press. */
+  .moin-radio {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .moin-radio > input {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--foreground) 15%, transparent);
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+    transition: background-color var(--fast) var(--ease);
+  }
+  .moin-radio > input:checked { background: var(--foreground); }
+  .moin-radio > input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .moin-radio > span {
+    position: absolute;
+    inset: 0.375rem;
+    border-radius: var(--radius-full);
+    background: var(--background);
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .moin-radio > input:checked + span { visibility: visible; }
+}

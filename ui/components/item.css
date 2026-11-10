@@ -1,0 +1,142 @@
+@layer moin-components {
+  /* A list: items on one card, a thin line between them, inset like iOS. */
+  .moin-list {
+    --item-edge: calc(var(--space-5) + var(--inset));
+    display: flex;
+    flex-direction: column;
+    padding: var(--inset);
+    border-radius: var(--radius-large);
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+
+  /* In a grid a list is as tall as its items, not as its neighbor. */
+  .moin-grid > .moin-list { align-self: start; }
+
+  .moin-item {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    width: 100%;
+    min-height: var(--row);
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--item-edge);
+    border: 0;
+    background: none;
+    text-align: left;
+    outline: none;
+  }
+  /* The line over every item but the first; it starts where the text does. */
+  .moin-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--item-edge);
+    right: var(--item-edge);
+    height: 1px;
+    background: var(--border);
+  }
+  .moin-item:first-child::before { display: none; }
+  .moin-item:has(> [data-lead])::before { left: calc(var(--item-edge) + 3rem); }
+  /* The light of an item: the same gap on every side, so two lit items never
+     touch and its curve runs parallel to the group's. */
+  .moin-item::after {
+    content: "";
+    position: absolute;
+    inset: var(--inset);
+    z-index: -1;
+    border-radius: var(--lit-top) var(--lit-top) var(--lit-bottom) var(--lit-bottom);
+  }
+  /* Corners that touch the group follow its curve. All others are at most a
+     quarter of the item's height, so an item never turns into a pill. */
+  .moin-item,
+  .moin-expand > summary {
+    --lit: max(0px, calc(var(--radius-large) - 2 * var(--inset)));
+    --lit-small: min(var(--lit), calc(var(--row) / 4));
+    --lit-top: var(--lit-small);
+    --lit-bottom: var(--lit-small);
+  }
+  .moin-list > .moin-item:first-child,
+  .moin-list > .moin-expand:first-child > summary {
+    --lit-top: var(--lit);
+  }
+  .moin-list > .moin-item:last-child,
+  .moin-list > .moin-expand:last-child:not([open]) > summary,
+  .moin-list > .moin-expand[open]:last-child > div > .moin-item:last-child {
+    --lit-bottom: var(--lit);
+  }
+  .moin-item[data-control] { flex-wrap: wrap; }
+  .moin-item[data-control] > .moin-select { flex: none; width: 9rem; }
+  :is(a, button, label).moin-item { cursor: pointer; }
+  :is(a, button, label).moin-item:is(:hover, :focus-visible)::after,
+  a.moin-item[aria-current]::after,
+  label.moin-item:is(:has(:checked), :has(:focus-visible))::after {
+    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+  }
+  :is(a, button, label).moin-item:active::after {
+    background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  }
+  /* A lit item and the lines next to it give way. */
+  :is(a, button, label).moin-item:is(:hover, :focus-visible)::before,
+  :is(a, button, label).moin-item:is(:hover, :focus-visible) + :is(.moin-item, .moin-expand)::before,
+  a.moin-item[aria-current]::before,
+  a.moin-item[aria-current] + :is(.moin-item, .moin-expand)::before,
+  label.moin-item:is(:has(:checked), :has(:focus-visible))::before,
+  label.moin-item:is(:has(:checked), :has(:focus-visible)) + :is(.moin-item, .moin-expand)::before {
+    opacity: 0;
+  }
+  button.moin-item[data-danger] { color: var(--failed-text); }
+  label.moin-item input:is([type="radio"], [type="checkbox"]) { position: absolute; opacity: 0; pointer-events: none; }
+
+  .moin-item-text { flex: 1; min-width: 0; }
+  .moin-item-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-item-note {
+    display: block;
+    overflow: hidden;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-item-value {
+    flex: none;
+    max-width: 50%;
+    overflow: hidden;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-chevron,
+  .moin-item-check,
+  .moin-out {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+  }
+  .moin-out {
+    -webkit-mask-image: url("../icons/external.svg");
+    mask-image: url("../icons/external.svg");
+  }
+  .moin-item-check {
+    visibility: hidden;
+    background: var(--foreground);
+    -webkit-mask-image: url("../icons/check.svg");
+    mask-image: url("../icons/check.svg");
+  }
+  label.moin-item:has(:checked) .moin-item-check { visibility: visible; }
+}

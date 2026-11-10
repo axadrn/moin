@@ -4,13 +4,12 @@ import (
 	"io/fs"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
-	"github.com/axadrn/moin"
 	"github.com/axadrn/moin/hub/assets"
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/app"
-	"github.com/axadrn/moin/hub/internal/content"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/handler"
 	"github.com/axadrn/moin/hub/internal/mcp"
@@ -42,7 +41,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	// Web, API and MCP invitations share one budget.
 	invitationLimiter := middleware.NewWorkspaceInvitationLimiter()
 
-	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing, content.Root)
+	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing, app.Texts)
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
@@ -83,17 +82,19 @@ func SetupRoutes(app *app.App) http.Handler {
 	)
 }
 
-// kitHandler serves the kit: from the folder at the top of the repo in
-// development, else from the binary.
-func kitHandler(app *app.App) http.Handler {
-	if app.Cfg.IsDevelopment() {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// uiAssets serves the ui folder under /assets/ui/. Only a block may be shown
+// in a frame, by this site's own preview.
+func uiAssets(app *app.App) http.Handler {
+	files := http.FileServer(http.FS(app.UIFiles))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if app.Cfg.IsDevelopment() {
 			w.Header().Set("Cache-Control", "no-store")
-			http.FileServer(http.Dir("../kit")).ServeHTTP(w, r)
-		})
-	}
-	kit, _ := fs.Sub(moin.Kit, "kit")
-	return http.FileServer(http.FS(kit))
+		}
+		if strings.HasPrefix(r.URL.Path, "blocks/") {
+			middleware.AllowOwnFrames(w)
+		}
+		files.ServeHTTP(w, r)
+	})
 }
 
 // assetHandler serves the files under assets: from disk in development,
@@ -122,16 +123,12 @@ func assetHandler(app *app.App) http.Handler {
 // siteRoutes are the public site: assets, the home page, docs, search, the
 // changelog, the catalog and the legal pages.
 func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, catalogPages *handler.CatalogHandler) {
-	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
+	seo := handler.NewSEOHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.Cfg.AppURL, app.Texts, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
 	assetHandler := assetHandler(app)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
-	mux.Handle("GET /assets/kit/", http.StripPrefix("/assets/kit/", middleware.Gzip(kitHandler(app))))
-	mux.Handle("GET /kit/", http.StripPrefix("/kit/", middleware.Gzip(kitHandler(app))))
-	mux.HandleFunc("GET /kit", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/kit/showroom/", http.StatusFound)
-	})
+	mux.Handle("GET /assets/ui/", http.StripPrefix("/assets/ui/", middleware.Gzip(uiAssets(app))))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	// Browsers, link previews and analytics ask for /favicon.ico at the root.
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
@@ -146,9 +143,13 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
-	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.CatalogService).Search)
-	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
-	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(content.Root, app.Cfg.AppURL, build.Name))
+	ui := handler.NewUIHandler(app.UIDocsService, app.UIFiles)
+	mux.HandleFunc("GET /ui", ui.Show)
+	mux.HandleFunc("GET /ui.md", ui.Show)
+	mux.HandleFunc("GET /ui/", ui.Show)
+	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.CatalogService).Search)
+	mux.HandleFunc("GET /changelog", handler.Changelog(app.Texts))
+	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(app.Texts, app.Cfg.AppURL, build.Name))
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)

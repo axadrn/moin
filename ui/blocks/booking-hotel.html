@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotel</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Alfama House</h1>
+          <p class="moin-header-line moin-muted">Lisbon · 4.8 out of 5</p>
+        </div>
+      </header>
+      <!-- Dates -->
+      <div class="moin-list">
+        <details class="moin-expand" open>
+          <summary>
+            <span class="moin-fill moin-truncate">Dates</span>
+            <span class="moin-item-value" data-date>Nov 20 – Nov 23</span>
+            <i class="moin-chevron"></i>
+          </summary>
+          <div>
+            <div class="moin-item">
+              <moin-calendar range months="2" min="2026-11-09" value="2026-11-20,2026-11-23"></moin-calendar>
+            </div>
+          </div>
+        </details>
+      </div>
+      <!-- Guests -->
+      <div class="moin-field">
+        <label for="hotel-guests">Guests</label>
+        <div class="moin-select">
+          <button type="button" id="hotel-guests" popovertarget="hotel-guests-list" aria-label="Guests" style="anchor-name:--hotel-guests">
+            <span class="moin-truncate" data-select-label>2 guests</span>
+          </button>
+          <div popover id="hotel-guests-list" role="radiogroup" aria-label="Guests" style="position-anchor:--hotel-guests">
+            <label class="moin-option">
+              <input type="radio" name="guests" value="1">
+              <span>1 guest</span>
+            </label>
+            <label class="moin-option">
+              <input type="radio" name="guests" value="2" checked>
+              <span>2 guests</span>
+            </label>
+            <label class="moin-option">
+              <input type="radio" name="guests" value="3">
+              <span>3 guests</span>
+            </label>
+            <label class="moin-option">
+              <input type="radio" name="guests" value="4">
+              <span>4 guests</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <!-- Room -->
+      <form class="moin-section">
+        <div class="moin-section-head">
+          <h2>Room</h2>
+        </div>
+        <div class="moin-list">
+          <label class="moin-item">
+            <input type="radio" name="room">
+            <span class="moin-item-text">
+              <span class="moin-item-name">Courtyard room</span>
+              <span class="moin-item-note">Queen bed · Free cancellation</span>
+            </span>
+            <span class="moin-item-value">$142 a night</span>
+            <i class="moin-item-check"></i>
+          </label>
+          <label class="moin-item">
+            <input type="radio" name="room" checked>
+            <span class="moin-item-text">
+              <span class="moin-item-name">River room</span>
+              <span class="moin-item-note">King bed · Free cancellation</span>
+            </span>
+            <span class="moin-item-value">$186 a night</span>
+            <i class="moin-item-check"></i>
+          </label>
+          <label class="moin-item">
+            <input type="radio" name="room">
+            <span class="moin-item-text">
+              <span class="moin-item-name">Roof suite</span>
+              <span class="moin-item-note">King bed · Terrace</span>
+            </span>
+            <span class="moin-item-value">$264 a night</span>
+            <i class="moin-item-check"></i>
+          </label>
+        </div>
+      </form>
+      <!-- Actions -->
+      <div class="moin-row">
+        <button type="button" class="moin-button moin-end" data-kind="primary">Reserve</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

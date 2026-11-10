@@ -56,26 +56,26 @@ templ DevKit() {
 			}
 			@kit.Section("Fields", nil) {
 				@kit.Card("Domain", nil) {
-					@kit.Field("Domain", "kit-domain", "") {
+					@kit.Field("Domain", "moin-domain", "") {
 						@kit.Inline() {
-							@kit.Input(templ.Attributes{"id": "kit-domain", "placeholder": "my-app.example.com"})
+							@kit.Input(templ.Attributes{"id": "moin-domain", "placeholder": "my-app.example.com"})
 							@kit.Button(kit.Primary, "", nil) {
 								Add
 							}
 						}
 					}
-					@kit.Field("Wrong", "kit-wrong", "Not a domain.") {
-						@kit.Input(templ.Attributes{"id": "kit-wrong", "value": "my-app", "aria-invalid": "true"})
+					@kit.Field("Wrong", "moin-wrong", "Not a domain.") {
+						@kit.Input(templ.Attributes{"id": "moin-wrong", "value": "my-app", "aria-invalid": "true"})
 					}
-					@kit.Field("Branch", "kit-branch", "") {
-						@kit.Select(kit.SelectProps{ID: "kit-branch", Name: "branch", Label: "Branch", Options: []kit.Option{{Value: "main", Label: "main"}, {Value: "next", Label: "next"}}, Value: "main"})
+					@kit.Field("Branch", "moin-branch", "") {
+						@kit.Select(kit.SelectProps{ID: "moin-branch", Name: "branch", Label: "Branch", Options: []kit.Option{{Value: "main", Label: "main"}, {Value: "next", Label: "next"}}, Value: "main"})
 					}
-					@kit.Choice("kit-mode", "Mode", []kit.Option{{Value: "fields", Label: "Fields"}, {Value: "text", Label: "Text"}}, "fields")
+					@kit.Choice("moin-mode", "Mode", []kit.Option{{Value: "fields", Label: "Fields"}, {Value: "text", Label: "Text"}}, "fields")
 					@kit.TextArea(templ.Attributes{"rows": "3", "placeholder": "KEY=value"})
 				}
 			}
 			@kit.Section("Tabs", nil) {
-				@kit.Segmented("kit-tabs", "Sections", []kit.Segment{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#", Key: "d"}, {Label: "Domains", Href: "#", Key: "o"}, {Label: "Logs", Href: "#", Key: "l"}})
+				@kit.Segmented("moin-tabs", "Sections", []kit.Segment{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#", Key: "d"}, {Label: "Domains", Href: "#", Key: "o"}, {Label: "Logs", Href: "#", Key: "l"}})
 			}
 			@kit.Section("Rows that open", nil) {
 				@kit.List() {
@@ -112,13 +112,13 @@ templ DevKit() {
 			@kit.Section("Rows that are picked", nil) {
 				<form>
 					@kit.List() {
-						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "a"}) {
+						@kit.RowPick(templ.Attributes{"name": "moin-pick", "value": "a"}) {
 							@kit.RowText("Nov 7, 09:00 UTC", "Hourly · 2.1 MB")
 						}
-						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "b", "checked": true}) {
+						@kit.RowPick(templ.Attributes{"name": "moin-pick", "value": "b", "checked": true}) {
 							@kit.RowText("Nov 7, 08:00 UTC", "Hourly · 2.0 MB")
 						}
-						@kit.RowPick(templ.Attributes{"name": "kit-pick", "value": "c"}) {
+						@kit.RowPick(templ.Attributes{"name": "moin-pick", "value": "c"}) {
 							@kit.RowText("Nov 6, 23:12 UTC", "By hand · 1.9 MB")
 						}
 					}
@@ -140,25 +140,25 @@ templ DevKit() {
 			@kit.Section("Rows that hold a control", nil) {
 				@kit.List() {
 					@kit.RowControl(nil) {
-						@kit.RowLabel("kit-switch", "A switch", "")
-						@kit.Switch(templ.Attributes{"id": "kit-switch", "checked": true})
+						@kit.RowLabel("moin-switch", "A switch", "")
+						@kit.Switch(templ.Attributes{"id": "moin-switch", "checked": true})
 					}
 					@kit.RowControl(nil) {
-						@kit.RowLabel("kit-switch-off", "Off, and one that cannot change", "")
-						@kit.Switch(templ.Attributes{"id": "kit-switch-off"})
+						@kit.RowLabel("moin-switch-off", "Off, and one that cannot change", "")
+						@kit.Switch(templ.Attributes{"id": "moin-switch-off"})
 						@kit.Switch(templ.Attributes{"disabled": true, "aria-label": "Cannot change"})
 					}
 					@kit.RowForm(nil) {
-						@kit.RowLabel("kit-provider", "Provider", "")
+						@kit.RowLabel("moin-provider", "Provider", "")
 						<div class="w-36 shrink-0">
-							@kit.Select(kit.SelectProps{ID: "kit-provider", Name: "provider", Label: "Provider", Options: []kit.Option{{Value: "nip.io", Label: "nip.io"}, {Value: "sslip.io", Label: "sslip.io"}}, Value: "nip.io"})
+							@kit.Select(kit.SelectProps{ID: "moin-provider", Name: "provider", Label: "Provider", Options: []kit.Option{{Value: "nip.io", Label: "nip.io"}, {Value: "sslip.io", Label: "sslip.io"}}, Value: "nip.io"})
 						</div>
 					}
 					@kit.RowForm(nil) {
 						<div class="min-w-0 flex-1">
-							@kit.Field("Add a domain", "kit-row-domain", "") {
+							@kit.Field("Add a domain", "moin-row-domain", "") {
 								@kit.Inline() {
-									@kit.Input(templ.Attributes{"id": "kit-row-domain", "placeholder": "my-app.example.com"})
+									@kit.Input(templ.Attributes{"id": "moin-row-domain", "placeholder": "my-app.example.com"})
 									@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button"}) {
 										Add
 									}
@@ -273,14 +273,14 @@ templ DevKit() {
 			}
 			@kit.Section("Dialog", nil) {
 				@kit.List() {
-					@kit.RowButton(false, kit.OpenDialog("kit-dialog")) {
+					@kit.RowButton(false, kit.OpenDialog("moin-dialog")) {
 						<span class="font-medium">Open the dialog</span>
 					}
 					@kit.RowButton(true, templ.Attributes{"hx-confirm": "Stop my-app? It goes offline until you start it.", "hx-post": "/dev/null"}) {
 						<span class="font-medium">Stop</span>
 					}
 				}
-				@kit.Dialog("kit-dialog", "Stop my-app?", "It goes offline until you start it.") {
+				@kit.Dialog("moin-dialog", "Stop my-app?", "It goes offline until you start it.") {
 					@kit.DialogButtons() {
 						@kit.Button(kit.Secondary, "", kit.CloseDialog()) {
 							Cancel

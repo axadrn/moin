@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chat</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">General</h1>
+          <p class="moin-header-line moin-muted">3 people</p>
+        </div>
+      </header>
+      <!-- List -->
+      <div class="moin-list">
+        <div class="moin-item">
+          <span data-lead class="moin-avatar">
+            <span aria-hidden="true">GH</span>
+          </span>
+          <div class="moin-item-text">
+            <div class="moin-item-name">Grace Hopper</div>
+            <p class="moin-text moin-muted">The new build is live on staging.</p>
+          </div>
+          <span class="moin-item-value">09:12</span>
+        </div>
+        <div class="moin-item">
+          <span data-lead class="moin-avatar">
+            <span aria-hidden="true">AT</span>
+          </span>
+          <div class="moin-item-text">
+            <div class="moin-item-name">Alan Turing</div>
+            <p class="moin-text moin-muted">Looks good. Backups ran too.</p>
+          </div>
+          <span class="moin-item-value">09:15</span>
+        </div>
+        <div class="moin-item">
+          <span data-lead class="moin-avatar">
+            <span aria-hidden="true">AL</span>
+          </span>
+          <div class="moin-item-text">
+            <div class="moin-item-name">Ada Lovelace</div>
+            <p class="moin-text moin-muted">Then let's ship it.</p>
+          </div>
+          <span class="moin-item-value">09:16</span>
+        </div>
+      </div>
+      <!-- Actions -->
+      <div class="moin-row" data-gap="2">
+        <input class="moin-input" placeholder="Write a message" aria-label="Message">
+        <button type="button" class="moin-button" data-kind="primary">Send</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

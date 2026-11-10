@@ -1,0 +1,34 @@
+@layer moin-components {
+  /* A face: initials, or a picture. */
+  .moin-avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    user-select: none;
+  }
+  .moin-avatar[data-size] {
+    width: 4rem;
+    height: 4rem;
+    font-size: 1.25rem;
+  }
+  /* A picture in place of the initials. */
+  .moin-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Several people in little space. Each overlaps the one before it. */
+  .moin-avatar-group { display: inline-flex; }
+  .moin-avatar-group > .moin-avatar { box-shadow: 0 0 0 2px var(--background); }
+  .moin-card .moin-avatar-group > .moin-avatar { box-shadow: 0 0 0 2px var(--card); }
+  .moin-avatar-group > .moin-avatar + .moin-avatar { margin-inline-start: calc(-1 * var(--space-2)); }
+}

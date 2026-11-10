@@ -22,7 +22,7 @@ templ Field(label, forID, hint string) {
 		<label for={ forID } class="px-1 text-sm font-medium">{ label }</label>
 		{ children... }
 		if hint != "" {
-			// While the field is invalid (data-invalid, moin.js) its message
+			// While the field is invalid (data-invalid, hub.js) its message
 			// takes the place of the hint.
 			<p class="group/hint px-1 text-sm text-muted-foreground" data-field-hint={ forID }>
 				<span data-hint-text class="group-data-invalid/hint:hidden">{ hint }</span>

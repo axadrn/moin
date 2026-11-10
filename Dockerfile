@@ -66,10 +66,9 @@ RUN apk add --no-cache ca-certificates sqlite
 ENV APP_ENV=production
 ENV GO_ENV=production
 
-# Copy the binary, CSS output, and content directory
+# Copy the binary, CSS output and downloads
 COPY --from=build /app/hub/main .
 COPY --from=build /app/hub/assets/css/output.css ./assets/css/output.css
-COPY --from=build /app/hub/content ./content
 COPY --from=build /app/hub/downloads ./downloads
 
 # Expose the port

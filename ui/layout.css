@@ -1,0 +1,159 @@
+/* Layout: how things sit next to each other, and the five sizes
+   of text. The container makes the space with gap, never the element. */
+
+@layer moin-layout {
+  .moin-stack,
+  .moin-row,
+  .moin-grid {
+    --gap: var(--space-4);
+    gap: var(--gap);
+    min-width: 0;
+  }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="1"] { --gap: var(--space-1); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="2"] { --gap: var(--space-2); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="3"] { --gap: var(--space-3); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="6"] { --gap: var(--space-6); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="8"] { --gap: var(--space-8); }
+
+  /* Under each other. */
+  .moin-stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Next to each other. */
+  .moin-row {
+    display: flex;
+    align-items: center;
+  }
+  .moin-row[data-wrap] { flex-wrap: wrap; }
+  .moin-row[data-between] { justify-content: space-between; }
+  .moin-row[data-end] { justify-content: flex-end; }
+  .moin-row[data-top] { align-items: flex-start; }
+  .moin-row[data-bottom] { align-items: flex-end; }
+
+  /* Next to each other from a tablet up, under each other on a phone. */
+  @media (max-width: 39.99rem) {
+    .moin-row[data-phone="stack"] {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  /* Two columns from a tablet up, as high as the highest. */
+  .moin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  @media (min-width: 40rem) {
+    .moin-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  /* Up to this many columns, each at least 14rem wide: it wraps by itself. */
+  .moin-grid:is([data-cols="2"], [data-cols="3"], [data-cols="4"]) {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(14rem, calc((100% - (var(--n) - 1) * var(--gap)) / var(--n)))), 1fr));
+  }
+  .moin-grid[data-cols="2"] { --n: 2; }
+  .moin-grid[data-cols="3"] { --n: 3; }
+  .moin-grid[data-cols="4"] { --n: 4; }
+  /* One wide and one narrow. */
+  @media (min-width: 40rem) {
+    .moin-grid[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    .moin-grid[data-cols="1-2"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  }
+  /* As many columns as fit, each at least --min wide, sharing the width. */
+  .moin-grid[data-fit] {
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--min, 12rem), 100%), 1fr));
+  }
+
+  /* One width for the whole product. */
+  .moin-page {
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding-left: max(var(--gutter, 1rem), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--gutter, 1rem), env(safe-area-inset-right, 0px));
+  }
+  @media (min-width: 40rem) {
+    .moin-page {
+      --gutter: 1.5rem;
+    }
+  }
+
+  /* What a page holds: the page width, what is in it under each other. */
+  .moin-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    padding-block: var(--space-6) 5rem;
+  }
+
+  /* A page outside the app: a head, one narrow column in the middle, a foot. */
+  .moin-centered {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+  }
+  .moin-centered > :is(header, footer) {
+    display: flex;
+    flex: none;
+    height: 4rem;
+    align-items: center;
+  }
+  .moin-centered > footer {
+    justify-content: center;
+    gap: var(--space-6);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+  .moin-centered > footer > a:hover { color: var(--foreground); }
+  .moin-centered > div {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    padding: 2.5rem var(--space-4) 4rem;
+  }
+  @media (min-width: 40rem) {
+    .moin-centered > div { padding-top: 6rem; }
+  }
+  .moin-centered > div > * {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  /* A block of a page: a quiet title, an action at its end. */
+  .moin-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .moin-section-head {
+    display: flex;
+    min-height: 2rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .moin-section-head > :is(h2, h3) {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .moin-row[data-center] { justify-content: center; }
+  .moin-fill { flex: 1; min-width: 0; }
+  .moin-end { margin-inline-start: auto; }
+  .moin-scroll { overflow-x: auto; min-width: 0; }
+  .moin-hidden-phone { display: none; }
+  @media (min-width: 40rem) {
+    .moin-hidden-phone { display: revert; }
+    .moin-only-phone { display: none; }
+  }
+}

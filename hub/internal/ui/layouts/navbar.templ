@@ -6,7 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/githubstars"
-	"github.com/axadrn/moin/hub/internal/ui/parts"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // GitHubURL is the open source repository of moin.
@@ -15,16 +15,21 @@ const GitHubURL = "https://github.com/" + githubstars.Repo
 
 // navLinks are the places of the public site. A self-hosted hub has no
 // prices to show.
-func navLinks(billing bool, path string) []parts.BarLink {
-	links := []parts.BarLink{
+func navLinks(billing bool, path string) []components.BarLink {
+	links := []components.BarLink{
 		{Label: "Catalog", Href: "/catalog", Current: strings.HasPrefix(path, "/catalog")},
 		{Label: "Docs", Href: "/docs", Current: strings.HasPrefix(path, "/docs")},
-		{Label: "Kit", Href: "/kit"},
+		{Label: "UI", Href: "/ui", Current: inUI(path)},
 	}
 	if billing {
-		links = append(links, parts.BarLink{Label: "Pricing", Href: "/#pricing"})
+		links = append(links, components.BarLink{Label: "Pricing", Href: "/#pricing"})
 	}
 	return links
+}
+
+// inUI says a path is on the website of moin UI.
+func inUI(path string) bool {
+	return path == "/ui" || strings.HasPrefix(path, "/ui/")
 }
 
 // starsShowAt is how many GitHub stars it takes before the navbar shows
@@ -36,38 +41,42 @@ const starsShowAt = 1000
 // the way in; the footer has the rest. No menu: links change pages.
 templ Navbar() {
 	{{ user := ctxkeys.User(ctx) }}
-	@parts.Bar(parts.BarProps{Float: true}) {
-		<a href="/" class="kit-row" data-gap="2" aria-label={ brand.Name + " home, beta" }>
-			@parts.Wordmark(parts.WordmarkProps{})
-			@parts.Badge(parts.BadgeProps{Class: "kit-hidden-phone"}) {
-				Beta
+	@components.Bar(components.BarProps{Float: true}) {
+		<a href="/" class="moin-row" data-gap="2" aria-label={ brand.Name + " home" }>
+			@components.Wordmark(components.WordmarkProps{})
+			@components.Badge(components.BadgeProps{Class: "moin-hidden-phone"}) {
+				if inUI(ctxkeys.URLPath(ctx)) {
+					UI
+				} else {
+					Beta
+				}
 			}
 		</a>
-		@parts.BarLinks(parts.BarLinksProps{Label: "Main", Links: navLinks(ctxkeys.RenderConfig(ctx).Billing, ctxkeys.URLPath(ctx))})
-		<span class="kit-fill"></span>
+		@components.BarLinks(components.BarLinksProps{Label: "Main", Links: navLinks(ctxkeys.RenderConfig(ctx).Billing, ctxkeys.URLPath(ctx))})
+		<span class="moin-fill"></span>
 		// The one search of the site, where the app keeps its search: top
 		// right, on every public page. Without JavaScript it is the page
 		// /search.
-		@parts.Button(parts.ButtonProps{Href: "/search", Icon: true, Quiet: true, Attrs: templ.Attributes{"data-site-search-open": true, "aria-label": "Search", "aria-keyshortcuts": "Meta+K /"}}) {
-			<i class="kit-icon kit-icon-search"></i>
+		@components.Button(components.ButtonProps{Href: "/search", Icon: true, Quiet: true, Attrs: templ.Attributes{"data-site-search-open": true, "aria-label": "Search", "aria-keyshortcuts": "Meta+K /"}}) {
+			<i class="moin-icon moin-icon-search"></i>
 		}
 		// The star count shows from starsShowAt on: a small one says
 		// "nobody uses this", like the live numbers of the home page.
-		<span class="kit-only-phone">
-			@parts.Button(parts.ButtonProps{Href: "/docs", Quiet: true}) {
+		<span class="moin-only-phone">
+			@components.Button(components.ButtonProps{Href: "/docs", Quiet: true}) {
 				Docs
 			}
 		</span>
-		<span class="kit-hidden-phone">
+		<span class="moin-hidden-phone">
 			{{ stars := githubstars.Count() }}
 			if stars >= starsShowAt {
-				@parts.Button(parts.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
-					<i class="kit-icon kit-icon-git-hub"></i>
+				@components.Button(components.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
+					<i class="moin-icon moin-icon-git-hub"></i>
 					{ githubstars.Short(stars) }
 				}
 			} else {
-				@parts.Button(parts.ButtonProps{Href: GitHubURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
-					<i class="kit-icon kit-icon-git-hub"></i>
+				@components.Button(components.ButtonProps{Href: GitHubURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
+					<i class="moin-icon moin-icon-git-hub"></i>
 				}
 			}
 		</span>
@@ -76,7 +85,7 @@ templ Navbar() {
 		if user != nil {
 			{{ href, label = "/app", "Overview" }}
 		}
-		@parts.Button(parts.ButtonProps{Kind: parts.Primary, Href: href}) {
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: href}) {
 			{ label }
 		}
 	}

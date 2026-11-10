@@ -26,7 +26,7 @@ templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 				} else {
 					<div
 						id="deploy-log"
-						class="moin-term moin-term-lines"
+						class="hub-term hub-term-lines"
 						hx-sse:connect={ appPath + "/deploys/" + strconv.Itoa(deploy.Number) + "/log" }
 						hx-sse:close="done"
 						hx-swap="beforeend"
@@ -77,7 +77,7 @@ templ deployLogState(status string, oob bool) {
 func deployLogChip(status string) (string, string, string) {
 	switch status {
 	case model.DeployRunning:
-		return "following", "bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "moin-dot-run bg-running"
+		return "following", "bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "hub-dot-run bg-running"
 	case model.DeploySucceeded:
 		return "succeeded", "bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "bg-live"
 	case model.DeployFailed:
@@ -103,9 +103,9 @@ templ DeployLogChunk(chunk LogChunk) {
 		if item.Line != nil {
 			@logRow(*item.Line)
 		} else {
-			<details class="moin-term-fold">
-				<summary class="moin-term-toggle">
-					<span class="moin-term-arrow" aria-hidden="true">▸</span>
+			<details class="hub-term-fold">
+				<summary class="hub-term-toggle">
+					<span class="hub-term-arrow" aria-hidden="true">▸</span>
 					@foldCount(*item.Fold, false)
 				</summary>
 				<div id={ fmt.Sprintf("fold-%d", item.Fold.ID) }>
@@ -123,11 +123,11 @@ templ foldCount(fold LogFold, oob bool) {
 }
 
 templ logRow(line LogLine) {
-	<div class="moin-term-line" data-kind={ line.Kind } data-n={ strconv.Itoa(line.N) }>
+	<div class="hub-term-line" data-kind={ line.Kind } data-n={ strconv.Itoa(line.N) }>
 		<span>
 			{ line.Text }
 			if line.Path != "" {
-				<span class="moin-term-dim" title={ line.Path }>{ " (" + shortPath(line.Path) + ")" }</span>
+				<span class="hub-term-dim" title={ line.Path }>{ " (" + shortPath(line.Path) + ")" }</span>
 			}
 		</span>
 	</div>

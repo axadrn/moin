@@ -4,8 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"regexp"
 	"strings"
 	"time"
@@ -17,12 +16,12 @@ import (
 // issueAtEnd is a "(#N)" that ends a list item of the changelog.
 var issueAtEnd = regexp.MustCompile(`(?m)^(- .*) \(#(\d+)\)$`)
 
-// Changelog renders <contentDir>/changelog.md, the release notes of every
+// Changelog renders changelog.md, the release notes of every
 // version, newest first. The GitHub release of a version has the same text,
 // so the file keeps a plain "(#N)", which GitHub links by itself, and this
 // page links it here.
-func Changelog(contentDir string) (string, error) {
-	source, err := os.ReadFile(filepath.Join(contentDir, "changelog.md"))
+func Changelog(files fs.FS) (string, error) {
+	source, err := fs.ReadFile(files, "changelog.md")
 	if err != nil {
 		return "", fmt.Errorf("read changelog: %w", err)
 	}
@@ -42,10 +41,10 @@ type Release struct {
 	InShort string
 }
 
-// ChangelogReleases reads the versions of <contentDir>/changelog.md, newest
+// ChangelogReleases reads the versions of changelog.md, newest
 // first, for the feed.
-func ChangelogReleases(contentDir string) ([]Release, error) {
-	source, err := os.ReadFile(filepath.Join(contentDir, "changelog.md"))
+func ChangelogReleases(files fs.FS) ([]Release, error) {
+	source, err := fs.ReadFile(files, "changelog.md")
 	if err != nil {
 		return nil, fmt.Errorf("read changelog: %w", err)
 	}

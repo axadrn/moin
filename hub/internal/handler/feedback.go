@@ -69,7 +69,7 @@ func failed(w http.ResponseWriter, r *http.Request, title string, err error, fie
 	answerFailed(w, r, title, message)
 }
 
-// invalid sends the moin:invalid event moin.js handles.
+// invalid sends the moin:invalid event hub.js handles.
 func invalid(w http.ResponseWriter, detail map[string]string) {
 	event, err := json.Marshal(map[string]map[string]string{"moin:invalid": detail})
 	if err != nil {
@@ -80,7 +80,7 @@ func invalid(w http.ResponseWriter, detail map[string]string) {
 	w.Header().Set("HX-Reswap", "none")
 }
 
-// startDownload sends the moin:download event moin.js handles.
+// startDownload sends the moin:download event hub.js handles.
 func startDownload(w http.ResponseWriter, link string) {
 	event, err := json.Marshal(map[string]map[string]string{"moin:download": {"link": link}})
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/parts"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 )
@@ -29,77 +29,77 @@ templ SettingsHome(view SettingsHomeView) {
 	{{ cfg := ctxkeys.RenderConfig(ctx) }}
 	@layouts.App("Settings") {
 		@panelPage() {
-			@parts.Header(parts.HeaderProps{Title: "Settings"})
-			<section class="kit-section">
-				<div class="kit-section-head">
+			@components.Header(components.HeaderProps{Title: "Settings"})
+			<section class="moin-section">
+				<div class="moin-section-head">
 					<h2>{ workspace.Name }</h2>
 				</div>
-				@parts.List() {
-					@parts.Item(parts.ItemProps{Href: base + "/workspace", Name: "Team"})
+				@components.List() {
+					@components.Item(components.ItemProps{Href: base + "/workspace", Name: "Team"})
 					if view.GitHub {
-						@parts.Item(parts.ItemProps{Href: base + "/settings/github", Name: "GitHub", Value: gitHubValue(view.GitHubAccounts)})
+						@components.Item(components.ItemProps{Href: base + "/settings/github", Name: "GitHub", Value: gitHubValue(view.GitHubAccounts)})
 					}
-					@parts.Item(parts.ItemProps{Href: base + "/alerts", Name: "Alerts"})
-					@parts.Item(parts.ItemProps{Href: base + "/bucket", Name: "Bucket"})
-					@parts.Item(parts.ItemProps{Href: base + "/activity", Name: "Activity"})
+					@components.Item(components.ItemProps{Href: base + "/alerts", Name: "Alerts"})
+					@components.Item(components.ItemProps{Href: base + "/bucket", Name: "Bucket"})
+					@components.Item(components.ItemProps{Href: base + "/activity", Name: "Activity"})
 					if member != nil && member.Can(model.WorkspacePermissionManageBilling) && cfg.Billing {
-						@parts.Item(parts.ItemProps{Href: base + "/billing", Name: "Billing"})
+						@components.Item(components.ItemProps{Href: base + "/billing", Name: "Billing"})
 					}
 				}
 			</section>
-			<section class="kit-section">
-				<div class="kit-section-head">
+			<section class="moin-section">
+				<div class="moin-section-head">
 					<h2>Workspaces</h2>
 				</div>
-				@parts.List() {
+				@components.List() {
 					for _, item := range ctxkeys.Workspaces(ctx) {
 						if item.ID == workspace.ID {
 							// The open one is no place to go: a check where
 							// the others have their chevron.
-							@parts.Item(parts.ItemProps{Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)}) {
+							@components.Item(components.ItemProps{Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)}) {
 								<svg aria-label="Open now" viewBox="0 0 16 16" width="16" height="16"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 							}
 						} else {
-							@parts.Item(parts.ItemProps{Href: item.Path() + "/settings", Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)})
+							@components.Item(components.ItemProps{Href: item.Path() + "/settings", Name: item.Name, Note: model.WorkspaceRoleLabel(item.Role), Lead: workspaceLead(item)})
 						}
 					}
-					@parts.Item(parts.ItemProps{Href: "/workspaces/new", Name: "New workspace"})
+					@components.Item(components.ItemProps{Href: "/workspaces/new", Name: "New workspace"})
 				}
 			</section>
-			<section class="kit-section">
-				<div class="kit-section-head">
+			<section class="moin-section">
+				<div class="moin-section-head">
 					<h2>You</h2>
 				</div>
-				@parts.List() {
-					@parts.Item(parts.ItemProps{Href: base + "/settings/account", Name: user.Name, Note: user.Email, Lead: parts.Avatar(parts.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})})
+				@components.List() {
+					@components.Item(components.ItemProps{Href: base + "/settings/account", Name: user.Name, Note: user.Email, Lead: components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})})
 				}
 			</section>
-			<section class="kit-section">
-				<div class="kit-section-head">
+			<section class="moin-section">
+				<div class="moin-section-head">
 					<h2>moin</h2>
 				</div>
-				@parts.List() {
-					@parts.Item(parts.ItemProps{Name: "Appearance"}) {
-						@parts.Choice(parts.ChoiceProps{Name: "appearance", Label: "Appearance", Options: []parts.Option{
+				@components.List() {
+					@components.Item(components.ItemProps{Name: "Appearance"}) {
+						@components.Choice(components.ChoiceProps{Name: "appearance", Label: "Appearance", Options: []components.Option{
 							{Value: "system", Label: "System", Attrs: templ.Attributes{"data-theme-set": "system"}},
 							{Value: "light", Label: "Light", Attrs: templ.Attributes{"data-theme-set": "light"}},
 							{Value: "dark", Label: "Dark", Attrs: templ.Attributes{"data-theme-set": "dark"}},
 						}})
 					}
-					@parts.Item(parts.ItemProps{Href: "/docs", Name: "Docs"})
-					@parts.Item(parts.ItemProps{Href: "/changelog", Name: "Changelog", Value: build.Version, Attrs: templ.Attributes{"data-changelog": build.Version}}) {
-						@parts.Dot(parts.DotProps{State: parts.StateLive, Attrs: templ.Attributes{"data-changelog-dot": true, "hidden": true, "aria-label": "New"}})
+					@components.Item(components.ItemProps{Href: "/docs", Name: "Docs"})
+					@components.Item(components.ItemProps{Href: "/changelog", Name: "Changelog", Value: build.Version, Attrs: templ.Attributes{"data-changelog": build.Version}}) {
+						@components.Dot(components.DotProps{State: components.StateLive, Attrs: templ.Attributes{"data-changelog-dot": true, "hidden": true, "aria-label": "New"}})
 					}
-					@parts.Item(parts.ItemProps{Name: "Support", Value: cfg.SupportEmail})
+					@components.Item(components.ItemProps{Name: "Support", Value: cfg.SupportEmail})
 				}
 			</section>
 			if ctxkeys.IsAdmin(ctx) {
-				@parts.List() {
-					@parts.Item(parts.ItemProps{Href: "/admin", Name: "Admin"})
+				@components.List() {
+					@components.Item(components.ItemProps{Href: "/admin", Name: "Admin"})
 				}
 			}
-			@parts.List() {
-				@parts.Item(parts.ItemProps{Button: true, Danger: true, Name: "Sign out", Attrs: templ.Attributes{"hx-post": "/auth/logout", "hx-swap": "none", "data-logout": "true"}})
+			@components.List() {
+				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Sign out", Attrs: templ.Attributes{"hx-post": "/auth/logout", "hx-swap": "none", "data-logout": "true"}})
 			}
 		}
 	}
@@ -107,7 +107,7 @@ templ SettingsHome(view SettingsHomeView) {
 
 // workspaceLead is the initial of a workspace in the list.
 templ workspaceLead(item model.WorkspaceMembership) {
-	@parts.Avatar(parts.AvatarProps{Name: item.Name, Initials: model.Initial(item.Name)})
+	@components.Avatar(components.AvatarProps{Name: item.Name, Initials: model.Initial(item.Name)})
 }
 
 // gitHubValue is what the GitHub row says: the accounts, or Connect.
@@ -125,18 +125,18 @@ templ SettingsGitHub(installations []model.GitHubInstallation) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("GitHub · Settings") {
 		@panelPage() {
-			@parts.Header(parts.HeaderProps{Back: parts.Back{Label: "Settings", Href: base + "/settings"}, Title: "GitHub"})
-			@parts.List() {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: base + "/settings"}, Title: "GitHub"})
+			@components.List() {
 				for _, installation := range installations {
 					if installation.SettingsURL != "" {
-						@parts.Item(parts.ItemProps{Href: installation.SettingsURL, External: true, Name: installation.Account}) {
-							<span class="kit-small kit-muted">Repos on GitHub</span>
+						@components.Item(components.ItemProps{Href: installation.SettingsURL, External: true, Name: installation.Account}) {
+							<span class="moin-small moin-muted">Repos on GitHub</span>
 						}
 					} else {
-						@parts.Item(parts.ItemProps{Name: installation.Account})
+						@components.Item(components.ItemProps{Name: installation.Account})
 					}
 				}
-				@parts.Item(parts.ItemProps{Href: base + "/github/install?next=" + base + "/settings/github", Name: gitHubConnectLabel(installations)})
+				@components.Item(components.ItemProps{Href: base + "/github/install?next=" + base + "/settings/github", Name: gitHubConnectLabel(installations)})
 			}
 		}
 	}

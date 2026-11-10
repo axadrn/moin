@@ -1,21 +1,21 @@
 package kit
 
-import "github.com/axadrn/moin/hub/internal/ui/parts"
+import "github.com/axadrn/moin/hub/internal/ui/components"
 
 // State is one of the states every status in moin shows as (DESIGN.md,
 // Status): live ● (online, the live deploy), running ◐ (deploying), waiting
 // ○ in the running color (a daemon that never connected), done ✓ muted (a
 // deploy that succeeded but is no longer live), failed ✗ (failed, offline)
 // and idle ○ (new, unknown).
-type State = parts.State
+type State = components.State
 
 const (
-	StateLive    = parts.StateLive
-	StateRunning = parts.StateRunning
-	StateWaiting = parts.StateWaiting
-	StateDone    = parts.StateDone
-	StateFailed  = parts.StateFailed
-	StateIdle    = parts.StateIdle
+	StateLive    = components.StateLive
+	StateRunning = components.StateRunning
+	StateWaiting = components.StateWaiting
+	StateDone    = components.StateDone
+	StateFailed  = components.StateFailed
+	StateIdle    = components.StateIdle
 )
 
 // Status is a state's dot and its word (children), in a line of text: a
@@ -49,9 +49,9 @@ templ Chip(state State) {
 templ Dot(state State) {
 	switch stateOf(state) {
 		case StateLive:
-			<span aria-hidden="true" class="moin-dot-live inline-block size-2 shrink-0 rounded-full bg-live"></span>
+			<span aria-hidden="true" class="hub-dot-live inline-block size-2 shrink-0 rounded-full bg-live"></span>
 		case StateRunning:
-			<span aria-hidden="true" class="moin-dot-run inline-block size-2 shrink-0 rounded-full bg-running"></span>
+			<span aria-hidden="true" class="hub-dot-run inline-block size-2 shrink-0 rounded-full bg-running"></span>
 		case StateWaiting:
 			<span aria-hidden="true" class="inline-block size-2 shrink-0 rounded-full border-[1.5px] border-running"></span>
 		case StateDone:

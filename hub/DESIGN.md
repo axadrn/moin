@@ -120,11 +120,11 @@ Every page is a full page load; there is no hx-boost and no client router.
   TUI. There is no which-key menu.
 - **Live parts** use `kit.Live(url)`, the only way a page opens a stream
   (hx-sse). It closes when the page is left, and a page back from the
-  back-forward cache loads fresh (`moin.js`). A part that reloads itself
+  back-forward cache loads fresh (`hub.js`). A part that reloads itself
   has `hx-get` and `hx-trigger="<event> from:body"` and renders its content
   with the page; it is never empty until an event fills it.
 - **Scripts** live in the component that needs them (`templ.OnceHandle`)
-  or in `assets/js/moin.js` when every page needs them. Both listen on
+  or in `assets/js/hub.js` when every page needs them. Both listen on
   `document`, so HTML that htmx swaps in works at once. No page script.
 
 ## Pages

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mail</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Inbox</h1>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button" data-kind="primary">Write</button>
+          </div>
+        </div>
+      </header>
+      <!-- Cards -->
+      <div class="moin-grid" data-cols="1-2">
+        <div class="moin-list">
+          <a href="#mail" class="moin-item" aria-current="true">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Grace Hopper</div>
+              <div class="moin-item-note">Your invoice for November</div>
+            </div>
+          </a>
+          <a href="#mail" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Alan Turing</div>
+              <div class="moin-item-note">Notes from the review</div>
+            </div>
+          </a>
+          <a href="#mail" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Ada Lovelace</div>
+              <div class="moin-item-note">Welcome to the team</div>
+            </div>
+          </a>
+        </div>
+        <article class="moin-card">
+          <div class="moin-stack" data-gap="1">
+            <h2 class="moin-heading">Your invoice for November</h2>
+            <p class="moin-small moin-muted">Grace Hopper · Today at 08:41</p>
+          </div>
+          <hr class="moin-separator">
+          <div class="moin-prose">
+            <p>Hi Ada,</p>
+            <p>your invoice is ready. It comes to $48 and is due on December 1.</p>
+            <p>Thanks,<br>Grace</p>
+          </div>
+          <div class="moin-card-foot">
+            <button type="button" class="moin-button">Forward</button>
+            <button type="button" class="moin-button" data-kind="primary">Reply</button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

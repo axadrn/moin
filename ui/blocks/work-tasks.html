@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tasks</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Tasks</h1>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button" data-kind="primary">New task</button>
+          </div>
+        </div>
+      </header>
+      <!-- Cards -->
+      <div class="moin-grid" data-cols="3">
+        <div class="moin-section">
+          <div class="moin-section-head">
+            <h2>To do</h2>
+          </div>
+          <div class="moin-list">
+            <a href="#tasks" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Write the changelog</div>
+                <div class="moin-item-note">Ada</div>
+              </div>
+            </a>
+            <a href="#tasks" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Fix the sign-in link</div>
+                <div class="moin-item-note">Grace</div>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="moin-section">
+          <div class="moin-section-head">
+            <h2>Doing</h2>
+          </div>
+          <div class="moin-list">
+            <a href="#tasks" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">New pricing page</div>
+                <div class="moin-item-note">Alan</div>
+              </div>
+              <span class="moin-chip" data-state="running">
+                <span>Today</span>
+              </span>
+            </a>
+          </div>
+        </div>
+        <div class="moin-section">
+          <div class="moin-section-head">
+            <h2>Done</h2>
+          </div>
+          <form class="moin-list">
+            <label class="moin-item">
+              <input type="checkbox" name="task-done" checked>
+              <span class="moin-item-text">
+                <span class="moin-item-name">Backups every hour</span>
+              </span>
+              <i class="moin-item-check"></i>
+            </label>
+            <label class="moin-item">
+              <input type="checkbox" name="task-done" checked>
+              <span class="moin-item-text">
+                <span class="moin-item-name">Dark mode</span>
+              </span>
+              <i class="moin-item-check"></i>
+            </label>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

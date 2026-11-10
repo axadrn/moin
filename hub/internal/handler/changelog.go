@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/xml"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -13,9 +14,9 @@ import (
 
 // Changelog shows what shipped, newest first. It reads the file on every
 // request, so a new release shows without a restart in development.
-func Changelog(contentDir string) http.HandlerFunc {
+func Changelog(files fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		html, err := service.Changelog(contentDir)
+		html, err := service.Changelog(files)
 		if err != nil {
 			slog.Error("changelog failed", "error", err)
 			w.WriteHeader(http.StatusNotFound)
@@ -28,7 +29,7 @@ func Changelog(contentDir string) http.HandlerFunc {
 
 // ChangelogFeed is the changelog as RSS, one item per release, so a reader
 // or a Slack feed hears about each one.
-func ChangelogFeed(contentDir, appURL, name string) http.HandlerFunc {
+func ChangelogFeed(files fs.FS, appURL, name string) http.HandlerFunc {
 	type item struct {
 		Title       string `xml:"title"`
 		Link        string `xml:"link"`
@@ -49,7 +50,7 @@ func ChangelogFeed(contentDir, appURL, name string) http.HandlerFunc {
 	}
 	base := strings.TrimRight(appURL, "/")
 	return func(w http.ResponseWriter, r *http.Request) {
-		releases, err := service.ChangelogReleases(contentDir)
+		releases, err := service.ChangelogReleases(files)
 		if err != nil {
 			slog.Error("changelog feed failed", "error", err)
 			http.Error(w, "no changelog", http.StatusNotFound)

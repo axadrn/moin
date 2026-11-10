@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/parts"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // APITokensView is the data of the API tokens card in account settings.
@@ -52,12 +52,12 @@ func NewAPITokenForm(workspaceID string) APITokenForm {
 	return APITokenForm{Access: APITokenAccessWrite, Expiry: "90", WorkspaceID: workspaceID}
 }
 
-var apiTokenAccessOptions = []parts.Option{
+var apiTokenAccessOptions = []components.Option{
 	{Value: APITokenAccessWrite, Label: "Read and write"},
 	{Value: APITokenAccessRead, Label: "Read only"},
 }
 
-var apiTokenExpiryOptions = []parts.Option{
+var apiTokenExpiryOptions = []components.Option{
 	{Value: "7", Label: "7 days"},
 	{Value: "30", Label: "30 days"},
 	{Value: "90", Label: "90 days"},
@@ -65,10 +65,10 @@ var apiTokenExpiryOptions = []parts.Option{
 	{Value: APITokenExpiryNever, Label: "Never"},
 }
 
-func (v APITokensView) workspaceOptions() []parts.Option {
-	options := make([]parts.Option, 0, len(v.Workspaces))
+func (v APITokensView) workspaceOptions() []components.Option {
+	options := make([]components.Option, 0, len(v.Workspaces))
 	for _, workspace := range v.Workspaces {
-		options = append(options, parts.Option{Value: workspace.ID, Label: workspace.Name})
+		options = append(options, components.Option{Value: workspace.ID, Label: workspace.Name})
 	}
 	return options
 }

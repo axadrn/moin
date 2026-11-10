@@ -1,0 +1,23 @@
+@layer moin-components {
+  @media (prefers-reduced-motion: reduce) {
+    .moin-dot,
+    .moin-skeleton,
+    .moin-bar { animation: none; }
+  }
+}
+
+@keyframes moin-breathe {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent); }
+  70% { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes moin-pulse {
+  50% { opacity: 0.5; }
+}
+@keyframes moin-blink {
+  50% { opacity: 0.35; }
+}
+@keyframes moin-bar-line {
+  from { box-shadow: 0 1px 0 transparent; }
+  to { box-shadow: 0 1px 0 var(--border); }
+}

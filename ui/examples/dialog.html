@@ -1,0 +1,17 @@
+<div class="moin-list">
+  <button type="button" class="moin-item" data-open-dialog="demo-dialog" aria-haspopup="dialog">
+    <span class="moin-strong">Open the dialog</span>
+  </button>
+</div>
+<dialog id="demo-dialog" class="moin-dialog" aria-labelledby="demo-dialog-title">
+  <div class="moin-stack" style="--gap:1.25rem">
+    <div class="moin-stack" data-gap="1">
+      <h2 id="demo-dialog-title" class="moin-heading">Stop my-app?</h2>
+      <p class="moin-text moin-muted">It goes offline until you start it.</p>
+    </div>
+    <div class="moin-dialog-buttons">
+      <button type="button" class="moin-button" data-close-dialog>Cancel</button>
+      <button type="button" class="moin-button" data-kind="danger" data-close-dialog>Stop</button>
+    </div>
+  </div>
+</dialog>

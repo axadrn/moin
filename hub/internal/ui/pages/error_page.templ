@@ -16,7 +16,7 @@ templ ErrorPage(status int, title, description string) {
 			<title>{ title }</title>
 			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
 			<script nonce={ templ.GetNonce(ctx) }>
-				const theme = localStorage.getItem('kit-mode') || localStorage.getItem('theme') || 'system';
+				const theme = localStorage.getItem('moin-mode') || localStorage.getItem('theme') || 'system';
 				const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 				document.documentElement.classList.toggle('dark', dark);
 			</script>

@@ -73,7 +73,7 @@ Yes, at no extra cost. [Invite them](/docs/guides/team#invite-someone).
 
 ## Is moin open source?
 
-Yes, all of it, under AGPL-3.0 at [github.com/axadrn/moin](https://github.com/axadrn/moin). [Host it yourself](/docs/self-hosting), free.
+Yes, all of it: AGPL-3.0, and [moin UI](/ui) under MIT, at [github.com/axadrn/moin](https://github.com/axadrn/moin). [Host it yourself](/docs/self-hosting), free.
 
 ## Why AGPL, and can I contribute?
 

@@ -4,7 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
-	"github.com/axadrn/moin/hub/internal/ui/parts"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // AppBar is the one bar of the hub, quiet: the wordmark home,
@@ -14,16 +14,16 @@ import (
 templ AppBar() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ user := ctxkeys.User(ctx) }}
-	@parts.Bar(parts.BarProps{ID: "app-bar", Attrs: templ.Attributes{"data-app-base": basePath}}) {
-		<a href={ templ.SafeURL(basePath + "/overview") } class="kit-row" aria-label="Home">
-			@parts.Wordmark(parts.WordmarkProps{})
+	@components.Bar(components.BarProps{ID: "app-bar", Attrs: templ.Attributes{"data-app-base": basePath}}) {
+		<a href={ templ.SafeURL(basePath + "/overview") } class="moin-row" aria-label="Home">
+			@components.Wordmark(components.WordmarkProps{})
 		</a>
-		<span class="kit-fill"></span>
-		@parts.Button(parts.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"aria-label": "Search", "aria-keyshortcuts": "Meta+K /", "data-open-palette": true}}) {
-			<i class="kit-icon kit-icon-search"></i>
+		<span class="moin-fill"></span>
+		@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"aria-label": "Search", "aria-keyshortcuts": "Meta+K /", "data-open-palette": true}}) {
+			<i class="moin-icon moin-icon-search"></i>
 		}
 		if user != nil {
-			<a href={ templ.SafeURL(basePath + "/settings") } class="kit-row" aria-label="Settings">
+			<a href={ templ.SafeURL(basePath + "/settings") } class="moin-row" aria-label="Settings">
 				@UserAvatar(user)
 			</a>
 		}
@@ -32,7 +32,7 @@ templ AppBar() {
 }
 
 // palette is the search, in the middle of the screen: ⌘K, ctrl+k, / or the
-// search button open it (moin.js). What you type goes to the server, which
+// search button open it (hub.js). What you type goes to the server, which
 // answers the apps, servers, places and actions that match (htmx active
 // search); the arrows pick one, Enter opens it, Escape or a click outside
 // closes it.
@@ -78,13 +78,13 @@ templ palette(basePath string) {
 // (IdentityUpdates).
 templ UserAvatar(user *model.User) {
 	<span id="bar-avatar" class="contents">
-		@parts.Avatar(parts.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
+		@components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
 	</span>
 }
 
 // IdentityUpdates is what a changed name or picture swaps into the bar.
 templ IdentityUpdates(user *model.User) {
 	<span id="bar-avatar" class="contents" hx-swap-oob="true">
-		@parts.Avatar(parts.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
+		@components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
 	</span>
 }

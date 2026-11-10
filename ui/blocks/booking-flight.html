@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Book a flight</h1>
+        </div>
+      </header>
+      <!-- From, To -->
+      <div class="moin-grid" data-cols="2">
+        <div class="moin-field">
+          <label for="flight-from">From</label>
+          <input id="flight-from" class="moin-input" value="Berlin">
+        </div>
+        <div class="moin-field">
+          <label for="flight-to">To</label>
+          <input id="flight-to" class="moin-input" value="Lisbon">
+        </div>
+      </div>
+      <!-- Depart, Return -->
+      <div class="moin-list">
+        <details class="moin-expand" name="flight-date" open>
+          <summary>
+            <span class="moin-fill moin-truncate">Depart</span>
+            <span class="moin-item-value" data-date>Nov 20, 2026</span>
+            <i class="moin-chevron"></i>
+          </summary>
+          <div>
+            <div class="moin-item">
+              <moin-calendar min="2026-11-09" value="2026-11-20"></moin-calendar>
+            </div>
+          </div>
+        </details>
+        <details class="moin-expand" name="flight-date">
+          <summary>
+            <span class="moin-fill moin-truncate">Return</span>
+            <span class="moin-item-value" data-date>One way</span>
+            <i class="moin-chevron"></i>
+          </summary>
+          <div>
+            <div class="moin-item">
+              <moin-calendar min="2026-11-20"></moin-calendar>
+            </div>
+          </div>
+        </details>
+      </div>
+      <!-- Flights -->
+      <form class="moin-section">
+        <div class="moin-section-head">
+          <h2>Flights</h2>
+        </div>
+        <div class="moin-list">
+          <label class="moin-item">
+            <input type="radio" name="flight" checked>
+            <span class="moin-item-text">
+              <span class="moin-item-name">08:15 to 11:40</span>
+              <span class="moin-item-note">Direct · 4 h 25 min</span>
+            </span>
+            <span class="moin-item-value">$142</span>
+            <i class="moin-item-check"></i>
+          </label>
+          <label class="moin-item">
+            <input type="radio" name="flight">
+            <span class="moin-item-text">
+              <span class="moin-item-name">13:05 to 16:30</span>
+              <span class="moin-item-note">Direct · 4 h 25 min</span>
+            </span>
+            <span class="moin-item-value">$168</span>
+            <i class="moin-item-check"></i>
+          </label>
+          <label class="moin-item">
+            <input type="radio" name="flight">
+            <span class="moin-item-text">
+              <span class="moin-item-name">17:50 to 23:10</span>
+              <span class="moin-item-note">1 stop · 6 h 20 min</span>
+            </span>
+            <span class="moin-item-value">$119</span>
+            <i class="moin-item-check"></i>
+          </label>
+        </div>
+      </form>
+      <!-- Actions -->
+      <div class="moin-row">
+        <button type="button" class="moin-button moin-end" data-kind="primary">Continue</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

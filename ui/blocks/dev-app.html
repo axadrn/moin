@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-back">
+          <a href="#apps" class="moin-back">Apps</a>
+        </div>
+        <div class="moin-header-main">
+          <h1 class="moin-title">my-app</h1>
+          <p class="moin-header-line">
+            <i class="moin-dot" data-state="live"></i>
+            <span>Live · v12</span>
+          </p>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button">Restart</button>
+            <button type="button" class="moin-button" data-kind="primary">Deploy</button>
+          </div>
+        </div>
+      </header>
+      <!-- Desktop only -->
+      <div class="moin-hidden-phone">
+        <nav class="moin-tabs" aria-label="my-app">
+          <a href="#app" class="moin-tab" aria-current="page">App</a>
+          <a href="#deploys" class="moin-tab">Deploys</a>
+          <a href="#domains" class="moin-tab">Domains</a>
+          <a href="#app" class="moin-tab">Logs</a>
+          <a href="#data" class="moin-tab">Data</a>
+          <a href="#app-settings" class="moin-tab">Settings</a>
+        </nav>
+      </div>
+      <!-- Phone only -->
+      <div class="moin-only-phone">
+        <div class="moin-list">
+          <a href="#deploys" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Deploys</div>
+            </div>
+            <span class="moin-item-value">v12 live</span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#domains" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Domains</div>
+            </div>
+            <span class="moin-item-value">2</span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#app" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Logs</div>
+            </div>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#data" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Data</div>
+            </div>
+            <span class="moin-item-value">postgres-db</span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#app-settings" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">Settings</div>
+            </div>
+            <i class="moin-chevron"></i>
+          </a>
+        </div>
+      </div>
+      <!-- Cards -->
+      <div class="moin-grid">
+        <section class="moin-card">
+          <div class="moin-card-head">
+            <h2 class="moin-heading">CPU</h2>
+            <a href="#metrics" class="moin-button">Metrics</a>
+          </div>
+          <moin-chart values="30.0,35.9,41.2,45.2,47.6,48.4,47.7,45.9,43.7,41.7,40.3,40.0,40.8,42.5,44.8,47.0,48.6,48.9,47.7,44.8,40.4,34.9,28.9,23.1,18.1,14.6,12.6,12.3,13.3,15.2,17.3,19.0,20.0,19.8,18.6,16.5,14.1,11.9,10.6,10.7,12.4,15.7,20.5,26.3,32.3,37.9,42.4,45.5,47.0,46.9,45.6,43.7,41.8,40.3,39.9,40.5,42.2,44.5,47.0,49.1,50.1,49.6,47.4,43.6,38.5,32.6,26.7,21.3,17.2,14.6,13.6,14.0,15.5,17.4,19.1,20.1,20.2,19.1,17.0,14.4,11.9,10.0,9.3,10.3,13.0,17.2,22.6,28.5,34.4,39.4,43.1,45.2,45.8,45.0,43.4,41.6" unit="%" top="100" start-hour="9"></moin-chart>
+        </section>
+        <div class="moin-stack">
+          <div class="moin-list">
+            <a href="#domains" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">my-app.example.com</div>
+                <div class="moin-item-note">99.98% in the last 24 hours</div>
+              </div>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#backups" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Backups</div>
+                <div class="moin-item-note">Checked today · hourly</div>
+              </div>
+              <i class="moin-chevron"></i>
+            </a>
+            <div class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Server</div>
+              </div>
+              <span class="moin-item-value">web-1</span>
+            </div>
+            <div class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">Commit</div>
+              </div>
+              <span class="moin-item-value moin-mono">8c41f2a</span>
+            </div>
+          </div>
+          <div class="moin-command">
+            <code>moin logs my-app --follow</code>
+            <button type="button" class="moin-copy" data-copy="moin logs my-app --follow" aria-label="Copy the command">
+              <i class="moin-icon moin-icon-copy"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

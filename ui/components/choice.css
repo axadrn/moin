@@ -1,0 +1,63 @@
+@layer moin-components {
+  /* One of these: pills in a pill, the open one lifted. Links in .moin-tabs,
+     radios in .moin-choice. */
+  .moin-tabs,
+  .moin-choice {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    width: fit-content;
+    max-width: 100%;
+    height: var(--press);
+    padding: var(--space-1);
+    border-radius: var(--radius-press);
+    background: var(--muted);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .moin-choice[data-size="s"] { height: 2.25rem; }
+  .moin-tab,
+  .moin-choice > label {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 100%;
+    padding-inline: var(--space-4);
+    border-radius: max(0px, calc(var(--radius-press) - var(--space-1)));
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-tab:hover,
+  .moin-choice > label:hover { color: var(--foreground); }
+  .moin-tab[aria-current],
+  .moin-choice > label:has(:checked) {
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: var(--shadow-low);
+  }
+  .moin-choice input { position: absolute; opacity: 0; pointer-events: none; }
+
+  /* Quiet: only words, for tabs under tabs. */
+  .moin-tabs[data-quiet] {
+    gap: var(--space-5);
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .moin-tabs[data-quiet] .moin-tab {
+    height: auto;
+    padding: var(--space-1) 0;
+  }
+  .moin-tabs[data-quiet] .moin-tab[aria-current]:not(:focus-visible) {
+    background: none;
+    box-shadow: none;
+  }
+}

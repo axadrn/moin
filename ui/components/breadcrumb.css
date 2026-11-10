@@ -1,0 +1,33 @@
+@layer moin-components {
+  /* Where you are, and the way up. */
+  .moin-breadcrumb > ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+  }
+  .moin-breadcrumb li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .moin-breadcrumb li + li::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    -webkit-mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+  }
+  .moin-breadcrumb a { outline: none; }
+  .moin-breadcrumb a:hover { color: var(--foreground); }
+  .moin-breadcrumb a:focus-visible {
+    border-radius: var(--radius);
+    box-shadow: var(--focus);
+  }
+  .moin-breadcrumb [aria-current] { color: var(--foreground); }
+}

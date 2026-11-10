@@ -1,0 +1,23 @@
+package components
+
+// CardProps is a Card: its title, at most one action next to it.
+type CardProps struct {
+	Title  string
+	Action templ.Component
+	Attrs  templ.Attributes
+}
+
+// Card is a block with one topic.
+templ Card(p CardProps) {
+	<section class="moin-card" { p.Attrs... }>
+		if p.Title != "" || p.Action != nil {
+			<div class="moin-card-head">
+				<h2 class="moin-heading">{ p.Title }</h2>
+				if p.Action != nil {
+					@p.Action
+				}
+			</div>
+		}
+		{ children... }
+	</section>
+}

@@ -2,15 +2,17 @@ package app
 
 import (
 	"fmt"
+	"github.com/axadrn/moin"
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/internal/build"
+	"io/fs"
 	"log/slog"
 	"path/filepath"
 
+	"github.com/axadrn/moin/hub/content"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/content"
 	"github.com/axadrn/moin/hub/internal/db"
 	"github.com/axadrn/moin/hub/internal/dbbackup"
 	"github.com/axadrn/moin/hub/internal/repository"
@@ -23,15 +25,20 @@ import (
 )
 
 type App struct {
-	Cfg                 *config.Config
-	DB                  *sqlx.DB
-	HistoryDB           *sqlx.DB
-	OldDomainService    *service.OldDomainService
-	AuthService         *service.AuthService
-	UserService         *service.UserService
-	EmailService        *service.EmailService
-	LegalService        *service.LegalService
-	DocsService         *service.DocsService
+	Cfg              *config.Config
+	DB               *sqlx.DB
+	HistoryDB        *sqlx.DB
+	OldDomainService *service.OldDomainService
+	AuthService      *service.AuthService
+	UserService      *service.UserService
+	EmailService     *service.EmailService
+	LegalService     *service.LegalService
+	DocsService      *service.DocsService
+	UIDocsService    *service.DocsService
+	// Texts is content/ and UIFiles is ui/: from disk in development, else
+	// from the binary.
+	Texts               fs.FS
+	UIFiles             fs.FS
 	FileService         *service.FileService
 	SubscriptionService *service.SubscriptionService
 	AdminService        *service.AdminService
@@ -147,7 +154,9 @@ func New(cfg *config.Config) (*App, error) {
 	serverService.RequirePlanFor(subscriptionService.Access)
 	// The catalog ships in content/catalog; its releases come from the
 	// registries, asked by this hub itself.
-	entries, err := catalog.Load(filepath.Join(content.Root, "catalog"))
+	texts := content.FS(cfg.IsDevelopment())
+	uiFiles := moin.UI(cfg.IsDevelopment())
+	entries, err := catalog.Load(texts)
 	if err != nil {
 		return nil, fmt.Errorf("load the catalog: %w", err)
 	}
@@ -199,8 +208,11 @@ func New(cfg *config.Config) (*App, error) {
 	application := &App{
 		Cfg: cfg, DB: database, HistoryDB: history, AuthService: auth, UserService: userService,
 		EmailService:        email,
-		LegalService:        service.NewLegalService(content.Root, cfg.SupportEmail),
-		DocsService:         service.NewDocsService(content.Root, cfg.AppURL),
+		LegalService:        service.NewLegalService(texts, cfg.SupportEmail),
+		DocsService:         service.NewDocsService(texts, cfg.AppURL, cfg.IsDevelopment()),
+		UIDocsService:       service.NewUIDocsService(uiFiles, cfg.AppURL, cfg.IsDevelopment()),
+		Texts:               texts,
+		UIFiles:             uiFiles,
 		FileService:         fileService,
 		SubscriptionService: subscriptionService,
 		AdminService:        adminService,

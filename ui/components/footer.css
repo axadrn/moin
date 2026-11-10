@@ -1,0 +1,56 @@
+@layer moin-components {
+  /* Footer: a brand, columns of links, one last line. */
+  .moin-footer {
+    padding-block: var(--space-8);
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-footer-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-8) var(--space-6);
+  }
+  .moin-footer-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+    grid-column: 1 / -1;
+  }
+  .moin-footer-brand > a { color: var(--foreground); }
+  .moin-footer-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .moin-footer-column > h2 {
+    margin-block-end: var(--space-2);
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  /* Big enough to hit with a finger. */
+  .moin-footer-column > a {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  .moin-footer-column > a:hover { color: var(--foreground); }
+  .moin-footer-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-6);
+    margin-block-start: var(--space-8);
+  }
+  @media (min-width: 40rem) {
+    .moin-footer { padding-block: 4rem var(--space-8); }
+    .moin-footer-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (min-width: 64rem) {
+    .moin-footer-columns { grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr)); }
+    .moin-footer-brand { grid-column: auto; }
+  }
+}

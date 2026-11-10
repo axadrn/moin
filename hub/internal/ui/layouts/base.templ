@@ -35,15 +35,15 @@ templ Base(props ...SEOProps) {
 			// first paint is already in Geist.
 			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
 			<link href={ kit.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
-			<link href={ kit.AssetURL("/assets/kit/kit.css") } rel="stylesheet"/>
+			<link href={ kit.AssetURL("/assets/ui/moin.css") } rel="stylesheet"/>
 			// Scripts in swapped content get the page's nonce, so the CSP lets
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
 			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
 			// Server-sent events swap HTML as it streams (hx-sse:connect).
 			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
-			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/kit/kit.js") }></script>
-			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/moin.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/ui/moin.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/hub.js") }></script>
 			// A link starts loading when the pointer rests on it, so the page
 			// is there on the click (Chrome and Edge; others ignore it). Only
 			// pages: never sign in or out, GitHub or the API.
@@ -134,14 +134,14 @@ templ themeScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(function() {
 			window.themeUtils = window.themeUtils || {};
-			// One choice for moin and the kit. Browsers that chose before keep it.
+			// One choice for all of moin. Browsers that chose before keep it.
 			if (localStorage.getItem('theme')) {
-				localStorage.setItem('kit-mode', localStorage.getItem('theme'));
+				localStorage.setItem('moin-mode', localStorage.getItem('theme'));
 				localStorage.removeItem('theme');
 			}
 			const media = window.matchMedia('(prefers-color-scheme: dark)');
 			window.themeUtils.getThemePreference = function() {
-				return localStorage.getItem('kit-mode') || 'system';
+				return localStorage.getItem('moin-mode') || 'system';
 			};
 			window.themeUtils.applyTheme = function() {
 				const preference = window.themeUtils.getThemePreference();
@@ -152,7 +152,7 @@ templ themeScript() {
 			window.themeUtils.cycleTheme = function() {
 				const current = window.themeUtils.getThemePreference();
 				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
-				localStorage.setItem('kit-mode', next);
+				localStorage.setItem('moin-mode', next);
 				window.themeUtils.applyTheme();
 			};
 			window.themeUtils.applyTheme();

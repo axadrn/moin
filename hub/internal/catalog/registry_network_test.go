@@ -4,6 +4,7 @@ package catalog
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 // TestRealRegistries asks the real registries for every catalog image:
 // each must list releases. Run: go test -tags network ./hub/internal/catalog/
 func TestRealRegistries(t *testing.T) {
-	entries, err := Load(filepath.Join("..", "..", "content", "catalog"))
+	entries, err := Load(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,59 @@
+/* The icons, drawn on one 24 grid. Each is a mask, so it takes the color of
+   the text around it. Generated once from the templ icons. */
+
+@layer moin-components {
+  .moin-icon {
+    display: inline-block;
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+  .moin-icon[data-size="s"] {
+    width: 1rem;
+    height: 1rem;
+  }
+  .moin-icon-activity { --i: url("icons/activity.svg"); }
+  .moin-icon-app { --i: url("icons/app.svg"); }
+  .moin-icon-apps { --i: url("icons/apps.svg"); }
+  .moin-icon-bell { --i: url("icons/bell.svg"); }
+  .moin-icon-book { --i: url("icons/book.svg"); }
+  .moin-icon-bucket { --i: url("icons/bucket.svg"); }
+  .moin-icon-catalog { --i: url("icons/catalog.svg"); }
+  .moin-icon-check { --i: url("icons/check.svg"); }
+  .moin-icon-chevron-down { --i: url("icons/chevron-down.svg"); }
+  .moin-icon-chevron-left { --i: url("icons/chevron-left.svg"); }
+  .moin-icon-chevron-right { --i: url("icons/chevron-right.svg"); }
+  .moin-icon-copy { --i: url("icons/copy.svg"); }
+  .moin-icon-card { --i: url("icons/card.svg"); }
+  .moin-icon-database { --i: url("icons/database.svg"); }
+  .moin-icon-deploy { --i: url("icons/deploy.svg"); }
+  .moin-icon-disk { --i: url("icons/disk.svg"); }
+  .moin-icon-external { --i: url("icons/external.svg"); }
+  .moin-icon-failed { --i: url("icons/failed.svg"); }
+  .moin-icon-gauge { --i: url("icons/gauge.svg"); }
+  .moin-icon-globe { --i: url("icons/globe.svg"); }
+  .moin-icon-key { --i: url("icons/key.svg"); }
+  .moin-icon-logs { --i: url("icons/logs.svg"); }
+  .moin-icon-package { --i: url("icons/package.svg"); }
+  .moin-icon-play { --i: url("icons/play.svg"); }
+  .moin-icon-plus { --i: url("icons/plus.svg"); }
+  .moin-icon-restart { --i: url("icons/restart.svg"); }
+  .moin-icon-search { --i: url("icons/search.svg"); }
+  .moin-icon-server { --i: url("icons/server.svg"); }
+  .moin-icon-server-off { --i: url("icons/server-off.svg"); }
+  .moin-icon-settings { --i: url("icons/settings.svg"); }
+  .moin-icon-shield { --i: url("icons/shield.svg"); }
+  .moin-icon-shield-off { --i: url("icons/shield-off.svg"); }
+  .moin-icon-stop { --i: url("icons/stop.svg"); }
+  .moin-icon-theme { --i: url("icons/theme.svg"); }
+  .moin-icon-trash { --i: url("icons/trash.svg"); }
+  .moin-icon-undo { --i: url("icons/undo.svg"); }
+  .moin-icon-user { --i: url("icons/user.svg"); }
+  .moin-icon-users { --i: url("icons/users.svg"); }
+  .moin-icon-x { --i: url("icons/x.svg"); }
+  .moin-icon-git-hub { --i: url("icons/git-hub.svg"); }
+  .moin-icon-google { --i: url("icons/google.svg"); }
+}

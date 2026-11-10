@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/axadrn/moin"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,7 +39,7 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 func TestSiteSearchFindsDocsAndCatalogWithATypo(t *testing.T) {
 	docs := newDocsTestHandler(t).docsService
 	store := catalog.NewStore([]catalog.Entry{{Slug: "ntfy", Name: "ntfy", Category: "Communication", Pitch: "Push notifications."}}, catalog.Registry{})
-	search := NewSiteSearchHandler(docs, service.NewCatalogService(store, nil))
+	search := NewSiteSearchHandler(docs, service.NewUIDocsService(moin.UI(false), "", false), moin.UI(false), service.NewCatalogService(store, nil))
 	serve := func(path string, htmx bool) string {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		if htmx {
@@ -124,7 +125,7 @@ func newDocsTestHandler(t *testing.T) *DocsHandler {
 			t.Fatalf("write docs page: %v", err)
 		}
 	}
-	return NewDocsHandler(service.NewDocsService(contentPath, ""))
+	return NewDocsHandler(service.NewDocsService(os.DirFS(contentPath), "", false))
 }
 
 func serveDocs(t *testing.T, handler *DocsHandler, path string) *httptest.ResponseRecorder {

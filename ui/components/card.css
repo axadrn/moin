@@ -1,0 +1,30 @@
+@layer moin-components {
+  /* A card: one topic. A title with at most one action next to it, and a
+     foot with buttons when it asks for something. */
+  .moin-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+    padding: var(--pad);
+    border-radius: var(--radius-large);
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .moin-card[data-flush] { padding-inline: 0; }
+  .moin-card[data-flush] > :is(.moin-card-head, .moin-card-foot) { padding-inline: var(--pad); }
+  .moin-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: var(--press);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+  }
+  .moin-card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+}

@@ -6,7 +6,7 @@ package kit
 // line under it (both can be filled by a script: data-dialog-title,
 // data-dialog-note), the content and DialogButtons at the end. A button
 // with OpenDialog opens it; one with data-close-dialog closes it, and so
-// do Escape and a click beside it (moin.js). Its controls are one step
+// do Escape and a click beside it (hub.js). Its controls are one step
 // lighter than it, as it is one step lighter than the page.
 templ Dialog(id, title, note string) {
 	<dialog id={ id } data-dialog aria-labelledby={ id + "-title" } aria-describedby={ id + "-note" } class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-black/30 dark:[--muted:#3a3a3c]">

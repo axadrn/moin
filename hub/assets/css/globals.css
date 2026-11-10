@@ -1,6 +1,6 @@
-/* Tailwind and the kit side by side while pages move to the kit: resets
-   first, then the kit, then what is left of Tailwind on top. */
-@layer theme, base, kit-foundation, kit-layout, kit-parts, components, utilities;
+/* Tailwind and moin UI side by side while pages move to moin UI: resets
+   first, then moin UI, then what is left of Tailwind on top. */
+@layer theme, base, moin-theme, moin-layout, moin-components, components, utilities;
 
 @font-face {
   font-family: "Geist";
@@ -241,11 +241,11 @@
     border: 2px solid var(--muted-foreground);
     border-top-color: var(--foreground);
     border-radius: 9999px;
-    animation: moin-spin 0.7s linear infinite;
+    animation: hub-spin 0.7s linear infinite;
   }
 }
 
-@keyframes moin-spin {
+@keyframes hub-spin {
   to {
     transform: rotate(360deg);
   }
@@ -254,21 +254,21 @@
 /* app */
 @layer components {
   /* The running symbol turns (the landing page uses it too). */
-  .moin-turn {
-    animation: moin-spin 1.6s linear infinite;
+  .hub-turn {
+    animation: hub-spin 1.6s linear infinite;
     transform-origin: center;
   }
 
   /* Status dots: live breathes, running blinks. */
-  .moin-dot-live {
-    animation: moin-breathe 2.4s ease-out infinite;
+  .hub-dot-live {
+    animation: hub-breathe 2.4s ease-out infinite;
   }
-  .moin-dot-run {
-    animation: moin-blink 1.2s ease-in-out infinite;
+  .hub-dot-run {
+    animation: hub-blink 1.2s ease-in-out infinite;
   }
 
   /* Logs and commands: mono on the surface they sit on. */
-  .moin-term {
+  .hub-term {
     --tf: var(--card-foreground);
     color: color-mix(in oklab, var(--tf) 92%, transparent);
     font-family: var(--font-mono);
@@ -278,10 +278,10 @@
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklab, var(--tf) 18%, transparent) transparent;
   }
-  .moin-term-lines {
+  .hub-term-lines {
     counter-reset: line;
   }
-  .moin-term-line {
+  .hub-term-line {
     counter-increment: line;
     display: grid;
     grid-template-columns: 2.75rem minmax(0, 1fr);
@@ -289,59 +289,59 @@
     white-space: pre-wrap;
     overflow-wrap: break-word;
   }
-  .moin-term-line::before {
+  .hub-term-line::before {
     content: counter(line);
     padding-right: 1rem;
     text-align: right;
     color: color-mix(in oklab, var(--tf) 22%, transparent);
     user-select: none;
   }
-  .moin-term-line[data-n]::before {
+  .hub-term-line[data-n]::before {
     content: attr(data-n);
   }
-  .moin-term-line:hover {
+  .hub-term-line:hover {
     background: color-mix(in oklab, var(--tf) 4%, transparent);
   }
-  .moin-term-line[data-kind="out"] {
+  .hub-term-line[data-kind="out"] {
     color: color-mix(in oklab, var(--tf) 50%, transparent);
   }
-  .moin-term-line[data-kind="step"] > span::before {
+  .hub-term-line[data-kind="step"] > span::before {
     content: "→ ";
     color: color-mix(in oklab, var(--tf) 45%, transparent);
   }
-  .moin-term-line[data-kind="ok"] {
+  .hub-term-line[data-kind="ok"] {
     color: var(--live);
   }
-  .moin-term-line[data-kind="ok"] > span::before {
+  .hub-term-line[data-kind="ok"] > span::before {
     content: "✓ ";
   }
-  .moin-term-line[data-kind="err"] {
+  .hub-term-line[data-kind="err"] {
     color: var(--failed);
   }
-  .moin-term-line[data-kind="err"] > span::before {
+  .hub-term-line[data-kind="err"] > span::before {
     content: "✗ ";
   }
-  .moin-term-dim {
+  .hub-term-dim {
     color: color-mix(in oklab, var(--tf) 42%, transparent);
   }
   @media (max-width: 40rem) {
-    .moin-term-line {
+    .hub-term-line {
       grid-template-columns: 2.25rem minmax(0, 1fr);
       padding-right: 0.75rem;
     }
-    .moin-term-line::before {
+    .hub-term-line::before {
       padding-right: 0.75rem;
     }
   }
 
   /* Tool output between two steps folds into one line: a <details>. */
-  .moin-term-fold:not(:has(.moin-term-line)) {
+  .hub-term-fold:not(:has(.hub-term-line)) {
     display: none;
   }
-  .moin-term-fold[open] {
+  .hub-term-fold[open] {
     background: color-mix(in oklab, var(--tf) 3%, transparent);
   }
-  .moin-term-toggle {
+  .hub-term-toggle {
     list-style: none;
     display: flex;
     width: 100%;
@@ -356,49 +356,49 @@
     outline: none;
     border-radius: 8px;
   }
-  .moin-term-toggle::-webkit-details-marker {
+  .hub-term-toggle::-webkit-details-marker {
     display: none;
   }
-  .moin-term-toggle:hover {
+  .hub-term-toggle:hover {
     color: var(--tf);
     background: color-mix(in oklab, var(--tf) 5%, transparent);
   }
-  .moin-term-toggle:focus-visible {
+  .hub-term-toggle:focus-visible {
     box-shadow: inset 0 0 0 2px var(--ring);
   }
-  .moin-term-arrow {
+  .hub-term-arrow {
     display: inline-block;
     transition: rotate 0.12s ease-out;
   }
-  [open] > .moin-term-toggle .moin-term-arrow {
+  [open] > .hub-term-toggle .hub-term-arrow {
     rotate: 90deg;
   }
   @media (max-width: 40rem) {
-    .moin-term-toggle {
+    .hub-term-toggle {
       padding-left: 2.25rem;
     }
   }
 
   /* Container logs: time, service, message. Phones show the message only. */
-  .moin-term-log {
+  .hub-term-log {
     grid-template-columns: 2.25rem minmax(0, 1fr);
   }
   @media (min-width: 40rem) {
-    .moin-term-log {
+    .hub-term-log {
       grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr);
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .moin-turn,
-    .moin-dot-live,
-    .moin-dot-run {
+    .hub-turn,
+    .hub-dot-live,
+    .hub-dot-run {
       animation: none;
     }
   }
 }
 
-@keyframes moin-breathe {
+@keyframes hub-breathe {
   0% {
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
   }
@@ -410,7 +410,7 @@
   }
 }
 
-@keyframes moin-blink {
+@keyframes hub-blink {
   50% {
     opacity: 0.35;
   }
@@ -441,7 +441,7 @@
 
 /* Feedback (DESIGN.md): a button that did its job shows a check in place of
    its label for a moment, at the same size; a line in the page under its
-   row or form says what failed. moin.js sets both. */
+   row or form says what failed. hub.js sets both. */
 @layer components {
   [data-done] {
     position: relative;
@@ -478,13 +478,13 @@
 
 /* The bar shows a line under it only once the page scrolls under it. */
 @layer components {
-  .moin-bar {
-    animation: moin-bar-line linear both;
+  .hub-bar {
+    animation: hub-bar-line linear both;
     animation-timeline: scroll();
     animation-range: 0 1.5rem;
   }
 }
-@keyframes moin-bar-line {
+@keyframes hub-bar-line {
   from {
     box-shadow: 0 1px 0 transparent;
   }

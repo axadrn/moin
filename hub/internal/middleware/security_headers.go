@@ -29,6 +29,14 @@ func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler 
 	})
 }
 
+// AllowOwnFrames lets this site show a response in a frame of its own. The
+// headers are set by then, so this changes them.
+func AllowOwnFrames(w http.ResponseWriter) {
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+	policy := w.Header().Get("Content-Security-Policy")
+	w.Header().Set("Content-Security-Policy", strings.Replace(policy, "frame-ancestors 'none'", "frame-ancestors 'self'", 1))
+}
+
 // contentSecurityPolicy says what a page may load and run. Scripts need the
 // nonce or one of the listed hosts, and nothing may frame the page.
 func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {

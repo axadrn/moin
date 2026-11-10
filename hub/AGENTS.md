@@ -120,14 +120,15 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/mcp` serves the MCP tools for AI agents.
 - `internal/service` owns business rules.
 - `internal/repository` owns raw SQL.
-- `internal/ui` has three flat folders, each answering one question. `kit/`: what pages are built from (rows, buttons, fields, dialog, icons, chart, wordmark); it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A part goes to `kit/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. No fourth folder without a good reason, no subfolders.
+- `internal/ui` has four flat folders, each answering one question. `components/`: the Go side of moin UI (`../ui` at the repo root), one templ function per component, printing exactly its example; a page that moved to moin UI uses these. `kit/`, on its way out as pages move: what pages are built from (rows, buttons, fields, dialog, icons, chart, wordmark); it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A part goes to `kit/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. No fourth folder without a good reason, no subfolders.
 - `internal/db/migrations` contains the Goose schema.
 - `internal/service/payment` contains the selected billing adapter.
 - `internal/access` contains signup policy, plans, features, limits, quotas, and lifecycle rules.
 - `internal/service/mailer` contains the selected mail adapter.
 - `internal/service/workspace.go` owns workspaces, roles, invitations, seats, and the activity.
 - `internal/storage` and `internal/service/file.go` own file storage.
-- `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `content/` is embedded in the binary (`content.FS`), read from disk in development. `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `/ui` is the website of moin UI: `ui/docs` and `ui/blocks` at the repo root, `internal/handler/ui.go`, `internal/ui/pages/ui.templ`.
 
 ## Included product surface
 This project includes authentication with email links and passwords, email verification, password recovery, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.

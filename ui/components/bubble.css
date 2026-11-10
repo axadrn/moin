@@ -1,0 +1,15 @@
+@layer moin-components {
+  /* An icon in a tinted circle. */
+  .moin-bubble {
+    --tint: var(--failed);
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--tint) 12%, transparent);
+    color: var(--tint);
+  }
+}

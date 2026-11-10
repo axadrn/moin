@@ -53,7 +53,7 @@ func TestChangelogFormat(t *testing.T) {
 			t.Errorf("%s: no Upgrade section", version)
 		}
 	}
-	html, err := Changelog(filepath.Join("..", "..", "content"))
+	html, err := Changelog(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil || !strings.Contains(html, "v1.0.0-beta.1") {
 		t.Errorf("Changelog renders %d bytes, %v", len(html), err)
 	}
@@ -67,7 +67,7 @@ func TestChangelogLinksIssues(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "changelog.md"), []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	html, err := Changelog(dir)
+	html, err := Changelog(os.DirFS(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestChangelogLinksIssues(t *testing.T) {
 			t.Errorf("%q should stay plain in %s", text, html)
 		}
 	}
-	page, err := Changelog(filepath.Join("..", "..", "content"))
+	page, err := Changelog(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil || !strings.Contains(page, `(<a href="https://github.com/axadrn/moin/issues/17">#17</a>)</li>`) {
 		t.Errorf("the changelog links no #17: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestChangelogLinksIssues(t *testing.T) {
 // TestChangelogReleases: the feed reads every version with its date and
 // its In short line, newest first.
 func TestChangelogReleases(t *testing.T) {
-	releases, err := ChangelogReleases("../../content")
+	releases, err := ChangelogReleases(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil {
 		t.Fatal(err)
 	}

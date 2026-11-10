@@ -1,9 +1,10 @@
 package service
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
+	"path"
 	"strings"
 	"time"
 
@@ -21,32 +22,27 @@ type LegalPage struct {
 }
 
 type LegalService struct {
-	contentDir   string
+	files        fs.FS
 	supportEmail string
 	pages        map[string]*LegalPage
 }
 
-// NewLegalService serves the pages in <contentDir>/legal. {{support_email}}
-// in a page becomes supportEmail.
-func NewLegalService(contentDir, supportEmail string) *LegalService {
+// NewLegalService serves the pages in legal/. {{support_email}} in a page
+// becomes supportEmail.
+func NewLegalService(files fs.FS, supportEmail string) *LegalService {
 	return &LegalService{
-		contentDir:   filepath.Join(contentDir, "legal"),
+		files:        files,
 		supportEmail: supportEmail,
 		pages:        make(map[string]*LegalPage),
 	}
 }
 
 func (s *LegalService) LoadPages() error {
-	files, err := os.ReadDir(s.contentDir)
+	files, err := fs.ReadDir(s.files, "legal")
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
-		if os.IsNotExist(err) {
-			// Create directory if it doesn't exist
-			err = os.MkdirAll(s.contentDir, 0755)
-			if err != nil {
-				return fmt.Errorf("failed to create legal directory: %w", err)
-			}
-			return nil
-		}
 		return fmt.Errorf("failed to read legal directory: %w", err)
 	}
 
@@ -68,8 +64,7 @@ func (s *LegalService) LoadPages() error {
 }
 
 func (s *LegalService) loadPage(slug string) (*LegalPage, error) {
-	filePath := filepath.Join(s.contentDir, slug+".md")
-	content, err := os.ReadFile(filePath)
+	content, err := fs.ReadFile(s.files, path.Join("legal", slug+".md"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -81,12 +76,6 @@ func (s *LegalService) loadPage(slug string) (*LegalPage, error) {
 		return nil, fmt.Errorf("failed to parse markdown: %w", err)
 	}
 
-	// Get file info for last updated date
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file info: %w", err)
-	}
-
 	title, _ := meta["title"].(string)
 	description, _ := meta["description"].(string)
 	if title == "" {
@@ -94,17 +83,12 @@ func (s *LegalService) loadPage(slug string) (*LegalPage, error) {
 		title = cases.Title(language.English).String(strings.ReplaceAll(slug, "-", " "))
 	}
 
-	// Get lastUpdated from frontmatter first, fallback to file modification time
+	// A file in the binary has no date of its own: the page says it.
 	var lastUpdated string
 	dateValue, ok := meta["lastUpdated"]
 	if ok {
 		// Try to parse various date formats
 		lastUpdated = s.parseDate(dateValue)
-	}
-
-	// Fallback to file modification time if not in frontmatter
-	if lastUpdated == "" {
-		lastUpdated = info.ModTime().Format("January 2, 2006")
 	}
 
 	return &LegalPage{

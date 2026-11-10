@@ -1,0 +1,24 @@
+@layer moin-components {
+  /* A file: the browser's own picker, its button in our shape. */
+  .moin-file {
+    display: block;
+    width: 100%;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-file::file-selector-button {
+    height: var(--press);
+    margin-inline-end: var(--space-3);
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-press);
+    background: var(--muted);
+    color: var(--foreground);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .moin-file:focus-visible::file-selector-button { box-shadow: var(--focus); }
+}

@@ -1,0 +1,59 @@
+@layer moin-components {
+  /* Text: five sizes and a few ways to say more. */
+  .moin-title {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+  }
+  .moin-number {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    font-variant-numeric: tabular-nums;
+  }
+  .moin-heading {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 500;
+  }
+  .moin-text {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-small {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .moin-muted { color: var(--muted-foreground); }
+  .moin-strong { font-weight: 500; }
+  .moin-mono { font-family: var(--font-mono); }
+  .moin-digits { font-variant-numeric: tabular-nums; }
+  .moin-center { text-align: center; }
+  .moin-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A link in a line of text. */
+  .moin-link {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+  .moin-link:hover { color: var(--foreground); }
+}

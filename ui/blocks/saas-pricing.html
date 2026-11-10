@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricing</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <div class="moin-stack moin-center" data-gap="2">
+        <h1 class="moin-title">Simple pricing</h1>
+        <p class="moin-muted">Start free. Pay when it grows.</p>
+      </div>
+      <!-- Cards -->
+      <div class="moin-grid" data-cols="3">
+        <section class="moin-card">
+          <div class="moin-stack" data-gap="1">
+            <h2 class="moin-heading">Free</h2>
+            <span class="moin-number">$0</span>
+          </div>
+          <p class="moin-text moin-muted">For one person trying it out.</p>
+          <button type="button" class="moin-button">Start free</button>
+        </section>
+        <section class="moin-card">
+          <div class="moin-stack" data-gap="1">
+            <h2 class="moin-heading">Pro</h2>
+            <span class="moin-number">$12</span>
+          </div>
+          <p class="moin-text moin-muted">For one person who ships.</p>
+          <button type="button" class="moin-button" data-kind="primary">Go Pro</button>
+        </section>
+        <section class="moin-card">
+          <div class="moin-stack" data-gap="1">
+            <h2 class="moin-heading">Team</h2>
+            <span class="moin-number">$48</span>
+          </div>
+          <p class="moin-text moin-muted">For five people and their work.</p>
+          <button type="button" class="moin-button">Start a team</button>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
