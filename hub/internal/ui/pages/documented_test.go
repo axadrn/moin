@@ -18,7 +18,7 @@ var (
 // notKit look like a class of moin UI and are not one: keys of localStorage,
 // URL params and custom elements.
 var notKit = map[string]bool{
-	"moin-mode":           true,
+	"moin-theme", "moin-mode": true,
 	"moin-docs-surface":   true,
 	"moin-changelog-seen": true,
 	"moin-theme-editor":   true,

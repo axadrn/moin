@@ -443,6 +443,7 @@
       theme.vars = varsOf(theme);
       moin.write("moin-theme", JSON.stringify(theme));
       applyTheme();
+      markReset();
       this.refresh(keepInputs);
     }
 
@@ -488,5 +489,21 @@
       this.querySelector("#moin-theme-code").value = encode(theme);
     }
   }
+  // Reset theme shows only while a theme other than moin's own is on.
+  function markReset() {
+    const shape = (theme) => JSON.stringify({ radius: theme.radius, picks: theme.picks || {}, colors: theme.colors || {} });
+    const theme = load();
+    const tried = Object.keys(theme).length > 0 && shape(theme) !== shape(PRESETS.Moin);
+    document.querySelectorAll("[data-theme-reset]").forEach((button) => (button.hidden = !tried));
+  }
+  markReset();
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-theme-reset]")) return;
+    try {
+      localStorage.removeItem("moin-theme");
+    } catch {}
+    location.reload();
+  });
+
   customElements.define("moin-theme-editor", ThemeEditor);
 })();

@@ -43,7 +43,18 @@ templ uiPage(seo layouts.SEOProps) {
 // uiHead is the title of the site and its tabs.
 templ uiHead(active string) {
 	@components.Header(components.HeaderProps{Title: "The UI moin runs on", Line: uiText("Native HTML, CSS and JS for any stack. Your code, not a library. Experimental: it can change at any time.")})
-	@components.Tabs(components.TabsProps{Label: "moin UI", Tabs: uiTabs(active)})
+	<div class="moin-row" data-gap="2">
+		@components.Tabs(components.TabsProps{Label: "moin UI", Tabs: uiTabs(active)})
+		@uiReset()
+	</div>
+}
+
+// uiReset undoes a theme you tried. It shows only while one is on
+// (theme-editor.js).
+templ uiReset() {
+	@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"data-theme-reset": true, "hidden": true, "aria-label": "Reset theme", "data-tip": "Reset theme"}}) {
+		@components.Icon("undo")
+	}
 }
 
 templ uiText(words string) {
@@ -114,7 +125,9 @@ func uiBack(page *model.DocPage) components.Back {
 // UIDoc is one component.
 templ UIDoc(page *model.DocPage, next *model.DocPage) {
 	@uiPage(layouts.SEOProps{Title: page.Title + " · moin UI", Description: page.Description, Path: ctxkeys.URLPath(ctx), MarkdownPath: uiURL(page) + ".md"}) {
-		@components.Header(components.HeaderProps{Back: uiBack(page), Title: page.Title})
+		@components.Header(components.HeaderProps{Back: uiBack(page), Title: page.Title}) {
+			@uiReset()
+		}
 		@uiProse(page)
 		if next != nil {
 			@components.Card(components.CardProps{}) {
@@ -167,6 +180,7 @@ templ UIBlock(block *model.UIBlock) {
 			@components.Button(components.ButtonProps{Href: "/assets/ui/blocks/" + block.Slug + ".html", Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
 				Full screen
 			}
+			@uiReset()
 		}
 		@components.Preview(components.PreviewProps{ID: "block-code", Code: block.Code}) {
 			<iframe src={ "/assets/ui/blocks/" + block.Slug + ".html" } title={ block.Title } loading="lazy"></iframe>
