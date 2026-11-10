@@ -43,7 +43,14 @@
   }
 
   .moin-preview-source { border-top: 1px solid var(--border); }
+  .moin-preview-source > summary::-webkit-details-marker { display: none; }
+  .moin-preview-source > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
+  .moin-preview-source[open] > summary .moin-chevron { rotate: 90deg; }
   .moin-preview-source > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    list-style: none;
     padding: var(--space-3) var(--space-5);
     color: var(--muted-foreground);
     font-size: 0.875rem;
