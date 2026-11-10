@@ -29,23 +29,9 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Install Tailwind CSS
-        env:
-          TAILWIND_URL: https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
-          TAILWIND_SHA256: dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a
-        run: |
-          curl --fail --location --silent --show-error "$TAILWIND_URL" --output "$RUNNER_TEMP/tailwindcss"
-          echo "$TAILWIND_SHA256  $RUNNER_TEMP/tailwindcss" | sha256sum --check -
-          chmod +x "$RUNNER_TEMP/tailwindcss"
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-
       - name: Generate templ files
         working-directory: hub
         run: go tool templ generate
-
-      - name: Build Tailwind CSS
-        working-directory: hub
-        run: tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 
       - name: Check module declarations
         run: |

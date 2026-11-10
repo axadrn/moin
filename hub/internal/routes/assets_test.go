@@ -33,7 +33,7 @@ func TestFontAssetPathPattern(t *testing.T) {
 		"fonts/geist/geist-variable.woff2":              true,
 		"/fonts/bricolage/bricolage-grotesque-bold.ttf": true,
 		"/fonts/geist/README.md":                        false,
-		"/css/output.css":                               false,
+		"/css/hub.css":                                  false,
 	} {
 		if got := fontAssetPathPattern.MatchString(path); got != want {
 			t.Errorf("fontAssetPathPattern.MatchString(%q) = %t, want %t", path, got, want)

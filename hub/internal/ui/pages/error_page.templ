@@ -21,7 +21,6 @@ templ ErrorPage(status int, title, description string) {
 				document.documentElement.classList.toggle('dark', dark);
 				document.documentElement.classList.toggle('light', theme === 'light');
 			</script>
-			<link href={ components.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
 			<link href={ components.AssetURL("/assets/ui/moin.css") } rel="stylesheet"/>
 			<link href={ components.AssetURL("/assets/css/hub.css") } rel="stylesheet"/>
 		</head>
