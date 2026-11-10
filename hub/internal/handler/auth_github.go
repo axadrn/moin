@@ -82,7 +82,13 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("oauth_state")
 	if err != nil || cookie.Value != state || state == "" {
 		slog.Warn("github oauth state validation failed", "error", err)
-		render(w, r, pages.Auth("OAuth authentication failed. Please try again."))
+		// A sign-in that came back after another one finished, from a
+		// second tab or the back button: this browser is signed in already.
+		if ctxkeys.User(r.Context()) != nil {
+			redirect(w, r, "/app", http.StatusSeeOther)
+			return
+		}
+		render(w, r, pages.AuthGitHubFailed("This GitHub sign-in is no longer valid. Please try again."))
 		return
 	}
 
@@ -97,7 +103,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		slog.Warn("github oauth callback missing code")
-		render(w, r, pages.Auth("OAuth authentication failed. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
 		return
 	}
 
@@ -105,7 +111,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	token, err := h.githubOAuthConfig().Exchange(context.Background(), code)
 	if err != nil {
 		slog.Error("github oauth token exchange failed", "error", err)
-		render(w, r, pages.Auth("OAuth authentication failed. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
 		return
 	}
 
@@ -113,12 +119,12 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	emails, name, err := githubAccount(client, h.githubAPI())
 	if errors.Is(err, errOAuthEmailMissing) || errors.Is(err, errOAuthEmailUnverified) {
 		slog.Warn("github oauth: no verified email", "error", err)
-		render(w, r, pages.Auth("GitHub did not share a verified email address. Verify your email on GitHub and try again."))
+		render(w, r, pages.AuthGitHubFailed("GitHub did not share a verified email address. Verify your email on GitHub and try again."))
 		return
 	}
 	if err != nil {
 		slog.Error("failed to get github user info", "error", err)
-		render(w, r, pages.Auth("OAuth authentication failed. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
 		return
 	}
 
@@ -130,14 +136,14 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("oauth authentication failed", "error", err)
-		render(w, r, pages.Auth("Authentication failed. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("Authentication failed. Please try again."))
 		return
 	}
 
 	_, err = h.authService.StartSession(w, r, user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.Auth("An error occurred. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("An error occurred. Please try again."))
 		return
 	}
 

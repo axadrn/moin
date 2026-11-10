@@ -44,7 +44,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
-	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter)
+	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
 	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
@@ -165,7 +165,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
-func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter limiter) {
+func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter, githubLimiter limiter) {
 	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
@@ -175,8 +175,8 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimi
 	mux.HandleFunc("GET /auth/forgot-password-sent", middleware.RequireGuest(auth.ForgotPasswordSentPage))
 	mux.HandleFunc("GET /auth/magic-link-sent", middleware.RequireGuest(auth.MagicLinkSentPage))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
-	mux.HandleFunc("GET /auth/github", rateLimiter(middleware.RequireGuest(auth.GitHubAuth)))
-	mux.HandleFunc("GET /auth/github/callback", rateLimiter(auth.GitHubCallback))
+	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
+	mux.HandleFunc("GET /auth/github/callback", githubLimiter(auth.GitHubCallback))
 	mux.HandleFunc("GET /auth/magic-link/{token}", auth.VerifyMagicLink)
 	mux.HandleFunc("GET /auth/forgot-password/{token}", auth.VerifyForgotPassword)
 	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)

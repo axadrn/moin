@@ -13,12 +13,25 @@ import (
 // Auth is the way in: GitHub first where it is set up, else a link by
 // email, and a password for those who set one.
 templ Auth(errorMsg string) {
+	@authPage(errorMsg, "")
+}
+
+// AuthGitHubFailed is the way in after a GitHub sign-in did not work. The
+// email field had nothing to do with it, so the message stands on its own.
+templ AuthGitHubFailed(message string) {
+	@authPage("", message)
+}
+
+templ authPage(errorMsg, githubError string) {
 	{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
 	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
 		if ctxkeys.RenderConfig(ctx).Billing {
 			@authLine() {
 				30 days free. No card.
 			}
+		}
+		if githubError != "" {
+			<p class="moin-text moin-failed moin-center" role="alert">{ githubError }</p>
 		}
 		@authStack() {
 			if github {
