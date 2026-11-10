@@ -33,7 +33,7 @@ templ HomeOpenSection(open HomeOpen) {
 		<section id="open" class="moin-band">
 			<h2 class="moin-statement">Built in the open.</h2>
 			@components.List() {
-				@components.Item(components.ItemProps{Href: layouts.GitHubURL, Name: "Open source", Note: "AGPL-3.0, every line on GitHub"})
+				@components.Item(components.ItemProps{Href: layouts.GitHubURL, Name: "Open source", Note: "Every line on GitHub"})
 				@components.Item(components.ItemProps{Href: "/changelog", Name: homeVersions(open.Releases), Note: "Since " + open.Since.Format("January 2, 2006")})
 				@components.Item(components.ItemProps{Href: "/changelog", Name: open.Latest.Version, Note: open.Latest.Date.Format("January 2")})
 			}

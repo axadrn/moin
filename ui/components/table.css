@@ -45,7 +45,7 @@
   }
   .moin-table th a:hover { color: var(--foreground); }
   .moin-table th a:focus-visible {
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
     box-shadow: var(--focus);
   }
   .moin-table th[aria-sort] { color: var(--foreground); }

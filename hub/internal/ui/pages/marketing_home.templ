@@ -35,6 +35,7 @@ templ Home(network model.Network, open HomeOpen) {
 				@HomeSecurity()
 				@HomeCompare()
 				@HomeOpenSection(open)
+				@HomeNext()
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@HomePricing()
 				}
@@ -71,6 +72,7 @@ templ HomeHero() {
 	<section class="moin-hero">
 		<div class="moin-page">
 			<div class="moin-stack" data-gap="6" data-center>
+				<a href="/next" class="moin-badge">{ brand.Name } next: what grows next to deploys</a>
 				<h1 class="moin-display moin-stack" style="--gap:0">
 					<span>Deploy <br class="moin-only-phone"/>anything.</span>
 					<span class="moin-muted">Lose nothing.</span>
@@ -87,6 +89,18 @@ templ HomeHero() {
 		<div>
 			@homeHarbor()
 		</div>
+	</section>
+}
+
+// HomeNext says what grows next to deploys, and where to read more.
+templ HomeNext() {
+	<section id="next" class="moin-band">
+		<h2 class="moin-statement">What grows next.</h2>
+		<p class="moin-lead">Deploying stays the main thing. Next to it come the other tools a team needs to build software: tasks, docs, chat and mail.</p>
+		@components.List() {
+			@components.Item(components.ItemProps{Href: "/next", Name: brand.Name + " next", Note: "The story, and how it works"})
+			@components.Item(components.ItemProps{Href: "/docs/roadmap", Name: "The roadmap", Note: "Everything planned, deploys first"})
+		}
 	</section>
 }
 
@@ -339,7 +353,7 @@ templ HomeQuestions() {
 	<section id="questions" class="moin-band">
 		<h2 class="moin-statement">Good questions.</h2>
 		@components.List() {
-			@homeQuestion("Is "+brand.Name+" open source?", "Yes. AGPL-3.0, free to host yourself.")
+			@homeQuestion("Is "+brand.Name+" open source?", "Yes, and free to host yourself.")
 			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
 			@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
 			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")

@@ -5,7 +5,7 @@
     display: flex;
     gap: var(--space-3);
     padding: var(--space-4) var(--space-5);
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-lg);
     background: color-mix(in oklab, var(--tint) 14%, var(--card));
     color: var(--card-foreground);
   }

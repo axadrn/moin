@@ -91,7 +91,7 @@ var CompareRows = []CompareRow{
 	{"Every day", "Deploy from", yes("Folder, GitHub, image", "Your folder, a GitHub push or a CI image.", "")},
 	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
 	{"Every day", "Activity log", yes("Yes", "Who did what, when, in every workspace.", "")},
-	{"Price", "Host it yourself, free", yes("Yes", "AGPL-3.0, all of it.", "")},
+	{"Price", "Host it yourself, free", yes("Yes", "All of it.", "")},
 	{"Price", "You pay", plain("$29 per workspace", "Unlimited servers, apps and team. $249 a year. The tenth server costs the same as the first, the whole team is included and every feature is in.", "")},
 }
 

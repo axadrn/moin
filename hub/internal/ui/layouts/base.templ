@@ -38,6 +38,7 @@ templ Base(props ...SEOProps) {
 			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
 			<link href={ components.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
 			<link href={ components.AssetURL("/assets/ui/moin.css") } rel="stylesheet"/>
+			<link href={ components.AssetURL("/assets/css/hub.css") } rel="stylesheet"/>
 			// Scripts in swapped content get the page's nonce, so the CSP lets
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>

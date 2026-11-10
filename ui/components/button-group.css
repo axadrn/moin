@@ -1,17 +1,17 @@
 @layer moin-components {
-  /* Buttons that belong together, side by side. Only the outer corners are
-     round; the inner ones are at most a quarter of the height. */
+  /* Buttons that belong together, side by side. The outer corners are the
+     ones of a button, the inner ones the small step. */
   .moin-button-group {
     display: inline-flex;
     gap: 2px;
   }
-  .moin-button-group > .moin-button { border-radius: min(var(--radius), calc(var(--press) / 4)); }
+  .moin-button-group > .moin-button { border-radius: var(--radius-sm); }
   .moin-button-group > .moin-button:first-child {
-    border-start-start-radius: var(--radius-press);
-    border-end-start-radius: var(--radius-press);
+    border-start-start-radius: var(--radius-md);
+    border-end-start-radius: var(--radius-md);
   }
   .moin-button-group > .moin-button:last-child {
-    border-start-end-radius: var(--radius-press);
-    border-end-end-radius: var(--radius-press);
+    border-start-end-radius: var(--radius-md);
+    border-end-end-radius: var(--radius-md);
   }
 }

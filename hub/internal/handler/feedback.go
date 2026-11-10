@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/axadrn/moin/hub/internal/api"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // The answers of DESIGN.md, Feedback: each handler picks one of them, so the
@@ -20,12 +20,12 @@ import (
 // check for a moment. title is the thing and the past verb ("blog added"),
 // description what follows, if anything.
 func answerDone(w http.ResponseWriter, r *http.Request, title, description string) {
-	renderOOB(w, r, kit.Feedback("done", title, description), "beforeend:#feedback")
+	renderOOB(w, r, components.Feedback(components.FeedbackProps{Kind: "done", Title: title, Note: description}), "beforeend:#feedback")
 }
 
 // answerNote says that an action worked only in part, and what is left.
 func answerNote(w http.ResponseWriter, r *http.Request, title, description string) {
-	renderOOB(w, r, kit.Feedback("note", title, description), "beforeend:#feedback")
+	renderOOB(w, r, components.Feedback(components.FeedbackProps{Kind: "note", Title: title, Note: description}), "beforeend:#feedback")
 }
 
 // answerFailed says why an action failed when no field is to blame, in a line
@@ -39,7 +39,7 @@ func answerFailed(w http.ResponseWriter, r *http.Request, title, description str
 // answerError is the line of answerFailed for an answer that also swaps in
 // the part as it is now, like a switch that flips back.
 func answerError(w http.ResponseWriter, r *http.Request, title, description string) {
-	renderOOB(w, r, kit.Feedback("failed", title, description), "beforeend:#feedback")
+	renderOOB(w, r, components.Feedback(components.FeedbackProps{Kind: "failed", Title: title, Note: description}), "beforeend:#feedback")
 }
 
 // fieldError marks the field with the ID field as wrong: it turns red and

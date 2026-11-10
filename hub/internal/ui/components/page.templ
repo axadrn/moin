@@ -1,6 +1,10 @@
 package components
 
-import "github.com/axadrn/moin/hub/internal/brand"
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+)
 
 // Back is the page one step up. A page at the top has none.
 type Back struct {
@@ -388,4 +392,18 @@ templ ConfirmDialog() {
 			}
 		}
 	}
+}
+
+// PaletteActionProps is an answer of the palette that does something.
+type PaletteActionProps struct {
+	ID       string
+	Selected bool
+	Attrs    templ.Attributes
+}
+
+// PaletteAction is one option of a palette that acts instead of opening a page.
+templ PaletteAction(p PaletteActionProps) {
+	<button type="button" id={ p.ID } role="option" aria-selected={ strconv.FormatBool(p.Selected) } class="moin-option" { p.Attrs... }>
+		{ children... }
+	</button>
 }

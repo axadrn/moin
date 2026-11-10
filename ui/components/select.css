@@ -9,7 +9,7 @@
     justify-content: space-between;
     gap: var(--space-2);
     padding-inline: var(--space-5);
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     font-size: 0.875rem;
     text-align: left;
@@ -34,8 +34,8 @@
     min-width: 12rem;
     max-height: 18rem;
     margin: var(--space-2) 0 0;
-    padding: calc(2 * var(--inset) - var(--scroll-edge));
-    border-radius: calc(var(--radius-press) + var(--scroll-edge));
+    padding: calc(var(--menu-gap) - var(--scroll-edge));
+    border-radius: var(--radius-lg);
     background: var(--menu);
     color: var(--menu-foreground);
     backdrop-filter: var(--menu-blur);
@@ -70,8 +70,9 @@
     align-items: center;
     gap: var(--space-3);
     /* The text starts where the text of the field it belongs to starts. */
-    padding: var(--space-2) calc(var(--space-5) - max(2 * var(--inset), var(--scroll-edge)));
-    border-radius: var(--radius-press);
+    padding: var(--space-2) calc(var(--space-5) - var(--menu-gap));
+    /* Its curve runs along the one of the menu it is in. */
+    border-radius: max(0px, calc(var(--radius-lg) - var(--menu-gap)));
     font-size: 0.875rem;
     line-height: 1.25rem;
     text-align: left;

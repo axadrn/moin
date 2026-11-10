@@ -12,19 +12,19 @@
   }
   .moin-range::-webkit-slider-runnable-track {
     height: 0.5rem;
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
   }
   .moin-range::-moz-range-track {
     height: 0.5rem;
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
   }
   .moin-range::-webkit-slider-thumb {
     width: 1.5rem;
     height: 1.5rem;
     margin-top: -0.5rem;
-    border-radius: max(0px, calc(var(--radius-press) - 2px));
+    border-radius: max(0px, calc(var(--radius-md) - 2px));
     background: var(--foreground);
     box-shadow: var(--shadow-low);
     appearance: none;
@@ -33,7 +33,7 @@
     width: 1.5rem;
     height: 1.5rem;
     border: 0;
-    border-radius: max(0px, calc(var(--radius-press) - 2px));
+    border-radius: max(0px, calc(var(--radius-md) - 2px));
     background: var(--foreground);
     box-shadow: var(--shadow-low);
   }

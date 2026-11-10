@@ -9,7 +9,7 @@
     height: var(--press);
     padding-inline: var(--space-5);
     border: 0;
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     color: var(--foreground);
     font-size: 0.875rem;

@@ -55,7 +55,7 @@
     gap: var(--space-2);
     height: 1.75rem;
     padding-inline: 0.625rem var(--space-3);
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     color: var(--muted-foreground);
     font-size: 0.875rem;

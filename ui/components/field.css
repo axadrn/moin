@@ -7,7 +7,7 @@
     height: var(--press);
     padding-inline: var(--space-5);
     border: 0;
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     font-size: 1rem;
     outline: none;
@@ -17,7 +17,7 @@
     width: 100%;
     min-height: 10rem;
     padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-md);
     background: var(--muted);
     font-family: var(--font-mono);
     font-size: 1rem;
@@ -77,7 +77,7 @@
     min-width: 0;
     height: var(--press);
     padding-inline: var(--space-5);
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     color: var(--muted-foreground);
     font-size: 1rem;

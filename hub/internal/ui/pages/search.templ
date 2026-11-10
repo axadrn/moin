@@ -269,22 +269,9 @@ templ SearchResults(items []SearchItem, query string) {
 			<div class="moin-palette-group" role="presentation">{ item.Group }</div>
 		}
 		if item.Post != "" {
-			<button
-				type="button"
-				id={ "search-" + strconv.Itoa(i) }
-				role="option"
-				aria-selected={ strconv.FormatBool(i == 0) }
-				class="moin-option"
-				hx-post={ item.Post }
-				hx-swap="none"
-				if item.Confirm != "" {
-					hx-confirm={ item.Confirm }
-					data-confirm-action={ item.Accept }
-				}
-				data-pick={ item.ID() }
-			>
+			@components.PaletteAction(components.PaletteActionProps{ID: "search-" + strconv.Itoa(i), Selected: i == 0, Attrs: searchActionAttrs(item)}) {
 				@searchOption(item)
-			</button>
+			}
 		} else {
 			<a
 				id={ "search-" + strconv.Itoa(i) }
@@ -319,4 +306,14 @@ templ searchOption(item SearchItem) {
 	if item.Key != "" {
 		<kbd class="moin-kbd">{ item.Key }</kbd>
 	}
+}
+
+// searchActionAttrs is what an answer that does something sends.
+func searchActionAttrs(item SearchItem) templ.Attributes {
+	attrs := templ.Attributes{"hx-post": item.Post, "hx-swap": "none", "data-pick": item.ID()}
+	if item.Confirm != "" {
+		attrs["hx-confirm"] = item.Confirm
+		attrs["data-confirm-action"] = item.Accept
+	}
+	return attrs
 }

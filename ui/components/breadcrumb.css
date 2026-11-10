@@ -26,7 +26,7 @@
   .moin-breadcrumb a { outline: none; }
   .moin-breadcrumb a:hover { color: var(--foreground); }
   .moin-breadcrumb a:focus-visible {
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
     box-shadow: var(--focus);
   }
   .moin-breadcrumb [aria-current] { color: var(--foreground); }

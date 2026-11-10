@@ -6,9 +6,11 @@
     --muted-foreground: color-mix(in oklab, var(--terminal-foreground) 65%, transparent);
     position: relative;
     min-width: 0;
+    --copy-outer: var(--radius-lg);
+    --copy-gap: max(var(--scroll-edge), var(--space-1));
     /* Always a box, also on a card of the same color. */
     border: 1px solid var(--border);
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-lg);
     background: var(--terminal);
     color: var(--terminal-foreground);
   }
@@ -27,8 +29,8 @@
   .moin-code > .moin-copy {
     position: absolute;
     /* Off the corner also when the theme has no radius. */
-    top: max(var(--scroll-edge), var(--space-1));
-    right: max(var(--scroll-edge), var(--space-1));
+    top: var(--copy-gap);
+    right: var(--copy-gap);
     background: var(--terminal);
   }
   .moin-code > .moin-copy:hover { background: color-mix(in oklab, var(--foreground) 12%, var(--terminal)); }

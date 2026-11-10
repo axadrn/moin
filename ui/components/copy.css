@@ -1,13 +1,14 @@
 @layer moin-components {
   /* A command to copy. */
   .moin-command {
+    --copy-gap: max(var(--scroll-edge), var(--space-1));
     display: flex;
     height: var(--press);
     min-width: 0;
     align-items: center;
     gap: var(--space-2);
-    padding-inline: var(--space-5) max(var(--scroll-edge), var(--space-1));
-    border-radius: var(--radius-press);
+    padding-inline: var(--space-5) var(--copy-gap);
+    border-radius: var(--radius-md);
     background: var(--muted);
   }
   .moin-command > code {
@@ -26,7 +27,8 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border-radius: var(--radius-press);
+    /* In the corner of its box its curve runs along the box's. */
+    border-radius: max(0px, calc(var(--copy-outer, var(--radius-md)) - var(--copy-gap, 0px)));
     color: var(--muted-foreground);
     outline: none;
   }

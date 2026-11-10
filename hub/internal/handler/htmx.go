@@ -14,7 +14,7 @@ func isAction(r *http.Request) bool {
 }
 
 // confirmation is the name typed into the confirm dialog, for the service
-// to check before what is big and cannot be undone. kit.ConfirmDialog sends
+// to check before what is big and cannot be undone. components.ConfirmDialog sends
 // it as X-Moin-Confirm, URI-encoded, since a header carries no UTF-8.
 func confirmation(r *http.Request) string {
 	typed, err := url.PathUnescape(r.Header.Get("X-Moin-Confirm"))

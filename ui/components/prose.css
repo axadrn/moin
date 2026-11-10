@@ -19,7 +19,7 @@
     ol { padding-inline-start: 1.25rem; list-style: decimal; }
     :not(pre) > code {
       padding: 0.125em 0.375em;
-      border-radius: var(--radius);
+      border-radius: var(--radius-sm);
       background: var(--muted);
       font-family: var(--font-mono);
       font-size: 0.875em;
@@ -27,7 +27,7 @@
     pre {
       padding: var(--space-4) var(--space-5);
       overflow-x: auto;
-      border-radius: var(--radius-large);
+      border-radius: var(--radius-lg);
       background: var(--terminal);
       color: var(--terminal-foreground);
       font-family: var(--font-mono);
@@ -45,7 +45,7 @@
     }
     img {
       max-width: 100%;
-      border-radius: var(--radius-large);
+      border-radius: var(--radius-lg);
     }
     /* A table: a line between its rows. Only its own box scrolls sideways. */
     table {

@@ -1,0 +1,334 @@
+/* The hub's own CSS, on top of moin UI: its fonts, the look of a log and of
+   the hero, and what htmx needs. Everything else is moin UI. */
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/geist/geist-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/geist/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* The scrollbar always has its place, so a page that gets shorter or longer
+   never shifts sideways. A modal dialog keeps the page still. */
+html {
+  scrollbar-gutter: stable;
+}
+html:has(dialog:modal) {
+  overflow: hidden;
+}
+body {
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"]) {
+  position: relative;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"]) > * {
+  visibility: hidden;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"])::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 1rem;
+  height: 1rem;
+  content: "";
+  border: 2px solid var(--muted-foreground);
+  border-top-color: var(--foreground);
+  border-radius: 9999px;
+  animation: hub-spin 0.7s linear infinite;
+}
+
+
+@keyframes hub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* app */
+/* The running symbol turns (the landing page uses it too). */
+.hub-turn {
+  animation: hub-spin 1.6s linear infinite;
+  transform-origin: center;
+}
+
+/* Status dots: live breathes, running blinks. */
+.hub-dot-live {
+  animation: hub-breathe 2.4s ease-out infinite;
+}
+.hub-dot-run {
+  animation: hub-blink 1.2s ease-in-out infinite;
+}
+
+/* Logs and commands: mono on the surface they sit on. */
+.hub-term {
+  --tf: var(--card-foreground);
+  color: color-mix(in oklab, var(--tf) 92%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.85;
+  font-variant-ligatures: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--tf) 18%, transparent) transparent;
+}
+.hub-term-lines {
+  counter-reset: line;
+}
+.hub-term-line {
+  counter-increment: line;
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  padding-right: 1.25rem;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.hub-term-line::before {
+  content: counter(line);
+  padding-right: 1rem;
+  text-align: right;
+  color: color-mix(in oklab, var(--tf) 22%, transparent);
+  user-select: none;
+}
+.hub-term-line[data-n]::before {
+  content: attr(data-n);
+}
+.hub-term-line:hover {
+  background: color-mix(in oklab, var(--tf) 4%, transparent);
+}
+.hub-term-line[data-kind="out"] {
+  color: color-mix(in oklab, var(--tf) 50%, transparent);
+}
+.hub-term-line[data-kind="step"] > span::before {
+  content: "→ ";
+  color: color-mix(in oklab, var(--tf) 45%, transparent);
+}
+.hub-term-line[data-kind="ok"] {
+  color: var(--live);
+}
+.hub-term-line[data-kind="ok"] > span::before {
+  content: "✓ ";
+}
+.hub-term-line[data-kind="err"] {
+  color: var(--failed);
+}
+.hub-term-line[data-kind="err"] > span::before {
+  content: "✗ ";
+}
+.hub-term-dim {
+  color: color-mix(in oklab, var(--tf) 42%, transparent);
+}
+@media (max-width: 40rem) {
+  .hub-term-line {
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    padding-right: 0.75rem;
+  }
+  .hub-term-line::before {
+    padding-right: 0.75rem;
+  }
+}
+
+/* Tool output between two steps folds into one line: a <details>. */
+.hub-term-fold:not(:has(.hub-term-line)) {
+  display: none;
+}
+.hub-term-fold[open] {
+  background: color-mix(in oklab, var(--tf) 3%, transparent);
+}
+.hub-term-toggle {
+  list-style: none;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem 0 2.75rem;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  color: color-mix(in oklab, var(--tf) 52%, transparent);
+  cursor: pointer;
+  outline: none;
+  border-radius: 8px;
+}
+.hub-term-toggle::-webkit-details-marker {
+  display: none;
+}
+.hub-term-toggle:hover {
+  color: var(--tf);
+  background: color-mix(in oklab, var(--tf) 5%, transparent);
+}
+.hub-term-toggle:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+.hub-term-arrow {
+  display: inline-block;
+  transition: rotate 0.12s ease-out;
+}
+[open] > .hub-term-toggle .hub-term-arrow {
+  rotate: 90deg;
+}
+@media (max-width: 40rem) {
+  .hub-term-toggle {
+    padding-left: 2.25rem;
+  }
+}
+
+/* Container logs: time, service, message. Phones show the message only. */
+.hub-term-log {
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+}
+@media (min-width: 40rem) {
+  .hub-term-log {
+    grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-turn,
+  .hub-dot-live,
+  .hub-dot-run {
+    animation: none;
+  }
+}
+
+
+@keyframes hub-breathe {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes hub-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* landing */
+/* A live dot breathes. */
+.lp-pulse {
+  animation: lp-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-pulse {
+    animation: none;
+  }
+}
+
+
+@keyframes lp-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--live) 18%, transparent);
+  }
+}
+
+/* Every link loads a whole page, with no fade: the browser keeps the old
+   page on screen until the new one is painted, so there is no flash, and a
+   fade would show both pages at once (a ghost on Back). */
+
+/* Feedback (DESIGN.md): a button that did its job shows a check in place of
+   its label for a moment, at the same size; a line in the page under its
+   row or form says what failed. hub.js sets both. */
+[data-done] {
+  position: relative;
+  color: transparent !important;
+}
+[data-done] > * {
+  visibility: hidden;
+}
+[data-done]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  background: var(--foreground);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.moin-button[data-kind="primary"][data-done]::after {
+  background: var(--primary-foreground);
+}
+[data-said] {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+header + [data-said] {
+  padding-inline: 0;
+}
+[data-said="failed"] {
+  color: var(--failed);
+}
+
+
+/* The bar shows a line under it only once the page scrolls under it. */
+.hub-bar {
+  animation: hub-bar-line linear both;
+  animation-timeline: scroll();
+  animation-range: 0 1.5rem;
+}
+
+@keyframes hub-bar-line {
+  from {
+    box-shadow: 0 1px 0 transparent;
+  }
+  to {
+    box-shadow: 0 1px 0 var(--border);
+  }
+}
+
+/* The wall of containers on the home page. */
+.hub-harbor {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+.hub-harbor-shade { stop-opacity: light-dark(0.26, 0.6); }
+.hub-harbor-card { fill: var(--card); }
+.hub-harbor-muted { fill: var(--muted); }
+.hub-harbor-ink { fill: var(--foreground); }
+.hub-harbor-tint-5 { fill: color-mix(in oklab, var(--foreground) 5%, transparent); }
+.hub-harbor-tint-9 { fill: color-mix(in oklab, var(--foreground) 9%, transparent); }
+.hub-harbor-side { fill: rgb(0 0 0 / light-dark(20%, 50%)); }
+.hub-harbor-foot { fill: rgb(0 0 0 / light-dark(35%, 65%)); }
+.hub-harbor-on-ink { fill: var(--background); }
+.hub-harbor-on-steel { fill: var(--foreground); }
+.hub-harbor-owner { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; }
+.hub-harbor-type { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.45; }
+.hub-harbor-app { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; opacity: 0.60; }
+.hub-harbor-app[data-ink] { opacity: 0.85; }
+.hub-harbor-rib { fill: color-mix(in oklab, var(--foreground) 7.5%, transparent); }
+.hub-harbor-rib-ink { fill: color-mix(in oklab, var(--background) 14%, transparent); }
+.hub-harbor-rail { fill: color-mix(in oklab, var(--foreground) 10%, transparent); }
+.hub-harbor-rail-ink { fill: color-mix(in oklab, var(--background) 12%, transparent); }

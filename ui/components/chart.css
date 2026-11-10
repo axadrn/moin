@@ -123,7 +123,7 @@
     content: "";
     width: 100%;
     height: var(--v);
-    border-radius: calc(var(--radius) * 0.5) calc(var(--radius) * 0.5) 0 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     background: var(--chart-1);
   }
   .moin-bars > i:hover::before { background: var(--chart-3); }
@@ -133,7 +133,7 @@
     position: fixed;
     z-index: 70;
     padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     /* The text color as its ground: it stands out on every surface. */
     background: var(--foreground);
     color: var(--background);
@@ -161,7 +161,7 @@
   .moin-history > i {
     flex: 1;
     min-width: 1px;
-    border-radius: calc(var(--radius) * 0.4);
+    border-radius: var(--radius-sm);
     background: var(--live);
   }
   .moin-history > i[data-state="failed"] { background: var(--failed); }
@@ -231,7 +231,7 @@
     flex: none;
     width: 0.625rem;
     height: 0.625rem;
-    border-radius: calc(var(--radius) * 0.4);
+    border-radius: var(--radius-sm);
     background: var(--c);
   }
 

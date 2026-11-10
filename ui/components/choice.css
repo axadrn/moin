@@ -12,7 +12,7 @@
     max-width: 100%;
     height: var(--press);
     padding: var(--space-1);
-    border-radius: var(--radius-press);
+    border-radius: var(--radius-md);
     background: var(--muted);
     overflow-x: auto;
     scrollbar-width: none;
@@ -25,7 +25,7 @@
     align-items: center;
     height: 100%;
     padding-inline: var(--space-4);
-    border-radius: max(0px, calc(var(--radius-press) - var(--space-1)));
+    border-radius: max(0px, calc(var(--radius-md) - var(--space-1)));
     color: var(--muted-foreground);
     font-size: 0.875rem;
     line-height: 1.25rem;

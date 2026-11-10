@@ -30,17 +30,24 @@
     --space-6: 1.5rem;
     --space-8: 2rem;
 
-    /* Shape: one number. What you press has one corner, what holds it a
-       slightly bigger one, so the corners nest. Round things stay round. */
+    /* Shape: one number. Every corner is a multiple of it, so at 0 everything
+       is square: tiny things, what you press, what holds it. Something inside
+       a box takes the box's corner minus the gap, never its own number.
+       Round things stay round. */
     --radius: 0.5rem;
-    --radius-press: calc(var(--radius) * 1.5);
-    --radius-large: calc(var(--radius) * 2);
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: calc(var(--radius) * 1.5);
+    --radius-lg: calc(var(--radius) * 2);
+    /* The floating bar: a pill, square in a theme without radius. */
+    --radius-bar: calc(var(--radius) * 4);
     --radius-full: 9999px;
     /* The gap around anything lit inside a group. */
     --inset: 0.1875rem;
     /* How far a scrollbar stays from the edge of a round box: what the
        biggest corner cuts off. */
-    --scroll-edge: calc(var(--radius-large) * 0.3);
+    --scroll-edge: calc(var(--radius-lg) * 0.3);
+    /* How far what is lit in a menu stays from its edge. */
+    --menu-gap: max(calc(2 * var(--inset)), var(--scroll-edge));
 
     /* Density: one number for how tight everything sits. Everything you press
        is this high, rows and cards follow. */

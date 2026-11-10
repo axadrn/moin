@@ -80,13 +80,13 @@ templ Compare(competitor Competitor) {
 templ compareHeader(name string, score CompareScore) {
 	<div aria-hidden="true" class="moin-hidden-phone">
 		<div class="moin-list" style="--card:transparent">
-			<div class="moin-item moin-text moin-muted">
-				<div class="moin-grid moin-fill" data-cols="2-3-3">
+			@components.Item(components.ItemProps{}) {
+				<div class="moin-grid moin-fill moin-text moin-muted" data-cols="2-3-3">
 					<span></span>
 					<span class="moin-stack" style="--gap:0"><span class="moin-strong">{ brand.Name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Ours, score.Facts) }</span></span>
 					<span class="moin-stack" style="--gap:0"><span class="moin-strong">{ name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Theirs, score.Facts) }</span></span>
 				</div>
-			</div>
+			}
 		</div>
 	</div>
 }

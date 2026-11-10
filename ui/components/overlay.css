@@ -6,7 +6,7 @@
     margin: auto;
     padding: var(--space-6);
     border: 0;
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-lg);
     background: var(--popover);
     color: var(--popover-foreground);
     box-shadow: var(--shadow-float);
@@ -42,7 +42,7 @@
     max-height: min(70vh, 34rem);
     margin: 12vh auto 0;
     overflow: hidden;
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-lg);
     background: var(--menu);
     color: var(--menu-foreground);
     backdrop-filter: var(--menu-blur);
@@ -62,7 +62,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: calc(2 * var(--inset) - var(--scroll-edge));
+    padding: calc(var(--menu-gap) - var(--scroll-edge));
     padding-top: calc(2 * var(--inset));
     border-top: 1px solid var(--border);
     overflow-y: auto;
@@ -71,7 +71,7 @@
 
   /* The name of a group of options, starting where their text starts. */
   .moin-palette-group {
-    padding: var(--space-3) calc(var(--space-5) - max(2 * var(--inset), var(--scroll-edge))) var(--space-1);
+    padding: var(--space-3) calc(var(--space-5) - var(--menu-gap)) var(--space-1);
     color: var(--muted-foreground);
     font-size: 0.75rem;
     line-height: 1rem;
