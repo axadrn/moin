@@ -57,33 +57,32 @@ phrases ("supercharge", "unleash", "seamless", "effortless",
 | `terminal`, `terminal-foreground` | log and command blocks, in both themes. One step lighter than anything it sits on: dark on light pages, `#2c2c2e` over the black page and `#1c1c1e` cards in dark |
 | neutrals | `background`, `card`, `muted`, `border`: pure grays, no tint |
 
-Tailwind: `font-display` (Geist 800, tight), `bg-brand text-brand-foreground`, `text-live`,
-`bg-live/12`, `text-running`, `text-failed`, `bg-terminal`. Numbers
-`tabular-nums`.
+Classes: `moin-display` (Geist 800, tight), `moin-live`, `moin-running`,
+`moin-failed`. Numbers `moin-digits`.
 
 **Logo.** The wordmark `moin.`, drawn as a shape: lowercase, with a round full
-stop, round like the dot on the i. `kit.Wordmark` on the page;
+stop, round like the dot on the i. `components.Wordmark` on the page;
 `assets/img/logo.svg`, the favicon (`m.` white on a black tile) and the OG
 image are the same shapes. The story behind the name is Why moin in the FAQ.
 
 ## Geometry
 
-One system, in one place: the kit (`internal/ui/kit`). A page gives a kit
-part its content, never a height, radius, padding or color. To change the
-look, change the kit, not a page. `/dev/kit` (only with `APP_ENV=development`)
-shows every part in every state, light and dark: check a part there once
+One system, in one place: moin UI (`ui/` at the repo root, the Go side in
+`internal/ui/components`). A page gives a component its content, never a
+height, radius, padding or color. To change the look, change moin UI, not a
+page. `/ui` shows every component, light and dark: check it there once
 instead of on every page.
 
 | Part | Value |
 | --- | --- |
-| Everything you press: buttons, fields, segments, chips, the search | 44 px high, a capsule (`rounded-full`) |
-| Groups: cards, lists, dialogs, the palette | `rounded-4xl`, 24 px inside |
-| Inside a group: rows, boxes, a log | the group's radius minus its padding (`rounded-3xl`), so the curves run parallel |
-| Page | `kit.Page`: one width (`max-w-5xl`), 16 px gutters on phones, 24 px from `sm` |
+| Everything you press: buttons, fields, segments, chips, the search | 44 px high, `--radius-md` |
+| Groups: cards, lists, dialogs, the palette | `--radius-lg`, 24 px inside |
+| Inside a group: rows, boxes, a log | the group's radius minus the gap to it, so the curves run parallel |
+| Page | `moin-page`: one width, 16 px gutters on phones, 24 px from a tablet up |
 
 Overlays (the palette, a select's list, the keys, the confirm dialog) float:
-one step lighter than what they cover (`bg-popover`: white in light, #2c2c2e
-in dark), a shadow, no border. What is lit inside them is `bg-foreground/8`,
+one step lighter than what they cover (`--popover`: white in light, #2c2c2e
+in dark), a shadow, no border. What is lit inside them is the foreground at 8 %,
 so it shows on any surface.
 
 Never a card in a card. Marketing illustrations (terminal, chat, the
@@ -98,9 +97,9 @@ Every page is a full page load; there is no hx-boost and no client router.
   auto; }` holds the old page until the new one paints, so nothing flashes.
 - **htmx only acts on the page:** save, delete, a switch, a search, a part
   that reloads itself. Never to switch pages.
-- **One tab bar per page at most** (`kit.Segmented`). A second level is a
+- **One tab bar per page at most** (`components.Tabs`). A second level is a
   list that drills down to its own page ("‹ my-app" back), never a second tab
-  bar. Filters that only narrow (a time range) are a `kit.Select`.
+  bar. Filters that only narrow (a time range) are a `components.Select`.
 - **Tabs only on an app's top level.** App, Deploys, Domains, Logs, Data
   and Settings have the app's head and its tabs. Anything one level deeper
   is a page of its own, the same on a phone and the desktop: one back
@@ -118,14 +117,13 @@ Every page is a full page load; there is no hx-boost and no client router.
   the middle of the screen, a native `<dialog>`. It finds apps, servers,
   places and actions, and shows each one's key. The same palette is in the
   TUI. There is no which-key menu.
-- **Live parts** use `kit.Live(url)`, the only way a page opens a stream
+- **Live parts** use `components.Live`, the only way a page opens a stream
   (hx-sse). It closes when the page is left, and a page back from the
   back-forward cache loads fresh (`hub.js`). A part that reloads itself
   has `hx-get` and `hx-trigger="<event> from:body"` and renders its content
   with the page; it is never empty until an event fills it.
-- **Scripts** live in the component that needs them (`templ.OnceHandle`)
-  or in `assets/js/hub.js` when every page needs them. Both listen on
-  `document`, so HTML that htmx swaps in works at once. No page script.
+- **Scripts** live in `ui/moin.js` when moin UI needs them and in
+  `assets/js/hub.js` when only the hub does. Both listen on `document`, so HTML that htmx swaps in works at once. No page script.
 
 ## Pages
 
@@ -141,53 +139,47 @@ Rules every page follows:
 
   | Name | Classes | Use |
   | --- | --- | --- |
-  | page title | `text-3xl font-semibold tracking-tight` | the `h1`, once per page |
-  | number | `text-2xl font-semibold tracking-tight tabular-nums` | a value that is the point |
-  | section title | `text-base font-medium` | card titles |
-  | body | `text-sm` | everything else (muted with `text-muted-foreground`) |
-  | small | `text-xs text-muted-foreground` | meta next to a value: times, counts |
+  | page title | `moin-title` | the `h1`, once per page |
+  | number | `moin-number` | a value that is the point |
+  | section title | `moin-heading` | card titles |
+  | body | `moin-text` | everything else (muted with `moin-muted`) |
+  | small | `moin-small moin-muted` | meta next to a value: times, counts |
 
-- **Families.** Geist (`font-sans`) for everything; Geist Mono (`font-mono`)
+- **Families.** Geist for everything; Geist Mono (`moin-mono`)
   only for code, commands, IDs, keys, commits, paths and log lines.
-- **Parts.** `kit.Card` (a topic with its title and at most one action),
-  `kit.List` and `kit.Row` (grouped rows, a line between rows, inset like
-  iOS), `kit.Section` (a quiet title over a list), `kit.Grid` (cards side by
-  side, as high as the highest), `kit.Field`, `kit.Input`, `kit.Select`,
-  `kit.Choice`, `kit.Segmented`, `kit.Button`, `kit.IconButton`,
-  `kit.Command`, `kit.Dialog`, `kit.Status` / `kit.Chip` / `kit.Dot` (a
-  state in words, as a pill, or as a dot), `kit.Chart` (drawn by the
-  server as SVG), and the icons of `kit/icons.templ`. Nothing comes from a
-  UI library: a page that needs a new part adds it to the kit and to
-  `/dev/kit`.
-- **One list, a few kinds of row.** Every group of rows is a `kit.List`;
+- **Components.** Everything a page is built from is one function with one
+  Props struct in `internal/ui/components`, printing exactly its example in
+  `ui/examples`. Nothing comes from a UI library: a page that needs something
+  new adds it to moin UI, with its docs and example.
+- **One list, a few kinds of row.** Every group of rows is a `components.List`;
   a page never draws a row of its own. Only what does something lights up,
   and the lines next to a lit row give way so the light fills the gap:
 
-  | Row | Kit | Looks |
+  | Row | `components.Item` | Looks |
   | --- | --- | --- |
-  | opens something | `kit.Row(href)`, `kit.RowAttrs`; another site `kit.RowExternal`; more in place `kit.RowMore` | lights up, ends in a chevron (↗ and a new tab for another site) |
-  | does something | `kit.RowButton` | lights up, names its action, no chevron |
-  | is picked | `kit.RowPick`, a radio of a form | the picked one is lit like under the mouse and ends in a check; no ring, no border |
-  | only tells | `kit.Row("")`, `kit.RowFact` | still: no light, the lines stay |
-  | holds a control | `kit.RowControl`, `kit.RowForm`, with `kit.RowLabel` | still: the switch, select or field is what you press |
+  | opens something | `Href`; another site `External`; more in place `components.Expand` | lights up, ends in a chevron (↗ and a new tab for another site) |
+  | does something | `Button` | lights up, names its action, no chevron |
+  | is picked | `Pick`, a radio of a form | the picked one is lit like under the mouse and ends in a check; no ring, no border |
+  | only tells | no `Href`, or `Value` | still: no light, the lines stay |
+  | holds a control | `For`, `Form` | still: the switch, select or field is what you press |
 
   Two lit rows never touch: the light is round and sits 3 px inside the
   row, so the open row and the one under the mouse keep room between them.
   Lines start where the text starts, after a leading icon or avatar
   (`data-lead`).
-  `/dev/kit` shows each kind.
+  `/ui/item` shows each kind.
 - **Icons only in the catalog.** A catalog app shows its logo
-  (`kit.AppIcon`) where you browse and pick; your own apps go by their
+  (`components.AppIcon`) where you browse and pick; your own apps go by their
   names everywhere else.
-- **One look for picking.** The palette and every `kit.Select` list share
-  `kit.OptionClass`: the option the mouse or the arrows are on is lit, only
+- **One look for picking.** The palette and every `components.Select` list share one
+  look: the option the mouse or the arrows are on is lit, only
   that one.
 - **No explaining.** No description line under a title, no help icon next
   to it. A card about an empty thing says what is missing in one sentence
   and shows the one button or command that fills it.
 - **Danger at the end.** Stop, remove and disconnect sit at the bottom of
   Settings, as red text buttons that ask first.
-- **Text.** Muted for secondary facts, `tabular-nums` for numbers and
+- **Text.** Muted for secondary facts, `moin-digits` for numbers and
   times. Times are relative ("3h ago") with the full stamp as `title`.
 - **Times, sizes and durations** read the same on every surface and come
   from one place, `internal/human`: "just now", "4m ago", "3h ago",
@@ -205,7 +197,7 @@ toasts.
   is the rest of the answer.
 - **If a field is wrong** (empty, too long, taken, not a domain): the field
   turns red and takes the focus, what was typed stays, and the line under
-  it says why in one short sentence (`kit.Field`). A field in one row with
+  it says why in one short sentence (`components.Field`). A field in one row with
   its button has that line too.
 - **If it failed and no field is to blame** (daemon offline, not allowed):
   a red line in the page under the row, form or head that sent it, until
@@ -255,11 +247,11 @@ decides, and for tier 1 sends the name.
 
 Web: put the question in `hx-confirm` ("Remove blog? Its data stays."):
 up to the first "? " is the title, the rest the description. The dialog
-(`blocks.ConfirmDialog`, in the base layout) repeats the label of the
+(`components.ConfirmDialog`, in the base layout) repeats the label of the
 clicked button, or `data-confirm-action`. Add `data-confirm-name` for
 tier 1. Never `window.confirm` and no question dialog of a page's own;
 only the account keeps its dialog, as the server checks the DELETE. The
-confirm dialog, the palette and the list of `kit.Select` are the only
+confirm dialog, the palette and the list of `components.Select` are the only
 overlays: no menus, popovers or
 sheets. CLI:
 `confirm` and `typeName` in `internal/cli/args.go`; TUI: `confirmFirst`
