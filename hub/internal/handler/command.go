@@ -61,7 +61,7 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 		input.Catalog = h.catalog.Store().Entries()
 	}
 	// recent are the IDs of the picks this browser remembers, the most
-	// used and latest first (moin.js).
+	// used and latest first (hub.js).
 	var recent []string
 	if value := r.URL.Query().Get("recent"); value != "" {
 		recent = strings.Split(value, "\n")

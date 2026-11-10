@@ -1,0 +1,16 @@
+@layer moin-components {
+  /* A key on the keyboard. */
+  .moin-kbd {
+    display: inline-flex;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    padding-inline: var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+}

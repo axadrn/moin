@@ -1,6 +1,6 @@
 ---
 title: "Why moin"
-description: "Small stack, a daemon that only dials out, backups whose restores are checked"
+description: "Small stack. A daemon that only dials out. Backups whose restores are checked."
 group: "Start"
 order: 3
 ---
@@ -18,7 +18,7 @@ moin is two programs you can read. It is not a pile of tools.
 | Web | HTML from the server, with templ and htmx. No Node, no npm tree. |
 | Database | SQLite, in a file next to the hub. |
 
-All of it is open source under AGPL-3.0, in one repo: [github.com/axadrn/moin](https://github.com/axadrn/moin).
+All of it is open source, in one repo: [github.com/axadrn/moin](https://github.com/axadrn/moin).
 
 ## The daemon only dials out
 

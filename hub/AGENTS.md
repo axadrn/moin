@@ -13,7 +13,7 @@ moin stands on its own: it started from a starter template, but it follows only 
 ## Stack
 
 - Go 1.26 with the standard library `net/http` router.
-- templ, htmx 4.0, vanilla JavaScript, and Tailwind CSS.
+- templ, htmx 4.0, vanilla JavaScript, and moin UI (`../ui`): native CSS, no build step.
 - sqlx with raw SQL and SQLite.
 - Cloudflare Email Sending for transactional email. Without credentials in development, emails go to the log.
 - Stripe for subscription billing.
@@ -103,9 +103,9 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 
 ## Commands
 
-- `task dev` runs templ, the application, and Tailwind watchers.
+- `task dev` runs templ and the application.
 - `task dev` selects available app and templ proxy ports automatically. Pass `APP_PORT`, `DEV_PORT`, or `OPEN_BROWSER=true` to override its development defaults.
-- No foreign UI library, not even for icons or charts: every part comes from our own kit (`internal/ui/kit`, gallery at `/app/<workspace>/dev/kit` in development). Icons are templ components in `kit/icons.templ`, drawn on one 24 grid with `currentColor`; only brand marks keep their official shapes.
+- No foreign UI library, not even for icons or charts: everything comes from moin UI (`../ui`, shown at `/ui`). Icons are SVG files in `../ui/icons`, drawn on one 24 grid with `currentColor`; only brand marks keep their official shapes.
 - `go test ./...` runs the test suite.
 - `go test -race ./...` checks concurrency behavior.
 - `go vet ./...` and `go build ./...` run static and build checks.
@@ -120,14 +120,15 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/mcp` serves the MCP tools for AI agents.
 - `internal/service` owns business rules.
 - `internal/repository` owns raw SQL.
-- `internal/ui` has three flat folders, each answering one question. `kit/`: what pages are built from (rows, buttons, fields, dialog, icons, chart, wordmark); it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A part goes to `kit/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. No fourth folder without a good reason, no subfolders.
+- `internal/ui` has three flat folders, each answering one question. `components/`: the Go side of moin UI (`../ui` at the repo root), one templ function per component, printing exactly its example; it knows looks, not moin's data. `layouts/`: what surrounds every page (the HTML frame, the app bar and palette, the site's navbar, footer and search). `pages/`: what one page shows, one file per page or topic. A piece goes to `components/` once two pages need it, to `layouts/` if it surrounds every page, else into its page. A test keeps every page on the components. No fourth folder without a good reason, no subfolders.
 - `internal/db/migrations` contains the Goose schema.
 - `internal/service/payment` contains the selected billing adapter.
 - `internal/access` contains signup policy, plans, features, limits, quotas, and lifecycle rules.
 - `internal/service/mailer` contains the selected mail adapter.
 - `internal/service/workspace.go` owns workspaces, roles, invitations, seats, and the activity.
 - `internal/storage` and `internal/service/file.go` own file storage.
-- `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `content/` is embedded in the binary (`content.FS`), read from disk in development. `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `/ui` is the website of moin UI: `ui/docs` and `ui/blocks` at the repo root, `internal/handler/ui.go`, `internal/ui/pages/ui.templ`.
 
 ## Included product surface
 This project includes authentication with email links and passwords, email verification, password recovery, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.

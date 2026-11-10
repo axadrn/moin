@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/xml"
+	"io/fs"
 	"log/slog"
 	"strings"
 	"time"
@@ -16,7 +17,13 @@ var publicRoutes = []struct {
 }{
 	{"/", "1.0", "daily"},
 	{"/docs", "0.8", "weekly"},
+	{"/next", "0.7", "weekly"},
+	{"/ui", "0.8", "weekly"},
+	{"/ui/components", "0.7", "weekly"},
+	{"/ui/layout", "0.7", "weekly"},
+	{"/ui/blocks", "0.7", "weekly"},
 	{"/catalog", "0.8", "daily"},
+	{"/roadmap", "0.6", "weekly"},
 	{"/changelog", "0.6", "weekly"},
 	{"/auth", "0.3", "monthly"},
 }
@@ -34,6 +41,8 @@ type SitemapService struct {
 	catalog []string
 	// compare are the slugs of the tools with a page under /compare.
 	compare []string
+	// ui are the pages of moin UI.
+	ui []string
 }
 
 // AddCatalog lists a page for each catalog app.
@@ -78,6 +87,9 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 			ChangeFreq: route.ChangeFreq, Priority: route.Priority,
 		})
 	}
+	for _, path := range s.ui {
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + path, LastMod: today, ChangeFreq: "weekly", Priority: "0.6"})
+	}
 	for _, slug := range s.catalog {
 		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/catalog/" + slug, LastMod: today, ChangeFreq: "daily", Priority: "0.7"})
 	}
@@ -99,6 +111,10 @@ func (s *SitemapService) docsURLs() []model.SitemapURL {
 	today := time.Now().Format("2006-01-02")
 	var urls []model.SitemapURL
 	for _, page := range s.docsService.FlatDocsList() {
+		// The roadmap's own page is /roadmap, in publicRoutes.
+		if page.Slug == "roadmap" {
+			continue
+		}
 		priority := "0.6"
 		if strings.Count(page.Slug, "/") == 0 {
 			priority = "0.8"
@@ -111,4 +127,28 @@ func (s *SitemapService) docsURLs() []model.SitemapURL {
 		})
 	}
 	return urls
+}
+
+// AddUI adds the pages of moin UI: its docs and its blocks.
+func (s *SitemapService) AddUI(docs *DocsService, files fs.FS) {
+	if docs == nil {
+		return
+	}
+	if _, err := docs.DocsTree(); err != nil {
+		return
+	}
+	for _, page := range docs.FlatDocsList() {
+		if page.Slug != "start" {
+			s.ui = append(s.ui, "/ui/"+page.Slug)
+		}
+	}
+	groups, err := UIBlocks(files)
+	if err != nil {
+		return
+	}
+	for _, group := range groups {
+		for _, block := range group.Blocks {
+			s.ui = append(s.ui, "/ui/blocks/"+block.Slug)
+		}
+	}
 }

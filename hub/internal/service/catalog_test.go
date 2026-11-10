@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -50,7 +51,7 @@ func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon,
 	if err := apps.apps.UpdateBucket(*stored); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := catalog.Load(filepath.Join("..", "..", "content", "catalog"))
+	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil {
 		t.Fatal(err)
 	}

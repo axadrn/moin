@@ -1,0 +1,45 @@
+@layer moin-components {
+  /* A command to copy. */
+  .moin-command {
+    --copy-gap: max(var(--scroll-edge), var(--space-1));
+    display: flex;
+    height: var(--press);
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-5) var(--copy-gap);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+  }
+  .moin-command > code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .moin-copy {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    /* In the corner of its box its curve runs along the box's. */
+    border-radius: max(0px, calc(var(--copy-outer, var(--radius-md)) - var(--copy-gap, 0px)));
+    color: var(--muted-foreground);
+    outline: none;
+  }
+  .moin-copy:hover {
+    background: color-mix(in oklab, var(--foreground) 5%, transparent);
+    color: var(--foreground);
+  }
+  .moin-copy[data-copied] { color: var(--live); }
+  .moin-copy > .moin-icon { width: 1rem; height: 1rem; }
+  .moin-copy[data-copied] > .moin-icon {
+    -webkit-mask-image: url("../icons/check.svg");
+    mask-image: url("../icons/check.svg");
+  }
+}

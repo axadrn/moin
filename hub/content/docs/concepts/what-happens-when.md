@@ -1,6 +1,6 @@
 ---
 title: "What happens when"
-description: "A server restarts, a bucket is gone, a copy is broken: what moin does, tried on real servers"
+description: "A server restarts. A bucket is gone. A copy is broken. What moin does, tried on real servers."
 group: "Servers and data"
 order: 7
 ---

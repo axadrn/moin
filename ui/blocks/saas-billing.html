@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Billing</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Billing</h1>
+        </div>
+      </header>
+      <!-- Team plan -->
+      <section class="moin-card">
+        <div class="moin-card-head">
+          <div class="moin-stack" data-gap="1">
+            <h2 class="moin-heading">Team plan</h2>
+            <p class="moin-small moin-muted">Renews on December 1</p>
+          </div>
+          <span class="moin-number">$48</span>
+        </div>
+        <div class="moin-stack" data-gap="2">
+          <div class="moin-row" data-between>
+            <span class="moin-text">Seats</span>
+            <span class="moin-text moin-digits">3 of 5</span>
+          </div>
+          <div class="moin-meter" style="--value:60%">
+            <span></span>
+          </div>
+        </div>
+        <div class="moin-card-foot">
+          <button type="button" class="moin-button">Change plan</button>
+        </div>
+      </section>
+      <!-- Invoices -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Invoices</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#billing" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">November 2026</div>
+              </div>
+              <span class="moin-item-value">$48.00</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#billing" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">October 2026</div>
+              </div>
+              <span class="moin-item-value">$48.00</span>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

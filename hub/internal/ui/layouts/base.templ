@@ -1,6 +1,8 @@
 package layouts
 
-import "github.com/axadrn/moin/hub/internal/ui/kit"
+import (
+	"github.com/axadrn/moin/hub/internal/ui/components"
+)
 
 import "github.com/axadrn/moin/hub/internal/brand"
 import "github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -34,14 +36,16 @@ templ Base(props ...SEOProps) {
 			// The text font loads with the stylesheet, not after it, so the
 			// first paint is already in Geist.
 			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
-			<link href={ kit.AssetURL("/assets/css/output.css") } rel="stylesheet"/>
+			<link href={ components.AssetURL("/assets/ui/moin.css") } rel="stylesheet"/>
+			<link href={ components.AssetURL("/assets/css/hub.css") } rel="stylesheet"/>
 			// Scripts in swapped content get the page's nonce, so the CSP lets
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
 			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
 			// Server-sent events swap HTML as it streams (hx-sse:connect).
 			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
-			<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/moin.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/ui/moin.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/hub.js") }></script>
 			// A link starts loading when the pointer rests on it, so the page
 			// is there on the click (Chrome and Edge; others ignore it). Only
 			// pages: never sign in or out, GitHub or the API.
@@ -55,12 +59,11 @@ templ Base(props ...SEOProps) {
 			}
 		</head>
 		<body
-			class="style-nova min-h-screen"
 			hx-headers:inherited={ `{"X-CSRF-Token":"` + ctxkeys.CSRFToken(ctx) + `"}` }
 		>
 			{{ session := ctxkeys.Session(ctx) }}
 			if session.IsImpersonating() {
-				<div class="sticky top-0 z-50 flex items-center justify-center gap-3 border-b border-amber-500/30 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+				<div class="moin-alert moin-text" data-state="running" data-sticky>
 					<span>You are viewing the application as another user.</span>
 					<form
 						action="/admin/impersonation/stop"
@@ -69,14 +72,16 @@ templ Base(props ...SEOProps) {
 						hx-swap="none"
 						hx-disable="find button[type='submit']"
 					>
-						@kit.CSRF()
-						<button type="submit" class="font-medium underline-offset-4 hover:underline">Return to Admin</button>
+						@components.CSRF()
+						@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
+							Return to Admin
+						}
 					</form>
 				</div>
 			}
 			{ children... }
 			<div id="feedback" hidden></div>
-			@kit.ConfirmDialog()
+			@components.ConfirmDialog()
 		</body>
 	</html>
 }
@@ -114,7 +119,7 @@ templ seo(props SEOProps) {
 	<meta property="og:url" content={ baseURL + props.Path }/>
 	<meta property="og:site_name" content={ appName }/>
 	// OpenGraph Image
-	<meta property="og:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
+	<meta property="og:image" content={ baseURL + components.AssetURL("/assets/img/og.png") }/>
 	<meta property="og:image:width" content="1200"/>
 	<meta property="og:image:height" content="630"/>
 	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
@@ -122,7 +127,7 @@ templ seo(props SEOProps) {
 	<meta name="twitter:card" content="summary_large_image"/>
 	<meta name="twitter:title" content={ fullTitle }/>
 	<meta name="twitter:description" content={ props.Description }/>
-	<meta name="twitter:image" content={ baseURL + kit.AssetURL("/assets/img/og.png") }/>
+	<meta name="twitter:image" content={ baseURL + components.AssetURL("/assets/img/og.png") }/>
 	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
 	// Theme Color
 	<meta name="theme-color" content="#000000"/>
@@ -132,31 +137,46 @@ templ themeScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(function() {
 			window.themeUtils = window.themeUtils || {};
+			// One choice for all of moin. Browsers that chose before keep it.
+			if (localStorage.getItem('theme')) {
+				localStorage.setItem('moin-mode', localStorage.getItem('theme'));
+				localStorage.removeItem('theme');
+			}
 			const media = window.matchMedia('(prefers-color-scheme: dark)');
 			window.themeUtils.getThemePreference = function() {
-				return localStorage.getItem('theme') || 'system';
+				return localStorage.getItem('moin-mode') || 'system';
 			};
 			window.themeUtils.applyTheme = function() {
 				const preference = window.themeUtils.getThemePreference();
 				const isDark = preference === 'system' ? media.matches : preference === 'dark';
-				document.documentElement.classList.toggle('dark', isDark);
+				const root = document.documentElement;
+				root.classList.toggle('dark', isDark);
+				root.classList.toggle('light', preference === 'light');
+				// moin.js pins the scheme for a stored choice; system follows
+				// the rules in the stylesheet again.
+				root.style.colorScheme = preference === 'system' ? '' : preference;
 				document.dispatchEvent(new CustomEvent('theme-changed'));
 			};
-			window.themeUtils.cycleTheme = function() {
-				const current = window.themeUtils.getThemePreference();
-				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
-				localStorage.setItem('theme', next);
-				window.themeUtils.applyTheme();
+			// A theme tried in the editor, on the pages of moin UI only. Here,
+			// before the first paint, like the mode above.
+			window.themeUtils.applySavedTheme = function() {
+				if (!/^\/ui(\/|$)/.test(location.pathname)) return;
+				const root = document.documentElement;
+				let theme = {};
+				try { theme = JSON.parse(localStorage.getItem('moin-theme')) || {}; } catch {}
+				for (const name of [...root.style]) {
+					if (name.startsWith('--')) root.style.removeProperty(name);
+				}
+				if (theme.radius) root.style.setProperty('--radius', theme.radius);
+				for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
+				for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
+					root.style.setProperty(name, `light-dark(${light}, ${dark})`);
+				}
 			};
+			window.themeUtils.applySavedTheme();
 			window.themeUtils.applyTheme();
 			media.addEventListener('change', function() {
 				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
-			});
-			document.addEventListener('click', function(event) {
-				const switcher = event.target.closest('[data-theme-switcher]');
-				if (!switcher) return;
-				event.preventDefault();
-				window.themeUtils.cycleTheme();
 			});
 		})();
 	</script>

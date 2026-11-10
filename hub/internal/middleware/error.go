@@ -3,7 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/axadrn/moin/hub/internal/api"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 	"log/slog"
 	"net/http"
@@ -22,7 +22,7 @@ func renderMiddlewareError(w http.ResponseWriter, r *http.Request, status int, t
 			slog.Error("render middleware error feedback wrapper failed", "error", err)
 			return
 		}
-		if err := kit.Feedback("failed", title, description).Render(r.Context(), w); err != nil {
+		if err := components.Feedback(components.FeedbackProps{Kind: "failed", Title: title, Note: description}).Render(r.Context(), w); err != nil {
 			slog.Error("render middleware error feedback failed", "error", err)
 			return
 		}

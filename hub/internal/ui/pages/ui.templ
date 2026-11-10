@@ -1,0 +1,189 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+const (
+	uiStart      = "Start"
+	uiBlocksTab  = "Blocks"
+	uiComponents = "Components"
+	uiLayoutTab  = "Layout"
+	uiThemeTab   = "Theme"
+)
+
+func uiTabs(active string) []components.Tab {
+	tabs := []components.Tab{
+		{Label: uiStart, Href: "/ui"},
+		{Label: uiBlocksTab, Href: "/ui/blocks"},
+		{Label: uiComponents, Href: "/ui/components"},
+		{Label: uiLayoutTab, Href: "/ui/layout"},
+		{Label: uiThemeTab, Href: "/ui/theme"},
+	}
+	for i := range tabs {
+		tabs[i].Active = tabs[i].Label == active
+	}
+	return tabs
+}
+
+// uiPage is the frame of moin UI's pages. The theme you try stays on while
+// you walk through them, and only here: theme-editor.js sets it.
+templ uiPage(seo layouts.SEOProps) {
+	@layouts.Home(seo) {
+		<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/theme-editor.js") }></script>
+		<main class="moin-page moin-content">
+			{ children... }
+		</main>
+	}
+}
+
+// uiHead is the title of the site and its tabs.
+templ uiHead(active string) {
+	@components.Header(components.HeaderProps{Title: "The UI moin runs on", Line: uiText("Native HTML, CSS and JS for any stack. Your code, not a library. Experimental: it can change at any time.")})
+	<div class="moin-row" data-gap="2">
+		@components.Tabs(components.TabsProps{Label: "moin UI", Tabs: uiTabs(active)})
+		@uiReset()
+	</div>
+}
+
+// uiReset undoes a theme you tried. It shows only while one is on
+// (theme-editor.js).
+templ uiReset() {
+	@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"data-theme-reset": true, "hidden": true, "aria-label": "Reset theme", "data-tip": "Reset theme"}}) {
+		@components.Icon("undo")
+	}
+}
+
+templ uiText(words string) {
+	{ words }
+}
+
+templ uiProse(page *model.DocPage) {
+	<article class="moin-prose">
+		@templ.Raw(page.HTMLContent)
+	</article>
+}
+
+// UIStart is /ui.
+templ UIStart(page *model.DocPage) {
+	@uiPage(layouts.SEOProps{Title: "moin UI", Description: page.Description, Path: "/ui", MarkdownPath: "/ui.md"}) {
+		@uiHead(uiStart)
+		@uiProse(page)
+	}
+}
+
+// UIComponents is /ui/components: every component under its topic.
+templ UIComponents(groups []model.DocGroup) {
+	@uiPage(layouts.SEOProps{Title: "Components · moin UI", Description: "Every component of moin UI.", Path: "/ui/components"}) {
+		@uiHead(uiComponents)
+		<div class="moin-columns">
+			for _, group := range groups {
+				@uiPages(group.Title, group.Pages)
+			}
+		</div>
+	}
+}
+
+// UILayout is /ui/layout.
+templ UILayout(pages []*model.DocPage) {
+	@uiPage(layouts.SEOProps{Title: "Layout · moin UI", Description: "Where things stand: stacks, rows and grids.", Path: "/ui/layout"}) {
+		@uiHead(uiLayoutTab)
+		@uiPages("", pages)
+	}
+}
+
+templ uiPages(title string, pages []*model.DocPage) {
+	<div class="moin-section">
+		if title != "" {
+			<div class="moin-section-head"><h2>{ title }</h2></div>
+		}
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, page := range pages {
+					@components.Item(components.ItemProps{Href: uiURL(page), Name: page.Title})
+				}
+			}
+		}
+	</div>
+}
+
+func uiURL(page *model.DocPage) string {
+	return "/ui/" + page.Slug
+}
+
+// uiBack is the way back from a page.
+func uiBack(page *model.DocPage) components.Back {
+	if page.Group == "Layout" {
+		return components.Back{Label: "Layout", Href: "/ui/layout"}
+	}
+	return components.Back{Label: "Components", Href: "/ui/components"}
+}
+
+// UIDoc is one component.
+templ UIDoc(page *model.DocPage, next *model.DocPage) {
+	@uiPage(layouts.SEOProps{Title: page.Title + " · moin UI", Description: page.Description, Path: ctxkeys.URLPath(ctx), MarkdownPath: uiURL(page) + ".md"}) {
+		@components.Header(components.HeaderProps{Back: uiBack(page), Title: page.Title}) {
+			@uiReset()
+		}
+		@uiProse(page)
+		if next != nil {
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Href: uiURL(next), Name: "Next: " + next.Title})
+				}
+			}
+		}
+		<p class="moin-small moin-muted"><a href={ templ.SafeURL(uiURL(page) + ".md") } class="moin-link">This page as Markdown</a></p>
+	}
+}
+
+// UITheme is /ui/theme: the editor, then how a theme works.
+templ UITheme(page *model.DocPage) {
+	@uiPage(layouts.SEOProps{Title: "Theme · moin UI", Description: page.Description, Path: "/ui/theme", MarkdownPath: "/ui/theme.md"}) {
+		<link rel="stylesheet" href={ components.AssetURL("/assets/css/theme-editor.css") }/>
+		@uiHead(uiThemeTab)
+		@components.Card(components.CardProps{}) {
+			<moin-theme-editor start="Moin"></moin-theme-editor>
+		}
+		@uiProse(page)
+	}
+}
+
+// UIBlocks is /ui/blocks.
+templ UIBlocks(groups []model.UIBlockGroup) {
+	@uiPage(layouts.SEOProps{Title: "Blocks · moin UI", Description: "Whole pages to copy.", Path: "/ui/blocks"}) {
+		@uiHead(uiBlocksTab)
+		<div class="moin-columns">
+			for _, group := range groups {
+				<div class="moin-section">
+					<div class="moin-section-head"><h2>{ group.Title }</h2></div>
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							for _, block := range group.Blocks {
+								@components.Item(components.ItemProps{Href: "/ui/blocks/" + block.Slug, Name: block.Title})
+							}
+						}
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+// UIBlock is one block, in a frame of its own: it is a whole page.
+templ UIBlock(block *model.UIBlock) {
+	@uiPage(layouts.SEOProps{Title: block.Title + " · moin UI", Description: "A whole page to copy.", Path: "/ui/blocks/" + block.Slug}) {
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Blocks", Href: "/ui/blocks"}, Title: block.Title}) {
+			@components.Button(components.ButtonProps{Href: "/assets/ui/blocks/" + block.Slug + ".html", Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+				Full screen
+			}
+			@uiReset()
+		}
+		@components.Preview(components.PreviewProps{ID: "block-code", Code: block.Code}) {
+			<iframe src={ "/assets/ui/blocks/" + block.Slug + ".html" } title={ block.Title } loading="lazy"></iframe>
+		}
+	}
+}

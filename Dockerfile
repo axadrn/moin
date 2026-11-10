@@ -15,21 +15,7 @@ COPY . .
 # Install build-time dependencies.
 RUN apt-get update && apt-get install -y wget ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Download the pinned Tailwind standalone binary for the current CPU architecture.
-RUN arch="$(dpkg --print-architecture)" && \
-    case "$arch" in \
-      amd64) tailwind_arch="x64"; tailwind_sha256="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a" ;; \
-      arm64) tailwind_arch="arm64"; tailwind_sha256="55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195" ;; \
-      *) echo "unsupported architecture: $arch" && exit 1 ;; \
-    esac && \
-    wget -qO /usr/local/bin/tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-${tailwind_arch}" && \
-    echo "${tailwind_sha256}  /usr/local/bin/tailwindcss" | sha256sum --check - && \
-    chmod +x /usr/local/bin/tailwindcss
-
 WORKDIR /app/hub
-
-# Compile Tailwind CSS.
-RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
 
 # Generate Go files from .templ files.
 RUN go tool templ generate
@@ -66,10 +52,8 @@ RUN apk add --no-cache ca-certificates sqlite
 ENV APP_ENV=production
 ENV GO_ENV=production
 
-# Copy the binary, CSS output, and content directory
+# Copy the binary and downloads
 COPY --from=build /app/hub/main .
-COPY --from=build /app/hub/assets/css/output.css ./assets/css/output.css
-COPY --from=build /app/hub/content ./content
 COPY --from=build /app/hub/downloads ./downloads
 
 # Expose the port

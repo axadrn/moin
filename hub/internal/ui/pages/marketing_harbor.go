@@ -114,13 +114,13 @@ var harborBoxes = func() []harborCrate {
 func harborTone(tone int) (base, over string) {
 	switch tone {
 	case 0:
-		return "fill-card", ""
+		return "hub-harbor-card", ""
 	case 1:
-		return "fill-muted", ""
+		return "hub-harbor-muted", ""
 	case 2:
-		return "fill-muted", "fill-foreground/[0.09]"
+		return "hub-harbor-muted", "hub-harbor-tint-9"
 	}
-	return "fill-card", "fill-foreground/[0.05]"
+	return "hub-harbor-card", "hub-harbor-tint-5"
 }
 
 // harborRibs are the x positions of the corrugation ribs of a container.

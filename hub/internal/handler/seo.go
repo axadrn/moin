@@ -5,9 +5,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"io/fs"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -15,19 +14,21 @@ type SEOHandler struct {
 	sitemapService *service.SitemapService
 	docsService    *service.DocsService
 	baseURL        string
-	llmsPath       string
+	files          fs.FS
 	robotsNoIndex  bool
 }
 
 func NewSEOHandler(
-	docsService *service.DocsService,
+	docsService, uiDocs *service.DocsService,
+	uiFiles fs.FS,
 	baseURL string,
-	contentPath string,
+	files fs.FS,
 	robotsNoIndex bool,
 	legal bool,
 ) *SEOHandler {
 	sitemap := service.NewSitemapService(docsService, baseURL, legal)
-	if entries, err := catalog.Load(filepath.Join(contentPath, "catalog")); err == nil {
+	sitemap.AddUI(uiDocs, uiFiles)
+	if entries, err := catalog.Load(files); err == nil {
 		slugs := make([]string, 0, len(entries))
 		for _, entry := range entries {
 			slugs = append(slugs, entry.Slug)
@@ -41,7 +42,7 @@ func NewSEOHandler(
 		sitemapService: sitemap,
 		docsService:    docsService,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
-		llmsPath:       filepath.Join(contentPath, "llms.txt"),
+		files:          files,
 		robotsNoIndex:  robotsNoIndex,
 	}
 }
@@ -56,7 +57,7 @@ func (h *SEOHandler) Robots(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
-	content, err := os.ReadFile(h.llmsPath)
+	content, err := fs.ReadFile(h.files, "llms.txt")
 	if err != nil {
 		http.NotFound(w, r)
 		return

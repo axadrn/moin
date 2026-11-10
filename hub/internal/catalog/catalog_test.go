@@ -16,7 +16,7 @@ import (
 // TestEntries: every entry in content/catalog loads and is valid, so a
 // broken one fails here, not on a customer's install.
 func TestEntries(t *testing.T) {
-	entries, err := Load(filepath.Join("..", "..", "content", "catalog"))
+	entries, err := Load(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestLoadRefusesBadEntries(t *testing.T) {
 		"no port":      {"app.md": "---\nname: A\npitch: p\ncategory: Analytics\nwebsite: https://a.example\nimage: a/b\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:${VERSION}\n"},
 	} {
 		dir := t.TempDir()
-		entry := filepath.Join(dir, "a")
+		entry := filepath.Join(dir, "catalog", "a")
 		if err := os.MkdirAll(entry, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +61,7 @@ func TestLoadRefusesBadEntries(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if _, err := Load(dir); err == nil {
+		if _, err := Load(os.DirFS(dir)); err == nil {
 			t.Errorf("%s: loaded", name)
 		}
 	}

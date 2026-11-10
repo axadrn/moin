@@ -6,7 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -27,98 +27,110 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	{{ seatLimit := subscription.Access().Limit(access.LimitMembers) }}
 	{{ basePath := workspace.Path() }}
 	@panelPage(templ.Attributes{"id": "workspace-content", "hx-swap-oob": "true"}) {
-		@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Team")
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: basePath + "/settings"}, Title: "Team"})
 		if viewer.Can(model.WorkspacePermissionManageMembers) {
-			@kit.Card("Invite a teammate", nil) {
+			@components.Card(components.CardProps{Title: "Invite a teammate"}) {
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/invitations") }
 					method="POST"
-					class="flex flex-col gap-2 sm:flex-row sm:items-center"
+					class="moin-row"
+					data-gap="2"
+					data-phone="stack"
 					hx-post={ basePath + "/workspace/invitations" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
 				>
-					@kit.CSRF()
-					<label for="invite-email" class="sr-only">Email</label>
-					@kit.Input(templ.Attributes{"id": "invite-email", "name": "email", "type": "email", "placeholder": "teammate@example.com", "autocomplete": "off"})
-					<div class="flex gap-2">
-						<div class="w-36 shrink-0">
-							@kit.Select(kit.SelectProps{ID: "invite-role", Name: "role", Label: "Role", Options: []kit.Option{{Value: model.WorkspaceRoleMember, Label: "Member"}, {Value: model.WorkspaceRoleAdmin, Label: "Admin"}}, Value: model.WorkspaceRoleMember})
+					@components.CSRF()
+					<label for="invite-email" class="moin-sr-only">Email</label>
+					<div class="moin-fill">
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "invite-email", "name": "email", "type": "email", "placeholder": "teammate@example.com", "autocomplete": "off"}})
+					</div>
+					<div class="moin-row" data-gap="2">
+						<div class="moin-width" data-fixed style="--width:9rem">
+							@components.Select(components.SelectProps{ID: "invite-role", Name: "role", Label: "Role", Options: []components.Option{{Value: model.WorkspaceRoleMember, Label: "Member"}, {Value: model.WorkspaceRoleAdmin, Label: "Admin"}}, Value: model.WorkspaceRoleMember})
 						</div>
-						<div class="flex-1 sm:flex-none [&>button]:w-full">
-							@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
-								Send invite
-							}
-						</div>
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-phone": "fill"}}) {
+							Send invite
+						}
 					</div>
 				</form>
 			}
 		}
-		@kit.Section("In the team", seatCount(seatText(len(members), seatLimit))) {
-			@kit.List() {
-				for _, member := range members {
-					@kit.RowControl(templ.Attributes{"data-member": member.ID}) {
-						@kit.Avatar("", member.Name, model.Initial(member.Name+member.Email), "size-9")
-						@kit.RowText(member.Name, member.Email)
-						if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
-							<div class="flex w-full items-center gap-2 sm:w-auto">
-								<form
-									action={ templ.SafeURL(basePath + "/workspace/members/" + member.ID + "/role") }
-									method="POST"
-									class="w-36 shrink-0"
-									hx-post={ basePath + "/workspace/members/" + member.ID + "/role" }
-									hx-trigger="change"
-									hx-swap="none"
-								>
-									@kit.CSRF()
-									@kit.Select(kit.SelectProps{ID: "role-" + member.ID, Name: "role", Label: "Role of " + member.Name, Options: roleOptions(viewer.Can(model.WorkspacePermissionManageOwners)), Value: member.Role})
-								</form>
-								@kit.Button(kit.Danger, "", templ.Attributes{
-									"hx-post":    basePath + "/workspace/members/" + member.ID + "/remove",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-									"hx-confirm": "Remove " + member.Name + " from " + workspace.Name + "?",
-								}) {
-									Remove
-								}
-							</div>
-						} else {
-							<span class="shrink-0 text-sm text-muted-foreground">{ model.WorkspaceRoleLabel(member.Role) }</span>
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>In the team</h2>
+				@seatCount(seatText(len(members), seatLimit))
+			</div>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, member := range members {
+						@components.Item(components.ItemProps{Name: member.Name, Note: member.Email, Lead: components.Avatar(components.AvatarProps{Name: member.Name, Initials: model.Initial(member.Name + member.Email)}), Attrs: templ.Attributes{"data-member": member.ID, "data-control": true}}) {
+							if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
+								<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+									<form
+										action={ templ.SafeURL(basePath + "/workspace/members/" + member.ID + "/role") }
+										method="POST"
+										class="moin-width"
+										data-fixed
+										style="--width:9rem"
+										hx-post={ basePath + "/workspace/members/" + member.ID + "/role" }
+										hx-trigger="change"
+										hx-swap="none"
+									>
+										@components.CSRF()
+										@components.Select(components.SelectProps{ID: "role-" + member.ID, Name: "role", Label: "Role of " + member.Name, Options: roleOptions(viewer.Can(model.WorkspacePermissionManageOwners)), Value: member.Role})
+									</form>
+									@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/members/" + member.ID + "/remove",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+										"hx-confirm": "Remove " + member.Name + " from " + workspace.Name + "?",
+									}}) {
+										Remove
+									}
+								</div>
+							} else {
+								<span class="moin-text moin-muted">{ model.WorkspaceRoleLabel(member.Role) }</span>
+							}
 						}
 					}
 				}
 			}
-		}
+		</section>
 		if viewer.Can(model.WorkspacePermissionManageMembers) && len(invitations) > 0 {
-			@kit.Section("Invitations", nil) {
-				@kit.List() {
-					for _, invitation := range invitations {
-						@kit.RowControl(templ.Attributes{"data-invitation": invitation.Email}) {
-							@kit.RowText(invitation.Email, model.WorkspaceRoleLabel(invitation.Role)+" · expires "+invitation.ExpiresAt.Local().Format("Jan 2, 2006"))
-							<div class="flex w-full items-center gap-2 sm:w-auto">
-								@kit.Button(kit.Secondary, "", templ.Attributes{
-									"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/resend",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-								}) {
-									Resend
-								}
-								@kit.Button(kit.Danger, "", templ.Attributes{
-									"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/revoke",
-									"hx-swap":    "none",
-									"hx-disable": "this",
-									"hx-confirm": "Revoke the invitation of " + invitation.Email + "? The link in the email stops working.",
-								}) {
-									Revoke
-								}
-							</div>
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Invitations</h2>
+				</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, invitation := range invitations {
+							@components.Item(components.ItemProps{Name: invitation.Email, Note: model.WorkspaceRoleLabel(invitation.Role) + " · expires " + invitation.ExpiresAt.Local().Format("Jan 2, 2006"), Attrs: templ.Attributes{"data-invitation": invitation.Email, "data-control": true}}) {
+								<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+									@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/resend",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+									}}) {
+										Resend
+									}
+									@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
+										"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/revoke",
+										"hx-swap":    "none",
+										"hx-disable": "this",
+										"hx-confirm": "Revoke the invitation of " + invitation.Email + "? The link in the email stops working.",
+									}}) {
+										Revoke
+									}
+								</div>
+							}
 						}
 					}
 				}
-			}
+			</section>
 		}
 		if viewer.Can(model.WorkspacePermissionManageWorkspace) {
-			@kit.Card("Workspace name", nil) {
+			@components.Card(components.CardProps{Title: "Workspace name"}) {
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/name") }
 					method="POST"
@@ -126,37 +138,35 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
 				>
-					@kit.CSRF()
-					<label for="workspace-name" class="sr-only">Workspace name</label>
-					@kit.Inline() {
-						@kit.Input(templ.Attributes{"id": "workspace-name", "name": "name", "value": workspace.Name, "autocomplete": "off"})
-						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					@components.CSRF()
+					<label for="workspace-name" class="moin-sr-only">Workspace name</label>
+					<div class="moin-row" data-gap="2" data-phone="stack">
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "workspace-name", "name": "name", "value": workspace.Name, "autocomplete": "off"}})
+						@components.Button(components.ButtonProps{Type: "submit"}) {
 							Save
 						}
-					}
+					</div>
 				</form>
 			}
 		}
-		@kit.List() {
-			@kit.RowButton(true, templ.Attributes{
-				"hx-post":             basePath + "/workspace/leave",
-				"hx-swap":             "none",
-				"hx-disable":          "this",
-				"hx-confirm":          "Leave " + workspace.Name + "? You lose access to it. A sole Owner hands ownership to someone else first.",
-				"data-confirm-action": "Leave workspace",
-			}) {
-				<span class="font-medium">Leave workspace</span>
-			}
-			if viewer.Can(model.WorkspacePermissionDeleteWorkspace) {
-				@kit.RowButton(true, templ.Attributes{
-					"hx-post":             basePath + "/workspace/delete",
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Leave workspace", Attrs: templ.Attributes{
+					"hx-post":             basePath + "/workspace/leave",
 					"hx-swap":             "none",
 					"hx-disable":          "this",
-					"hx-confirm":          "Delete " + workspace.Name + " for good? Its team, invitations and activity go with it. A paid subscription must be cancelled and run out first.",
-					"data-confirm-name":   workspace.Name,
-					"data-confirm-action": "Delete permanently",
-				}) {
-					<span class="font-medium">Delete workspace</span>
+					"hx-confirm":          "Leave " + workspace.Name + "? You lose access to it. A sole Owner hands ownership to someone else first.",
+					"data-confirm-action": "Leave workspace",
+				}})
+				if viewer.Can(model.WorkspacePermissionDeleteWorkspace) {
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete workspace", Attrs: templ.Attributes{
+						"hx-post":             basePath + "/workspace/delete",
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          "Delete " + workspace.Name + " for good? Its team, invitations and activity go with it. A paid subscription must be cancelled and run out first.",
+						"data-confirm-name":   workspace.Name,
+						"data-confirm-action": "Delete permanently",
+					}})
 				}
 			}
 		}
@@ -165,14 +175,14 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 
 // seatCount is the count at the end of the members' title.
 templ seatCount(text string) {
-	<span class="text-sm text-muted-foreground tabular-nums">{ text }</span>
+	<span class="moin-text moin-muted moin-digits">{ text }</span>
 }
 
 // roleOptions are the roles a viewer may give; only owners make owners.
-func roleOptions(owners bool) []kit.Option {
-	options := []kit.Option{{Value: model.WorkspaceRoleAdmin, Label: "Admin"}, {Value: model.WorkspaceRoleMember, Label: "Member"}}
+func roleOptions(owners bool) []components.Option {
+	options := []components.Option{{Value: model.WorkspaceRoleAdmin, Label: "Admin"}, {Value: model.WorkspaceRoleMember, Label: "Member"}}
 	if owners {
-		options = append([]kit.Option{{Value: model.WorkspaceRoleOwner, Label: "Owner"}}, options...)
+		options = append([]components.Option{{Value: model.WorkspaceRoleOwner, Label: "Owner"}}, options...)
 	}
 	return options
 }

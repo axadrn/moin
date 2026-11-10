@@ -1,0 +1,64 @@
+@layer moin-components {
+  /* An item that opens what is under it in place. */
+  .moin-expand { position: relative; }
+  .moin-expand::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--item-edge, var(--space-5));
+    right: var(--item-edge, var(--space-5));
+    height: 1px;
+    background: var(--border);
+  }
+  .moin-expand > summary {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    min-height: var(--row);
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--item-edge, var(--space-5));
+    font-weight: 500;
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-expand > summary::-webkit-details-marker { display: none; }
+  .moin-expand > summary::after {
+    content: "";
+    position: absolute;
+    inset: var(--inset);
+    z-index: -1;
+    border-radius: var(--lit);
+  }
+  .moin-expand > summary:is(:hover, :focus-visible)::after {
+    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+  }
+  .moin-expand > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
+  .moin-expand[open] > summary .moin-chevron { rotate: 90deg; }
+  .moin-expand > div > .moin-item:first-child::before { display: block; }
+
+  /* Quiet: a few words that open more words under them. No line, no light,
+     the size of the text around it. The chevron says it opens. */
+  .moin-expand[data-quiet] { color: var(--muted-foreground); }
+  .moin-expand[data-quiet]::before,
+  .moin-expand[data-quiet] > summary::after { display: none; }
+  .moin-expand[data-quiet] > summary {
+    display: inline-flex;
+    max-width: 100%;
+    min-height: 0;
+    gap: var(--space-1);
+    padding: var(--space-1) 0;
+    font-weight: inherit;
+  }
+  .moin-expand[data-quiet] > summary .moin-item-name { font-weight: inherit; }
+  .moin-expand[data-quiet] > summary:is(:hover, :focus-visible) { color: var(--foreground); }
+  .moin-list > .moin-expand:first-child::before { display: none; }
+  /* A lit item and the lines next to it give way, as for any other item. */
+  .moin-expand:has(> summary:is(:hover, :focus-visible))::before,
+  .moin-expand:has(> summary:is(:hover, :focus-visible)) > div > .moin-item:first-child::before,
+  .moin-expand:not([open]):has(> summary:is(:hover, :focus-visible)) + :is(.moin-expand, .moin-item)::before,
+  .moin-expand[open]:has(> div > :is(a, button, label).moin-item:last-child:is(:hover, :focus-visible)) + :is(.moin-expand, .moin-item)::before {
+    opacity: 0;
+  }
+}

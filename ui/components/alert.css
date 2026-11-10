@@ -1,0 +1,26 @@
+@layer moin-components {
+  /* Something the page has to say, in the page. Nothing floats. */
+  .moin-alert {
+    --tint: var(--idle);
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklab, var(--tint) 14%, var(--card));
+    color: var(--card-foreground);
+  }
+  .moin-alert > .moin-icon { color: var(--tint); }
+  .moin-alert[data-state="live"] { --tint: var(--live); }
+  .moin-alert[data-state="running"] { --tint: var(--running); }
+  .moin-alert[data-state="failed"] { --tint: var(--failed); }
+  /* A strip across the page that stays while it scrolls. */
+  .moin-alert[data-sticky] {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding-block: var(--space-1);
+    border-radius: 0;
+  }
+}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -10,13 +11,13 @@ import (
 )
 
 type HomeHandler struct {
-	telemetry  *service.TelemetryService
-	billing    bool
-	contentDir string
+	telemetry *service.TelemetryService
+	billing   bool
+	files     fs.FS
 }
 
-func NewHomeHandler(telemetry *service.TelemetryService, billing bool, contentDir string) *HomeHandler {
-	return &HomeHandler{telemetry: telemetry, billing: billing, contentDir: contentDir}
+func NewHomeHandler(telemetry *service.TelemetryService, billing bool, files fs.FS) *HomeHandler {
+	return &HomeHandler{telemetry: telemetry, billing: billing, files: files}
 }
 
 // HomePage shows the landing page of the hosted hub. A self-hosted
@@ -31,7 +32,7 @@ func (h *HomeHandler) HomePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A changelog that cannot be read hides Built in the open, nothing more.
-	releases, err := service.ChangelogReleases(h.contentDir)
+	releases, err := service.ChangelogReleases(h.files)
 	if err != nil {
 		slog.Warn("home: changelog", "error", err)
 	}

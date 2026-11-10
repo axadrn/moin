@@ -1,0 +1,76 @@
+@layer moin-components {
+  /* State: a dot, a word, a pill. */
+  .moin-dot {
+    display: inline-block;
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--idle);
+  }
+  .moin-dot[data-state="live"] {
+    background: var(--live);
+    animation: moin-breathe 2.4s ease-out infinite;
+  }
+  .moin-dot[data-state="running"] {
+    background: var(--running);
+    animation: moin-blink 1.2s ease-in-out infinite;
+  }
+  .moin-dot[data-state="failed"] { background: var(--failed); }
+  .moin-dot[data-state="waiting"] {
+    background: none;
+    border: 1.5px solid var(--running);
+  }
+  .moin-dot[data-state="idle"] {
+    background: none;
+    border: 1.5px solid var(--muted-foreground);
+  }
+  .moin-dot[data-state="done"] {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+
+  .moin-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+  }
+  /* The dot's own place, wide enough for the ring of a live one. */
+  .moin-status > .moin-dot { margin-inline: var(--space-1); }
+  .moin-status[data-state="failed"] { color: var(--failed-text); }
+  .moin-status:is([data-state="idle"], [data-state="done"]) { color: var(--muted-foreground); }
+
+  .moin-chip {
+    --tint: var(--idle);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+    height: 1.75rem;
+    padding-inline: 0.625rem var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .moin-chip:is([data-state="live"], [data-state="running"], [data-state="waiting"], [data-state="failed"]) {
+    background: color-mix(in oklab, var(--tint) 16%, transparent);
+    color: color-mix(in oklab, var(--tint), var(--foreground) 40%);
+  }
+  .moin-chip[data-state="live"] { --tint: var(--live); }
+  .moin-chip:is([data-state="running"], [data-state="waiting"]) { --tint: var(--running); }
+  .moin-chip[data-state="failed"] { --tint: var(--failed); }
+
+  /* A dot alone, in the room of a chip: the mark at the end of an item. */
+  .moin-status[data-alone] { width: 2rem; justify-content: center; }
+}

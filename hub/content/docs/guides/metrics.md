@@ -1,11 +1,11 @@
 ---
 title: "Metrics"
-description: "CPU, memory, disk and network of every server and app, live and with history"
+description: "CPU, memory, disk and network of every server and app. Live and with history."
 group: "Every day"
 order: 5
 ---
 
-Metrics show how hard your servers and apps work: CPU, memory, disk and network, live and over the last 30 days. Nothing to install or set up.
+Metrics show how hard your servers and apps work. CPU, memory, disk and network. Live and over the last 30 days. Nothing to install or set up.
 
 ```surfaces
 Web: **Servers**, the server, **Metrics**; the app, **Metrics**

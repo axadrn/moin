@@ -1,11 +1,11 @@
 ---
 title: "Team"
-description: "Invite your team to the same servers and apps, with roles"
+description: "Invite your team to the same servers and apps. With roles."
 group: "Team"
 order: 1
 ---
 
-Your team is the people who work with you. Invite them, and everyone works on the same apps and servers. Teams are free.
+Your team is the people who work with you. Invite them. Everyone works on the same apps and servers. Teams are free.
 
 You all share one workspace, the space where everything lives. One plan covers the whole team.
 

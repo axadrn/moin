@@ -6,7 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
@@ -28,11 +28,11 @@ templ ServerSecurity(view SecurityView) {
 	@layouts.App(server.Name + " security") {
 		@panelPage(templ.Attributes{"data-server-security": server.Name}) {
 			@serverHead(server, "security")
-			<div id="server-security" class="flex flex-col gap-6">
+			<div id="server-security" class="moin-stack" data-gap="6">
 				@securityState(view, securityPath)
 				@securityKeys(view)
 				@serverRules(server)
-				@kit.Card("Name", nil) {
+				@components.Card(components.CardProps{Title: "Name"}) {
 					<form
 						hx-post={ basePath + "/servers/" + server.Link() + "/name" }
 						hx-target="#main"
@@ -41,50 +41,48 @@ templ ServerSecurity(view SecurityView) {
 						hx-disable="find button[type='submit']"
 						data-rename-server
 					>
-						@kit.CSRF()
-						<label for="server-rename" class="sr-only">Server name</label>
-						@kit.Inline() {
-							@kit.Input(templ.Attributes{"id": "server-rename", "name": "name", "type": "text", "value": server.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
-							@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+						@components.CSRF()
+						<label for="server-rename" class="moin-sr-only">Server name</label>
+						<div class="moin-row" data-gap="2" data-phone="stack">
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "server-rename", "name": "name", "type": "text", "value": server.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"}})
+							@components.Button(components.ButtonProps{Type: "submit"}) {
 								Save
 							}
-						}
+						</div>
 					</form>
 				}
-				@kit.List() {
-					if server.Online && daemonOutdated(server) {
-						@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}) {
-							@kit.RowText("Update daemon", server.DaemonVersion+" → "+build.Version)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if server.Online && daemonOutdated(server) {
+							@components.Item(components.ItemProps{Button: true, Name: "Update daemon", Note: server.DaemonVersion + " → " + build.Version, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}})
 						}
-					}
-					@kit.RowButton(false, templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}) {
-						@kit.RowText("New install command", "The old one stops working")
+						@components.Item(components.ItemProps{Button: true, Name: "New install command", Note: "The old one stops working", Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}})
 					}
 				}
 				// The new command shows here, out of band, until its daemon
 				// used it.
-				<div id="server-added" class="empty:hidden"></div>
-				@kit.List() {
-					if view.Integrations.Cloudflare {
-						@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
-					}
-					if view.Integrations.Tailscale {
-						@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
-					}
-					@kit.RowButton(true, templ.Attributes{
-						"hx-delete":          basePath + "/servers/" + server.Link(),
-						"hx-swap":            "none",
-						"hx-disable":         "this",
-						"hx-confirm":         ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
-						"data-confirm-name":  server.Name,
-						"data-confirm-action": "Remove server",
-						"data-remove-server": server.Name,
-					}) {
-						<span class="font-medium">Remove server</span>
+				<div id="server-added" class="moin-hide-empty"></div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if view.Integrations.Cloudflare {
+							@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
+						}
+						if view.Integrations.Tailscale {
+							@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
+						}
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove server", Attrs: templ.Attributes{
+							"hx-delete":           basePath + "/servers/" + server.Link(),
+							"hx-swap":             "none",
+							"hx-disable":          "this",
+							"hx-confirm":          ifElse(server.Online, "Remove "+server.Name+"? Remove its apps first. moin disconnects its daemon and its token stops working.", "Remove "+server.Name+" and its apps? It is offline: its apps stay on it with their data if it comes back; remove them there with moin daemon uninstall --apps."),
+							"data-confirm-name":   server.Name,
+							"data-confirm-action": "Remove server",
+							"data-remove-server":  server.Name,
+						}})
 					}
 				}
 			</div>
-			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link())
+			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
 			@securityScript()
 		}
 	}
@@ -94,42 +92,52 @@ templ ServerSecurity(view SecurityView) {
 // reloads it when the server changes, unless a switch waits for Apply.
 templ securityState(view SecurityView, securityPath string) {
 	{{ report := service.SecurityReport(view.Server) }}
-	<div id="security-state" class="flex flex-col gap-6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
-		<form class="flex flex-col gap-3" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
-			@kit.CSRF()
+	<div id="security-state" class="moin-stack" data-gap="6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
+		<form class="moin-stack" data-gap="3" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
+			@components.CSRF()
 			// What the page showed: Apply changes only the switches flipped here
 			// and keeps what changed elsewhere meanwhile.
 			<input type="hidden" name="was_tunnel" value={ onValue(view.Server.Tunnel) }/>
 			<input type="hidden" name="was_ssh_tailscale" value={ onValue(view.Server.SSHTailscale) }/>
 			<input type="hidden" name="was_firewall" value={ onValue(view.Server.Firewall) }/>
-			@kit.Section("Access", nil) {
-				@kit.List() {
-					@securityToggle("tunnel", "Cloudflare Tunnel", "Ports 80 and 443 close, Cloudflare serves HTTPS", view.Server.Tunnel, !view.Integrations.Cloudflare, "Needs a Cloudflare API token, below")
-					@securityToggle("ssh_tailscale", "SSH only on Tailscale", "SSH answers only on your tailnet", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Needs a Tailscale auth key, below")
-					@securityToggle("firewall", "Firewall", "Drops every connection the server does not need", view.Server.Firewall, false, "")
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Access</h2>
+				</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@securityToggle("tunnel", "Cloudflare Tunnel", "Ports 80 and 443 close, Cloudflare serves HTTPS", view.Server.Tunnel, !view.Integrations.Cloudflare, "Needs a Cloudflare API token, below")
+						@securityToggle("ssh_tailscale", "SSH only on Tailscale", "SSH answers only on your tailnet", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Needs a Tailscale auth key, below")
+						@securityToggle("firewall", "Firewall", "Drops every connection the server does not need", view.Server.Firewall, false, "")
+					}
 				}
-			}
-			<div class="flex justify-end">
-				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			</section>
+			<div class="moin-row" data-end>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Apply
 				}
 			</div>
 		</form>
 		if report != nil {
-			@kit.Section("What the daemon set up", nil) {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>What the daemon set up</h2>
+				</div>
 				<div data-security-report>
-					@kit.List() {
-						@securityFact("Traffic", "", proxyText(report.Proxy))
-						@securityFact("Open to everyone", portsNote(report.Firewall), portsText(*report, view.Server.SSHTailscale))
-						@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
-						for _, problem := range report.Problems {
-							@kit.Row("") {
-								<div class="min-w-0 flex-1 text-sm text-running">{ problem }</div>
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							@securityFact("Traffic", "", proxyText(report.Proxy))
+							@securityFact("Open to everyone", portsNote(report.Firewall), portsText(*report, view.Server.SSHTailscale))
+							@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
+							for _, problem := range report.Problems {
+								@components.Item(components.ItemProps{}) {
+									<div class="moin-fill moin-text moin-running">{ problem }</div>
+								}
 							}
 						}
 					}
 				</div>
-			}
+			</section>
 		}
 	</div>
 }
@@ -137,8 +145,8 @@ templ securityState(view SecurityView, securityPath string) {
 // securityFact is a row of what the daemon set up: the name and a note
 // left, the value right.
 templ securityFact(name, note, value string) {
-	@kit.RowFact(name, note) {
-		<span class="font-mono">{ value }</span>
+	@components.Item(components.ItemProps{Name: name, Note: note}) {
+		<span class="moin-item-value moin-mono">{ value }</span>
 	}
 }
 
@@ -146,9 +154,8 @@ templ securityFact(name, note, value string) {
 // cannot be turned on and says what it needs.
 templ securityToggle(name, title, note string, on, locked bool, lockedNote string) {
 	{{ id := "security-" + strings.ReplaceAll(name, "_", "-") }}
-	@kit.RowControl(nil) {
-		@kit.RowLabel(id, title, ifElse(locked && !on, lockedNote, note))
-		@kit.Switch(templ.Attributes{"id": id, "name": name, "value": "1", "checked": on, "disabled": locked && !on, "data-toggle": name})
+	@components.Item(components.ItemProps{For: id, Name: title, Note: ifElse(locked && !on, lockedNote, note)}) {
+		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id, "name": name, "value": "1", "checked": on, "disabled": locked && !on, "data-toggle": name}})
 	}
 }
 
@@ -157,13 +164,13 @@ templ securityToggle(name, title, note string, on, locked bool, lockedNote strin
 // key is removed at the end of the page.
 templ securityKeys(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@kit.Card("Keys for every server", nil) {
-		<form class="flex flex-col gap-4" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
-			@kit.CSRF()
+	@components.Card(components.CardProps{Title: "Keys for every server"}) {
+		<form class="moin-stack" data-gap="4" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
+			@components.CSRF()
 			@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount, "Tunnel Edit and DNS Edit; Zone Settings Edit for Always Use HTTPS")
 			@keyField("tailscale-key", "tailscale_key", "Tailscale auth key", "tskey-auth-…", view.Integrations.Tailscale, "Stored", "A reusable auth key")
-			<div class="flex justify-end">
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			<div class="moin-row" data-end>
+				@components.Button(components.ButtonProps{Type: "submit"}) {
 					Save keys
 				}
 			</div>
@@ -172,8 +179,8 @@ templ securityKeys(view SecurityView) {
 }
 
 templ keyField(id, name, label, placeholder string, stored bool, storedText, help string) {
-	@kit.Field(label, id, ifElse(stored, "✓ "+storedText, help)) {
-		@kit.Input(templ.Attributes{"id": id, "name": name, "type": "password", "placeholder": ifElse(stored, "Paste a new one to replace it", placeholder), "autocomplete": "off"})
+	@components.Field(components.FieldProps{Label: label, For: id, Hint: ifElse(stored, "✓ "+storedText, help)}) {
+		@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "name": name, "type": "password", "placeholder": ifElse(stored, "Paste a new one to replace it", placeholder), "autocomplete": "off"}})
 	}
 }
 
@@ -209,7 +216,7 @@ templ securityScript() {
 // removeKeyButton takes one stored key away; the fields only add or replace.
 templ removeKeyButton(server, key, label, question string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@kit.RowButton(true, templ.Attributes{
+	@components.Item(components.ItemProps{Button: true, Danger: true, Name: label, Attrs: templ.Attributes{
 		"hx-post":         basePath + "/integrations",
 		"hx-vals":         `{"server":"` + server + `","remove":"` + key + `"}`,
 		"hx-target":       "#server-security",
@@ -218,9 +225,7 @@ templ removeKeyButton(server, key, label, question string) {
 		"hx-disable":      "this",
 		"hx-confirm":      question,
 		"data-remove-key": key,
-	}) {
-		<span class="font-medium">{ label }</span>
-	}
+	}})
 }
 
 func proxyText(proxy string) string {
@@ -293,25 +298,30 @@ func tailnetNote(ip string, key, sshOnTailscale bool) string {
 // Only the owner of the server changes them, on the server.
 templ serverRules(server model.Server) {
 	{{ rules := service.ServerRules(server) }}
-	@kit.Section("Rules", nil) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Rules</h2>
+		</div>
 		<div data-rules-panel>
 			if len(rules.Lines()) == 0 {
-				@kit.List() {
-					@kit.Row("") {
-						<div class="min-w-0 flex-1">
-							<div class="font-medium">None</div>
-							<div class="text-sm text-muted-foreground">moin may do everything here. Write <code class="font-mono text-foreground">/etc/moin/rules</code> on the server to limit it.</div>
-						</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{}) {
+							<div class="moin-fill">
+								<div class="moin-strong">None</div>
+								<div class="moin-small moin-muted">moin may do everything here. Write <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
+							</div>
+						}
 					}
 				}
 			} else {
-				@kit.Card("", nil) {
-					<pre class="overflow-x-auto font-mono text-sm leading-relaxed" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
-					@kit.Quiet() {
-						From <code class="font-mono">/etc/moin/rules</code> on the server. The daemon refuses the rest.
-					}
+				@components.Card(components.CardProps{}) {
+					<pre class="moin-mono moin-text moin-scroll" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
+					<p class="moin-small moin-muted">
+						From <code class="moin-mono">/etc/moin/rules</code> on the server. The daemon refuses the rest.
+					</p>
 				}
 			}
 		</div>
-	}
+	</section>
 }

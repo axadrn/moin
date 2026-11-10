@@ -1,0 +1,99 @@
+@layer moin-components {
+  /* Text: five sizes and a few ways to say more. */
+  .moin-title {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+  }
+  .moin-number {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    font-variant-numeric: tabular-nums;
+  }
+  .moin-heading {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 500;
+  }
+  .moin-text {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-small {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .moin-muted { color: var(--muted-foreground); }
+  .moin-strong { font-weight: 500; }
+  .moin-mono { font-family: var(--font-mono); }
+  .moin-digits { font-variant-numeric: tabular-nums; }
+  .moin-center { text-align: center; text-wrap: balance; }
+  /* The sizes of a landing page: its one promise, a statement per section,
+     a sentence that leads to the rest, and a sign-off word as big as the page. */
+  .moin-display {
+    font-family: var(--font-heading);
+    font-size: 12vw;
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.06em;
+  }
+  .moin-statement {
+    font-family: var(--font-heading);
+    font-size: 2.25rem;
+    font-weight: var(--weight-title);
+    line-height: 2.5rem;
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+  .moin-lead {
+    max-width: var(--measure, 76ch);
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    color: var(--muted-foreground);
+    text-wrap: pretty;
+  }
+  .moin-huge { font-size: clamp(4rem, 13vw, 8rem); line-height: 1; }
+  @media (min-width: 40rem) {
+    .moin-display { font-size: clamp(3rem, 5.4vw, 5.75rem); letter-spacing: -0.05em; }
+    .moin-statement { font-size: 3rem; line-height: 1; }
+    .moin-lead[data-large] { font-size: 1.25rem; }
+  }
+  /* The plain text color inside a quiet line, and the colors of a state. */
+  .moin-foreground { color: var(--foreground); }
+  .moin-live { color: var(--live-text); }
+  .moin-running { color: var(--running); }
+  .moin-failed { color: var(--failed-text); }
+  /* Long words break instead of pushing the box wider. */
+  .moin-break { overflow-wrap: anywhere; }
+  .moin-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A link in a line of text. */
+  .moin-link {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+  .moin-link:hover { color: var(--foreground); }
+  /* A link that is a name: the underline comes with the pointer. */
+  .moin-link[data-quiet]:not(:hover) { text-decoration: none; }
+}

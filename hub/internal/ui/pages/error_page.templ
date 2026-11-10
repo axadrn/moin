@@ -3,7 +3,7 @@ package pages
 import (
 	"strconv"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 templ ErrorPage(status int, title, description string) {
@@ -16,13 +16,15 @@ templ ErrorPage(status int, title, description string) {
 			<title>{ title }</title>
 			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
 			<script nonce={ templ.GetNonce(ctx) }>
-				const theme = localStorage.getItem('theme') || 'system';
+				const theme = localStorage.getItem('moin-mode') || localStorage.getItem('theme') || 'system';
 				const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 				document.documentElement.classList.toggle('dark', dark);
+				document.documentElement.classList.toggle('light', theme === 'light');
 			</script>
-			<link href="/assets/css/output.css" rel="stylesheet"/>
+			<link href={ components.AssetURL("/assets/ui/moin.css") } rel="stylesheet"/>
+			<link href={ components.AssetURL("/assets/css/hub.css") } rel="stylesheet"/>
 		</head>
-		<body class="style-nova min-h-screen">
+		<body>
 			@StatusScreen(title, description, strconv.Itoa(status)+" "+title)
 		</body>
 	</html>
@@ -36,10 +38,10 @@ templ StatusScreen(title, description, line string) {
 			{ description }
 		}
 		@authStack() {
-			@kit.Button(kit.Primary, "/", nil) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/"}) {
 				Back to home
 			}
 		}
-		<p class="text-center font-mono text-xs break-all text-muted-foreground">{ line }</p>
+		<p class="moin-small moin-mono moin-muted moin-center moin-break">{ line }</p>
 	}
 }

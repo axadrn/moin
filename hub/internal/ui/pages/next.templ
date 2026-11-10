@@ -1,0 +1,46 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// Next is the story of moin next. What is planned, item by item, is in the
+// roadmap: one list.
+templ Next() {
+	@layouts.Home(layouts.SEOProps{Title: brand.Name + " next", Description: "One app to build it. Ship it. Run it. Open source. Highly experimental.", Path: "/next"}) {
+		<main class="moin-page moin-content moin-narrow">
+			<div class="moin-stack" data-gap="6">
+				<span class="moin-row"><span class="moin-badge">Highly experimental</span></span>
+				<h1 class="moin-statement">One app to build it. Ship it. Run it.</h1>
+				<p class="moin-lead" data-large>Think Linear. Slack. Mail. GitHub boards. All in one app. Open source. On your servers. Ready for your AI agents.</p>
+			</div>
+			<section class="moin-section">
+				<div class="moin-section-head"><h2>Moving in</h2></div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Name: "Tasks and roadmaps"})
+						@components.Item(components.ItemProps{Name: "Docs"})
+						@components.Item(components.ItemProps{Name: "Chat"})
+						@components.Item(components.ItemProps{Name: "Mail"})
+						@components.Item(components.ItemProps{Name: "Analytics"})
+						@components.Item(components.ItemProps{Name: "And many more"})
+					}
+				}
+			</section>
+			<div class="moin-stack" data-gap="6">
+				<p class="moin-lead">It will break. It can change. It can vanish any day. A few users get in first. Your deploys stay out of it.</p>
+				<p class="moin-lead">Nobody builds this for you. We build it together. In the open. Open an issue today. It can decide what ships tomorrow.</p>
+			</div>
+			<div class="moin-row" data-gap="2" data-wrap>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: layouts.GitHubURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+					Shape it on GitHub
+				}
+				@components.Button(components.ButtonProps{Href: "/roadmap"}) {
+					See the roadmap
+				}
+			</div>
+		</main>
+	}
+}

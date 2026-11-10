@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overview</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-back"></div>
+        <div class="moin-header-main">
+          <h1 class="moin-title">2 things need you.</h1>
+          <p class="moin-header-line moin-muted">7 apps · 3 servers · every backup checked today</p>
+        </div>
+      </header>
+      <!-- Needs you -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Needs you</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#deploys" class="moin-item">
+              <span data-lead class="moin-bubble">
+                <i class="moin-icon moin-icon-failed" data-size="s"></i>
+              </span>
+              <div class="moin-item-text">
+                <div class="moin-item-name">blog</div>
+                <div class="moin-item-note">v13 failed, v12 still runs</div>
+              </div>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#overview" class="moin-item">
+              <span data-lead class="moin-bubble" style="--tint:var(--running)">
+                <i class="moin-icon moin-icon-disk" data-size="s"></i>
+              </span>
+              <div class="moin-item-text">
+                <div class="moin-item-name">web-2</div>
+                <div class="moin-item-note">Disk is 91% full</div>
+              </div>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+      </div>
+      <!-- Pinned -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Pinned</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#app" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">my-app</div>
+              </div>
+              <span class="moin-status" title="Live">
+                <i class="moin-dot" data-state="live"></i>
+                <span class="moin-sr-only">Live</span>
+              </span>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+      </div>
+      <!-- Deployed last -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Deployed last</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#deploys" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">blog</div>
+                <div class="moin-item-note">v12 still runs</div>
+              </div>
+              <span class="moin-chip" data-state="failed">
+                <i class="moin-dot" data-state="failed"></i>
+                <span>v13 failed</span>
+              </span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#app" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">docs</div>
+              </div>
+              <span class="moin-chip" data-state="running">
+                <i class="moin-dot" data-state="running"></i>
+                <span>Deploying v8</span>
+              </span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#app" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">shop</div>
+              </div>
+              <span class="moin-status" title="Live">
+                <i class="moin-dot" data-state="live"></i>
+                <span class="moin-sr-only">Live</span>
+              </span>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+      </div>
+      <!-- List -->
+      <section class="moin-card">
+        <div class="moin-list">
+          <a href="#apps" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">All apps</div>
+            </div>
+            <span class="moin-item-value">7</span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#overview" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">All servers</div>
+            </div>
+            <span class="moin-item-value">3</span>
+            <i class="moin-chevron"></i>
+          </a>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

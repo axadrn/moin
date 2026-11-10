@@ -2,7 +2,7 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/dotenv"
 )
 
@@ -10,12 +10,10 @@ import (
 // swaps the env part only; the address stays.
 templ envModes(appLink string, text bool) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
-	<div class="shrink-0">
-		@kit.Segmented("env-modes", "Edit as", []kit.Segment{
-			{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
-			{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
-		})
-	</div>
+	@components.Tabs(components.TabsProps{ID: "env-modes", Label: "Edit as", Tabs: []components.Tab{
+		{Label: "Fields", Href: envPath, Active: !text, Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+		{Label: "Text", Href: envPath + "?text=1", Active: text, Attrs: templ.Attributes{"hx-get": envPath + "?text=1", "hx-target": "#app-env", "hx-swap": "outerHTML"}},
+	}})
 }
 
 // AppEnvText is every env var of an app as one .env text to edit. Saving
@@ -23,27 +21,31 @@ templ envModes(appLink string, text bool) {
 templ AppEnvText(appLink, text, problem string) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env">
-		@kit.Section("Environment", envModes(appLink, true)) {
-			@kit.Card("", nil) {
-				<form class="flex flex-col gap-4" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-env-text>
-					@kit.CSRF()
-					<div class="flex flex-col gap-2">
-						<label for="env-text" class="sr-only">Env vars</label>
-						@kit.TextArea(envTextAttributes(problem)) {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Environment</h2>
+				@envModes(appLink, true)
+			</div>
+			@components.Card(components.CardProps{}) {
+				<form class="moin-stack" data-gap="4" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-env-text>
+					@components.CSRF()
+					<div class="moin-stack" data-gap="2">
+						<label for="env-text" class="moin-sr-only">Env vars</label>
+						@components.TextArea(components.TextAreaProps{Attrs: envTextAttributes(problem)}) {
 							{ text }
 						}
 						if problem != "" {
-							<p id="env-text-problem" class="px-1 text-sm text-failed" role="alert">{ problem }</p>
+							<p id="env-text-problem" class="moin-text moin-failed" role="alert">{ problem }</p>
 						}
 					</div>
-					<div class="flex justify-end">
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+					<div class="moin-row" data-end>
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 							Review changes
 						}
 					</div>
 				</form>
 			}
-		}
+		</section>
 	</div>
 }
 
@@ -61,38 +63,42 @@ func envTextAttributes(problem string) templ.Attributes {
 templ AppEnvReview(appLink, text string, change dotenv.Change) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env" data-env-review>
-		@kit.Section("Environment", envModes(appLink, true)) {
-			@kit.Card("This replaces the env vars", nil) {
-				<ul class="flex flex-col gap-1 px-1 font-mono text-sm" role="list">
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Environment</h2>
+				@envModes(appLink, true)
+			</div>
+			@components.Card(components.CardProps{Title: "This replaces the env vars"}) {
+				<ul class="moin-stack moin-text" data-gap="1" role="list">
 					for _, key := range change.Added {
-						<li><span class="text-live">+</span> { key } <span class="font-sans text-xs text-muted-foreground">new</span></li>
+						<li><span class="moin-mono"><span class="moin-live">+</span> { key }</span> <span class="moin-small moin-muted">new</span></li>
 					}
 					for _, key := range change.Changed {
-						<li><span class="text-running">~</span> { key } <span class="font-sans text-xs text-muted-foreground">new value</span></li>
+						<li><span class="moin-mono"><span class="moin-running">~</span> { key }</span> <span class="moin-small moin-muted">new value</span></li>
 					}
 					for _, key := range change.Removed {
-						<li><span class="text-failed">-</span> { key } <span class="font-sans text-xs text-muted-foreground">removed</span></li>
+						<li><span class="moin-mono"><span class="moin-failed">-</span> { key }</span> <span class="moin-small moin-muted">removed</span></li>
 					}
 				</ul>
-				<form class="flex flex-wrap justify-end gap-2" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button">
-					@kit.CSRF()
+				<form class="moin-row" data-wrap data-end data-gap="2" hx-post={ envPath + "/text" } hx-target="#app-env" hx-swap="outerHTML" hx-disable="find button">
+					@components.CSRF()
 					<input type="hidden" name="text" value={ text }/>
-					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "name": "back", "value": "1"}) {
+					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"name": "back", "value": "1"}}) {
 						Back to the text
 					}
-					@kit.Button(replaceKind(len(change.Removed) > 0), "", templ.Attributes{"type": "submit", "name": "confirm", "value": "1", "data-env-replace": true}) {
+					@components.Button(components.ButtonProps{Kind: replaceKind(len(change.Removed) > 0), Type: "submit", Attrs: templ.Attributes{"name": "confirm", "value": "1", "data-env-replace": true}}) {
 						Replace
 					}
 				</form>
 			}
-		}
+		</section>
 	</div>
 }
 
 // replaceKind is the red button when the change removes something.
-func replaceKind(removes bool) kit.Kind {
+func replaceKind(removes bool) components.Kind {
 	if removes {
-		return kit.Danger
+		return components.Danger
 	}
-	return kit.Primary
+	return components.Primary
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -48,27 +48,32 @@ func (v ActivityView) filtered() bool {
 templ Activity(view ActivityView) {
 	@layouts.App("Activity") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, "Activity")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, Title: "Activity"})
 			if len(view.Choices.Apps)+len(view.Choices.Servers)+len(view.Choices.Users) > 0 {
 				@activityFilters(view)
 			}
 			<div id="activity-list">
 				if len(view.Events) == 0 {
-					@kit.List() {
-						@kit.Row("") {
+					@components.Card(components.CardProps{}) {
+						@components.List() {
 							if view.filtered() {
-								@kit.RowText("Nothing matches", "No change of the team matches this filter")
+								@components.Item(components.ItemProps{Name: "Nothing matches", Note: "No change of the team matches this filter"})
 							} else {
-								@kit.RowText("Nothing happened yet", "Deploys, restores and every other change show up here")
+								@components.Item(components.ItemProps{Name: "Nothing happened yet", Note: "Deploys, restores and every other change show up here"})
 							}
 						}
 					}
 				} else {
-					@kit.Section("Newest first, in UTC", nil) {
-						<div class="flex flex-col rounded-4xl bg-card p-1.5" role="list" data-activity>
-							@ActivityRows(view)
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>Newest first, in UTC</h2>
 						</div>
-					}
+						@components.Card(components.CardProps{}) {
+							@components.List(templ.Attributes{"role": "list", "data-activity": true}) {
+								@ActivityRows(view)
+							}
+						}
+					</section>
 				}
 			</div>
 		}
@@ -81,43 +86,43 @@ templ ActivityRows(view ActivityView) {
 	{{ now := time.Now() }}
 	for _, event := range view.Events {
 		{{ details := event.Details() }}
-		@kit.RowAttrs("", templ.Attributes{"data-event": event.Action}) {
-			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+		@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-event": event.Action}}) {
+			<span class="moin-bubble" style="--tint:var(--muted-foreground)" aria-hidden="true">
 				@activityIcon(event.Action)
 			</span>
-			<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-				<p class="text-sm text-pretty break-words">
-					<span class="font-medium">{ event.Actor() }</span>
+			<div class="moin-fill moin-stack" style="--gap:2px">
+				<p class="moin-text moin-break">
+					<span class="moin-strong">{ event.Actor() }</span>
 					{ " " + event.Summary() }
 				</p>
 				if details["message"] != "" {
-					<p class="truncate text-xs text-muted-foreground">{ details["message"] }</p>
+					<p class="moin-truncate moin-small moin-muted">{ details["message"] }</p>
 				}
 				if details["error"] != "" {
-					<p class="truncate text-xs text-muted-foreground">{ details["error"] }</p>
+					<p class="moin-truncate moin-small moin-muted">{ details["error"] }</p>
 				}
-				<p class="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-					<time class="tabular-nums" datetime={ event.CreatedAt.UTC().Format(time.RFC3339Nano) }>{ stamp(event.CreatedAt) }</time>
+				<p class="moin-row moin-small moin-muted" data-wrap data-gap="2">
+					<time class="moin-digits" datetime={ event.CreatedAt.UTC().Format(time.RFC3339Nano) }>{ stamp(event.CreatedAt) }</time>
 					if label := event.ViaLabel(); label != "" {
 						<span>{ "via " + label }</span>
 					}
 					if view.Admin && event.ActorName != "" && event.ActorEmail != "" {
-						<span class="break-all">{ event.ActorEmail }</span>
+						<span class="moin-break">{ event.ActorEmail }</span>
 					}
 					if view.Admin && event.IP != "" {
-						<span class="tabular-nums">{ event.IP }</span>
+						<span class="moin-digits">{ event.IP }</span>
 					}
 					if view.Admin && event.UserAgent != "" {
-						<span class="max-w-64 truncate" title={ event.UserAgent }>{ event.UserAgent }</span>
+						<span class="moin-truncate" title={ event.UserAgent }>{ event.UserAgent }</span>
 					}
 				</p>
 			</div>
-			<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{ human.Ago(event.CreatedAt, now) }</span>
+			<span class="moin-small moin-muted moin-digits">{ human.Ago(event.CreatedAt, now) }</span>
 		}
 	}
 	if view.Next != "" {
-		@kit.RowButton(false, templ.Attributes{"id": "activity-more", "hx-get": ctxkeys.AppBasePath(ctx) + "/activity" + view.query(view.Next), "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "this"}) {
-			<span class="flex-1 text-center font-medium">Show older</span>
+		@components.Item(components.ItemProps{Button: true, Attrs: templ.Attributes{"id": "activity-more", "hx-get": ctxkeys.AppBasePath(ctx) + "/activity" + view.query(view.Next), "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "this"}}) {
+			<span class="moin-fill moin-center moin-strong">Show older</span>
 		}
 	}
 }
@@ -129,7 +134,9 @@ templ activityFilters(view ActivityView) {
 	<form
 		method="get"
 		action={ templ.SafeURL(path) }
-		class="grid gap-2 sm:grid-cols-3"
+		class="moin-grid"
+		data-fit
+		data-gap="2"
 		hx-get={ path }
 		hx-trigger="change"
 		hx-target="#activity-list"
@@ -145,25 +152,25 @@ templ activityFilters(view ActivityView) {
 }
 
 // activitySelect picks one of the options, or all of them.
-templ activitySelect(name, all, current string, choices []kit.Option) {
-	{{ options := append([]kit.Option{{Value: "", Label: all}}, choices...) }}
-	@kit.Select(kit.SelectProps{ID: "activity-" + name, Name: name, Label: all, Options: options, Value: current})
+templ activitySelect(name, all, current string, choices []components.Option) {
+	{{ options := append([]components.Option{{Value: "", Label: all}}, choices...) }}
+	@components.Select(components.SelectProps{ID: "activity-" + name, Name: name, Label: all, Options: options, Value: current})
 }
 
 // valueOptions are options that show their value.
-func valueOptions(values []string) []kit.Option {
-	options := []kit.Option{}
+func valueOptions(values []string) []components.Option {
+	options := []components.Option{}
 	for _, value := range values {
-		options = append(options, kit.Option{Value: value, Label: value})
+		options = append(options, components.Option{Value: value, Label: value})
 	}
 	return options
 }
 
 // userOptions are the people by name, filtered by user ID.
-func userOptions(users []model.ActivityUser) []kit.Option {
-	options := []kit.Option{}
+func userOptions(users []model.ActivityUser) []components.Option {
+	options := []components.Option{}
 	for _, user := range users {
-		options = append(options, kit.Option{Value: user.Value(), Label: user.Label()})
+		options = append(options, components.Option{Value: user.Value(), Label: user.Label()})
 	}
 	return options
 }
@@ -171,22 +178,22 @@ func userOptions(users []model.ActivityUser) []kit.Option {
 templ activityIcon(action string) {
 	switch  {
 		case action == "app.rolled_back":
-			@kit.IconUndo("size-4")
+			@components.Icon("undo")
 		case action == "app.deployed" || action == "app.installed" || action == "app.updated" || action == "app.redeployed" || action == "app.restarted" || action == "app.started" || strings.HasPrefix(action, "deploy."):
-			@kit.IconDeploy("size-4")
+			@components.Icon("deploy")
 		case action == "app.stopped":
-			@kit.IconStop("size-4")
+			@components.Icon("stop")
 		case strings.HasPrefix(action, "data."):
-			@kit.IconDatabase("size-4")
+			@components.Icon("database")
 		case strings.HasPrefix(action, "backup."):
-			@kit.IconBucket("size-4")
+			@components.Icon("bucket")
 		case strings.HasPrefix(action, "server."):
-			@kit.IconServer("size-4")
+			@components.Icon("server")
 		case strings.HasPrefix(action, "env."):
-			@kit.IconKey("size-4")
+			@components.Icon("key")
 		case strings.HasPrefix(action, "workspace."):
-			@kit.IconUsers("size-4")
+			@components.Icon("users")
 		default:
-			@kit.IconActivity("size-4")
+			@components.Icon("activity")
 	}
 }

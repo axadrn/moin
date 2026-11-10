@@ -1,0 +1,41 @@
+/* The theme editor of /ui/theme: the fonts it offers and its color rows. */
+@font-face {
+  font-family: "Inter";
+  src: url("/assets/fonts/inter/inter-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/bricolage/bricolage-grotesque-bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* Colors side by side: a name, a swatch for light, a swatch for dark. */
+.demo-colors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3rem 3rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+}
+.demo-colors > input {
+  justify-self: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  box-shadow: 0 0 0 1px var(--border);
+  appearance: none;
+  cursor: pointer;
+}
+.demo-colors > input::-webkit-color-swatch-wrapper { padding: 0; }
+.demo-colors > input::-webkit-color-swatch { border: 0; border-radius: inherit; }
+.demo-colors > input::-moz-color-swatch { border: 0; border-radius: inherit; }
+
+.demo-colors > input:focus-visible {
+  box-shadow: var(--focus);
+}

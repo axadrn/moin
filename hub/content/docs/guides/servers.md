@@ -5,7 +5,7 @@ group: "Servers and data"
 order: 1
 ---
 
-A server is your computer on the internet. The daemon is the little helper on it. It only calls out, so the server needs no open door for moin.
+A server is your computer on the internet. The daemon is the little helper on it. It only calls out. The server needs no open door for moin.
 
 Any Linux server with systemd works, amd64 or arm64, at any provider. Ubuntu and Debian are the easy choice.
 

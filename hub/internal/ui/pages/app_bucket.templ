@@ -5,7 +5,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -21,8 +21,8 @@ type BucketView struct {
 templ Bucket(view BucketView) {
 	@layouts.App("Bucket") {
 		@panelPage(templ.Attributes{"data-bucket-page": true}) {
-			@kit.Header(kit.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, "Bucket")
-			<div id="bucket" class="flex flex-col gap-6">
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, Title: "Bucket"})
+			<div id="bucket" class="moin-stack" data-gap="6">
 				for _, bucket := range view.Buckets {
 					@bucketPanel(bucket)
 				}
@@ -37,69 +37,71 @@ templ Bucket(view BucketView) {
 templ bucketPanel(bucket service.Bucket) {
 	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket/" + bucket.Name }}
 	<div data-bucket={ bucket.Name }>
-		@kit.Section(bucket.Name, bucketBadge(bucket.Default)) {
-			@kit.List() {
-				@bucketFact("Used by", bucketUsedBy(bucket), false, nil)
-				@bucketFact("Bucket", bucket.Bucket, true, templ.Attributes{"data-bucket": true})
-				if bucket.Folder != "" {
-					@bucketFact("Folder", bucket.Folder, true, templ.Attributes{"data-bucket-folder": true})
-				}
-				@bucketFact("Endpoint", orAWS(bucket.Endpoint), true, nil)
-				@bucketFact("Access key", bucket.AccessKey, true, nil)
-				if len(bucket.Older) > 0 {
-					@kit.Row("") {
-						<div class="min-w-0 flex-1" data-bucket-older>
-							<div class="font-medium">Left by</div>
-							<div class="text-sm text-muted-foreground">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
-						</div>
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>{ bucket.Name }</h2>
+				@bucketBadge(bucket.Default)
+			</div>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@bucketFact("Used by", bucketUsedBy(bucket), false, nil)
+					@bucketFact("Bucket", bucket.Bucket, true, templ.Attributes{"data-bucket": true})
+					if bucket.Folder != "" {
+						@bucketFact("Folder", bucket.Folder, true, templ.Attributes{"data-bucket-folder": true})
 					}
-				}
-				@bucketDisclosure("Change") {
-					@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
-				}
-				if !bucket.Default {
-					@kit.RowButton(false, templ.Attributes{
-						"hx-post":           bucketPath + "/default",
-						"hx-target":         "#bucket",
-						"hx-select":         "#bucket",
-						"hx-swap":           "outerHTML",
-						"hx-disable":        "this",
-						"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
-						"data-make-default": bucket.Name,
-					}) {
-						<span class="font-medium">Make default</span>
+					@bucketFact("Endpoint", orAWS(bucket.Endpoint), true, nil)
+					@bucketFact("Access key", bucket.AccessKey, true, nil)
+					if len(bucket.Older) > 0 {
+						@components.Item(components.ItemProps{}) {
+							<div class="moin-item-text" data-bucket-older>
+								<div class="moin-strong">Left by</div>
+								<div class="moin-small moin-muted">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
+							</div>
+						}
 					}
-				}
-				@kit.RowButton(true, templ.Attributes{
-					"hx-post":            bucketPath + "/remove",
-					"hx-target":          "#bucket",
-					"hx-select":          "#bucket",
-					"hx-swap":            "outerHTML",
-					"hx-disable":         "this",
-					"hx-confirm":         "Remove the bucket " + bucket.Name + " from moin? What is in it stays there.",
-					"data-confirm-name":  bucket.Name,
-					"data-remove-bucket": bucket.Name,
-				}) {
-					<span class="font-medium">Remove</span>
+					@bucketDisclosure("Change") {
+						@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
+					}
+					if !bucket.Default {
+						@components.Item(components.ItemProps{Button: true, Name: "Make default", Attrs: templ.Attributes{
+							"hx-post":           bucketPath + "/default",
+							"hx-target":         "#bucket",
+							"hx-select":         "#bucket",
+							"hx-swap":           "outerHTML",
+							"hx-disable":        "this",
+							"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
+							"data-make-default": bucket.Name,
+						}})
+					}
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove", Attrs: templ.Attributes{
+						"hx-post":            bucketPath + "/remove",
+						"hx-target":          "#bucket",
+						"hx-select":          "#bucket",
+						"hx-swap":            "outerHTML",
+						"hx-disable":         "this",
+						"hx-confirm":         "Remove the bucket " + bucket.Name + " from moin? What is in it stays there.",
+						"data-confirm-name":  bucket.Name,
+						"data-remove-bucket": bucket.Name,
+					}})
 				}
 			}
-		}
+		</section>
 	</div>
 }
 
 // bucketFact is one fact of a bucket: its name left, the value right.
 templ bucketFact(name, value string, mono bool, attributes templ.Attributes) {
-	@kit.RowFact(name, "") {
-		<span class={ templ.KV("font-mono", mono) } { attributes... }>{ value }</span>
+	@components.Item(components.ItemProps{Name: name}) {
+		<span class={ "moin-item-value", templ.KV("moin-mono", mono) } { attributes... }>{ value }</span>
 	}
 }
 
 // bucketDisclosure is a row of a List that opens a form under it, in
-// place (kit.RowMore).
+// place.
 templ bucketDisclosure(label string) {
-	@kit.RowMore(label) {
-		@kit.RowControl(nil) {
-			<div class="min-w-0 flex-1 pt-1 pb-2">
+	@components.Expand(components.ExpandProps{Name: label}) {
+		@components.Item(components.ItemProps{}) {
+			<div class="moin-fill">
 				{ children... }
 			</div>
 		}
@@ -110,16 +112,18 @@ templ bucketDisclosure(label string) {
 templ bucketAdd(first bool) {
 	<div data-add-bucket>
 		if first {
-			@kit.Card("Add your bucket", nil) {
-				@kit.Quiet() {
+			@components.Card(components.CardProps{Title: "Add your bucket"}) {
+				<p class="moin-small moin-muted">
 					Deploys from your terminal and backups go there. Its keys need read and write access to this one bucket.
-				}
+				</p>
 				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: "default"}, true)
 			}
 		} else {
-			@kit.List() {
-				@bucketDisclosure("Another bucket") {
-					@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true)
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@bucketDisclosure("Another bucket") {
+						@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true)
+					}
 				}
 			}
 		}
@@ -129,9 +133,9 @@ templ bucketAdd(first bool) {
 // bucketForm adds a bucket or changes one. The IDs of its fields start
 // with prefix, so every form on the page has its own.
 templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
-	<form class="flex flex-col gap-4" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-bucket-form>
-		@kit.CSRF()
-		<div class="grid items-start gap-4 sm:grid-cols-2">
+	<form class="moin-stack" data-gap="4" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-bucket-form>
+		@components.CSRF()
+		<div class="moin-grid">
 			@bucketField(prefix, "name", "Name", bucket.Name, "like client-a", "Your name for it in moin", "text", false)
 			@bucketField(prefix, "region", "Region", bucket.Region, "auto", "auto for R2", "text", false)
 			@bucketField(prefix, "endpoint", "Endpoint", bucket.Endpoint, "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3", "text", true)
@@ -140,14 +144,14 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 			@bucketField(prefix, "access_key", "Access key", bucket.AccessKey, "", "", "text", false)
 			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Stored encrypted", "password", false)
 		</div>
-		<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-			<p class="px-1 text-sm text-muted-foreground">moin writes and deletes a test file first.</p>
+		<div class="moin-row" data-wrap data-end data-gap="3">
+			<p class="moin-text moin-muted">moin writes and deletes a test file first.</p>
 			if adding {
-				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Add bucket
 				}
 			} else {
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+				@components.Button(components.ButtonProps{Type: "submit"}) {
 					Save bucket
 				}
 			}
@@ -157,16 +161,16 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 
 // bucketField is one field of a bucket form, with a hint below.
 templ bucketField(prefix, name, label, value, placeholder, hint, kind string, wide bool) {
-	<div class={ templ.KV("sm:col-span-2", wide) }>
-		@kit.Field(label, prefix+name, hint) {
-			@kit.Input(templ.Attributes{"id": prefix + name, "name": name, "type": kind, "value": value, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"})
+	<div data-wide?={ wide }>
+		@components.Field(components.FieldProps{Label: label, For: prefix + name, Hint: hint}) {
+			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": prefix + name, "name": name, "type": kind, "value": value, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"}})
 		}
 	</div>
 }
 
 templ bucketBadge(isDefault bool) {
 	if isDefault {
-		<span class="text-sm text-muted-foreground" data-default-bucket>Default</span>
+		<span class="moin-small moin-muted" data-default-bucket>Default</span>
 	}
 }
 

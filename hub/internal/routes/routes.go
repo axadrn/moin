@@ -4,17 +4,16 @@ import (
 	"io/fs"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/assets"
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/app"
-	"github.com/axadrn/moin/hub/internal/content"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/handler"
 	"github.com/axadrn/moin/hub/internal/mcp"
 	"github.com/axadrn/moin/hub/internal/middleware"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
@@ -41,11 +40,11 @@ func SetupRoutes(app *app.App) http.Handler {
 	// Web, API and MCP invitations share one budget.
 	invitationLimiter := middleware.NewWorkspaceInvitationLimiter()
 
-	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing, content.Root)
+	home := handler.NewHomeHandler(app.TelemetryService, app.Cfg.Billing, app.Texts)
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
-	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter)
+	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
 	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
@@ -82,6 +81,21 @@ func SetupRoutes(app *app.App) http.Handler {
 	)
 }
 
+// uiAssets serves the ui folder under /assets/ui/. Only a block may be shown
+// in a frame, by this site's own preview.
+func uiAssets(app *app.App) http.Handler {
+	files := http.FileServer(http.FS(app.UIFiles))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if app.Cfg.IsDevelopment() {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		if strings.HasPrefix(r.URL.Path, "blocks/") {
+			middleware.AllowOwnFrames(w)
+		}
+		files.ServeHTTP(w, r)
+	})
+}
+
 // assetHandler serves the files under assets: from disk in development,
 // without caching, else from the binary, hashed scripts and fonts cached
 // for a year.
@@ -108,11 +122,12 @@ func assetHandler(app *app.App) http.Handler {
 // siteRoutes are the public site: assets, the home page, docs, search, the
 // changelog, the catalog and the legal pages.
 func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, catalogPages *handler.CatalogHandler) {
-	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
+	seo := handler.NewSEOHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.Cfg.AppURL, app.Texts, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
 	assetHandler := assetHandler(app)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
+	mux.Handle("GET /assets/ui/", http.StripPrefix("/assets/ui/", middleware.Gzip(uiAssets(app))))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	// Browsers, link previews and analytics ask for /favicon.ico at the root.
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
@@ -127,9 +142,15 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
-	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.CatalogService).Search)
-	mux.HandleFunc("GET /changelog", handler.Changelog(content.Root))
-	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(content.Root, app.Cfg.AppURL, build.Name))
+	mux.HandleFunc("GET /next", handler.Next)
+	ui := handler.NewUIHandler(app.UIDocsService, app.UIFiles)
+	mux.HandleFunc("GET /ui", ui.Show)
+	mux.HandleFunc("GET /ui.md", ui.Show)
+	mux.HandleFunc("GET /ui/", ui.Show)
+	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.CatalogService).Search)
+	mux.HandleFunc("GET /roadmap", handler.Roadmap(app.Texts))
+	mux.HandleFunc("GET /changelog", handler.Changelog(app.Texts))
+	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(app.Texts, app.Cfg.AppURL, build.Name))
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
@@ -144,7 +165,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
-func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter limiter) {
+func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter, githubLimiter limiter) {
 	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
@@ -154,8 +175,8 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimi
 	mux.HandleFunc("GET /auth/forgot-password-sent", middleware.RequireGuest(auth.ForgotPasswordSentPage))
 	mux.HandleFunc("GET /auth/magic-link-sent", middleware.RequireGuest(auth.MagicLinkSentPage))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
-	mux.HandleFunc("GET /auth/github", rateLimiter(middleware.RequireGuest(auth.GitHubAuth)))
-	mux.HandleFunc("GET /auth/github/callback", rateLimiter(auth.GitHubCallback))
+	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
+	mux.HandleFunc("GET /auth/github/callback", githubLimiter(auth.GitHubCallback))
 	mux.HandleFunc("GET /auth/magic-link/{token}", auth.VerifyMagicLink)
 	mux.HandleFunc("GET /auth/forgot-password/{token}", auth.VerifyForgotPassword)
 	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)
@@ -205,12 +226,6 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.Home))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/account", workspace(settings.SettingsPage))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/github", workspace(settings.GitHub))
-	if app.Cfg.IsDevelopment() {
-		// The gallery of the kit (DESIGN.md, Geometry), never in production.
-		mux.HandleFunc("GET /app/{workspaceSlug}/dev/kit", workspace(func(w http.ResponseWriter, r *http.Request) {
-			_ = pages.DevKit().Render(r.Context(), w)
-		}))
-	}
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
@@ -358,6 +373,8 @@ func adminRoutes(mux *http.ServeMux, app *app.App) {
 	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
 	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
 	mux.HandleFunc("POST /admin/users/{userID}/forever-free", adminRoute(admin.ForeverFree))
+	mux.HandleFunc("POST /admin/users/{userID}/offer", adminRoute(admin.ApplyOffer))
+	mux.HandleFunc("POST /admin/offers/claim", adminRoute(admin.ClaimOffers))
 	mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
 }
 

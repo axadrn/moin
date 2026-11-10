@@ -3,7 +3,7 @@ package pages
 import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -25,23 +25,23 @@ templ authScreen(seo layouts.SEOProps, title string) {
 // authFrame is the screen of authScreen without the document around it,
 // for the error page, which brings its own.
 templ authFrame(title string) {
-	<div class="flex min-h-svh flex-col bg-background">
-		<header class={ kit.Page, "flex h-16 shrink-0 items-center" }>
-			<a href="/" class="flex items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home" }>
-				@kit.Wordmark("text-xl leading-none")
+	<div class="moin-centered">
+		<header class="moin-page">
+			<a href="/" class="moin-row" aria-label={ brand.Name + " home" }>
+				@components.Wordmark(components.WordmarkProps{})
 			</a>
 		</header>
-		<main class="flex flex-1 justify-center px-4 pt-10 pb-16 sm:pt-24">
-			<div class="flex w-full max-w-sm flex-col gap-8">
-				<h1 class="text-center text-3xl font-semibold tracking-tight text-balance">{ title }</h1>
+		<div>
+			<main>
+				<h1 class="moin-title moin-center">{ title }</h1>
 				{ children... }
-			</div>
-		</main>
-		<footer class="flex h-16 shrink-0 items-center justify-center gap-6 text-sm text-muted-foreground">
-			<a href="/docs" class="hover:text-foreground">Docs</a>
+			</main>
+		</div>
+		<footer>
+			<a href="/docs">Docs</a>
 			if ctxkeys.RenderConfig(ctx).Billing {
-				<a href="/legal/terms" class="hover:text-foreground">Terms</a>
-				<a href="/legal/privacy" class="hover:text-foreground">Privacy</a>
+				<a href="/legal/terms">Terms</a>
+				<a href="/legal/privacy">Privacy</a>
 			}
 		</footer>
 	</div>
@@ -50,7 +50,7 @@ templ authFrame(title string) {
 // authStack stacks the fields and buttons of an auth page, each as wide as
 // the column.
 templ authStack() {
-	<div class="flex flex-col gap-3">
+	<div class="moin-stack" data-gap="3">
 		{ children... }
 	</div>
 }
@@ -58,61 +58,49 @@ templ authStack() {
 // authLine is the one sentence of an auth page that says what happens,
 // centered under the title.
 templ authLine() {
-	<p class="-mt-4 text-center text-sm text-pretty text-muted-foreground">
+	<p class="moin-text moin-muted moin-center">
 		{ children... }
 	</p>
 }
 
 // authLink is a quiet way elsewhere under the buttons, 44 px high.
 templ authLink(href string) {
-	<a href={ templ.SafeURL(href) } class="mx-auto flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30">
-		{ children... }
-	</a>
+	<div class="moin-row" data-center>
+		@components.Button(components.ButtonProps{Href: href, Quiet: true, Attrs: templ.Attributes{"data-muted": true}}) {
+			{ children... }
+		}
+	</div>
 }
 
 // authOr parts two ways to sign in.
 templ authOr() {
-	<div class="flex items-center gap-4 py-1 text-sm text-muted-foreground" aria-hidden="true">
-		<span class="h-px flex-1 bg-border"></span>
-		or
-		<span class="h-px flex-1 bg-border"></span>
-	</div>
+	<div class="moin-or" aria-hidden="true">or</div>
 }
 
 // authTerms is the line about the terms where moin is sold.
 templ authTerms() {
 	if ctxkeys.RenderConfig(ctx).Billing {
-		<p class="text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-foreground">
-			By continuing, you agree to the <a href="/legal/terms">Terms</a> and the <a href="/legal/privacy">Privacy Policy</a>.
+		<p class="moin-small moin-muted moin-center">
+			By continuing, you agree to the <a href="/legal/terms" class="moin-link">Terms</a> and the <a href="/legal/privacy" class="moin-link">Privacy Policy</a>.
 		</p>
 	}
 }
 
-// factRow is a row of a kit.List that states one fact: what, and its
-// value on the right.
+// factRow is a row of a components.List that states one fact: what, and
+// its value on the right.
 templ factRow(name, value string) {
-	@kit.Row("") {
-		<span class="flex-1 font-medium">{ name }</span>
-		<span class="min-w-0 truncate text-sm text-muted-foreground">{ value }</span>
-	}
+	@components.Item(components.ItemProps{Name: name, Value: value})
 }
 
-// formField is kit.Field with an error the page renders with: the label
+// formField is components.Field with an error the page renders with: the label
 // over its control, and the line under it, which shows the hint, or the
 // message when the field is wrong (DESIGN.md, Feedback). The line is there
 // from the start, empty without a hint, so a message only swaps text and
 // nothing moves. The control points at it with aria-describedby id-hint.
 templ formField(label, id, hint, err string) {
-	<div class="flex flex-col gap-2">
-		if label != "" {
-			<label for={ id } class="px-1 text-sm font-medium">{ label }</label>
-		}
+	@components.Field(components.FieldProps{Label: label, For: id, Hint: hint, Error: err}) {
 		{ children... }
-		<p id={ id + "-hint" } class="group/hint min-h-5 px-1 text-sm text-muted-foreground" data-field-hint={ id } data-invalid?={ err != "" } aria-live="polite">
-			<span class="group-data-invalid/hint:hidden">{ hint }</span>
-			<span data-hint-error class="hidden text-failed group-data-invalid/hint:inline">{ err }</span>
-		</p>
-	</div>
+	}
 }
 
 // ariaInvalid is the aria-invalid of a field with this message.

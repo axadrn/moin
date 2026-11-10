@@ -1,0 +1,116 @@
+/* The hub's own CSS, on top of moin UI: its fonts, the spinner of a running
+   htmx request, the feedback of hub.js, and the art of the home page.
+   Everything else is moin UI. */
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/geist/geist-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/geist/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"]) {
+  position: relative;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"]) > * {
+  visibility: hidden;
+}
+
+:is(button.htmx-request, form.htmx-request button[type="submit"])::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 1rem;
+  height: 1rem;
+  content: "";
+  border: 2px solid var(--muted-foreground);
+  border-top-color: var(--foreground);
+  border-radius: 9999px;
+  animation: hub-spin 0.7s linear infinite;
+}
+
+
+@keyframes hub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Feedback (DESIGN.md): a button that did its job shows a check in place of
+   its label for a moment, at the same size; a line in the page under its
+   row or form says what failed. hub.js sets both. */
+[data-done] {
+  position: relative;
+  color: transparent !important;
+}
+[data-done] > * {
+  visibility: hidden;
+}
+[data-done]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  background: var(--foreground);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.moin-button[data-kind="primary"][data-done]::after {
+  background: var(--primary-foreground);
+}
+[data-said] {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+header + [data-said] {
+  padding-inline: 0;
+}
+[data-said="failed"] {
+  color: var(--failed);
+}
+
+
+/* The wall of containers on the home page. */
+.hub-harbor {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+.hub-harbor-shade { stop-opacity: light-dark(0.26, 0.6); }
+.hub-harbor-card { fill: var(--card); }
+.hub-harbor-muted { fill: var(--muted); }
+.hub-harbor-ink { fill: var(--foreground); }
+.hub-harbor-tint-5 { fill: color-mix(in oklab, var(--foreground) 5%, transparent); }
+.hub-harbor-tint-9 { fill: color-mix(in oklab, var(--foreground) 9%, transparent); }
+.hub-harbor-side { fill: rgb(0 0 0 / light-dark(20%, 50%)); }
+.hub-harbor-foot { fill: rgb(0 0 0 / light-dark(35%, 65%)); }
+.hub-harbor-on-ink { fill: var(--background); }
+.hub-harbor-on-steel { fill: var(--foreground); }
+.hub-harbor-owner { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; }
+.hub-harbor-type { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.45; }
+.hub-harbor-app { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; opacity: 0.60; }
+.hub-harbor-app[data-ink] { opacity: 0.85; }
+.hub-harbor-rib { fill: color-mix(in oklab, var(--foreground) 7.5%, transparent); }
+.hub-harbor-rib-ink { fill: color-mix(in oklab, var(--background) 14%, transparent); }
+.hub-harbor-rail { fill: color-mix(in oklab, var(--foreground) 10%, transparent); }
+.hub-harbor-rail-ink { fill: color-mix(in oklab, var(--background) 12%, transparent); }

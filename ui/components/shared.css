@@ -1,0 +1,25 @@
+@layer moin-components {
+  /* Whatever scrolls at the edge of a round box. A scrollbar sits inside the
+     border, so a see-through border keeps it and its corner in the curve. */
+  .moin-textarea,
+  .moin-code > pre,
+  .moin-select > [popover],
+  .moin-menu,
+  .moin-palette-list {
+    border: var(--scroll-edge) solid transparent;
+  }
+
+  /* The focus ring of everything you can press. */
+  .moin-button:focus-visible,
+  .moin-input:focus-visible,
+  .moin-textarea:focus-visible,
+  .moin-switch > input:focus-visible,
+  .moin-check > input:focus-visible,
+  .moin-radio > input:focus-visible,
+  .moin-tab:focus-visible,
+  .moin-back:focus-visible,
+  .moin-copy:focus-visible,
+  .moin-choice > label:has(:focus-visible) {
+    box-shadow: var(--focus);
+  }
+}

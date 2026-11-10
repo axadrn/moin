@@ -112,6 +112,41 @@ func (h *AdminHandler) ForeverFree(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AdminUserPlan(user))
 }
 
+// ApplyOffer gives the first workspace of a user the offer of an address.
+func (h *AdminHandler) ApplyOffer(w http.ResponseWriter, r *http.Request) {
+	userID := r.PathValue("userID")
+	err := h.admin.ApplyOffer(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID, r.FormValue("email"))
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	if !isAction(r) {
+		redirect(w, r, "/admin/users/"+url.PathEscape(userID), http.StatusSeeOther)
+		return
+	}
+	user, err := h.admin.User(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), userID)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	answerDone(w, r, "Offer applied", "")
+	render(w, r, pages.AdminUserPlan(user))
+}
+
+// ClaimOffers applies every open offer to the account with that address.
+func (h *AdminHandler) ClaimOffers(w http.ResponseWriter, r *http.Request) {
+	claimed, err := h.admin.ClaimOffers(ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), confirmation(r))
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	if !isAction(r) {
+		redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+	answerDone(w, r, "Offers applied", strconv.Itoa(claimed)+" applied.")
+}
+
 func (h *AdminHandler) StartImpersonation(w http.ResponseWriter, r *http.Request) {
 	err := h.admin.StartImpersonation(w, r, ctxkeys.User(r.Context()), ctxkeys.Session(r.Context()), r.PathValue("userID"))
 	if err != nil {
@@ -146,7 +181,7 @@ func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err e
 		title = "Not found"
 		description = "The requested admin resource was not found."
 	case errors.Is(err, service.ErrAdminSelfAction), errors.Is(err, service.ErrAdminTargetIsOperator),
-		errors.Is(err, service.ErrNoWorkspace), errors.Is(err, service.ErrPaying):
+		errors.Is(err, service.ErrNoWorkspace), errors.Is(err, service.ErrPaying), errors.Is(err, service.ErrNoOffer):
 		status = http.StatusConflict
 		title = "Action not allowed"
 		description = err.Error()

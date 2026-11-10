@@ -1,6 +1,6 @@
 ---
 title: "FAQ"
-description: "Common questions, short answers"
+description: "Common questions. Short answers."
 group: "Reference"
 order: 6
 ---
@@ -45,7 +45,7 @@ Only what you open, passed through to you and never stored. `data: off` and `log
 
 ## Where are my env vars?
 
-In the hub, sealed with AES-256-GCM, and handed to your server with each deploy. [Roadmap](/docs/roadmap) says what comes next.
+In the hub, sealed with AES-256-GCM, and handed to your server with each deploy. [Roadmap](/roadmap) says what comes next.
 
 ## What is a workspace?
 
@@ -73,7 +73,7 @@ Yes, at no extra cost. [Invite them](/docs/guides/team#invite-someone).
 
 ## Is moin open source?
 
-Yes, all of it, under AGPL-3.0 at [github.com/axadrn/moin](https://github.com/axadrn/moin). [Host it yourself](/docs/self-hosting), free.
+Yes, all of it: AGPL-3.0, and [moin UI](/ui) under MIT, at [github.com/axadrn/moin](https://github.com/axadrn/moin). [Host it yourself](/docs/self-hosting), free.
 
 ## Why AGPL, and can I contribute?
 

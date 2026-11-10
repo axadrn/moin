@@ -138,6 +138,13 @@ func RateLimitAuth(clientIPs ClientIPResolver) func(http.HandlerFunc) http.Handl
 	return RateLimit(clientIPs, 5, 15*time.Minute)
 }
 
+// RateLimitGitHubLogin limits signing in with GitHub. One sign-in is two
+// requests, nothing can be guessed here, and it must not share the password
+// budget: a few tries would lock the callback out in the middle of a sign-in.
+func RateLimitGitHubLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
+	return RateLimit(clientIPs, 30, 15*time.Minute)
+}
+
 // RateLimitDeviceLogin limits `moin login` in the browser: starting a login
 // and opening or answering its code on the web, per client IP.
 func RateLimitDeviceLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {

@@ -1,0 +1,20 @@
+<div class="moin-card">
+  <div class="moin-row" data-wrap data-gap="3">
+    <button type="button" class="moin-button" data-open-palette>Open the palette</button>
+    <span class="moin-text moin-muted">Or press ⌘K, ctrl+K or /.</span>
+  </div>
+</div>
+<dialog id="moin-palette" class="moin-palette" aria-label="Search">
+  <div class="moin-palette-box">
+    <div class="moin-input-icon">
+      <label for="moin-search" class="moin-sr-only">Search or run a command</label>
+      <i class="moin-icon moin-icon-search"></i>
+      <input id="moin-search" class="moin-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search, or type: deploy my-app">
+    </div>
+    <div class="moin-palette-list" role="radiogroup" aria-label="Results" id="moin-results">
+      <div class="moin-palette-group" role="presentation">Apps</div>
+      <a href="#" role="option" aria-selected="true" class="moin-option">my-app</a>
+      <a href="#" role="option" aria-selected="false" class="moin-option">blog</a>
+    </div>
+  </div>
+</dialog>

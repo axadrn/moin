@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -17,7 +17,7 @@ import (
 templ AdminOverview(data *model.AdminOverview) {
 	@layouts.Admin("Admin") {
 		@panelPage() {
-			@kit.Header(kit.Back{}, "Admin")
+			@components.Header(components.HeaderProps{Title: "Admin"})
 			@adminNumbers([]adminNumber{
 				{"Users", data.Metrics.Users},
 				{"Verified", data.Metrics.VerifiedUsers},
@@ -26,7 +26,10 @@ templ AdminOverview(data *model.AdminOverview) {
 				{"Sessions", data.Metrics.ActiveSessions},
 			})
 			if n := data.Network; n != nil {
-				@kit.Section("Network", nil) {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>Network</h2>
+					</div>
 					@adminNumbers([]adminNumber{
 						{"Deploys", n.Deploys},
 						{"Apps", n.Apps},
@@ -34,14 +37,20 @@ templ AdminOverview(data *model.AdminOverview) {
 						{"Hosted", n.HostedWorkspaces},
 						{"Self-hosted", n.SelfHosted},
 					})
-				}
+				</section>
 			}
-			@kit.List() {
-				@kit.Row("/admin/activity") {
-					@kit.RowText("Activity", "")
-				}
-				@kit.Row("/admin/old-domain") {
-					@kit.RowText("Old domain", "")
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Href: "/admin/activity", Name: "Activity"})
+					@components.Item(components.ItemProps{Button: true, Name: "Apply open offers", Attrs: templ.Attributes{
+						"hx-post":             "/admin/offers/claim",
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          "Apply every open offer to the account with that address?",
+						"data-confirm-name":   "offers",
+						"data-confirm-action": "Apply offers",
+					}})
+					@components.Item(components.ItemProps{Href: "/admin/old-domain", Name: "Old domain"})
 				}
 			}
 			@adminUsers(data.Users)
@@ -51,74 +60,72 @@ templ AdminOverview(data *model.AdminOverview) {
 
 // adminUsers is the search and one page of users, newest first.
 templ adminUsers(users model.AdminUserPage) {
-	@kit.Section("Users", adminCount(plural(users.TotalUsers, "user", "users"))) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Users</h2>
+			@adminCount(plural(users.TotalUsers, "user", "users"))
+		</div>
 		<form method="GET" action="/admin" role="search">
-			@kit.Inline() {
-				<label for="admin-search" class="sr-only">Name or email</label>
-				@kit.Input(templ.Attributes{"id": "admin-search", "name": "q", "type": "search", "value": users.Query, "placeholder": "Name or email", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			<div class="moin-row" data-gap="2" data-phone="stack">
+				<label for="admin-search" class="moin-sr-only">Name or email</label>
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-search", "name": "q", "type": "search", "value": users.Query, "placeholder": "Name or email", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true}})
+				@components.Button(components.ButtonProps{Type: "submit"}) {
 					Search
 				}
-			}
+			</div>
 		</form>
-		@kit.List() {
-			for _, user := range users.Users {
-				@kit.Row("/admin/users/" + user.ID) {
-					@kit.RowText(adminUserName(user), adminUserNote(user))
-					if value := adminUserValue(user); value != "" {
-						<span class="shrink-0 text-sm whitespace-nowrap text-muted-foreground">{ value }</span>
-					}
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				for _, user := range users.Users {
+					@components.Item(components.ItemProps{Href: "/admin/users/" + user.ID, Name: adminUserName(user), Note: adminUserNote(user), Value: adminUserValue(user)})
 				}
-			}
-			if len(users.Users) == 0 {
-				@kit.Row("") {
-					@kit.RowText(adminNoUsers(users.Query), "")
+				if len(users.Users) == 0 {
+					@components.Item(components.ItemProps{Name: adminNoUsers(users.Query)})
 				}
 			}
 		}
 		if users.TotalPages > 1 {
-			<div class="flex items-center justify-between gap-3 pt-2">
-				<span class="px-1 text-sm text-muted-foreground tabular-nums">{ fmt.Sprintf("Page %d of %d", users.Page, users.TotalPages) }</span>
-				<div class="flex gap-2">
+			<div class="moin-row" data-between data-gap="3">
+				<span class="moin-text moin-muted moin-digits">{ fmt.Sprintf("Page %d of %d", users.Page, users.TotalPages) }</span>
+				<div class="moin-row" data-gap="2">
 					if users.Page > 1 {
-						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page-1), nil) {
+						@components.Button(components.ButtonProps{Href: adminPageURL(users.Query, users.Page-1)}) {
 							Newer
 						}
 					}
 					if users.TotalPages > users.Page {
-						@kit.Button(kit.Secondary, adminPageURL(users.Query, users.Page+1), nil) {
+						@components.Button(components.ButtonProps{Href: adminPageURL(users.Query, users.Page+1)}) {
 							Older
 						}
 					}
 				</div>
 			</div>
 		}
-	}
+	</section>
 }
 
 // AdminActivity is what operators did, newest first.
 templ AdminActivity(events []model.AdminActivityEvent) {
 	@layouts.Admin("Activity · Admin") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, "Activity")
-			@kit.List() {
-				for _, event := range events {
-					@kit.Row(adminEventHref(event)) {
-						@kit.RowText(model.AdminActivityActionLabel(event.Action), adminEventNote(event))
-						<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="shrink-0 text-sm whitespace-nowrap text-muted-foreground tabular-nums">
-							{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
-						</time>
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: "Activity"})
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, event := range events {
+						@components.Item(components.ItemProps{Href: adminEventHref(event), Name: model.AdminActivityActionLabel(event.Action), Note: adminEventNote(event)}) {
+							<time datetime={ event.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") } title={ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") } class="moin-text moin-muted moin-digits">
+								{ event.CreatedAt.UTC().Format("Jan 2, 15:04:05") }
+							</time>
+						}
 					}
-				}
-				if len(events) == 0 {
-					@kit.Row("") {
-						@kit.RowText("No operator activity yet", "")
+					if len(events) == 0 {
+						@components.Item(components.ItemProps{Name: "No operator activity yet"})
 					}
 				}
 			}
-			@kit.Quiet() {
-				<span class="px-1">{ fmt.Sprintf("Kept %d days, in UTC.", int(model.AdminActivityRetention.Hours()/24)) }</span>
-			}
+			<p class="moin-small moin-muted">
+				{ fmt.Sprintf("Kept %d days, in UTC.", int(model.AdminActivityRetention.Hours()/24)) }
+			</p>
 		}
 	}
 }
@@ -132,19 +139,21 @@ type adminNumber struct {
 // adminNumbers are counts side by side on one card: the word, the number
 // under it. Three in a row on a phone, all in one row from sm.
 templ adminNumbers(numbers []adminNumber) {
-	<dl class="grid grid-cols-3 gap-x-4 gap-y-5 rounded-4xl bg-card p-6 sm:grid-cols-5">
-		for _, number := range numbers {
-			<div class="flex min-w-0 flex-col gap-1">
-				<dt class="truncate text-sm text-muted-foreground">{ number.Label }</dt>
-				<dd class="text-2xl font-semibold tracking-tight tabular-nums">{ strconv.Itoa(number.Value) }</dd>
-			</div>
-		}
-	</dl>
+	@components.Card(components.CardProps{}) {
+		<dl class="moin-grid" data-fit style="--min:5rem">
+			for _, number := range numbers {
+				<div class="moin-stack" data-gap="1">
+					<dt class="moin-text moin-muted moin-truncate">{ number.Label }</dt>
+					<dd class="moin-number">{ strconv.Itoa(number.Value) }</dd>
+				</div>
+			}
+		</dl>
+	}
 }
 
 // adminCount is the quiet count at the end of a section title.
 templ adminCount(text string) {
-	<span class="text-sm text-muted-foreground tabular-nums">{ text }</span>
+	<span class="moin-text moin-muted moin-digits">{ text }</span>
 }
 
 func adminPageURL(query string, page int) string {

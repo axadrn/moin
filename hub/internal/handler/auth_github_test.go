@@ -12,6 +12,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 )
 
 // TestGitHubAuthNeedsClient: without a client ID and secret, GitHub would
@@ -53,6 +54,37 @@ func TestGitHubAuthUsesOneTimeStateCookie(t *testing.T) {
 	redirectURI := location.Query().Get("redirect_uri")
 	if redirectURI != "https://api.example.com/auth/github/callback" {
 		t.Fatalf("redirect_uri = %q, want the API_URL callback", redirectURI)
+	}
+}
+
+// TestGitHubCallbackWithStaleStateWhenSignedIn: a sign-in that comes back
+// after another one finished goes into the app, not to the sign-in page.
+func TestGitHubCallbackWithStaleStateWhenSignedIn(t *testing.T) {
+	handler := &authHandler{cfg: &config.Config{}}
+	request := httptest.NewRequest(http.MethodGet, "/auth/github/callback?code=c&state=old", nil)
+	request = request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "ada"}))
+	response := httptest.NewRecorder()
+
+	handler.GitHubCallback(response, request)
+
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/app" {
+		t.Fatalf("GitHubCallback() = %d %q, want 303 to /app", response.Code, response.Header().Get("Location"))
+	}
+}
+
+// TestGitHubCallbackFailureLeavesTheEmailFieldAlone: a failed GitHub sign-in
+// says so on its own and does not mark the email field.
+func TestGitHubCallbackFailureLeavesTheEmailFieldAlone(t *testing.T) {
+	handler := &authHandler{cfg: &config.Config{}}
+	request := httptest.NewRequest(http.MethodGet, "/auth/github/callback?code=c&state=old", nil)
+	request = request.WithContext(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{GitHubLogin: true}))
+	response := httptest.NewRecorder()
+
+	handler.GitHubCallback(response, request)
+
+	body := response.Body.String()
+	if strings.Contains(body, `aria-invalid="true"`) || !strings.Contains(body, `role="alert"`) {
+		t.Fatalf("GitHubCallback() body marks the email field or has no alert:\n%s", body)
 	}
 }
 

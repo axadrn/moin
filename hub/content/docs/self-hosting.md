@@ -1,11 +1,11 @@
 ---
 title: "Self-hosting"
-description: "Run your own moin hub, free forever, the same product we host"
+description: "Run your own moin hub. Free forever. The same product we host."
 group: "Start"
 order: 5
 ---
 
-Self-hosting means you run the hub on your own server instead of using ours. You get the product we host: every feature, unlimited servers, apps and teammates. No license key, no account with us.
+Self-hosting means you run the hub on your own server instead of using ours. You get the product we host. Every feature. Unlimited servers, apps and teammates. No license key. No account with us.
 
 ## One server
 

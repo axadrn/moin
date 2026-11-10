@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backups</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-back">
+          <a href="#data" class="moin-back">postgres-db</a>
+        </div>
+        <div class="moin-header-main">
+          <h1 class="moin-title">Backups</h1>
+          <p class="moin-header-line">
+            <i class="moin-dot" data-state="live"></i>
+            <span>Checked today, it restores</span>
+          </p>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button" data-kind="primary">Back up now</button>
+          </div>
+        </div>
+      </header>
+      <!-- Cards -->
+      <div class="moin-grid" data-fit style="--min:9rem">
+        <div class="moin-card">
+          <span class="moin-small moin-muted">Copies</span>
+          <span class="moin-number">48</span>
+        </div>
+        <div class="moin-card">
+          <span class="moin-small moin-muted">Newest</span>
+          <span class="moin-number">12m ago</span>
+        </div>
+        <div class="moin-card">
+          <span class="moin-small moin-muted">In your bucket</span>
+          <span class="moin-number">96 MB</span>
+        </div>
+      </div>
+      <!-- Restore a copy -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Restore a copy</h2>
+        </div>
+        <form class="moin-stack" data-gap="3">
+          <section class="moin-card">
+            <div class="moin-list">
+              <label class="moin-item">
+                <input type="radio" name="copy">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 8, 09:00 UTC</span>
+                  <span class="moin-item-note">Hourly · 2.1 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="copy" checked>
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 8, 08:00 UTC</span>
+                  <span class="moin-item-note">Hourly · 2.0 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="copy">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">Nov 7, 23:12 UTC</span>
+                  <span class="moin-item-note">By hand · 1.9 MB</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <details class="moin-expand">
+                <summary>
+                  <span class="moin-fill moin-truncate">45 more</span>
+                  <i class="moin-chevron"></i>
+                </summary>
+                <div>
+                  <label class="moin-item">
+                    <input type="radio" name="copy">
+                    <span class="moin-item-text">
+                      <span class="moin-item-name">Nov 7, 22:00 UTC</span>
+                      <span class="moin-item-note">Hourly · 1.9 MB</span>
+                    </span>
+                    <i class="moin-item-check"></i>
+                  </label>
+                </div>
+              </details>
+            </div>
+          </section>
+          <div class="moin-row" data-end>
+            <button type="button" class="moin-button" data-kind="danger" data-confirm="Restore over the live data? The data of the last 2 hours goes away." data-confirm-name="postgres-db">Restore</button>
+          </div>
+        </form>
+      </div>
+      <!-- Schedule -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Schedule</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <div class="moin-item" data-control>
+              <label for="every" class="moin-item-text">
+                <span class="moin-item-name">Back up</span>
+              </label>
+              <div class="moin-select">
+                <button type="button" id="every" popovertarget="every-list" aria-label="Back up" style="anchor-name:--every">
+                  <span class="moin-truncate" data-select-label>Every hour</span>
+                </button>
+                <div popover id="every-list" role="radiogroup" aria-label="Back up" style="position-anchor:--every">
+                  <label class="moin-option">
+                    <input type="radio" name="every" checked>
+                    <span>Every hour</span>
+                  </label>
+                  <label class="moin-option">
+                    <input type="radio" name="every">
+                    <span>Every day</span>
+                  </label>
+                  <label class="moin-option">
+                    <input type="radio" name="every">
+                    <span>Every week</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="moin-item" data-control>
+              <label for="check" class="moin-item-text">
+                <span class="moin-item-name">Daily check</span>
+                <span class="moin-item-note">Restores the newest copy to see that it works</span>
+              </label>
+              <span class="moin-switch">
+                <input id="check" type="checkbox" role="switch" autocomplete="off" checked>
+                <span></span>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,51 @@
+package components
+
+// FooterLink is one link of a column.
+type FooterLink struct {
+	Label    string
+	Href     string
+	External bool
+}
+
+// FooterColumn is a title over its links.
+type FooterColumn struct {
+	Title string
+	Links []FooterLink
+}
+
+// FooterProps is the columns and the line under them.
+type FooterProps struct {
+	Columns []FooterColumn
+	End     templ.Component
+}
+
+// Footer prints its children first, usually the wordmark, then the columns
+// and the last line.
+templ Footer(p FooterProps) {
+	<footer class="moin-footer">
+		<div class="moin-page">
+			<div class="moin-footer-columns">
+				<div class="moin-footer-brand">
+					{ children... }
+				</div>
+				for _, column := range p.Columns {
+					<nav class="moin-footer-column" aria-label={ column.Title }>
+						<h2>{ column.Title }</h2>
+						for _, link := range column.Links {
+							if link.External {
+								<a href={ templ.SafeURL(link.Href) } target="_blank" rel="noopener">{ link.Label }</a>
+							} else {
+								<a href={ templ.SafeURL(link.Href) }>{ link.Label }</a>
+							}
+						}
+					</nav>
+				}
+			</div>
+			if p.End != nil {
+				<div class="moin-footer-end">
+					@p.End
+				</div>
+			}
+		</div>
+	</footer>
+}

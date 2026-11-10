@@ -27,3 +27,17 @@ type DocGroup struct {
 	Title string
 	Pages []*DocPage
 }
+
+// UIBlock is a whole page of moin UI to copy.
+type UIBlock struct {
+	Slug  string
+	Title string
+	// Code is the file, with the links as they are after copying the folder.
+	Code string
+}
+
+// UIBlockGroup is a topic of the blocks.
+type UIBlockGroup struct {
+	Title  string
+	Blocks []UIBlock
+}

@@ -1,6 +1,6 @@
 ---
 title: "SQLite or Postgres?"
-description: "We recommend SQLite; Postgres works fully; moin backs up both"
+description: "We recommend SQLite. Postgres works fully. moin backs up both."
 group: "Servers and data"
 order: 6
 ---

@@ -1,0 +1,120 @@
+@layer moin-components {
+  /* Fields. 16 px on phones, so iOS does not zoom in. */
+  .moin-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--press);
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-size: 1rem;
+    outline: none;
+  }
+  .moin-textarea {
+    display: block;
+    width: 100%;
+    min-height: 10rem;
+    padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    outline: none;
+    resize: vertical;
+  }
+  @media (min-width: 40rem) {
+    .moin-input,
+    .moin-textarea { font-size: 0.875rem; }
+  }
+  .moin-input::placeholder,
+  .moin-textarea::placeholder { color: var(--muted-foreground); }
+  .moin-input:disabled { opacity: 0.4; }
+  /* A field without a box until you press it, for a cell of a table. */
+  .moin-input[data-bare] {
+    max-width: 22rem;
+    min-width: 6rem;
+    padding-inline: var(--space-3);
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font-mono);
+    text-overflow: ellipsis;
+    field-sizing: content;
+  }
+  .moin-input[data-bare]:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+  .moin-input[data-bare]:focus-visible { background: var(--muted); }
+  .moin-input[data-bare]::placeholder { font-style: italic; }
+  .moin-input[data-num] { text-align: right; }
+  .moin-input[data-state="saved"] { color: var(--live-text); }
+  .moin-input[data-state="failed"] { color: var(--failed-text); }
+  .moin-input[aria-invalid="true"] {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--failed) 30%, transparent);
+  }
+
+  /* A field with an icon in it. An input cannot hold anything, so a box holds
+     both: the icon sits over the field and the text moves over for it. */
+  .moin-input-icon {
+    position: relative;
+    min-width: 0;
+  }
+  .moin-input-icon > .moin-icon {
+    position: absolute;
+    top: 50%;
+    left: var(--space-5);
+    translate: 0 -50%;
+    color: var(--muted-foreground);
+    pointer-events: none;
+  }
+  .moin-input-icon > .moin-input { padding-inline-start: 3rem; }
+
+  /* A field with fixed text in front of it or after it. The box looks like
+     the field, and the input in it goes see-through. */
+  .moin-input-text {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    height: var(--press);
+    padding-inline: var(--space-5);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 1rem;
+  }
+  .moin-input-text:has(:focus-visible) { box-shadow: var(--focus); }
+  .moin-input-text > .moin-input {
+    flex: 1;
+    width: auto;
+    height: 100%;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--foreground);
+    box-shadow: none;
+  }
+  @media (min-width: 40rem) {
+    .moin-input-text { font-size: 0.875rem; }
+  }
+
+  .moin-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .moin-field > :is(label, span) {
+    padding-inline: var(--space-5);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+  }
+  .moin-hint {
+    min-height: 1.25rem;
+    padding-inline: var(--space-5);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+  }
+  .moin-hint[data-invalid] { color: var(--failed-text); }
+}

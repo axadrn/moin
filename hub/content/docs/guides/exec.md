@@ -1,11 +1,11 @@
 ---
 title: "Run a command"
-description: "A one-off command in an app's container, without SSH"
+description: "A one-off command in an app's container. No SSH."
 group: "Every day"
 order: 3
 ---
 
-Run one command inside your app and see what it prints. Good for migrations, the first admin user, or a look at a file. No SSH, no key on your laptop.
+Run one command inside your app and see what it prints. Good for migrations, the first admin user, or a look at a file. No SSH. No key on your laptop.
 
 ```text
 you: moin exec my-app -- ls /data

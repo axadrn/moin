@@ -1,11 +1,11 @@
 ---
 title: "GitHub"
-description: "Deploy any branch, tag or commit without a checkout, and every push"
+description: "Deploy any branch, tag or commit without a checkout. And every push."
 group: "Apps"
 order: 4
 ---
 
-Connect GitHub, and moin takes your code straight from it. Link a repo to an app once. Then deploy any branch, tag or commit, and every push if you like. The pull request shows a green check, **moin/deploy**, when the deploy is live.
+Connect GitHub. moin takes your code straight from it. Link a repo to an app once. Then deploy any branch, tag or commit. Every push too, if you like. When the deploy is live, the pull request shows a green check: **moin/deploy**.
 
 ## Connect GitHub
 

@@ -1,7 +1,7 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -23,17 +23,18 @@ templ NewWorkspaceForm(errorMsg string) {
 		id="new-workspace-form"
 		action="/workspaces/new"
 		method="POST"
-		class="flex flex-col gap-4"
+		class="moin-stack"
+		data-gap="4"
 		hx-post="/workspaces/new"
 		hx-target="#new-workspace-form"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
 	>
-		@kit.CSRF()
+		@components.CSRF()
 		@formField("Name", "workspace-name", "Like your company or a project.", errorMsg) {
-			@kit.Input(templ.Attributes{"id": "workspace-name", "name": "name", "type": "text", "placeholder": "Acme", "aria-invalid": ariaInvalid(errorMsg), "aria-describedby": "workspace-name-hint", "autocomplete": "off", "autofocus": true, "required": true})
+			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "workspace-name", "name": "name", "type": "text", "placeholder": "Acme", "aria-invalid": ariaInvalid(errorMsg), "aria-describedby": "workspace-name-hint", "autocomplete": "off", "autofocus": true, "required": true}})
 		}
-		@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+		@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 			Create workspace
 		}
 	</form>

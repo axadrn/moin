@@ -1,0 +1,106 @@
+@layer moin-components {
+  /* Button: a pill, the same height everywhere. One primary per screen. */
+  .moin-button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: var(--press);
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    cursor: pointer;
+    transition: background-color var(--fast) var(--ease);
+  }
+  .moin-button:hover { background: color-mix(in oklab, var(--muted) 70%, transparent); }
+  .moin-button[data-kind="primary"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .moin-button[data-kind="primary"]:hover { background: color-mix(in oklab, var(--primary) 85%, transparent); }
+  .moin-button[data-kind="danger"] { color: var(--failed-text); }
+  .moin-button[data-kind="danger"]:hover { background: color-mix(in oklab, var(--failed) 10%, transparent); }
+  .moin-button:disabled {
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  /* A button that stays pressed: a real checkbox inside it. */
+  .moin-button:has(> input[type="checkbox"]) { position: relative; }
+  .moin-button > input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .moin-button:has(> input:checked),
+  .moin-button:has(> input:checked):hover {
+    background: var(--foreground);
+    color: var(--background);
+  }
+  .moin-button:has(> input:focus-visible) { box-shadow: var(--focus); }
+
+  /* A button that did its job shows a check, at the same size. */
+  .moin-button:is([data-done], [data-copied]),
+  .moin-button[aria-busy="true"] {
+    position: relative;
+    color: transparent;
+  }
+  .moin-button:is([data-done], [data-copied])::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    background: var(--foreground);
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+  .moin-button[data-kind="primary"]:is([data-done], [data-copied])::after { background: var(--primary-foreground); }
+  .moin-button[aria-busy="true"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--muted-foreground);
+    border-top-color: var(--foreground);
+    border-radius: var(--radius-full);
+    animation: moin-spin 0.7s linear infinite;
+  }
+
+  /* A button with only an icon in it. */
+  .moin-button[data-icon] {
+    width: var(--press);
+    padding-inline: 0;
+    color: var(--muted-foreground);
+  }
+  .moin-button[data-icon]:hover {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+  .moin-button[data-icon][data-kind="danger"]:hover { color: var(--failed-text); }
+  .moin-button[data-quiet] { background: transparent; }
+  /* Quiet words: a way elsewhere under the real buttons. */
+  .moin-button[data-muted] { color: var(--muted-foreground); }
+  .moin-button[data-muted]:hover { color: var(--foreground); }
+  .moin-button[data-quiet]:hover { background: var(--muted); }
+  .moin-button[data-icon][aria-current] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  /* The button of a row that shares the line with a short control. */
+  @media (max-width: 39.99rem) {
+    .moin-button[data-phone="fill"] { flex: 1; }
+  }
+}

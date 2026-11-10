@@ -16,12 +16,12 @@ func TestSurfacesRenderAsAChoice(t *testing.T) {
 	for _, want := range []string{
 		`data-surfaces`,
 		`role="radiogroup"`,
-		`type="radio" id="surface-1-web" name="surface-1" value="web" checked`,
+		`type="radio" name="surface-1" value="web" checked`,
 		`<strong>Server</strong>`,
 		`<a href="/docs/guides/security">Security</a>`,
-		`<pre class="m-0 rounded-none bg-transparent px-6 py-4 pr-14"><code>moin integrations cloudflare</code></pre>`,
-		`<code>PUT /api/v1/integrations</code>`,
-		`<code>set_integrations</code>`,
+		`id="surface-1-cli-code" tabindex="0">moin integrations cloudflare</pre>`,
+		`PUT /api/v1/integrations</pre>`,
+		`set_integrations</pre>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
@@ -73,7 +73,7 @@ func TestSurfacesLongCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(html), "<code>moin buckets add \\\n  --bucket b \\\n  --access-key k</code>") {
+	if !strings.Contains(string(html), "moin buckets add \\\n  --bucket b \\\n  --access-key k</pre>") {
 		t.Errorf("got %s", html)
 	}
 	want := "- CLI:\n\n  ```\n  moin buckets add \\\n    --bucket b \\\n    --access-key k\n  ```\n- MCP: `add_bucket`\n"

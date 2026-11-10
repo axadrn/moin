@@ -1,0 +1,12 @@
+package components
+
+// Chart is one or two lines over time, like Stocks or Weather. It prints the
+// numbers and the already formatted words as JSON in a <moin-chart>; moin.js
+// draws it and shows what is under the pointer or a finger. The first line
+// is ink, the second muted: a chart has no colors of its own (DESIGN.md,
+// Character).
+templ Chart(p ChartProps) {
+	<moin-chart>
+		@templ.Raw(`<script type="application/json">` + chartJSON(p) + `</script>`)
+	</moin-chart>
+}

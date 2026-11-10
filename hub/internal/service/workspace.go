@@ -39,6 +39,8 @@ type WorkspaceService struct {
 	users         *repository.Users
 	subscriptions *SubscriptionService
 	email         *EmailService
+	// offers, when set, gives a new workspace the offer of its creator.
+	offers *OfferService
 }
 
 func NewWorkspaceService(
@@ -59,6 +61,12 @@ func NewWorkspaceService(
 		subscriptions: subscriptions,
 		email:         email,
 	}
+}
+
+// UseOffers gives every new workspace the offer of its creator. The hosted
+// hub sets it.
+func (s *WorkspaceService) UseOffers(offers *OfferService) {
+	s.offers = offers
 }
 
 func (s *WorkspaceService) Create(userID, name string) (*model.Workspace, error) {
@@ -133,7 +141,23 @@ func (s *WorkspaceService) insert(userID, name, slug string) (*model.Workspace, 
 	if err != nil {
 		return nil, fmt.Errorf("create workspace: %w", err)
 	}
+	s.claimOffer(userID, workspaceID)
 	return workspace, nil
+}
+
+// claimOffer never fails the new workspace: an offer that could not be
+// applied stays open.
+func (s *WorkspaceService) claimOffer(userID, workspaceID string) {
+	if s.offers == nil {
+		return
+	}
+	user, err := s.users.ByID(userID)
+	if err == nil {
+		_, err = s.offers.Claim(user, workspaceID)
+	}
+	if err != nil {
+		slog.Error("claim an offer", "error", err, "workspace_id", workspaceID)
+	}
 }
 
 // createdWorkspace says whether the user created a workspace before.

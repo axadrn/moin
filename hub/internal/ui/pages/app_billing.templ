@@ -6,7 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -16,7 +16,7 @@ templ Billing() {
 	{{ basePath := workspace.Path() }}
 	@layouts.App("Billing") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Billing")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: basePath + "/settings"}, Title: "Billing"})
 			@billingCurrent(subscription, basePath)
 			// The offer shows while there is something to buy: in the trial
 			// and when the workspace is read-only, not on a plan it has.
@@ -35,13 +35,14 @@ templ Billing() {
 // state, what it costs and the date that matters, and Manage when Stripe
 // keeps the details.
 templ billingCurrent(subscription *model.Subscription, basePath string) {
-	@kit.List() {
-		@kit.Row("") {
-			@kit.RowText(planName(subscription.PlanID), billingLine(subscription))
-			@billingStatus(subscription)
-			if subscription.ProviderCustomerID != nil {
-				@kit.Button(kit.Secondary, basePath+"/billing/manage", nil) {
-					Manage
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Name: planName(subscription.PlanID), Note: billingLine(subscription)}) {
+				@billingStatus(subscription)
+				if subscription.ProviderCustomerID != nil {
+					@components.Button(components.ButtonProps{Href: basePath + "/billing/manage"}) {
+						Manage
+					}
 				}
 			}
 		}
@@ -51,28 +52,28 @@ templ billingCurrent(subscription *model.Subscription, basePath string) {
 // billingStatus is the state of the subscription as a status chip.
 templ billingStatus(subscription *model.Subscription) {
 	{{ kind, word := billingState(subscription) }}
-	@kit.Chip(kind) {
+	@components.Chip(components.ChipProps{State: kind}) {
 		{ word }
 	}
 }
 
-func billingState(subscription *model.Subscription) (kit.State, string) {
+func billingState(subscription *model.Subscription) (components.State, string) {
 	switch subscription.Status {
 	case model.SubscriptionStatusActive:
 		if subscription.PlanID == model.SubscriptionPlanFree {
-			return kit.StateIdle, "Read-only"
+			return components.StateIdle, "Read-only"
 		}
-		return kit.StateLive, "Active"
+		return components.StateLive, "Active"
 	case model.SubscriptionStatusTrialing:
-		return kit.StateRunning, "Trial"
+		return components.StateRunning, "Trial"
 	case model.SubscriptionStatusPastDue:
-		return kit.StateWaiting, "Payment due"
+		return components.StateWaiting, "Payment due"
 	case model.SubscriptionStatusIncomplete:
-		return kit.StateIdle, "Payment pending"
+		return components.StateIdle, "Payment pending"
 	case model.SubscriptionStatusCancelled:
-		return kit.StateFailed, "Cancelled"
+		return components.StateFailed, "Cancelled"
 	}
-	return kit.StateFailed, "Ended"
+	return components.StateFailed, "Ended"
 }
 
 // billingLine says what the plan costs and the date that matters next.
@@ -101,32 +102,40 @@ templ billingOffer(plan access.Plan, basePath string) {
 		hx-post={ basePath + "/billing/checkout" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
-		class="group/offer flex flex-col items-start gap-6 rounded-4xl bg-card p-6 sm:p-8"
+		class="moin-card"
 		data-offer
+		data-either
 	>
-		@kit.CSRF()
+		@components.CSRF()
 		<input type="hidden" name="plan_id" value={ plan.ID }/>
-		<div class="flex w-full flex-wrap items-center justify-between gap-4">
-			<h2 class="text-base font-medium">{ plan.Name }</h2>
-			@kit.Choice("interval", "Pay", []kit.Option{{Value: "yearly", Label: "Yearly"}, {Value: "monthly", Label: "Monthly"}}, "yearly")
-		</div>
-		<div class="flex flex-col gap-1">
-			<p class="flex items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:hidden">
-				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
-				<span class="text-muted-foreground">a year</span>
-				<span class="text-sm font-medium">Save { yearlySaving(plan) }</span>
-			</p>
-			<p class="hidden items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:flex">
-				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
-				<span class="text-muted-foreground">a month</span>
-			</p>
-			<p class="text-muted-foreground">Unlimited servers, apps and teammates.</p>
-		</div>
-		<div class="flex flex-col items-start gap-3">
-			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-subscribe": true}) {
-				Subscribe
-			}
-			<p class="text-sm text-muted-foreground">Plus tax where it applies. Cancel any time.</p>
+		<div class="moin-stack" data-gap="6">
+			<div class="moin-row" data-wrap data-between data-gap="4">
+				<h2 class="moin-heading">{ plan.Name }</h2>
+				@components.Choice(components.ChoiceProps{Name: "interval", Label: "Pay", Options: []components.Option{
+					{Value: "yearly", Label: "Yearly", Attrs: templ.Attributes{"id": "interval-yearly"}},
+					{Value: "monthly", Label: "Monthly", Attrs: templ.Attributes{"id": "interval-monthly", "data-other": true}},
+				}, Checked: "yearly"})
+			</div>
+			<div class="moin-stack" data-gap="1">
+				<p class="moin-row" data-baseline data-gap="3" data-way="first">
+					<span class="moin-number">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
+					<span class="moin-muted">a year</span>
+					<span class="moin-text moin-strong">Save { yearlySaving(plan) }</span>
+				</p>
+				<p class="moin-row" data-baseline data-gap="3" data-way="other">
+					<span class="moin-number">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+					<span class="moin-muted">a month</span>
+				</p>
+				<p class="moin-muted">Unlimited servers, apps and teammates.</p>
+			</div>
+			<div class="moin-stack" data-gap="3">
+				<div class="moin-row">
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-subscribe": true}}) {
+						Subscribe
+					}
+				</div>
+				<p class="moin-small moin-muted">Plus tax where it applies. Cancel any time.</p>
+			</div>
 		</div>
 	</form>
 }

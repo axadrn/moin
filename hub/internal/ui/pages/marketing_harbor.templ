@@ -8,7 +8,7 @@ templ homeHarbor() {
 	<svg
 		viewBox={ harborN(harborLeftX) + " " + harborN(harborTopY) + " " + harborN(harborW) + " " + harborN(harborH-harborTopY) }
 		preserveAspectRatio="xMidYMax slice"
-		class="block h-full w-full select-none"
+		class="hub-harbor"
 		role="img"
 		aria-label="A wall of shipping containers, each an app: postgres, redis, node, python, bun and your-app."
 	>
@@ -21,7 +21,7 @@ templ homeHarbor() {
 				}
 			</clipPath>
 			<linearGradient id="harbor-shade" x1="1" y1="0" x2="0" y2="1">
-				<stop offset="0" stop-color="#000" class="[stop-opacity:0.26] dark:[stop-opacity:0.6]"></stop>
+				<stop offset="0" stop-color="#000" class="hub-harbor-shade"></stop>
 				<stop offset="1" stop-color="#000" stop-opacity="0"></stop>
 			</linearGradient>
 		</defs>
@@ -51,18 +51,18 @@ templ homeHarbor() {
 templ harborSides(b harborCrate) {
 	{{ base, over := harborTone(b.Tone) }}
 	if b.Ink {
-		{{ base, over = "fill-foreground", "" }}
+		{{ base, over = "hub-harbor-ink", "" }}
 	}
 	<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class={ base }></polygon>
 	if over != "" {
 		<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class={ over }></polygon>
 	}
-	<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class="fill-black/20 dark:fill-black/50"></polygon>
+	<polygon points={ harborSideLeft(b.X, b.Y, b.Depth) } class="hub-harbor-side"></polygon>
 	<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class={ base }></polygon>
 	if over != "" {
 		<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class={ over }></polygon>
 	}
-	<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class="fill-black/35 dark:fill-black/65"></polygon>
+	<polygon points={ harborSideBottom(b.X, b.Y, b.Depth) } class="hub-harbor-foot"></polygon>
 }
 
 // harborContainer is one 20-foot container from the side, at x, y: the
@@ -72,7 +72,7 @@ templ harborSides(b harborCrate) {
 templ harborContainer(x, y int, b harborCrate) {
 	{{ base, over := harborTone(b.Tone) }}
 	if b.Ink {
-		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBoxW) } height={ harborN(harborBoxH) } class="fill-foreground"></rect>
+		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBoxW) } height={ harborN(harborBoxH) } class="hub-harbor-ink"></rect>
 	} else {
 		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBoxW) } height={ harborN(harborBoxH) } class={ base }></rect>
 		if over != "" {
@@ -80,18 +80,18 @@ templ harborContainer(x, y int, b harborCrate) {
 		}
 	}
 	if b.Ref != "" {
-		<g class={ "font-sans", templ.KV("fill-background", b.Ink), templ.KV("fill-foreground", !b.Ink) }>
-			<text x={ harborN(x + harborBoxW - 10) } y={ harborN(y + 20) } text-anchor="end" class="text-[11px] font-bold tracking-[0.08em] opacity-55">{ b.Code } 1</text>
-			<text x={ harborN(x + harborBoxW - 10) } y={ harborN(y + 34) } text-anchor="end" class="text-[9px] font-bold tracking-[0.08em] opacity-45">22G1</text>
-			<text x={ harborN(x + 10) } y={ harborN(y + harborBoxH - 14) } class={ "text-[20px] font-extrabold tracking-[-0.01em]", templ.KV("opacity-85", b.Ink), templ.KV("opacity-60", !b.Ink) }>{ b.Ref }</text>
+		<g class={ templ.KV("hub-harbor-on-ink", b.Ink), templ.KV("hub-harbor-on-steel", !b.Ink) }>
+			<text x={ harborN(x + harborBoxW - 10) } y={ harborN(y + 20) } text-anchor="end" class="hub-harbor-owner">{ b.Code } 1</text>
+			<text x={ harborN(x + harborBoxW - 10) } y={ harborN(y + 34) } text-anchor="end" class="hub-harbor-type">22G1</text>
+			<text x={ harborN(x + 10) } y={ harborN(y + harborBoxH - 14) } class="hub-harbor-app" data-ink?={ b.Ink }>{ b.Ref }</text>
 		</g>
 	}
-	<g class={ templ.KV("fill-background/[0.14]", b.Ink), templ.KV("fill-foreground/[0.075]", !b.Ink) }>
+	<g class={ templ.KV("hub-harbor-rib-ink", b.Ink), templ.KV("hub-harbor-rib", !b.Ink) }>
 		for _, r := range harborRibs(x) {
 			<rect x={ harborN(r) } y={ harborN(y + 4) } width="3" height={ harborN(harborBoxH - 8) }></rect>
 		}
 	</g>
-	<g class={ templ.KV("fill-background/[0.12]", b.Ink), templ.KV("fill-foreground/[0.10]", !b.Ink) }>
+	<g class={ templ.KV("hub-harbor-rail-ink", b.Ink), templ.KV("hub-harbor-rail", !b.Ink) }>
 		<rect x={ harborN(x) } y={ harborN(y) } width={ harborN(harborBoxW) } height="5"></rect>
 		<rect x={ harborN(x) } y={ harborN(y + harborBoxH - 5) } width={ harborN(harborBoxW) } height="5"></rect>
 		<rect x={ harborN(x) } y={ harborN(y) } width="4" height={ harborN(harborBoxH) }></rect>

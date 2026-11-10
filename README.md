@@ -2,7 +2,7 @@
   <img src="hub/assets/img/og.png" alt="moin. Deploy anything. Lose nothing." width="100%">
 </p>
 
-Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule, checked every day. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
+Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule. Checked every day. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
 
 ```bash
 moin login              # log in through the browser
@@ -27,4 +27,4 @@ The hub is in [`hub`](hub).
 
 ## License
 
-AGPL-3.0, all of it. See [LICENSE](LICENSE) and [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).
+Open source: [what the licenses cover](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).

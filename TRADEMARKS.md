@@ -1,6 +1,6 @@
 # Trademarks
 
-The code of moin is open source under AGPL-3.0. The name "moin" and its logo
+The code of moin is open source. The name "moin" and its logo
 are not part of that license.
 
 You may:

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -14,34 +14,41 @@ import (
 templ AdminOldDomain(report *model.OldDomain) {
 	@layouts.Admin("Old domain · Admin") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Admin", Href: "/admin"}, "Old domain")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: "Old domain"})
 			if len(report.Hosts) == 0 {
-				@kit.List() {
-					@kit.Row("") {
-						@kit.RowText("No old domain is set", "Put it in OLD_URLS.")
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Name: "No old domain is set", Note: "Put it in OLD_URLS."})
 					}
 				}
 			} else {
-				@kit.List() {
-					@adminFact("Domain", strings.Join(report.Hosts, ", "))
-					@adminFact("Can it go?", oldDomainVerdict(report))
-					@adminFact("Requests", strconv.Itoa(report.Total)+" in "+strconv.Itoa(report.Days)+" days")
-					@adminFact("Last request", oldDomainLast(report))
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@adminFact("Domain", strings.Join(report.Hosts, ", "))
+						@adminFact("Can it go?", oldDomainVerdict(report))
+						@adminFact("Requests", strconv.Itoa(report.Total)+" in "+strconv.Itoa(report.Days)+" days")
+						@adminFact("Last request", oldDomainLast(report))
+					}
 				}
 				if len(report.Rows) > 0 {
-					@kit.Section("By day", nil) {
-						@kit.List() {
-							for _, row := range report.Rows {
-								@kit.Row("") {
-									<div class="min-w-0 flex-1">
-										<div class="truncate font-medium tabular-nums">{ row.Day }</div>
-										<div class="truncate text-sm text-muted-foreground"><span class="font-mono">{ row.Host }</span> · { row.Kind }</div>
-									</div>
-									<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ strconv.Itoa(row.Requests) }</span>
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>By day</h2>
+						</div>
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, row := range report.Rows {
+									@components.Item(components.ItemProps{}) {
+										<div class="moin-item-text">
+											<div class="moin-item-name moin-digits">{ row.Day }</div>
+											<div class="moin-item-note"><span class="moin-mono">{ row.Host }</span> · { row.Kind }</div>
+										</div>
+										<span class="moin-item-value">{ strconv.Itoa(row.Requests) }</span>
+									}
 								}
 							}
 						}
-					}
+					</section>
 				}
 			}
 		}

@@ -3,7 +3,7 @@ package pages
 import (
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 )
 
@@ -16,46 +16,24 @@ templ panelPage(attrs ...templ.Attributes) {
 	if len(attrs) > 0 {
 		{{ a = attrs[0] }}
 	}
-	<div class={ kit.Page, "flex flex-col gap-6 pt-6 pb-20" } { a... }>
+	<div class="moin-page moin-content" { a... }>
 		{ children... }
 	</div>
 }
 
-// panelBody is how the body of a panel sits in its card.
-type panelBody string
-
-const (
-	// panelBodyText pads text and forms like the header.
-	panelBodyText panelBody = ""
-	// panelBodyRows leaves 12 px; rows bring px-3, so their text lines up
-	// with the title.
-	panelBodyRows panelBody = "rows"
-	// panelBodyFlush runs logs and tables from edge to edge.
-	panelBodyFlush panelBody = "flush"
-)
-
-// panelProps is a card of a page: its title, one line, one action and how
-// its body sits.
+// panelProps is a card whose body runs from edge to edge: its title and the
+// actions next to it.
 type panelProps struct {
 	// ID is the card's id; Heading the id of its title, for aria-labelledby.
-	ID          string
-	Heading     string
-	Title       string
-	Description string
-	// Action is the one small control right of the title.
-	Action templ.Component
-	// Docs is the docs page, with its anchor, that explains the panel: a
-	// small book right of the title, before the Action.
-	Docs  string
-	Body  panelBody
-	Class string
-	Attrs templ.Attributes
+	ID      string
+	Heading string
+	Title   string
+	Action  templ.Component
+	Attrs   templ.Attributes
 }
 
-// panel is a card with a title: one topic of a page, the same shape as
-// kit.Card. The title sits left, a short line of fact under it, at most one
-// action right, and the body under them with one inner edge. Docs is not
-// shown: the page explains itself, and the docs explain concepts.
+// panel is a components.Card for a log: the body runs from edge to edge and
+// fills the card, and the title has an id for aria-labelledby.
 templ panel(p panelProps) {
 	{{ attrs := templ.Attributes{"role": "region"} }}
 	for k, v := range p.Attrs {
@@ -68,68 +46,52 @@ templ panel(p panelProps) {
 		if p.ID != "" {
 			id={ p.ID }
 		}
-		class={ "flex h-full min-w-0 flex-col gap-4 rounded-4xl bg-card py-6", p.Class }
+		class="moin-card moin-fill"
+		data-flush
 		{ attrs... }
 	>
-		<div class="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-6">
-			<div class="flex min-w-0 flex-col gap-0.5">
-				<h2
-					if p.Heading != "" {
-						id={ p.Heading }
-					}
-					class="text-base font-medium"
-				>{ p.Title }</h2>
-				if p.Description != "" {
-					<p class="text-sm text-muted-foreground">{ p.Description }</p>
+		<div class="moin-card-head">
+			<h2
+				if p.Heading != "" {
+					id={ p.Heading }
 				}
-			</div>
+				class="moin-heading"
+			>{ p.Title }</h2>
 			if p.Action != nil {
-				<div class="flex flex-wrap items-center gap-2">
+				<div class="moin-row" data-wrap data-gap="2">
 					@p.Action
 				</div>
 			}
 		</div>
-		<div class={ panelBodyClass(p.Body) }>
+		<div class="moin-stack moin-fill">
 			{ children... }
 		</div>
 	</section>
 }
 
-func panelBodyClass(body panelBody) string {
-	switch body {
-	case panelBodyRows:
-		return "min-w-0 px-3"
-	case panelBodyFlush:
-		return "flex min-h-0 min-w-0 flex-1 flex-col"
-	}
-	return "min-w-0 px-6"
-}
-
 // copyButton copies value, or the text of the element target selects: a
-// small round button whose icon turns into a check for a moment
-// (data-copy, in the panel script).
+// round button whose icon turns into a check for a moment (data-copy, in
+// hub.js).
 templ copyButton(value, target, label string) {
 	{{ attrs := templ.Attributes{"data-copy": value, "aria-label": label, "title": label} }}
 	if target != "" {
 		{{ attrs["data-copy-target"] = target }}
 	}
-	<button type="button" class="group/copy flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30" { attrs... }>
-		@kit.IconCopy("size-4 group-data-copied/copy:hidden")
-		@kit.IconCheck("hidden size-4 text-live group-data-copied/copy:block")
-	</button>
+	@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: attrs}) {
+		@components.Icon("copy")
+	}
 }
 
 // switchForm is a switch that saves itself (DESIGN.md, Feedback), a row of
-// a kit.List: its words and the switch with the id switchID. A change
+// a components.List: its words and the switch with the id switchID. A change
 // posts the switch, as "on", to action, which saves only that and answers
 // this row as stored. The switch is disabled while it saves, so a second
 // click cannot overtake the first; its id keeps the focus on it when the
 // answer swaps the row.
 templ switchForm(id, action, switchID, name, note string, on bool) {
-	@kit.RowForm(templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}) {
-		@kit.CSRF()
-		@kit.RowLabel(switchID, name, note)
-		@kit.Switch(templ.Attributes{"id": switchID, "name": "on", "value": "1", "checked": on})
+	@components.Item(components.ItemProps{Form: true, For: switchID, Name: name, Note: note, Attrs: templ.Attributes{"id": id, "hx-post": action, "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+		@components.CSRF()
+		@components.Switch(components.SwitchProps{ID: switchID, Name: "on", Value: "1", Checked: on})
 	}
 }
 

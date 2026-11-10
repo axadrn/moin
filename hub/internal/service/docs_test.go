@@ -19,7 +19,7 @@ func TestDocsShowTheRealHub(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	service := NewDocsService(root, "https://moin.run/")
+	service := NewDocsService(os.DirFS(root), "https://moin.run/", false)
 	if err := service.BuildDocsTree(); err != nil {
 		t.Fatal(err)
 	}

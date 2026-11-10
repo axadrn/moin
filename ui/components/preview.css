@@ -1,0 +1,71 @@
+@layer moin-components {
+  /* Preview: something shown live, its code behind a button. */
+  .moin-preview {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+  .moin-preview-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    min-height: 12rem;
+    padding: var(--space-8) var(--space-6);
+  }
+  .moin-preview-stage > * { max-width: 100%; }
+  .moin-preview-stage > :is(.moin-list, .moin-card, .moin-grid, .moin-columns, .moin-stack, .moin-field, .moin-code, .moin-command, .moin-alert, .moin-prose, .moin-steps, .moin-timeline, .moin-scroll, .moin-empty, .moin-history, .moin-footer, form, section, header, nav:not(.moin-tabs, .moin-breadcrumb, .moin-row), moin-calendar, moin-chart) { width: 100%; }
+
+  /* What fills a whole page stays in the flow here. */
+  .moin-preview-stage .moin-bar { position: static; }
+  .moin-preview-stage .moin-centered { min-height: 0; }
+  .moin-preview-stage .moin-hero { --bar: 0rem; min-height: 0; }
+  .moin-preview-stage .moin-hero > :last-child { height: 8rem; }
+  .moin-preview-stage .moin-band { --band: 2rem; }
+
+  /* Pull the corner to watch it answer. */
+  .moin-preview-stage[data-resize] {
+    align-items: stretch;
+    max-width: 100%;
+    min-width: 10rem;
+    overflow: auto;
+    resize: horizontal;
+  }
+
+  /* A whole page in a frame. */
+  .moin-preview-stage:has(> iframe) { padding: 0; }
+  .moin-preview-stage > iframe {
+    display: block;
+    width: 100%;
+    height: min(48rem, 80svh);
+    border: 0;
+  }
+
+  .moin-preview-source { border-top: 1px solid var(--border); }
+  .moin-preview-source > summary::-webkit-details-marker { display: none; }
+  .moin-preview-source > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
+  .moin-preview-source[open] > summary .moin-chevron { rotate: 90deg; }
+  .moin-preview-source > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    list-style: none;
+    padding: var(--space-3) var(--space-5);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .moin-preview-source > summary:hover,
+  .moin-preview-source[open] > summary { color: var(--foreground); }
+  .moin-preview-source > summary:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus);
+  }
+  .moin-preview-source > .moin-code {
+    border: 0;
+    border-radius: 0;
+  }
+}

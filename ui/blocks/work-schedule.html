@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calendar</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Calendar</h1>
+        </div>
+      </header>
+      <!-- Cards -->
+      <div class="moin-grid" data-cols="1-2">
+        <div class="moin-card">
+          <moin-calendar value="2026-11-09"></moin-calendar>
+        </div>
+        <div class="moin-section">
+          <div class="moin-section-head">
+            <h2>Monday, November 9</h2>
+          </div>
+          <section class="moin-card">
+            <div class="moin-list">
+              <a href="#schedule" class="moin-item">
+                <div class="moin-item-text">
+                  <div class="moin-item-name">Standup</div>
+                  <div class="moin-item-note">09:30, 15 minutes</div>
+                </div>
+                <i class="moin-chevron"></i>
+              </a>
+              <a href="#schedule" class="moin-item">
+                <div class="moin-item-text">
+                  <div class="moin-item-name">Design review</div>
+                  <div class="moin-item-note">14:00, 1 hour</div>
+                </div>
+                <i class="moin-chevron"></i>
+              </a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

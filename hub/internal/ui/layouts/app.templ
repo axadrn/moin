@@ -1,9 +1,6 @@
 package layouts
 
-import (
-	"github.com/axadrn/moin/hub/internal/ui/kit"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
-)
+import "github.com/axadrn/moin/hub/internal/ctxkeys"
 
 // Crumb is one step of the path in the top bar. The last one has no link.
 type Crumb struct {
@@ -27,7 +24,7 @@ templ App(title string) {
 // AppShell is the hub: the bar on top, the page under it. No
 // sidebar: the search in the bar goes everywhere (DESIGN.md, Navigation).
 // Every link loads a whole page; the browser keeps the old one on screen
-// until the new one is painted and fades between them (globals.css).
+// until the new one is painted and fades between them (hub.css).
 templ AppShell(p AppProps) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{
@@ -41,7 +38,7 @@ templ AppShell(p AppProps) {
 			<div id="update-notice" hx-get={ basePath + "/update" } hx-trigger="load" hx-swap="outerHTML"></div>
 		}
 		<div id="main">
-			<div class={ kit.Page, "pt-4 empty:hidden" }>
+			<div class="moin-page moin-hide-empty" style="--page-top:1rem">
 				@AppTrialCard()
 			</div>
 			{ children... }
@@ -52,8 +49,8 @@ templ AppShell(p AppProps) {
 }
 
 // appShellScript adds what every page of the panel shares: copy buttons
-// (copying with [data-copy] lives in moin.js, for every page), the go-to keys (g then h, s, b, y, t, l or ,) and n to
-// focus the page's main field ([data-hotkey-focus]). / is the search (moin.js).
+// (copying with [data-copy] lives in hub.js, for every page), the go-to keys (g then h, s, b, y, t, l or ,) and n to
+// focus the page's main field ([data-hotkey-focus]). / is the search (hub.js).
 templ appShellScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		(() => {

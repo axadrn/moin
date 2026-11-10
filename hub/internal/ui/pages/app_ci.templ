@@ -2,28 +2,28 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // appCI is the "Deploy from CI" card of the Deploys section: deploy an
 // image built elsewhere, and the deploy hook CI calls; hook says the app
 // has one.
 templ appCI(appName, appLink string, hook bool) {
-	<div class="grid" data-app-ci>
-		@kit.Card("Deploy from CI", nil) {
+	<div data-app-ci>
+		@components.Card(components.CardProps{Title: "Deploy from CI"}) {
 			<form
 				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
 				hx-swap="none"
 				hx-disable="find button[type='submit']"
 			>
-				@kit.CSRF()
-				@kit.Field("Deploy an image", "image-ref", "") {
-					@kit.Inline() {
-						@kit.Input(templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "placeholder": "ghcr.io/me/" + appName + ":3f2a9c1", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true})
-						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "data-deploy-image": true}) {
+				@components.CSRF()
+				@components.Field(components.FieldProps{Label: "Deploy an image", For: "image-ref"}) {
+					<div class="moin-row" data-gap="2" data-phone="stack">
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "placeholder": "ghcr.io/me/" + appName + ":3f2a9c1", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+						@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
 							Deploy image
 						}
-					}
+					</div>
 				}
 			</form>
 			@AppHook(appName, appLink, "", hook)
@@ -34,11 +34,11 @@ templ appCI(appName, appLink string, hook bool) {
 // AppHook is the deploy hook: whether the app has one, the buttons, and a
 // new hook's URL once, with the curl CI runs.
 templ AppHook(appName, appLink, url string, on bool) {
-	<div id="app-hook" class="flex flex-col gap-3" data-hook-on?={ on }>
-		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-			<div class="min-w-0 px-1">
-				<p class="text-sm font-medium">Deploy hook</p>
-				<p class="text-sm text-muted-foreground">
+	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
+		<div class="moin-row" data-wrap data-between data-gap="3">
+			<div>
+				<p class="moin-text moin-strong">Deploy hook</p>
+				<p class="moin-small moin-muted">
 					if on {
 						On
 					} else {
@@ -46,16 +46,16 @@ templ AppHook(appName, appLink, url string, on bool) {
 					}
 				</p>
 			</div>
-			<div class="flex flex-wrap gap-2">
+			<div class="moin-row" data-wrap data-gap="2">
 				if on {
-					@kit.Button(kit.Secondary, "", templ.Attributes{
+					@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
 						"hx-target":     "#app-hook",
 						"hx-swap":       "outerHTML",
 						"hx-disable":    "this",
 						"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + appName + ".",
 						"data-hook-off": true,
-					}) {
+					}}) {
 						Turn off
 					}
 				}
@@ -63,16 +63,16 @@ templ AppHook(appName, appLink, url string, on bool) {
 			</div>
 		</div>
 		if url != "" {
-			@kit.Quiet() {
-				Copy it now, it shows only once. Store it in CI as the secret <code class="font-mono text-foreground">MOIN_DEPLOY_HOOK</code>.
-			}
+			<p class="moin-small moin-muted">
+				Copy it now, it shows only once. Store it in CI as the secret <code class="moin-mono moin-foreground">MOIN_DEPLOY_HOOK</code>.
+			</p>
 			<div data-deploy-hook>
-				@kit.Command(url)
+				@components.Command(components.CommandProps{Text: url})
 			</div>
-			@kit.Quiet() {
+			<p class="moin-small moin-muted">
 				CI calls it after pushing the image:
-			}
-			@kit.Command(`curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`)
+			</p>
+			@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`})
 		}
 	</div>
 }
@@ -92,7 +92,7 @@ templ newHookButton(appLink string, replaces bool) {
 			attributes["hx-confirm"] = "Create a new deploy hook? The old URL stops working."
 		}
 	}}
-	@kit.Button(kit.Secondary, "", attributes) {
+	@components.Button(components.ButtonProps{Attrs: attributes}) {
 		New deploy hook
 	}
 }

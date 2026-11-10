@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploys and log</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-back">
+          <a href="#apps" class="moin-back">Apps</a>
+        </div>
+        <div class="moin-header-main">
+          <h1 class="moin-title">blog</h1>
+          <p class="moin-header-line">
+            <i class="moin-dot" data-state="failed"></i>
+            <span>v13 failed · v12 still live</span>
+          </p>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button">Restart</button>
+            <button type="button" class="moin-button" data-kind="primary">Deploy</button>
+          </div>
+        </div>
+      </header>
+      <!-- Desktop only -->
+      <div class="moin-hidden-phone">
+        <nav class="moin-tabs" aria-label="blog">
+          <a href="#app" class="moin-tab">App</a>
+          <a href="#deploys" class="moin-tab" aria-current="page">Deploys</a>
+          <a href="#domains" class="moin-tab">Domains</a>
+          <a href="#app" class="moin-tab">Logs</a>
+          <a href="#data" class="moin-tab">Data</a>
+          <a href="#app-settings" class="moin-tab">Settings</a>
+        </nav>
+      </div>
+      <!-- Cards -->
+      <div class="moin-grid">
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#deploys" class="moin-item" aria-current="true">
+              <div class="moin-item-text">
+                <div class="moin-item-name">v13</div>
+                <div class="moin-item-note">Fix the feed · 4m ago</div>
+              </div>
+              <span class="moin-status" data-state="failed"><i class="moin-dot" data-state="failed"></i>failed</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#deploys" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">v12</div>
+                <div class="moin-item-note">New header · 2d ago</div>
+              </div>
+              <span class="moin-status" data-state="live"><i class="moin-dot" data-state="live"></i>live</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#deploys" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">v11</div>
+                <div class="moin-item-note">Faster images · 5d ago</div>
+              </div>
+              <span class="moin-status" data-state="done"><i class="moin-dot" data-state="done"></i>succeeded</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#deploys" class="moin-item">
+              <div class="moin-item-text">
+                <div class="moin-item-name">v10</div>
+                <div class="moin-item-note">Update Go · 12d ago</div>
+              </div>
+              <span class="moin-status" data-state="done"><i class="moin-dot" data-state="done"></i>succeeded</span>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+        <section class="moin-card" data-flush>
+          <div class="moin-card-head">
+            <h2 class="moin-heading">Log</h2>
+            <div class="moin-row" data-gap="2">
+              <span class="moin-small moin-digits moin-muted">v13</span>
+              <span class="moin-chip" data-state="failed">
+                <i class="moin-dot" data-state="failed"></i>
+                <span>failed</span>
+              </span>
+              <button type="button" class="moin-copy" data-copy-target="#log" data-copy aria-label="Copy the log">
+                <i class="moin-icon moin-icon-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="moin-log" id="log" tabindex="0" aria-label="Deploy log">
+            <div data-kind="step">
+              <span>Cloning 8c41f2a</span>
+            </div>
+            <div data-kind="ok">
+              <span>Cloned in 2s</span>
+            </div>
+            <div data-kind="step">
+              <span>Building the image</span>
+            </div>
+            <div data-kind="out">
+              <span>#1 [internal] load build definition</span>
+            </div>
+            <div data-kind="out">
+              <span>#2 [build 1/4] FROM golang:1.26</span>
+            </div>
+            <div data-kind="out">
+              <span>#3 [build 2/4] RUN go build ./...</span>
+            </div>
+            <div data-kind="ok">
+              <span>Built in 48s</span>
+            </div>
+            <div data-kind="step">
+              <span>Starting v13</span>
+            </div>
+            <div data-kind="out">
+              <span>health check on :8080, try 1 of 5</span>
+            </div>
+            <div data-kind="out">
+              <span>health check on :8080, try 5 of 5</span>
+            </div>
+            <div data-kind="err">
+              <span>v13 did not answer on :8080</span>
+            </div>
+            <div data-kind="step">
+              <span>v12 keeps running</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

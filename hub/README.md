@@ -20,4 +20,4 @@ The image builds from the repo root: `docker build .`
 
 ## License
 
-AGPL-3.0. See [LICENSE](../LICENSE).
+Open source: [what the licenses cover](https://moin.run/docs/faq#is-moin-open-source).

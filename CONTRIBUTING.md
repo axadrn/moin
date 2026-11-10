@@ -10,7 +10,7 @@ broken link, are welcome anytime.
 
 ## License of your contribution
 
-moin is licensed under AGPL-3.0. Your contribution comes in under the
+Your contribution comes in under the
 Apache License 2.0, so the project can keep choosing its license later. You
 keep the copyright of your work.
 

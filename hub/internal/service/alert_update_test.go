@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -100,7 +101,7 @@ func TestCheckUpdatesOncePerRelease(t *testing.T) {
 // history.db after a restart, without asking a registry.
 func TestCatalogCacheServesARestart(t *testing.T) {
 	cache := newTestCatalogCache(t)
-	entries, err := catalog.Load(filepath.Join("..", "..", "content", "catalog"))
+	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "content")))
 	if err != nil {
 		t.Fatal(err)
 	}

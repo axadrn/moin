@@ -2,17 +2,20 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // SettingsAPITokensSection is the API tokens of the tokens tab: a new
 // token once it is made, the list, and the form for another. Requests
 // replace its parts by id.
 templ SettingsAPITokensSection(view APITokensView) {
-	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true"></div>
-	@kit.Section("API tokens", nil) {
+	<div id="api-token-reveal" class="moin-hide-empty" hx-swap-oob="true"></div>
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>API tokens</h2>
+		</div>
 		@APITokenList(view)
-	}
+	</section>
 	@APITokenCreate(view)
 }
 
@@ -20,7 +23,7 @@ templ SettingsAPITokensSection(view APITokensView) {
 // replaces it, which empties the form.
 templ APITokenCreate(view APITokensView) {
 	<div id="api-token-create" hx-swap-oob="true">
-		@kit.Card("New token", nil) {
+		@components.Card(components.CardProps{Title: "New token"}) {
 			@APITokenCreateForm(view, false)
 		}
 	</div>
@@ -35,30 +38,31 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 		if oob {
 			hx-swap-oob="true"
 		}
-		class="flex flex-col gap-4"
+		class="moin-stack"
+		data-gap="4"
 		hx-post={ ctxkeys.AppBasePath(ctx) + "/settings/api-tokens" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
-		@kit.CSRF()
-		<div class="grid items-start gap-4 md:grid-cols-2">
+		@components.CSRF()
+		<div class="moin-grid" data-cols="2">
 			@formField("Name", "api-token-name", "", form.Errors["name"]) {
-				@kit.Input(templ.Attributes{"id": "api-token-name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Like ci or Claude", "required": true, "maxlength": "64", "autocomplete": "off", "aria-invalid": ariaInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"})
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "api-token-name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Like ci or Claude", "required": true, "maxlength": "64", "autocomplete": "off", "aria-invalid": ariaInvalid(form.Errors["name"]), "aria-describedby": "api-token-name-hint"}})
 			}
 			@formField("Expires", "api-token-expiry", "", form.Errors["expiry"]) {
-				@kit.Select(kit.SelectProps{ID: "api-token-expiry", Name: "expiry", Label: "Expires", Options: apiTokenExpiryOptions, Value: form.Expiry})
+				@components.Select(components.SelectProps{ID: "api-token-expiry", Name: "expiry", Label: "Expires", Options: apiTokenExpiryOptions, Value: form.Expiry})
 			}
 			if len(view.Workspaces) > 0 {
 				@formField("Workspace", "api-token-workspace", "", form.Errors["workspace_id"]) {
-					@kit.Select(kit.SelectProps{ID: "api-token-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: form.WorkspaceID})
+					@components.Select(components.SelectProps{ID: "api-token-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: form.WorkspaceID})
 				}
 			}
 			@formField("Access", "access-"+form.Access, "", form.Errors["access"]) {
-				@kit.Choice("access", "Access", apiTokenAccessOptions, form.Access)
+				@components.Choice(components.ChoiceProps{Name: "access", Label: "Access", Options: apiTokenAccessOptions, Checked: form.Access})
 			}
 		</div>
-		<div class="flex justify-end">
-			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 				Create token
 			}
 		</div>
@@ -69,32 +73,30 @@ templ APITokenCreateForm(view APITokensView, oob bool) {
 templ APITokenList(view APITokensView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<div id="api-token-list" hx-swap-oob="true">
-		@kit.List() {
-			if len(view.Tokens) == 0 {
-				@kit.Row("") {
-					<p class="text-sm text-muted-foreground">No tokens yet.</p>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if len(view.Tokens) == 0 {
+					@components.Item(components.ItemProps{}) {
+						<p class="moin-small moin-muted">No tokens yet.</p>
+					}
 				}
-			}
-			for _, token := range view.Tokens {
-				@kit.RowControl(templ.Attributes{"data-api-token-row": token.ID}) {
-					<div class="min-w-0 flex-1">
-						<div class="flex min-w-0 items-center gap-2">
-							<span class="truncate font-medium">{ token.Name }</span>
-							if token.IsExpired(view.Now) {
-								<span class="shrink-0 text-sm text-failed">expired</span>
+				for _, token := range view.Tokens {
+					@components.Item(components.ItemProps{Name: token.Name, Note: apiTokenNote(token, view), Attrs: templ.Attributes{"data-api-token-row": token.ID}}) {
+						if token.IsExpired(view.Now) {
+							@components.Status(components.StatusProps{State: components.StateFailed}) {
+								expired
 							}
-						</div>
-						<div class="text-sm text-muted-foreground">{ apiTokenNote(token, view) }</div>
-					</div>
-					@kit.Button(kit.Secondary, "", templ.Attributes{
-						"type":       "button",
-						"aria-label": "Revoke " + token.Name,
-						"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
-					}) {
-						Revoke
+						}
+						@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+							"type":       "button",
+							"aria-label": "Revoke " + token.Name,
+							"hx-delete":  basePath + "/settings/api-tokens/" + token.ID,
+							"hx-swap":    "none",
+							"hx-disable": "this",
+							"hx-confirm": "Revoke " + token.Name + "? Requests with it stop working right away.",
+						}}) {
+							Revoke
+						}
 					}
 				}
 			}
@@ -105,12 +107,12 @@ templ APITokenList(view APITokensView) {
 // APITokenReveal shows a new token once, at the top of the tab, until the
 // page is left.
 templ APITokenReveal(raw string) {
-	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true">
-		@kit.Card("Copy your new token", nil) {
-			@kit.Command(raw)
-			@kit.Quiet() {
+	<div id="api-token-reveal" class="moin-hide-empty" hx-swap-oob="true">
+		@components.Card(components.CardProps{Title: "Copy your new token"}) {
+			@components.Command(components.CommandProps{Text: raw})
+			<p class="moin-small moin-muted">
 				It shows only this once.
-			}
+			</p>
 		}
 	</div>
 }

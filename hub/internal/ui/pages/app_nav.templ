@@ -3,23 +3,23 @@ package pages
 import (
 	"fmt"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
 // appKind is the status symbol of an app: its newest deploy.
-func appKind(app model.App) kit.State {
+func appKind(app model.App) components.State {
 	switch {
 	case app.LatestNumber == 0:
-		return kit.StateIdle
+		return components.StateIdle
 	case app.LatestStatus == model.DeployRunning:
-		return kit.StateRunning
+		return components.StateRunning
 	case app.LatestStatus == model.DeployFailed:
-		return kit.StateFailed
+		return components.StateFailed
 	}
-	return kit.StateLive
+	return components.StateLive
 }
 
 // appSections are the parts of an app, each one question: does it run,
@@ -53,13 +53,16 @@ func appSectionLabel(id string) string {
 templ appHeader(app model.App, section string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	if section != "app" {
-		<div class="sm:hidden">
-			@kit.Header(kit.Back{Label: app.Name, Href: appPath}, appSectionLabel(section))
+		<div class="moin-only-phone">
+			@components.Header(components.HeaderProps{Back: components.Back{Label: app.Name, Href: appPath}, Title: appSectionLabel(section)})
 		</div>
 	}
-	<div class={ templ.KV("hidden sm:block", section != "app") }>
-		@kit.Header(kit.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, app.Name) {
-			@appStateLine(app)
+	<div
+		if section != "app" {
+			class="moin-hidden-phone"
+		}
+	>
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, Title: app.Name, Line: appStateLine(app)}) {
 			@appActions(app)
 		}
 	</div>
@@ -73,54 +76,52 @@ templ appHeader(app model.App, section string) {
 // name from sm.
 templ appActions(app model.App) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
-	<div id="app-actions" hx-swap-oob="true" class="flex w-full flex-col gap-2 empty:hidden sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+	<div id="app-actions" hx-swap-oob="true" class="moin-contents">
 		if app.ChangesWaiting > 0 && !app.Stopped && app.LiveNumber > 0 {
-			<span class="hidden text-sm text-muted-foreground sm:inline" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
+			<span class="moin-hidden-phone moin-text moin-muted" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
 		}
-		<div class="grid w-full auto-cols-fr grid-flow-col gap-2 empty:hidden sm:flex sm:w-auto">
 		if app.Stopped {
-			@kit.Button(kit.Primary, "", templ.Attributes{"hx-post": appPath + "/start", "hx-swap": "none", "hx-disable": "this", "data-start": true}) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"hx-post": appPath + "/start", "hx-swap": "none", "hx-disable": "this", "data-start": true}}) {
 				Start
 			}
 		} else if app.LiveNumber > 0 {
-			@kit.Button(restartKind(app), "", templ.Attributes{"hx-post": appPath + "/restart", "hx-swap": "none", "hx-disable": "this", "data-restart": true}) {
+			@components.Button(components.ButtonProps{Kind: restartKind(app), Attrs: templ.Attributes{"hx-post": appPath + "/restart", "hx-swap": "none", "hx-disable": "this", "data-restart": true}}) {
 				Restart
 			}
 		}
 		if app.LatestNumber > 0 && !app.Stopped {
-			@kit.Button(deployKind(app), "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true}) {
+			@components.Button(components.ButtonProps{Kind: deployKind(app), Attrs: templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true}}) {
 				Deploy
 			}
 		}
-		</div>
 	</div>
 }
 
-func restartKind(app model.App) kit.Kind {
+func restartKind(app model.App) components.Kind {
 	if app.ChangesWaiting > 0 {
-		return kit.Primary
+		return components.Primary
 	}
-	return kit.Secondary
+	return ""
 }
 
-func deployKind(app model.App) kit.Kind {
+func deployKind(app model.App) components.Kind {
 	if app.ChangesWaiting > 0 {
-		return kit.Secondary
+		return ""
 	}
-	return kit.Primary
+	return components.Primary
 }
 
 // appStateLine is the answer of an app's page in one line: does it run.
 templ appStateLine(app model.App) {
-	<p id="app-state" hx-swap-oob="true" class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium sm:order-last" data-status>
-		@kit.Dot(appStateKind(app))
+	<span id="app-state" hx-swap-oob="true" class="moin-contents" data-status>
+		@components.Dot(components.DotProps{State: appStateKind(app)})
 		<span>{ appStateWords(app) }</span>
-	</p>
+	</span>
 }
 
-func appStateKind(app model.App) kit.State {
+func appStateKind(app model.App) components.State {
 	if app.Stopped {
-		return kit.StateIdle
+		return components.StateIdle
 	}
 	return appKind(app)
 }
@@ -152,19 +153,19 @@ func changesWaiting(n int) string {
 // to its page. Only from sm: a phone gets the list on the App section.
 templ appTabs(appName, appLink, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink }}
-	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
+	{{ tabs := make([]components.Tab, 0, len(appSections)) }}
 	for _, s := range appSections {
-		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
+		{{ tabs = append(tabs, components.Tab{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
 	}
-	<div class="hidden sm:block">
-		@kit.Segmented("app-tabs", appName, segments)
+	<div class="moin-hidden-phone">
+		@components.Tabs(components.TabsProps{ID: "app-tabs", Label: appName, Tabs: tabs})
 	</div>
 }
 
 // appSection is the tabs, then what the open section shows. A part that
 // reloads on the app's events keeps the head live on every section.
 templ appSection(appName, appLink, section string) {
-	<div id="app-section" class="flex flex-col gap-6">
+	<div id="app-section" class="moin-stack" data-gap="6">
 		@appTabs(appName, appLink, section)
 		if section != "deploys" {
 			// The Deploys section reloads through its list (appDeploys).
@@ -177,9 +178,8 @@ templ appSection(appName, appLink, section string) {
 // PinSwitch pins an app above the others that run fine, in every list: a
 // switch in the app's settings that saves itself (DESIGN.md, Feedback).
 templ PinSwitch(app model.App) {
-	@kit.RowForm(templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/pin", "hx-trigger": "change", "hx-swap": "none"}) {
-		@kit.CSRF()
-		@kit.RowLabel("pin-on", "Pin to the top", "")
-		@kit.Switch(templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true})
+	@components.Item(components.ItemProps{Form: true, For: "pin-on", Name: "Pin to the top", Attrs: templ.Attributes{"id": "pin-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/pin", "hx-trigger": "change", "hx-swap": "none"}}) {
+		@components.CSRF()
+		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "pin-on", "name": "on", "value": "1", "checked": app.Pinned, "aria-label": "Pin " + app.Name, "data-pin": true}})
 	}
 }

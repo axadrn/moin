@@ -1,0 +1,283 @@
+/* Layout: how things sit next to each other, and the five sizes
+   of text. The container makes the space with gap, never the element. */
+
+@layer moin-layout {
+  .moin-stack,
+  .moin-row,
+  .moin-grid {
+    --gap: var(--space-4);
+    gap: var(--gap);
+    min-width: 0;
+  }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="1"] { --gap: var(--space-1); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="2"] { --gap: var(--space-2); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="3"] { --gap: var(--space-3); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="6"] { --gap: var(--space-6); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="8"] { --gap: var(--space-8); }
+
+  /* Under each other. */
+  .moin-stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Next to each other. */
+  .moin-row {
+    display: flex;
+    align-items: center;
+  }
+  .moin-row[data-wrap] { flex-wrap: wrap; }
+  .moin-row[data-between] { justify-content: space-between; }
+  .moin-row[data-end] { justify-content: flex-end; }
+  .moin-row[data-top] { align-items: flex-start; }
+
+  /* Next to each other from a tablet up, under each other on a phone. */
+  @media (max-width: 39.99rem) {
+    .moin-row[data-phone="stack"] {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  /* Two columns from a tablet up, as high as the highest. */
+  .moin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  @media (min-width: 40rem) {
+    .moin-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  /* Up to this many columns, each at least 14rem wide: it wraps by itself. */
+  .moin-grid:is([data-cols="2"], [data-cols="3"], [data-cols="4"]) {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(14rem, calc((100% - (var(--n) - 1) * var(--gap)) / var(--n)))), 1fr));
+  }
+  .moin-grid[data-cols="2"] { --n: 2; }
+  .moin-grid[data-cols="3"] { --n: 3; }
+  .moin-grid[data-cols="4"] { --n: 4; }
+  /* One wide and one narrow. */
+  @media (min-width: 40rem) {
+    .moin-grid[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    .moin-grid[data-cols="1-2"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  }
+  /* Tiles of different sizes. data-wide takes two columns, data-tall two
+     rows. Two columns, four on a desktop. */
+  .moin-bento {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense;
+    gap: var(--space-4);
+  }
+  .moin-bento > [data-wide] { grid-column: span 2; }
+  @media (min-width: 64rem) {
+    .moin-bento { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .moin-bento > [data-tall] { grid-row: span 2; }
+  }
+
+  /* Groups of different length, two columns from a tablet up: each column
+     fills up, so no holes stay. */
+  @media (min-width: 48rem) {
+    .moin-columns { columns: 2; column-gap: var(--space-6); }
+  }
+
+  /* As many columns as fit, each at least --min wide, sharing the width. */
+  .moin-grid[data-fit] {
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--min, 12rem), 100%), 1fr));
+  }
+
+  /* One width for the whole product. */
+  .moin-page {
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding-left: max(var(--gutter, 1rem), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--gutter, 1rem), env(safe-area-inset-right, 0px));
+    padding-top: var(--page-top, 0);
+  }
+  @media (min-width: 40rem) {
+    .moin-page {
+      --gutter: 1.5rem;
+    }
+  }
+
+  /* What a page holds: the page width, what is in it under each other. */
+  .moin-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    padding-block: var(--space-6) 5rem;
+  }
+
+  /* A page outside the app: a head, one narrow column in the middle, a foot. */
+  .moin-centered {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+  }
+  .moin-centered > :is(header, footer) {
+    display: flex;
+    flex: none;
+    height: 4rem;
+    align-items: center;
+  }
+  .moin-centered > footer {
+    justify-content: center;
+    gap: var(--space-6);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+  .moin-centered > footer > a:hover { color: var(--foreground); }
+  .moin-centered > div {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    padding: 2.5rem var(--space-4) 4rem;
+  }
+  @media (min-width: 40rem) {
+    .moin-centered > div { padding-top: 6rem; }
+  }
+  .moin-centered > div > * {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  /* A block of a page: a quiet title, an action at its end. */
+  .moin-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .moin-section-head {
+    display: flex;
+    min-height: 2rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .moin-section-head > :is(h2, h3) {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .moin-row[data-center] { justify-content: center; }
+  .moin-row[data-baseline] { align-items: baseline; }
+  .moin-stack[data-center] { align-items: center; }
+  /* As wide as text reads well, or --width. On a moin-page it stays centered. */
+  .moin-narrow { max-width: var(--width, 42rem); }
+  /* A label and two answers, one under the other on a phone. Rows in a list
+     keep the same columns, so they line up. */
+  @media (min-width: 40rem) {
+    .moin-grid[data-cols="2-3-3"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 3fr); }
+  }
+  /* The sentence under the title of a page in the middle belongs to it. */
+  .moin-centered > div > * > .moin-title + p { margin-block-start: calc(var(--space-4) * -1); }
+
+  /* The first screen of a landing page: under a floating bar, words in the
+     middle, and what shows them below. */
+  .moin-hero {
+    --bar: 4.25rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    margin-block-start: calc(var(--bar) * -1);
+    overflow: hidden;
+  }
+  .moin-hero > :first-child {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
+    padding-block: calc(var(--bar) + 2rem) 2rem;
+    text-align: center;
+  }
+  .moin-hero > :last-child {
+    flex: none;
+    width: 100%;
+    height: 42svh;
+  }
+  @media (min-width: 40rem) {
+    .moin-hero { --bar: 4.75rem; }
+    .moin-hero > :first-child { padding-block: calc(var(--bar) + 2.5rem) 2.5rem; }
+    .moin-hero > :last-child { height: 44svh; }
+  }
+
+  /* A statement of a landing page with room above it. */
+  .moin-band {
+    --band: 7rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    padding-block-start: var(--band);
+  }
+  .moin-band:last-child { padding-block-end: var(--band); }
+  @media (min-width: 40rem) {
+    .moin-band { --band: 9rem; }
+  }
+  .moin-fill { flex: 1; min-width: var(--fill-min, 0); }
+  .moin-end { margin-inline-start: auto; }
+  .moin-scroll { overflow-x: auto; min-width: 0; }
+  /* Both ways, up to --scroll-max high: what stays in view needs this box. */
+  .moin-scroll[data-both] {
+    max-height: var(--scroll-max, 36rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .moin-hidden-phone { display: none; }
+  @media (min-width: 40rem) {
+    .moin-hidden-phone { display: revert; }
+    .moin-only-phone { display: none; }
+  }
+
+  /* Out to the edge of its card, past the card's padding. */
+  .moin-bleed { margin-inline: calc(-1 * var(--pad)); }
+  /* Back in by the card's padding, for what sits in a moin-bleed. */
+  .moin-inset { padding-inline: var(--pad); }
+  /* A part of a row with its own width (--width) from a tablet up, the whole
+     line on a phone. */
+  .moin-width { flex: none; width: 100%; min-width: 0; }
+  @media (min-width: 40rem) {
+    .moin-width { width: var(--width); }
+  }
+  /* The whole width of a grid. */
+  .moin-grid > [data-wide] { grid-column: 1 / -1; }
+  /* What is empty takes no room. */
+  .moin-hide-empty:empty { display: none; }
+
+  /* A link to a place on the page stops under the floating bar, or --jump. */
+  :target { scroll-margin-block-start: var(--jump, 6rem); }
+
+  /* A box that only holds an id: what is in it counts as being in its place. */
+  .moin-contents { display: contents; }
+  /* A moin-width that keeps its width on a phone too. */
+  .moin-width[data-fixed] { width: var(--width); }
+
+  /* A form with two ways. Inside data-either, the radio marked data-other
+     shows the parts marked data-way="other" in place of those marked
+     data-way="first", with no script. */
+  [data-either]:not(:has(input[data-other]:checked)) [data-way="other"],
+  [data-either]:has(input[data-other]:checked) [data-way="first"] { display: none; }
+}
+
+/* A group of moin-columns is one box on its own line, past the display of
+   whatever it is, a card too. So a column break never carries its margin to
+   the top of the next column, in any engine. */
+@layer moin-components {
+  .moin-columns.moin-columns > * {
+    display: inline-flex;
+    flex-direction: column;
+    width: 100%;
+    vertical-align: top;
+    break-inside: avoid;
+    margin-block-end: var(--space-6);
+  }
+}

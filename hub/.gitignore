@@ -32,7 +32,6 @@ go.work
 
 # Generated files
 *_templ.go
-output.css
 
 # IDE
 .idea/
@@ -51,10 +50,6 @@ Thumbs.db
 # Air tmp
 /tmp/
 
-# Node (if using npm for Tailwind)
-node_modules/
-package-lock.json
-tailwindcss
 
 # Daemon binaries served at /download
 /downloads/

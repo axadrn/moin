@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Dashboard</h1>
+          <div class="moin-header-actions">
+            <button type="button" class="moin-button">Export</button>
+            <button type="button" class="moin-button" data-kind="primary">New report</button>
+          </div>
+        </div>
+      </header>
+      <!-- Cards -->
+      <div class="moin-grid" data-cols="3">
+        <div class="moin-card">
+          <span class="moin-small moin-muted">Revenue</span>
+          <span class="moin-number">$48,210</span>
+        </div>
+        <div class="moin-card">
+          <span class="moin-small moin-muted">Customers</span>
+          <span class="moin-number">1,284</span>
+        </div>
+        <div class="moin-card">
+          <span class="moin-small moin-muted">Churn</span>
+          <span class="moin-number">1.9%</span>
+        </div>
+      </div>
+      <!-- Visitors -->
+      <section class="moin-card">
+        <div class="moin-card-head">
+          <h2 class="moin-heading">Visitors</h2>
+        </div>
+        <moin-chart><script type="application/json">{"lines":[{"values":[30.0,35.9,41.2,45.2,47.6,48.4,47.7,45.9,43.7,41.7,40.3,40.0,40.8,42.5,44.8,47.0,48.6,48.9,47.7,44.8,40.4,34.9,28.9,23.1,18.1,14.6,12.6,12.3,13.3,15.2,17.3,19.0,20.0,19.8,18.6,16.5,14.1,11.9,10.6,10.7,12.4,15.7,20.5,26.3,32.3,37.9,42.4,45.5,47.0,46.9,45.6,43.7,41.8,40.3,39.9,40.5,42.2,44.5,47.0,49.1,50.1,49.6,47.4,43.6,38.5,32.6,26.7,21.3,17.2,14.6,13.6,14.0,15.5,17.4,19.1,20.1,20.2,19.1,17.0,14.4,11.9,10.0,9.3,10.3,13.0,17.2,22.6,28.5,34.4,39.4,43.1,45.2,45.8,45.0,43.4,41.6]}],"unit":" k","times":["09:00","09:15","09:30","09:45","10:01","10:16","10:31","10:46","11:01","11:16","11:32","11:47","12:02","12:17","12:32","12:47","13:03","13:18","13:33","13:48","14:03","14:18","14:33","14:49","15:04","15:19","15:34","15:49","16:04","16:20","16:35","16:50","17:05","17:20","17:35","17:51","18:06","18:21","18:36","18:51","19:06","19:21","19:37","19:52","20:07","20:22","20:37","20:52","21:08","21:23","21:38","21:53","22:08","22:23","22:39","22:54","23:09","23:24","23:39","23:54","00:09","00:25","00:40","00:55","01:10","01:25","01:40","01:56","02:11","02:26","02:41","02:56","03:11","03:27","03:42","03:57","04:12","04:27","04:42","04:57","05:13","05:28","05:43","05:58","06:13","06:28","06:44","06:59","07:14","07:29","07:44","07:59","08:15","08:30","08:45","09:00"],"ticks":["09:00","21:00","09:00"]}</script></moin-chart>
+      </section>
+      <!-- New customers -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>New customers</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <a href="#dashboard" class="moin-item">
+              <span data-lead class="moin-avatar">
+                <span aria-hidden="true">GH</span>
+              </span>
+              <div class="moin-item-text">
+                <div class="moin-item-name">Grace Hopper</div>
+                <div class="moin-item-note">Team plan</div>
+              </div>
+              <span class="moin-item-value">$48</span>
+              <i class="moin-chevron"></i>
+            </a>
+            <a href="#dashboard" class="moin-item">
+              <span data-lead class="moin-avatar">
+                <span aria-hidden="true">AT</span>
+              </span>
+              <div class="moin-item-text">
+                <div class="moin-item-name">Alan Turing</div>
+                <div class="moin-item-note">Pro plan</div>
+              </div>
+              <span class="moin-item-value">$12</span>
+              <i class="moin-chevron"></i>
+            </a>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

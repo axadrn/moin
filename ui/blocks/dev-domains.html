@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Domains</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-back">
+          <a href="#app" class="moin-back">my-app</a>
+        </div>
+        <div class="moin-header-main">
+          <h1 class="moin-title">Domains</h1>
+        </div>
+      </header>
+      <!-- List -->
+      <section class="moin-card">
+        <div class="moin-list">
+          <a href="#metrics" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">my-app.example.com</div>
+              <div class="moin-item-note">99.98% · 182 ms</div>
+            </div>
+            <span class="moin-chip" data-state="live">
+              <i class="moin-dot" data-state="live"></i>
+              <span>Up</span>
+            </span>
+            <i class="moin-chevron"></i>
+          </a>
+          <a href="#metrics" class="moin-item">
+            <div class="moin-item-text">
+              <div class="moin-item-name">www.example.com</div>
+              <div class="moin-item-note">Waiting for its DNS record</div>
+            </div>
+            <span class="moin-chip" data-state="waiting">
+              <i class="moin-dot" data-state="waiting"></i>
+              <span>Waiting</span>
+            </span>
+            <i class="moin-chevron"></i>
+          </a>
+        </div>
+      </section>
+      <!-- Uptime, 30 days -->
+      <section class="moin-card">
+        <div class="moin-row" data-between>
+          <h2 class="moin-heading">Uptime, 30 days</h2>
+          <span class="moin-text moin-muted moin-digits">99.8%</span>
+        </div>
+        <div class="moin-history" role="img" aria-label="30 days, one with an outage" >
+          <i data-tip="Oct 10 · 100%"></i>
+          <i data-tip="Oct 11 · 100%"></i>
+          <i data-tip="Oct 12 · 100%"></i>
+          <i data-tip="Oct 13 · 100%"></i>
+          <i data-tip="Oct 14 · 100%"></i>
+          <i data-tip="Oct 15 · 100%"></i>
+          <i data-tip="Oct 16 · 100%"></i>
+          <i data-tip="Oct 17 · 100%"></i>
+          <i data-tip="Oct 18 · 100%"></i>
+          <i data-tip="Oct 19 · 100%"></i>
+          <i data-tip="Oct 20 · 100%"></i>
+          <i data-tip="Oct 21 · 100%"></i>
+          <i data-tip="Oct 22 · 100%"></i>
+          <i data-tip="Oct 23 · 100%"></i>
+          <i data-tip="Oct 24 · 100%"></i>
+          <i data-tip="Oct 25 · 100%"></i>
+          <i data-tip="Oct 26 · 100%"></i>
+          <i data-tip="Oct 27 · 100%"></i>
+          <i data-tip="Oct 28 · 100%"></i>
+          <i data-tip="Oct 29 · 100%"></i>
+          <i data-tip="Oct 30 · 100%"></i>
+          <i data-state="failed" data-tip="Oct 31 · down 48m"></i>
+          <i data-tip="Nov 1 · 100%"></i>
+          <i data-tip="Nov 2 · 100%"></i>
+          <i data-tip="Nov 3 · 100%"></i>
+          <i data-tip="Nov 4 · 100%"></i>
+          <i data-tip="Nov 5 · 100%"></i>
+          <i data-tip="Nov 6 · 100%"></i>
+          <i data-tip="Nov 7 · 100%"></i>
+          <i data-tip="Nov 8 · 100%"></i>
+        </div>
+      </section>
+      <!-- Add a domain -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Add a domain</h2>
+        </div>
+        <form class="moin-card">
+          <div class="moin-field">
+            <label for="add-domain">Domain</label>
+            <div class="moin-row" data-gap="2" data-phone="stack">
+              <input id="add-domain" class="moin-input" placeholder="my-app.example.com">
+              <button type="button" class="moin-button" data-kind="primary">Add</button>
+            </div>
+          </div>
+          <div class="moin-field">
+            <label for="bad-domain">Another one</label>
+            <input id="bad-domain" class="moin-input" value="example" aria-invalid="true">
+            <p class="moin-hint" data-invalid>Not a domain.</p>
+          </div>
+        </form>
+      </div>
+      <!-- List -->
+      <section class="moin-card">
+        <div class="moin-list">
+          <div class="moin-item" data-control>
+            <label for="instant" class="moin-item-text">
+              <span class="moin-item-name">Instant HTTPS address</span>
+              <span class="moin-item-note">my-app.203-0-113-9.nip.io</span>
+            </label>
+            <span class="moin-switch">
+              <input id="instant" type="checkbox" role="switch" autocomplete="off" checked>
+              <span></span>
+            </span>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

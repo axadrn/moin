@@ -1,6 +1,6 @@
 ---
 title: "Palette and keys"
-description: "One box finds and does everything; a few keys do the rest"
+description: "One box finds and does everything. A few keys do the rest."
 group: "Reference"
 order: 3
 ---

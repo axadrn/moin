@@ -1,36 +1,43 @@
 package layouts
 
+import "github.com/axadrn/moin/hub/internal/ui/components"
 
 // AppShortcuts is the dialog ? opens: every key of the panel, the same as
 // in the terminal UI.
 templ AppShortcuts() {
-	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-4xl bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-black/30">
-		<h2 id="app-shortcuts-title" class="text-base font-medium">Keys</h2>
-		<dl class="mt-5 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 text-sm">
-			@shortcut([]string{"⌘", "K"}, "The palette: find and do anything")
-			@shortcut([]string{"/"}, "The same")
-			@shortcut([]string{"Ctrl", "J"}, "In the palette: down (Ctrl K up)")
-			@shortcut([]string{"J", "K"}, "Down and up a list, Enter opens")
-			@shortcut([]string{"G", "G"}, "To the top (Shift G to the end)")
-			@shortcut([]string{"-"}, "One level up")
-			@shortcut([]string{"G", "H"}, "Overview")
-			@shortcut([]string{"G", "S"}, "Servers")
-			@shortcut([]string{"G", ","}, "Settings")
-			@shortcut([]string{"D", "O", "L", "B", "E"}, "On an app: Deploys, Domains, Logs, Data, Settings")
-			@shortcut([]string{"?"}, "This list")
-			@shortcut([]string{"Esc"}, "Close, or leave a field")
-		</dl>
-		<form method="dialog" class="mt-6 flex justify-end">
-			<button class="h-11 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground">Done</button>
-		</form>
+	<dialog id="app-shortcuts" aria-labelledby="app-shortcuts-title" class="moin-dialog">
+		<div class="moin-stack" style="--gap:1.25rem">
+			<h2 id="app-shortcuts-title" class="moin-heading">Keys</h2>
+			<dl class="moin-stack moin-text" data-gap="3">
+				@shortcut([]string{"⌘", "K"}, "The palette: find and do anything")
+				@shortcut([]string{"/"}, "The same")
+				@shortcut([]string{"Ctrl", "J"}, "In the palette: down (Ctrl K up)")
+				@shortcut([]string{"J", "K"}, "Down and up a list, Enter opens")
+				@shortcut([]string{"G", "G"}, "To the top (Shift G to the end)")
+				@shortcut([]string{"-"}, "One level up")
+				@shortcut([]string{"G", "H"}, "Overview")
+				@shortcut([]string{"G", "S"}, "Servers")
+				@shortcut([]string{"G", ","}, "Settings")
+				@shortcut([]string{"D", "O", "L", "B", "E"}, "On an app: Deploys, Domains, Logs, Data, Settings")
+				@shortcut([]string{"?"}, "This list")
+				@shortcut([]string{"Esc"}, "Close, or leave a field")
+			</dl>
+			<form method="dialog" class="moin-row" data-end>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+					Done
+				}
+			</form>
+		</div>
 	</dialog>
 }
 
 templ shortcut(keys []string, label string) {
-	<dt class="flex gap-1">
-		for _, key := range keys {
-			<kbd class="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-muted px-1.5 font-sans text-xs text-muted-foreground">{ key }</kbd>
-		}
-	</dt>
-	<dd class="text-muted-foreground">{ label }</dd>
+	<div class="moin-row" data-gap="3">
+		<dt class="moin-row moin-width" data-fixed data-gap="1" style="--width:8.5rem">
+			for _, key := range keys {
+				<kbd class="moin-kbd">{ key }</kbd>
+			}
+		</dt>
+		<dd class="moin-fill moin-muted">{ label }</dd>
+	</div>
 }

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appointment</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Book a call</h1>
+          <p class="moin-header-line moin-muted">30 minutes with Ada Lovelace</p>
+        </div>
+      </header>
+      <!-- Day and time -->
+      <div class="moin-grid" data-cols="1-2">
+        <div class="moin-card">
+          <moin-calendar min="2026-11-09" value="2026-11-16"></moin-calendar>
+        </div>
+        <form class="moin-section">
+          <div class="moin-section-head">
+            <h2>Free times</h2>
+          </div>
+          <section class="moin-card">
+            <div class="moin-list">
+              <label class="moin-item">
+                <input type="radio" name="slot">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">09:00</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="slot" checked>
+                <span class="moin-item-text">
+                  <span class="moin-item-name">10:30</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="slot">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">13:00</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+              <label class="moin-item">
+                <input type="radio" name="slot">
+                <span class="moin-item-text">
+                  <span class="moin-item-name">15:30</span>
+                </span>
+                <i class="moin-item-check"></i>
+              </label>
+            </div>
+          </section>
+        </form>
+      </div>
+      <!-- Actions -->
+      <div class="moin-row">
+        <button type="button" class="moin-button moin-end" data-kind="primary">Book</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

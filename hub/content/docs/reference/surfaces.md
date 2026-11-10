@@ -5,7 +5,7 @@ group: "Reference"
 order: 1
 ---
 
-Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs/reference/api) and [MCP](/docs/guides/mcp); the [terminal UI](/docs/reference/tui) covers the daily work and opens the web for setup. ✓ means it works there end to end; otherwise the cell says why.
+Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs/reference/api) and [MCP](/docs/guides/mcp). The [terminal UI](/docs/reference/tui) covers the daily work and opens the web for setup. ✓ means it works there end to end. Otherwise the cell says why.
 
 ## Daily work
 

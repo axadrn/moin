@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <main>
+    <section class="moin-centered">
+      <!-- Logo -->
+      <header class="moin-page">
+        <a href="#" aria-label="Home" class="moin-heading">Acme</a>
+      </header>
+      <!-- Sign in -->
+      <div>
+        <div>
+          <h1 class="moin-title moin-center">Sign in</h1>
+          <div class="moin-stack" data-gap="3">
+            <button type="button" class="moin-button"><i class="moin-icon moin-icon-git-hub" data-size="s"></i>Continue with GitHub</button>
+            <div class="moin-or" aria-hidden="true">or</div>
+            <div class="moin-field">
+              <label for="email">Email</label>
+              <input id="email" class="moin-input" type="email" placeholder="ada@example.com" autocomplete="off">
+            </div>
+            <button type="button" class="moin-button" data-kind="primary">Send me a link</button>
+          </div>
+          <p class="moin-small moin-center moin-muted">No password. The link works once.</p>
+        </div>
+      </div>
+      <!-- Footer -->
+      <footer>
+        <a href="#signin">Docs</a>
+        <a href="#signin">Terms</a>
+        <a href="#signin">Privacy</a>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

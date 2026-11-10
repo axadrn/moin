@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "Copies on your schedule, go back to one, undo it, and download a copy"
+description: "Copies on your schedule. Go back to one. Undo it. Download a copy."
 group: "Servers and data"
 order: 3
 ---

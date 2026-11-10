@@ -1,0 +1,104 @@
+@layer moin-components {
+  /* Select: a button and a native popover of radios under it. */
+  .moin-select { position: relative; width: 100%; min-width: 0; }
+  .moin-select > button {
+    display: flex;
+    width: 100%;
+    height: var(--press);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-inline: var(--space-5);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-size: 0.875rem;
+    text-align: left;
+    outline: none;
+  }
+  .moin-select > button:focus-visible { box-shadow: var(--focus); }
+  .moin-select > button::after {
+    content: "";
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/chevron-down.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-down.svg") center / contain no-repeat;
+  }
+  .moin-select > [popover],
+  .moin-menu {
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    min-width: 12rem;
+    max-height: 18rem;
+    margin: var(--space-2) 0 0;
+    padding: calc(var(--menu-gap) - var(--scroll-edge));
+    border-radius: var(--radius-lg);
+    background: var(--menu);
+    color: var(--menu-foreground);
+    backdrop-filter: var(--menu-blur);
+    -webkit-backdrop-filter: var(--menu-blur);
+    box-shadow: var(--shadow-float);
+    overflow-y: auto;
+  }
+  /* As wide as its button, wider only for an option that needs it. */
+  /* As wide as its longest option, within the screen. */
+  .moin-select > [popover] {
+    width: max-content;
+    min-width: max(12rem, anchor-size(width));
+    max-width: calc(100vw - 2rem);
+  }
+  .moin-menu {
+    right: anchor(right);
+    left: auto;
+    width: auto;
+  }
+  .moin-select > [popover]:popover-open,
+  .moin-menu:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .moin-select input { position: absolute; opacity: 0; pointer-events: none; }
+  [data-select-label] > .moin-icon {
+    margin-inline-end: var(--space-2);
+    vertical-align: text-bottom;
+  }
+
+  /* One option of a list you pick from: a select and the palette. */
+  .moin-option {
+    display: flex;
+    width: 100%;
+    min-height: var(--press);
+    align-items: center;
+    gap: var(--space-3);
+    /* The text starts where the text of the field it belongs to starts. */
+    padding: var(--space-2) calc(var(--space-5) - var(--menu-gap));
+    /* Its curve runs along the one of the menu it is in. */
+    border-radius: max(0px, calc(var(--radius-lg) - var(--menu-gap)));
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: left;
+    outline: none;
+    cursor: pointer;
+  }
+  button.moin-option:is(:hover, :focus-visible),
+  .moin-option:has(:focus),
+  .moin-option[aria-selected="true"] {
+    background: var(--menu-lit);
+    color: var(--menu-lit-foreground, inherit);
+  }
+  .moin-option:has(:checked) { font-weight: 500; }
+  .moin-option:has(:checked)::after {
+    content: "";
+    flex: none;
+    margin-inline-start: auto;
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+}

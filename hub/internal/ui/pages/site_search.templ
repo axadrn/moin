@@ -7,7 +7,7 @@ import (
 	"github.com/axadrn/moin/internal/find"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -21,17 +21,17 @@ type SiteHit struct {
 }
 
 // FindSite is the one search of the public site, behind the magnifier of
-// the navbar: an app whose name matches first, then the docs, then the
-// apps found by their category or one sentence. It matches like the
+// the navbar: an app whose name matches first, then the parts and rooms of
+// the kit, then the docs, then the apps found by their category or one sentence. It matches like the
 // palette (find.Name), so a typo still finds. Without a query it is the
 // first steps and the catalog.
-func FindSite(groups []model.DocGroup, apps []CatalogEntryView, query string, limit int) []SiteHit {
+func FindSite(groups []model.DocGroup, apps []CatalogEntryView, kit []SiteHit, query string, limit int) []SiteHit {
 	if strings.TrimSpace(query) == "" {
 		var out []SiteHit
 		if len(groups) > 0 {
 			out = FindDocs(groups[:1], "", 0)
 		}
-		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"})
+		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"}, SiteHit{Title: "UI", Where: "The UI kit moin runs on", Href: "/ui"})
 	}
 	var named, other []SiteHit
 	for _, app := range FilterCatalog(apps, "", query, SortName) {
@@ -42,7 +42,13 @@ func FindSite(groups []model.DocGroup, apps []CatalogEntryView, query string, li
 			other = append(other, hit)
 		}
 	}
-	out := append(named, FindDocs(groups, query, limit)...)
+	out := named
+	for _, hit := range kit {
+		if _, ok := find.Name(query, hit.Title); ok {
+			out = append(out, hit)
+		}
+	}
+	out = append(out, FindDocs(groups, query, limit)...)
 	out = append(out, other...)
 	return out[:min(len(out), limit)]
 }
@@ -91,17 +97,17 @@ func FindDocs(groups []model.DocGroup, query string, limit int) []SiteHit {
 // (layouts.SiteSearch), the first one picked so Enter opens it.
 templ SiteSearchOptions(query string, hits []SiteHit) {
 	if len(hits) == 0 {
-		<p class="px-4 py-3 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
+		<p class="moin-message">Nothing found for “{ query }”.</p>
 	}
 	for i, hit := range hits {
 		<a
 			href={ templ.SafeURL(hit.Href) }
 			role="option"
 			aria-selected={ ifElse(i == 0, "true", "false") }
-			class="flex min-h-11 items-center gap-3 rounded-3xl px-4 py-2 text-sm outline-none aria-selected:bg-foreground/6"
+			class="moin-option"
 		>
-			<span class="min-w-0 flex-1 truncate font-medium">{ hit.Title }</span>
-			<span class="shrink-0 truncate text-xs text-muted-foreground">{ hit.Where }</span>
+			<span class="moin-fill moin-truncate moin-strong">{ hit.Title }</span>
+			<span class="moin-small moin-muted moin-truncate">{ hit.Where }</span>
 		</a>
 	}
 }
@@ -116,19 +122,19 @@ templ SearchPage(query string, hits []SiteHit) {
 		Path:        "/search",
 		NoIndex:     true,
 	}) {
-		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
-			@kit.Header(kit.Back{}, "Search")
+		<main class="moin-page moin-narrow moin-content">
+			@components.Header(components.HeaderProps{Title: "Search"})
 			<form method="get" action="/search" role="search">
-				<label for="search-q" class="sr-only">Search</label>
-				@kit.Input(templ.Attributes{"id": "search-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs and the catalog", "autocomplete": "off", "spellcheck": "false"})
+				<label for="search-q" class="moin-sr-only">Search</label>
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "search-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs and the catalog", "autocomplete": "off", "spellcheck": "false"}})
 			</form>
 			if strings.TrimSpace(query) != "" && len(hits) == 0 {
-				<p class="px-1 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
+				<p class="moin-text moin-muted">Nothing found for “{ query }”.</p>
 			} else {
-				@kit.List() {
-					for _, hit := range hits {
-						@kit.Row(hit.Href) {
-							@kit.RowText(hit.Title, hit.Where)
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, hit := range hits {
+							@components.Item(components.ItemProps{Href: hit.Href, Name: hit.Title, Note: hit.Where})
 						}
 					}
 				}

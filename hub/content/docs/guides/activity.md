@@ -1,6 +1,6 @@
 ---
 title: "Activity"
-description: "Who changed what, to the second, and what moin never writes down"
+description: "Who changed what, to the second. What moin never writes down."
 group: "Team"
 order: 2
 ---

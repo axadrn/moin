@@ -1,0 +1,117 @@
+@layer moin-components {
+  /* Logs and commands: mono on the surface they sit on. */
+  .moin-log {
+    --tf: var(--card-foreground);
+    max-height: 32rem;
+    overflow: auto;
+    color: color-mix(in oklab, var(--tf) 92%, transparent);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.85;
+    font-variant-ligatures: none;
+    counter-reset: line;
+  }
+  /* Every div is one line, in a fold too. data-n sets its number. */
+  .moin-log div {
+    counter-increment: line;
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    padding-right: var(--space-3);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .moin-log div::before {
+    content: counter(line);
+    padding-right: var(--space-3);
+    color: color-mix(in oklab, var(--tf) 22%, transparent);
+    text-align: right;
+    user-select: none;
+  }
+  .moin-log div[data-n]::before { content: attr(data-n); }
+  .moin-log div:hover { background: color-mix(in oklab, var(--tf) 4%, transparent); }
+  .moin-log [data-kind="out"] { color: color-mix(in oklab, var(--tf) 50%, transparent); }
+  .moin-log [data-kind="step"] > span::before {
+    content: "→ ";
+    color: color-mix(in oklab, var(--tf) 45%, transparent);
+  }
+  .moin-log [data-kind="ok"] { color: var(--live); }
+  .moin-log [data-kind="ok"] > span::before { content: "✓ "; }
+  .moin-log [data-kind="err"] { color: var(--failed); }
+  .moin-log [data-kind="err"] > span::before { content: "✗ "; }
+  /* What matters less in a line. */
+  .moin-log [data-dim] { color: color-mix(in oklab, var(--tf) 42%, transparent); }
+
+  /* The lines between two steps fold into one: a details with its lines
+     right in it, and an aria-hidden arrow in its summary. */
+  .moin-log details:not(:has(div)) { display: none; }
+  .moin-log details[open] { background: color-mix(in oklab, var(--tf) 3%, transparent); }
+  .moin-log summary {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-5) 0 2.25rem;
+    border-radius: 8px;
+    color: color-mix(in oklab, var(--tf) 52%, transparent);
+    font: inherit;
+    font-weight: 500;
+    text-align: left;
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-log summary::-webkit-details-marker { display: none; }
+  .moin-log summary:hover {
+    background: color-mix(in oklab, var(--tf) 5%, transparent);
+    color: var(--tf);
+  }
+  .moin-log summary:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+  .moin-log summary > [aria-hidden] {
+    display: inline-block;
+    transition: rotate 0.12s ease-out;
+  }
+  .moin-log [open] > summary > [aria-hidden] { rotate: 90deg; }
+
+  @media (min-width: 40rem) {
+    .moin-log div {
+      grid-template-columns: 2.75rem minmax(0, 1fr);
+      padding-right: var(--space-5);
+    }
+    .moin-log div::before { padding-right: var(--space-4); }
+    .moin-log summary { padding-left: 2.75rem; }
+    /* Two more columns in front of the text, like a time and a service. */
+    .moin-log[data-meta] div { grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr); }
+  }
+
+  /* Plain output in one pre, with its own line breaks. */
+  pre.moin-log {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* Lines that keep the newest in view while you are at the bottom and stay
+     put when you scroll up. --tail is how high it grows; data-top keeps few
+     lines at the top; data-hold keeps the place of lines still to come. */
+  .moin-tail {
+    display: flex;
+    flex-direction: column-reverse;
+    max-height: var(--tail, 30rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    outline: none;
+  }
+  .moin-tail:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+  /* The tail scrolls, not the log in it. */
+  .moin-tail > .moin-log {
+    max-height: none;
+    overflow: visible;
+  }
+  .moin-tail[data-top] { justify-content: safe flex-end; }
+  .moin-tail[data-hold] { height: 20rem; }
+  @media (min-width: 40rem) {
+    .moin-tail[data-hold] { height: var(--tail, 30rem); }
+  }
+  @media (min-width: 64rem) {
+    .moin-tail[data-tall] { min-height: 18rem; }
+  }
+}

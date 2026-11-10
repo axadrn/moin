@@ -1,0 +1,67 @@
+@layer moin-components {
+  /* A card: one topic. A title with at most one action next to it, and a
+     foot with buttons when it asks for something. */
+  .moin-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+    padding: var(--pad);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .moin-card[data-center] { justify-content: center; }
+  .moin-card[data-gap="1"] { gap: var(--space-1); }
+  .moin-card[data-gap="6"] { gap: var(--space-6); }
+  .moin-card[data-gap="8"] { gap: var(--space-8); }
+  .moin-card[data-flush] { padding-inline: 0; }
+  .moin-card[data-flush] > :is(.moin-card-head, .moin-card-foot) { padding-inline: var(--pad); }
+  .moin-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: var(--press);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+  }
+  .moin-card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+}
+
+@layer moin-components {
+  /* A whole card can be a link. */
+  a.moin-card { transition: background-color var(--fast) var(--ease); }
+  a.moin-card:hover { background: color-mix(in oklab, var(--card), var(--foreground) 4%); }
+  a.moin-card:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  /* The one card that stands out. */
+  .moin-card[data-ink] {
+    --card: var(--foreground);
+    --card-foreground: var(--background);
+    --muted-foreground: color-mix(in oklab, var(--background) 65%, var(--foreground));
+  }
+  a.moin-card[data-ink]:hover { background: color-mix(in oklab, var(--foreground), var(--background) 12%); }
+}
+
+@layer moin-components {
+  /* A list in a card runs to --inset from the card's edge. The light of an
+     item then sits the same distance from the card on every side, and the
+     words line up with the card's own. */
+  .moin-card > .moin-list {
+    --item-edge: calc(var(--pad) - var(--inset));
+    margin-inline: calc(var(--inset) - var(--pad));
+  }
+  .moin-card > .moin-list:first-child { margin-block-start: calc(var(--inset) - var(--pad)); }
+  .moin-card > .moin-list:last-child { margin-block-end: calc(var(--inset) - var(--pad)); }
+  /* A flush card has no padding at the sides to run past. */
+  .moin-card[data-flush] > .moin-list { margin-inline: var(--inset); }
+
+  /* In a grid a card with only a list is as tall as its rows, not as its
+     neighbor. */
+  .moin-grid > .moin-card:has(> .moin-list:only-child) { align-self: start; }
+}

@@ -3,7 +3,7 @@ package pages
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // SettingsRegistriesSection is the registry logins your servers pull
@@ -11,56 +11,61 @@ import (
 // for another. Saving or removing one answers the whole section.
 templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="settings-registries" class="flex flex-col gap-6">
-		@kit.Section("Registries", nil) {
-			@kit.List() {
-				if len(logins) == 0 {
-					@kit.Row("") {
-						<p class="text-sm text-muted-foreground">No registry logins yet.</p>
+	<div id="settings-registries" class="moin-stack" data-gap="6">
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Registries</h2>
+			</div>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					if len(logins) == 0 {
+						@components.Item(components.ItemProps{}) {
+							<p class="moin-small moin-muted">No registry logins yet.</p>
+						}
 					}
-				}
-				for _, login := range logins {
-					@kit.RowControl(templ.Attributes{"data-registry": login.Host}) {
-						<div class="min-w-0 flex-1">
-							<div class="truncate font-mono font-medium">{ login.Host }</div>
-							<div class="truncate text-sm text-muted-foreground">{ "as " + login.Username }</div>
-						</div>
-						@kit.Button(kit.Secondary, "", templ.Attributes{
-							"type":       "button",
-							"hx-delete":  basePath + "/settings/registries/" + login.Host,
-							"hx-target":  "#settings-registries",
-							"hx-swap":    "outerHTML",
-							"hx-disable": "this",
-							"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
-						}) {
-							Remove
+					for _, login := range logins {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-registry": login.Host, "data-control": true}}) {
+							<div class="moin-fill">
+								<div class="moin-truncate moin-mono moin-strong">{ login.Host }</div>
+								<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username }</div>
+							</div>
+							@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+								"hx-delete":  basePath + "/settings/registries/" + login.Host,
+								"hx-target":  "#settings-registries",
+								"hx-swap":    "outerHTML",
+								"hx-disable": "this",
+								"hx-confirm": "Remove the login for " + login.Host + "? Private images from it no longer pull.",
+							}}) {
+								Remove
+							}
 						}
 					}
 				}
 			}
-		}
-		@kit.Card("New registry login", nil) {
+		</section>
+		@components.Card(components.CardProps{Title: "New registry login"}) {
 			<form
-				class="flex flex-col gap-4"
+				class="moin-stack"
+				data-gap="4"
 				hx-post={ basePath + "/settings/registries" }
 				hx-target="#settings-registries"
 				hx-swap="outerHTML"
 				hx-disable="find button[type='submit']"
 			>
-				@kit.CSRF()
-				<div class="grid items-start gap-4 md:grid-cols-3">
+				@components.CSRF()
+				<div class="moin-grid" data-cols="3">
 					@formField("Registry", "registry-host", "", "") {
-						@kit.Input(templ.Attributes{"id": "registry-host", "aria-describedby": "registry-host-hint", "name": "host", "type": "text", "placeholder": "ghcr.io", "autocomplete": "off", "spellcheck": "false", "autocapitalize": "off", "required": true})
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "registry-host", "aria-describedby": "registry-host-hint", "name": "host", "type": "text", "placeholder": "ghcr.io", "autocomplete": "off", "spellcheck": "false", "autocapitalize": "off", "required": true}})
 					}
 					@formField("Username", "registry-username", "", "") {
-						@kit.Input(templ.Attributes{"id": "registry-username", "aria-describedby": "registry-username-hint", "name": "username", "type": "text", "autocomplete": "off", "autocapitalize": "off", "required": true})
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "registry-username", "aria-describedby": "registry-username-hint", "name": "username", "type": "text", "autocomplete": "off", "autocapitalize": "off", "required": true}})
 					}
 					@formField("Password or token", "registry-password", "", "") {
-						@kit.Input(templ.Attributes{"id": "registry-password", "aria-describedby": "registry-password-hint", "name": "password", "type": "password", "autocomplete": "new-password", "required": true})
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "registry-password", "aria-describedby": "registry-password-hint", "name": "password", "type": "password", "autocomplete": "new-password", "required": true}})
 					}
 				</div>
-				<div class="flex justify-end">
-					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+				<div class="moin-row" data-end>
+					@components.Button(components.ButtonProps{Type: "submit"}) {
 						Save login
 					}
 				</div>

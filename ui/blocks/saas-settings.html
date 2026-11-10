@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="../moin.css">
+  <script src="../moin.js"></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="moin-bar">
+    <div class="moin-page moin-bar-inner">
+      <a href="#" class="moin-row" data-gap="2" aria-label="Home">
+        <span class="moin-heading">Acme</span>
+      </a>
+      <span class="moin-fill"></span>
+      <button type="button" class="moin-button" data-icon data-quiet aria-label="Switch the theme" data-mode-toggle>
+        <i class="moin-icon moin-icon-theme"></i>
+      </button>
+      <span class="moin-avatar">
+        <span aria-hidden="true">AL</span>
+        <span class="moin-sr-only">Ada Lovelace</span>
+      </span>
+    </div>
+  </header>
+  <main>
+    <section class="moin-page moin-content">
+      <!-- Title -->
+      <header class="moin-header">
+        <div class="moin-header-main">
+          <h1 class="moin-title">Settings</h1>
+        </div>
+      </header>
+      <!-- Profile -->
+      <form class="moin-card">
+        <div class="moin-card-head">
+          <h2 class="moin-heading">Profile</h2>
+        </div>
+        <div class="moin-field">
+          <label for="settings-name">Name</label>
+          <input id="settings-name" class="moin-input" value="Ada Lovelace">
+        </div>
+        <div class="moin-field">
+          <label for="settings-email">Email</label>
+          <input id="settings-email" class="moin-input" type="email" value="ada@example.com">
+        </div>
+        <div class="moin-field">
+          <label for="settings-avatar">Picture</label>
+          <input id="settings-avatar" class="moin-file" type="file">
+        </div>
+        <div class="moin-card-foot">
+          <button type="button" class="moin-button" data-kind="primary">Save</button>
+        </div>
+      </form>
+      <!-- Notifications -->
+      <div class="moin-section">
+        <div class="moin-section-head">
+          <h2>Notifications</h2>
+        </div>
+        <section class="moin-card">
+          <div class="moin-list">
+            <div class="moin-item" data-control>
+              <label for="settings-mail" class="moin-item-text">
+                <span class="moin-item-name">Email</span>
+              </label>
+              <span class="moin-switch">
+                <input id="settings-mail" type="checkbox" role="switch" autocomplete="off" checked>
+                <span></span>
+              </span>
+            </div>
+            <div class="moin-item" data-control>
+              <label for="settings-push" class="moin-item-text">
+                <span class="moin-item-name">Push</span>
+              </label>
+              <span class="moin-switch">
+                <input id="settings-push" type="checkbox" role="switch" autocomplete="off">
+                <span></span>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- List -->
+      <section class="moin-card">
+        <div class="moin-list">
+          <button type="button" class="moin-item" data-danger>
+            <span class="moin-strong">Delete account</span>
+          </button>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,9 +1,0 @@
-package kit
-
-// Feedback is the answer to a click (DESIGN.md, Feedback), sent out of band
-// into #feedback. moin.js hands it to the element that sent the request:
-// "done" turns its button into a check for a moment, "failed" and "note"
-// put the words in a line under it. Nothing floats over the page.
-templ Feedback(kind, title, description string) {
-	<output data-feedback={ kind } data-title={ title }>{ description }</output>
-}

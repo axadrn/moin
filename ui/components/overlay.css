@@ -1,0 +1,80 @@
+@layer moin-components {
+  /* Overlays float one step lighter than what they cover, with no border. */
+  .moin-dialog {
+    --muted: var(--muted-raised);
+    width: min(28rem, calc(100% - 2rem));
+    margin: auto;
+    padding: var(--space-6);
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--popover);
+    color: var(--popover-foreground);
+    box-shadow: var(--shadow-float);
+  }
+  .moin-dialog::backdrop,
+  .moin-palette::backdrop { background: var(--dim); }
+  .moin-dialog-buttons {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--space-2);
+  }
+  @media (min-width: 40rem) {
+    .moin-dialog-buttons {
+      flex-direction: row;
+      justify-content: flex-end;
+    }
+  }
+
+  .moin-palette {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .moin-palette-box {
+    display: flex;
+    flex-direction: column;
+    width: min(38rem, calc(100vw - 2rem));
+    max-height: min(70vh, 34rem);
+    margin: 12vh auto 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--menu);
+    color: var(--menu-foreground);
+    backdrop-filter: var(--menu-blur);
+    -webkit-backdrop-filter: var(--menu-blur);
+    box-shadow: var(--shadow-float);
+  }
+  .moin-palette-box > .moin-input-icon { flex: none; }
+  .moin-palette-box .moin-input::-webkit-search-cancel-button { display: none; }
+  .moin-palette-box .moin-input {
+    height: 4rem;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 1rem;
+  }
+  .moin-palette-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: calc(var(--menu-gap) - var(--scroll-edge));
+    padding-top: calc(2 * var(--inset));
+    border-top: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .moin-palette-list:empty { display: none; }
+
+  /* The name of a group of options, starting where their text starts. */
+  .moin-palette-group {
+    padding: var(--space-3) calc(var(--space-5) - var(--menu-gap)) var(--space-1);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+  }
+}

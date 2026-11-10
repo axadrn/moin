@@ -34,7 +34,7 @@ var Product = Catalog{
 			Benefits: []string{
 				"Unlimited servers and apps",
 				"Your whole team, no seat price",
-				"Backups on your schedule, checked every day",
+				"Backups on your schedule. Checked every day",
 				"Data browser, SQL and the GitHub App",
 			},
 			Purchasable: true,
