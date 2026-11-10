@@ -8,7 +8,7 @@ const (
 	Tagline = "Deploy anything. Lose nothing."
 	// Promise is the line under the tagline, the same on the home page,
 	// the sign-in page, the docs, the README and the CLI.
-	Promise = "Your apps on your servers. Backups on your schedule, checked every day."
+	Promise = "Your apps on your servers. Backups on your schedule. Checked every day."
 	// Company runs the hosted service and holds the copyright.
 	Company = "Berry Good Ideas LLC"
 	// SupportEmail is where people write about moin, on every install;
@@ -16,5 +16,5 @@ const (
 	SupportEmail = "hello@moin.run"
 	// Description is Promise with a few words for search engines, at most
 	// 160 characters: the description of the home page.
-	Description = Promise + " Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP."
+	Description = Promise + " Open source. SQLite and Postgres. Web, CLI, terminal UI and MCP."
 )

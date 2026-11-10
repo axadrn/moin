@@ -74,7 +74,7 @@ templ HomeHero() {
 					<span>Deploy <br class="moin-only-phone"/>anything.</span>
 					<span class="moin-muted">Lose nothing.</span>
 				</h1>
-				<p class="moin-lead moin-center moin-hidden-phone" style="--measure:34ch">Your apps on your servers. Backups on your schedule, checked every day.</p>
+				<p class="moin-lead moin-center moin-hidden-phone" style="--measure:34ch">Your apps on your servers. Backups on your schedule. Checked every day.</p>
 			</div>
 			<div class="moin-row" data-gap="2" data-center data-wrap>
 				@homePrimary()
@@ -180,7 +180,7 @@ func homeSurfaceOptions() []components.Option {
 templ HomeStart() {
 	<section id="how" class="moin-band">
 		<h2 class="moin-statement">Four steps. Live.</h2>
-		<p class="moin-lead">In the web, the terminal or with your AI agent. You pick.</p>
+		<p class="moin-lead">On the web. In the terminal. With your AI agent. You pick.</p>
 		<div class="moin-grid">
 			<div class="moin-stack" data-surfaces>
 				@components.Choice(components.ChoiceProps{Name: "home-surface", Label: "Where", Options: homeSurfaceOptions(), Checked: "web"})
@@ -197,7 +197,7 @@ templ HomeStart() {
 			@homeMoment("my-app", "It's live.", "my-app.203-0-113-7.sslip.io, with HTTPS.")
 		</div>
 		<p class="moin-lead">
-			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml.
+			Node. Bun. Python. Ruby. PHP. Go. Any Dockerfile. Any compose.yml.
 			<a href="/docs/getting-started" class="moin-link moin-foreground">Get started</a>
 		</p>
 	</section>
@@ -297,7 +297,7 @@ templ HomePricing() {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
-					<span class="moin-small moin-muted" data-yearly-deal>Or $249 a year. 30 days free, no card.</span>
+					<span class="moin-small moin-muted" data-yearly-deal>Or $249 a year. 30 days free. No card.</span>
 				</div>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 					{ homeStartLabel(ctx) }
@@ -308,15 +308,15 @@ templ HomePricing() {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Self-hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever</span></span>
-					<span class="moin-small moin-muted">Your own moin hub, on your server. Open source.</span>
+					<span class="moin-small moin-muted">Your own moin hub. On your server. Open source.</span>
 				</div>
 				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
 					Host it yourself
 				}
-				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
+				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App. Email optional", "Help on GitHub")
 			}
 		</div>
-		<p class="moin-lead" data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
+		<p class="moin-lead" data-one-price>Unlimited servers. Unlimited apps. Unlimited team. Nothing to unlock.</p>
 	</section>
 }
 
@@ -338,11 +338,11 @@ templ HomeQuestions() {
 	<section id="questions" class="moin-band">
 		<h2 class="moin-statement">Good questions.</h2>
 		@components.List() {
-			@homeQuestion("Is "+brand.Name+" open source?", "Yes, and free to host yourself.")
+			@homeQuestion("Is "+brand.Name+" open source?", "Yes. And free to host yourself.")
 			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
 			@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
 			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")
-			@homeQuestion("Which servers?", "Any Linux server with root access, at any provider.")
+			@homeQuestion("Which servers?", "Any Linux server with root access. Any provider.")
 		}
 		<p class="moin-lead">
 			<a href="/docs/faq" class="moin-link moin-foreground">All questions</a>
@@ -387,7 +387,7 @@ templ HomeEnd() {
 			</div>
 			<p class="moin-small moin-muted">
 				if ctxkeys.RenderConfig(ctx).Billing {
-					30 days free, no card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
+					30 days free. No card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
 				} else {
 					Free and open source.
 				}
