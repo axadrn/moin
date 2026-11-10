@@ -8,6 +8,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -19,7 +20,7 @@ templ AppMetricsPage(view AppMetricsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	@layouts.App(view.App.Name + " metrics") {
 		@panelPage(templ.Attributes{"data-app-metrics": view.App.Name}) {
-			@kit.Header(kit.Back{Label: view.App.Name, Href: appPath}, "Metrics")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: view.App.Name, Href: appPath}, Title: "Metrics"})
 			@appMetricsPanel(view, appPath+"/metrics")
 		}
 	}
@@ -31,14 +32,17 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 	{{ m := view.Metrics }}
 	{{ times := metricsTimes(m.Points) }}
 	{{ marks := deployMarks(m.Points, m.Deploys) }}
-	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
+	<div id="metrics" class="moin-stack" data-gap="6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.ServerOnline && m.Server != "" {
 			<p class="px-1 text-sm text-failed" data-server-offline>{ m.Server } is offline: its daemon sends no metrics.</p>
 		}
 		@serverRangeSelect(path, m.Range.Name)
-		@kit.Section("Now", nil) {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Now</h2>
+			</div>
 			<div data-metrics-now>
-				@kit.List() {
+				@components.List() {
 					if now := m.Now; now != nil {
 						@serverStat("CPU", "of the whole server", percentText(now.CPU))
 						@serverStat("Memory", appLimitNote(now), human.Size(float64(now.MemoryUsed)))
@@ -51,23 +55,26 @@ templ appMetricsPanel(view AppMetricsView, path string) {
 					}
 				}
 			</div>
-		}
-		@kit.Section(rangeTitle(m.Range), nil) {
+		</section>
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>{ rangeTitle(m.Range) }</h2>
+			</div>
 			if len(times) == 0 {
-				@kit.Card("", nil) {
-					@kit.Quiet() {
+				@components.Card(components.CardProps{}) {
+					<p class="moin-small moin-muted">
 						No metrics yet. The daemon sends them every 15 seconds while the app runs.
-					}
-					@kit.Command("moin metrics " + view.App.Name)
+					</p>
+					@components.Command(components.CommandProps{Text: "moin metrics " + view.App.Name})
 				}
 			} else {
-				@kit.Grid() {
+				<div class="moin-grid" data-cols="2">
 					@serverChart("CPU", metricsChartProps{ID: "app-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Marks: marks}, times, m.Range)
 					@serverChart("Memory", metricsChartProps{ID: "app-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: human.Size, Marks: marks}, times, m.Range)
 					@serverChart("Network", metricsChartProps{ID: "app-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText, Marks: marks}, times, m.Range)
-				}
+				</div>
 			}
-		}
+		</section>
 	</div>
 }
 
@@ -108,14 +115,17 @@ templ ServerMetricsPage(view ServerMetricsView) {
 templ serverMetricsPanel(view ServerMetricsView, path string) {
 	{{ m := view.Metrics }}
 	{{ times := metricsTimes(m.Points) }}
-	<div id="metrics" class="flex flex-col gap-6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
+	<div id="metrics" class="moin-stack" data-gap="6" data-metrics-range={ m.Range.Name } { metricsRefresh(path+"?range="+m.Range.Name, m.Range.Name)... }>
 		if !m.Online {
 			<p class="px-1 text-sm text-failed" data-server-offline>The server is offline: its daemon sends no metrics.</p>
 		}
 		@serverRangeSelect(path, m.Range.Name)
-		@kit.Section("Now", nil) {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Now</h2>
+			</div>
 			<div data-metrics-now>
-				@kit.List() {
+				@components.List() {
 					if now := m.Now; now != nil {
 						@serverStat("CPU", cpuNote(now), percentText(now.CPU))
 						@serverStat("Memory", shareOf(now.MemoryUsed, now.MemoryTotal), usedOf(now.MemoryUsed, now.MemoryTotal))
@@ -129,24 +139,27 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 					}
 				}
 			</div>
-		}
-		@kit.Section(rangeTitle(m.Range), nil) {
+		</section>
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>{ rangeTitle(m.Range) }</h2>
+			</div>
 			if len(times) == 0 {
-				@kit.Card("", nil) {
-					@kit.Quiet() {
+				@components.Card(components.CardProps{}) {
+					<p class="moin-small moin-muted">
 						No metrics yet. The daemon sends them every 15 seconds.
-					}
-					@kit.Command("moin metrics --server " + view.Server.Name)
+					</p>
+					@components.Command(components.CommandProps{Text: "moin metrics --server " + view.Server.Name})
 				}
 			} else {
-				@kit.Grid() {
+				<div class="moin-grid" data-cols="2">
 					@serverChart("CPU", metricsChartProps{ID: "server-cpu", Lines: []kit.ChartLine{metricsLine("CPU", m.Points, cpuOf)}, Value: percentText, Top: 100}, times, m.Range)
 					@serverChart("Memory", metricsChartProps{ID: "server-memory", Lines: []kit.ChartLine{metricsLine("Memory", m.Points, memoryOf)}, Value: human.Size, Top: totalTop(m.Now, false)}, times, m.Range)
 					@serverChart("Disk", metricsChartProps{ID: "server-disk", Lines: []kit.ChartLine{metricsLine("Disk", m.Points, diskOf)}, Value: human.Size, Top: totalTop(m.Now, true)}, times, m.Range)
 					@serverChart("Network", metricsChartProps{ID: "server-network", Lines: []kit.ChartLine{metricsLine("In", m.Points, rxOf), metricsLine("Out", m.Points, txOf)}, Value: rateText}, times, m.Range)
-				}
+				</div>
 			}
-		}
+		</section>
 		@serverAppsMetrics(m.Apps)
 	</div>
 }
@@ -155,14 +168,14 @@ templ serverMetricsPanel(view ServerMetricsView, path string) {
 // range in place and puts it in the address.
 templ serverRangeSelect(path, active string) {
 	<form class="w-40" hx-get={ path } hx-trigger="change" hx-target="#metrics" hx-select="#metrics" hx-swap="outerHTML" hx-push-url="true" data-metrics-ranges>
-		@kit.Select(kit.SelectProps{ID: "metrics-range", Name: "range", Label: "Range", Options: rangeOptions(), Value: active})
+		@components.Select(components.SelectProps{ID: "metrics-range", Name: "range", Label: "Range", Options: rangeOptions(), Value: active})
 	</form>
 }
 
-func rangeOptions() []kit.Option {
-	options := make([]kit.Option, 0, len(service.MetricsRanges))
+func rangeOptions() []components.Option {
+	options := make([]components.Option, 0, len(service.MetricsRanges))
 	for _, r := range service.MetricsRanges {
-		options = append(options, kit.Option{Value: r.Name, Label: rangeLabel(r.Name)})
+		options = append(options, components.Option{Value: r.Name, Label: rangeLabel(r.Name)})
 	}
 	return options
 }
@@ -194,7 +207,7 @@ templ serverStat(name, note, value string) {
 // serverChart is a card with one chart.
 templ serverChart(title string, p metricsChartProps, times []time.Time, r service.MetricsRange) {
 	<div class="grid min-w-0" data-metrics-chart={ p.ID }>
-		@kit.Card(title, nil) {
+		@components.Card(components.CardProps{Title: title}) {
 			@kit.Chart(metricsChart(p, times, r))
 		}
 	</div>
@@ -223,16 +236,17 @@ func totalTop(now *service.MetricsNow, disk bool) float64 {
 // serverAppsMetrics lists the apps of the server, the one with the most
 // memory first.
 templ serverAppsMetrics(apps []service.AppMetricsNow) {
-	@kit.Section("Apps", nil) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Apps</h2>
+		</div>
 		<div data-server-apps-metrics>
-			@kit.List() {
+			@components.List() {
 				if len(apps) == 0 {
-					@kit.Row("") {
-						@kit.RowText("No apps on this server yet", "")
-					}
+					@components.Item(components.ItemProps{Name: "No apps on this server yet"})
 				}
 				for _, app := range apps {
-					@kit.RowAttrs(ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", templ.Attributes{"data-app-metrics-row": app.Name}) {
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx)+"/apps/"+app.Name+"/metrics", Attrs: templ.Attributes{"data-app-metrics-row": app.Name}}) {
 						if now := app.Now; now != nil {
 							@kit.RowText(app.Name, "CPU "+percentText(now.CPU)+" · network "+rateText(now.NetRx+now.NetTx))
 							<span class="shrink-0 font-medium tabular-nums">{ human.Size(float64(now.MemoryUsed)) }</span>
@@ -244,5 +258,5 @@ templ serverAppsMetrics(apps []service.AppMetricsNow) {
 				}
 			}
 		</div>
-	}
+	</section>
 }

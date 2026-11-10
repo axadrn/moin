@@ -17,8 +17,8 @@ const GitHubURL = "https://github.com/" + githubstars.Repo
 // prices to show.
 func navLinks(billing bool, path string) []components.BarLink {
 	links := []components.BarLink{
-		{Label: "Catalog", Href: "/catalog", Current: strings.HasPrefix(path, "/catalog")},
 		{Label: "Docs", Href: "/docs", Current: strings.HasPrefix(path, "/docs")},
+		{Label: "Catalog", Href: "/catalog", Current: strings.HasPrefix(path, "/catalog")},
 		{Label: "UI", Href: "/ui", Current: inUI(path)},
 	}
 	if billing {

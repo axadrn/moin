@@ -63,6 +63,13 @@
     .moin-grid[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
     .moin-grid[data-cols="1-2"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
   }
+  /* Groups of different length, two columns from a tablet up: each column
+     fills up, so no holes stay. */
+  .moin-columns > * { break-inside: avoid; margin-block-end: var(--space-6); }
+  @media (min-width: 48rem) {
+    .moin-columns { columns: 2; column-gap: var(--space-6); }
+  }
+
   /* As many columns as fit, each at least --min wide, sharing the width. */
   .moin-grid[data-fit] {
     grid-template-columns: repeat(auto-fit, minmax(min(var(--min, 12rem), 100%), 1fr));

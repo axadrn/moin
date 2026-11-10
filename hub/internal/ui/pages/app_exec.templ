@@ -4,7 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // execServices are the services of the live deploy a command can run in:
@@ -29,10 +29,10 @@ func execServices(app model.App, deploys []api.Deploy) []string {
 	return nil
 }
 
-func execServiceOptions(services []string) []kit.Option {
-	options := make([]kit.Option, 0, len(services))
+func execServiceOptions(services []string) []components.Option {
+	options := make([]components.Option, 0, len(services))
 	for _, service := range services {
-		options = append(options, kit.Option{Value: service, Label: service})
+		options = append(options, components.Option{Value: service, Label: service})
 	}
 	return options
 }
@@ -44,23 +44,23 @@ templ appExec(app model.App, deploys []api.Deploy) {
 	if ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) {
 		{{ services := execServices(app, deploys) }}
 		if len(services) > 0 {
-			@kit.Card("Run a command", nil) {
+			@components.Card(components.CardProps{Title: "Run a command"}) {
 				<form
-					class="flex flex-col gap-4"
+					class="moin-stack" data-gap="4"
 					data-exec-form
 					data-exec-url={ "/api/v1/apps/" + app.Link() + "/exec?workspace=" + ctxkeys.Workspace(ctx).Link() }
 				>
 					<div class="flex flex-col gap-2 sm:flex-row">
 						if len(services) > 1 {
 							<div class="sm:w-40 sm:shrink-0">
-								@kit.Select(kit.SelectProps{ID: "exec-service", Name: "service", Label: "Service", Options: execServiceOptions(services)})
+								@components.Select(components.SelectProps{ID: "exec-service", Name: "service", Label: "Service", Options: execServiceOptions(services)})
 							</div>
 						} else {
 							<input type="hidden" name="service" value={ services[0] }/>
 						}
-						<label for="exec-command" class="sr-only">Command</label>
-						@kit.Input(templ.Attributes{"id": "exec-command", "name": "line", "type": "text", "placeholder": "rails db:migrate", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true, "data-exec-line": true})
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit", "data-exec-run": true}) {
+						<label for="exec-command" class="moin-sr-only">Command</label>
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "exec-command", "name": "line", "type": "text", "placeholder": "rails db:migrate", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true, "data-exec-line": true}})
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-exec-run": true}}) {
 							Run
 						}
 					</div>

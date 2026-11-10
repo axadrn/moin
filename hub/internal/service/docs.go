@@ -36,7 +36,7 @@ const docsPlaceholder = "https://moin.example.com"
 // NewDocsService serves the pages under docs/ in files.
 func NewDocsService(files fs.FS, appURL string, live bool) *DocsService {
 	return &DocsService{
-		parser: markdown.NewParser(),
+		parser: markdown.NewParser(markdown.Examples(files)),
 		files:  files,
 		appURL: strings.TrimRight(appURL, "/"),
 		groups: docsGroups,
@@ -48,7 +48,6 @@ func NewDocsService(files fs.FS, appURL string, live bool) *DocsService {
 // examples.
 func NewUIDocsService(files fs.FS, appURL string, live bool) *DocsService {
 	docs := NewDocsService(files, appURL, live)
-	docs.parser = markdown.NewParser(markdown.Examples(files))
 	docs.groups = uiGroups
 	docs.examples = files
 	return docs

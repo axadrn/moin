@@ -2,7 +2,7 @@
   /* A badge: a word that labels something. */
   .moin-badge {
     padding: 2px var(--space-2);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-full);
     background: var(--muted);
     color: var(--muted-foreground);
     font-size: 0.75rem;

@@ -30,14 +30,12 @@
     --space-6: 1.5rem;
     --space-8: 2rem;
 
-    /* Shape: one number. Every corner is that number times a step. */
+    /* Shape: one number. What you press has one corner, what holds it a
+       slightly bigger one, so the corners nest. Round things stay round. */
     --radius: 0.5rem;
-    --radius-small: calc(var(--radius) * 1.75);
-    --radius-medium: calc(var(--radius) * 2.2);
-    --radius-large: calc(var(--radius) * 2.6);
+    --radius-press: calc(var(--radius) * 1.5);
+    --radius-large: calc(var(--radius) * 2);
     --radius-full: 9999px;
-    /* What you press: a capsule at 0.5rem, square at 0. */
-    --radius-press: calc(var(--radius) * var(--press-size));
     /* The gap around anything lit inside a group. */
     --inset: 0.1875rem;
     /* How far a scrollbar stays from the edge of a round box: what the

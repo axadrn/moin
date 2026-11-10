@@ -25,7 +25,7 @@
     pre {
       padding: var(--space-4) var(--space-5);
       overflow-x: auto;
-      border-radius: var(--radius-medium);
+      border-radius: var(--radius-large);
       background: var(--terminal);
       color: var(--terminal-foreground);
       font-family: var(--font-mono);
@@ -43,7 +43,7 @@
     }
     img {
       max-width: 100%;
-      border-radius: var(--radius-medium);
+      border-radius: var(--radius-large);
     }
   }
 }

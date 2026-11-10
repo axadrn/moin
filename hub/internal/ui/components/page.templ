@@ -12,6 +12,7 @@ type Back struct {
 // a status. Children are the actions.
 type HeaderProps struct {
 	Back  Back
+	Icon  templ.Component
 	Title string
 	Line  templ.Component
 }
@@ -26,6 +27,9 @@ templ Header(p HeaderProps) {
 			}
 		</div>
 		<div class="moin-header-main">
+			if p.Icon != nil {
+				@p.Icon
+			}
 			<h1 class="moin-title">{ p.Title }</h1>
 			if p.Line != nil {
 				<p class="moin-header-line">
@@ -46,6 +50,10 @@ type Tab struct {
 	Label  string
 	Href   string
 	Active bool
+	// Key opens it from the keyboard. Attrs swap a part of a page instead,
+	// when the address should stay.
+	Key   string
+	Attrs templ.Attributes
 }
 
 // TabsProps is Tabs. Label names them for screen readers.
@@ -74,6 +82,10 @@ templ Tabs(p TabsProps) {
 				if tab.Active {
 					aria-current="page"
 				}
+				if tab.Key != "" {
+					data-key={ tab.Key }
+				}
+				{ tab.Attrs... }
 			>{ tab.Label }</a>
 		}
 	</nav>
@@ -242,4 +254,138 @@ func wordmarkHeight(size string) string {
 		return "1.25rem"
 	}
 	return size
+}
+
+// Page is the one width and edge of the hub.
+const Page = "moin-page"
+
+// Icon is one of the icons in ui/icons, by its file name.
+templ Icon(name string) {
+	<i class={ "moin-icon moin-icon-" + name }></i>
+}
+
+// Chevron ends something that opens.
+templ Chevron() {
+	<i class="moin-chevron"></i>
+}
+
+// ProseProps is markdown that is already HTML.
+type ProseProps struct {
+	HTML string
+}
+
+// Prose sets docs and articles.
+templ Prose(p ProseProps) {
+	<div class="moin-prose">
+		@templ.Raw(p.HTML)
+	</div>
+}
+
+// LiveProps is the stream of a page.
+type LiveProps struct {
+	URL string
+}
+
+// Live keeps the page live: it holds the server-sent event stream at URL and
+// lets every named event bubble up the page, where an element reloads itself
+// with hx-trigger="<event> from:body". It is the only way a page opens a
+// stream; the plugin closes it when the page is left.
+templ Live(p LiveProps) {
+	<div hx-sse:connect={ p.URL } hidden></div>
+}
+
+// FeedbackProps is the answer to a click.
+type FeedbackProps struct {
+	Kind  string
+	Title string
+	Note  string
+}
+
+// Feedback is sent out of band into #feedback. hub.js hands it to the element
+// that sent the request: "done" turns its button into a check for a moment,
+// "failed" and "note" put the words in a line under it.
+templ Feedback(p FeedbackProps) {
+	<output data-feedback={ p.Kind } data-title={ p.Title }>{ p.Note }</output>
+}
+
+// ModeSwitch is the round button between light and dark.
+templ ModeSwitch() {
+	@Button(ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"data-mode-toggle": true, "aria-label": "Switch the theme"}}) {
+		@Icon("theme")
+	}
+}
+
+// AppIconProps is the icon of a catalog app.
+type AppIconProps struct {
+	Name    string
+	Initial string
+	Logo    string
+	Large   bool
+}
+
+// AppIcon is a logo on a white tile in both themes, or a first letter on an
+// ink tile. Large is as high as a title.
+templ AppIcon(p AppIconProps) {
+	if p.Logo != "" {
+		<span class="moin-app-icon" data-large?={ p.Large } data-lead aria-hidden="true">
+			<img src={ p.Logo } alt="" loading="lazy" decoding="async"/>
+		</span>
+	} else {
+		<span class="moin-app-icon" data-large?={ p.Large } data-letter data-lead aria-hidden="true">{ p.Initial }</span>
+	}
+}
+
+// TextAreaProps is a field of several lines.
+type TextAreaProps struct {
+	Attrs templ.Attributes
+}
+
+// TextArea holds what is in it as children.
+templ TextArea(p TextAreaProps) {
+	<textarea class="moin-textarea" { p.Attrs... }>
+		{ children... }
+	</textarea>
+}
+
+// ExpandProps is an item that opens what is under it in place.
+type ExpandProps struct {
+	Name string
+}
+
+// Expand holds items as children, a native details.
+templ Expand(p ExpandProps) {
+	<details class="moin-expand">
+		<summary>
+			<span class="moin-item-name">{ p.Name }</span>
+			<i class="moin-chevron"></i>
+		</summary>
+		<div>
+			{ children... }
+		</div>
+	</details>
+}
+
+// ConfirmDialog asks before every request whose element has hx-confirm. The
+// question is the hx-confirm text: up to the first "? " the title, the rest
+// the note. With data-confirm-name on the element or one around it, the
+// button works only once that name is typed. hub.js opens it.
+templ ConfirmDialog() {
+	@Dialog(DialogProps{ID: "confirm-dialog"}) {
+		<div class="moin-stack" data-gap="3" data-confirm-typed hidden>
+			<div data-confirm-shown>
+				@Command(CommandProps{})
+			</div>
+			@Field(FieldProps{Label: "Type it to confirm", For: "confirm-name"}) {
+				@Input(InputProps{Attrs: templ.Attributes{"id": "confirm-name", "type": "text", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "data-confirm-input": true}})
+			}
+		</div>
+		@DialogButtons() {
+			@Button(ButtonProps{Attrs: CloseDialog()}) {
+				Cancel
+			}
+			@Button(ButtonProps{Kind: Danger, Attrs: templ.Attributes{"data-confirm-accept": true}}) {
+				Continue
+			}
+		}
+	}
 }

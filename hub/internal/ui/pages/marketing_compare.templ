@@ -1,10 +1,10 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"fmt"
 
 	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -15,9 +15,9 @@ templ HomeCompare() {
 	<section id="compare" class={ homeSection }>
 		<h2 class={ homeStatement }>Look at the score.</h2>
 		<p class={ homeNote }>None of these seven documents a daily restore check. { brand.Name } runs one.</p>
-		@kit.List() {
+		@components.List() {
 			for _, competitor := range Competitors {
-				@kit.Row("/compare/" + competitor.Slug) {
+				@components.Item(components.ItemProps{Href: "/compare/" + competitor.Slug}) {
 					@compareLine(competitor.Name, competitor.ScoreLine())
 				}
 			}
@@ -30,7 +30,7 @@ templ HomeCompare() {
 // sentence is never cut on a phone.
 templ compareLine(name, note string) {
 	<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-		<span class="font-medium">{ name }</span>
+		<span class="moin-strong">{ name }</span>
 		<span class="text-sm text-pretty text-muted-foreground">{ note }</span>
 	</div>
 }
@@ -45,22 +45,25 @@ templ Compare(competitor Competitor) {
 		Description: competitor.Lead,
 		Path:        "/compare/" + competitor.Slug,
 	}) {
-		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
-			@kit.Header(kit.Back{}, brand.Name + " or " + competitor.Name + "?")
+		<main class={ components.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@components.Header(components.HeaderProps{Title: brand.Name + " or " + competitor.Name + "?"})
 			<p class={ homeLead, "max-w-2xl" }>{ competitor.Lead }</p>
 			<p class={ homeNumber }>{ competitor.ScoreLine() }</p>
-			<div class="flex flex-col gap-6">
+			<div class="moin-stack" data-gap="6">
 				@compareHeader(competitor.Name, score)
 				for _, group := range compareGroups {
-					@kit.Section(group, nil) {
-						@kit.List() {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>{ group }</h2>
+						</div>
+						@components.List() {
 							for i, row := range CompareRows {
 								if row.Group == group {
 									@compareFact(row, competitor.Name, competitor.Cells[i])
 								}
 							}
 						}
-					}
+					</section>
 				}
 			</div>
 			<p class="px-1 text-sm text-muted-foreground">
@@ -89,7 +92,7 @@ templ compareHeader(name string, score CompareScore) {
 }
 
 templ compareFact(row CompareRow, name string, cell CompareCell) {
-	@kit.Row("") {
+	@components.Item(components.ItemProps{}) {
 		<div class={ compareColumns }>
 			<span class="font-medium text-pretty">{ row.Label }</span>
 			@compareAnswer(brand.Name, row.Ours)
@@ -104,7 +107,7 @@ templ compareAnswer(whose string, cell CompareCell) {
 	<div class="flex min-w-0 items-start gap-2">
 		@compareMarkIcon(cell.Mark)
 		<div class="flex min-w-0 flex-col gap-0.5 text-sm text-pretty">
-			<span><span class="text-muted-foreground sm:sr-only">{ whose }: </span><span class="font-medium">{ cell.Short }</span></span>
+			<span><span class="text-muted-foreground sm:sr-only">{ whose }: </span><span class="moin-strong">{ cell.Short }</span></span>
 			if cell.Detail != "" {
 				<span class="text-xs text-muted-foreground">{ cell.Detail }</span>
 			}
@@ -121,7 +124,7 @@ templ compareMarkIcon(mark compareMark) {
 	switch mark {
 		case markYes:
 			<span role="img" aria-label="Yes" class="flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
-				@kit.IconCheck("size-3")
+				@components.Icon("check")
 			</span>
 		case markPart:
 			<span role="img" aria-label="Partly" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-foreground/40 text-foreground">
@@ -129,7 +132,7 @@ templ compareMarkIcon(mark compareMark) {
 			</span>
 		case markNo:
 			<span role="img" aria-label="No" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-muted-foreground">
-				@kit.IconX("size-3")
+				@components.Icon("x")
 			</span>
 		case markUnknown:
 			<span role="img" aria-label="Not documented" class="flex size-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-xs font-medium text-muted-foreground">?</span>

@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"context"
 	"strconv"
 	"strings"
@@ -40,7 +41,7 @@ templ Home(network model.Network, open HomeOpen) {
 	}) {
 		<main>
 			@HomeHero()
-			<div class={ kit.Page, "pb-28 sm:pb-36" }>
+			<div class={ components.Page, "pb-28 sm:pb-36" }>
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
@@ -64,7 +65,7 @@ templ Home(network model.Network, open HomeOpen) {
 // while sign-up is closed. That it starts free is told on the sign-up page
 // and the pricing.
 templ homePrimary() {
-	@kit.Button(kit.Primary, "/auth", nil) {
+	@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 		{ homeStartLabel(ctx) }
 	}
 }
@@ -84,7 +85,7 @@ func homeStartLabel(ctx context.Context) string {
 // container an app.
 templ HomeHero() {
 	<section class="-mt-[4.25rem] flex min-h-svh flex-col overflow-hidden sm:-mt-[4.75rem]">
-		<div class={ kit.Page, "flex flex-1 flex-col items-center justify-center gap-8 pt-[calc(4.25rem+2rem)] pb-8 text-center sm:pt-[calc(4.75rem+2.5rem)] sm:pb-10" }>
+		<div class={ components.Page, "flex flex-1 flex-col items-center justify-center gap-8 pt-[calc(4.25rem+2rem)] pb-8 text-center sm:pt-[calc(4.75rem+2.5rem)] sm:pb-10" }>
 			<div class="flex flex-col items-center gap-6">
 				<h1 class="font-display text-[12vw] leading-[0.95] tracking-[-0.06em] sm:text-[clamp(3rem,5.4vw,5.75rem)] sm:tracking-[-0.05em]">
 					<span class="block">Deploy <br class="sm:hidden"/>anything.</span>
@@ -95,7 +96,7 @@ templ HomeHero() {
 			<div class="flex justify-center gap-2">
 				@homePrimary()
 				<span class="max-[339px]:hidden">
-					@kit.Button(kit.Secondary, "/docs", nil) {
+					@components.Button(components.ButtonProps{Href: "/docs"}) {
 						Read the docs
 					}
 				</span>
@@ -133,9 +134,9 @@ templ HomeLive(network model.Network) {
 
 templ homeLiveNumber(count int, label, name string) {
 	<div class="flex flex-col gap-1 rounded-4xl bg-card p-6" data-live-number={ name }>
-		<dt class="sr-only">{ label }</dt>
+		<dt class="moin-sr-only">{ label }</dt>
 		<dd class={ homeNumber }>{ liveCount(count) }</dd>
-		<dd class="text-sm text-muted-foreground">{ label }</dd>
+		<dd class="moin-small moin-muted">{ label }</dd>
 	</div>
 }
 
@@ -144,11 +145,11 @@ templ homeLiveNumber(count int, label, name string) {
 templ homeMoment(state, big, small string) {
 	<div class="flex h-full min-w-0 flex-col justify-center gap-4 rounded-4xl bg-card p-8">
 		<span class="flex items-center gap-3 font-medium">
-			@kit.Dot(kit.StateLive)
+			@components.Dot(components.DotProps{State: components.StateLive})
 			{ state }
 		</span>
 		<p class={ homeStatement, "break-words" }>{ big }</p>
-		<p class="text-sm text-muted-foreground">{ small }</p>
+		<p class="moin-small moin-muted">{ small }</p>
 	</div>
 }
 
@@ -173,10 +174,10 @@ var homeSurfaces = []homeSurface{
 var homeStepNames = [4]string{"Log in", "Add a server", "Add your bucket", "Deploy"}
 
 // homeSurfaceOptions are the choices of the four steps.
-func homeSurfaceOptions() []kit.Option {
-	options := make([]kit.Option, 0, len(homeSurfaces))
+func homeSurfaceOptions() []components.Option {
+	options := make([]components.Option, 0, len(homeSurfaces))
 	for _, surface := range homeSurfaces {
-		options = append(options, kit.Option{Value: surface.Value, Label: surface.Label})
+		options = append(options, components.Option{Value: surface.Value, Label: surface.Label})
 	}
 	return options
 }
@@ -194,7 +195,7 @@ templ HomeStart() {
 				</div>
 				for _, surface := range homeSurfaces {
 					<div class="hidden min-w-0" data-surface={ surface.Value }>
-						@kit.List() {
+						@components.List() {
 							for index, step := range surface.Steps {
 								@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
 							}
@@ -213,7 +214,7 @@ templ HomeStart() {
 
 // homeStep is one step: its number, what you do, and how.
 templ homeStep(number, name, how string) {
-	@kit.Row("") {
+	@components.Item(components.ItemProps{}) {
 		<span class="w-4 shrink-0 text-sm text-muted-foreground tabular-nums">{ number }</span>
 		<div class="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
 			<span class="flex-1 font-medium">{ name }</span>
@@ -259,10 +260,10 @@ templ HomeSecurity() {
 templ homeTile(statement, line, href string) {
 	<a href={ templ.SafeURL(href) } class="flex min-h-28 min-w-0 items-center gap-3 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
 		<span class="flex min-w-0 flex-1 flex-col gap-1">
-			<span class="font-medium">{ statement }</span>
-			<span class="text-sm text-muted-foreground">{ line }</span>
+			<span class="moin-strong">{ statement }</span>
+			<span class="moin-small moin-muted">{ line }</span>
 		</span>
-		@kit.Chevron()
+		@components.Chevron()
 	</a>
 }
 
@@ -273,30 +274,34 @@ templ HomeDoes() {
 	<section id="product" class={ homeSection }>
 		<h2 class={ homeStatement }>Everything. Built in.</h2>
 		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
-			@kit.Section("Ship", nil) {
-				@kit.List() {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Ship</h2>
+				</div>
+				@components.List() {
 					@homeFeature("Deploy", "Any repo, a compose.yml or an image", "/docs/guides/deploy")
 					@homeFeature("Domains", "HTTPS from the first deploy", "/docs/guides/domains")
 					@homeFeature("GitHub", "Every push, or one commit", "/docs/guides/github")
 					@homeFeature("Catalog", "n8n, Umami, Open WebUI and more", "/catalog")
 				}
-			}
-			@kit.Section("Keep", nil) {
-				@kit.List() {
+			</section>
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Keep</h2>
+				</div>
+				@components.List() {
 					@homeFeature("Backups", "Restore, undo, download", "/docs/guides/backups")
 					@homeFeature("Data", "Browse, edit, run SQL", "/docs/guides/data")
 					@homeFeature("Uptime and alerts", "Mail, Slack, Discord, Telegram", "/docs/guides/alerts")
 					@homeFeature("AI agents", "Claude, Cursor, any MCP client", "/docs/guides/mcp")
 				}
-			}
+			</section>
 		</div>
 	</section>
 }
 
 templ homeFeature(name, note, href string) {
-	@kit.Row(href) {
-		@kit.RowText(name, note)
-	}
+	@components.Item(components.ItemProps{Href: href, Name: name, Note: note})
 }
 
 // ---------------------------------------------------------------- pricing
@@ -305,30 +310,30 @@ templ homeFeature(name, note, href string) {
 templ HomePricing() {
 	<section id="pricing" class={ homeSection }>
 		<h2 class={ homeStatement }>One price. Every feature.</h2>
-		@kit.Grid() {
+		<div class="moin-grid" data-cols="2">
 			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="hosted">
 				<div class="flex flex-col gap-1">
-					<span class="font-medium">Hosted</span>
-					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$29</span><span class="text-sm text-muted-foreground">a month per workspace</span></span>
-					<span class="text-sm text-muted-foreground" data-yearly-deal>Or $249 a year. 30 days free, no card.</span>
+					<span class="moin-strong">Hosted</span>
+					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
+					<span class="moin-small moin-muted" data-yearly-deal>Or $249 a year. 30 days free, no card.</span>
 				</div>
-				@kit.Button(kit.Primary, "/auth", nil) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 					{ homeStartLabel(ctx) }
 				}
 				@homePlanRows("Ready in minutes", "We run and update it", "GitHub and email set up", "Support by email")
 			</div>
 			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="self-hosted">
 				<div class="flex flex-col gap-1">
-					<span class="font-medium">Self-hosted</span>
-					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$0</span><span class="text-sm text-muted-foreground">forever</span></span>
-					<span class="text-sm text-muted-foreground">Your own moin hub, on your server. Open source.</span>
+					<span class="moin-strong">Self-hosted</span>
+					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$0</span><span class="moin-small moin-muted">forever</span></span>
+					<span class="moin-small moin-muted">Your own moin hub, on your server. Open source.</span>
 				</div>
-				@kit.Button(kit.Secondary, "/docs/self-hosting", nil) {
+				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
 					Host it yourself
 				}
 				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
 			</div>
-		}
+		</div>
 		<p class={ homeNote } data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
 	</section>
 }
@@ -350,7 +355,7 @@ templ homePlanRows(rows ...string) {
 templ HomeQuestions() {
 	<section id="questions" class={ homeSection }>
 		<h2 class={ homeStatement }>Good questions.</h2>
-		@kit.List() {
+		@components.List() {
 			@homeQuestion("Is "+brand.Name+" open source?", "Yes. AGPL-3.0, free to host yourself.")
 			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
 			@homeQuestion("Can you see my data?", "Only what you open. It is never stored.")
@@ -364,8 +369,8 @@ templ HomeQuestions() {
 }
 
 templ homeQuestion(question, answer string) {
-	@kit.RowMore(question) {
-		@kit.Row("") {
+	@components.Expand(components.ExpandProps{Name: question}) {
+		@components.Item(components.ItemProps{}) {
 			<span class="min-w-0 flex-1 text-sm text-pretty text-muted-foreground">{ answer }</span>
 		}
 	}
@@ -394,11 +399,11 @@ templ HomeEnd() {
 			</p>
 			<div class="flex flex-wrap gap-2">
 				@homePrimary()
-				@kit.Button(kit.Secondary, "/docs/why-moin", nil) {
+				@components.Button(components.ButtonProps{Href: "/docs/why-moin"}) {
 					Why { brand.Name }
 				}
 			</div>
-			<p class="text-sm text-muted-foreground">
+			<p class="moin-small moin-muted">
 				if ctxkeys.RenderConfig(ctx).Billing {
 					30 days free, no card. Or <a href="/docs/self-hosting" class="text-foreground underline underline-offset-4">host it yourself</a>, free forever.
 				} else {

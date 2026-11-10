@@ -7,7 +7,7 @@ import (
 	"github.com/axadrn/moin/internal/find"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -123,19 +123,17 @@ templ SearchPage(query string, hits []SiteHit) {
 		NoIndex:     true,
 	}) {
 		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
-			@kit.Header(kit.Back{}, "Search")
+			@components.Header(components.HeaderProps{Title: "Search"})
 			<form method="get" action="/search" role="search">
-				<label for="search-q" class="sr-only">Search</label>
-				@kit.Input(templ.Attributes{"id": "search-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs and the catalog", "autocomplete": "off", "spellcheck": "false"})
+				<label for="search-q" class="moin-sr-only">Search</label>
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "search-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs and the catalog", "autocomplete": "off", "spellcheck": "false"}})
 			</form>
 			if strings.TrimSpace(query) != "" && len(hits) == 0 {
 				<p class="px-1 text-sm text-muted-foreground">Nothing found for “{ query }”.</p>
 			} else {
-				@kit.List() {
+				@components.List() {
 					for _, hit := range hits {
-						@kit.Row(hit.Href) {
-							@kit.RowText(hit.Title, hit.Where)
-						}
+						@components.Item(components.ItemProps{Href: hit.Href, Name: hit.Title, Note: hit.Where})
 					}
 				}
 			}

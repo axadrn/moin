@@ -1,6 +1,9 @@
 package markdown
 
-import "github.com/axadrn/moin/hub/internal/ui/kit"
+import (
+	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+)
 
 // surfaceItem is one surface of a surfaces block: a line of code, or lines
 // of rendered inline markdown.
@@ -38,10 +41,10 @@ templ surfacesView(name string, items []surfaceItem) {
 	</div>
 }
 
-func surfaceOptions(items []surfaceItem) []kit.Option {
-	options := make([]kit.Option, 0, len(items))
+func surfaceOptions(items []surfaceItem) []components.Option {
+	options := make([]components.Option, 0, len(items))
 	for _, item := range items {
-		options = append(options, kit.Option{Value: item.Value, Label: item.Label})
+		options = append(options, components.Option{Value: item.Value, Label: item.Label})
 	}
 	return options
 }

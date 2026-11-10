@@ -14,7 +14,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/protocol"
 )
@@ -68,7 +68,7 @@ templ AppData(view DataView) {
 		if view.Table == nil {
 			// The app's changes come as the event "apps": the head and a
 			// running restore reload on it.
-			@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link())
+			@components.Live(components.LiveProps{URL: "/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
 		}
 	}
 }
@@ -89,32 +89,33 @@ templ dataListPage(view DataView) {
 	@appHeader(view.App, "data")
 	@appSection(view.App.Name, view.App.Link(), "data") {
 		if len(view.Databases) == 0 && len(view.NoBackup) == 0 {
-			@kit.Card("", nil) {
-				@kit.Quiet() {
+			@components.Card(components.CardProps{}) {
+				<p class="moin-small moin-muted">
 					No SQLite file on a volume and no Postgres service yet.
-				}
-				@kit.Command("moin deploy " + view.App.Name)
+				</p>
+				@components.Command(components.CommandProps{Text: "moin deploy " + view.App.Name})
 			}
 		} else {
-			@kit.Section("Databases", nil) {
-				@kit.List() {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Databases</h2>
+				</div>
+				@components.List() {
 					for _, database := range view.Databases {
-						@kit.Row(databaseURL(ctx, view.App.Name, database.Path)) {
-							@kit.RowText(shortPath(database.Path), databaseKind(database))
+						@components.Item(components.ItemProps{Href: databaseURL(ctx, view.App.Name, database.Path), Name: shortPath(database.Path), Note: databaseKind(database)}) {
 							@databaseBackupValue(view, database.Path)
 						}
 					}
 					for _, database := range view.NoBackup {
-						@kit.Row("") {
-							@kit.RowText(database.Service, databaseKind(database))
+						@components.Item(components.ItemProps{Name: database.Service, Note: databaseKind(database)}) {
 							<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" data-no-backup>
-								@kit.Dot(kit.StateFailed)
+								@components.Dot(components.DotProps{State: components.StateFailed})
 								moin can't back this up
 							</span>
 						}
 					}
 				}
-			}
+			</section>
 		}
 		@BackupSettings(view.Backups)
 	}
@@ -128,12 +129,12 @@ templ databaseBackupValue(view DataView, database string) {
 		<span class="shrink-0 text-sm text-muted-foreground">No backups</span>
 	} else if known && backup.BackupError() != "" {
 		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.BackupError()) }>
-			@kit.Dot(kit.StateFailed)
+			@components.Dot(components.DotProps{State: components.StateFailed})
 			Backup fails
 		</span>
 	} else if known && backup.CheckError != "" {
 		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.CheckError) }>
-			@kit.Dot(kit.StateFailed)
+			@components.Dot(components.DotProps{State: components.StateFailed})
 			Check failed
 		</span>
 	} else if known && backup.CopiedAt != nil {
@@ -153,35 +154,37 @@ func backupStatusOf(statuses []model.BackupStatus, database string) (model.Backu
 // dataDatabasePage is one database: its tables, its backup with the
 // moments to go back to, and the SQL console.
 templ dataDatabasePage(view DataView) {
-	@kit.Header(kit.Back{Label: "Data", Href: dataPath(ctx, view.App.Link())}, databaseName(view.Database))
-	<div class="flex flex-col gap-6">
+	@components.Header(components.HeaderProps{Back: components.Back{Label: "Data", Href: dataPath(ctx, view.App.Link())}, Title: databaseName(view.Database)})
+	<div class="moin-stack" data-gap="6">
 		if view.Error != "" {
 			@dataError(view.Error)
 		} else {
-			@kit.Section("Tables", nil) {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Tables</h2>
+				</div>
 				if len(view.Tables) == 0 {
-					@kit.Card("", nil) {
-						@kit.Quiet() {
+					@components.Card(components.CardProps{}) {
+						<p class="moin-small moin-muted">
 							No tables yet. Your migrations make them on the next deploy.
-						}
+						</p>
 					}
 				} else {
-					@kit.List() {
+					@components.List() {
 						for _, table := range view.Tables {
-							@kit.Row(tableURL(ctx, view.App.Name, view.Database, table.Name, 0)) {
-								@kit.RowText(table.Name, tableKind(table))
+							@components.Item(components.ItemProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, 0), Name: table.Name, Note: tableKind(table)}) {
 								<span class="shrink-0 text-sm text-muted-foreground tabular-nums" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
 							}
 						}
 						if view.Migration != nil {
-							@kit.Row("") {
+							@components.Item(components.ItemProps{}) {
 								<span class="flex-1 font-medium" data-migration>Migrations</span>
 								<span class="min-w-0 truncate text-sm text-muted-foreground" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="font-mono">{ view.Migration.Version }</span></span>
 							}
 						}
 					}
 				}
-			}
+			</section>
 			@DatabaseBackups(view.Backups, view.Database)
 			@dataConsole(view)
 		}
@@ -192,8 +195,8 @@ templ dataDatabasePage(view DataView) {
 // how it is built.
 templ dataTablePage(view DataView) {
 	{{ table := *view.Table }}
-	@kit.Header(kit.Back{Label: databaseName(view.Database), Href: databaseURL(ctx, view.App.Name, view.Database)}, table.Name)
-	<div class="flex flex-col gap-6">
+	@components.Header(components.HeaderProps{Back: components.Back{Label: databaseName(view.Database), Href: databaseURL(ctx, view.App.Name, view.Database)}, Title: table.Name})
+	<div class="moin-stack" data-gap="6">
 		if view.Error != "" {
 			@dataError(view.Error)
 		} else {
@@ -206,7 +209,7 @@ templ dataTablePage(view DataView) {
 // dataError is why the server could not answer: a state of the page.
 templ dataError(message string) {
 	<p role="alert" class="flex items-center gap-2 px-1 text-sm text-failed" data-data-error>
-		@kit.Dot(kit.StateFailed)
+		@components.Dot(components.DotProps{State: components.StateFailed})
 		<span class="min-w-0 break-words">{ message }</span>
 	</p>
 }
@@ -269,19 +272,19 @@ templ dataRows(view DataView) {
 	{{ table := *view.Table }}
 	{{ editable := service.Editable(table) }}
 	{{ shown := view.Offset + len(view.Result.Rows) }}
-	@kit.Card(plural(int(table.Rows), "row", "rows"), addRowAction(table)) {
+	@components.Card(components.CardProps{Title: plural(int(table.Rows), "row", "rows"), Action: addRowAction(table)}) {
 		if table.Type == "table" {
 			@newRowForm(dataPath(ctx, view.App.Link()), view.Database, table)
 		}
 		if table.Type == "table" && !editable {
-			@kit.Quiet() {
+			<p class="moin-small moin-muted">
 				No primary key, so a row has no name to edit it by. Change rows with SQL.
-			}
+			</p>
 		}
 		if len(view.Result.Rows) == 0 {
-			@kit.Quiet() {
+			<p class="moin-small moin-muted">
 				No rows yet.
-			}
+			</p>
 		} else {
 			<div class={ dataScroll }>
 				<table class={ dataTableClass } data-rows>
@@ -292,7 +295,7 @@ templ dataRows(view DataView) {
 									<span class="inline-flex items-center gap-1.5">
 										if column.PrimaryKey {
 											<span role="img" aria-label="primary key">
-												@kit.IconKey("size-3.5")
+												@components.Icon("key")
 											</span>
 										}
 										<span class="text-foreground">{ column.Name }</span>
@@ -301,7 +304,7 @@ templ dataRows(view DataView) {
 								</th>
 							}
 							if editable {
-								<th scope="col" class={ dataHead }><span class="sr-only">Delete</span></th>
+								<th scope="col" class={ dataHead }><span class="moin-sr-only">Delete</span></th>
 							}
 						</tr>
 					</thead>
@@ -334,7 +337,7 @@ templ dataRows(view DataView) {
 											hx-confirm={ "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone." }
 											data-confirm-action="Delete"
 										>
-											@kit.IconTrash("")
+											@components.Icon("trash")
 										</button>
 									</td>
 								}
@@ -349,12 +352,12 @@ templ dataRows(view DataView) {
 				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
 				<div class="flex gap-2">
 					if view.Offset > 0 {
-						@kit.Button(kit.Secondary, tableURL(ctx, view.App.Name, view.Database, table.Name, max(view.Offset-view.Limit, 0)), nil) {
+						@components.Button(components.ButtonProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, max(view.Offset-view.Limit, 0))}) {
 							Newer
 						}
 					}
 					if int64(shown) < table.Rows {
-						@kit.Button(kit.Secondary, tableURL(ctx, view.App.Name, view.Database, table.Name, view.Offset+view.Limit), nil) {
+						@components.Button(components.ButtonProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, view.Offset+view.Limit)}) {
 							Older
 						}
 					}
@@ -374,7 +377,7 @@ func addRowAction(table protocol.DBTable) templ.Component {
 }
 
 templ addRowButton() {
-	@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button", "data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"}) {
+	@components.Button(components.ButtonProps{Attrs: templ.Attributes{"data-new-row-toggle": true, "aria-controls": "new-row", "aria-expanded": "false"}}) {
 		Add row
 	}
 }
@@ -395,24 +398,29 @@ const (
 // made it and its indexes. The schema changes with the migrations in the
 // repo, not here.
 templ dataSchema(table protocol.DBTable) {
-	@kit.Section("Columns", nil) {
-		@kit.List() {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Columns</h2>
+		</div>
+		@components.List() {
 			for _, column := range table.Columns {
-				@kit.RowAttrs("", templ.Attributes{"data-schema-column": column.Name}) {
-					@kit.RowText(column.Name, columnNote(column))
+				@components.Item(components.ItemProps{Name: column.Name, Note: columnNote(column), Attrs: templ.Attributes{"data-schema-column": column.Name}}) {
 					<span class="shrink-0 font-mono text-sm text-muted-foreground">{ columnType(column) }</span>
 				}
 			}
 		}
-	}
-	@kit.Section("Statement", nil) {
-		<div class="flex flex-col gap-2">
+	</section>
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Statement</h2>
+		</div>
+		<div class="moin-stack" data-gap="2">
 			<pre class={ dataTerm } data-table-sql>{ table.SQL }</pre>
 			for _, index := range table.Indexes {
 				<pre class={ dataTerm }>{ index }</pre>
 			}
 		</div>
-	}
+	</section>
 }
 
 func columnType(column protocol.DBColumn) string {
@@ -436,22 +444,22 @@ func columnNote(column protocol.DBColumn) string {
 // newRowForm adds a row: a field per column. It opens with Add row and
 // closes with Cancel.
 templ newRowForm(dataPath, database string, table protocol.DBTable) {
-	<form id="new-row" hidden class="flex flex-col gap-4" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
-		@kit.CSRF()
+	<form id="new-row" hidden class="moin-stack" data-gap="4" hx-post={ dataPath + "/insert" } hx-swap="none" hx-disable="find button[type='submit']" data-new-row>
+		@components.CSRF()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
 		<div class="grid items-start gap-4 sm:grid-cols-2">
 			for _, column := range table.Columns {
-				@kit.Field(column.Name, "new-row-"+column.Name, strings.ToLower(column.Type)) {
-					@kit.Input(templ.Attributes{"id": "new-row-" + column.Name, "type": "text", "name": "value:" + column.Name, "placeholder": newRowPlaceholder(column), "spellcheck": "false", "autocomplete": "off"})
+				@components.Field(components.FieldProps{Label: column.Name, For: "new-row-"+column.Name, Hint: strings.ToLower(column.Type)}) {
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "new-row-" + column.Name, "type": "text", "name": "value:" + column.Name, "placeholder": newRowPlaceholder(column), "spellcheck": "false", "autocomplete": "off"}})
 				}
 			}
 		</div>
 		<div class="flex flex-wrap items-center justify-end gap-2">
-			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "button", "data-new-row-cancel": true}) {
+			@components.Button(components.ButtonProps{Attrs: templ.Attributes{"data-new-row-cancel": true}}) {
 				Cancel
 			}
-			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			@components.Button(components.ButtonProps{Type: "submit"}) {
 				Save row
 			}
 		</div>
@@ -478,7 +486,7 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 		hx-trigger="submit, change"
 		data-cell={ state }
 	>
-		@kit.CSRF()
+		@components.CSRF()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table }/>
 		if ref.Key != "" {
@@ -510,27 +518,30 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 // dataConsole runs SQL on the database: reads only, unless Allow changes
 // is on.
 templ dataConsole(view DataView) {
-	@kit.Section("SQL", nil) {
-		@kit.Card("", nil) {
-			<form class="flex flex-col gap-4" hx-post={ dataPath(ctx, view.App.Link()) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
-				@kit.CSRF()
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>SQL</h2>
+		</div>
+		@components.Card(components.CardProps{}) {
+			<form class="moin-stack" data-gap="4" hx-post={ dataPath(ctx, view.App.Link()) + "/query" } hx-target="#sql-result" hx-swap="innerHTML" hx-disable="find button[type='submit']" data-sql-form>
+				@components.CSRF()
 				<input type="hidden" name="db" value={ view.Database }/>
-				<label for="sql" class="sr-only">SQL</label>
-				@kit.TextArea(templ.Attributes{"id": "sql", "name": "sql", "rows": "4", "placeholder": sqlPlaceholder(view), "spellcheck": "false", "autocomplete": "off", "data-sql": true})
+				<label for="sql" class="moin-sr-only">SQL</label>
+				@components.TextArea(components.TextAreaProps{Attrs: templ.Attributes{"id": "sql", "name": "sql", "rows": "4", "placeholder": sqlPlaceholder(view), "spellcheck": "false", "autocomplete": "off", "data-sql": true}})
 				<p hidden class="px-1 text-sm text-running" data-sql-schema-hint>This changes the schema. Put it in a migration, or the next deploy will not know about it.</p>
 				<div class="flex flex-wrap items-center justify-between gap-3">
 					<label class="flex cursor-pointer items-center gap-3 px-1">
-						@kit.Switch(templ.Attributes{"name": "write", "value": "1", "data-sql-write": true})
+						@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"name": "write", "value": "1", "data-sql-write": true}})
 						<span class="text-sm font-medium">Allow changes</span>
 					</label>
-					@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+					@components.Button(components.ButtonProps{Type: "submit"}) {
 						Run
 					}
 				</div>
 			</form>
 			<div id="sql-result" class="min-w-0 empty:hidden"></div>
 		}
-	}
+	</section>
 }
 
 // dataScripts is the script of the data pages: the SQL console's keys and
@@ -603,11 +614,11 @@ templ DataResult(result protocol.DBResult, write bool, message string) {
 		<p role="alert" class="px-1 font-mono text-sm break-words text-failed" data-sql-error>{ message }</p>
 	} else if write {
 		<p role="status" class="flex items-center gap-2 px-1 text-sm font-medium" data-sql-changes>
-			@kit.IconCheck("size-4 shrink-0 text-live")
+			@components.Icon("check")
 			{ plural(int(result.Changes), "row changed", "rows changed") }
 		</p>
 	} else {
-		<div class="flex flex-col gap-2">
+		<div class="moin-stack" data-gap="2">
 			<p role="status" class="px-1 text-xs text-muted-foreground tabular-nums">
 				{ plural(len(result.Rows), "row", "rows") }
 				if result.Truncated {

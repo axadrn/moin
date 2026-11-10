@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"strconv"
 	"strings"
 	"time"
@@ -21,18 +22,16 @@ templ Apps(apps []model.App, servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Apps") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Overview", Href: basePath + "/overview"}, "Apps") {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: basePath + "/overview"}, Title: "Apps"}) {
 				<div class="sm:ml-auto">
-					@kit.Button(kit.Primary, basePath+"/new-app", nil) {
+					@components.Button(components.ButtonProps{Kind: components.Primary, Href: basePath+"/new-app"}) {
 						New app
 					}
 				</div>
 			}
 			if len(apps) == 0 {
-				@kit.List() {
-					@kit.Row(basePath + "/new-app") {
-						@kit.RowText("No apps yet", "Start one from your folder, GitHub or the catalog.")
-					}
+				@components.List() {
+					@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from your folder, GitHub or the catalog."})
 				}
 			} else {
 				@appRows(apps, servers)
@@ -47,32 +46,30 @@ templ NewApp(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("New app") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Apps", Href: basePath + "/apps"}, "New app")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Apps", Href: basePath + "/apps"}, Title: "New app"})
 			if len(servers) == 0 {
-				@kit.List() {
-					@kit.Row(basePath + "/servers") {
-						@kit.RowText("Connect a server first", "Apps run on your servers. One command, no open port.")
-					}
+				@components.List() {
+					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers. One command, no open port."})
 				}
 			} else {
-				@kit.Card("From your folder", nil) {
-					@kit.Quiet() {
+				@components.Card(components.CardProps{Title: "From your folder"}) {
+					<p class="moin-small moin-muted">
 						Run this in the folder of your app. It finds compose.yml, a Dockerfile or a Go module and builds on your server.
-					}
-					@kit.Command("moin deploy")
+					</p>
+					@components.Command(components.CommandProps{Text: "moin deploy"})
 				}
-				@kit.Card("From GitHub", nil) {
-					@kit.Quiet() {
+				@components.Card(components.CardProps{Title: "From GitHub"}) {
+					<p class="moin-small moin-muted">
 						Name it and pick its server. Then link its repo, and every push deploys.
-					}
+					</p>
 					@AppAddForm(servers)
 				}
-				@kit.Card("From the catalog", nil) {
-					@kit.Quiet() {
+				@components.Card(components.CardProps{Title: "From the catalog"}) {
+					<p class="moin-small moin-muted">
 						Umami, n8n, Ghost and 44 more, the newest release in one click.
-					}
+					</p>
 					<div>
-						@kit.Button(kit.Secondary, basePath+"/catalog", templ.Attributes{"data-catalog-link": true}) {
+						@components.Button(components.ButtonProps{Href: basePath+"/catalog", Attrs: templ.Attributes{"data-catalog-link": true}}) {
 							Open the catalog
 						}
 					</div>
@@ -93,22 +90,22 @@ templ AppAddForm(servers []model.Server) {
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
-		@kit.CSRF()
-		<label for="app-name" class="sr-only">App name</label>
-		@kit.Input(templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like my-app", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
+		@components.CSRF()
+		<label for="app-name" class="moin-sr-only">App name</label>
+		@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like my-app", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true}})
 		<div class="flex gap-2 sm:w-64">
-			@kit.Select(kit.SelectProps{ID: "app-server", Name: "server", Label: "Server", Options: serverOptions(servers)})
-			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			@components.Select(components.SelectProps{ID: "app-server", Name: "server", Label: "Server", Options: serverOptions(servers)})
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 				Add
 			}
 		</div>
 	</form>
 }
 
-func serverOptions(servers []model.Server) []kit.Option {
-	options := make([]kit.Option, 0, len(servers))
+func serverOptions(servers []model.Server) []components.Option {
+	options := make([]components.Option, 0, len(servers))
 	for _, server := range servers {
-		options = append(options, kit.Option{Value: server.Name, Label: server.Name})
+		options = append(options, components.Option{Value: server.Name, Label: server.Name})
 	}
 	return options
 }
@@ -173,7 +170,7 @@ templ AppPage(view AppPageView) {
 		}
 		// The app's changes come as the event "apps"; parts that show them
 		// reload on it (hx-trigger "apps from:body").
-		@kit.Live("/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link())
+		@components.Live(components.LiveProps{URL: "/api/v1/apps/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
 	}
 }
 
@@ -187,43 +184,39 @@ templ appHomeSection(view AppPageView) {
 		@CatalogUpdate(*view.Catalog)
 	}
 	<div class="sm:hidden">
-		@kit.List() {
+		@components.List() {
 			for _, section := range appSections[1:] {
-				@kit.Row(appPath + section.Path) {
-					@kit.RowText(section.Label, "")
+				@components.Item(components.ItemProps{Href: appPath + section.Path, Name: section.Label}) {
 					<span class="truncate text-sm text-muted-foreground">{ appSectionValue(app, section.ID) }</span>
 				}
 			}
 		}
 	</div>
 	<div class="hidden sm:block">
-		@kit.Section("Domains", nil) {
-			@kit.List() {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Domains</h2>
+			</div>
+			@components.List() {
 				for _, domain := range appDomains(app) {
-					@kit.RowExternal("https://" + domain) {
-						@kit.RowText(domain, "")
-					}
+					@components.Item(components.ItemProps{Href: "https://" + domain, External: true, Name: domain})
 				}
 				if len(appDomains(app)) == 0 {
 					@kit.RowControl(nil) {
 						@kit.RowText("No domain yet", "")
-						@kit.Button(kit.Secondary, appPath+"/domains", nil) {
+						@components.Button(components.ButtonProps{Href: appPath+"/domains"}) {
 							Add a domain
 						}
 					}
 				}
 			}
-		}
+		</section>
 	</div>
-	@kit.List() {
-		@kit.Row(appPath + "/metrics") {
-			@kit.RowText("Metrics", "")
-		}
+	@components.List() {
+		@components.Item(components.ItemProps{Href: appPath + "/metrics", Name: "Metrics"})
 		if app.Catalog != "" {
 			// Its page in the catalog: what it is, its links, newer versions.
-			@kit.Row(ctxkeys.AppBasePath(ctx) + "/catalog/" + app.Catalog) {
-				@kit.RowText("In the catalog", app.Catalog)
-			}
+			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/catalog/" + app.Catalog, Name: "In the catalog", Note: app.Catalog})
 		}
 	}
 }
@@ -290,7 +283,7 @@ templ appDomainsSection(view AppPageView) {
 // slow to answer they load into a box that keeps their place.
 templ appLogsSection(app model.App, deploys []api.Deploy, logs *AppLogsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
-	@kit.Card("Last 200 lines", loadLogsButton(appPath)) {
+	@components.Card(components.CardProps{Title: "Last 200 lines", Action: loadLogsButton(appPath)}) {
 		<div class="-mx-6">
 			if logs != nil {
 				@AppLogs(logs.Lines, logs.Message)
@@ -319,7 +312,7 @@ const appLogsBox = "flex max-h-[30rem] flex-col-reverse justify-end-safe overflo
 // pin, and at the end what stops or removes it.
 templ appSettingsSection(app model.App, envKeys []string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
-	@kit.Card("Name", nil) {
+	@components.Card(components.CardProps{Title: "Name"}) {
 		<form
 			hx-post={ appPath + "/name" }
 			hx-target="#main"
@@ -328,41 +321,41 @@ templ appSettingsSection(app model.App, envKeys []string) {
 			hx-disable="find button[type='submit']"
 			data-rename-app
 		>
-			@kit.CSRF()
-			<label for="app-rename" class="sr-only">App name</label>
-			@kit.Inline() {
-				@kit.Input(templ.Attributes{"id": "app-rename", "name": "name", "type": "text", "value": app.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"})
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			@components.CSRF()
+			<label for="app-rename" class="moin-sr-only">App name</label>
+			<div class="moin-row" data-gap="2" data-phone="stack">
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "app-rename", "name": "name", "type": "text", "value": app.Name, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"}})
+				@components.Button(components.ButtonProps{Type: "submit"}) {
 					Save
 				}
-			}
+			</div>
 		</form>
 	}
 	@AppEnv(app.Link(), envKeys, nil)
-	@kit.List() {
+	@components.List() {
 		@PinSwitch(app)
 	}
-	@kit.List() {
+	@components.List() {
 		if app.LiveNumber > 0 && !app.Stopped {
-			@kit.RowButton(true, templ.Attributes{
+			@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
 				"hx-post":    appPath + "/stop",
 				"hx-swap":    "none",
 				"hx-disable": "this",
 				"hx-confirm": "Stop " + app.Name + "? It is offline until you start it. Its data and settings stay.",
 				"data-stop":  true,
-			}) {
-				<span class="font-medium">Stop { app.Name }</span>
+			}}) {
+				<span class="moin-strong">Stop { app.Name }</span>
 			}
 		}
-		@kit.RowButton(true, templ.Attributes{
+		@components.Item(components.ItemProps{Button: true, Danger: true, Attrs: templ.Attributes{
 			"hx-delete":         appPath,
 			"hx-swap":           "none",
 			"hx-disable":        "this",
 			"hx-confirm":        "Remove " + app.Name + "? Its containers stop and go. Its data stays on the server.",
 			"data-confirm-name": app.Name,
 			"data-remove-app":   true,
-		}) {
-			<span class="font-medium">Remove { app.Name }</span>
+		}}) {
+			<span class="moin-strong">Remove { app.Name }</span>
 		}
 	}
 }
@@ -385,7 +378,7 @@ func appLastDeployLine(deploys []api.Deploy) string {
 }
 
 templ loadLogsButton(appPath string) {
-	@kit.Button(kit.Secondary, "", templ.Attributes{"hx-get": appPath + "/logs/lines", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"}) {
+	@components.Button(components.ButtonProps{Attrs: templ.Attributes{"hx-get": appPath + "/logs/lines", "hx-target": "#app-logs", "hx-swap": "outerHTML", "hx-disable": "this"}}) {
 		Reload
 	}
 }
@@ -451,8 +444,8 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 	>
 		if len(deploys) == 0 {
 			<div class="flex flex-col gap-3 px-5 py-4">
-				<p class="font-medium">No deploys yet</p>
-				@kit.Command("moin deploy " + app.Name)
+				<p class="moin-strong">No deploys yet</p>
+				@components.Command(components.CommandProps{Text: "moin deploy " + app.Name})
 			</div>
 		} else {
 			<div class="flex flex-col" role="list">
@@ -460,7 +453,7 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 					@deployRow(app, deploys, deploy, selected)
 				}
 				if len(deploys) > deploysShown {
-					@kit.RowMore(plural(len(deploys)-deploysShown, "older deploy", "older deploys")) {
+					@components.Expand(components.ExpandProps{Name: plural(len(deploys)-deploysShown, "older deploy", "older deploys")}) {
 						for _, deploy := range deploys[deploysShown:] {
 							@deployRow(app, deploys, deploy, selected)
 						}
@@ -476,7 +469,7 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected int) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
-	@kit.RowAttrs(deployHref(basePath, app.Link(), deploys, deploy.Number), deployRowAttributes(deploy.Number, deploy.Number == selectedNumber(deploys, selected))) {
+	@components.Item(components.ItemProps{Href: deployHref(basePath, app.Link(), deploys, deploy.Number), Attrs: deployRowAttributes(deploy.Number, deploy.Number == selectedNumber(deploys, selected))}) {
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span class="flex min-w-0 items-center gap-3">
 				<span class="font-semibold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
@@ -492,7 +485,7 @@ templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected
 				</span>
 			}
 			if deploy.FromNumber > 0 {
-				<span class="text-sm text-muted-foreground">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
+				<span class="moin-small moin-muted">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
 			}
 			if deploy.Error != "" {
 				<span class="truncate text-sm text-failed" title={ deploy.Error }>{ deploy.Error }</span>
@@ -526,19 +519,19 @@ const deploysShown = 8
 templ deployStatus(deploy api.Deploy, liveNumber int) {
 	switch  {
 		case deploy.Status == model.DeployRunning:
-			@kit.Status(kit.StateRunning, nil) {
+			@components.Status(components.StatusProps{State: components.StateRunning}) {
 				deploying
 			}
 		case deploy.Status == model.DeployFailed:
-			@kit.Status(kit.StateFailed, nil) {
+			@components.Status(components.StatusProps{State: components.StateFailed}) {
 				failed
 			}
 		case deploy.Number == liveNumber:
-			@kit.Status(kit.StateLive, nil) {
+			@components.Status(components.StatusProps{State: components.StateLive}) {
 				live
 			}
 		default:
-			@kit.Status(kit.StateDone, nil) {
+			@components.Status(components.StatusProps{State: components.StateDone}) {
 				succeeded
 			}
 	}
@@ -601,12 +594,14 @@ func parseLogLine(line string) logLine {
 templ AppEnv(appLink string, keys []string, values map[string]string) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
 	<div id="app-env">
-		@kit.Section("Environment", envModes(appLink, false)) {
-			@kit.List() {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Environment</h2>
+				@envModes(appLink, false)
+			</div>
+			@components.List() {
 				if len(keys) == 0 {
-					@kit.Row("") {
-						@kit.RowText("No env vars yet", "")
-					}
+					@components.Item(components.ItemProps{Name: "No env vars yet"})
 				}
 				for _, key := range keys {
 					@kit.RowControl(nil) {
@@ -630,37 +625,33 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 							data-confirm-action="Remove"
 							class="-my-1.5 -mr-3.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
 						>
-							@kit.IconX("size-4")
+							@components.Icon("x")
 						</button>
 					}
 				}
 				if len(keys) > 0 {
 					if len(values) == 0 {
-						@kit.RowButton(false, templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}) {
-							<span class="font-medium">Show values</span>
-						}
+						@components.Item(components.ItemProps{Button: true, Name: "Show values", Attrs: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}})
 					} else {
-						@kit.RowButton(false, templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}) {
-							<span class="font-medium">Hide values</span>
-						}
+						@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
 					}
 				}
 				@kit.RowForm(templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}) {
 					<div class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
-						@kit.CSRF()
-						<label for="env-key" class="sr-only">Name</label>
+						@components.CSRF()
+						<label for="env-key" class="moin-sr-only">Name</label>
 						<div class="sm:w-56 sm:shrink-0">
-							@kit.Input(templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true})
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true}})
 						</div>
-						<label for="env-value" class="sr-only">Value</label>
-						@kit.Input(templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"})
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+						<label for="env-value" class="moin-sr-only">Value</label>
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-value", "name": "value", "type": "password", "placeholder": "Value", "autocomplete": "off"}})
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 							Set
 						}
 					</div>
 				}
 			}
-		}
+		</section>
 	</div>
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -27,15 +28,15 @@ templ AppUptime(view UptimeView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	@layouts.App(view.App.Name + " uptime") {
 		@panelPage(templ.Attributes{"data-app-uptime": view.App.Name}) {
-			@kit.Header(kit.Back{Label: "Domains", Href: appPath + "/domains"}, "Uptime")
-			<div id="app-uptime" class="flex flex-col gap-6">
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Domains", Href: appPath + "/domains"}, Title: "Uptime"})
+			<div id="app-uptime" class="moin-stack" data-gap="6">
 				@uptimeServerOffline(view)
 				if len(view.Uptime.Domains) == 0 {
-					@kit.Card("", nil) {
-						@kit.Quiet() {
+					@components.Card(components.CardProps{}) {
+						<p class="moin-small moin-muted">
 							No domain to visit yet.
-						}
-						@kit.Command("moin domains add " + view.App.Name + ".example.com")
+						</p>
+						@components.Command(components.CommandProps{Text: "moin domains add " + view.App.Name + ".example.com"})
 					}
 				}
 				for _, domain := range view.Uptime.Domains {
@@ -50,17 +51,19 @@ templ AppUptime(view UptimeView) {
 // section of an app; a row opens the uptime page.
 templ AppUptimeBody(view UptimeView) {
 	if len(view.Uptime.Domains) > 0 {
-		@kit.Section("Uptime", nil) {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Uptime</h2>
+			</div>
 			@uptimeServerOffline(view)
-			@kit.List() {
+			@components.List() {
 				for _, domain := range view.Uptime.Domains {
-					@kit.Row(ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/uptime") {
-						@kit.RowText(domain.Domain, uptimeNote(domain))
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/uptime", Name: domain.Domain, Note: uptimeNote(domain)}) {
 						@uptimeState(domain)
 					}
 				}
 			}
-		}
+		</section>
 	}
 }
 
@@ -69,7 +72,7 @@ templ AppUptimeBody(view UptimeView) {
 templ uptimeServerOffline(view UptimeView) {
 	if !view.Uptime.ServerOnline && view.App.ServerName != "" {
 		<p class="px-1" data-server-offline>
-			@kit.Status(kit.StateFailed, nil) {
+			@components.Status(components.StatusProps{State: components.StateFailed}) {
 				{ view.App.ServerName } is offline
 			}
 		</p>
@@ -79,9 +82,13 @@ templ uptimeServerOffline(view UptimeView) {
 // uptimeDomain is one domain: its numbers and outages, then its uptime.
 templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 	<div data-uptime-domain={ domain.Domain }>
-		@kit.Section(domain.Domain, uptimeState(domain)) {
-			<div class="flex flex-col gap-4">
-				@kit.List() {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>{ domain.Domain }</h2>
+				@uptimeState(domain)
+			</div>
+			<div class="moin-stack" data-gap="4">
+				@components.List() {
 					@uptimeFact("Last 24 hours", orNone(percent(domain.Uptime24h)), averageNote(domain))
 					@uptimeFact("Last 7 days", orNone(percent(domain.Uptime7d)), "")
 					@uptimeFact("Last 30 days", orNone(percent(domain.Uptime30d)), "")
@@ -96,12 +103,12 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 				}
 				if len(domain.Outages) > 0 {
 					<div data-outages>
-						@kit.List() {
+						@components.List() {
 							for _, outage := range domain.Outages {
-								@kit.RowAttrs("", templ.Attributes{"data-outage": stamp(outage.StartedAt)}) {
+								@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-outage": stamp(outage.StartedAt)}}) {
 									<div class="min-w-0 flex-1">
 										<div class="font-medium tabular-nums" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
-										<div class="text-sm text-muted-foreground">{ outageText(outage, view.Now) }</div>
+										<div class="moin-small moin-muted">{ outageText(outage, view.Now) }</div>
 									</div>
 								}
 							}
@@ -110,34 +117,32 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 				}
 				@uptimeSettings(view.App, domain)
 			</div>
-		}
+		</section>
 	</div>
 }
 
 // uptimeFact is a row with a number on the right and what it means.
 templ uptimeFact(label, value, note string) {
-	@kit.RowFact(label, note) {
-		{ value }
-	}
+	@components.Item(components.ItemProps{Name: label, Note: note, Value: value})
 }
 
 // uptimeState is the state of a domain's visit as a status.
 templ uptimeState(domain service.UptimeDomain) {
 	switch domain.State {
 		case model.UptimeUp:
-			@kit.Status(kit.StateLive, templ.Attributes{"data-uptime-state": domain.State}) {
+			@components.Status(components.StatusProps{State: components.StateLive, Attrs: templ.Attributes{"data-uptime-state": domain.State}}) {
 				Up
 			}
 		case model.UptimeDown:
-			@kit.Status(kit.StateFailed, templ.Attributes{"data-uptime-state": domain.State}) {
+			@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"data-uptime-state": domain.State}}) {
 				Down
 			}
 		case model.UptimePaused:
-			@kit.Status(kit.StateIdle, templ.Attributes{"data-uptime-state": domain.State}) {
+			@components.Status(components.StatusProps{State: components.StateIdle, Attrs: templ.Attributes{"data-uptime-state": domain.State}}) {
 				Paused
 			}
 		default:
-			@kit.Status(kit.StateWaiting, templ.Attributes{"data-uptime-state": domain.State}) {
+			@components.Status(components.StatusProps{State: components.StateWaiting, Attrs: templ.Attributes{"data-uptime-state": domain.State}}) {
 				Waiting
 			}
 	}
@@ -147,18 +152,18 @@ templ uptimeState(domain service.UptimeDomain) {
 templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/path" }}
 	{{ id := "uptime-" + domain.Domain }}
-	@kit.List() {
+	@components.List() {
 		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
-			@kit.CSRF()
+			@components.CSRF()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
 			<div class="min-w-0 flex-1 pb-2">
-				@kit.Field("Path", id+"-path", "") {
-					@kit.Inline() {
-						@kit.Input(templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellvisit": "false"})
-						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+				@components.Field(components.FieldProps{Label: "Path", For: id+"-path"}) {
+					<div class="moin-row" data-gap="2" data-phone="stack">
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellvisit": "false"}})
+						@components.Button(components.ButtonProps{Type: "submit"}) {
 							Save
 						}
-					}
+					</div>
 				}
 			</div>
 		}
@@ -170,11 +175,10 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@kit.RowForm(templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}) {
-		@kit.CSRF()
+	@components.Item(components.ItemProps{Form: true, For: id+"-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}}) {
+		@components.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
-		@kit.RowLabel(id+"-on", "Visit every minute", "")
-		@kit.Switch(templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused})
+		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused}})
 	}
 }
 

@@ -7,7 +7,7 @@
     align-items: center;
     justify-content: center;
     padding-inline: var(--space-1);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-press);
     background: var(--muted);
     color: var(--muted-foreground);
     font-family: var(--font-mono);

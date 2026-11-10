@@ -1,8 +1,8 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -14,17 +14,17 @@ templ Legal(page *service.LegalPage) {
 		Description: page.Description,
 		Path:        "/legal/" + page.Slug,
 	}) {
-		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
-			@kit.Header(kit.Back{}, page.Title)
-			<div class="flex flex-col gap-3">
-				@kit.Segmented("legal", "Legal", []kit.Segment{
+		<main class={ components.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@components.Header(components.HeaderProps{Title: page.Title})
+			<div class="moin-stack" data-gap="3">
+				@components.Tabs(components.TabsProps{ID: "legal", Label: "Legal", Tabs: []components.Tab{
 					{Label: "Terms of Service", Href: "/legal/terms", Active: page.Slug == "terms"},
 					{Label: "Privacy Policy", Href: "/legal/privacy", Active: page.Slug == "privacy"},
-				})
+				}})
 				<p class="px-1 text-xs text-muted-foreground">Last updated { page.LastUpdated }</p>
 			</div>
 			<article class="max-w-2xl min-w-0 text-base">
-				@kit.Typeset(page.Content)
+				@components.Prose(components.ProseProps{HTML: page.Content})
 			</article>
 		</main>
 	}

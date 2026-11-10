@@ -27,7 +27,7 @@ templ authScreen(seo layouts.SEOProps, title string) {
 // for the error page, which brings its own.
 templ authFrame(title string) {
 	<div class="flex min-h-svh flex-col bg-background">
-		<header class={ kit.Page, "flex h-16 shrink-0 items-center" }>
+		<header class={ components.Page, "flex h-16 shrink-0 items-center" }>
 			<a href="/" class="flex items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30" aria-label={ brand.Name + " home" }>
 				@kit.Wordmark("text-xl leading-none")
 			</a>
@@ -51,7 +51,7 @@ templ authFrame(title string) {
 // authStack stacks the fields and buttons of an auth page, each as wide as
 // the column.
 templ authStack() {
-	<div class="flex flex-col gap-3">
+	<div class="moin-stack" data-gap="3">
 		{ children... }
 	</div>
 }
@@ -92,7 +92,7 @@ templ authTerms() {
 // factRow is a row of a kit.List that states one fact: what, and its
 // value on the right.
 templ factRow(name, value string) {
-	@kit.Row("") {
+	@components.Item(components.ItemProps{}) {
 		<span class="flex-1 font-medium">{ name }</span>
 		<span class="min-w-0 truncate text-sm text-muted-foreground">{ value }</span>
 	}

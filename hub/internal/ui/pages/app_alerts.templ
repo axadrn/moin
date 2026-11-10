@@ -7,6 +7,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -21,7 +22,7 @@ type AlertsView struct {
 }
 
 // alertKinds give the kind select its labels.
-var alertKinds = []kit.Option{
+var alertKinds = []components.Option{
 	{Value: model.AlertSlack, Label: "Slack"},
 	{Value: model.AlertDiscord, Label: "Discord"},
 	{Value: model.AlertTelegram, Label: "Telegram"},
@@ -34,15 +35,15 @@ templ Alerts(view AlertsView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Alerts") {
 		@panelPage(templ.Attributes{"data-alerts-page": true}) {
-			@kit.Header(kit.Back{Label: "Settings", Href: basePath + "/settings"}, "Alerts")
-			<div id="alerts" class="flex flex-col gap-6">
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: basePath + "/settings"}, Title: "Alerts"})
+			<div id="alerts" class="moin-stack" data-gap="6">
 				if view.SigningSecret != "" && view.Created != nil {
 					<div data-signing-secret>
-						@kit.Card("Signing secret of "+view.Created.Name, nil) {
-							@kit.Quiet() {
+						@components.Card(components.CardProps{Title: "Signing secret of "+view.Created.Name}) {
+							<p class="moin-small moin-muted">
 								Shown this once. Every post carries <code class="font-mono text-foreground">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret.
-							}
-							@kit.Command(view.SigningSecret)
+							</p>
+							@components.Command(components.CommandProps{Text: view.SigningSecret})
 						}
 					</div>
 				}
@@ -50,13 +51,14 @@ templ Alerts(view AlertsView) {
 				if ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) {
 					@alertDestinationForm()
 				}
-				@kit.Section("Email", nil) {
-					@kit.List() {
-						@kit.Row(basePath + "/settings/account") {
-							@kit.RowText("Owners and admins", "Each turns it off for themselves")
-						}
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>Email</h2>
+					</div>
+					@components.List() {
+						@components.Item(components.ItemProps{Href: basePath + "/settings/account", Name: "Owners and admins", Note: "Each turns it off for themselves"})
 					}
-				}
+				</section>
 			</div>
 		}
 	}
@@ -68,13 +70,14 @@ templ alertDestinations(view AlertsView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ manage := ctxkeys.WorkspaceMember(ctx).Can(model.WorkspacePermissionManageWorkspace) }}
 	{{ now := time.Now() }}
-	@kit.Section("Destinations", nil) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>Destinations</h2>
+		</div>
 		<div data-alert-destinations>
-			@kit.List() {
+			@components.List() {
 				if len(view.Destinations) == 0 {
-					@kit.Row("") {
-						@kit.RowText("None yet", "Alerts go by mail only")
-					}
+					@components.Item(components.ItemProps{Name: "None yet", Note: "Alerts go by mail only"})
 				}
 				for _, destination := range view.Destinations {
 					@kit.RowControl(templ.Attributes{"data-alert-destination": destination.Name}) {
@@ -92,30 +95,30 @@ templ alertDestinations(view AlertsView) {
 							</div>
 							if destination.FailingSince != nil {
 								<div class="flex min-w-0 items-center gap-2 pt-1 text-sm text-failed" data-alert-failing>
-									@kit.Dot(kit.StateFailed)
+									@components.Dot(components.DotProps{State: components.StateFailed})
 									<span class="truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
 								</div>
 							}
 						</div>
 						if manage {
 							<div class="flex w-full items-center gap-2 sm:w-auto">
-								@kit.Button(kit.Secondary, "", templ.Attributes{
+								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 									"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
 									"hx-target":  "#alerts",
 									"hx-select":  "#alerts",
 									"hx-swap":    "outerHTML",
 									"hx-disable": "this",
-								}) {
+								}}) {
 									Send test
 								}
-								@kit.Button(kit.Danger, "", templ.Attributes{
+								@components.Button(components.ButtonProps{Kind: components.Danger, Attrs: templ.Attributes{
 									"hx-delete":  basePath + "/alerts/destinations/" + destination.Name,
 									"hx-target":  "#alerts",
 									"hx-select":  "#alerts",
 									"hx-swap":    "outerHTML",
 									"hx-disable": "this",
 									"hx-confirm": "Remove " + destination.Name + "? Its alerts stop.",
-								}) {
+								}}) {
 									Remove
 								}
 							</div>
@@ -124,13 +127,13 @@ templ alertDestinations(view AlertsView) {
 				}
 			}
 		</div>
-	}
+	</section>
 }
 
 // alertDestinationForm adds a destination. Telegram has a bot token and a
 // chat ID instead of a URL: CSS shows the fields of the picked kind.
 templ alertDestinationForm() {
-	@kit.Card("Add a destination", nil) {
+	@components.Card(components.CardProps{Title: "Add a destination"}) {
 		<form
 			class="group/alert flex flex-col gap-4"
 			hx-post={ ctxkeys.AppBasePath(ctx) + "/alerts/destinations" }
@@ -140,30 +143,30 @@ templ alertDestinationForm() {
 			hx-disable="find button[type='submit']"
 			data-alert-form
 		>
-			@kit.CSRF()
+			@components.CSRF()
 			<div class="grid items-start gap-4 sm:grid-cols-2">
-				@kit.Field("Kind", "alert-kind", "") {
-					@kit.Select(kit.SelectProps{ID: "alert-kind", Name: "kind", Label: "Kind", Options: alertKinds, Value: model.AlertSlack})
+				@components.Field(components.FieldProps{Label: "Kind", For: "alert-kind"}) {
+					@components.Select(components.SelectProps{ID: "alert-kind", Name: "kind", Label: "Kind", Options: alertKinds, Value: model.AlertSlack})
 				}
 				@alertField("name", "Name", "team-chat", "Lowercase letters, digits and dashes", "text", "")
 			</div>
 			@alertField("url", "Webhook URL", "https://hooks.slack.com/services/…", "Stored encrypted, never shown again", "password", "url")
 			@alertField("bot_token", "Bot token", "123456:ABC-DEF…", "From @BotFather; add the bot to the chat first", "password", "telegram")
 			@alertField("chat_id", "Chat ID", "-1001234567890", "The chat, group or channel, or @channelname", "text", "telegram")
-			<div class="flex flex-col gap-2">
+			<div class="moin-stack" data-gap="2">
 				<span class="px-1 text-sm font-medium">Events</span>
 				<div class="grid gap-x-6 sm:grid-cols-2">
 					for _, event := range model.AlertEvents {
 						{{ id := "alert-event-" + strings.ReplaceAll(event, ".", "-") }}
 						<label for={ id } class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-1">
 							<span class="text-sm">{ model.AlertEventLabel(event) }</span>
-							@kit.Switch(templ.Attributes{"id": id, "name": "events", "value": event, "checked": true})
+							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id, "name": "events", "value": event, "checked": true}})
 						</label>
 					}
 				</div>
 			</div>
-			<div class="flex justify-end">
-				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+			<div class="moin-row" data-end>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Add destination
 				}
 			</div>
@@ -179,8 +182,8 @@ templ alertField(name, label, placeholder, hint, kind, forKind string) {
 		data-alert-kind={ forKind }
 		class={ templ.KV("group-has-[input[value=telegram]:checked]/alert:hidden", forKind == "url"), templ.KV("hidden group-has-[input[value=telegram]:checked]/alert:block", forKind == "telegram") }
 	>
-		@kit.Field(label, id, hint) {
-			@kit.Input(templ.Attributes{"id": id, "name": name, "type": kind, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"})
+		@components.Field(components.FieldProps{Label: label, For: id, Hint: hint}) {
+			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "name": name, "type": kind, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"}})
 		}
 	</div>
 }

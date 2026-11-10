@@ -4,6 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -18,17 +19,18 @@ templ DocsHome(groups []model.DocGroup) {
 		MarkdownPath: "/docs.md",
 	}) {
 		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
-			@kit.Header(kit.Back{}, "Docs")
+			@components.Header(components.HeaderProps{Title: "Docs"})
 			for _, group := range groups {
-				@kit.Section(group.Title, nil) {
-					@kit.List() {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>{ group.Title }</h2>
+					</div>
+					@components.List() {
 						for _, page := range group.Pages {
-							@kit.Row(docsPageURL(page)) {
-								@kit.RowText(page.Title, "")
-							}
+							@components.Item(components.ItemProps{Href: docsPageURL(page), Name: page.Title})
 						}
 					}
-				}
+				</section>
 			}
 		</main>
 	}
@@ -45,14 +47,14 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		MarkdownPath: docsMarkdownURL(page),
 	}) {
 		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
-			@kit.Header(kit.Back{Label: "Docs", Href: "/docs"}, page.Title)
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Docs", Href: "/docs"}, Title: page.Title})
 			<article class="min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
-				@kit.Typeset(page.HTMLContent)
+				@components.Prose(components.ProseProps{HTML: page.HTMLContent})
 			</article>
-			<div class="flex flex-col gap-3">
+			<div class="moin-stack" data-gap="3">
 				if next != nil {
-					@kit.List() {
-						@kit.Row(docsPageURL(next)) {
+					@components.List() {
+						@components.Item(components.ItemProps{Href: docsPageURL(next)}) {
 							<div class="min-w-0 flex-1 truncate font-medium"><span class="text-muted-foreground">Next: </span>{ next.Title }</div>
 						}
 					}

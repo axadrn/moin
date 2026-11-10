@@ -1,7 +1,7 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"fmt"
 	"strconv"
 
@@ -46,14 +46,14 @@ templ deployLogActions(app model.App, deploy *api.Deploy) {
 		@deployLogState(deploy.Status, false)
 		@copyButton("", "#deploy-log", "Copy the log")
 		if canRollBack(app, *deploy) {
-			@kit.Button(kit.Secondary, "", templ.Attributes{
+			@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 				"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/rollback",
 				"hx-vals":       fmt.Sprintf(`{"number": "%d"}`, deploy.Number),
 				"hx-swap":       "none",
 				"hx-disable":    "this",
 				"hx-confirm":    fmt.Sprintf("Roll back to v%d? It runs that deploy again.", deploy.Number),
 				"data-rollback": true,
-			}) {
+			}}) {
 				Roll back
 			}
 		}

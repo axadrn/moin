@@ -4,7 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -33,10 +33,10 @@ func deviceName(login *model.DeviceLogin) string {
 }
 
 // workspaceOptions are the workspaces to pick from.
-func (v DeviceView) workspaceOptions() []kit.Option {
-	options := make([]kit.Option, 0, len(v.Workspaces))
+func (v DeviceView) workspaceOptions() []components.Option {
+	options := make([]components.Option, 0, len(v.Workspaces))
 	for _, workspace := range v.Workspaces {
-		options = append(options, kit.Option{Value: workspace.ID, Label: workspace.Name})
+		options = append(options, components.Option{Value: workspace.ID, Label: workspace.Name})
 	}
 	return options
 }
@@ -46,25 +46,25 @@ func (v DeviceView) workspaceOptions() []kit.Option {
 templ Device(view DeviceView) {
 	if view.Login == nil {
 		@authScreen(deviceSEO, "Log in the CLI") {
-			<form id="device-code-form" action="/device" method="GET" class="flex flex-col gap-4">
+			<form id="device-code-form" action="/device" method="GET" class="moin-stack" data-gap="4">
 				@formField("Code", "code", "Enter the code your terminal shows.", view.CodeError) {
-					@kit.Input(templ.Attributes{"id": "code", "name": "code", "type": "text", "value": view.Code, "placeholder": "ABCD-EFGH", "aria-invalid": ariaInvalid(view.CodeError), "aria-describedby": "code-hint", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "maxlength": "16", "autofocus": true, "required": true})
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "code", "name": "code", "type": "text", "value": view.Code, "placeholder": "ABCD-EFGH", "aria-invalid": ariaInvalid(view.CodeError), "aria-describedby": "code-hint", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "maxlength": "16", "autofocus": true, "required": true}})
 				}
-				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Continue
 				}
 			</form>
 		}
 	} else {
 		@authScreen(deviceSEO, "Log in "+deviceName(view.Login)+"?") {
-			<form id="device-approve-form" action="/device/approve" method="POST" class="flex flex-col gap-4">
-				@kit.CSRF()
+			<form id="device-approve-form" action="/device/approve" method="POST" class="moin-stack" data-gap="4">
+				@components.CSRF()
 				<input type="hidden" name="code" value={ view.Code }/>
 				<div class="flex flex-col items-center gap-2 rounded-4xl bg-card px-6 py-5">
 					<p class="font-mono text-2xl font-semibold tracking-tight" data-device-code>{ view.Code }</p>
 					<p class="text-center text-sm text-muted-foreground">Approve only if your terminal shows this code.</p>
 				</div>
-				@kit.List() {
+				@components.List() {
 					@factRow("You", ctxkeys.User(ctx).Email)
 					if len(view.Workspaces) == 1 {
 						@factRow("Workspace", view.Workspaces[0].Name)
@@ -73,7 +73,7 @@ templ Device(view DeviceView) {
 				}
 				if len(view.Workspaces) > 1 {
 					@formField("Workspace", "device-workspace", "", view.WorkspaceError) {
-						@kit.Select(kit.SelectProps{ID: "device-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: view.WorkspaceID})
+						@components.Select(components.SelectProps{ID: "device-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: view.WorkspaceID})
 					}
 				} else {
 					<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
@@ -81,10 +81,10 @@ templ Device(view DeviceView) {
 						<p class="px-1 text-sm text-failed" role="alert">{ view.WorkspaceError }</p>
 					}
 				}
-				@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Approve
 				}
-				@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "formaction": "/device/deny"}) {
+				@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": "/device/deny"}}) {
 					Deny
 				}
 			</form>

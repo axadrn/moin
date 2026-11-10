@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -30,17 +31,20 @@ templ Overview(view OverviewView) {
 	{{ now := time.Now() }}
 	@layouts.App("Overview") {
 		@panelPage() {
-			@kit.Header(kit.Back{}, overviewHeadline(view)) {
+			@components.Header(components.HeaderProps{Title: overviewHeadline(view)}) {
 				<p class="w-full text-muted-foreground">{ overviewSummary(view.Status) }</p>
 			}
 			if len(view.Servers) == 0 {
 				@overviewStart(basePath)
 			} else {
 				if !view.Status.OK() {
-					@kit.Section("Needs you", nil) {
-						@kit.List() {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>Needs you</h2>
+						</div>
+						@components.List() {
 							for _, issue := range view.Status.Issues {
-								@kit.Row(basePath + issue.Path) {
+								@components.Item(components.ItemProps{Href: basePath + issue.Path}) {
 									<span data-lead class={ "flex size-9 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
 										@overviewIssueIcon(issue.Kind)
 									</span>
@@ -48,36 +52,41 @@ templ Overview(view OverviewView) {
 								}
 							}
 						}
-					}
+					</section>
 				}
 				if len(view.Pinned) > 0 {
-					@kit.Section("Pinned", nil) {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>Pinned</h2>
+						</div>
 						@appRows(view.Pinned, view.Servers)
-					}
+					</section>
 				}
 				if len(view.Recent) > 0 {
-					@kit.Section("Deployed last", nil) {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>Deployed last</h2>
+						</div>
 						@appRows(view.Recent, view.Servers)
-					}
+					</section>
 				}
 				if len(view.Status.Updates) > 0 {
-					@kit.Section("Updates", nil) {
-						@kit.List() {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>Updates</h2>
+						</div>
+						@components.List() {
 							for _, update := range view.Status.Updates {
-								@kit.Row(basePath + "/apps/" + update.Link) {
-									@kit.RowText(update.App, update.Name+" "+update.Version+" → "+update.Latest)
-								}
+								@components.Item(components.ItemProps{Href: basePath + "/apps/" + update.Link, Name: update.App, Note: update.Name+" "+update.Version+" → "+update.Latest})
 							}
 						}
-					}
+					</section>
 				}
-				@kit.List() {
-					@kit.Row(basePath + "/apps") {
-						@kit.RowText("All apps", "")
+				@components.List() {
+					@components.Item(components.ItemProps{Href: basePath + "/apps", Name: "All apps"}) {
 						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(view.Apps) }</span>
 					}
-					@kit.Row(basePath + "/servers") {
-						@kit.RowText("All servers", serversLine(view.Servers, now))
+					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "All servers", Note: serversLine(view.Servers, now)}) {
 						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(len(view.Servers)) }</span>
 					}
 				}
@@ -90,10 +99,9 @@ templ Overview(view OverviewView) {
 // something is off, and their state mark.
 templ appRows(apps []model.App, servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@kit.List() {
+	@components.List() {
 		for _, app := range apps {
-			@kit.Row(basePath + "/apps/" + app.Link()) {
-				@kit.RowText(app.Name, appNote(app, serverOnline(servers, app.ServerID)))
+			@components.Item(components.ItemProps{Href: basePath + "/apps/" + app.Link(), Name: app.Name, Note: appNote(app, serverOnline(servers, app.ServerID))}) {
 				@appState(app)
 			}
 		}
@@ -168,21 +176,21 @@ func serverOnline(servers []model.Server, id string) bool {
 templ appState(app model.App) {
 	switch  {
 		case app.LatestNumber == 0 || app.Stopped:
-			@kit.Chip(kit.StateIdle) {
+			@components.Chip(components.ChipProps{State: components.StateIdle}) {
 				{ ifElse(app.Stopped, "Stopped", "New") }
 			}
 		case app.LatestStatus == model.DeployRunning:
-			@kit.Chip(kit.StateRunning) {
+			@components.Chip(components.ChipProps{State: components.StateRunning}) {
 				{ fmt.Sprintf("Deploying v%d", app.LatestNumber) }
 			}
 		case app.LatestStatus == model.DeployFailed:
-			@kit.Chip(kit.StateFailed) {
+			@components.Chip(components.ChipProps{State: components.StateFailed}) {
 				{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 			}
 		default:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Live">
-				@kit.Dot(kit.StateLive)
-				<span class="sr-only">Live</span>
+				@components.Dot(components.DotProps{State: components.StateLive})
+				<span class="moin-sr-only">Live</span>
 			</span>
 	}
 }
@@ -201,10 +209,10 @@ templ overviewNewApp(basePath string) {
 
 // overviewStart is the first visit: no server yet.
 templ overviewStart(basePath string) {
-	@kit.List() {
-		@kit.Row(basePath + "/servers") {
+	@components.List() {
+		@components.Item(components.ItemProps{Href: basePath + "/servers"}) {
 			<span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background" aria-hidden="true">
-				@kit.IconServer("size-5")
+				@components.Icon("server")
 			</span>
 			@kit.RowText("Connect your first server", "Any Linux box you own. One command, no open port.")
 		}
@@ -214,17 +222,17 @@ templ overviewStart(basePath string) {
 templ overviewIssueIcon(kind string) {
 	switch kind {
 		case service.IssueServerDown:
-			@kit.IconServerOff("size-4")
+			@components.Icon("server-off")
 		case service.IssueDeployFailed:
-			@kit.IconFailed("size-4")
+			@components.Icon("failed")
 		case service.IssueBackupFailed, service.IssueCheckFailed:
-			@kit.IconShieldOff("size-4")
+			@components.Icon("shield-off")
 		case service.IssueDomainDown:
-			@kit.IconGlobe("size-4")
+			@components.Icon("globe")
 		case service.IssueDiskFull:
-			@kit.IconDisk("size-4")
+			@components.Icon("disk")
 		default:
-			@kit.IconRestart("size-4")
+			@components.Icon("restart")
 	}
 }
 

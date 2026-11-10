@@ -6,6 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/human"
@@ -31,7 +32,7 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Servers") {
 		@panelPage() {
-			@kit.Header(kit.Back{Label: "Overview", Href: basePath + "/overview"}, "Servers")
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: basePath + "/overview"}, Title: "Servers"})
 			<div id="server-added" class="empty:hidden">
 				if removed != nil {
 					@serverRemoved(*removed)
@@ -39,16 +40,19 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 			</div>
 			@ServerList(servers)
 			if canAdd {
-				@kit.Card("Add a server", nil) {
+				@components.Card(components.CardProps{Title: "Add a server"}) {
 					@ServerAddForm(suggestion)
 				}
 			}
-			@kit.Section("Daemons", nil) {
-				@kit.List() {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Daemons</h2>
+				</div>
+				@components.List() {
 					@DaemonUpdatesForm(autoUpdate)
 				}
-			}
-			@kit.Live("/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link())
+			</section>
+			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
 		}
 	}
 }
@@ -65,14 +69,14 @@ templ ServerAddForm(suggestion string) {
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
 	>
-		@kit.CSRF()
-		<label for="server-name" class="sr-only">Server name</label>
-		@kit.Inline() {
-			@kit.Input(templ.Attributes{"id": "server-name", "name": "name", "type": "text", "value": suggestion, "placeholder": "Name, like web-1", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true})
-			@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+		@components.CSRF()
+		<label for="server-name" class="moin-sr-only">Server name</label>
+		<div class="moin-row" data-gap="2" data-phone="stack">
+			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "server-name", "name": "name", "type": "text", "value": suggestion, "placeholder": "Name, like web-1", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true}})
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 				Add server
 			}
-		}
+		</div>
 	</form>
 }
 
@@ -88,14 +92,14 @@ templ ServerAdded(added AddedServer) {
 		hx-swap="outerHTML"
 		data-server-added={ added.Name }
 	>
-		@kit.Card("Install the daemon on "+added.Name, nil) {
-			@kit.Quiet() {
+		@components.Card(components.CardProps{Title: "Install the daemon on "+added.Name}) {
+			<p class="moin-small moin-muted">
 				Run it on the server as root. It works once, for an hour.
-			}
+			</p>
 			<div data-install-command>
-				@kit.Command(added.Command)
+				@components.Command(components.CommandProps{Text: added.Command})
 			</div>
-			@kit.Status(kit.StateWaiting, nil) {
+			@components.Status(components.StatusProps{State: components.StateWaiting}) {
 				Waiting for the daemon
 			}
 		}
@@ -106,9 +110,9 @@ templ ServerAdded(added AddedServer) {
 // the server just added has connected.
 templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
-		@kit.List() {
-			@kit.Row(ctxkeys.AppBasePath(ctx) + "/new-app") {
-				@kit.Dot(kit.StateLive)
+		@components.List() {
+			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/new-app"}) {
+				@components.Dot(components.DotProps{State: components.StateLive})
 				@kit.RowText(name+" is online", "Deploy an app to it")
 			}
 		}
@@ -125,11 +129,11 @@ templ ServerGone() {
 // installed, with the command that removes it there.
 templ serverRemoved(removed RemovedServer) {
 	<div data-server-removed={ removed.Name }>
-		@kit.Card(removed.Name+" is removed", nil) {
-			@kit.Quiet() {
+		@components.Card(components.CardProps{Title: removed.Name+" is removed"}) {
+			<p class="moin-small moin-muted">
 				Run this on the server as root to remove its daemon. Its apps keep running; --apps removes them too.
-			}
-			@kit.Command(removed.Command)
+			</p>
+			@components.Command(components.CommandProps{Text: removed.Command})
 		}
 	</div>
 }
@@ -146,15 +150,12 @@ templ ServerList(servers []model.Server) {
 		hx-trigger="servers from:body"
 		hx-swap="none"
 	>
-		@kit.List() {
+		@components.List() {
 			if len(servers) == 0 {
-				@kit.Row("") {
-					@kit.RowText("No servers yet", "Add one, then run its install command on it.")
-				}
+				@components.Item(components.ItemProps{Name: "No servers yet", Note: "Add one, then run its install command on it."})
 			}
 			for _, server := range servers {
-				@kit.Row(basePath + "/servers/" + server.Link() + "/security") {
-					@kit.RowText(server.Name, serverNote(server, now))
+				@components.Item(components.ItemProps{Href: basePath + "/servers/" + server.Link() + "/security", Name: server.Name, Note: serverNote(server, now)}) {
 					@serverState(server)
 				}
 			}
@@ -181,15 +182,15 @@ templ serverState(server model.Server) {
 	switch  {
 		case server.Online:
 			<span class="flex size-8 shrink-0 items-center justify-center" title="Online">
-				@kit.Dot(kit.StateLive)
-				<span class="sr-only">Online</span>
+				@components.Dot(components.DotProps{State: components.StateLive})
+				<span class="moin-sr-only">Online</span>
 			</span>
 		case server.LastSeenAt == nil:
-			@kit.Chip(kit.StateWaiting) {
+			@components.Chip(components.ChipProps{State: components.StateWaiting}) {
 				Waiting
 			}
 		default:
-			@kit.Chip(kit.StateFailed) {
+			@components.Chip(components.ChipProps{State: components.StateFailed}) {
 				Offline
 			}
 	}
@@ -199,15 +200,15 @@ templ serverState(server model.Server) {
 templ serverStatus(server model.Server) {
 	switch  {
 		case server.Online:
-			@kit.Chip(kit.StateLive) {
+			@components.Chip(components.ChipProps{State: components.StateLive}) {
 				Online
 			}
 		case server.LastSeenAt == nil:
-			@kit.Chip(kit.StateWaiting) {
+			@components.Chip(components.ChipProps{State: components.StateWaiting}) {
 				Waiting
 			}
 		default:
-			@kit.Chip(kit.StateFailed) {
+			@components.Chip(components.ChipProps{State: components.StateFailed}) {
 				Offline
 			}
 	}
@@ -217,13 +218,13 @@ templ serverStatus(server model.Server) {
 // name and status, and its two pages.
 templ serverHead(server model.Server, active string) {
 	{{ serverPath := ctxkeys.AppBasePath(ctx) + "/servers/" + server.Link() }}
-	@kit.Header(kit.Back{Label: "Servers", Href: ctxkeys.AppBasePath(ctx) + "/servers"}, server.Name) {
+	@components.Header(components.HeaderProps{Back: components.Back{Label: "Servers", Href: ctxkeys.AppBasePath(ctx) + "/servers"}, Title: server.Name}) {
 		@serverStatus(server)
 	}
-	@kit.Segmented("server-sections", "Server", []kit.Segment{
+	@components.Tabs(components.TabsProps{ID: "server-sections", Label: "Server", Tabs: []components.Tab{
 		{Label: "Security", Href: serverPath + "/security", Active: active == "security"},
 		{Label: "Metrics", Href: serverPath + "/metrics", Active: active == "metrics"},
-	})
+	}})
 }
 
 // daemonOutdated reports whether the daemon runs another version than the

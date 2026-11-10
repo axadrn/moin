@@ -6,7 +6,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -29,7 +29,7 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 	} else {
 		@authScreen(seo, "Join "+invitation.WorkspaceName) {
 			@authStack() {
-				@kit.List() {
+				@components.List() {
 					@factRow("From", invitation.InviterName)
 					@factRow("Role", model.WorkspaceRoleLabel(invitation.Role))
 					@factRow("For", invitation.Email)
@@ -39,8 +39,8 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 				}
 				if user != nil {
 					<form action={ templ.SafeURL(ctxkeys.URLPath(ctx)) } method="POST" class="relative flex flex-col">
-						@kit.CSRF()
-						@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+						@components.CSRF()
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 							{ "Join " + invitation.WorkspaceName }
 						}
 					</form>

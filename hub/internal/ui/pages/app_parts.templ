@@ -3,7 +3,6 @@ package pages
 import (
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -81,7 +80,7 @@ templ panel(p panelProps) {
 					class="text-base font-medium"
 				>{ p.Title }</h2>
 				if p.Description != "" {
-					<p class="text-sm text-muted-foreground">{ p.Description }</p>
+					<p class="moin-small moin-muted">{ p.Description }</p>
 				}
 			</div>
 			if p.Action != nil {
@@ -115,8 +114,8 @@ templ copyButton(value, target, label string) {
 		{{ attrs["data-copy-target"] = target }}
 	}
 	<button type="button" class="group/copy flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30" { attrs... }>
-		@kit.IconCopy("size-4 group-data-copied/copy:hidden")
-		@kit.IconCheck("hidden size-4 text-live group-data-copied/copy:block")
+		@components.Icon("copy")
+		@components.Icon("check")
 	</button>
 }
 

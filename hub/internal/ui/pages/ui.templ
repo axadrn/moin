@@ -5,7 +5,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 )
 
 const (
@@ -34,7 +33,7 @@ func uiTabs(active string) []components.Tab {
 // you walk through them, and only here: theme-editor.js sets it.
 templ uiPage(seo layouts.SEOProps) {
 	@layouts.Home(seo) {
-		<script defer nonce={ templ.GetNonce(ctx) } src={ kit.AssetURL("/assets/js/theme-editor.js") }></script>
+		<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/theme-editor.js") }></script>
 		<main class="moin-page moin-content">
 			{ children... }
 		</main>
@@ -69,7 +68,7 @@ templ UIStart(page *model.DocPage) {
 templ UIComponents(groups []model.DocGroup) {
 	@uiPage(layouts.SEOProps{Title: "Components · moin UI", Description: "Every component of moin UI.", Path: "/ui/components"}) {
 		@uiHead(uiComponents)
-		<div class="moin-grid" data-gap="6">
+		<div class="moin-columns">
 			for _, group := range groups {
 				@uiPages(group.Title, group.Pages)
 			}
@@ -127,7 +126,7 @@ templ UIDoc(page *model.DocPage, next *model.DocPage) {
 // UITheme is /ui/theme: the editor, then how a theme works.
 templ UITheme(page *model.DocPage) {
 	@uiPage(layouts.SEOProps{Title: "Theme · moin UI", Description: page.Description, Path: "/ui/theme", MarkdownPath: "/ui/theme.md"}) {
-		<link rel="stylesheet" href={ kit.AssetURL("/assets/css/theme-editor.css") }/>
+		<link rel="stylesheet" href={ components.AssetURL("/assets/css/theme-editor.css") }/>
 		@uiHead(uiThemeTab)
 		@components.Card(components.CardProps{}) {
 			<moin-theme-editor start="Moin"></moin-theme-editor>
@@ -141,7 +140,7 @@ templ UIBlocks(groups []model.UIBlockGroup) {
 	@uiPage(layouts.SEOProps{Title: "Blocks · moin UI", Description: "Whole pages to copy.", Path: "/ui/blocks"}) {
 		@uiHead(uiBlocksTab)
 		<p class="moin-text moin-muted">Whole pages made of components. Copy one and change the two paths at the top.</p>
-		<div class="moin-grid" data-gap="6">
+		<div class="moin-columns">
 			for _, group := range groups {
 				<div class="moin-section">
 					<div class="moin-section-head"><h2>{ group.Title }</h2></div>

@@ -2,7 +2,7 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -23,7 +23,7 @@ templ AuthMagicLinkSent(email string) {
 
 // AuthMagicLinkResend sends the link once more; sent says it went.
 templ AuthMagicLinkResend(email string, sent bool) {
-	<div id="magic-link-resend" class="flex flex-col gap-3">
+	<div id="magic-link-resend" class="moin-stack" data-gap="3">
 		<form
 			id="magic-link-resend-form"
 			class="flex flex-col"
@@ -32,9 +32,9 @@ templ AuthMagicLinkResend(email string, sent bool) {
 			hx-swap="outerHTML"
 			hx-disable="find button[type='submit']"
 		>
-			@kit.CSRF()
+			@components.CSRF()
 			<input type="hidden" name="email" value={ email }/>
-			@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+			@components.Button(components.ButtonProps{Type: "submit"}) {
 				if sent {
 					Send again
 				} else {

@@ -2,7 +2,7 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -14,7 +14,7 @@ templ VerifyEmailSuccess() {
 			setTimeout(() => { window.location.href = "/app"; }, 3000);
 		</script>
 		@authStack() {
-			@kit.Button(kit.Primary, "/app", nil) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/app"}) {
 				{ "Open " + brand.Name }
 			}
 		}
@@ -28,7 +28,7 @@ templ VerifyEmailError(errorMessage string) {
 			{ errorMessage }
 		}
 		@authStack() {
-			@kit.Button(kit.Primary, "/auth", nil) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 				Sign in
 			}
 		}

@@ -17,7 +17,7 @@
     width: 100%;
     min-height: 10rem;
     padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
-    border-radius: var(--radius-medium);
+    border-radius: var(--radius-large);
     background: var(--muted);
     font-family: var(--font-mono);
     font-size: 1rem;

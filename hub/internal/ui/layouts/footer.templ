@@ -7,7 +7,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 )
 
 // footerColumns are the links of the site footer. The maker's other open
@@ -68,6 +67,6 @@ templ footerEnd() {
 		<span>Made by <a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="moin-link">Axel Adrian</a></span>
 		// The theme lives here only: the navbar keeps the places and the one
 		// way in.
-		@kit.ThemeSwitcher()
+		@components.ModeSwitch()
 	</span>
 }

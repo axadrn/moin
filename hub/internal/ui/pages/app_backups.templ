@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/protocol"
 )
@@ -58,14 +59,17 @@ func (view BackupsView) othersOf(database string) []service.DatabaseBackups {
 // bucket. Without a bucket, the way to add one.
 templ BackupSettings(view BackupsView) {
 	<div id="data-backups">
-		@kit.Section("Backups", nil) {
-			@kit.List() {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Backups</h2>
+			</div>
+			@components.List() {
 				if view.Bucket == nil {
-					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
 						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
 					}
 				} else {
-					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
 						<span class="shrink-0 font-medium">Bucket</span>
 						<span class="min-w-0 flex-1 truncate text-right text-sm text-muted-foreground" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
 					}
@@ -84,7 +88,7 @@ templ BackupSettings(view BackupsView) {
 					}
 				}
 			}
-		}
+		</section>
 	</div>
 }
 
@@ -102,9 +106,9 @@ templ AppBucketForm(view BackupsView) {
 		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
 		data-confirm-action="Move"
 	>
-		@kit.CSRF()
-		@kit.Select(kit.SelectProps{ID: "app-bucket", Name: "bucket", Label: "Bucket", Options: appBucketOptions(view.Buckets), Value: appBucketValue(view.App)})
-		@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit"}) {
+		@components.CSRF()
+		@components.Select(components.SelectProps{ID: "app-bucket", Name: "bucket", Label: "Bucket", Options: appBucketOptions(view.Buckets), Value: appBucketValue(view.App)})
+		@components.Button(components.ButtonProps{Type: "submit"}) {
 			Move
 		}
 	</form>
@@ -123,15 +127,15 @@ func appBucketValue(app model.App) string {
 
 // appBucketOptions are the choices: the default, whichever it is, then
 // each bucket by name.
-func appBucketOptions(buckets []service.Bucket) []kit.Option {
-	options := []kit.Option{}
+func appBucketOptions(buckets []service.Bucket) []components.Option {
+	options := []components.Option{}
 	for _, bucket := range buckets {
 		if bucket.Default {
-			options = append(options, kit.Option{Value: appBucketDefault, Label: "The default (" + bucket.Name + ")"})
+			options = append(options, components.Option{Value: appBucketDefault, Label: "The default (" + bucket.Name + ")"})
 		}
 	}
 	for _, bucket := range buckets {
-		options = append(options, kit.Option{Value: bucket.Name, Label: bucket.Name})
+		options = append(options, components.Option{Value: bucket.Name, Label: bucket.Name})
 	}
 	return options
 }
@@ -144,20 +148,29 @@ templ DatabaseBackups(view BackupsView, database string) {
 	{{ backup, known := view.backupOf(database) }}
 	<div id="db-backups" class="group/backups flex flex-col gap-6" data-database-backup={ database }>
 		if view.Bucket == nil {
-			@kit.Section("Backups", nil) {
-				@kit.List() {
-					@kit.Row(ctxkeys.AppBasePath(ctx) + "/bucket") {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Backups</h2>
+				</div>
+				@components.List() {
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
 						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
 					}
 				}
-			}
+			</section>
 		} else if view.Error != "" {
-			@kit.Section("Backups", nil) {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Backups</h2>
+				</div>
 				@dataError(view.Error)
-			}
+			</section>
 		} else {
-			@kit.Section("Backups", nil) {
-				@kit.List() {
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Backups</h2>
+				</div>
+				@components.List() {
 					@backupState(backup, known, database, view.Now)
 					@backupRestore(view, database)
 					if view.ScheduleInFile {
@@ -167,15 +180,18 @@ templ DatabaseBackups(view BackupsView, database string) {
 					}
 					@backupDownload(view, backup, database)
 				}
-			}
+			</section>
 			@backupGoBack(view, backup, database, database, "Go back to")
 			for _, other := range view.othersOf(database) {
-				@kit.Section(databaseName(other.Database), nil) {
-					@kit.List() {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>{ databaseName(other.Database) }</h2>
+					</div>
+					@components.List() {
 						@backupState(other, true, other.Database, view.Now)
 						@backupDownload(view, other, other.Database)
 					}
-				}
+				</section>
 				@backupGoBack(view, other, other.Database, database, "Go back to · "+databaseName(other.Database))
 			}
 		}
@@ -201,9 +217,12 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	// When the bucket cannot be reached, nobody knows there is nothing.
 	if len(backup.Moments) > 0 || backup.Problem == "" {
-		@kit.Section(title, nil) {
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>{ title }</h2>
+			</div>
 			<form
-				class="flex flex-col gap-2"
+				class="moin-stack" data-gap="2"
 				hx-post={ appPath + "/backups/restore" }
 				hx-target="#db-backups"
 				hx-swap="outerHTML"
@@ -213,12 +232,12 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				data-confirm-action="Restore"
 				data-restore
 			>
-				@kit.CSRF()
+				@components.CSRF()
 				<input type="hidden" name="database" value={ database }/>
 				<input type="hidden" name="page" value={ page }/>
-				@kit.List() {
+				@components.List() {
 					if len(backup.Moments) == 0 {
-						@kit.Row("") {
+						@components.Item(components.ItemProps{}) {
 							<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
 						}
 					}
@@ -227,14 +246,14 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 					}
 				}
 				if len(backup.Moments) > 0 {
-					<div class="flex justify-end">
-						@kit.Button(kit.Secondary, "", templ.Attributes{"type": "submit", "disabled": true, "data-restore-button": true}) {
+					<div class="moin-row" data-end>
+						@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"disabled": true, "data-restore-button": true}}) {
 							Restore
 						}
 					</div>
 				}
 			</form>
-		}
+		</section>
 	}
 }
 
@@ -245,16 +264,16 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 templ backupState(backup service.DatabaseBackups, known bool, database string, now time.Time) {
 	@kit.RowControl(templ.Attributes{"data-backup-state": true}) {
 		<div class="hidden min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:flex" role="status">
-			@kit.Dot(kit.StateRunning)
+			@components.Dot(components.DotProps{State: components.StateRunning})
 			<span class="truncate font-medium">Restoring { databaseName(database) }</span>
 		</div>
 		<div class="flex min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:hidden">
 			switch  {
 				case !known:
-					@kit.Dot(kit.StateRunning)
+					@components.Dot(components.DotProps{State: components.StateRunning})
 					@kit.RowText("Starting", "")
 				case backup.Problem != "":
-					@kit.Dot(kit.StateFailed)
+					@components.Dot(components.DotProps{State: components.StateFailed})
 					<div class="min-w-0 flex-1">
 						<div class="font-medium text-failed" data-backup-problem>{ backup.Problem }</div>
 						<details class="group/details text-sm text-muted-foreground">
@@ -263,10 +282,10 @@ templ backupState(backup service.DatabaseBackups, known bool, database string, n
 						</details>
 					</div>
 				case backup.CopiedAt != nil:
-					@kit.Dot(kit.StateLive)
+					@components.Dot(components.DotProps{State: components.StateLive})
 					<span class="min-w-0 flex-1 truncate font-medium" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Last copy " + human.Ago(*backup.CopiedAt, now) + " · " + checkedText(backup, now) }</span>
 				default:
-					@kit.Dot(kit.StateRunning)
+					@components.Dot(components.DotProps{State: components.StateRunning})
 					@kit.RowText("Starting", "")
 			}
 		</div>
@@ -289,7 +308,7 @@ func checkedStamp(backup service.DatabaseBackups) string {
 
 // momentPick is one moment to pick for a restore: what it is and when.
 templ momentPick(moment service.Moment, now time.Time) {
-	@kit.RowPick(templ.Attributes{"name": "moment", "value": moment.ID, "data-moment": moment.ID}) {
+	@components.Item(components.ItemProps{Pick: true, Attrs: templ.Attributes{"name": "moment", "value": moment.ID, "data-moment": moment.ID}}) {
 		<span class="min-w-0 flex-1 font-medium break-words">{ moment.Label }</span>
 		<span class="shrink-0 text-sm text-muted-foreground tabular-nums" title={ stamp(moment.At) }>{ momentTime(moment.At, now) }</span>
 	}
@@ -311,24 +330,24 @@ templ backupRestore(view BackupsView, database string) {
 	{{ restore := view.Restore }}
 	if restore != nil && restore.Active() {
 		@kit.RowControl(templ.Attributes{"hx-get": databaseURL(ctx, view.App.Name, database), "hx-trigger": "apps from:body", "hx-select": "#db-backups", "hx-target": "#db-backups", "hx-swap": "outerHTML", "data-restore-running": true}) {
-			@kit.Dot(kit.StateRunning)
+			@components.Dot(components.DotProps{State: components.StateRunning})
 			<div class="min-w-0 flex-1">
 				<div class="truncate font-medium">Restoring { databaseName(database) } to { lowerFirst(restore.To) }</div>
 				if restore.State == service.RestoreUnknown {
-					<div class="text-sm text-muted-foreground" data-restore-unknown>The server is offline; moin asks it how the restore went when it is back.</div>
+					<div class="moin-small moin-muted" data-restore-unknown>The server is offline; moin asks it how the restore went when it is back.</div>
 				}
 			</div>
 		}
 	} else if restore != nil && restore.State == service.RestoreFailed {
 		@kit.RowControl(templ.Attributes{"data-restore-failed": true}) {
-			@kit.Dot(kit.StateFailed)
+			@components.Dot(components.DotProps{State: components.StateFailed})
 			<div class="min-w-0 flex-1">
 				if strings.HasPrefix(restore.Error, service.RestoreNoWord) {
 					<div class="font-medium text-failed">Unknown how the restore to { lowerFirst(restore.To) } ended: check the app</div>
 				} else {
 					<div class="font-medium text-failed">The restore to { lowerFirst(restore.To) } failed</div>
 				}
-				<details class="text-sm text-muted-foreground">
+				<details class="moin-small moin-muted">
 					<summary class="cursor-pointer list-none py-1 outline-none hover:text-foreground focus-visible:text-foreground [&::-webkit-details-marker]:hidden">Show details</summary>
 					<p class="font-mono text-xs break-words">{ restore.Error }</p>
 				</details>
@@ -356,32 +375,28 @@ func lowerFirst(label string) string {
 templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database string) {
 	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/schedule" }}
 	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML"} }}
-	@kit.RowForm(form) {
-		@kit.CSRF()
+	@components.Item(components.ItemProps{Form: true, For: "backup-every", Name: "How often", Attrs: form}) {
+		@components.CSRF()
 		@scheduleFields(view.App, database, "every")
-		@kit.RowLabel("backup-every", "How often", "")
 		<div class="w-44 shrink-0">
-			@kit.Select(kit.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
+			@components.Select(components.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
 		</div>
 	}
-	@kit.RowForm(form) {
-		@kit.CSRF()
+	@components.Item(components.ItemProps{Form: true, For: "backup-keep", Name: "Keep", Attrs: form}) {
+		@components.CSRF()
 		@scheduleFields(view.App, database, "keep")
-		@kit.RowLabel("backup-keep", "Keep", "")
 		<div class="w-44 shrink-0">
-			@kit.Select(kit.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
+			@components.Select(components.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
 		</div>
 	}
 }
 
 // scheduleInFile shows the schedule compose.yml sets. Only the file changes it.
 templ scheduleInFile(view BackupsView, backup service.DatabaseBackups) {
-	@kit.Row("") {
-		@kit.RowText("How often", "from compose.yml")
+	@components.Item(components.ItemProps{Name: "How often", Note: "from compose.yml"}) {
 		<span class="shrink-0 text-sm text-muted-foreground" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
 	}
-	@kit.Row("") {
-		@kit.RowText("Keep", "from compose.yml")
+	@components.Item(components.ItemProps{Name: "Keep", Note: "from compose.yml"}) {
 		<span class="shrink-0 text-sm text-muted-foreground">{ service.KeepText(view.App.BackupKeep) }</span>
 	}
 }
@@ -398,18 +413,18 @@ templ scheduleFields(app model.App, database, except string) {
 	}
 }
 
-func everyOptions() []kit.Option {
-	options := []kit.Option{}
+func everyOptions() []components.Option {
+	options := []components.Option{}
 	for _, every := range protocol.Everies {
-		options = append(options, kit.Option{Value: strconv.Itoa(every), Label: upperFirst(service.EveryText(every))})
+		options = append(options, components.Option{Value: strconv.Itoa(every), Label: upperFirst(service.EveryText(every))})
 	}
 	return options
 }
 
-func keepOptions() []kit.Option {
-	options := []kit.Option{}
+func keepOptions() []components.Option {
+	options := []components.Option{}
 	for _, keep := range protocol.Keeps {
-		options = append(options, kit.Option{Value: strconv.Itoa(keep), Label: service.KeepText(keep)})
+		options = append(options, components.Option{Value: strconv.Itoa(keep), Label: service.KeepText(keep)})
 	}
 	return options
 }
@@ -425,7 +440,7 @@ func upperFirst(text string) string {
 // the user's own bucket through a link that lasts 15 minutes.
 templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
 	if len(backup.Copies) > 0 {
-		@kit.RowButton(false, templ.Attributes{"id": "db-download", "data-download": true, "hx-get": ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/download?database=" + url.QueryEscape(database), "hx-swap": "none", "hx-disable": "this"}) {
+		@components.Item(components.ItemProps{Button: true, Attrs: templ.Attributes{"id": "db-download", "data-download": true, "hx-get": ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/download?database=" + url.QueryEscape(database), "hx-swap": "none", "hx-disable": "this"}}) {
 			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
 			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
 		}

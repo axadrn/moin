@@ -133,7 +133,7 @@
     position: fixed;
     z-index: 70;
     padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-press);
     /* The text color as its ground: it stands out on every surface. */
     background: var(--foreground);
     color: var(--background);

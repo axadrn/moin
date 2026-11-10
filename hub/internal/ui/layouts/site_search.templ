@@ -1,6 +1,6 @@
 package layouts
 
-import "github.com/axadrn/moin/hub/internal/ui/kit"
+import "github.com/axadrn/moin/hub/internal/ui/components"
 
 // SiteSearch is the one search of the public site, in the middle of the
 // screen like the app's palette: the magnifier of the navbar, ⌘K, ctrl+k
@@ -11,8 +11,8 @@ templ SiteSearch() {
 	<dialog id="site-search" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search">
 		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl">
 			<form method="get" action="/search" role="search" class="relative shrink-0">
-				<label for="site-search-input" class="sr-only">Search the docs and the catalog</label>
-				@kit.IconSearch("pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground")
+				<label for="site-search-input" class="moin-sr-only">Search the docs and the catalog</label>
+				@components.Icon("search")
 				<input
 					id="site-search-input"
 					name="q"

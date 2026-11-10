@@ -12,6 +12,7 @@ templ List() {
 //   - Href: it opens a page, the whole item is a link with a chevron.
 //     External opens another site in a new tab.
 //   - Button: it does something on this page. Danger makes its words red.
+//   - Pick: one to pick of a list in a form, a radio. Attrs go on the radio.
 //   - For: it holds the control with that id, and its words are the label.
 //     Form makes the item the form, for a control that saves itself.
 //   - none of them: it only tells.
@@ -24,6 +25,7 @@ type ItemProps struct {
 	External bool
 	Button   bool
 	Danger   bool
+	Pick     bool
 	For      string
 	Form     bool
 	Name     string
@@ -54,6 +56,13 @@ templ Item(p ItemProps) {
 				}
 				{ children... }
 			</button>
+		case p.Pick:
+			<label class="moin-item">
+				<input type="radio" autocomplete="off" { p.Attrs... }/>
+				@itemText(p)
+				{ children... }
+				<i class="moin-item-check"></i>
+			</label>
 		case p.Form:
 			<form class="moin-item" data-control { p.Attrs... }>
 				@itemLabel(p)

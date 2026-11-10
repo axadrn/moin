@@ -3,7 +3,7 @@ package pages
 import (
 	"strconv"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 templ ErrorPage(status int, title, description string) {
@@ -36,7 +36,7 @@ templ StatusScreen(title, description, line string) {
 			{ description }
 		}
 		@authStack() {
-			@kit.Button(kit.Primary, "/", nil) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/"}) {
 				Back to home
 			}
 		}

@@ -1,7 +1,7 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -13,16 +13,16 @@ templ Changelog(html string) {
 		Description: "What changed in moin, newest first.",
 		Path:        "/changelog",
 	}) {
-		<main class={ kit.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
-			@kit.Header(kit.Back{}, "Changelog") {
+		<main class={ components.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+			@components.Header(components.HeaderProps{Title: "Changelog"}) {
 				<span class="sm:ml-auto">
-					@kit.Button(kit.Secondary, "/changelog.xml", nil) {
+					@components.Button(components.ButtonProps{Href: "/changelog.xml"}) {
 						RSS
 					}
 				</span>
 			}
 			<article class="max-w-2xl min-w-0 text-base">
-				@kit.Typeset(html)
+				@components.Prose(components.ProseProps{HTML: html})
 			</article>
 		</main>
 	}

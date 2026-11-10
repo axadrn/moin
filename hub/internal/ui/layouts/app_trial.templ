@@ -7,7 +7,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // trialDaysLeft rounds up: a trial that ends in five hours has one day left.
@@ -30,19 +30,19 @@ templ AppTrialCard() {
 				<p class="min-w-64 flex-1 text-sm">
 					if current.State == access.StateTrial {
 						{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
-						<span class="font-medium" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
+						<span class="moin-strong" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
 						<span class="text-muted-foreground">After it, moin turns read-only. Your apps keep running.</span>
 					} else {
-						<span class="font-medium">Your trial has ended.</span>
+						<span class="moin-strong">Your trial has ended.</span>
 						<span class="text-muted-foreground">Your apps keep running, and you can stop and start them.</span>
 					}
 				</p>
 				if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
-					@kit.Button(kit.Primary, ctxkeys.AppBasePath(ctx)+"/billing", nil) {
+					@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx)+"/billing"}) {
 						Subscribe
 					}
 				} else {
-					<p class="text-sm text-muted-foreground">An owner can subscribe.</p>
+					<p class="moin-small moin-muted">An owner can subscribe.</p>
 				}
 			</div>
 		}

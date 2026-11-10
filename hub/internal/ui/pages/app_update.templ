@@ -1,11 +1,11 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/internal/build"
 )
 
@@ -19,7 +19,7 @@ templ UpdateNotice(info model.VersionInfo) {
 	{{ running := update != nil && update.Running() }}
 	<div
 		id="update-notice"
-		class={ kit.Page, "pt-4 empty:hidden" }
+		class={ components.Page, "pt-4 empty:hidden" }
 		if running {
 			hx-get={ basePath + "/update" }
 			hx-trigger="every 5s"
@@ -31,34 +31,34 @@ templ UpdateNotice(info model.VersionInfo) {
 			switch  {
 				case running:
 					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@kit.Status(kit.StateRunning, nil) {
+						@components.Status(components.StatusProps{State: components.StateRunning}) {
 							{ "Updating " + build.Name + " to " + update.Version }
 						}
-						@kit.Quiet() {
+						<p class="moin-small moin-muted">
 							Back in a minute. Your apps keep running.
-						}
+						</p>
 					}
 				case update != nil && (update.State == "rolled_back" || update.State == "failed"):
 					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@kit.Status(kit.StateFailed, nil) {
+						@components.Status(components.StatusProps{State: components.StateFailed}) {
 							{ "The update to " + update.Version + " did not work" }
 						}
-						@kit.Quiet() {
+						<p class="moin-small moin-muted">
 							{ update.Reason }
 							if update.State == "rolled_back" {
 								{ " " + build.Name + " runs " + info.Version + " again." }
 							}
 							{ " " }
 							<a class="text-foreground underline underline-offset-4" href={ templ.SafeURL("/docs/self-hosting#updates") }>What to do</a>
-						}
+						</p>
 					}
 				case update != nil && update.State == "done" && update.Version == info.Version && time.Since(update.At) < 10*time.Minute:
 					@updateLine(templ.Attributes{"data-update-state": "done"}) {
-						@kit.Status(kit.StateLive, nil) {
+						@components.Status(components.StatusProps{State: components.StateLive}) {
 							{ build.Name + " " + info.Version + " runs now" }
 						}
 						<div>
-							@kit.Button(kit.Secondary, info.NotesURL, templ.Attributes{"target": "_blank", "rel": "noopener"}) {
+							@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
 								Changelog
 							}
 						</div>
@@ -66,26 +66,26 @@ templ UpdateNotice(info model.VersionInfo) {
 				case info.UpdateAvailable:
 					@updateLine(templ.Attributes{"data-update-available": info.Latest}) {
 						<div class="flex flex-col gap-1">
-							<p class="font-medium">{ build.Name + " " + info.Latest + " is out" }</p>
+							<p class="moin-strong">{ build.Name + " " + info.Latest + " is out" }</p>
 							if info.Summary != "" {
-								@kit.Quiet() {
+								<p class="moin-small moin-muted">
 									{ info.Summary }
-								}
+								</p>
 							}
 						</div>
 						<div class="flex flex-wrap items-center gap-2">
 							if info.CanUpdate {
 								<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button">
-									@kit.CSRF()
-									@kit.Button(kit.Primary, "", templ.Attributes{"type": "submit"}) {
+									@components.CSRF()
+									@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 										Update now
 									}
 								</form>
 							} else {
-								<span class="text-sm text-muted-foreground">On the server: <code class="font-mono text-foreground">sh update.sh</code></span>
+								<span class="moin-small moin-muted">On the server: <code class="font-mono text-foreground">sh update.sh</code></span>
 							}
 							if info.NotesURL != "" {
-								@kit.Button(kit.Secondary, info.NotesURL, templ.Attributes{"target": "_blank", "rel": "noopener"}) {
+								@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
 									Release notes
 								}
 							}

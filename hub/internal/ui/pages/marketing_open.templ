@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -32,16 +32,10 @@ templ HomeOpenSection(open HomeOpen) {
 	if open.Releases > 0 {
 		<section id="open" class={ homeSection }>
 			<h2 class={ homeStatement }>Built in the open.</h2>
-			@kit.List() {
-				@kit.Row(layouts.GitHubURL) {
-					@kit.RowText("Open source", "AGPL-3.0, every line on GitHub")
-				}
-				@kit.Row("/changelog") {
-					@kit.RowText(homeVersions(open.Releases), "Since "+open.Since.Format("January 2, 2006"))
-				}
-				@kit.Row("/changelog") {
-					@kit.RowText(open.Latest.Version, open.Latest.Date.Format("January 2"))
-				}
+			@components.List() {
+				@components.Item(components.ItemProps{Href: layouts.GitHubURL, Name: "Open source", Note: "AGPL-3.0, every line on GitHub"})
+				@components.Item(components.ItemProps{Href: "/changelog", Name: homeVersions(open.Releases), Note: "Since "+open.Since.Format("January 2, 2006")})
+				@components.Item(components.ItemProps{Href: "/changelog", Name: open.Latest.Version, Note: open.Latest.Date.Format("January 2")})
 			}
 		</section>
 	}
